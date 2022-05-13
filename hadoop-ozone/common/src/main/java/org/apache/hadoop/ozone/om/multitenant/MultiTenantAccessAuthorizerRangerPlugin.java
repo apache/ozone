@@ -347,6 +347,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     String policyID;
     try {
       JsonObject jObject = new JsonParser().parse(policyInfo).getAsJsonObject();
+      // TODO: Use policy name instead of id
       policyID = jObject.get("id").getAsString();
       LOG.debug("policyID is: {}", policyID);
     } catch (JsonParseException e) {

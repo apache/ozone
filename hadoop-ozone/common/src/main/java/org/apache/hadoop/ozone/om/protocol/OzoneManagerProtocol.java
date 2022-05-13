@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
-import org.apache.hadoop.ozone.om.helpers.DeleteTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -50,7 +50,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -596,7 +596,7 @@ public interface OzoneManagerProtocol
    * @return DeleteTenantResponse
    * @throws IOException
    */
-  default DeleteTenantInfo deleteTenant(String tenantId)
+  default DeleteTenantState deleteTenant(String tenantId)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach");
@@ -671,10 +671,10 @@ public interface OzoneManagerProtocol
 
   /**
    * List tenants.
-   * @return TenantInfoList
+   * @return TenantStateList
    * @throws IOException
    */
-  TenantInfoList listTenant() throws IOException;
+  TenantStateList listTenant() throws IOException;
 
   /**
    * OzoneFS api to get file status for an entry.

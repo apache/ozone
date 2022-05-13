@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
@@ -43,8 +45,8 @@ public final class OmDBAccessIdInfo {
    */
   private final boolean isDelegatedAdmin;
 
-  // This implies above String fields should NOT contain the split key.
-  public static final String SERIALIZATION_SPLIT_KEY = ";";
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OmDBAccessIdInfo.class);
 
   public OmDBAccessIdInfo(String tenantId, String userPrincipal,
                           boolean isAdmin, boolean isDelegatedAdmin) {
@@ -61,25 +63,26 @@ public final class OmDBAccessIdInfo {
   /**
    * Convert OmDBAccessIdInfo to protobuf to be persisted to DB.
    */
-  public OzoneManagerProtocolProtos.OmDBAccessInfo getProtobuf() {
-    return OzoneManagerProtocolProtos.OmDBAccessInfo.newBuilder()
+  public OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo getProtobuf() {
+    return OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo.newBuilder()
+        .setTenantId(tenantId)
         .setUserPrincipal(userPrincipal)
         .setIsAdmin(isAdmin)
         .setIsDelegatedAdmin(isDelegatedAdmin)
-        .setTenantId(tenantId)
         .build();
   }
 
   /**
-   * Convert byte array to OmDBAccessIdInfo.
+   * Convert protobuf to OmDBAccessIdInfo.
    */
   public static OmDBAccessIdInfo getFromProtobuf(
-      OzoneManagerProtocolProtos.OmDBAccessInfo infoProto) throws IOException {
+      OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo infoProto)
+      throws IOException {
     return new Builder()
-        .setKerberosPrincipal(infoProto.getUserPrincipal())
+        .setTenantId(infoProto.getTenantId())
+        .setUserPrincipal(infoProto.getUserPrincipal())
         .setIsAdmin(infoProto.getIsAdmin())
         .setIsDelegatedAdmin(infoProto.getIsDelegatedAdmin())
-        .setTenantId(infoProto.getTenantId())
         .build();
   }
 
@@ -101,7 +104,7 @@ public final class OmDBAccessIdInfo {
   @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private String tenantId;
-    private String kerberosPrincipal;
+    private String userPrincipal;
     private boolean isAdmin;
     private boolean isDelegatedAdmin;
 
@@ -110,8 +113,8 @@ public final class OmDBAccessIdInfo {
       return this;
     }
 
-    public Builder setKerberosPrincipal(String kerberosPrincipal) {
-      this.kerberosPrincipal = kerberosPrincipal;
+    public Builder setUserPrincipal(String userPrincipal) {
+      this.userPrincipal = userPrincipal;
       return this;
     }
 
@@ -126,8 +129,8 @@ public final class OmDBAccessIdInfo {
     }
 
     public OmDBAccessIdInfo build() {
-      return new OmDBAccessIdInfo(tenantId, kerberosPrincipal,
-          isAdmin, isDelegatedAdmin);
+      return new OmDBAccessIdInfo(
+          tenantId, userPrincipal, isAdmin, isDelegatedAdmin);
     }
   }
 }

@@ -27,11 +27,12 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -56,7 +57,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
@@ -78,7 +78,7 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SC
     - If tenant already exists, throw exception to client; else continue
   - tenantStateTable: New entry
     - Key: tenant name. e.g. finance
-    - Value: new OmDBTenantInfo for the tenant
+    - Value: new OmDBTenantState for the tenant
       - tenantId: finance
       - bucketNamespaceName: finance
       - accountNamespaceName: finance
@@ -116,7 +116,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
     // Check Ozone cluster admin privilege
-    OMTenantRequestHelper.checkAdmin(ozoneManager);
+    ozoneManager.getMultiTenantManager().checkAdmin();
 
     final CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
     final String tenantId = request.getTenantId();
@@ -157,8 +157,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         .setOwnerName(owner)
         .build();
 
-    // TODO: Shall we check volume existence here as well?
-
     // Generate volume modification time
     long initialTime = Time.now();
     final VolumeInfo updatedVolumeInfo = volumeInfo.toBuilder()
@@ -171,17 +169,11 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     tenantInContext = ozoneManager.getMultiTenantManager()
         .createTenantAccessInAuthorizer(tenantId);
 
-    // Get the tenant default policy, pass this along
-    final String tenantDefaultPolicies = tenantInContext
-        .getTenantAccessPolicies()
-        .stream().map(AccessPolicy::getPolicyID)
-        .collect(Collectors.joining(","));
-
     final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
         .setCreateTenantRequest(
             CreateTenantRequest.newBuilder()
-                .setTenantDefaultPolicyName(tenantDefaultPolicies)
-                .setTenantId(tenantId))
+                .setTenantId(tenantId)
+                .setVolumeName(volumeName))
         .setCreateVolumeRequest(
             CreateVolumeRequest.newBuilder().setVolumeInfo(updatedVolumeInfo))
         // TODO: Can the three lines below be ignored?
@@ -217,6 +209,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
 
+    final OMMetrics omMetrics = ozoneManager.getMetrics();
+    omMetrics.incNumTenantCreates();
+    omMetrics.incNumVolumeCreates();
+
     OMClientResponse omClientResponse = null;
     final OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
@@ -231,10 +227,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final VolumeInfo volumeInfo =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
     final String volumeName = volumeInfo.getVolume();
+    Preconditions.checkState(request.getVolumeName().equals(volumeName),
+        "CreateTenantRequest's volumeName value should match VolumeInfo's");
     final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
     IOException exception = null;
-
-    final String tenantDefaultPolicies = request.getTenantDefaultPolicyName();
 
     try {
       // Check ACL: requires volume CREATE permission.
@@ -289,36 +285,27 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       // Create tenant
       // Add to tenantStateTable. Redundant assignment for clarity
       final String bucketNamespaceName = volumeName;
-      final String accountNamespaceName = tenantId;  // TODO: Double check
-      final String userPolicyGroupName =
-          tenantId + OzoneConsts.DEFAULT_TENANT_USER_POLICY_SUFFIX;
-      final String bucketPolicyGroupName =
-          tenantId + OzoneConsts.DEFAULT_TENANT_BUCKET_POLICY_SUFFIX;
-      final OmDBTenantInfo omDBTenantInfo = new OmDBTenantInfo(
-          tenantId, bucketNamespaceName, accountNamespaceName,
-          userPolicyGroupName, bucketPolicyGroupName);
+      // Populate policy ID list
+      final String bucketNamespacePolicyName =
+          OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantId);
+      final String bucketPolicyName =
+          OMMultiTenantManager.getDefaultBucketPolicyName(tenantId);
+      final String userRoleName =
+          OMMultiTenantManager.getDefaultUserRoleName(tenantId);
+      final String adminRoleName =
+          OMMultiTenantManager.getDefaultAdminRoleName(tenantId);
+      final OmDBTenantState omDBTenantState = new OmDBTenantState(
+          tenantId, bucketNamespaceName, userRoleName, adminRoleName,
+          bucketNamespacePolicyName, bucketPolicyName);
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantId),
-          new CacheValue<>(Optional.of(omDBTenantInfo), transactionLogIndex));
-
-      // Add to tenantPolicyTable
-      omMetadataManager.getTenantPolicyTable().addCacheEntry(
-          new CacheKey<>(userPolicyGroupName),
-          new CacheValue<>(Optional.of(tenantDefaultPolicies),
-              transactionLogIndex));
-      final String bucketPolicyId =
-          bucketPolicyGroupName + OzoneConsts.DEFAULT_TENANT_POLICY_ID_SUFFIX;
-      omMetadataManager.getTenantPolicyTable().addCacheEntry(
-          new CacheKey<>(bucketPolicyGroupName),
-          new CacheValue<>(Optional.of(bucketPolicyId), transactionLogIndex));
+          new CacheValue<>(Optional.of(omDBTenantState), transactionLogIndex));
 
       omResponse.setCreateTenantResponse(
           CreateTenantResponse.newBuilder()
               .build());
-      omClientResponse = new OMTenantCreateResponse(
-          omResponse.build(),
-          omVolumeArgs, volumeList,
-          omDBTenantInfo, tenantDefaultPolicies, bucketPolicyId);
+      omClientResponse = new OMTenantCreateResponse(omResponse.build(),
+          omVolumeArgs, volumeList, omDBTenantState);
 
     } catch (IOException ex) {
       // Error handling. Clean up Ranger policies when necessary.
@@ -367,10 +354,11 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
     if (exception == null) {
       LOG.info("Created tenant '{}' and volume '{}'", tenantId, volumeName);
-      // TODO: HDDS-6375: omMetrics.incNumTenants()
+      omMetrics.incNumTenants();
+      omMetrics.incNumVolumes();
     } else {
       LOG.error("Failed to create tenant '{}'", tenantId, exception);
-      // TODO: HDDS-6375: omMetrics.incNumTenantCreateFails()
+      omMetrics.incNumTenantCreateFails();
     }
     return omClientResponse;
   }

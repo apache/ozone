@@ -20,14 +20,22 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.client.*;
+import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.*;
+import org.junit.AfterClass;
+import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +44,9 @@ import java.io.IOException;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.*;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.junit.Assert.fail;
@@ -49,16 +59,15 @@ public class TestBucketOwner {
 
   private static MiniOzoneCluster cluster;
   private static final Logger LOG =
-          LoggerFactory.getLogger(TestBucketOwner.class);
+      LoggerFactory.getLogger(TestBucketOwner.class);
   private static  UserGroupInformation adminUser =
-          UserGroupInformation.createUserForTesting("om",
-          new String[] {"ozone"});
+      UserGroupInformation.createUserForTesting("om", new String[]{"ozone"});
   private static  UserGroupInformation user1 = UserGroupInformation
-          .createUserForTesting("user1", new String[] {"test1"});
+      .createUserForTesting("user1", new String[] {"test1"});
   private static UserGroupInformation user2 = UserGroupInformation
-          .createUserForTesting("user2", new String[] {"test2"});
+      .createUserForTesting("user2", new String[] {"test2"});
   private static UserGroupInformation user3 = UserGroupInformation
-          .createUserForTesting("user3", new String[] {"test3"});
+      .createUserForTesting("user3", new String[] {"test3"});
   private static OzoneClient client;
   private static ObjectStore objectStore;
 

@@ -190,6 +190,9 @@ public interface MultiTenantAccessController {
           roleIDsMatch;
     }
 
+    /**
+     * Builder class for a role.
+     */
     public static final class Builder {
       private String name;
       private final Set<BasicUserPrincipal> users;
@@ -311,6 +314,9 @@ public interface MultiTenantAccessController {
           Objects.equals(getLabels(), policy.getLabels());
     }
 
+    /**
+     * Builder class for a policy.
+     */
     public static final class Builder {
       private String name;
       private final Set<String> volumes;

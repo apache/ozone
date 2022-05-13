@@ -25,19 +25,25 @@ Test Timeout        5 minutes
 
 
 *** Test Cases ***
-Create a volume, bucket and key
+Create a volume and bucket
+    [Tags]    create-volume-and-bucket
     ${output} =         Execute          ozone sh volume create ${PREFIX}-volume
                         Should not contain  ${output}       Failed
     ${output} =         Execute          ozone sh bucket create /${PREFIX}-volume/${PREFIX}-bucket
                         Should not contain  ${output}       Failed
+
+Create key
                         Execute and checkrc    echo "${PREFIX}: key created using Ozone Shell" > /tmp/sourcekey    0
     ${output} =         Execute          ozone sh key put /${PREFIX}-volume/${PREFIX}-bucket/${PREFIX}-key /tmp/sourcekey
                         Should not contain  ${output}       Failed
                         Execute and checkrc    rm /tmp/sourcekey    0
 
-Create a bucket and key in volume s3v
+Create a bucket in s3v volume
+    [Tags]    create-volume-and-bucket
     ${output} =         Execute          ozone sh bucket create /s3v/${PREFIX}-bucket
                         Should not contain  ${output}       Failed
+
+Create key in the bucket in s3v volume
                         Execute and checkrc    echo "${PREFIX}: another key created using Ozone Shell" > /tmp/sourcekey    0
     ${output} =         Execute          ozone sh key put /s3v/${PREFIX}-bucket/key1-shell /tmp/sourcekey
                         Should not contain  ${output}       Failed

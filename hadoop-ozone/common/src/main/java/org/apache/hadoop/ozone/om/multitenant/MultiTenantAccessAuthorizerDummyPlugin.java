@@ -47,7 +47,7 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   @Override
   public String assignUser(BasicUserPrincipal principal, String existingRole,
       boolean isAdmin) throws IOException {
-    return "assignUser-roleId-returned";
+    return "assignUser-roleName-returned";
   }
 
   @Override

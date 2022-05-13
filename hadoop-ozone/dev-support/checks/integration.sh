@@ -16,4 +16,4 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 CHECK=integration
-source "${DIR}/junit.sh" -pl :ozone-integration-test,:mini-chaos-tests "$@"
+source "${DIR}/junit.sh" -pl :ozone-integration-test,:mini-chaos-tests -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600 "$@"

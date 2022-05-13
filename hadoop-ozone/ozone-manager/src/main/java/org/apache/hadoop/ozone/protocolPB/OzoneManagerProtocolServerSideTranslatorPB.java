@@ -38,6 +38,8 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.validation.RequestValidations;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -60,6 +62,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     OzoneManagerProtocolPB {
   private static final Logger LOG = LoggerFactory
       .getLogger(OzoneManagerProtocolServerSideTranslatorPB.class);
+  private static final String OM_REQUESTS_PACKAGE = 
+      "org.apache.hadoop.ozone";
+  
   private final OzoneManagerRatisServer omRatisServer;
   private final RequestHandler handler;
   private final boolean isRatisEnabled;
@@ -68,6 +73,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private final AtomicLong transactionIndex;
   private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse,
       ProtocolMessageEnum> dispatcher;
+  private final RequestValidations requestValidations;
 
   /**
    * Constructs an instance of the server handler.
@@ -109,20 +115,29 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     }
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
-        metrics, LOG);
+        metrics, LOG, OMPBHelper::processForDebug, OMPBHelper::processForDebug);
+    // TODO: make this injectable for testing...
+    requestValidations =
+        new RequestValidations()
+            .fromPackage(OM_REQUESTS_PACKAGE)
+            .withinContext(
+                ValidationContext.of(ozoneManager.getVersionManager()))
+            .load();
   }
 
   /**
-   * Submit requests to Ratis server for OM HA implementation.
-   * TODO: Once HA is implemented fully, we should have only one server side
-   * translator for OM protocol.
+   * Submit mutating requests to Ratis server in OM, and process read requests.
    */
   @Override
   public OMResponse submitRequest(RpcController controller,
       OMRequest request) throws ServiceException {
+    OMRequest validatedRequest = requestValidations.validateRequest(request);
 
-    return dispatcher.processRequest(request, this::processRequest,
+    OMResponse response = 
+        dispatcher.processRequest(validatedRequest, this::processRequest,
         request.getCmdType(), request.getTraceID());
+    
+    return requestValidations.validateResponse(request, response);
   }
 
   private OMResponse processRequest(OMRequest request) throws

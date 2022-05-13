@@ -432,6 +432,7 @@ public class RDBStore implements DBStore {
       LOG.error("Unable to get delta updates since sequenceNumber {} ",
           sequenceNumber, e);
     }
+    dbUpdatesWrapper.setLatestSequenceNumber(db.getLatestSequenceNumber());
     return dbUpdatesWrapper;
   }
 

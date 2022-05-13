@@ -20,11 +20,11 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.ozone.OzoneConsts.TENANT_ID_USERNAME_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_ACCESS_ID;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_AUTHORIZER_ERROR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.multitenant.AccessPolicy.AccessGrantType.ALLOW;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.NONE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ_ACL;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
@@ -44,18 +44,19 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
-import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
-import org.apache.hadoop.ozone.om.multitenant.CachedTenantInfo;
+import org.apache.hadoop.ozone.om.multitenant.CachedTenantState;
 import org.apache.hadoop.ozone.om.multitenant.OzoneTenant;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizer;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerDummyPlugin;
@@ -64,10 +65,10 @@ import org.apache.hadoop.ozone.om.multitenant.OzoneOwnerPrincipal;
 import org.apache.hadoop.ozone.om.multitenant.OzoneTenantRolePrincipal;
 import org.apache.hadoop.ozone.om.multitenant.RangerAccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,27 +90,30 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       "ozone.om.tenant.dev.skip.ranger";
 
   private MultiTenantAccessAuthorizer authorizer;
+  private final OzoneManager ozoneManager;
   private final OMMetadataManager omMetadataManager;
   private final OzoneConfiguration conf;
   private final ReentrantReadWriteLock controlPathLock;
-  private final Map<String, CachedTenantInfo> tenantCache;
+  private final Map<String, CachedTenantState> tenantCache;
 
-  OMMultiTenantManagerImpl(OMMetadataManager mgr, OzoneConfiguration conf)
+  OMMultiTenantManagerImpl(OzoneManager ozoneManager, OzoneConfiguration conf)
       throws IOException {
     this.conf = conf;
-    controlPathLock = new ReentrantReadWriteLock();
-    omMetadataManager = mgr;
-    tenantCache = new ConcurrentHashMap<>();
+    this.controlPathLock = new ReentrantReadWriteLock();
+    this.ozoneManager = ozoneManager;
+    this.omMetadataManager = ozoneManager.getMetadataManager();
+    this.tenantCache = new ConcurrentHashMap<>();
     boolean devSkipRanger = conf.getBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER,
         false);
     if (devSkipRanger) {
-      authorizer = new MultiTenantAccessAuthorizerDummyPlugin();
+      this.authorizer = new MultiTenantAccessAuthorizerDummyPlugin();
     } else {
-      authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
+      this.authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
     }
-    authorizer.init(conf);
+    this.authorizer.init(conf);
     loadUsersFromDB();
   }
+
 
 // start() and stop() lifeycle methods can be added when there is a background
 // work going on.
@@ -200,7 +204,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         tenant.addTenantAccessPolicy(tenantBucketCreatePolicy);
       }
 
-      tenantCache.put(tenantID, new CachedTenantInfo(tenantID));
+      tenantCache.put(tenantID, new CachedTenantState(tenantID));
     } catch (Exception e) {
       try {
         removeTenantAccessFromAuthorizer(tenant);
@@ -212,17 +216,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       controlPathLock.writeLock().unlock();
     }
     return tenant;
-  }
-
-  @Override
-  public Tenant getTenantInfo(String tenantID) throws IOException {
-    // Todo : fix this.
-    return null;
-  }
-
-  @Override
-  public void deactivateTenant(String tenantID) throws IOException {
-
   }
 
   @Override
@@ -276,10 +269,10 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
       LOG.info("Adding user '{}' to tenant '{}' in-memory state.",
           principal.getName(), tenantId);
-      CachedTenantInfo cachedTenantInfo =
+      CachedTenantState cachedTenantState =
           tenantCache.getOrDefault(tenantId,
-              new CachedTenantInfo(tenantId));
-      cachedTenantInfo.getTenantUsers().add(userAccessIdPair);
+              new CachedTenantState(tenantId));
+      cachedTenantState.getTenantUsers().add(userAccessIdPair);
 
       final OzoneTenantRolePrincipal roleTenantAllUsers =
           OzoneTenantRolePrincipal.getUserRole(tenantId);
@@ -360,32 +353,64 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     return tenantId + TENANT_ID_USERNAME_DELIMITER + userPrincipal;
   }
 
-  @Override
-  public String getUserSecret(String accessID) throws IOException {
-    return "";
+  /**
+   * {@inheritDoc}
+   */
+  public boolean isTenantAdmin(UserGroupInformation callerUgi,
+      String tenantId, boolean delegated) {
+    if (callerUgi == null) {
+      return false;
+    } else {
+      return isTenantAdmin(
+              callerUgi.getShortUserName(), tenantId, delegated)
+          || isTenantAdmin(
+              callerUgi.getUserName(), tenantId, delegated)
+          || ozoneManager.isAdmin(callerUgi.getShortUserName())
+          || ozoneManager.isAdmin(callerUgi.getUserName());
+    }
   }
 
-  @Override
-  public void modifyUser(String accessID,
-                         List<String> groupsAdded,
-                         List<String> groupsRemoved) throws IOException {
+  /**
+   * Internal isTenantAdmin method that takes a username String instead of UGI.
+   */
+  private boolean isTenantAdmin(String username, String tenantId,
+      boolean delegated) {
+    if (StringUtils.isEmpty(username) || StringUtils.isEmpty(tenantId)) {
+      return false;
+    }
 
-  }
+    try {
+      final OmDBUserPrincipalInfo principalInfo =
+          omMetadataManager.getPrincipalToAccessIdsTable().get(username);
 
-  @Override
-  public void deactivateUser(String accessID)
-      throws IOException {
+      if (principalInfo == null) {
+        // The user is not assigned to any tenant
+        return false;
+      }
 
-  }
+      // Find accessId assigned to the specified tenant
+      for (final String accessId : principalInfo.getAccessIds()) {
+        final OmDBAccessIdInfo accessIdInfo =
+            omMetadataManager.getTenantAccessIdTable().get(accessId);
+        // accessIdInfo could be null since we may not have a lock on the tenant
+        if (accessIdInfo == null) {
+          return false;
+        }
+        if (tenantId.equals(accessIdInfo.getTenantId())) {
+          if (!delegated) {
+            return accessIdInfo.getIsAdmin();
+          } else {
+            return accessIdInfo.getIsAdmin()
+                && accessIdInfo.getIsDelegatedAdmin();
+          }
+        }
+      }
+    } catch (IOException e) {
+      LOG.error("Error while retrieving value for key '" + username
+          + "' in PrincipalToAccessIdsTable");
+    }
 
-  @Override
-  public boolean isTenantAdmin(String user, String tenantId) {
-    return true;
-  }
-
-  @Override
-  public boolean tenantExists(String tenantId) throws IOException {
-    return omMetadataManager.getTenantStateTable().isExist(tenantId);
+    return false;
   }
 
   @Override
@@ -396,23 +421,24 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       throw new IOException("Tenant '" + tenantID + "' not found!");
     }
 
-    List<TenantUserAccessId> userAccessIds = new ArrayList<>();
-    CachedTenantInfo cachedTenantInfo = tenantCache.get(tenantID);
-    if (cachedTenantInfo == null) {
+    List<UserAccessIdInfo> userAccessIds = new ArrayList<>();
+    CachedTenantState cachedTenantState = tenantCache.get(tenantID);
+    if (cachedTenantState == null) {
       throw new IOException("Inconsistent in memory Tenant cache '" + tenantID
           + "' not found in cache, but present in OM DB!");
     }
 
-    cachedTenantInfo.getTenantUsers().stream()
+    cachedTenantState.getTenantUsers().stream()
         .filter(
             k -> StringUtils.isEmpty(prefix) || k.getKey().startsWith(prefix))
         .forEach(
             k -> userAccessIds.add(
-                TenantUserAccessId.newBuilder()
+                UserAccessIdInfo.newBuilder()
                     .setUserPrincipal(k.getKey())
                     .setAccessId(k.getValue())
                     .build()));
-    return new TenantUserList(tenantID, userAccessIds);
+
+    return new TenantUserList(userAccessIds);
   }
 
   @Override
@@ -425,12 +451,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     }
     return Optional.of(omDBAccessIdInfo.getTenantId());
   }
-
-  public List<String> listAllAccessIDs(String tenantID)
-      throws IOException {
-    return null;
-  }
-
 
   @Override
   public void assignTenantAdmin(String accessID, boolean delegated)
@@ -469,101 +489,45 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   }
 
-  @Override
-  public List<String> listAllTenantAdmin(String tenantID)
-      throws IOException {
-    return null;
-  }
-
-  @Override
-  public void grantAccess(String accessID,
-      BucketNameSpace bucketNameSpace) throws IOException {
-
-  }
-
-  @Override
-  public void grantBucketAccess(String accessID,
-      BucketNameSpace bucketNameSpace, String bucketName) throws IOException {
-
-  }
-
-  @Override
-  public void revokeAccess(String accessID,
-      BucketNameSpace bucketNameSpace) throws IOException {
-
-  }
-
-  @Override
-  public void grantAccess(String accessID,
-      AccountNameSpace accountNameSpace) throws IOException {
-
-  }
-
-  @Override
-  public void revokeAccess(String accessID,
-      AccountNameSpace accountNameSpace) throws IOException {
-
-  }
-
-  @Override
-  public String createTenantDefaultPolicy(Tenant tenant,
-      AccessPolicy policy) throws IOException {
-    return null;
-  }
-
-  @Override
-  public List<Pair<String, AccessPolicy>> listDefaultTenantPolicies(
-      Tenant tenant) throws IOException {
-    return null;
-  }
-
-  @Override
-  public List<Pair<String, AccessPolicy>> listAllTenantPolicies(
-      Tenant tenant) throws IOException {
-    return null;
-  }
-
-  @Override
-  public void updateTenantPolicy(Tenant tenant, String policyID,
-      AccessPolicy policy) throws IOException {
-
-  }
-
-  private AccessPolicy newDefaultVolumeAccessPolicy(String volumeName,
-      OzoneTenantRolePrincipal userPrinc, OzoneTenantRolePrincipal adminPrinc)
+  private AccessPolicy newDefaultVolumeAccessPolicy(String tenantId,
+      OzoneTenantRolePrincipal userRole, OzoneTenantRolePrincipal adminRole)
       throws IOException {
 
-    AccessPolicy policy = new RangerAccessPolicy(
-        // principal already contains volume name
-        volumeName + " - VolumeAccess");
+    final String volumeAccessPolicyName =
+        OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantId);
+    AccessPolicy policy = new RangerAccessPolicy(volumeAccessPolicyName);
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(VOLUME).setStoreType(OZONE).setVolumeName(volumeName)
+        .setResType(VOLUME).setStoreType(OZONE).setVolumeName(tenantId)
         .setBucketName("").setKeyName("").build();
     // Tenant users have READ, LIST and READ_ACL access on the volume
-    policy.addAccessPolicyElem(obj, userPrinc, READ, ALLOW);
-    policy.addAccessPolicyElem(obj, userPrinc, LIST, ALLOW);
-    policy.addAccessPolicyElem(obj, userPrinc, READ_ACL, ALLOW);
+    policy.addAccessPolicyElem(obj, userRole, READ, ALLOW);
+    policy.addAccessPolicyElem(obj, userRole, LIST, ALLOW);
+    policy.addAccessPolicyElem(obj, userRole, READ_ACL, ALLOW);
     // Tenant admins have ALL access on the volume
-    policy.addAccessPolicyElem(obj, adminPrinc, ALL, ALLOW);
+    policy.addAccessPolicyElem(obj, adminRole, ALL, ALLOW);
     return policy;
   }
 
-  private AccessPolicy newDefaultBucketAccessPolicy(String volumeName,
-      OzoneTenantRolePrincipal userPrinc) throws IOException {
-    AccessPolicy policy = new RangerAccessPolicy(
-        // principal already contains volume name
-        volumeName + " - BucketAccess");
+  private AccessPolicy newDefaultBucketAccessPolicy(String tenantId,
+      OzoneTenantRolePrincipal userRole) throws IOException {
+
+    final String bucketAccessPolicyName =
+        OMMultiTenantManager.getDefaultBucketPolicyName(tenantId);
+    AccessPolicy policy = new RangerAccessPolicy(bucketAccessPolicyName);
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(BUCKET).setStoreType(OZONE).setVolumeName(volumeName)
+        .setResType(BUCKET).setStoreType(OZONE).setVolumeName(tenantId)
         .setBucketName("*").setKeyName("").build();
     // Tenant users have permission to CREATE buckets
-    policy.addAccessPolicyElem(obj, userPrinc, CREATE, ALLOW);
-    // Bucket owner have ALL access on their own buckets. TODO: Tentative
+    policy.addAccessPolicyElem(obj, userRole, CREATE, ALLOW);
+    // Bucket owner have ALL access on their own buckets
     policy.addAccessPolicyElem(obj, new OzoneOwnerPrincipal(), ALL, ALLOW);
     return policy;
   }
 
-  // TODO: Fine-tune this once we have bucket ownership.
+  // TODO: This policy doesn't seem necessary as the bucket-level policy has
+  //  already granted the key-level access.
+  //  Not sure if that is the intended behavior in Ranger though.
+  //  Still, could add this KeyAccess policy as well in Ranger, doesn't hurt.
   private AccessPolicy newDefaultKeyAccessPolicy(String volumeName,
       String bucketName) throws IOException {
     AccessPolicy policy = new RangerAccessPolicy(
@@ -575,39 +539,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         .setBucketName("*").setKeyName("*").build();
     // Bucket owners should have ALL permission on their keys
     policy.addAccessPolicyElem(obj, new OzoneOwnerPrincipal(), ALL, ALLOW);
-    return policy;
-  }
-
-  private AccessPolicy allowAccessBucketPolicy(String vol, String bucketName,
-      OzoneTenantRolePrincipal principal) throws IOException {
-    AccessPolicy policy = new RangerAccessPolicy(
-        principal.getName() + "AllowBucketAccess" + vol + bucketName +
-            "Policy");
-    OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(BUCKET).setStoreType(OZONE).setVolumeName(vol)
-        .setBucketName(bucketName).setKeyName("*").build();
-    for (ACLType acl : ACLType.values()) {
-      if (acl != NONE) {
-        policy.addAccessPolicyElem(obj, principal, acl,
-            ALLOW);
-      }
-    }
-    return policy;
-  }
-
-  private AccessPolicy allowAccessKeyPolicy(String vol, String bucketName,
-      OzoneTenantRolePrincipal principal) throws IOException {
-    AccessPolicy policy = new RangerAccessPolicy(
-        principal.getName() + "AllowBucketKeyAccess" + vol + bucketName +
-            "Policy");
-    OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(KEY).setStoreType(OZONE).setVolumeName(vol)
-        .setBucketName(bucketName).setKeyName("*").build();
-    for (ACLType acl :ACLType.values()) {
-      if (acl != NONE) {
-        policy.addAccessPolicyElem(obj, principal, acl, ALLOW);
-      }
-    }
     return policy;
   }
 
@@ -630,9 +561,9 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         String tenantId = value.getTenantId();
         String user = value.getUserPrincipal();
 
-        CachedTenantInfo cachedTenantInfo = tenantCache
-            .computeIfAbsent(tenantId, k -> new CachedTenantInfo(tenantId));
-        cachedTenantInfo.getTenantUsers().add(
+        CachedTenantState cachedTenantState = tenantCache
+            .computeIfAbsent(tenantId, k -> new CachedTenantState(tenantId));
+        cachedTenantState.getTenantUsers().add(
             new ImmutablePair<>(user, accessId));
         userCount++;
       }
@@ -643,8 +574,131 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     }
   }
 
+
+  @Override
+  public void checkAdmin() throws OMException {
+
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    if (!ozoneManager.isAdmin(ugi)) {
+      throw new OMException("User '" + ugi.getUserName() +
+          "' is not an Ozone admin.",
+          OMException.ResultCodes.PERMISSION_DENIED);
+    }
+  }
+
+  @Override
+  public void checkTenantAdmin(String tenantId, boolean delegated)
+      throws OMException {
+
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    if (!isTenantAdmin(ugi, tenantId, delegated)) {
+      throw new OMException("User '" + ugi.getUserName() +
+          "' is neither an Ozone admin nor a delegated admin of tenant '" +
+          tenantId + "'.", OMException.ResultCodes.PERMISSION_DENIED);
+    }
+  }
+
+  @Override
+  public void checkTenantExistence(String tenantId) throws OMException {
+
+    try {
+      if (!omMetadataManager.getTenantStateTable().isExist(tenantId)) {
+        throw new OMException("Tenant '" + tenantId + "' doesn't exist.",
+            OMException.ResultCodes.TENANT_NOT_FOUND);
+      }
+    } catch (IOException ex) {
+      if (ex instanceof OMException) {
+        final OMException omEx = (OMException) ex;
+        if (omEx.getResult().equals(OMException.ResultCodes.TENANT_NOT_FOUND)) {
+          throw omEx;
+        }
+      }
+      throw new OMException("Error while retrieving OmDBTenantInfo for tenant "
+          + "'" + tenantId + "': " + ex.getMessage(),
+          OMException.ResultCodes.METADATA_ERROR);
+    }
+  }
+
+  @Override
+  public String getTenantVolumeName(String tenantId) throws IOException {
+
+    final OmDBTenantState tenantState =
+        omMetadataManager.getTenantStateTable().get(tenantId);
+
+    if (tenantState == null) {
+      throw new OMException("Potential DB error or race condition. "
+          + "OmDBTenantState entry is missing for tenant '" + tenantId + "'.",
+          OMException.ResultCodes.TENANT_NOT_FOUND);
+    }
+
+    final String volumeName = tenantState.getBucketNamespaceName();
+
+    if (volumeName == null) {
+      throw new OMException("Potential DB error. volumeName "
+          + "field is null for tenantId '" + tenantId + "'.",
+          OMException.ResultCodes.VOLUME_NOT_FOUND);
+    }
+
+    return volumeName;
+  }
+
+  @Override
+  public boolean isUserAccessIdPrincipalOrTenantAdmin(String accessId,
+      UserGroupInformation ugi) throws IOException {
+
+    final OmDBAccessIdInfo accessIdInfo =
+        omMetadataManager.getTenantAccessIdTable().get(accessId);
+
+    if (accessIdInfo == null) {
+      // Doesn't have the accessId entry in TenantAccessIdTable.
+      // Probably came from `ozone s3 getsecret` with older OM.
+      return false;
+    }
+
+    final String tenantId = accessIdInfo.getTenantId();
+    // Sanity check
+    if (tenantId == null) {
+      throw new OMException("Unexpected error: OmDBAccessIdInfo " +
+          "tenantId field should not have been null",
+          OMException.ResultCodes.METADATA_ERROR);
+    }
+
+    final String accessIdPrincipal = accessIdInfo.getUserPrincipal();
+    // Sanity check
+    if (accessIdPrincipal == null) {
+      throw new OMException("Unexpected error: OmDBAccessIdInfo " +
+          "kerberosPrincipal field should not have been null",
+          OMException.ResultCodes.METADATA_ERROR);
+    }
+
+    // Check if ugi matches the holder of the accessId
+    if (ugi.getShortUserName().equals(accessIdPrincipal)) {
+      return true;
+    }
+
+    // Check if ugi is a tenant admin (or an Ozone cluster admin)
+    if (isTenantAdmin(ugi, tenantId, false)) {
+      return true;
+    }
+
+
+    return false;
+  }
+
+  @Override
+  public boolean isTenantEmpty(String tenantId) throws IOException {
+
+
+    if (!tenantCache.containsKey(tenantId)) {
+      throw new OMException("Tenant does not exist for tenantId: " + tenantId,
+          TENANT_NOT_FOUND);
+    }
+
+    return tenantCache.get(tenantId).isTenantEmpty();
+  }
+
   @VisibleForTesting
-  Map<String, CachedTenantInfo> getTenantCache() {
+  Map<String, CachedTenantState> getTenantCache() {
     return tenantCache;
   }
 }

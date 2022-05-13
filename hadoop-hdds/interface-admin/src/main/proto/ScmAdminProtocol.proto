@@ -524,6 +524,7 @@ message StartContainerBalancerRequestProto {
 
 message StartContainerBalancerResponseProto {
   required bool start = 1;
+  optional string message = 2;
 }
 
 message StopContainerBalancerRequestProto {

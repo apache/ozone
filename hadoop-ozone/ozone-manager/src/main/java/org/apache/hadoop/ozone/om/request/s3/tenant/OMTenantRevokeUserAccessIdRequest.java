@@ -26,11 +26,13 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -51,8 +53,6 @@ import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
-import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantAdmin;
-import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantExistence;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
 /*
@@ -91,6 +91,8 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
         ozoneManager.getMetadataManager();
     final OmDBAccessIdInfo accessIdInfo = omMetadataManager
         .getTenantAccessIdTable().get(accessId);
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
 
     if (accessIdInfo == null) {
       throw new OMException("accessId '" + accessId + "' doesn't exist",
@@ -100,16 +102,21 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     // If tenantId is not specified, we can infer it from the accessId
     String tenantId = request.getTenantId();
     if (StringUtils.isEmpty(tenantId)) {
-      tenantId = OMTenantRequestHelper.getTenantIdFromAccessId(
-          ozoneManager.getMetadataManager(), accessId);
-      assert (tenantId != null);
+      Optional<String> optionalTenantId =
+          multiTenantManager.getTenantForAccessID(accessId);
+      if (!optionalTenantId.isPresent()) {
+        throw new OMException("OmDBAccessIdInfo is missing for accessId '" +
+            accessId + "' in DB.", OMException.ResultCodes.METADATA_ERROR);
+      }
+      tenantId = optionalTenantId.get();
+      assert (!StringUtils.isEmpty(tenantId));
     }
 
     // Sanity check
-    checkTenantExistence(ozoneManager.getMetadataManager(), tenantId);
+    multiTenantManager.checkTenantExistence(tenantId);
 
-    // Caller should be an Ozone admin or this tenant's delegated admin
-    checkTenantAdmin(ozoneManager, tenantId);
+    // Caller should be an Ozone admin, or at least a tenant non-delegated admin
+    multiTenantManager.checkTenantAdmin(tenantId, false);
 
     if (accessIdInfo.getIsAdmin()) {
       throw new OMException("accessId '" + accessId + "' is a tenant admin of "
@@ -144,6 +151,9 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
 
+    final OMMetrics omMetrics = ozoneManager.getMetrics();
+    omMetrics.incNumTenantRevokeUsers();
+
     OMClientResponse omClientResponse = null;
     final OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
@@ -165,8 +175,8 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     String volumeName = null;
 
     try {
-      volumeName = OMTenantRequestHelper.getTenantVolumeName(
-          omMetadataManager, tenantId);
+      volumeName = ozoneManager.getMultiTenantManager()
+          .getTenantVolumeName(tenantId);
 
       acquiredVolumeLock =
           omMetadataManager.getLock().acquireWriteLock(VOLUME_LOCK, volumeName);
@@ -177,7 +187,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       assert (omDBAccessIdInfo != null);
       userPrincipal = omDBAccessIdInfo.getUserPrincipal();
       assert (userPrincipal != null);
-      OmDBKerberosPrincipalInfo principalInfo = omMetadataManager
+      OmDBUserPrincipalInfo principalInfo = omMetadataManager
           .getPrincipalToAccessIdsTable().getIfExist(userPrincipal);
       assert (principalInfo != null);
       principalInfo.removeAccessId(accessId);
@@ -190,16 +200,6 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
 
       // Remove from TenantAccessIdTable
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
-          new CacheKey<>(accessId),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
-
-      // Remove from tenantGroupTable
-      omMetadataManager.getTenantGroupTable().addCacheEntry(
-          new CacheKey<>(accessId),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
-
-      // Remove from tenantRoleTable
-      omMetadataManager.getTenantRoleTable().addCacheEntry(
           new CacheKey<>(accessId),
           new CacheValue<>(Optional.absent(), transactionLogIndex));
 
@@ -248,11 +248,10 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Revoked user '{}' accessId '{}' to tenant '{}'",
           userPrincipal, accessId, tenantId);
-      // TODO: HDDS-6375: omMetrics.incNumTenantRevokeUser()
     } else {
       LOG.error("Failed to revoke user '{}' accessId '{}' to tenant '{}': {}",
           userPrincipal, accessId, tenantId, exception.getMessage());
-      // TODO: HDDS-6375: omMetrics.incNumTenantRevokeUserFails()
+      omMetrics.incNumTenantRevokeUserFails();
     }
     return omClientResponse;
   }

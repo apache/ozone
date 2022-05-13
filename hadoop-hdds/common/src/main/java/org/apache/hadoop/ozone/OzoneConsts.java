@@ -341,11 +341,15 @@ public final class OzoneConsts {
 
   // For multi-tenancy
   public static final String TENANT_ID_USERNAME_DELIMITER = "$";
-  public static final String TENANT_ID_ROLE_DELIMITER = "-";
-  public static final String DEFAULT_TENANT_USER_POLICY_SUFFIX = "-users";
-  public static final String DEFAULT_TENANT_BUCKET_POLICY_SUFFIX = "-buckets";
-  public static final String DEFAULT_TENANT_POLICY_ID_SUFFIX = "-default";
-  public static final String DEFAULT_TENANT_USER_GROUP_SUFFIX = "-users";
+  public static final String DEFAULT_TENANT_BUCKET_NAMESPACE_POLICY_SUFFIX =
+      "-VolumeAccess";
+  public static final String DEFAULT_TENANT_BUCKET_POLICY_SUFFIX =
+      "-BucketAccess";
+  // Predefined tenant roles
+  // Tenant user role. All tenant users are assigned this role by default
+  public static final String DEFAULT_TENANT_ROLE_USER_SUFFIX = "-UserRole";
+  // Tenant admin role. All tenant admins are assigned this role
+  public static final String DEFAULT_TENANT_ROLE_ADMIN_SUFFIX = "-AdminRole";
 
   // For OM metrics saving to a file
   public static final String OM_METRICS_FILE = "omMetrics";
@@ -461,6 +465,10 @@ public final class OzoneConsts {
   public static final String OZONE_HTTP_SECURITY_ENABLED_SECURE = "true";
   public static final String OZONE_HTTP_FILTER_INITIALIZERS_SECURE =
       "org.apache.hadoop.security.AuthenticationFilterInitializer";
+
+  public static final String DELEGATION_TOKEN_KIND = "kind";
+  public static final String DELEGATION_TOKEN_SERVICE = "service";
+  public static final String DELEGATION_TOKEN_RENEWER = "renewer";
 
   public static final String OZONE_OM_RANGER_ADMIN_CREATE_USER_HTTP_ENDPOINT =
       "/service/xusers/secure/users";

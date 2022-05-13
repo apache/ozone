@@ -34,6 +34,8 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.PrefixManager;
@@ -48,6 +50,8 @@ import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -200,6 +204,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // exception
       throw new OMException("Bucket not found " + bucketName, BUCKET_NOT_FOUND);
     }
+
+    // Make sure associated bucket's layout matches the one associated with
+    // the request.
+    OMClientRequestUtils.checkClientRequestPrecondition(
+        omMetadataManager.getBucketTable().get(bucketKey).getBucketLayout(),
+        getBucketLayout());
   }
 
   // For keys batch delete and rename only
@@ -583,11 +593,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
   /**
    * Return bucket info for the specified bucket.
    */
+  @Nullable
   protected OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
       String volume, String bucket) {
-    return omMetadataManager.getBucketTable().getCacheValue(
-        new CacheKey<>(omMetadataManager.getBucketKey(volume, bucket)))
-        .getCacheValue();
+    String bucketKey = omMetadataManager.getBucketKey(volume, bucket);
+
+    CacheValue<OmBucketInfo> value = omMetadataManager.getBucketTable()
+        .getCacheValue(new CacheKey<>(bucketKey));
+
+    return value != null ? value.getCacheValue() : null;
   }
 
   /**
@@ -769,5 +783,30 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     return omMetadataManager
         .getMultipartKey(volumeName, bucketName, keyName, uploadID);
+  }
+
+  /**
+   * Prepare key for deletion service on overwrite.
+   *
+   * @param dbOzoneKey key to point to an object in RocksDB
+   * @param keyToDelete OmKeyInfo of a key to be in deleteTable
+   * @param omMetadataManager
+   * @param trxnLogIndex
+   * @param isRatisEnabled
+   * @return Old keys eligible for deletion.
+   * @throws IOException
+   */
+  protected RepeatedOmKeyInfo getOldVersionsToCleanUp(
+      @Nonnull String dbOzoneKey, @Nonnull OmKeyInfo keyToDelete,
+      OMMetadataManager omMetadataManager, long trxnLogIndex,
+      boolean isRatisEnabled) throws IOException {
+
+    // Past keys that was deleted but still in deleted table,
+    // waiting for deletion service.
+    RepeatedOmKeyInfo keysToDelete =
+        omMetadataManager.getDeletedTable().get(dbOzoneKey);
+
+    return OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,
+          trxnLogIndex, isRatisEnabled);
   }
 }

@@ -44,7 +44,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.DeleteTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
@@ -53,7 +53,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
-import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -365,6 +365,7 @@ public interface ClientProtocol {
    * @param keyMap The key is original key name nad value is new key name.
    * @throws IOException
    */
+  @Deprecated
   void renameKeys(String volumeName, String bucketName,
                   Map<String, String> keyMap) throws IOException;
 
@@ -615,9 +616,9 @@ public interface ClientProtocol {
    * Delete a tenant.
    * @param tenantId tenant name.
    * @throws IOException
-   * @return DeleteTenantInfo
+   * @return DeleteTenantState
    */
-  DeleteTenantInfo deleteTenant(String tenantId) throws IOException;
+  DeleteTenantState deleteTenant(String tenantId) throws IOException;
 
   /**
    * Assign a user to a tenant.
@@ -675,10 +676,10 @@ public interface ClientProtocol {
 
   /**
    * List tenants.
-   * @return TenantInfoList
+   * @return TenantStateList
    * @throws IOException
    */
-  TenantInfoList listTenant() throws IOException;
+  TenantStateList listTenant() throws IOException;
 
   /**
    * Get KMS client provider.
@@ -889,7 +890,7 @@ public interface ClientProtocol {
    * of the S3 API implementation within Ozone.
    * @param s3Auth authentication information for each S3 API call.
    */
-  void setTheadLocalS3Auth(S3Auth s3Auth);
+  void setThreadLocalS3Auth(S3Auth s3Auth);
 
   /**
    * Gets the S3 Authentication information that is attached to the thread.
@@ -900,7 +901,7 @@ public interface ClientProtocol {
   /**
    * Clears the S3 Authentication information attached to the thread.
    */
-  void clearTheadLocalS3Auth();
+  void clearThreadLocalS3Auth();
 
   /**
    * Sets the owner of bucket.

@@ -83,6 +83,11 @@ public class DeleteContainerCommandHandler implements CommandHandler {
   }
 
   @Override
+  public int getQueuedCount() {
+    return ((ThreadPoolExecutor)executor).getQueue().size();
+  }
+
+  @Override
   public SCMCommandProto.Type getCommandType() {
     return SCMCommandProto.Type.deleteContainerCommand;
   }

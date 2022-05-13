@@ -351,7 +351,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
               dataSizeRequired))) {
         LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
                 "required data size is {}",
-            datanodeDetails.toString(), metadataSizeRequired, dataSizeRequired);
+            datanodeDetails, metadataSizeRequired, dataSizeRequired);
         return true;
       }
     }

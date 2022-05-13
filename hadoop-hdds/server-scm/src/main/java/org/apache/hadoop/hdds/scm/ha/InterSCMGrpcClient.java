@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolProtos.CopyDBCh
 import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolServiceGrpc;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -59,7 +59,7 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
 
   public InterSCMGrpcClient(final String host,
       int port, final ConfigurationSource conf,
-      SCMCertificateClient scmCertificateClient) throws IOException {
+      CertificateClient scmCertificateClient) throws IOException {
     Preconditions.checkNotNull(conf);
     timeout = conf.getTimeDuration(
             ScmConfigKeys.OZONE_SCM_HA_GRPC_DEADLINE_INTERVAL,

@@ -417,7 +417,7 @@ public class TestNSSummaryTask {
             .setKeyName(key)
             .setFileName(fileName)
             .setReplicationConfig(
-                    new StandaloneReplicationConfig(
+                    StandaloneReplicationConfig.getInstance(
                             HddsProtos.ReplicationFactor.ONE))
             .setObjectID(objectID)
             .setParentObjectID(parentObjectId)
@@ -447,7 +447,7 @@ public class TestNSSummaryTask {
             .setKeyName(key)
             .setFileName(fileName)
             .setReplicationConfig(
-                    new StandaloneReplicationConfig(
+                    StandaloneReplicationConfig.getInstance(
                             HddsProtos.ReplicationFactor.ONE))
             .setObjectID(objectID)
             .setParentObjectID(parentObjectId)

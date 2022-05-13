@@ -494,6 +494,22 @@ public final class OMRequestTestUtils {
         new CacheValue<>(Optional.of(omBucketInfo), 1L));
   }
 
+  /**
+   * Get bucket info from OM DB.
+   * @param volumeName
+   * @param bucketName
+   * @param omMetadataManager
+   */
+  public static OmBucketInfo getBucketFromDB(String volumeName,
+      String bucketName, OMMetadataManager omMetadataManager) {
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    CacheValue<OmBucketInfo> value = omMetadataManager.getBucketTable()
+        .getCacheValue(new CacheKey<>(bucketKey));
+
+    return value != null ? value.getCacheValue() : null;
+  }
+
   public static OzoneManagerProtocolProtos.OMRequest createBucketRequest(
       String bucketName, String volumeName, boolean isVersionEnabled,
       OzoneManagerProtocolProtos.StorageTypeProto storageTypeProto) {

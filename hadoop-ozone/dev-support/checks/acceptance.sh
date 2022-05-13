@@ -41,6 +41,7 @@ export OZONE_ACCEPTANCE_SUITE
 cd "$DIST_DIR/compose" || exit 1
 ./test-all.sh 2>&1 | tee "${REPORT_DIR}/output.log"
 RES=$?
-cp result/* "$REPORT_DIR/"
+cp -rv result/* "$REPORT_DIR/"
 cp "$REPORT_DIR/log.html" "$REPORT_DIR/summary.html"
+find "$REPORT_DIR" -type f -empty -print0 | xargs -0 rm -v
 exit $RES

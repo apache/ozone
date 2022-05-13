@@ -28,12 +28,11 @@ import java.util.List;
 import com.google.common.base.Optional;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
 import org.apache.http.auth.BasicUserPrincipal;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
@@ -41,6 +40,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.mockito.Mockito;
 
 /**
  * Tests for Multi Tenant Manager APIs.
@@ -62,22 +62,28 @@ public class TestOMMultiTenantManagerImpl {
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(conf);
 
     final String bucketNamespaceName = tenantName;
-    final String accountNamespaceName = tenantName;
-    final String userPolicyGroupName =
-        tenantName + OzoneConsts.DEFAULT_TENANT_USER_POLICY_SUFFIX;
-    final String bucketPolicyGroupName =
-        tenantName + OzoneConsts.DEFAULT_TENANT_BUCKET_POLICY_SUFFIX;
+    final String bucketNamespacePolicyName =
+        OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantName);
+    final String bucketPolicyName =
+        OMMultiTenantManager.getDefaultBucketPolicyName(tenantName);
+    final String userRoleName =
+        OMMultiTenantManager.getDefaultUserRoleName(tenantName);
+    final String adminRoleName =
+        OMMultiTenantManager.getDefaultAdminRoleName(tenantName);
+    final OmDBTenantState omDBTenantState = new OmDBTenantState(
+        tenantName, bucketNamespaceName, userRoleName, adminRoleName,
+        bucketNamespacePolicyName, bucketPolicyName);
 
-    final OmDBTenantInfo omDBTenantInfo = new OmDBTenantInfo(
-        tenantName, bucketNamespaceName, accountNamespaceName,
-        userPolicyGroupName, bucketPolicyGroupName);
-    omMetadataManager.getTenantStateTable().put(tenantName, omDBTenantInfo);
+    omMetadataManager.getTenantStateTable().put(tenantName, omDBTenantState);
 
     omMetadataManager.getTenantAccessIdTable().put("seed-accessId1",
-        new OmDBAccessIdInfo(tenantName, "seed-user1",
-            false, false));
+        new OmDBAccessIdInfo(tenantName, "seed-user1", false, false));
 
-    tenantManager = new OMMultiTenantManagerImpl(omMetadataManager, conf);
+    OzoneManager ozoneManager = Mockito.mock(OzoneManager.class);
+    Mockito.when(ozoneManager.getMetadataManager())
+        .thenReturn(omMetadataManager);
+
+    tenantManager = new OMMultiTenantManagerImpl(ozoneManager, conf);
     assertEquals(1, tenantManager.getTenantCache().size());
     assertEquals(1,
         tenantManager.getTenantCache().get(tenantName).getTenantUsers().size());
@@ -91,10 +97,10 @@ public class TestOMMultiTenantManagerImpl {
 
     TenantUserList tenantUserList =
         tenantManager.listUsersInTenant(tenantName, "");
-    List<TenantUserAccessId> userAccessIds = tenantUserList.getUserAccessIds();
+    List<UserAccessIdInfo> userAccessIds = tenantUserList.getUserAccessIds();
     assertEquals(2, userAccessIds.size());
 
-    for (TenantUserAccessId userAccessId : userAccessIds) {
+    for (final UserAccessIdInfo userAccessId : userAccessIds) {
       String user = userAccessId.getUserPrincipal();
       if (user.equals("user1")) {
         assertEquals("accessId1", userAccessId.getAccessId());

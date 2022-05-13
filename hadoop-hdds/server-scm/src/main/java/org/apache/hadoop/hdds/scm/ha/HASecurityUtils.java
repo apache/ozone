@@ -20,6 +20,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
@@ -33,17 +34,14 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateCli
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.client.RaftClient;
-import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
-import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.retry.RetryPolicies;
-import org.apache.ratis.rpc.RpcType;
+import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.util.TimeDuration;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -301,25 +299,6 @@ public final class HASecurityUtils {
   }
 
   /**
-   * Create Server TLS parameters required for Ratis Server.
-
-   * @return Parameter map set with TLS config.
-   */
-  public static Parameters createSCMServerTlsParameters(
-      GrpcTlsConfig grpcTlsConfig) {
-    Parameters parameters = new Parameters();
-
-    if (grpcTlsConfig != null) {
-      GrpcConfigKeys.Server.setTlsConf(parameters, grpcTlsConfig);
-      GrpcConfigKeys.Admin.setTlsConf(parameters, grpcTlsConfig);
-      GrpcConfigKeys.Client.setTlsConf(parameters, grpcTlsConfig);
-      GrpcConfigKeys.TLS.setConf(parameters, grpcTlsConfig);
-    }
-
-    return parameters;
-  }
-
-  /**
    * Create GrpcTlsConfig.
    * @param conf
    * @param certificateClient
@@ -345,10 +324,10 @@ public final class HASecurityUtils {
    */
   public static SCMRatisResponse submitScmCertsToRatis(RaftGroup raftGroup,
       GrpcTlsConfig tlsConfig, Message message) throws Exception {
-    final RaftProperties properties = new RaftProperties();
 
     // TODO: GRPC TLS only for now, netty/hadoop RPC TLS support later.
-    RaftConfigKeys.Rpc.setType(properties, RpcType.valueOf("GRPC"));
+    final SupportedRpcType rpc = SupportedRpcType.GRPC;
+    final RaftProperties properties = RatisHelper.newRaftProperties(rpc);
 
 
     // For now not making anything configurable, RaftClient  is only used
@@ -357,16 +336,10 @@ public final class HASecurityUtils {
         .setRaftGroup(raftGroup)
         .setLeaderId(null)
         .setProperties(properties)
+        .setParameters(RatisHelper.setClientTlsConf(rpc, tlsConfig))
         .setRetryPolicy(
             RetryPolicies.retryUpToMaximumCountWithFixedSleep(120,
                 TimeDuration.valueOf(500, TimeUnit.MILLISECONDS)));
-
-    if (tlsConfig != null) {
-      Parameters parameters = new Parameters();
-      GrpcConfigKeys.Client.setTlsConf(parameters, tlsConfig);
-      builder.setParameters(parameters);
-    }
-
     RaftClient raftClient =  builder.build();
 
     CompletableFuture<RaftClientReply> future =

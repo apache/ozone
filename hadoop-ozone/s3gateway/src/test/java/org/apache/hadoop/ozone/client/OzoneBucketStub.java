@@ -79,7 +79,8 @@ public class OzoneBucketStub extends OzoneBucket {
       long creationTime) {
     super(volumeName,
         bucketName,
-        new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE),
+        StandaloneReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.ONE),
         storageType,
         versioning,
         creationTime);

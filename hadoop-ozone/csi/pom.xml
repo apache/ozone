@@ -28,6 +28,10 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>Apache Ozone CSI service</name>
   <packaging>jar</packaging>
 
+  <properties>
+    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>com.google.protobuf</groupId>

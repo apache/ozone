@@ -35,7 +35,10 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.security.OMSetSecretResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.*;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,7 +48,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
-import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.isUserAccessIdPrincipalOrTenantAdmin;
 
 /**
  * Handles SetSecret request.
@@ -108,7 +110,8 @@ public class OMSetSecretRequest extends OMClientRequest {
 
     if (!username.equals(accessId) && !ozoneManager.isAdmin(ugi)) {
       // Attempt to retrieve tenant info using the accessId
-      if (!isUserAccessIdPrincipalOrTenantAdmin(ozoneManager, accessId, ugi)) {
+      if (!ozoneManager.getMultiTenantManager()
+          .isUserAccessIdPrincipalOrTenantAdmin(accessId, ugi)) {
         throw new OMException("Permission denied. Requested accessId '" +
                 accessId + "' and user doesn't satisfy any of:\n" +
                 "1) accessId match current username: '" + username + "';\n" +

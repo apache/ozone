@@ -14,6 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
+Library             Collections
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
 
@@ -22,6 +23,7 @@ ${ENDPOINT_URL}                http://s3g:9878
 ${OZONE_S3_HEADER_VERSION}     v4
 ${OZONE_S3_SET_CREDENTIALS}    true
 ${BUCKET}                      generated
+${KEY_NAME}                    key1
 
 *** Keywords ***
 Execute AWSS3APICli
@@ -102,6 +104,7 @@ Setup s3 tests
     ...                ELSE                                      Set Variable    ${BUCKET}
                        Set Suite Variable                        ${BUCKET}
                        Run Keyword if                            '${BUCKET}' == 'link'                 Setup links for S3 tests
+                       Run Keyword if                            '${BUCKET}' == 'encrypted'            Create encrypted bucket
 
 Setup links for S3 tests
     ${exists} =        Bucket Exists    o3://${OM_SERVICE_ID}/s3v/link
@@ -109,6 +112,12 @@ Setup links for S3 tests
     Execute            ozone sh volume create o3://${OM_SERVICE_ID}/legacy
     Execute            ozone sh bucket create o3://${OM_SERVICE_ID}/legacy/source-bucket
     Create link        link
+
+Create encrypted bucket
+    Return From Keyword if    '${SECURITY_ENABLED}' == 'false'
+    ${exists} =        Bucket Exists    o3://${OM_SERVICE_ID}/s3v/encrypted
+    Return From Keyword If    ${exists}
+    Execute            ozone sh bucket create -k ${KEY_NAME} o3://${OM_SERVICE_ID}/s3v/encrypted
 
 Create link
     [arguments]       ${bucket}
@@ -118,3 +127,30 @@ Create link
 Generate random prefix
     ${random} =          Generate Ozone String
                          Set Suite Variable  ${PREFIX}  ${random}
+
+Perform Multipart Upload
+    [arguments]    ${bucket}    ${key}    @{files}
+
+    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${bucket} --key ${key}
+    ${upload_id} =      Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
+
+    @{etags} =    Create List
+    FOR    ${i}    ${file}    IN ENUMERATE    @{files}
+        ${part} =    Evaluate    ${i} + 1
+        ${result} =   Execute AWSS3APICli     upload-part --bucket ${bucket} --key ${key} --part-number ${part} --body ${file} --upload-id ${upload_id}
+        ${etag} =     Execute                 echo '${result}' | jq -r '.ETag'
+        Append To List    ${etags}    {ETag=${etag},PartNumber=${part}}
+    END
+
+    ${parts} =    Catenate    SEPARATOR=,    @{etags}
+    Execute AWSS3APICli     complete-multipart-upload --bucket ${bucket} --key ${key} --upload-id ${upload_id} --multipart-upload 'Parts=[${parts}]'
+
+Verify Multipart Upload
+    [arguments]    ${bucket}    ${key}    @{files}
+
+    ${random} =    Generate Ozone String
+
+    Execute AWSS3APICli     get-object --bucket ${bucket} --key ${key} /tmp/verify${random}
+    ${tmp} =    Catenate    @{files}
+    Execute    cat ${tmp} > /tmp/original${random}
+    Compare files    /tmp/original${random}    /tmp/verify${random}

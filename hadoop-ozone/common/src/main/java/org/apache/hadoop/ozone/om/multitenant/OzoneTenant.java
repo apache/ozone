@@ -24,26 +24,26 @@ import org.apache.hadoop.ozone.om.multitenant.impl.AccountNameSpaceImpl;
 import org.apache.hadoop.ozone.om.multitenant.impl.SingleVolumeTenantNamespace;
 
 /**
- * In-memory tenant info. For DB state, see OmDBTenantInfo.
+ * In-memory tenant info. For DB state, see OmDBTenantState.
  */
 public class OzoneTenant implements Tenant {
-  private final String tenantID;
-  private List<String> tenantRoleIds;
+  private final String tenantId;
+  private List<String> tenantRoleNames;
   private List<AccessPolicy> accessPolicies;
   private final AccountNameSpace accountNameSpace;
   private final BucketNameSpace bucketNameSpace;
 
   public OzoneTenant(String id) {
-    tenantID = id;
+    tenantId = id;
     accessPolicies = new ArrayList<>();
-    tenantRoleIds = new ArrayList<>();
+    tenantRoleNames = new ArrayList<>();
     accountNameSpace = new AccountNameSpaceImpl(id);
     bucketNameSpace = new SingleVolumeTenantNamespace(id);
   }
 
   @Override
   public String getTenantId() {
-    return tenantID;
+    return tenantId;
   }
 
   @Override
@@ -72,17 +72,17 @@ public class OzoneTenant implements Tenant {
   }
 
   @Override
-  public void addTenantAccessRole(String roleId) {
-    tenantRoleIds.add(roleId);
+  public void addTenantAccessRole(String roleName) {
+    tenantRoleNames.add(roleName);
   }
 
   @Override
-  public void removeTenantAccessRole(String roleId) {
-    tenantRoleIds.remove(roleId);
+  public void removeTenantAccessRole(String roleName) {
+    tenantRoleNames.remove(roleName);
   }
 
   @Override
   public List<String> getTenantRoles() {
-    return tenantRoleIds;
+    return tenantRoleNames;
   }
 }

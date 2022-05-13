@@ -110,7 +110,8 @@ public final class RatisPipelineUtils {
   static List<Pipeline> checkPipelineContainSameDatanodes(
       PipelineStateManager stateManager, Pipeline pipeline) {
     return stateManager
-        .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE))
+        .getPipelines(RatisReplicationConfig
+            .getInstance(ReplicationFactor.THREE))
         .stream().filter(p -> !p.getId().equals(pipeline.getId()) &&
             (p.getPipelineState() != Pipeline.PipelineState.CLOSED &&
                 p.sameDatanodes(pipeline)))

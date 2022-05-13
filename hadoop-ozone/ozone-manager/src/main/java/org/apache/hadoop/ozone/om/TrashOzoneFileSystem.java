@@ -287,6 +287,7 @@ public class TrashOzoneFileSystem extends FileSystem {
         .setVolumeName(volume)
         .setBucketName(bucket)
         .setKeyName(key)
+        .setHeadOp(true)
         .build();
     return keyArgs;
   }

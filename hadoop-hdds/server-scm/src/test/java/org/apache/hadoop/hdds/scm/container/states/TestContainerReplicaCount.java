@@ -26,7 +26,10 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
 import org.junit.Before;
 import org.junit.Test;
-import java.util.*;
+
+import java.util.HashSet;
+import java.util.Set;
+
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertTrue;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos

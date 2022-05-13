@@ -433,6 +433,7 @@ public final class HddsUtils {
     case DeleteContainer:
     case ReadContainer:
     case UpdateContainer:
+    case ListBlock:
       return true;
     default:
       return false;

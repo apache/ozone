@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -117,15 +118,17 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   List<BlockGroup> getPendingDeletionKeys(int count) throws IOException;
 
   /**
-   * Returns the names of up to {@code count} open keys that are older than
-   * the configured expiration age.
+   * Returns the names of up to {@code count} open keys whose age is
+   * greater than or equal to {@code expireThreshold}.
    *
    * @param count The maximum number of expired open keys to return.
+   * @param expireThreshold The threshold of open key expiration age.
    * @return a list of {@link String} representing the names of expired
    * open keys.
    * @throws IOException
    */
-  List<String> getExpiredOpenKeys(int count) throws IOException;
+  List<String> getExpiredOpenKeys(Duration expireThreshold, int count)
+      throws IOException;
 
   /**
    * Returns the metadataManager.

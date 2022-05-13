@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Map;
 
 import com.google.common.base.Optional;
@@ -38,7 +37,6 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -210,18 +208,5 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     }
 
     return omClientResponse;
-  }
-
-  public static OMKeyDeleteRequest getInstance(
-      OzoneManagerProtocolProtos.KeyArgs keyArgs, OMRequest omRequest,
-      OzoneManager ozoneManager) throws IOException {
-
-    BucketLayout bucketLayout =
-        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
-            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
-    if (bucketLayout.isFileSystemOptimized()) {
-      return new OMKeyDeleteRequestWithFSO(omRequest, bucketLayout);
-    }
-    return new OMKeyDeleteRequest(omRequest, bucketLayout);
   }
 }
