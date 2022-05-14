@@ -17,12 +17,11 @@
  */
 package org.apache.hadoop.hdds.server.http;
 
-import java.io.IOException;
-
 import org.apache.hadoop.hdds.server.http.ProfileServlet.Event;
 import org.apache.hadoop.hdds.server.http.ProfileServlet.Output;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test prometheus Sink.
@@ -30,7 +29,7 @@ import org.junit.Test;
 public class TestProfileServlet {
 
   @Test
-  public void testNameValidation() throws IOException {
+  public void testNameValidation() {
     ProfileServlet.validateFileName(
         ProfileServlet.generateFileName(1, Output.FLAMEGRAPH, Event.ALLOC));
     ProfileServlet.validateFileName(
@@ -40,22 +39,26 @@ public class TestProfileServlet {
             Event.L1_DCACHE_LOAD_MISSES));
   }
 
-  @Test(expected = IllegalArgumentException.class)
-  public void testNameValidationWithNewLine() throws IOException {
-    ProfileServlet.validateFileName(
-        "test\n" + ProfileServlet.generateFileName(1, Output.FLAMEGRAPH,
-            Event.ALLOC));
-    ProfileServlet.validateFileName(
-        "test\n" + ProfileServlet.generateFileName(1, Output.SVG, Event.ALLOC));
+  @Test
+  public void testNameValidationWithNewLine() {
+    Assertions.assertThrows(IllegalArgumentException.class,
+        () -> ProfileServlet.validateFileName("test\n" +
+            ProfileServlet.generateFileName(1, Output.FLAMEGRAPH,
+                Event.ALLOC)));
+    Assertions.assertThrows(IllegalArgumentException.class,
+        () -> ProfileServlet.validateFileName("test\n" +
+            ProfileServlet.generateFileName(1, Output.SVG, Event.ALLOC)));
   }
 
-  @Test(expected = IllegalArgumentException.class)
-  public void testNameValidationWithSlash() throws IOException {
-    ProfileServlet.validateFileName(
-        "../" + ProfileServlet.generateFileName(1, Output.FLAMEGRAPH,
-            Event.ALLOC));
-    ProfileServlet.validateFileName(
-        "../" + ProfileServlet.generateFileName(1, Output.SVG, Event.ALLOC));
+  @Test
+  public void testNameValidationWithSlash() {
+    Assertions.assertThrows(IllegalArgumentException.class,
+        () -> ProfileServlet.validateFileName("../" +
+            ProfileServlet.generateFileName(1, Output.FLAMEGRAPH,
+                Event.ALLOC)));
+    Assertions.assertThrows(IllegalArgumentException.class,
+        () -> ProfileServlet.validateFileName("../" +
+            ProfileServlet.generateFileName(1, Output.SVG, Event.ALLOC)));
   }
 
 }
