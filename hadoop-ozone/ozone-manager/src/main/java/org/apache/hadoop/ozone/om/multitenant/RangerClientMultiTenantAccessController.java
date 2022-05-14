@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPA
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -30,7 +31,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.http.auth.BasicUserPrincipal;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
@@ -56,16 +59,22 @@ public class RangerClientMultiTenantAccessController implements
   private final Map<String, IAccessAuthorizer.ACLType> stringToAcl;
   private final String omPrincipal;
 
-  public RangerClientMultiTenantAccessController(OzoneConfiguration conf) {
+  public RangerClientMultiTenantAccessController(OzoneConfiguration conf)
+      throws IOException {
     aclToString = MultiTenantAccessController.getRangerAclStrings();
     stringToAcl = new HashMap<>();
     aclToString.forEach((type, string) -> stringToAcl.put(string, type));
 
-    // TODO: Double check this set up after HDDS-6612 is merged.
+    // TODO: Double check configuration set up after HDDS-6612 is merged.
     String rangerHttpsAddress = conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY);
     rangerServiceName = conf.get(OZONE_RANGER_SERVICE);
-    omPrincipal = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
+    String configuredOmPrincipal = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
+    // Replace _HOST pattern with host name in the Kerberos principal. Ranger
+    // client currently does not do this automatically.
+    omPrincipal = SecurityUtil.getServerPrincipal(
+        configuredOmPrincipal, OmUtils.getOmAddress(conf).getHostName());
     String keytabPath = conf.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY);
+
     client = new RangerClient(rangerHttpsAddress,
         "kerberos", omPrincipal, keytabPath, rangerServiceName, "ozone");
   }

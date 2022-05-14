@@ -63,7 +63,7 @@ public class TestMultiTenantAccessController {
    * Use this setup to test against a live Ranger instance.
    */
   //  @Before
-  public void setupClusterTest() {
+  public void setupClusterTest() throws Exception {
     // These config keys must be set when the test is run:
     // OZONE_RANGER_HTTPS_ADDRESS_KEY
     // OZONE_RANGER_SERVICE
