@@ -28,12 +28,10 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameter;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,8 +39,8 @@ import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse;
@@ -50,13 +48,12 @@ import static org.apache.hadoop.hdds.security.x509.certificate.client.Certificat
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.RECOVER;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test class for {@link DefaultCertificateClient}.
  */
-@RunWith(Parameterized.class)
-@SuppressWarnings("visibilitymodifier")
 public class TestCertificateClientInit {
 
   private KeyPair keyPair;
@@ -72,18 +69,8 @@ public class TestCertificateClientInit {
   private static final String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
   private static final String OM_COMPONENT = OMCertificateClient.COMPONENT_NAME;
 
-  @Parameter
-  public boolean pvtKeyPresent;
-  @Parameter(1)
-  public boolean pubKeyPresent;
-  @Parameter(2)
-  public boolean certPresent;
-  @Parameter(3)
-  public InitResponse expectedResult;
-
-  @Parameterized.Parameters
-  public static Collection<Object[]> initData() {
-    return Arrays.asList(new Object[][]{
+  private static Stream<Object[]> parameters() {
+    return Arrays.stream(new Object[][]{
         {false, false, false, GETCERT},
         {false, false, true, FAILURE},
         {false, true, false, FAILURE},
@@ -94,7 +81,7 @@ public class TestCertificateClientInit {
         {true, true, true, SUCCESS}});
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     OzoneConfiguration config = new OzoneConfiguration();
     final String path = GenericTestUtils
@@ -117,7 +104,7 @@ public class TestCertificateClientInit {
     Files.createDirectories(securityConfig.getKeyLocation(OM_COMPONENT));
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     dnCertificateClient = null;
     omCertificateClient = null;
@@ -125,8 +112,10 @@ public class TestCertificateClientInit {
   }
 
 
-  @Test
-  public void testInitDatanode() throws Exception {
+  @ParameterizedTest
+  @MethodSource("parameters")
+  public void testInitDatanode(boolean pvtKeyPresent, boolean pubKeyPresent,
+      boolean certPresent, InitResponse expectedResult) throws Exception {
     if (pvtKeyPresent) {
       dnKeyCodec.writePrivateKey(keyPair.getPrivate());
     } else {
@@ -157,7 +146,7 @@ public class TestCertificateClientInit {
     }
     InitResponse response = dnCertificateClient.init();
 
-    assertTrue(response.equals(expectedResult));
+    assertEquals(expectedResult, response);
 
     if (!response.equals(FAILURE)) {
       assertTrue(OzoneSecurityUtil.checkIfFileExist(
@@ -169,8 +158,10 @@ public class TestCertificateClientInit {
     }
   }
 
-  @Test
-  public void testInitOzoneManager() throws Exception {
+  @ParameterizedTest
+  @MethodSource("parameters")
+  public void testInitOzoneManager(boolean pvtKeyPresent, boolean pubKeyPresent,
+      boolean certPresent, InitResponse expectedResult) throws Exception {
     if (pvtKeyPresent) {
       omKeyCodec.writePrivateKey(keyPair.getPrivate());
     } else {
@@ -202,9 +193,9 @@ public class TestCertificateClientInit {
     InitResponse response = omCertificateClient.init();
 
     if (pvtKeyPresent && pubKeyPresent && !certPresent) {
-      assertTrue(response.equals(RECOVER));
+      assertEquals(RECOVER, response);
     } else {
-      assertTrue(response.equals(expectedResult));
+      assertEquals(expectedResult, response);
     }
 
     if (!response.equals(FAILURE)) {

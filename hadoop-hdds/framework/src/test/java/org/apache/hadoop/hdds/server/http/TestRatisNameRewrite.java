@@ -20,30 +20,20 @@ package org.apache.hadoop.hdds.server.http;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Test Ratis metrics renaming.
  */
-@RunWith(Parameterized.class)
 public class TestRatisNameRewrite {
 
-  private List<String> names = new ArrayList<>();
-  private List<String> values = new ArrayList<>();
 
-  private String originalName;
-  private String expectedName;
-
-  private List<String> expectedTagNames;
-  private List<String> expectedTagValues;
-
-  @Parameterized.Parameters
-  public static List<Object[]> parameters() {
-    return Arrays.asList(
+  private static Stream<Object[]> parameters() {
+    return Stream.of(
         new Object[] {
             "ratis.log_appender"
                 + ".851cb00a-af97-455a-b079-d94a77d2a936@group-C14654DE8C2C"
@@ -95,23 +85,20 @@ public class TestRatisNameRewrite {
     );
   }
 
-  public TestRatisNameRewrite(String originalName, String expectedName,
+  @ParameterizedTest
+  @MethodSource("parameters")
+  public void normalizeRatisMetricName(String originalName, String expectedName,
       String[] expectedTagNames, String[] expectedTagValues) {
-    this.originalName = originalName;
-    this.expectedName = expectedName;
-    this.expectedTagNames = Arrays.asList(expectedTagNames);
-    this.expectedTagValues = Arrays.asList(expectedTagValues);
-  }
 
-  @Test
-  public void normalizeRatisMetricName() {
+    List<String> names = new ArrayList<>();
+    List<String> values = new ArrayList<>();
 
     String cleanName = new RatisNameRewriteSampleBuilder()
         .normalizeRatisMetric(originalName, names, values);
 
-    Assert.assertEquals(expectedName, cleanName);
-    Assert.assertEquals(expectedTagNames, names);
-    Assert.assertEquals(expectedTagValues, values);
+    Assertions.assertEquals(expectedName, cleanName);
+    Assertions.assertEquals(Arrays.asList(expectedTagNames), names);
+    Assertions.assertEquals(Arrays.asList(expectedTagValues), values);
 
   }
 }
