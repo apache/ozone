@@ -70,13 +70,13 @@ import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayo
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createEndpoint;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -91,7 +91,7 @@ public class TestEndPoint {
   private static File testDir;
   private static OzoneConfiguration config;
 
-  @AfterClass
+  @AfterAll
   public static void tearDown() throws Exception {
     if (scmServer != null) {
       scmServer.stop();
@@ -99,7 +99,7 @@ public class TestEndPoint {
     FileUtil.fullyDelete(testDir);
   }
 
-  @BeforeClass
+  @BeforeAll
   public static void setUp() throws Exception {
     serverAddress = SCMTestUtils.getReuseableAddress();
     scmServerImpl = new ScmTestMock();
@@ -126,10 +126,10 @@ public class TestEndPoint {
             serverAddress, 1000)) {
       SCMVersionResponseProto responseProto = rpcEndPoint.getEndPoint()
           .getVersion(null);
-      Assert.assertNotNull(responseProto);
-      Assert.assertEquals(VersionInfo.DESCRIPTION_KEY,
+      Assertions.assertNotNull(responseProto);
+      Assertions.assertEquals(VersionInfo.DESCRIPTION_KEY,
           responseProto.getKeys(0).getKey());
-      Assert.assertEquals(VersionInfo.getLatestVersion().getDescription(),
+      Assertions.assertEquals(VersionInfo.getLatestVersion().getDescription(),
           responseProto.getKeys(0).getValue());
     }
   }
@@ -154,11 +154,11 @@ public class TestEndPoint {
 
       // if version call worked the endpoint should automatically move to the
       // next state.
-      Assert.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
+      Assertions.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
           newState);
 
       // Now rpcEndpoint should remember the version it got from SCM
-      Assert.assertNotNull(rpcEndPoint.getVersion());
+      Assertions.assertNotNull(rpcEndPoint.getVersion());
     }
   }
 
@@ -184,11 +184,11 @@ public class TestEndPoint {
 
       // if version call worked the endpoint should automatically move to the
       // next state.
-      Assert.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
+      Assertions.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
           newState);
 
       // Now rpcEndpoint should remember the version it got from SCM
-      Assert.assertNotNull(rpcEndPoint.getVersion());
+      Assertions.assertNotNull(rpcEndPoint.getVersion());
 
       // Now change server cluster ID, so datanode cluster ID will be
       // different from SCM server response cluster ID.
@@ -196,17 +196,17 @@ public class TestEndPoint {
       scmServerImpl.setClusterId(newClusterId);
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       newState = versionTask.call();
-      Assert.assertEquals(EndpointStateMachine.EndPointStates.SHUTDOWN,
+      Assertions.assertEquals(EndpointStateMachine.EndPointStates.SHUTDOWN,
           newState);
       List<HddsVolume> volumesList = StorageVolumeUtil.getHddsVolumesList(
           ozoneContainer.getVolumeSet().getFailedVolumesList());
-      Assert.assertTrue(volumesList.size() == 1);
-      Assert.assertTrue(logCapturer.getOutput()
+      Assertions.assertTrue(volumesList.size() == 1);
+      Assertions.assertTrue(logCapturer.getOutput()
           .contains("org.apache.hadoop.ozone.common" +
               ".InconsistentStorageStateException: Mismatched ClusterIDs"));
-      Assert.assertTrue(ozoneContainer.getVolumeSet().getVolumesList().size()
+      Assertions.assertTrue(ozoneContainer.getVolumeSet().getVolumesList().size()
           == 0);
-      Assert.assertTrue(ozoneContainer.getVolumeSet().getFailedVolumesList()
+      Assertions.assertTrue(ozoneContainer.getVolumeSet().getFailedVolumesList()
           .size() == 1);
 
     }
@@ -233,7 +233,7 @@ public class TestEndPoint {
 
       // This version call did NOT work, so endpoint should remain in the same
       // state.
-      Assert.assertEquals(EndpointStateMachine.EndPointStates.GETVERSION,
+      Assertions.assertEquals(EndpointStateMachine.EndPointStates.GETVERSION,
           newState);
     }
   }
@@ -263,8 +263,8 @@ public class TestEndPoint {
       EndpointStateMachine.EndPointStates newState = versionTask.call();
       long end = Time.monotonicNow();
       scmServerImpl.setRpcResponseDelay(0);
-      Assert.assertThat(end - start, lessThanOrEqualTo(rpcTimeout + tolerance));
-      Assert.assertEquals(EndpointStateMachine.EndPointStates.GETVERSION,
+      Assertions.assertThat(end - start, lessThanOrEqualTo(rpcTimeout + tolerance));
+      Assertions.assertEquals(EndpointStateMachine.EndPointStates.GETVERSION,
           newState);
     }
   }
@@ -284,13 +284,13 @@ public class TestEndPoint {
               HddsTestUtils.getRandomContainerReports(10),
               HddsTestUtils.getRandomPipelineReports(),
               defaultLayoutVersionProto());
-      Assert.assertNotNull(responseProto);
-      Assert.assertEquals(nodeToRegister.getUuidString(),
+      Assertions.assertNotNull(responseProto);
+      Assertions.assertEquals(nodeToRegister.getUuidString(),
           responseProto.getDatanodeUUID());
-      Assert.assertNotNull(responseProto.getClusterID());
-      Assert.assertEquals(10, scmServerImpl.
+      Assertions.assertNotNull(responseProto.getClusterID());
+      Assertions.assertEquals(10, scmServerImpl.
           getContainerCountsForDatanode(nodeToRegister));
-      Assert.assertEquals(1, scmServerImpl.getNodeReportsCount(nodeToRegister));
+      Assertions.assertEquals(1, scmServerImpl.getNodeReportsCount(nodeToRegister));
     }
   }
 
@@ -347,7 +347,7 @@ public class TestEndPoint {
     try (EndpointStateMachine rpcEndpoint =
         registerTaskHelper(serverAddress, 1000, false)) {
       // Successful register should move us to Heartbeat state.
-      Assert.assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT,
+      Assertions.assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT,
           rpcEndpoint.getState());
     }
   }
@@ -357,7 +357,7 @@ public class TestEndPoint {
     InetSocketAddress address = SCMTestUtils.getReuseableAddress();
     try (EndpointStateMachine rpcEndpoint =
         registerTaskHelper(address, 1000, false)) {
-      Assert.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
+      Assertions.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
           rpcEndpoint.getState());
     }
   }
@@ -369,7 +369,7 @@ public class TestEndPoint {
         registerTaskHelper(address, 1000, true)) {
       // No Container ID, therefore we tell the datanode that we would like to
       // shutdown.
-      Assert.assertEquals(EndpointStateMachine.EndPointStates.SHUTDOWN,
+      Assertions.assertEquals(EndpointStateMachine.EndPointStates.SHUTDOWN,
           rpcEndpoint.getState());
     }
   }
@@ -383,7 +383,7 @@ public class TestEndPoint {
     registerTaskHelper(serverAddress, 1000, false).close();
     long end = Time.monotonicNow();
     scmServerImpl.setRpcResponseDelay(0);
-    Assert.assertThat(end - start, lessThanOrEqualTo(rpcTimeout + tolerance));
+    Assertions.assertThat(end - start, lessThanOrEqualTo(rpcTimeout + tolerance));
   }
 
   @Test
@@ -401,8 +401,8 @@ public class TestEndPoint {
 
       SCMHeartbeatResponseProto responseProto = rpcEndPoint.getEndPoint()
           .sendHeartbeat(request);
-      Assert.assertNotNull(responseProto);
-      Assert.assertEquals(0, responseProto.getCommandsCount());
+      Assertions.assertNotNull(responseProto);
+      Assertions.assertEquals(0, responseProto.getCommandsCount());
     }
   }
 
@@ -507,9 +507,9 @@ public class TestEndPoint {
               stateMachine.getLayoutVersionManager());
       endpointTask.setDatanodeDetailsProto(datanodeDetailsProto);
       endpointTask.call();
-      Assert.assertNotNull(endpointTask.getDatanodeDetailsProto());
+      Assertions.assertNotNull(endpointTask.getDatanodeDetailsProto());
 
-      Assert.assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT,
+      Assertions.assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT,
           rpcEndPoint.getState());
       return stateContext;
     }
@@ -537,7 +537,7 @@ public class TestEndPoint {
     long end = Time.monotonicNow();
     scmServerImpl.setRpcResponseDelay(0);
     // 6s is introduced by DeleteBlocksCommandHandler#stop
-    Assert.assertThat(end - start,
+    Assertions.assertThat(end - start,
         lessThanOrEqualTo(rpcTimeout + tolerance + 6000));
   }
 

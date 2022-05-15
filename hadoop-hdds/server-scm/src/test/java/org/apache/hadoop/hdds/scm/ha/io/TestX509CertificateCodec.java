@@ -20,8 +20,8 @@ package org.apache.hadoop.hdds.scm.ha.io;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
@@ -46,7 +46,7 @@ public class TestX509CertificateCodec {
     X509Certificate actual = (X509Certificate)
         x509CertificateCodec.deserialize(X509Certificate.class, byteString);
 
-    Assert.assertEquals(x509Certificate, actual);
+    Assertions.assertEquals(x509Certificate, actual);
 
   }
 

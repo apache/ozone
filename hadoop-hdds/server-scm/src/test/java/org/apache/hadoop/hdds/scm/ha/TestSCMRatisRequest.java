@@ -22,8 +22,8 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.ratis.protocol.Message;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,9 +42,9 @@ public class TestSCMRatisRequest {
     String operation = "test";
     SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation,
         new Class[]{pipelineID.getProtobuf().getClass()}, args);
-    Assert.assertEquals(operation,
+    Assertions.assertEquals(operation,
         SCMRatisRequest.decode(request.encode()).getOperation());
-    Assert.assertEquals(args[0],
+    Assertions.assertEquals(args[0],
         SCMRatisRequest.decode(request.encode()).getArguments()[0]);
   }
 
@@ -77,9 +77,9 @@ public class TestSCMRatisRequest {
     String operation = "test";
     SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation,
         new Class[]{pids.getClass()}, args);
-    Assert.assertEquals(operation,
+    Assertions.assertEquals(operation,
         SCMRatisRequest.decode(request.encode()).getOperation());
-    Assert.assertEquals(args[0],
+    Assertions.assertEquals(args[0],
         SCMRatisRequest.decode(request.encode()).getArguments()[0]);
   }
 
@@ -89,9 +89,9 @@ public class TestSCMRatisRequest {
     String operation = "test";
     SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation,
         new Class[]{value.getClass()}, value);
-    Assert.assertEquals(operation,
+    Assertions.assertEquals(operation,
         SCMRatisRequest.decode(request.encode()).getOperation());
-    Assert.assertEquals(value,
+    Assertions.assertEquals(value,
         SCMRatisRequest.decode(request.encode()).getArguments()[0]);
   }
 }

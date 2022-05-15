@@ -46,10 +46,10 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -93,7 +93,7 @@ public class TestDeletedBlockLog {
   private Map<Long, Set<ContainerReplica>> replicas = new HashMap<>();
   private ScmBlockDeletingServiceMetrics metrics;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     testDir = GenericTestUtils.getTestDir(
         TestDeletedBlockLog.class.getSimpleName());
@@ -148,7 +148,7 @@ public class TestDeletedBlockLog {
       for (Map.Entry<ContainerID, Long> e : map.entrySet()) {
         ContainerInfo info = containers.get(e.getKey().getId());
         try {
-          Assert.assertTrue(e.getValue() > info.getDeleteTransactionId());
+          Assertions.assertTrue(e.getValue() > info.getDeleteTransactionId());
         } catch (AssertionError err) {
           throw new Exception("New TxnId " + e.getValue() + " < " + info
               .getDeleteTransactionId());
@@ -181,7 +181,7 @@ public class TestDeletedBlockLog {
     replicas.put(cid, replicaSet);
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     deletedBlockLog.close();
     scm.stop();
@@ -278,24 +278,24 @@ public class TestDeletedBlockLog {
   public void testContainerManagerTransactionId() throws Exception {
     // Initially all containers should have deleteTransactionId as 0
     for (ContainerInfo containerInfo : containerManager.getContainers()) {
-      Assert.assertEquals(0, containerInfo.getDeleteTransactionId());
+      Assertions.assertEquals(0, containerInfo.getDeleteTransactionId());
     }
 
     // Create 30 TXs
     addTransactions(generateData(30), false);
     // Since transactions are not yet flushed deleteTransactionId should be
     // 0 for all containers
-    Assert.assertEquals(0, getTransactions(1000).size());
+    Assertions.assertEquals(0, getTransactions(1000).size());
     for (ContainerInfo containerInfo : containerManager.getContainers()) {
-      Assert.assertEquals(0, containerInfo.getDeleteTransactionId());
+      Assertions.assertEquals(0, containerInfo.getDeleteTransactionId());
     }
 
     scmHADBTransactionBuffer.flush();
     // After flush there should be 30 transactions in deleteTable
     // All containers should have positive deleteTransactionId
-    Assert.assertEquals(30, getTransactions(1000).size());
+    Assertions.assertEquals(30, getTransactions(1000).size());
     for (ContainerInfo containerInfo : containerManager.getContainers()) {
-      Assert.assertTrue(containerInfo.getDeleteTransactionId() > 0);
+      Assertions.assertTrue(containerInfo.getDeleteTransactionId() > 0);
     }
   }
 
@@ -321,12 +321,12 @@ public class TestDeletedBlockLog {
     incrementCount(txIDs);
     blocks = getTransactions(40 * BLOCKS_PER_TXN);
     for (DeletedBlocksTransaction block : blocks) {
-      Assert.assertEquals(-1, block.getCount());
+      Assertions.assertEquals(-1, block.getCount());
     }
 
     // If all TXs are failed, getTransactions call will always return nothing.
     blocks = getTransactions(40 * BLOCKS_PER_TXN);
-    Assert.assertEquals(blocks.size(), 0);
+    Assertions.assertEquals(blocks.size(), 0);
   }
 
   @Test
@@ -342,17 +342,17 @@ public class TestDeletedBlockLog {
     blocks.remove(blocks.size() - 1);
 
     blocks = getTransactions(50 * BLOCKS_PER_TXN);
-    Assert.assertEquals(30, blocks.size());
+    Assertions.assertEquals(30, blocks.size());
     commitTransactions(blocks, dnList.get(1), dnList.get(2),
         DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
             .build());
 
     blocks = getTransactions(50 * BLOCKS_PER_TXN);
-    Assert.assertEquals(30, blocks.size());
+    Assertions.assertEquals(30, blocks.size());
     commitTransactions(blocks, dnList.get(0));
 
     blocks = getTransactions(50 * BLOCKS_PER_TXN);
-    Assert.assertEquals(0, blocks.size());
+    Assertions.assertEquals(0, blocks.size());
   }
 
   @Test
@@ -385,7 +385,7 @@ public class TestDeletedBlockLog {
             scm.getScmMetadataStore().getDeletedBlocksTXTable().iterator()) {
           AtomicInteger count = new AtomicInteger();
           iter.forEachRemaining((keyValue) -> count.incrementAndGet());
-          Assert.assertEquals(added, count.get() + committed);
+          Assertions.assertEquals(added, count.get() + committed);
         }
       }
     }
@@ -409,10 +409,10 @@ public class TestDeletedBlockLog {
         metrics);
     List<DeletedBlocksTransaction> blocks =
         getTransactions(BLOCKS_PER_TXN * 10);
-    Assert.assertEquals(10, blocks.size());
+    Assertions.assertEquals(10, blocks.size());
     commitTransactions(blocks);
     blocks = getTransactions(BLOCKS_PER_TXN * 40);
-    Assert.assertEquals(40, blocks.size());
+    Assertions.assertEquals(40, blocks.size());
     commitTransactions(blocks);
 
     // close db and reopen it again to make sure
@@ -427,8 +427,8 @@ public class TestDeletedBlockLog {
         scm.getSequenceIdGen(),
         metrics);
     blocks = getTransactions(BLOCKS_PER_TXN * 40);
-    Assert.assertEquals(0, blocks.size());
-    //Assert.assertEquals((long)deletedBlockLog.getCurrentTXID(), 50L);
+    Assertions.assertEquals(0, blocks.size());
+    //Assertions.assertEquals((long)deletedBlockLog.getCurrentTXID(), 50L);
   }
 
   @Test
@@ -459,7 +459,7 @@ public class TestDeletedBlockLog {
 
     blocks = getTransactions(txNum * BLOCKS_PER_TXN);
     // There should be one txn remaining
-    Assert.assertEquals(1, blocks.size());
+    Assertions.assertEquals(1, blocks.size());
 
     // add two transactions for same container
     containerID = blocks.get(0).getContainerID();
@@ -474,7 +474,7 @@ public class TestDeletedBlockLog {
 
     // get should return two transactions for the same container
     blocks = getTransactions(txNum);
-    Assert.assertEquals(2, blocks.size());
+    Assertions.assertEquals(2, blocks.size());
   }
 
   private void mockContainerInfo(long containerID, DatanodeDetails dd)

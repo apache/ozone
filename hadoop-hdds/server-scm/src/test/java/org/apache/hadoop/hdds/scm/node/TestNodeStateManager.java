@@ -33,10 +33,10 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.util.Time;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -46,8 +46,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-import static junit.framework.TestCase.assertEquals;
-import static junit.framework.TestCase.assertNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 
@@ -62,7 +62,7 @@ public class TestNodeStateManager {
   private ConfigurationSource conf;
   private MockEventPublisher eventPublisher;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     conf = new ConfigurationSource() {
       @Override
@@ -90,7 +90,7 @@ public class TestNodeStateManager {
     nsm = new NodeStateManager(conf, eventPublisher, mockVersionManager);
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
   }
 
@@ -246,14 +246,14 @@ public class TestNodeStateManager {
 
     Set<ContainerID> containerSet = nsm.getContainers(dn.getUuid());
     assertEquals(2, containerSet.size());
-    Assert.assertTrue(containerSet.contains(ContainerID.valueOf(1)));
-    Assert.assertTrue(containerSet.contains(ContainerID.valueOf(2)));
+    Assertions.assertTrue(containerSet.contains(ContainerID.valueOf(1)));
+    Assertions.assertTrue(containerSet.contains(ContainerID.valueOf(2)));
 
     nsm.removeContainer(dn.getUuid(), ContainerID.valueOf(2));
     containerSet = nsm.getContainers(dn.getUuid());
     assertEquals(1, containerSet.size());
-    Assert.assertTrue(containerSet.contains(ContainerID.valueOf(1)));
-    Assert.assertFalse(containerSet.contains(ContainerID.valueOf(2)));
+    Assertions.assertTrue(containerSet.contains(ContainerID.valueOf(1)));
+    Assertions.assertFalse(containerSet.contains(ContainerID.valueOf(2)));
   }
 
   @Test

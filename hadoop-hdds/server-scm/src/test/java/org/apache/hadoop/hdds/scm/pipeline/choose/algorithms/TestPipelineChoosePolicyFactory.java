@@ -24,9 +24,9 @@ import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.List;
@@ -42,7 +42,7 @@ public class TestPipelineChoosePolicyFactory {
 
   private ScmConfig scmConfig;
 
-  @Before
+  @BeforeEach
   public void setup() {
     //initialize network topology instance
     conf = new OzoneConfiguration();
@@ -53,7 +53,7 @@ public class TestPipelineChoosePolicyFactory {
   public void testDefaultPolicy() throws IOException {
     PipelineChoosePolicy policy = PipelineChoosePolicyFactory
         .getPolicy(conf);
-    Assert.assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
+    Assertions.assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
         policy.getClass());
   }
 
@@ -78,7 +78,7 @@ public class TestPipelineChoosePolicyFactory {
     // set a policy class which does't have the right constructor implemented
     scmConfig.setPipelineChoosePolicyName(DummyImpl.class.getName());
     PipelineChoosePolicy policy = PipelineChoosePolicyFactory.getPolicy(conf);
-    Assert.assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
+    Assertions.assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
         policy.getClass());
   }
 
@@ -88,7 +88,7 @@ public class TestPipelineChoosePolicyFactory {
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         "org.apache.hadoop.hdds.scm.pipeline.choose.policy.HelloWorld");
     PipelineChoosePolicy policy = PipelineChoosePolicyFactory.getPolicy(conf);
-    Assert.assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
+    Assertions.assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
         policy.getClass());
   }
 }

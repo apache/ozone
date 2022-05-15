@@ -22,16 +22,16 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.ozone.test.TestClock;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
@@ -48,7 +48,7 @@ public class TestBackgroundPipelineScrubber {
   private OzoneConfiguration conf;
   private TestClock testClock;
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
     this.scmContext = SCMContext.emptyContext();
@@ -62,7 +62,7 @@ public class TestBackgroundPipelineScrubber {
         scmContext, testClock);
   }
 
-  @After
+  @AfterEach
   public void teardown() throws IOException {
     scrubber.stop();
   }
