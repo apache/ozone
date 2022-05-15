@@ -191,19 +191,24 @@ public class TestContainerPlacementFactory {
     }
   }
 
-  @Test(expected = SCMException.class)
-  public void testConstuctorNotFound() throws SCMException {
+  @Test
+  public void testConstuctorNotFound() {
     // set a placement class which does't have the right constructor implemented
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         DummyImpl.class.getName());
-    ContainerPlacementPolicyFactory.getPolicy(conf, null, null, true, null);
+
+    Assertions.assertThrows(SCMException.class, () ->
+        ContainerPlacementPolicyFactory.getPolicy(conf, null, null, true, null)
+    );
   }
 
-  @Test(expected = RuntimeException.class)
-  public void testClassNotImplemented() throws SCMException {
+  @Test
+  public void testClassNotImplemented() {
     // set a placement class not implemented
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         "org.apache.hadoop.hdds.scm.container.placement.algorithm.HelloWorld");
-    ContainerPlacementPolicyFactory.getPolicy(conf, null, null, true, null);
+    Assertions.assertThrows(RuntimeException.class, () ->
+        ContainerPlacementPolicyFactory.getPolicy(conf, null, null, true, null)
+    );
   }
 }

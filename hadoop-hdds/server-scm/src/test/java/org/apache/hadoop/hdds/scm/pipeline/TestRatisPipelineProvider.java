@@ -281,12 +281,12 @@ public class TestRatisPipelineProvider {
     List<DatanodeDetails> nodes = pipeline.getNodes();
 
     assertTrue(
-        "nodes of new pipeline cannot be all from open pipelines",
-        nodes.stream().noneMatch(membersOfOpenPipelines::contains));
+        nodes.stream().noneMatch(membersOfOpenPipelines::contains),
+        "nodes of new pipeline cannot be all from open pipelines");
 
     assertTrue(
-        "at least 1 node should have been from members of closed pipelines",
-        nodes.stream().anyMatch(membersOfClosedPipelines::contains));
+        nodes.stream().anyMatch(membersOfClosedPipelines::contains),
+        "at least 1 node should have been from members of closed pipelines");
     cleanup();
   }
 

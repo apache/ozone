@@ -134,14 +134,14 @@ public class TestSCMContainerPlacementCapacity {
       DatanodeDetails datanode0Details = datanodeDetails.get(0);
 
       Assertions.assertNotEquals(
-          "Datanode 0 should not been selected: excluded by parameter",
-          datanodes.get(0), datanode0Details);
+          datanodes.get(0), datanode0Details,
+          "Datanode 0 should not been selected: excluded by parameter");
       Assertions.assertNotEquals(
-          "Datanode 1 should not been selected: excluded by parameter",
-          datanodes.get(1), datanode0Details);
+          datanodes.get(1), datanode0Details,
+          "Datanode 1 should not been selected: excluded by parameter");
       Assertions.assertNotEquals(
-          "Datanode 2 should not been selected: not enough space there",
-          datanodes.get(2), datanode0Details);
+          datanodes.get(2), datanode0Details,
+          "Datanode 2 should not been selected: not enough space there");
 
       selectedCount
           .put(datanode0Details, selectedCount.get(datanode0Details) + 1);

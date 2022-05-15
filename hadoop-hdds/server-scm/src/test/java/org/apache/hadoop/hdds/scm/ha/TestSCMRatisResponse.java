@@ -79,11 +79,12 @@ public class TestSCMRatisResponse {
     Assertions.assertNull(response.getResult());
   }
 
-  @Test(expected =  InvalidProtocolBufferException.class)
-  public void testEncodeFailureWithNonProto() throws Exception {
+  @Test
+  public void testEncodeFailureWithNonProto() {
     // Non proto input
     Message message = Message.valueOf("test");
     // Should fail with exception.
-    SCMRatisResponse.encode(message);
+    Assertions.assertThrows(InvalidProtocolBufferException.class,
+        () -> SCMRatisResponse.encode(message));
   }
 }

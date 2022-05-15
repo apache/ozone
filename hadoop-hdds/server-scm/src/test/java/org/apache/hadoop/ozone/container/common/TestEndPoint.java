@@ -69,7 +69,6 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createEndpoint;
-import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -200,14 +199,13 @@ public class TestEndPoint {
           newState);
       List<HddsVolume> volumesList = StorageVolumeUtil.getHddsVolumesList(
           ozoneContainer.getVolumeSet().getFailedVolumesList());
-      Assertions.assertTrue(volumesList.size() == 1);
+      assertEquals(1, volumesList.size());
       Assertions.assertTrue(logCapturer.getOutput()
           .contains("org.apache.hadoop.ozone.common" +
               ".InconsistentStorageStateException: Mismatched ClusterIDs"));
-      Assertions.assertTrue(ozoneContainer.getVolumeSet().getVolumesList().size()
-          == 0);
-      Assertions.assertTrue(ozoneContainer.getVolumeSet().getFailedVolumesList()
-          .size() == 1);
+      assertEquals(0, ozoneContainer.getVolumeSet().getVolumesList().size());
+      assertEquals(1, ozoneContainer.getVolumeSet().getFailedVolumesList()
+          .size());
 
     }
   }
@@ -263,7 +261,7 @@ public class TestEndPoint {
       EndpointStateMachine.EndPointStates newState = versionTask.call();
       long end = Time.monotonicNow();
       scmServerImpl.setRpcResponseDelay(0);
-      Assertions.assertThat(end - start, lessThanOrEqualTo(rpcTimeout + tolerance));
+      Assertions.assertTrue(end - start <= rpcTimeout + tolerance);
       Assertions.assertEquals(EndpointStateMachine.EndPointStates.GETVERSION,
           newState);
     }
@@ -383,7 +381,7 @@ public class TestEndPoint {
     registerTaskHelper(serverAddress, 1000, false).close();
     long end = Time.monotonicNow();
     scmServerImpl.setRpcResponseDelay(0);
-    Assertions.assertThat(end - start, lessThanOrEqualTo(rpcTimeout + tolerance));
+    Assertions.assertTrue(end - start <= rpcTimeout + tolerance);
   }
 
   @Test
@@ -433,7 +431,7 @@ public class TestEndPoint {
           serverAddress, 3000);
       Map<Long, CommandStatus> map = stateContext.getCommandStatusMap();
       assertNotNull(map);
-      assertEquals("Should have 1 objects", 1, map.size());
+      assertEquals(1, map.size(), "Should have 1 objects");
       assertTrue(map.containsKey(3L));
       assertEquals(Type.deleteBlocksCommand, map.get(3L).getType());
       assertEquals(Status.PENDING, map.get(3L).getStatus());
@@ -537,8 +535,7 @@ public class TestEndPoint {
     long end = Time.monotonicNow();
     scmServerImpl.setRpcResponseDelay(0);
     // 6s is introduced by DeleteBlocksCommandHandler#stop
-    Assertions.assertThat(end - start,
-        lessThanOrEqualTo(rpcTimeout + tolerance + 6000));
+    Assertions.assertTrue(end - start <= rpcTimeout + tolerance + 6000);
   }
 
   private StateContext getContext(DatanodeDetails datanodeDetails) {

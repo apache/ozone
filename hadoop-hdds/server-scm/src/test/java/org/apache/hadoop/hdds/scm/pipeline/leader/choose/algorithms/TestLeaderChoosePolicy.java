@@ -55,18 +55,20 @@ public class TestLeaderChoosePolicy {
         MinLeaderCountChoosePolicy.class);
   }
 
-  @Test(expected = RuntimeException.class)
+  @Test
   public void testClassNotImplemented() {
     // set a class not implemented
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,
         "org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms" +
             ".HelloWorld");
-    new RatisPipelineProvider(
-        mock(NodeManager.class),
-        mock(PipelineStateManagerImpl.class),
-        conf,
-        mock(EventPublisher.class),
-        SCMContext.emptyContext());
+    Assertions.assertThrows(RuntimeException.class, () ->
+        new RatisPipelineProvider(
+            mock(NodeManager.class),
+            mock(PipelineStateManagerImpl.class),
+            conf,
+            mock(EventPublisher.class),
+            SCMContext.emptyContext())
+    );
 
     // expecting exception
   }

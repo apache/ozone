@@ -413,11 +413,11 @@ public class TestPipelineManagerImpl {
         pipelineReportHandler, true);
 
     // pipeline is healthy when all dns report
-    Assert
-        .assertTrue(pipelineManager.getPipeline(pipeline.getId()).isHealthy());
+    Assertions.assertTrue(
+        pipelineManager.getPipeline(pipeline.getId()).isHealthy());
     // pipeline should now move to open state
-    Assert
-        .assertTrue(pipelineManager.getPipeline(pipeline.getId()).isOpen());
+    Assertions.assertTrue(
+        pipelineManager.getPipeline(pipeline.getId()).isOpen());
 
     // close the pipeline
     pipelineManager.closePipeline(pipeline, false);

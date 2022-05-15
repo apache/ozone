@@ -48,23 +48,25 @@ public class TestSCMRatisRequest {
         SCMRatisRequest.decode(request.encode()).getArguments()[0]);
   }
 
-  @Test(expected = InvalidProtocolBufferException.class)
-  public void testEncodeWithNonProto() throws Exception {
+  @Test
+  public void testEncodeWithNonProto() {
     PipelineID pipelineID = PipelineID.randomId();
     // Non proto args
     Object[] args = new Object[] {pipelineID};
     SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, "test",
         new Class[]{pipelineID.getClass()}, args);
     // Should throw exception there.
-    request.encode();
+    Assertions.assertThrows(InvalidProtocolBufferException.class,
+        request::encode);
   }
 
-  @Test(expected = InvalidProtocolBufferException.class)
-  public void testDecodeWithNonProto() throws Exception {
+  @Test
+  public void testDecodeWithNonProto() {
     // Non proto message
     Message message = Message.valueOf("randomMessage");
     // Should throw exception there.
-    SCMRatisRequest.decode(message);
+    Assertions.assertThrows(InvalidProtocolBufferException.class,
+        () -> SCMRatisRequest.decode(message));
   }
 
   @Test

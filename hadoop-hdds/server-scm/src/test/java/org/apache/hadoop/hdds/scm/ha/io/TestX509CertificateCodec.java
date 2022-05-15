@@ -50,12 +50,13 @@ public class TestX509CertificateCodec {
 
   }
 
-  @Test(expected = InvalidProtocolBufferException.class)
-  public void testCodecError() throws Exception {
+  @Test
+  public void testCodecError() {
 
     X509CertificateCodec x509CertificateCodec = new X509CertificateCodec();
     ByteString byteString = ByteString.copyFrom("dummy".getBytes(UTF_8));
 
-    x509CertificateCodec.deserialize(X509Certificate.class, byteString);
+    Assertions.assertThrows(InvalidProtocolBufferException.class, () ->
+        x509CertificateCodec.deserialize(X509Certificate.class, byteString));
   }
 }

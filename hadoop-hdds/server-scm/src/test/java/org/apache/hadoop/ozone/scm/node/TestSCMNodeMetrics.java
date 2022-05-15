@@ -114,8 +114,8 @@ public class TestSCMNodeMetrics {
         .build();
     nodeManager.processHeartbeat(registeredDatanode, layoutInfo);
 
-    assertEquals("NumHBProcessed", hbProcessed + 1,
-        getCounter("NumHBProcessed"));
+    assertEquals(hbProcessed + 1, getCounter("NumHBProcessed"),
+        "NumHBProcessed");
   }
 
   /**
@@ -134,8 +134,8 @@ public class TestSCMNodeMetrics {
     nodeManager.processHeartbeat(MockDatanodeDetails
         .randomDatanodeDetails(), layoutInfo);
 
-    assertEquals("NumHBProcessingFailed", hbProcessedFailed + 1,
-        getCounter("NumHBProcessingFailed"));
+    assertEquals(hbProcessedFailed + 1, getCounter("NumHBProcessingFailed"),
+        "NumHBProcessingFailed");
   }
 
   /**
@@ -155,8 +155,9 @@ public class TestSCMNodeMetrics {
         .addStorageReport(storageReport).build();
 
     nodeManager.processNodeReport(registeredDatanode, nodeReport);
-    Assertions.assertEquals("NumNodeReportProcessed", nrProcessed + 1,
-        getCounter("NumNodeReportProcessed"));
+    Assertions.assertEquals(nrProcessed + 1,
+        getCounter("NumNodeReportProcessed"),
+        "NumNodeReportProcessed");
   }
 
   /**
@@ -176,8 +177,8 @@ public class TestSCMNodeMetrics {
         .addStorageReport(storageReport).build();
 
     nodeManager.processNodeReport(randomDatanode, nodeReport);
-    assertEquals("NumNodeReportProcessingFailed", nrProcessed + 1,
-        getCounter("NumNodeReportProcessingFailed"));
+    assertEquals(nrProcessed + 1, getCounter("NumNodeReportProcessingFailed"),
+        "NumNodeReportProcessingFailed");
   }
 
   /**
