@@ -70,6 +70,7 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslator
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -211,6 +212,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
@@ -1026,6 +1029,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     LOG.info("Creating RPC Server");
     InetSocketAddress omNodeRpcAddr = OmUtils.getOmAddress(conf);
+    boolean flexibleFqdnResolutionEnabled = conf.getBoolean(
+            OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
+            OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT);
+    if (flexibleFqdnResolutionEnabled && omNodeRpcAddr.getAddress() == null) {
+      omNodeRpcAddr =
+              OzoneNetUtils.getAddressWithHostNameLocal(omNodeRpcAddr);
+    }
 
     final int handlerCount = conf.getInt(OZONE_OM_HANDLER_COUNT_KEY,
         OZONE_OM_HANDLER_COUNT_DEFAULT);
@@ -2034,17 +2044,35 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     CertificateSignRequest.Builder builder = client.getCSRBuilder();
     KeyPair keyPair = new KeyPair(client.getPublicKey(),
         client.getPrivateKey());
-    InetSocketAddress omRpcAdd;
-    omRpcAdd = OmUtils.getOmAddress(config);
-    if (omRpcAdd == null || omRpcAdd.getAddress() == null) {
+    boolean flexibleFqdnResolutionEnabled = config.getBoolean(
+            OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
+            OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT);
+    InetSocketAddress omRpcAdd = OmUtils.getOmAddress(config);
+    String ip = null;
+
+    boolean addressResolved = omRpcAdd != null && omRpcAdd.getAddress() != null;
+    if (flexibleFqdnResolutionEnabled && !addressResolved && omRpcAdd != null) {
+      InetSocketAddress omRpcAddWithHostName =
+              OzoneNetUtils.getAddressWithHostNameLocal(omRpcAdd);
+      if (omRpcAddWithHostName != null
+              && omRpcAddWithHostName.getAddress() != null) {
+        addressResolved = true;
+        ip = omRpcAddWithHostName.getAddress().getHostAddress();
+      }
+    }
+
+    if (!addressResolved) {
       LOG.error("Incorrect om rpc address. omRpcAdd:{}", omRpcAdd);
       throw new RuntimeException("Can't get SCM signed certificate. " +
           "omRpcAdd: " + omRpcAdd);
     }
-    // Get host name.
-    String hostname = omRpcAdd.getAddress().getHostName();
-    String ip = omRpcAdd.getAddress().getHostAddress();
 
+    if (ip == null) {
+      ip = omRpcAdd.getAddress().getHostAddress();
+    }
+
+    String hostname = omRpcAdd.getHostName();
+    int port = omRpcAdd.getPort();
     String subject;
     if (builder.hasDnsName()) {
       subject = UserGroupInformation.getCurrentUser().getShortUserName()
@@ -2074,12 +2102,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     HddsProtos.OzoneManagerDetailsProto.Builder omDetailsProtoBuilder =
         HddsProtos.OzoneManagerDetailsProto.newBuilder()
-            .setHostName(omRpcAdd.getHostName())
+            .setHostName(hostname)
             .setIpAddress(ip)
             .setUuid(omStore.getOmId())
             .addPorts(HddsProtos.Port.newBuilder()
                 .setName(RPC_PORT)
-                .setValue(omRpcAdd.getPort())
+                .setValue(port)
                 .build());
 
     PKCS10CertificationRequest csr = builder.build();
