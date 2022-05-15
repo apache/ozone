@@ -204,7 +204,8 @@ public class TestCloseContainerEventHandler {
     i = 0;
     for (DatanodeDetails details : pipelineManager
         .getPipeline(container.getPipelineID()).getNodes()) {
-      Assertions.assertEquals(closeCount[i], nodeManager.getCommandCount(details));
+      Assertions.assertEquals(closeCount[i],
+          nodeManager.getCommandCount(details));
       i++;
     }
     eventQueue.fireEvent(CLOSE_CONTAINER, id);

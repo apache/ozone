@@ -85,7 +85,8 @@ public class TestCommandQueueReportHandler implements EventPublisher {
     for (int i = 0; i < commandCount; i++) {
       int storedCount = nodeManager.getNodeQueuedCommandCount(dn,
           commandReport.getReport().getCommand(i));
-      Assertions.assertEquals(commandReport.getReport().getCount(i), storedCount);
+      Assertions.assertEquals(commandReport.getReport().getCount(i),
+          storedCount);
       Assertions.assertTrue(storedCount > 0);
     }
   }

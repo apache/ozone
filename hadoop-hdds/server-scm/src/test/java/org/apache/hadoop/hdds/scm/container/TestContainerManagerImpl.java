@@ -176,7 +176,8 @@ public class TestContainerManagerImpl {
     final ContainerInfo admin = containerManager
         .allocateContainer(new ECReplicationConfig(3, 2), "admin");
     Assertions.assertEquals(1, containerManager.getContainers().size());
-    Assertions.assertNotNull(containerManager.getContainer(admin.containerID()));
+    Assertions.assertNotNull(
+        containerManager.getContainer(admin.containerID()));
   }
 
 }

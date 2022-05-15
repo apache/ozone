@@ -367,17 +367,20 @@ public class TestPipelineStateManagerImpl {
 
     stateManager.addContainerToPipeline(pipeline.getId(),
         ContainerID.valueOf(containerID));
-    Assertions.assertEquals(1, stateManager.getContainers(pipeline.getId()).size());
+    Assertions.assertEquals(1,
+        stateManager.getContainers(pipeline.getId()).size());
     stateManager.removeContainerFromPipeline(pipeline.getId(),
         ContainerID.valueOf(containerID));
-    Assertions.assertEquals(0, stateManager.getContainers(pipeline.getId()).size());
+    Assertions.assertEquals(0,
+        stateManager.getContainers(pipeline.getId()).size());
 
     // add two containers in the pipeline
     stateManager.addContainerToPipeline(pipeline.getId(),
         ContainerID.valueOf(++containerID));
     stateManager.addContainerToPipeline(pipeline.getId(),
         ContainerID.valueOf(++containerID));
-    Assertions.assertEquals(2, stateManager.getContainers(pipeline.getId()).size());
+    Assertions.assertEquals(2,
+        stateManager.getContainers(pipeline.getId()).size());
 
     // move pipeline to closing state
     finalizePipeline(pipelineProto);
@@ -386,7 +389,8 @@ public class TestPipelineStateManagerImpl {
         ContainerID.valueOf(containerID));
     stateManager.removeContainerFromPipeline(pipeline.getId(),
         ContainerID.valueOf(--containerID));
-    Assertions.assertEquals(0, stateManager.getContainers(pipeline.getId()).size());
+    Assertions.assertEquals(0,
+        stateManager.getContainers(pipeline.getId()).size());
 
     // clean up
     removePipeline(pipelineProto);

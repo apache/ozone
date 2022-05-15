@@ -223,12 +223,14 @@ public class TestSCMHAConfiguration {
         NetUtils.createSocketAddr("0.0.0.0", 9896);
     InetSocketAddress datanodeAddress =
         NetUtils.createSocketAddr("0.0.0.0", 9898);
-    Assertions.assertEquals(clientAddress, scmhaNodeDetails.getLocalNodeDetails()
+    Assertions.assertEquals(clientAddress,
+        scmhaNodeDetails.getLocalNodeDetails()
             .getClientProtocolServerAddress());
     Assertions.assertEquals(blockAddress, scmhaNodeDetails.getLocalNodeDetails()
         .getBlockProtocolServerAddress());
-    Assertions.assertEquals(datanodeAddress, scmhaNodeDetails.getLocalNodeDetails()
-        .getDatanodeProtocolServerAddress());
+    Assertions.assertEquals(datanodeAddress,
+        scmhaNodeDetails.getLocalNodeDetails()
+            .getDatanodeProtocolServerAddress());
 
     Assertions.assertEquals(10000,
         scmhaNodeDetails.getLocalNodeDetails().getRatisPort());
@@ -236,8 +238,10 @@ public class TestSCMHAConfiguration {
         scmhaNodeDetails.getLocalNodeDetails().getGrpcPort());
 
     for (SCMNodeDetails peer : scmhaNodeDetails.getPeerNodeDetails()) {
-      Assertions.assertEquals(clientAddress, peer.getClientProtocolServerAddress());
-      Assertions.assertEquals(blockAddress, peer.getBlockProtocolServerAddress());
+      Assertions.assertEquals(clientAddress,
+          peer.getClientProtocolServerAddress());
+      Assertions.assertEquals(blockAddress,
+          peer.getBlockProtocolServerAddress());
       Assertions.assertEquals(datanodeAddress,
           peer.getDatanodeProtocolServerAddress());
 

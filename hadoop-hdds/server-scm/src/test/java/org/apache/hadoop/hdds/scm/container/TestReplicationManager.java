@@ -443,8 +443,9 @@ public class TestReplicationManager {
 
     replicationManager.processAll();
     eventQueue.processAll(1000);
-    Assertions.assertEquals(currentDeleteCommandCount + 1, datanodeCommandHandler
-        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
+    Assertions.assertEquals(currentDeleteCommandCount + 1,
+        datanodeCommandHandler
+            .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
     Assertions.assertTrue(datanodeCommandHandler.received(
         SCMCommandProto.Type.deleteContainerCommand,
         replicaOne.getDatanodeDetails()));
@@ -469,7 +470,8 @@ public class TestReplicationManager {
         replicationManager.getMetrics().getNumReplicationCmdsSent());
     Assertions.assertEquals(currentBytesToReplicate + 100L,
         replicationManager.getMetrics().getNumReplicationBytesTotal());
-    Assertions.assertEquals(1, replicationManager.getInflightReplication().size());
+    Assertions.assertEquals(1,
+        replicationManager.getInflightReplication().size());
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightReplication());
 
@@ -497,7 +499,8 @@ public class TestReplicationManager {
     replicationManager.processAll();
     eventQueue.processAll(1000);
 
-    Assertions.assertEquals(0, replicationManager.getInflightReplication().size());
+    Assertions.assertEquals(0,
+        replicationManager.getInflightReplication().size());
     Assertions.assertEquals(0, replicationManager.getMetrics()
         .getInflightReplication());
     Assertions.assertEquals(currentReplicationCommandCompleted + 1,
@@ -544,8 +547,9 @@ public class TestReplicationManager {
 
     replicationManager.processAll();
     eventQueue.processAll(1000);
-    Assertions.assertEquals(currentDeleteCommandCount + 1, datanodeCommandHandler
-        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
+    Assertions.assertEquals(currentDeleteCommandCount + 1,
+        datanodeCommandHandler
+            .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
     Assertions.assertEquals(currentDeleteCommandCount + 1,
         replicationManager.getMetrics().getNumDeletionCmdsSent());
     Assertions.assertEquals(1, replicationManager.getInflightDeletion().size());
@@ -632,8 +636,9 @@ public class TestReplicationManager {
 
     replicationManager.processAll();
     eventQueue.processAll(1000);
-    Assertions.assertEquals(currentDeleteCommandCount + 1, datanodeCommandHandler
-        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
+    Assertions.assertEquals(currentDeleteCommandCount + 1,
+        datanodeCommandHandler
+            .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
     Assertions.assertTrue(datanodeCommandHandler.received(
         SCMCommandProto.Type.deleteContainerCommand,
         replicaOne.getDatanodeDetails()));
@@ -705,7 +710,8 @@ public class TestReplicationManager {
         replicationManager.getMetrics().getNumReplicationCmdsSent());
     Assertions.assertEquals(currentBytesToReplicate + 100,
         replicationManager.getMetrics().getNumReplicationBytesTotal());
-    Assertions.assertEquals(1, replicationManager.getInflightReplication().size());
+    Assertions.assertEquals(1,
+        replicationManager.getInflightReplication().size());
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightReplication());
 
@@ -736,7 +742,8 @@ public class TestReplicationManager {
         replicationManager.getMetrics().getNumReplicationCmdsCompleted());
     Assertions.assertEquals(currentReplicateBytesCompleted + 100,
         replicationManager.getMetrics().getNumReplicationBytesCompleted());
-    Assertions.assertEquals(0, replicationManager.getInflightReplication().size());
+    Assertions.assertEquals(0,
+        replicationManager.getInflightReplication().size());
     Assertions.assertEquals(0, replicationManager.getMetrics()
         .getInflightReplication());
 
@@ -827,8 +834,9 @@ public class TestReplicationManager {
 
     replicationManager.processAll();
     eventQueue.processAll(1000);
-    Assertions.assertEquals(currentDeleteCommandCount + 1, datanodeCommandHandler
-        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
+    Assertions.assertEquals(currentDeleteCommandCount + 1,
+        datanodeCommandHandler
+            .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
     // ReplicaTwo should be deleted, that is the unhealthy one
     Assertions.assertTrue(datanodeCommandHandler.received(
         SCMCommandProto.Type.deleteContainerCommand,
@@ -837,7 +845,8 @@ public class TestReplicationManager {
         replicationManager.getMetrics().getNumDeletionCmdsSent());
     Assertions.assertEquals(currentBytesToDelete + 99,
         replicationManager.getMetrics().getNumDeletionBytesTotal());
-    Assertions.assertEquals(1, replicationManager.getInflightDeletion().size());
+    Assertions.assertEquals(1,
+        replicationManager.getInflightDeletion().size());
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightDeletion());
 
@@ -874,7 +883,8 @@ public class TestReplicationManager {
             SCMCommandProto.Type.replicateContainerCommand));
     Assertions.assertEquals(currentReplicateCommandCount + 2,
         replicationManager.getMetrics().getNumReplicationCmdsSent());
-    Assertions.assertEquals(1, replicationManager.getInflightReplication().size());
+    Assertions.assertEquals(1,
+        replicationManager.getInflightReplication().size());
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightReplication());
 
@@ -1061,13 +1071,15 @@ public class TestReplicationManager {
     // At this stage, due to the mocked calls to validateContainerPlacement
     // the policy will not be satisfied, and replication will be triggered.
 
-    Assertions.assertEquals(currentReplicateCommandCount + 1, datanodeCommandHandler
-        .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand));
+    Assertions.assertEquals(currentReplicateCommandCount + 1,
+        datanodeCommandHandler.getInvocationCount(
+            SCMCommandProto.Type.replicateContainerCommand));
     Assertions.assertEquals(currentReplicateCommandCount + 1,
         replicationManager.getMetrics().getNumReplicationCmdsSent());
     Assertions.assertEquals(currentBytesToReplicate + 100,
         replicationManager.getMetrics().getNumReplicationBytesTotal());
-    Assertions.assertEquals(1, replicationManager.getInflightReplication().size());
+    Assertions.assertEquals(1,
+        replicationManager.getInflightReplication().size());
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightReplication());
 
@@ -1098,7 +1110,8 @@ public class TestReplicationManager {
         .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand));
     Assertions.assertEquals(currentReplicateCommandCount,
         replicationManager.getMetrics().getNumReplicationCmdsSent());
-    Assertions.assertEquals(1, replicationManager.getInflightReplication().size());
+    Assertions.assertEquals(1,
+        replicationManager.getInflightReplication().size());
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightReplication());
   }
@@ -1144,8 +1157,9 @@ public class TestReplicationManager {
     // The unhealthy replica should be removed, but not the other replica
     // as each time we test with 3 replicas, Mockito ensures it returns
     // mis-replicated
-    Assertions.assertEquals(currentDeleteCommandCount + 1, datanodeCommandHandler
-        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
+    Assertions.assertEquals(currentDeleteCommandCount + 1,
+        datanodeCommandHandler
+            .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
     Assertions.assertEquals(currentDeleteCommandCount + 1,
         replicationManager.getMetrics().getNumDeletionCmdsSent());
 
@@ -1190,8 +1204,9 @@ public class TestReplicationManager {
 
     replicationManager.processAll();
     eventQueue.processAll(1000);
-    Assertions.assertEquals(currentDeleteCommandCount + 1, datanodeCommandHandler
-        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
+    Assertions.assertEquals(currentDeleteCommandCount + 1,
+        datanodeCommandHandler
+            .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
     Assertions.assertEquals(currentDeleteCommandCount + 1,
         replicationManager.getMetrics().getNumDeletionCmdsSent());
     Assertions.assertEquals(1, replicationManager.getInflightDeletion().size());
@@ -1237,8 +1252,9 @@ public class TestReplicationManager {
 
     replicationManager.processAll();
     eventQueue.processAll(1000);
-    Assertions.assertEquals(currentDeleteCommandCount + 2, datanodeCommandHandler
-        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
+    Assertions.assertEquals(currentDeleteCommandCount + 2,
+        datanodeCommandHandler
+            .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
     Assertions.assertEquals(currentDeleteCommandCount + 2,
         replicationManager.getMetrics().getNumDeletionCmdsSent());
     Assertions.assertEquals(1, replicationManager.getInflightDeletion().size());
@@ -1425,8 +1441,9 @@ public class TestReplicationManager {
 
     replicationManager.processAll();
     eventQueue.processAll(1000);
-    Assertions.assertEquals(currentDeleteCommandCount + 2, datanodeCommandHandler
-        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
+    Assertions.assertEquals(currentDeleteCommandCount + 2,
+        datanodeCommandHandler
+            .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
     Assertions.assertEquals(currentDeleteCommandCount + 2,
         replicationManager.getMetrics().getNumDeletionCmdsSent());
     Assertions.assertEquals(1, replicationManager.getInflightDeletion().size());
@@ -1639,7 +1656,8 @@ public class TestReplicationManager {
     Assertions.assertFalse(datanodeCommandHandler.received(
         SCMCommandProto.Type.deleteContainerCommand, dn1.getDatanodeDetails()));
 
-    Assertions.assertTrue(cf.isDone() && cf.get() == MoveResult.DELETE_FAIL_POLICY);
+    Assertions.assertTrue(cf.isDone() &&
+        cf.get() == MoveResult.DELETE_FAIL_POLICY);
   }
 
 
@@ -1736,7 +1754,7 @@ public class TestReplicationManager {
     //quasi_closed -> closed
     containerStateManager.updateContainerState(id.getProtobuf(),
         LifeCycleEvent.FORCE_CLOSE);
-    Assertions.assertTrue(LifeCycleState.CLOSED ==
+    Assertions.assertSame(LifeCycleState.CLOSED,
         containerStateManager.getContainer(id).getState());
 
     //Node is not in healthy state

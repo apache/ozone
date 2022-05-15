@@ -117,14 +117,14 @@ public class TestStatisticsUpdate {
         Mockito.mock(EventPublisher.class));
 
     SCMNodeStat stat = nodeManager.getStats();
-    Assertions.assertEquals(300L, stat.getCapacity().get().longValue());
-    Assertions.assertEquals(270L, stat.getRemaining().get().longValue());
-    Assertions.assertEquals(30L, stat.getScmUsed().get().longValue());
+    Assertions.assertEquals(300L, stat.getCapacity().get());
+    Assertions.assertEquals(270L, stat.getRemaining().get());
+    Assertions.assertEquals(30L, stat.getScmUsed().get());
 
     SCMNodeMetric nodeStat = nodeManager.getNodeStat(datanode1);
-    Assertions.assertEquals(100L, nodeStat.get().getCapacity().get().longValue());
-    Assertions.assertEquals(90L, nodeStat.get().getRemaining().get().longValue());
-    Assertions.assertEquals(10L, nodeStat.get().getScmUsed().get().longValue());
+    Assertions.assertEquals(100L, nodeStat.get().getCapacity().get());
+    Assertions.assertEquals(90L, nodeStat.get().getRemaining().get());
+    Assertions.assertEquals(10L, nodeStat.get().getScmUsed().get());
 
     //TODO: Support logic to mark a node as dead in NodeManager.
 
@@ -143,10 +143,10 @@ public class TestStatisticsUpdate {
     nodeManager.processHeartbeat(datanode2, layoutInfo);
     //THEN statistics in SCM should changed.
     stat = nodeManager.getStats();
-    Assertions.assertEquals(200L, stat.getCapacity().get().longValue());
+    Assertions.assertEquals(200L, stat.getCapacity().get());
     Assertions.assertEquals(180L,
-        stat.getRemaining().get().longValue());
-    Assertions.assertEquals(20L, stat.getScmUsed().get().longValue());
+        stat.getRemaining().get());
+    Assertions.assertEquals(20L, stat.getScmUsed().get());
   }
 
 }

@@ -288,7 +288,8 @@ public class TestEndPoint {
       Assertions.assertNotNull(responseProto.getClusterID());
       Assertions.assertEquals(10, scmServerImpl.
           getContainerCountsForDatanode(nodeToRegister));
-      Assertions.assertEquals(1, scmServerImpl.getNodeReportsCount(nodeToRegister));
+      Assertions.assertEquals(1,
+          scmServerImpl.getNodeReportsCount(nodeToRegister));
     }
   }
 

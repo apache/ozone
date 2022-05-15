@@ -477,7 +477,8 @@ public class TestPipelineManagerImpl {
       fail();
     } catch (SCMException ioe) {
       // pipeline creation failed this time.
-      Assertions.assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
+      Assertions.assertEquals(
+          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
           ioe.getResult());
     }
 
