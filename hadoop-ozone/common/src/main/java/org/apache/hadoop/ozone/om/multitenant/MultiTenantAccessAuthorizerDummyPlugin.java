@@ -174,12 +174,12 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public long getCurrentOzoneServiceVersion(int ozoneServiceId) {
+  public long getCurrentOzoneServiceVersion() {
     return -1;
   }
 
   @Override
-  public String getAllMultiTenantPolicies(int ozoneServiceId) {
+  public String getAllMultiTenantPolicies() {
     return null;
   }
 

@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
@@ -41,8 +42,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
@@ -81,7 +80,6 @@ public class OMRangerBGSyncService extends BackgroundService {
   // Maximum number of attempts for each sync run
   private static final int MAX_ATTEMPT = 2;
   private final AtomicLong runCount = new AtomicLong(0);
-  private int rangerOzoneServiceId;
 
   private volatile boolean isServiceStarted = false;
 
@@ -109,6 +107,11 @@ public class OMRangerBGSyncService extends BackgroundService {
 
     public HashSet<String> getUserSet() {
       return userSet;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(name, id, userSet);
     }
 
     @Override
@@ -151,8 +154,8 @@ public class OMRangerBGSyncService extends BackgroundService {
 
   public OMRangerBGSyncService(OzoneManager ozoneManager,
       MultiTenantAccessAuthorizer authorizer, long interval,
-      TimeUnit unit, long serviceTimeout)
-      throws IOException {
+      TimeUnit unit, long serviceTimeout) {
+
     super("OMRangerBGSyncService", interval, unit, 1, serviceTimeout);
 
     this.ozoneManager = ozoneManager;
@@ -161,18 +164,7 @@ public class OMRangerBGSyncService extends BackgroundService {
 
     this.authorizer = authorizer;
 
-    if (authorizer != null) {
-      if (authorizer instanceof MultiTenantAccessAuthorizerRangerPlugin) {
-        MultiTenantAccessAuthorizerRangerPlugin rangerAuthorizer =
-            (MultiTenantAccessAuthorizerRangerPlugin) authorizer;
-        rangerOzoneServiceId = rangerAuthorizer.getRangerOzoneServiceId();
-      } else if (
-          !(authorizer instanceof MultiTenantAccessAuthorizerDummyPlugin)) {
-        throw new OMException("Unsupported MultiTenantAccessAuthorizer: " +
-            authorizer.getClass().getSimpleName(),
-            ResultCodes.INTERNAL_ERROR);
-      }
-    } else {
+    if (authorizer == null) {
       // authorizer can be null for unit tests
       LOG.warn("MultiTenantAccessAuthorizer is not set");
     }
@@ -297,7 +289,7 @@ public class OMRangerBGSyncService extends BackgroundService {
   }
 
   long retrieveRangerServiceVersion() throws IOException {
-    return authorizer.getCurrentOzoneServiceVersion(rangerOzoneServiceId);
+    return authorizer.getCurrentOzoneServiceVersion();
   }
 
   private RaftClientRequest newRaftClientRequest(OMRequest omRequest) {
@@ -383,8 +375,7 @@ public class OMRangerBGSyncService extends BackgroundService {
     }
     // TODO: incremental policies API is broken. We are getting all the
     //  Multi-Tenant policies using Ranger labels.
-    String allPolicies = authorizer.getAllMultiTenantPolicies(
-        rangerOzoneServiceId);
+    String allPolicies = authorizer.getAllMultiTenantPolicies();
     JsonObject jObject = new JsonParser().parse(allPolicies).getAsJsonObject();
     JsonArray policyArray = jObject.getAsJsonArray("policies");
     for (int i = 0; i < policyArray.size(); ++i) {

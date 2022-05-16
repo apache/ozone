@@ -90,6 +90,10 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   private int connectionRequestTimeout;
   private String authHeaderValue;
   private String rangerHttpsAddress;
+  // Stores Ranger cm_ozone service ID. This value should not change (unless
+  // somehow Ranger cm_ozone service is deleted and re-created while OM is
+  // still running and not reloaded / restarted).
+  private int rangerOzoneServiceId;
 
   @Override
   public void init(Configuration configuration) throws IOException {
@@ -102,6 +106,13 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
           OMException.ResultCodes.INTERNAL_ERROR);
     }
     initializeRangerConnection();
+
+    // Get Ranger cm_ozone service ID
+    rangerOzoneServiceId = retrieveRangerOzoneServiceId();
+  }
+
+  int getRangerOzoneServiceId() {
+    return rangerOzoneServiceId;
   }
 
   private void initializeRangerConnection() {
@@ -570,10 +581,10 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   /**
-   * Return the service ID for Ozone service in Ranger.
+   * Returns the service ID for Ozone service in Ranger.
    * TODO: Error handling when Ozone service doesn't exist in Ranger.
    */
-  public int getRangerOzoneServiceId() throws IOException {
+  public int retrieveRangerOzoneServiceId() throws IOException {
 
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT;
@@ -595,10 +606,9 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return id;
   }
 
-  public long getCurrentOzoneServiceVersion(int ozoneServiceId)
-      throws IOException {
+  public long getCurrentOzoneServiceVersion() throws IOException {
     String rangerAdminUrl = rangerHttpsAddress
-        + OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT + ozoneServiceId;
+        + OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT + getRangerOzoneServiceId();
 
     HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl, "GET", false);
     String sInfo = getResponseData(conn);
@@ -616,10 +626,9 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return sInfo;
   }
 
-  public String getAllMultiTenantPolicies(int ozoneServiceId)
-      throws IOException {
+  public String getAllMultiTenantPolicies() throws IOException {
     String rangerAdminUrl = rangerHttpsAddress
-        + OZONE_OM_RANGER_ALL_POLICIES_ENDPOINT + ozoneServiceId
+        + OZONE_OM_RANGER_ALL_POLICIES_ENDPOINT + getRangerOzoneServiceId()
         + "?policyLabelsPartial=" + OZONE_TENANT_RANGER_POLICY_LABEL;
     // Note: policyLabels (not partial) arg doesn't seem to work for Ranger
     // at this point. When Ranger fixed this we could use exact match instead.

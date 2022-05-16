@@ -258,9 +258,9 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
   boolean checkAccess(IOzoneObj ozoneObject, RequestContext context)
       throws OMException;
 
-  long getCurrentOzoneServiceVersion(int ozoneServiceId) throws IOException;
+  long getCurrentOzoneServiceVersion() throws IOException;
 
-  String getAllMultiTenantPolicies(int ozoneServiceId) throws IOException;
+  String getAllMultiTenantPolicies() throws IOException;
 
   MultiTenantAccessController getMultiTenantAccessController();
 }
