@@ -61,7 +61,7 @@ import org.apache.hadoop.ozone.om.request.s3.security.OMSetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3RevokeSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignUserAccessIdRequest;
-import org.apache.hadoop.ozone.om.request.s3.tenant.OMRangerServiceVersionSyncRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMSetRangerServiceVersionRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignAdminRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantDeleteRequest;
@@ -202,8 +202,8 @@ public final class OzoneManagerRatisUtils {
       return new OMTenantAssignAdminRequest(omRequest);
     case TenantRevokeAdmin:
       return new OMTenantRevokeAdminRequest(omRequest);
-    case RangerServiceVersionSync:
-      return new OMRangerServiceVersionSyncRequest(omRequest);
+    case SetRangerServiceVersion:
+      return new OMSetRangerServiceVersionRequest(omRequest);
 
     /*
      * Key requests that can have multiple variants based on the bucket layout

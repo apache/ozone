@@ -27,30 +27,28 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.s3.tenant.OMRangerServiceVersionSyncResponse;
+import org.apache.hadoop.ozone.om.response.s3.tenant.OMSetRangerServiceVersionResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerServiceVersionSyncRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerServiceVersionSyncResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetRangerServiceVersionRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetRangerServiceVersionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Optional;
 
-/*
- * This request is issued by the RangerSync Background thread to update the
- * OzoneServiceVersion as read from the Ranger during the  most up-to-date
- * ranger-to-OMDB sync operation.
- */
-
 /**
- * Handles OMRangerServiceVersionSync request.
+ * Handles OMSetRangerServiceVersionRequest.
+ *
+ * This is an Ozone Manager internal request issued only by the Ranger
+ * Background Sync service (OMRangerBGSyncService). This request writes
+ * OzoneServiceVersion (retrieved from Ranger) to OM DB during the sync.
  */
-public class OMRangerServiceVersionSyncRequest extends OMClientRequest {
+public class OMSetRangerServiceVersionRequest extends OMClientRequest {
   public static final Logger LOG =
-      LoggerFactory.getLogger(OMRangerServiceVersionSyncRequest.class);
+      LoggerFactory.getLogger(OMSetRangerServiceVersionRequest.class);
 
-  public OMRangerServiceVersionSyncRequest(OMRequest omRequest) {
+  public OMSetRangerServiceVersionRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
@@ -63,18 +61,18 @@ public class OMRangerServiceVersionSyncRequest extends OMClientRequest {
     final OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    final RangerServiceVersionSyncRequest request =
-        getOmRequest().getRangerServiceVersionSyncRequest();
+    final SetRangerServiceVersionRequest request =
+        getOmRequest().getSetRangerServiceVersionRequest();
     final long proposedVersion = request.getRangerServiceVersion();
     final String proposedVersionStr = String.valueOf(proposedVersion);
 
     omMetadataManager.getMetaTable().addCacheEntry(
         new CacheKey<>(OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY),
         new CacheValue<>(Optional.of(proposedVersionStr), transactionLogIndex));
-    omResponse.setRangerServiceVersionSyncResponse(
-        RangerServiceVersionSyncResponse.newBuilder().build());
+    omResponse.setSetRangerServiceVersionResponse(
+        SetRangerServiceVersionResponse.newBuilder().build());
 
-    omClientResponse = new OMRangerServiceVersionSyncResponse(
+    omClientResponse = new OMSetRangerServiceVersionResponse(
         omResponse.build(),
         OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY,
         proposedVersionStr);

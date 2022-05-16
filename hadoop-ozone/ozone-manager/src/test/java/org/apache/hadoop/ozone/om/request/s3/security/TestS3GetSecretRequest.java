@@ -36,11 +36,11 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignUserAccessIdRequest;
-import org.apache.hadoop.ozone.om.request.s3.tenant.OMRangerServiceVersionSyncRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMSetRangerServiceVersionRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.security.S3GetSecretResponse;
-import org.apache.hadoop.ozone.om.response.s3.tenant.OMRangerServiceVersionSyncResponse;
+import org.apache.hadoop.ozone.om.response.s3.tenant.OMSetRangerServiceVersionResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantAssignUserAccessIdResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantCreateResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
@@ -155,9 +155,9 @@ public class TestS3GetSecretRequest {
 
     return OMRequest.newBuilder()
         .setClientId(UUID.randomUUID().toString())
-        .setCmdType(Type.RangerServiceVersionSync)
-        .setRangerServiceVersionSyncRequest(
-            OzoneManagerProtocolProtos.RangerServiceVersionSyncRequest
+        .setCmdType(Type.SetRangerServiceVersion)
+        .setSetRangerServiceVersionRequest(
+            OzoneManagerProtocolProtos.SetRangerServiceVersionRequest
                 .newBuilder()
                 .setRangerServiceVersion(version)
                 .build()
@@ -468,25 +468,25 @@ public class TestS3GetSecretRequest {
 
     // 1. CreateTenantRequest: Create tenant "finance".
     long txLogIndex = 1;
-    // Run preExecute
-    OMRangerServiceVersionSyncRequest omRangerServiceVersionSyncRequest =
-        new OMRangerServiceVersionSyncRequest(
-            new OMRangerServiceVersionSyncRequest(
+    // Skip preExecute for OMSetRangerServiceVersionRequest
+    OMSetRangerServiceVersionRequest omSetRangerServiceVersionRequest =
+        new OMSetRangerServiceVersionRequest(
+            new OMSetRangerServiceVersionRequest(
                 createRangerSyncRequest(10)
             ).preExecute(ozoneManager)
         );
     // Run validateAndUpdateCache
     OMClientResponse omClientResponse =
-        omRangerServiceVersionSyncRequest.validateAndUpdateCache(ozoneManager,
+        omSetRangerServiceVersionRequest.validateAndUpdateCache(ozoneManager,
             txLogIndex, ozoneManagerDoubleBufferHelper);
     // Check response type and cast
     Assert.assertTrue(omClientResponse
-        instanceof OMRangerServiceVersionSyncResponse);
-    final OMRangerServiceVersionSyncResponse
-        omRangerServiceVersionSyncResponse =
-        (OMRangerServiceVersionSyncResponse) omClientResponse;
+        instanceof OMSetRangerServiceVersionResponse);
+    final OMSetRangerServiceVersionResponse
+        omSetRangerServiceVersionResponse =
+        (OMSetRangerServiceVersionResponse) omClientResponse;
     // Check response
-    String verStr = omRangerServiceVersionSyncResponse.getNewServiceVersion();
+    String verStr = omSetRangerServiceVersionResponse.getNewServiceVersion();
     Assert.assertEquals(10L, Long.parseLong(verStr));
   }
 }

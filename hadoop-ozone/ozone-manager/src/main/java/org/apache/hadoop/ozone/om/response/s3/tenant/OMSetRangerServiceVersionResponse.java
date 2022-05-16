@@ -33,14 +33,14 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import com.google.common.annotations.VisibleForTesting;
 
 /**
- * Response for OMRangerServiceVersionSync request.
+ * Response for OMSetRangerServiceVersionRequest.
  */
 @CleanupTableInfo(cleanupTables = {META_TABLE})
-public class OMRangerServiceVersionSyncResponse extends OMClientResponse {
+public class OMSetRangerServiceVersionResponse extends OMClientResponse {
   private String serviceVersionKey;
   private String serviceVersionValueStr;
 
-  public OMRangerServiceVersionSyncResponse(@Nonnull OMResponse omResponse,
+  public OMSetRangerServiceVersionResponse(@Nonnull OMResponse omResponse,
                                             @Nonnull String dbKey,
                                             @Nonnull String versionStr) {
     super(omResponse);
@@ -52,7 +52,7 @@ public class OMRangerServiceVersionSyncResponse extends OMClientResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMRangerServiceVersionSyncResponse(@Nonnull OMResponse omResponse) {
+  public OMSetRangerServiceVersionResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
     checkStatusNotOK();
   }

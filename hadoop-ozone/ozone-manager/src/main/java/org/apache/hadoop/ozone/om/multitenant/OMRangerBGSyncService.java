@@ -49,7 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerServiceVersionSyncRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetRangerServiceVersionRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
@@ -352,13 +352,13 @@ public class OMRangerBGSyncService extends BackgroundService {
 
   void setOMDBRangerServiceVersion(long version) throws ServiceException {
     // OM DB update goes through Ratis
-    RangerServiceVersionSyncRequest.Builder versionSyncRequest =
-        RangerServiceVersionSyncRequest.newBuilder()
+    SetRangerServiceVersionRequest.Builder versionSyncRequest =
+        SetRangerServiceVersionRequest.newBuilder()
             .setRangerServiceVersion(version);
 
     OMRequest omRequest = OMRequest.newBuilder()
-        .setCmdType(Type.RangerServiceVersionSync)
-        .setRangerServiceVersionSyncRequest(versionSyncRequest)
+        .setCmdType(Type.SetRangerServiceVersion)
+        .setSetRangerServiceVersionRequest(versionSyncRequest)
         .setClientId(CLIENT_ID.toString())
         .build();
 
@@ -367,7 +367,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       ozoneManager.getOmRatisServer().submitRequest(omRequest,
           raftClientRequest);
     } catch (ServiceException e) {
-      LOG.error("RangerServiceVersionSync request failed. "
+      LOG.error("SetRangerServiceVersion request failed. "
           + "Will retry at next run.");
       throw e;
     }

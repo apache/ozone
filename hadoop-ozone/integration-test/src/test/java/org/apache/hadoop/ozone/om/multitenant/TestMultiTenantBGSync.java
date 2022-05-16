@@ -112,9 +112,12 @@ public class TestMultiTenantBGSync {
   private TemporaryFolder folder = new TemporaryFolder();
 
   // The following values need to be set before this test can be enabled.
-  private static final String RANGER_ENDPOINT = "";
-  private static final String RANGER_ENDPOINT_USER = "";
-  private static final String RANGER_ENDPOINT_USER_PASSWD = "";
+  private static final String RANGER_ENDPOINT =
+      System.getenv("RANGER_ENDPOINT");
+  private static final String RANGER_ENDPOINT_USER =
+      System.getenv("RANGER_ENDPOINT_USER");
+  private static final String RANGER_ENDPOINT_USER_PASSWD =
+      System.getenv("RANGER_ENDPOINT_USER_PASSWD");
 
   private MultiTenantAccessAuthorizer omm;
   private OMRangerBGSyncService bgSync;
@@ -227,7 +230,7 @@ public class TestMultiTenantBGSync {
     try {
       doAnswer(invocation -> {
         OMRequest request = invocation.getArgument(0);
-        long v = request.getRangerServiceVersionSyncRequest()
+        long v = request.getSetRangerServiceVersionRequest()
             .getRangerServiceVersion();
         LOG.info("Writing Ranger Ozone Service Version: {}", v);
         ozoneManager.getMetadataManager().getMetaTable().put(
