@@ -31,6 +31,7 @@ import org.bouncycastle.cert.X509CertificateHolder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.nio.file.Files;
@@ -38,7 +39,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
-import java.util.Arrays;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -50,6 +50,7 @@ import static org.apache.hadoop.hdds.security.x509.certificate.client.Certificat
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * Test class for {@link DefaultCertificateClient}.
@@ -69,16 +70,17 @@ public class TestCertificateClientInit {
   private static final String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
   private static final String OM_COMPONENT = OMCertificateClient.COMPONENT_NAME;
 
-  private static Stream<Object[]> parameters() {
-    return Arrays.stream(new Object[][]{
-        {false, false, false, GETCERT},
-        {false, false, true, FAILURE},
-        {false, true, false, FAILURE},
-        {true, false, false, FAILURE},
-        {false, true, true, FAILURE},
-        {true, true, false, GETCERT},
-        {true, false, true, SUCCESS},
-        {true, true, true, SUCCESS}});
+  private static Stream<Arguments> parameters() {
+    return Stream.of(
+        arguments(false, false, false, GETCERT),
+        arguments(false, false, true, FAILURE),
+        arguments(false, true, false, FAILURE),
+        arguments(true, false, false, FAILURE),
+        arguments(false, true, true, FAILURE),
+        arguments(true, true, false, GETCERT),
+        arguments(true, false, true, SUCCESS),
+        arguments(true, true, true, SUCCESS)
+    );
   }
 
   @BeforeEach

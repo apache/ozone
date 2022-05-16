@@ -24,7 +24,10 @@ import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * Test Ratis metrics renaming.
@@ -32,9 +35,9 @@ import org.junit.jupiter.params.provider.MethodSource;
 public class TestRatisNameRewrite {
 
 
-  private static Stream<Object[]> parameters() {
+  private static Stream<Arguments> parameters() {
     return Stream.of(
-        new Object[] {
+        arguments(
             "ratis.log_appender"
                 + ".851cb00a-af97-455a-b079-d94a77d2a936@group-C14654DE8C2C"
                 + ".follower_65f881ea-8794-403d-be77-a030ed79c341_match_index",
@@ -43,8 +46,8 @@ public class TestRatisNameRewrite {
             new String[] {"851cb00a-af97-455a-b079-d94a77d2a936",
                 "group-C14654DE8C2C",
                 "65f881ea-8794-403d-be77-a030ed79c341"}
-        },
-        new Object[] {
+        ),
+        arguments(
             "ratis_grpc.log_appender.72caaf3a-fb1c-4da4-9cc0-a2ce21bb8e67@group"
                 + "-72caaf3a-fb1c-4da4-9cc0-a2ce21bb8e67"
                 + ".grpc_log_appender_follower_75fa730a-59f0-4547"
@@ -54,15 +57,15 @@ public class TestRatisNameRewrite {
             new String[] {"72caaf3a-fb1c-4da4-9cc0-a2ce21bb8e67",
                 "group-72caaf3a-fb1c-4da4-9cc0-a2ce21bb8e67",
                 "75fa730a-59f0-4547-bd68-216162c263eb"}
-        },
-        new Object[] {
+        ),
+        arguments(
             "ratis_core.ratis_log_worker.72caaf3a-fb1c-4da4-9cc0-a2ce21bb8e67"
                 + ".dataQueueSize",
             "ratis_core.ratis_log_worker.dataQueueSize",
             new String[] {"instance"},
             new String[] {"72caaf3a-fb1c-4da4-9cc0-a2ce21bb8e67"}
-        },
-        new Object[] {
+        ),
+        arguments(
             "ratis_grpc.log_appender.8e505d6e-12a4-4660-80e3-eb735879db06"
                 + "@group-49616B7F02CE.grpc_log_appender_follower_a4b099a7"
                 + "-511f-4fef-85bf-b9eeddd7c270_latency",
@@ -70,8 +73,8 @@ public class TestRatisNameRewrite {
             new String[] {"instance", "group", "follower"},
             new String[] {"8e505d6e-12a4-4660-80e3-eb735879db06",
                 "group-49616B7F02CE", "a4b099a7-511f-4fef-85bf-b9eeddd7c270"}
-        },
-        new Object[] {
+        ),
+        arguments(
             "ratis_grpc.log_appender.8e505d6e-12a4-4660-80e3-eb735879db06"
                 + "@group-49616B7F02CE.grpc_log_appender_follower_a4b099a7"
                 + "-511f-4fef-85bf-b9eeddd7c270_success_reply_count",
@@ -80,8 +83,7 @@ public class TestRatisNameRewrite {
             new String[] {"instance", "group", "follower"},
             new String[] {"8e505d6e-12a4-4660-80e3-eb735879db06",
                 "group-49616B7F02CE", "a4b099a7-511f-4fef-85bf-b9eeddd7c270"}
-        }
-
+        )
     );
   }
 
