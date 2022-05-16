@@ -17,14 +17,11 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.ozone.test.TestClock;
 import org.junit.Assert;
 import org.junit.Before;
@@ -35,7 +32,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 
@@ -64,19 +60,19 @@ public class TestContainerReplicaPendingOps {
   @Test
   public void testGetPendingOpsReturnsEmptyList() {
     List<ContainerReplicaOp> ops =
-        pendingOps.getPendingOps(getContainerInfo(1));
+        pendingOps.getPendingOps(new ContainerID(1));
     Assert.assertEquals(0, ops.size());
   }
 
   @Test
   public void testCanAddReplicasForAdd() {
-    pendingOps.scheduleAddReplica(getContainerInfo(1), dn1, 0);
-    pendingOps.scheduleAddReplica(getContainerInfo(1), dn2, 0);
-    pendingOps.scheduleAddReplica(getContainerInfo(1), dn3, 0);
-    pendingOps.scheduleAddReplica(getContainerInfo(2), dn1, 1);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn2, 0);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn3, 0);
+    pendingOps.scheduleAddReplica(new ContainerID(2), dn1, 1);
 
     List<ContainerReplicaOp> ops =
-        pendingOps.getPendingOps(getContainerInfo(1));
+        pendingOps.getPendingOps(new ContainerID(1));
     Assert.assertEquals(3, ops.size());
     for (ContainerReplicaOp op : ops) {
       Assert.assertEquals(0, op.getReplicaIndex());
@@ -88,7 +84,7 @@ public class TestContainerReplicaPendingOps {
     Assert.assertTrue(allDns.contains(dn2));
     Assert.assertTrue(allDns.contains(dn3));
 
-    ops = pendingOps.getPendingOps(getContainerInfo(2));
+    ops = pendingOps.getPendingOps(new ContainerID(2));
     Assert.assertEquals(1, ops.size());
     Assert.assertEquals(1, ops.get(0).getReplicaIndex());
     Assert.assertEquals(ADD, ops.get(0).getOpType());
@@ -97,13 +93,13 @@ public class TestContainerReplicaPendingOps {
 
   @Test
   public void testCanAddReplicasForDelete() {
-    pendingOps.scheduleDeleteReplica(getContainerInfo(1), dn1, 0);
-    pendingOps.scheduleDeleteReplica(getContainerInfo(1), dn2, 0);
-    pendingOps.scheduleDeleteReplica(getContainerInfo(1), dn3, 0);
-    pendingOps.scheduleDeleteReplica(getContainerInfo(2), dn1, 1);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn1, 0);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn2, 0);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn3, 0);
+    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn1, 1);
 
     List<ContainerReplicaOp> ops =
-        pendingOps.getPendingOps(getContainerInfo(1));
+        pendingOps.getPendingOps(new ContainerID(1));
     Assert.assertEquals(3, ops.size());
     for (ContainerReplicaOp op : ops) {
       Assert.assertEquals(0, op.getReplicaIndex());
@@ -115,7 +111,7 @@ public class TestContainerReplicaPendingOps {
     Assert.assertTrue(allDns.contains(dn2));
     Assert.assertTrue(allDns.contains(dn3));
 
-    ops = pendingOps.getPendingOps(getContainerInfo(2));
+    ops = pendingOps.getPendingOps(new ContainerID(2));
     Assert.assertEquals(1, ops.size());
     Assert.assertEquals(1, ops.get(0).getReplicaIndex());
     Assert.assertEquals(DELETE, ops.get(0).getOpType());
@@ -124,64 +120,64 @@ public class TestContainerReplicaPendingOps {
 
   @Test
   public void testCompletingOps() {
-    pendingOps.scheduleDeleteReplica(getContainerInfo(1), dn1, 0);
-    pendingOps.scheduleAddReplica(getContainerInfo(1), dn1, 0);
-    pendingOps.scheduleDeleteReplica(getContainerInfo(1), dn2, 0);
-    pendingOps.scheduleAddReplica(getContainerInfo(1), dn3, 0);
-    pendingOps.scheduleDeleteReplica(getContainerInfo(2), dn1, 1);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn1, 0);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn2, 0);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn3, 0);
+    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn1, 1);
 
     List<ContainerReplicaOp> ops =
-        pendingOps.getPendingOps(getContainerInfo(1));
+        pendingOps.getPendingOps(new ContainerID(1));
 
     // We expect 4 entries - 2 add and 2 delete.
     Assert.assertEquals(4, ops.size());
 
     Assert.assertTrue(pendingOps
-        .completeAddReplica(getContainerInfo(1), dn1, 0));
-    ops = pendingOps.getPendingOps(getContainerInfo(1));
+        .completeAddReplica(new ContainerID(1), dn1, 0));
+    ops = pendingOps.getPendingOps(new ContainerID(1));
     Assert.assertEquals(3, ops.size());
 
     // Complete one that does not exist:
     Assert.assertFalse(pendingOps
-        .completeAddReplica(getContainerInfo(1), dn1, 0));
-    ops = pendingOps.getPendingOps(getContainerInfo(1));
+        .completeAddReplica(new ContainerID(1), dn1, 0));
+    ops = pendingOps.getPendingOps(new ContainerID(1));
     Assert.assertEquals(3, ops.size());
 
     // Complete the remaining ones
-    pendingOps.completeDeleteReplica(getContainerInfo(1), dn1, 0);
-    pendingOps.completeDeleteReplica(getContainerInfo(1), dn2, 0);
-    pendingOps.completeAddReplica(getContainerInfo(1), dn3, 0);
-    ops = pendingOps.getPendingOps(getContainerInfo(1));
+    pendingOps.completeDeleteReplica(new ContainerID(1), dn1, 0);
+    pendingOps.completeDeleteReplica(new ContainerID(1), dn2, 0);
+    pendingOps.completeAddReplica(new ContainerID(1), dn3, 0);
+    ops = pendingOps.getPendingOps(new ContainerID(1));
     Assert.assertEquals(0, ops.size());
   }
 
   @Test
   public void testRemoveExpiredEntries() {
-    pendingOps.scheduleDeleteReplica(getContainerInfo(1), dn1, 0);
-    pendingOps.scheduleAddReplica(getContainerInfo(1), dn1, 0);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn1, 0);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0);
     clock.fastForward(1000);
-    pendingOps.scheduleDeleteReplica(getContainerInfo(1), dn2, 0);
-    pendingOps.scheduleAddReplica(getContainerInfo(1), dn3, 0);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn2, 0);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn3, 0);
     clock.fastForward(1000);
-    pendingOps.scheduleDeleteReplica(getContainerInfo(2), dn1, 1);
+    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn1, 1);
 
     List<ContainerReplicaOp> ops =
-        pendingOps.getPendingOps(getContainerInfo(1));
+        pendingOps.getPendingOps(new ContainerID(1));
     Assert.assertEquals(4, ops.size());
-    ops = pendingOps.getPendingOps(getContainerInfo(2));
+    ops = pendingOps.getPendingOps(new ContainerID(2));
     Assert.assertEquals(1, ops.size());
 
     // Some entries at "start" some at start + 1000 and start + 2000.
     // Clock is currently at +2000.
     pendingOps.removeExpiredEntries(2500);
     // Nothing is remove as nothing is older than the current clock time.
-    ops = pendingOps.getPendingOps(getContainerInfo(1));
+    ops = pendingOps.getPendingOps(new ContainerID(1));
     Assert.assertEquals(4, ops.size());
 
     clock.fastForward(1000);
     pendingOps.removeExpiredEntries(2500);
     // Nothing is remove as nothing is older than the current clock time.
-    ops = pendingOps.getPendingOps(getContainerInfo(1));
+    ops = pendingOps.getPendingOps(new ContainerID(1));
     Assert.assertEquals(2, ops.size());
     // We should lose the entries for DN1
     List<DatanodeDetails> dns = ops.stream()
@@ -195,32 +191,16 @@ public class TestContainerReplicaPendingOps {
     pendingOps.removeExpiredEntries(2500);
 
     // Now should only have entries for container 2
-    ops = pendingOps.getPendingOps(getContainerInfo(1));
+    ops = pendingOps.getPendingOps(new ContainerID(1));
     Assert.assertEquals(0, ops.size());
-    ops = pendingOps.getPendingOps(getContainerInfo(2));
+    ops = pendingOps.getPendingOps(new ContainerID(2));
     Assert.assertEquals(1, ops.size());
 
     // Advance the clock again and all should be removed
     clock.fastForward(1000);
     pendingOps.removeExpiredEntries(2500);
-    ops = pendingOps.getPendingOps(getContainerInfo(2));
+    ops = pendingOps.getPendingOps(new ContainerID(2));
     Assert.assertEquals(0, ops.size());
-  }
-
-
-  private ContainerInfo getContainerInfo(long containerID) {
-    return new ContainerInfo.Builder()
-        .setContainerID(containerID)
-        .setPipelineID(PipelineID.randomId())
-        .setSequenceId(1)
-        .setDeleteTransactionId(1)
-        .setUsedBytes(1234)
-        .setOwner("ozone")
-        .setNumberOfKeys(10)
-        .setState(HddsProtos.LifeCycleState.CLOSED)
-        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
-        .build();
-
   }
 
 }
