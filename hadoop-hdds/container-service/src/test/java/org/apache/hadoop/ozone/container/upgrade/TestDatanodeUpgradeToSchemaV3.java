@@ -144,14 +144,15 @@ public class TestDatanodeUpgradeToSchemaV3 {
     startPreFinalizedDatanode();
     HddsVolume dataVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0);
-    File dbFile = new File(dataVolume.getStorageDir().getAbsolutePath() + "/" +
-        dataVolume.getClusterID() + "/" + dataVolume.getStorageID());
-    // RocksDB is created at first startup, but not loaded
-    Assert.assertTrue(dbFile.exists());
     Assert.assertNull(dataVolume.getDbVolume());
     Assert.assertFalse(dataVolume.isDbLoaded());
 
     dsm.finalizeUpgrade();
+    // RocksDB is created during upgrade
+    File dbFile = new File(dataVolume.getStorageDir().getAbsolutePath() + "/" +
+        dataVolume.getClusterID() + "/" + dataVolume.getStorageID());
+    Assert.assertTrue(dbFile.exists());
+
     // RocksDB loaded when SchemaV3 is enabled
     if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
       Assert.assertNotNull(dataVolume.getDbParentDir().getAbsolutePath()
@@ -177,20 +178,19 @@ public class TestDatanodeUpgradeToSchemaV3 {
     startPreFinalizedDatanode();
     HddsVolume dataVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0);
-    Assert.assertNotNull(dataVolume.getDbParentDir());
+    Assert.assertNull(dataVolume.getDbParentDir());
 
+    dsm.finalizeUpgrade();
+    // RocksDB is created during upgrade
     DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
         .getVolumesList().get(0);
-    File dbFile = new File(dbVolume.getStorageDir().getAbsolutePath() + "/" +
-        dbVolume.getClusterID() + "/" + dataVolume.getStorageID());
-    // RocksDB is created at first startup, but not loaded
-    Assert.assertTrue(dbFile.exists());
     Assert.assertEquals(dbVolume, dataVolume.getDbVolume());
     Assert.assertTrue(
         dbVolume.getHddsVolumeIDs().contains(dataVolume.getStorageID()));
-    Assert.assertFalse(dataVolume.isDbLoaded());
+    File dbFile = new File(dbVolume.getStorageDir().getAbsolutePath() + "/" +
+        dbVolume.getClusterID() + "/" + dataVolume.getStorageID());
+    Assert.assertTrue(dbFile.exists());
 
-    dsm.finalizeUpgrade();
     // RocksDB loaded when SchemaV3 is enabled
     if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
       Assert.assertTrue(dataVolume.getDbParentDir().getAbsolutePath()
@@ -310,12 +310,12 @@ public class TestDatanodeUpgradeToSchemaV3 {
     startPreFinalizedDatanode();
     HddsVolume hddsVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0);
+    Assert.assertNull(hddsVolume.getDbParentDir());
+    dsm.finalizeUpgrade();
+    // DB is created during upgrade
     File dbDir = hddsVolume.getDbParentDir();
-    // DB is created before finalize
     Assert.assertTrue(dbDir.getAbsolutePath().startsWith(
         hddsVolume.getStorageDir().getAbsolutePath()));
-    Assert.assertFalse(hddsVolume.isDbLoaded());
-    dsm.finalizeUpgrade();
 
     // Add a new DbVolume
     addDbVolume();
@@ -359,7 +359,9 @@ public class TestDatanodeUpgradeToSchemaV3 {
       File dbFile;
       if (hddsVolume.getStorageDir().getAbsolutePath().startsWith(
           newDataVolume.getAbsolutePath())) {
-        Assert.assertEquals(dbVolume, hddsVolume.getDbVolume());
+        if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
+          Assert.assertEquals(dbVolume, hddsVolume.getDbVolume());
+        }
         // RocksDB of newly added HddsVolume is created on the newly added
         // DbVolume
         dbFile = new File(dbVolume.getStorageDir() + "/" +
