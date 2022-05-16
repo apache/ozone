@@ -334,14 +334,12 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public void quasiClose() throws StorageContainerException {
-    closeAndFlushIfNeeded(containerData::quasiCloseContainer,
-        !containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3));
+    closeAndFlushIfNeeded(containerData::quasiCloseContainer);
   }
 
   @Override
   public void close() throws StorageContainerException {
-    closeAndFlushIfNeeded(containerData::closeContainer,
-        !containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3));
+    closeAndFlushIfNeeded(containerData::closeContainer);
     LOG.info("Container {} is closed with bcsId {}.",
         containerData.getContainerID(),
         containerData.getBlockCommitSequenceId());
@@ -359,28 +357,20 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   /**
-   * For db-per-container schemas, the DB must be synced during
-   * close operation.
-   * For db-per-volume schemas, don't sync the whole db on closing
-   * of a single container.
+   * Sync RocksDB WAL on closing of a single container.
    *
    * @param closer
-   * @param flush
    * @throws StorageContainerException
    */
-  private void closeAndFlushIfNeeded(Runnable closer, boolean flush)
+  private void closeAndFlushIfNeeded(Runnable closer)
       throws StorageContainerException {
-    if (flush) {
-      flushAndSyncDB();
-    }
+    flushAndSyncDB();
 
     writeLock();
     try {
-      if (flush) {
-        // Second sync should be a very light operation as sync has already
-        // been done outside the lock.
-        flushAndSyncDB();
-      }
+      // Second sync should be a very light operation as sync has already
+      // been done outside the lock.
+      flushAndSyncDB();
       updateContainerData(closer);
       clearPendingPutBlockCache();
     } finally {
