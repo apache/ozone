@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig ;
+import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
@@ -61,6 +61,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 
+/*
+Test commands used in EC reconstruction.
+ */
 public class TestECReconstructionCommands {
 
   private static MiniOzoneCluster cluster;
@@ -135,8 +138,8 @@ public class TestECReconstructionCommands {
     if (clients == null) {
       return;
     }
-    for (XceiverClientSpi client : clients) {
-      client.close();
+    for (XceiverClientSpi c : clients) {
+      c.close();
     }
     clients = null;
   }
