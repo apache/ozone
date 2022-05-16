@@ -267,7 +267,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
    * Submits request directly to OM.
    */
   private OMResponse submitRequestDirectlyToOM(OMRequest request) throws
-      ServiceException{
+      ServiceException {
     OMClientResponse omClientResponse = null;
     long index = 0L;
     try {
