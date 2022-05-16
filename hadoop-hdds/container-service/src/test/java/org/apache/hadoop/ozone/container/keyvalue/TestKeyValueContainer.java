@@ -85,7 +85,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeFalse;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -185,8 +184,6 @@ public class TestKeyValueContainer {
 
   @Test
   public void testEmptyContainerImportExport() throws Exception {
-    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
-
     createContainer();
     closeContainer();
 
@@ -216,8 +213,6 @@ public class TestKeyValueContainer {
 
   @Test
   public void testContainerImportExport() throws Exception {
-    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
-
     long containerId = keyValueContainer.getContainerData().getContainerID();
     createContainer();
     long numberOfKeysToWrite = 12;
@@ -361,8 +356,6 @@ public class TestKeyValueContainer {
 
   @Test
   public void concurrentExport() throws Exception {
-    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
-
     createContainer();
     populate(100);
     closeContainer();

@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
@@ -280,6 +281,22 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    */
   void deleteBatchWithPrefix(BatchOperation batch, KEY prefix)
       throws IOException;
+
+  /**
+   * Dump all key value pairs with a prefix into an external file.
+   * @param externalFile
+   * @param prefix
+   * @throws IOException
+   */
+  void dumpToFileWithPrefix(File externalFile, KEY prefix) throws IOException;
+
+  /**
+   * Load key value pairs from an external file created by
+   * dumpToFileWithPrefix.
+   * @param externalFile
+   * @throws IOException
+   */
+  void loadFromFile(File externalFile) throws IOException;
 
   /**
    * Class used to represent the key and value pair of a db entry.

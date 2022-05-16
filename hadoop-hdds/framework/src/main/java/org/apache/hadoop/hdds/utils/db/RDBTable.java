@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -268,6 +269,25 @@ class RDBTable implements Table<byte[], byte[]> {
         deleteWithBatch(batch, iter.next().getValue());
       }
     }
+  }
+
+  @Override
+  public void dumpToFileWithPrefix(File externalFile, byte[] prefix)
+      throws IOException {
+    try (TableIterator<byte[], ByteArrayKeyValue> iter = iterator(prefix);
+         DumpFileWriter fileWriter = new RDBSstFileWriter()) {
+      fileWriter.open(externalFile);
+      while (iter.hasNext()) {
+        ByteArrayKeyValue entry = iter.next();
+        fileWriter.put(entry.getKey(), entry.getValue());
+      }
+    }
+  }
+
+  @Override
+  public void loadFromFile(File externalFile) throws IOException {
+    DumpFileLoader fileLoader = new RDBSstFileLoader(db, handle);
+    fileLoader.load(externalFile);
   }
 
   private List<ByteArrayKeyValue> getRangeKVs(byte[] startKey,

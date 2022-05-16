@@ -58,7 +58,9 @@ public class TestRDBTableStore {
           "Sixth", "Seventh",
           "Eighth");
   private final List<String> prefixedFamilies = Arrays.asList(
-      "PrefixFirst"
+      "PrefixFirst",
+      "PrefixTwo", "PrefixThree",
+      "PrefixFour", "PrefixFifth"
   );
   private static final int PREFIX_LENGTH = 8;
   @Rule
@@ -521,6 +523,93 @@ public class TestRDBTableStore {
           StringUtils.bytes2String(samplePrefix) + 123);
       rangeKVs = testTable.getRangeKVs(startKey, 10, samplePrefix);
       Assert.assertEquals(0, rangeKVs.size());
+    }
+  }
+
+  @Test
+  public void testDumpAndLoadBasic() throws Exception {
+    int containerCount = 3;
+    int blockCount = 5;
+    List<String> testPrefixes = generatePrefixes(containerCount);
+    List<Map<String, String>> testData = generateKVs(testPrefixes, blockCount);
+    File dumpFile = folder.newFile("PrefixTwo.dump");
+    byte[] samplePrefix = testPrefixes.get(2).getBytes(StandardCharsets.UTF_8);
+
+    try (Table<byte[], byte[]> testTable1 = rdbStore.getTable("PrefixTwo")) {
+      // write data
+      populatePrefixedTable(testTable1, testData);
+
+      // dump to external file
+      testTable1.dumpToFileWithPrefix(dumpFile, samplePrefix);
+
+      // check dump file exist
+      Assert.assertTrue(dumpFile.exists());
+      Assert.assertTrue(dumpFile.length() != 0);
+    }
+
+    // load dump file into another table
+    try (Table<byte[], byte[]> testTable2 = rdbStore.getTable("PrefixThree")) {
+      testTable2.loadFromFile(dumpFile);
+
+      // check loaded keys
+      try (TableIterator<byte[],
+          ? extends Table.KeyValue<byte[], byte[]>> iter = testTable2.iterator(
+          samplePrefix)) {
+        int keyCount = 0;
+        while (iter.hasNext()) {
+          // check prefix
+          Assert.assertTrue(Arrays.equals(
+              Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
+              samplePrefix));
+          keyCount++;
+        }
+
+        // check block count
+        Assert.assertEquals(blockCount, keyCount);
+      }
+    }
+  }
+
+  @Test
+  public void testDumpAndLoadEmpty() throws Exception {
+    int containerCount = 3;
+    List<String> testPrefixes = generatePrefixes(containerCount);
+
+    File dumpFile = folder.newFile("PrefixFour.dump");
+    byte[] samplePrefix = testPrefixes.get(2).getBytes(StandardCharsets.UTF_8);
+
+    try (Table<byte[], byte[]> testTable1 = rdbStore.getTable("PrefixFour")) {
+      // no data
+
+      // dump to external file
+      testTable1.dumpToFileWithPrefix(dumpFile, samplePrefix);
+
+      // check dump file exist
+      Assert.assertTrue(dumpFile.exists());
+      // empty dump file
+      Assert.assertTrue(dumpFile.length() == 0);
+    }
+
+    // load dump file into another table
+    try (Table<byte[], byte[]> testTable2 = rdbStore.getTable("PrefixFifth")) {
+      testTable2.loadFromFile(dumpFile);
+
+      // check loaded keys
+      try (TableIterator<byte[],
+          ? extends Table.KeyValue<byte[], byte[]>> iter = testTable2.iterator(
+          samplePrefix)) {
+        int keyCount = 0;
+        while (iter.hasNext()) {
+          // check prefix
+          Assert.assertTrue(Arrays.equals(
+              Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
+              samplePrefix));
+          keyCount++;
+        }
+
+        // check block count
+        Assert.assertEquals(0, keyCount);
+      }
     }
   }
 
