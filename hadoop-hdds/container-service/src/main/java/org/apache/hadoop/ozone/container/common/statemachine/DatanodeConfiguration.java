@@ -431,11 +431,11 @@ public class DatanodeConfiguration {
     this.containerSchemaV3Enabled = containerSchemaV3Enabled;
   }
 
-  public String getContainerSchemaV3KeySeperator() {
+  public String getContainerSchemaV3KeySeparator() {
     return this.containerSchemaV3KeySeparator;
   }
 
-  public void setContainerSchemaV3Enabled(String separator) {
+  public void setContainerSchemaV3KeySeparator(String separator) {
     this.containerSchemaV3KeySeparator = separator;
   }
 }

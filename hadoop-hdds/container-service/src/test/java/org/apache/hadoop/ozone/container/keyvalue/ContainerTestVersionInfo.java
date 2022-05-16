@@ -43,7 +43,7 @@ public class ContainerTestVersionInfo {
     this.layout = layout;
   }
 
-  private static List<ContainerTestVersionInfo> layoutList = new ArrayList<>();
+  public static List<ContainerTestVersionInfo> layoutList = new ArrayList<>();
   static {
     for (ContainerLayoutVersion ch : ContainerLayoutVersion.getAllVersions()) {
       for (String sch : SCHEMA_VERSIONS) {

@@ -41,12 +41,14 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.ozone.test.GenericTestUtils;
 
+import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 
 import org.junit.After;
@@ -79,16 +81,30 @@ public class TestKeyValueBlockIterator {
   private String datanodeID = UUID.randomUUID().toString();
   private String clusterID = UUID.randomUUID().toString();
 
-  public TestKeyValueBlockIterator(ContainerTestVersionInfo versionInfo) {
+  public TestKeyValueBlockIterator(ContainerTestVersionInfo versionInfo,
+      String keySeparator) {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+    DatanodeConfiguration dc = conf.getObject(DatanodeConfiguration.class);
+    dc.setContainerSchemaV3KeySeparator(keySeparator);
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> data() {
-    return ContainerTestVersionInfo.versionParameters();
+    List listA =
+    ContainerTestVersionInfo.layoutList.stream().map(
+        each -> new Object[] {each, ""})
+        .collect(toList());
+    List listB =
+        ContainerTestVersionInfo.layoutList.stream().map(
+            each -> new Object[] {each,
+                new DatanodeConfiguration().getContainerSchemaV3KeySeparator()})
+            .collect(toList());
+
+    listB.addAll(listA);
+    return listB;
   }
 
   @Before

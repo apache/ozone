@@ -88,14 +88,14 @@ public class DatanodeSchemaThreeDBDefinition
           DeletedBlocksTransaction.class,
           new DeletedBlocksTransactionCodec());
 
-  public static String separator;
+  private static String separator;
 
   public DatanodeSchemaThreeDBDefinition(String dbPath,
       ConfigurationSource config) {
     super(dbPath, config);
 
     DatanodeConfiguration dc = config.getObject(DatanodeConfiguration.class);
-    this.separator = dc.getContainerSchemaV3KeySeperator();
+    this.separator = dc.getContainerSchemaV3KeySeparator();
 
     // Get global ColumnFamilyOptions first.
     DatanodeDBProfile dbProfile = DatanodeDBProfile
@@ -143,15 +143,12 @@ public class DatanodeSchemaThreeDBDefinition
 
   public static String getContainerKeyPrefix(long containerID) {
     // NOTE: Rocksdb normally needs a fixed length prefix.
-    return FixedLengthStringUtils.bytes2String(Longs.toByteArray(containerID));
+    return FixedLengthStringUtils.bytes2String(Longs.toByteArray(containerID))
+        + separator;
   }
 
   private static int getContainerKeyPrefixLength() {
     return FixedLengthStringUtils.string2Bytes(
         getContainerKeyPrefix(0L)).length;
-  }
-
-  public static String getContainerKeySeparator() {
-    return separator;
   }
 }
