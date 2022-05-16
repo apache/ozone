@@ -370,38 +370,49 @@ public class OMRangerBGSyncService extends BackgroundService {
    */
   private void loadAllPoliciesRolesFromRanger(long baseVersion)
       throws IOException {
+
     if (LOG.isDebugEnabled()) {
       LOG.debug("baseVersion is {}", baseVersion);
     }
-    // TODO: incremental policies API is broken. We are getting all the
-    //  Multi-Tenant policies using Ranger labels.
+
     String allPolicies = authorizer.getAllMultiTenantPolicies();
     JsonObject jObject = new JsonParser().parse(allPolicies).getAsJsonObject();
-    JsonArray policyArray = jObject.getAsJsonArray("policies");
-    for (int i = 0; i < policyArray.size(); ++i) {
-      JsonObject newPolicy = policyArray.get(i).getAsJsonObject();
-      if (!newPolicy.getAsJsonArray("policyLabels").get(0)
-          .getAsString().equals(OZONE_TENANT_RANGER_POLICY_LABEL)) {
-        // Shouldn't get policies without the tag here very often as it is
+    JsonArray policies = jObject.getAsJsonArray("policies");
+    for (int i = 0; i < policies.size(); ++i) {
+      JsonObject policy = policies.get(i).getAsJsonObject();
+      JsonArray policyLabels = policy.getAsJsonArray("policyLabels");
+
+      // Verify that the policy has the OzoneTenant label
+      boolean hasOzoneTenantLabel = false;
+      // Loop just in case multiple labels are attached to the tenant policy
+      for (int j = 0; j < policyLabels.size(); j++) {
+        final String currentLabel = policyLabels.get(j).getAsString();
+        // Look for exact match
+        if (currentLabel.equals(OZONE_TENANT_RANGER_POLICY_LABEL)) {
+          hasOzoneTenantLabel = true;
+          break;
+        }
+      }
+
+      if (!hasOzoneTenantLabel) {
+        // Shouldn't get policies without the label often as it is
         // specified in the query param, unless a user removed the tag during
         // the sync
-
-        // TODO: Filter label again
-
-        LOG.warn("Received a Ranger policy without OzoneTenant tag: {}",
-            newPolicy.get("name").getAsString());
+        LOG.warn("Ignoring Ranger policy without the {} label: {}",
+            OZONE_TENANT_RANGER_POLICY_LABEL, policy.get("name").getAsString());
         continue;
       }
+
       // Temporarily put the policy in the to-delete list,
       // valid entries will be removed later
       mtRangerPoliciesToBeDeleted.put(
-          newPolicy.get("name").getAsString(),
-          newPolicy.get("id").getAsString());
+          policy.get("name").getAsString(),
+          policy.get("id").getAsString());
 
-      final JsonArray policyItems = newPolicy.getAsJsonArray("policyItems");
+      final JsonArray policyItems = policy.getAsJsonArray("policyItems");
       for (int j = 0; j < policyItems.size(); ++j) {
-        JsonObject policy = policyItems.get(j).getAsJsonObject();
-        JsonArray roles = policy.getAsJsonArray("roles");
+        JsonObject policyItem = policyItems.get(j).getAsJsonObject();
+        JsonArray roles = policyItem.getAsJsonArray("roles");
         for (int k = 0; k < roles.size(); ++k) {
           if (!mtRangerRoles.containsKey(roles.get(k).getAsString())) {
             // We only get the role name here. We need to query and populate it.

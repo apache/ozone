@@ -627,16 +627,27 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   public String getAllMultiTenantPolicies() throws IOException {
+
+    // Note: Ranger incremental policies API is broken. So we use policy label
+    // filter to get all Multi-Tenant policies.
+
     String rangerAdminUrl = rangerHttpsAddress
         + OZONE_OM_RANGER_ALL_POLICIES_ENDPOINT + getRangerOzoneServiceId()
         + "?policyLabelsPartial=" + OZONE_TENANT_RANGER_POLICY_LABEL;
-    // Note: policyLabels (not partial) arg doesn't seem to work for Ranger
-    // at this point. When Ranger fixed this we could use exact match instead.
 
-    HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl,
-        "GET", false);
-    String sInfo = getResponseData(conn);
-    return sInfo;
+    // Also note: policyLabels (not partial) arg doesn't seem to work for Ranger
+    // at this point. When Ranger fixed this we could use exact match instead,
+    // then we can remove the verification logic in
+    // loadAllPoliciesRolesFromRanger().
+
+    HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl, "GET", false);
+    final String jsonStr = getResponseData(conn);
+
+    if (jsonStr == null) {
+      throw new IOException("Invalid response from " + rangerAdminUrl);
+    }
+
+    return jsonStr;
   }
 
   @Override
