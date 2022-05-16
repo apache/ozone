@@ -71,7 +71,6 @@ public class OMRangerBGSyncService extends BackgroundService {
   public static final Logger LOG =
       LoggerFactory.getLogger(OMRangerBGSyncService.class);
   private static final ClientId CLIENT_ID = ClientId.randomId();
-  private static final long ONE_HOUR_IN_MILLIS = 3600 * 1000;
 
   private final OzoneManager ozoneManager;
   private final OMMetadataManager metadataManager;
@@ -148,9 +147,6 @@ public class OMRangerBGSyncService extends BackgroundService {
 
   // Keep OM DB mapping of Roles -> list of user principals.
   private final HashMap<String, HashSet<String>> mtOMDBRoles = new HashMap<>();
-
-  // Every BG ranger sync cycle we update this
-  private long lastRangerPolicyLoadTime;
 
   public OMRangerBGSyncService(OzoneManager ozoneManager,
       MultiTenantAccessAuthorizer authorizer, long interval,
@@ -389,7 +385,6 @@ public class OMRangerBGSyncService extends BackgroundService {
     String allPolicies = authorizer.getAllMultiTenantPolicies(
         rangerOzoneServiceId);
     JsonObject jObject = new JsonParser().parse(allPolicies).getAsJsonObject();
-    lastRangerPolicyLoadTime = jObject.get("queryTimeMS").getAsLong();
     JsonArray policyArray = jObject.getAsJsonArray("policies");
     for (int i = 0; i < policyArray.size(); ++i) {
       JsonObject newPolicy = policyArray.get(i).getAsJsonObject();
@@ -510,17 +505,9 @@ public class OMRangerBGSyncService extends BackgroundService {
     for (Map.Entry<String, String> entry :
         mtRangerPoliciesToBeDeleted.entrySet()) {
       final String policyName = entry.getKey();
+      LOG.info("Deleting policy from Ranger: {}", policyName);
       checkLeader();
-      // TODO: Use AccessController instead of AccessPolicy
-//      MultiTenantAccessController accessController =
-//          authorizer.getMultiTenantAccessController();
-      AccessPolicy accessPolicy = authorizer.getAccessPolicyByName(policyName);
-
-      if (lastRangerPolicyLoadTime >
-          (accessPolicy.getPolicyLastUpdateTime() + ONE_HOUR_IN_MILLIS)) {
-        LOG.warn("Deleting policy from Ranger: {}", policyName);
-        authorizer.deletePolicybyName(policyName);
-      }
+      authorizer.deletePolicybyName(policyName);
     }
 
   }
@@ -601,7 +588,7 @@ public class OMRangerBGSyncService extends BackgroundService {
     final OMMultiTenantManagerImpl impl =
         (OMMultiTenantManagerImpl) multiTenantManager;
 
-    mtOMDBRoles.putAll(impl.getAllRoles());
+    mtOMDBRoles.putAll(impl.getAllRolesFromCache());
   }
 
   private void loadAllRolesFromDB() throws IOException {
