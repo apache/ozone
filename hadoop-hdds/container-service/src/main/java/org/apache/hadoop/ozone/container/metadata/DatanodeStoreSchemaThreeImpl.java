@@ -45,7 +45,7 @@ import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDe
 public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
     implements DeleteTransactionStore<String> {
 
-  public static final String DUMP_FILE_SUFFIX = ".meta";
+  public static final String DUMP_FILE_SUFFIX = ".data";
 
   private final Table<String, DeletedBlocksTransaction> deleteTransactionTable;
 
