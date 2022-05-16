@@ -88,6 +88,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   // Use a non-fair RW lock for better throughput, we may revisit this decision
   // if this causes fairness issues.
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+  // Simple lock to synchronize container metadata dump operation.
+  private final Object dumpLock = new Object();
 
   private final KeyValueContainerData containerData;
   private ConfigurationSource config;
@@ -534,6 +536,11 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       //rewriting the yaml file with new checksum calculation.
       update(originalContainerData.getMetadata(), true);
 
+      if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+        // load metadata from received dump files before we try to parse kv
+        BlockUtils.loadKVContainerDataFromFiles(containerData, config);
+      }
+
       //fill in memory stat counter (keycount, byte usage)
       KeyValueContainerUtil.parseKVContainerData(containerData, config);
 
@@ -545,6 +552,10 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       }
       //delete all the temporary data in case of any exception.
       try {
+        if (containerData.getSchemaVersion() != null &&
+            containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+          BlockUtils.removeContainerFromDB(containerData, config);
+        }
         FileUtils.deleteDirectory(new File(containerData.getMetadataPath()));
         FileUtils.deleteDirectory(new File(containerData.getChunksPath()));
         FileUtils.deleteDirectory(
@@ -579,16 +590,18 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       }
 
       try {
-        compactDB();
-        // Close DB (and remove from cache) to avoid concurrent modification
-        // while packing it.
-        BlockUtils.removeDB(containerData, config);
+        if (!containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+          compactDB();
+          // Close DB (and remove from cache) to avoid concurrent modification
+          // while packing it.
+          BlockUtils.removeDB(containerData, config);
+        }
       } finally {
         readLock();
         writeUnlock();
       }
 
-      packer.pack(this, destination);
+      packContainerToDestination(destination, packer);
     } finally {
       if (lock.isWriteLockedByCurrentThread()) {
         writeUnlock();
@@ -850,4 +863,20 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         file.getName(), file.getParentFile());
   }
 
+  private void packContainerToDestination(OutputStream destination,
+      ContainerPacker<KeyValueContainerData> packer)
+      throws IOException {
+    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+      // Synchronize the dump and pack operation,
+      // so concurrent exports don't get dump files overwritten.
+      // We seldom got concurrent exports for a container,
+      // so it should not influence performance much.
+      synchronized (dumpLock) {
+        BlockUtils.dumpKVContainerDataToFiles(containerData, config);
+        packer.pack(this, destination);
+      }
+    } else {
+      packer.pack(this, destination);
+    }
+  }
 }

@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 
+import java.io.File;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix;
@@ -42,6 +43,9 @@ import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDe
  */
 public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
     implements DeleteTransactionStore<String> {
+
+  public static final String DUMP_FILE_SUFFIX = ".data";
+  public static final String DUMP_DIR = "db";
 
   private final Table<String, DeletedBlocksTransaction> deleteTransactionTable;
 
@@ -87,5 +91,40 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
       getDeleteTransactionTable().deleteBatchWithPrefix(batch, prefix);
       getBatchHandler().commitBatchOperation(batch);
     }
+  }
+
+  public void dumpKVContainerData(long containerID, File dumpDir)
+      throws IOException {
+    String prefix = getContainerKeyPrefix(containerID);
+    getMetadataTable().dumpToFileWithPrefix(
+        getTableDumpFile(getMetadataTable(), dumpDir), prefix);
+    getBlockDataTable().dumpToFileWithPrefix(
+        getTableDumpFile(getBlockDataTable(), dumpDir), prefix);
+    getDeletedBlocksTable().dumpToFileWithPrefix(
+        getTableDumpFile(getDeletedBlocksTable(), dumpDir), prefix);
+    getDeleteTransactionTable().dumpToFileWithPrefix(
+        getTableDumpFile(getDeleteTransactionTable(), dumpDir),
+        prefix);
+  }
+
+  public void loadKVContainerData(File dumpDir)
+      throws IOException {
+    getMetadataTable().loadFromFile(
+        getTableDumpFile(getMetadataTable(), dumpDir));
+    getBlockDataTable().loadFromFile(
+        getTableDumpFile(getBlockDataTable(), dumpDir));
+    getDeletedBlocksTable().loadFromFile(
+        getTableDumpFile(getDeletedBlocksTable(), dumpDir));
+    getDeleteTransactionTable().loadFromFile(
+        getTableDumpFile(getDeleteTransactionTable(), dumpDir));
+  }
+
+  public static File getTableDumpFile(Table<String, ?> table,
+      File dumpDir) throws IOException {
+    return new File(dumpDir, table.getName() + DUMP_FILE_SUFFIX);
+  }
+
+  public static File getDumpDir(File metaDir) {
+    return new File(metaDir, DUMP_DIR);
   }
 }
