@@ -441,12 +441,14 @@ public class TestHDDSUpgrade {
             .collect(Collectors.toSet());
 
     // Trigger Finalization on the SCM
-    StatusAndMessages status = scm.finalizeUpgrade("xyz");
+    StatusAndMessages status = scm.getFinalizationManager().finalizeUpgrade(
+        "xyz");
     Assert.assertEquals(STARTING_FINALIZATION, status.status());
 
     // Wait for the Finalization to complete on the SCM.
     while (status.status() != FINALIZATION_DONE) {
-      status = scm.queryUpgradeFinalizationProgress("xyz", false, false);
+      status = scm.getFinalizationManager().queryUpgradeFinalizationProgress("xyz",
+          false, false);
     }
 
     Set<PipelineID> postUpgradeOpenPipelines =
@@ -515,7 +517,7 @@ public class TestHDDSUpgrade {
       public void run() {
         try {
           loadSCMState();
-          scm.finalizeUpgrade("xyz");
+          scm.getFinalizationManager().finalizeUpgrade("xyz");
         } catch (IOException e) {
           e.printStackTrace();
           testPassed.set(false);
@@ -660,13 +662,11 @@ public class TestHDDSUpgrade {
     testPassed.set(true);
     InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
         new InjectedUpgradeFinalizationExecutor();
-    ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
+    scm.getFinalizationManager().getUpgradeFinalizer()
         .setFinalizationExecutor(scmFinalizationExecutor);
     scmFinalizationExecutor.configureTestInjectionFunction(
         BEFORE_PRE_FINALIZE_UPGRADE,
-        () -> {
-          return this.injectSCMFailureDuringSCMUpgrade();
-        });
+        this::injectSCMFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
@@ -685,13 +685,11 @@ public class TestHDDSUpgrade {
     testPassed.set(true);
     InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
         new InjectedUpgradeFinalizationExecutor();
-    ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
+    scm.getFinalizationManager().getUpgradeFinalizer()
         .setFinalizationExecutor(scmFinalizationExecutor);
     scmFinalizationExecutor.configureTestInjectionFunction(
         AFTER_PRE_FINALIZE_UPGRADE,
-        () -> {
-          return this.injectSCMFailureDuringSCMUpgrade();
-        });
+        this::injectSCMFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
@@ -710,13 +708,11 @@ public class TestHDDSUpgrade {
     testPassed.set(true);
     InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
         new InjectedUpgradeFinalizationExecutor();
-    ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
+    scm.getFinalizationManager().getUpgradeFinalizer()
         .setFinalizationExecutor(scmFinalizationExecutor);
     scmFinalizationExecutor.configureTestInjectionFunction(
         AFTER_COMPLETE_FINALIZATION,
-        () -> {
-          return this.injectSCMFailureDuringSCMUpgrade();
-        });
+        () -> this.injectSCMFailureDuringSCMUpgrade());
     testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
@@ -735,13 +731,11 @@ public class TestHDDSUpgrade {
     testPassed.set(true);
     InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
         new InjectedUpgradeFinalizationExecutor();
-    ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
+    scm.getFinalizationManager().getUpgradeFinalizer()
         .setFinalizationExecutor(scmFinalizationExecutor);
     scmFinalizationExecutor.configureTestInjectionFunction(
         AFTER_POST_FINALIZE_UPGRADE,
-        () -> {
-          return this.injectSCMFailureDuringSCMUpgrade();
-        });
+        () -> this.injectSCMFailureDuringSCMUpgrade());
     testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
@@ -760,13 +754,11 @@ public class TestHDDSUpgrade {
     testPassed.set(true);
     InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
         new InjectedUpgradeFinalizationExecutor();
-    ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
+    scm.getFinalizationManager().getUpgradeFinalizer()
         .setFinalizationExecutor(scmFinalizationExecutor);
     scmFinalizationExecutor.configureTestInjectionFunction(
         BEFORE_PRE_FINALIZE_UPGRADE,
-        () -> {
-          return injectDataNodeFailureDuringSCMUpgrade();
-        });
+        this::injectDataNodeFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
@@ -785,13 +777,11 @@ public class TestHDDSUpgrade {
     testPassed.set(true);
     InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
         new InjectedUpgradeFinalizationExecutor();
-    ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
+    scm.getFinalizationManager().getUpgradeFinalizer()
         .setFinalizationExecutor(scmFinalizationExecutor);
     scmFinalizationExecutor.configureTestInjectionFunction(
         AFTER_PRE_FINALIZE_UPGRADE,
-        () -> {
-          return injectDataNodeFailureDuringSCMUpgrade();
-        });
+        this::injectDataNodeFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
@@ -810,13 +800,11 @@ public class TestHDDSUpgrade {
     testPassed.set(true);
     InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
         new InjectedUpgradeFinalizationExecutor();
-    ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
+    scm.getFinalizationManager().getUpgradeFinalizer()
         .setFinalizationExecutor(scmFinalizationExecutor);
     scmFinalizationExecutor.configureTestInjectionFunction(
         AFTER_COMPLETE_FINALIZATION,
-        () -> {
-          return injectDataNodeFailureDuringSCMUpgrade();
-        });
+        this::injectDataNodeFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
@@ -835,13 +823,11 @@ public class TestHDDSUpgrade {
     testPassed.set(true);
     InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
         new InjectedUpgradeFinalizationExecutor();
-    ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
+    scm.getFinalizationManager().getUpgradeFinalizer()
         .setFinalizationExecutor(scmFinalizationExecutor);
     scmFinalizationExecutor.configureTestInjectionFunction(
         AFTER_POST_FINALIZE_UPGRADE,
-        () -> {
-          return injectDataNodeFailureDuringSCMUpgrade();
-        });
+        this::injectDataNodeFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
@@ -914,7 +900,7 @@ public class TestHDDSUpgrade {
           () -> {
             return this.injectSCMFailureDuringSCMUpgrade();
           });
-      ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
+      scm.getFinalizationManager().getUpgradeFinalizer()
           .setFinalizationExecutor(scmFinalizationExecutor);
 
       for (UpgradeTestInjectionPoints datanodeInjectionPoint :
@@ -973,7 +959,7 @@ public class TestHDDSUpgrade {
             helpingFailureInjectionThread.start();
             return true;
           });
-      ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
+      scm.getFinalizationManager().getUpgradeFinalizer()
           .setFinalizationExecutor(scmFinalizationExecutor);
       testFinalizationWithFailureInjectionHelper(helpingFailureInjectionThread);
       Assert.assertTrue(testPassed.get());
@@ -1038,7 +1024,7 @@ public class TestHDDSUpgrade {
     testPreUpgradeConditionsDataNodes();
 
     // Trigger Finalization on the SCM
-    StatusAndMessages status = scm.finalizeUpgrade("xyz");
+    StatusAndMessages status = scm.getFinalizationManager().finalizeUpgrade("xyz");
     Assert.assertEquals(STARTING_FINALIZATION, status.status());
 
     // Make sure that any outstanding thread created by failure injection
@@ -1053,9 +1039,11 @@ public class TestHDDSUpgrade {
     while ((status.status() != FINALIZATION_DONE) &&
         (status.status() != ALREADY_FINALIZED)) {
       loadSCMState();
-      status = scm.queryUpgradeFinalizationProgress("xyz", true, false);
+      status = scm.getFinalizationManager().queryUpgradeFinalizationProgress(
+          "xyz",
+          true, false);
       if (status.status() == FINALIZATION_REQUIRED) {
-        status = scm.finalizeUpgrade("xyz");
+        status = scm.getFinalizationManager().finalizeUpgrade("xyz");
       }
     }
 

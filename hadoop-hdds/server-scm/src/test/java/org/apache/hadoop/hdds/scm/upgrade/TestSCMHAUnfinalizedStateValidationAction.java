@@ -116,7 +116,7 @@ public class TestSCMHAUnfinalizedStateValidationAction {
     StorageContainerManager scm = HddsTestUtils.getScm(conf);
 
     Assert.assertEquals(UpgradeFinalizer.Status.FINALIZATION_REQUIRED,
-        scm.getUpgradeFinalizer().getStatus());
+        scm.getFinalizationManager().getUpgradeFinalizer().getStatus());
 
     if (shouldFail) {
       // Start on its own should fail.

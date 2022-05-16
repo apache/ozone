@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmHAUnfinalizedStateValidationAction;
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
@@ -1855,31 +1856,17 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmLayoutVersionManager;
   }
 
+  public FinalizationManager getFinalizationManager() {
+    // TODO
+    return null;
+  }
+
   /**
    * Return the node Id of this SCM.
    * @return node Id.
    */
   public String getSCMNodeId() {
     return scmHANodeDetails.getLocalNodeDetails().getNodeId();
-  }
-
-  public StatusAndMessages finalizeUpgrade(String upgradeClientID)
-      throws IOException {
-    return upgradeFinalizer.finalize(upgradeClientID, this);
-  }
-
-  public StatusAndMessages queryUpgradeFinalizationProgress(
-      String upgradeClientID, boolean takeover, boolean readonly
-  ) throws IOException {
-    if (readonly) {
-      return new StatusAndMessages(upgradeFinalizer.getStatus(),
-          Collections.emptyList());
-    }
-    return upgradeFinalizer.reportStatus(upgradeClientID, takeover);
-  }
-
-  public UpgradeFinalizer<StorageContainerManager> getUpgradeFinalizer() {
-    return upgradeFinalizer;
   }
 
   private void startSecretManagerIfNecessary() {
