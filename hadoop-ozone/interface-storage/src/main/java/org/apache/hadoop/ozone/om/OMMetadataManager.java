@@ -368,8 +368,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   Table<String, OmDBTenantState> getTenantStateTable();
 
-  Table<String, Long> getOmRangerStateTable();
-
   /**
    * Gets the OM Meta table.
    * @return meta table reference.

@@ -230,8 +230,8 @@ public class TestMultiTenantBGSync {
         long v = request.getRangerServiceVersionSyncRequest()
             .getRangerServiceVersion();
         LOG.info("Writing Ranger Ozone Service Version: {}", v);
-        ozoneManager.getMetadataManager().getOmRangerStateTable()
-            .put(OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY, v);
+        ozoneManager.getMetadataManager().getMetaTable().put(
+            OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY, String.valueOf(v));
         return null;
       }).when(omRatisServer).submitRequest(Mockito.any(), Mockito.any());
     } catch (ServiceException e) {

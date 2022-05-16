@@ -18,7 +18,7 @@
  */
 package org.apache.hadoop.ozone.om.response.s3.tenant;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.RANGER_STATE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.META_TABLE;
 
 import java.io.IOException;
 
@@ -35,18 +35,17 @@ import com.google.common.annotations.VisibleForTesting;
 /**
  * Response for OMRangerServiceVersionSync request.
  */
-@CleanupTableInfo(cleanupTables = {RANGER_STATE_TABLE})
+@CleanupTableInfo(cleanupTables = {META_TABLE})
 public class OMRangerServiceVersionSyncResponse extends OMClientResponse {
-  private long newServiceVersion;
-  private String serviceVersionkey;
+  private String serviceVersionKey;
+  private String serviceVersionValueStr;
 
   public OMRangerServiceVersionSyncResponse(@Nonnull OMResponse omResponse,
-                                            @Nonnull long proposedVersion,
-                                            @Nonnull String key
-  ) {
+                                            @Nonnull String dbKey,
+                                            @Nonnull String versionStr) {
     super(omResponse);
-    this.newServiceVersion = proposedVersion;
-    this.serviceVersionkey = key;
+    this.serviceVersionKey = dbKey;
+    this.serviceVersionValueStr = versionStr;
   }
 
   /**
@@ -62,12 +61,12 @@ public class OMRangerServiceVersionSyncResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    omMetadataManager.getOmRangerStateTable().putWithBatch(
-        batchOperation, serviceVersionkey, newServiceVersion);
+    omMetadataManager.getMetaTable().putWithBatch(
+        batchOperation, serviceVersionKey, serviceVersionValueStr);
   }
 
   @VisibleForTesting
-  public long getNewServiceVersion() {
-    return newServiceVersion;
+  public String getNewServiceVersion() {
+    return serviceVersionValueStr;
   }
 }

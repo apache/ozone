@@ -192,7 +192,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String PRINCIPAL_TO_ACCESS_IDS_TABLE =
       "principalToAccessIdsTable";
   public static final String TENANT_STATE_TABLE = "tenantStateTable";
-  public static final String RANGER_STATE_TABLE = "RangerStateTable";
 
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,
@@ -213,8 +212,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       META_TABLE,
       TENANT_ACCESS_ID_TABLE,
       PRINCIPAL_TO_ACCESS_IDS_TABLE,
-      TENANT_STATE_TABLE,
-      RANGER_STATE_TABLE
+      TENANT_STATE_TABLE
   };
 
   private DBStore store;
@@ -241,7 +239,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table tenantAccessIdTable;
   private Table principalToAccessIdsTable;
   private Table tenantStateTable;
-  private Table rangerStateTable;
 
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
@@ -444,7 +441,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(TENANT_ACCESS_ID_TABLE)
         .addTable(PRINCIPAL_TO_ACCESS_IDS_TABLE)
         .addTable(TENANT_STATE_TABLE)
-        .addTable(RANGER_STATE_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
         .addCodec(RepeatedOmKeyInfo.class,
@@ -552,12 +548,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     tenantStateTable = this.store.getTable(TENANT_STATE_TABLE,
         String.class, OmDBTenantState.class);
     checkTableStatus(tenantStateTable, TENANT_STATE_TABLE);
-
-    // String("RangerOzoneServiceVersion")> Long (current service version
-    // in Ranger)
-    rangerStateTable = this.store.getTable(RANGER_STATE_TABLE,
-        String.class, Long.class);
-    checkTableStatus(rangerStateTable, RANGER_STATE_TABLE);
   }
 
   /**
@@ -1379,19 +1369,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public Table<String, OmDBUserPrincipalInfo>
-      getPrincipalToAccessIdsTable() {
+  public Table<String, OmDBUserPrincipalInfo> getPrincipalToAccessIdsTable() {
     return principalToAccessIdsTable;
   }
 
   @Override
   public Table<String, OmDBTenantState> getTenantStateTable() {
     return tenantStateTable;
-  }
-
-  @Override
-  public Table<String, Long> getOmRangerStateTable() {
-    return rangerStateTable;
   }
 
   /**

@@ -66,16 +66,18 @@ public class OMRangerServiceVersionSyncRequest extends OMClientRequest {
     final RangerServiceVersionSyncRequest request =
         getOmRequest().getRangerServiceVersionSyncRequest();
     final long proposedVersion = request.getRangerServiceVersion();
+    final String proposedVersionStr = String.valueOf(proposedVersion);
 
-    omMetadataManager.getOmRangerStateTable().addCacheEntry(
+    omMetadataManager.getMetaTable().addCacheEntry(
         new CacheKey<>(OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY),
-        new CacheValue<>(Optional.of(proposedVersion), transactionLogIndex));
+        new CacheValue<>(Optional.of(proposedVersionStr), transactionLogIndex));
     omResponse.setRangerServiceVersionSyncResponse(
         RangerServiceVersionSyncResponse.newBuilder().build());
 
     omClientResponse = new OMRangerServiceVersionSyncResponse(
-        omResponse.build(), proposedVersion,
-        OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY);
+        omResponse.build(),
+        OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY,
+        proposedVersionStr);
     addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
         ozoneManagerDoubleBufferHelper);
 

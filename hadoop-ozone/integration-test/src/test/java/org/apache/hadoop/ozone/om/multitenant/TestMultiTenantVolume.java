@@ -250,12 +250,12 @@ public class TestMultiTenantVolume {
     final long writtenVersion = 10L;
 
     cluster.getOzoneManager().getMultiTenantManager()
-        .getOMRangerBGSyncService()
-        .setOMDBRangerServiceVersion(writtenVersion);
+        .getOMRangerBGSyncService().setOMDBRangerServiceVersion(writtenVersion);
 
-    long readBackVersion = cluster.getOzoneManager().getMetadataManager()
-        .getOmRangerStateTable()
+    String readBackVersionStr = cluster.getOzoneManager().getMetadataManager()
+        .getMetaTable()
         .get(OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY);
+    long readBackVersion = Long.parseLong(readBackVersionStr);
 
     Assert.assertEquals(writtenVersion, readBackVersion);
   }

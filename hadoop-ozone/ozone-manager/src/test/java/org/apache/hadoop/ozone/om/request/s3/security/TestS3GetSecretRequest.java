@@ -486,7 +486,7 @@ public class TestS3GetSecretRequest {
         omRangerServiceVersionSyncResponse =
         (OMRangerServiceVersionSyncResponse) omClientResponse;
     // Check response
-    Assert.assertEquals(10,
-        omRangerServiceVersionSyncResponse.getNewServiceVersion());
+    String verStr = omRangerServiceVersionSyncResponse.getNewServiceVersion();
+    Assert.assertEquals(10L, Long.parseLong(verStr));
   }
 }

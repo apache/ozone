@@ -329,13 +329,12 @@ public class OMRangerBGSyncService extends BackgroundService {
   }
 
   long getOMDBRangerServiceVersion() throws IOException {
-    final Long dbValue = ozoneManager.getMetadataManager()
-        .getOmRangerStateTable()
+    final String dbValue = ozoneManager.getMetadataManager().getMetaTable()
         .get(OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY);
     if (dbValue == null) {
-      return -1;
+      return -1L;
     } else {
-      return dbValue;
+      return Long.parseLong(dbValue);
     }
   }
 
