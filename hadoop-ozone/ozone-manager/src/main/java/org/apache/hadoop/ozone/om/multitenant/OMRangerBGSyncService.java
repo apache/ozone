@@ -42,6 +42,8 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
@@ -141,13 +143,44 @@ public class OMRangerBGSyncService extends BackgroundService {
     }
   }
 
-  // This map will be used to keep all the policies that are found in
-  // OM DB and should have been in Ranger. Currently, we are only printing such
-  // policyID. This can result if a tenant is deleted but the system
-  // crashed. Its an easy recovery to retry the "tenant delete" operation.
+  enum PolicyType {
+    BUCKET_NAMESPACE_POLICY,
+    BUCKET_POLICY
+  }
+
+  /**
+   * Helper class that stores the tenant name and policy type.
+   */
+  static class PolicyInfo {
+
+    String tenantId;
+    PolicyType policyType;
+
+    public PolicyInfo(String tenantId, PolicyType policyType) {
+      this.tenantId = tenantId;
+      this.policyType = policyType;
+    }
+
+    public String getTenantId() {
+      return tenantId;
+    }
+
+    public PolicyType getPolicyType() {
+      return policyType;
+    }
+
+    @Override
+    public String toString() {
+      return "PolicyInfo{" +
+          "tenantId='" + tenantId + '\'' + ", policyType=" + policyType + '}';
+    }
+  }
+
+  // This map keeps all the policies found in OM DB. These policies should be
+  // in Ranger. If not, the default policy will be (re)created.
   //
-  // Maps from policy name to policy ID in Ranger
-  private final HashMap<String, String> mtRangerPoliciesToBeCreated =
+  // Maps from policy name to PolicyInfo (tenant name and policy type) in Ranger
+  private final HashMap<String, PolicyInfo> mtRangerPoliciesToBeCreated =
       new HashMap<>();
 
   // We will track all the policies in Ranger here. After we have
@@ -468,15 +501,17 @@ public class OMRangerBGSyncService extends BackgroundService {
   /**
    * Helper function to add/remove a policy name to/from mtRangerPolicies lists.
    */
-  private void mtRangerPoliciesOpHelper(String policyName) {
+  private void mtRangerPoliciesOpHelper(
+      String policyName, PolicyInfo policyInfo) {
+
     if (mtRangerPoliciesToBeDeleted.containsKey(policyName)) {
-      // This entry is in sync with ranger, remove it from the set
+      // This entry is in sync with Ranger, remove it from the set
       // Eventually mtRangerPolicies will only contain entries that
       // are not in OMDB and should be removed from Ranger.
       mtRangerPoliciesToBeDeleted.remove(policyName);
     } else {
       // We could not find a policy in ranger that should have been there.
-      mtRangerPoliciesToBeCreated.put(policyName, null);
+      mtRangerPoliciesToBeCreated.put(policyName, policyInfo);
     }
   }
 
@@ -490,6 +525,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       final Table.KeyValue<String, OmDBTenantState> tableKeyValue =
           tenantStateTableIter.next();
       final OmDBTenantState dbTenantState = tableKeyValue.getValue();
+      final String tenantId = dbTenantState.getTenantId();
       final String volumeName = dbTenantState.getBucketNamespaceName();
       Preconditions.checkNotNull(volumeName);
 
@@ -498,8 +534,10 @@ public class OMRangerBGSyncService extends BackgroundService {
         acquiredVolumeLock = metadataManager.getLock().acquireWriteLock(
             VOLUME_LOCK, volumeName);
 
-        mtRangerPoliciesOpHelper(dbTenantState.getBucketNamespacePolicyName());
-        mtRangerPoliciesOpHelper(dbTenantState.getBucketPolicyName());
+        mtRangerPoliciesOpHelper(dbTenantState.getBucketNamespacePolicyName(),
+            new PolicyInfo(tenantId, PolicyType.BUCKET_NAMESPACE_POLICY));
+        mtRangerPoliciesOpHelper(dbTenantState.getBucketPolicyName(),
+            new PolicyInfo(tenantId, PolicyType.BUCKET_POLICY));
       } finally {
         if (acquiredVolumeLock) {
           metadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
@@ -507,13 +545,13 @@ public class OMRangerBGSyncService extends BackgroundService {
       }
     }
 
-    for (Map.Entry<String, String> entry :
+    for (Map.Entry<String, PolicyInfo> entry :
         mtRangerPoliciesToBeCreated.entrySet()) {
       final String policyName = entry.getKey();
       LOG.warn("Expected policy not found in Ranger: {}", policyName);
       checkLeader();
       // Attempt to recreate the default volume/bucket policy if it's missing
-      attemptToRecreateDefaultPolicy(policyName);
+      attemptToCreateDefaultPolicy(entry.getValue());
     }
 
     for (Map.Entry<String, String> entry :
@@ -526,65 +564,47 @@ public class OMRangerBGSyncService extends BackgroundService {
 
   }
 
-  private String getTenantIdFromPolicyName(
-      String policyName, String policySuffix) {
-    return policyName.substring(0, policyName.length() - policySuffix.length());
-  }
-
   /**
-   * Takes a policy name (e.g. tenant1-VolumeAccess), attempts to (re)create
-   * the policy in Ranger by the policy name alone.
+   * Attempts to (re)create a tenant default volume or bucket policy in Ranger.
    */
-  private void attemptToRecreateDefaultPolicy(String policyName)
+  private void attemptToCreateDefaultPolicy(PolicyInfo policyInfo)
       throws IOException {
-    String policySuffix, tenantId;
 
-    policySuffix = OzoneConsts.DEFAULT_TENANT_BUCKET_NAMESPACE_POLICY_SUFFIX;
-    if (policyName.endsWith(policySuffix)) {
-      // Recreate default VolumeAccess policy
-      tenantId = getTenantIdFromPolicyName(policyName, policySuffix);
+    final String tenantId = policyInfo.getTenantId();
+
+    final String volumeName =
+        multiTenantManager.getTenantVolumeName(tenantId);
+    final String userRoleName =
+        multiTenantManager.getTenantUserRoleName(tenantId);
+
+    final AccessPolicy accessPolicy;
+
+    switch (policyInfo.getPolicyType()) {
+    case BUCKET_NAMESPACE_POLICY:
       LOG.info("Recovering VolumeAccess policy for tenant: {}", tenantId);
 
-      final String volumeName =
-          multiTenantManager.getTenantVolumeName(tenantId);
-      final String userRoleName =
-          multiTenantManager.getTenantUserRoleName(tenantId);
       final String adminRoleName =
           multiTenantManager.getTenantAdminRoleName(tenantId);
 
-      final AccessPolicy tenantVolumeAccessPolicy =
-          multiTenantManager.newDefaultVolumeAccessPolicy(volumeName,
-              new OzoneTenantRolePrincipal(userRoleName),
-              new OzoneTenantRolePrincipal(adminRoleName));
+      accessPolicy = multiTenantManager.newDefaultVolumeAccessPolicy(volumeName,
+          new OzoneTenantRolePrincipal(userRoleName),
+          new OzoneTenantRolePrincipal(adminRoleName));
+      break;
 
-      String id = authorizer.createAccessPolicy(tenantVolumeAccessPolicy);
-      LOG.info("Created policy, ID: {}", id);
-
-      return;
-    }
-
-    policySuffix = OzoneConsts.DEFAULT_TENANT_BUCKET_POLICY_SUFFIX;
-    if (policyName.endsWith(policySuffix)) {
-      // Recreate default BucketAccess policy
-      tenantId = getTenantIdFromPolicyName(policyName, policySuffix);
+    case BUCKET_POLICY:
       LOG.info("Recovering BucketAccess policy for tenant: {}", tenantId);
 
-      final String volumeName =
-          multiTenantManager.getTenantVolumeName(tenantId);
-      final String userRoleName =
-          multiTenantManager.getTenantUserRoleName(tenantId);
-
-      final AccessPolicy tenantBucketCreatePolicy =
-          multiTenantManager.newDefaultBucketAccessPolicy(volumeName,
+      accessPolicy = multiTenantManager.newDefaultBucketAccessPolicy(volumeName,
               new OzoneTenantRolePrincipal(userRoleName));
+      break;
 
-      String id = authorizer.createAccessPolicy(tenantBucketCreatePolicy);
-      LOG.info("Created policy, ID: {}", id);
-
-      return;
+    default:
+      throw new OMException("Unknown policy type in " + policyInfo,
+          ResultCodes.INTERNAL_ERROR);
     }
 
-    LOG.error("Unable to recover Ranger policy: {}", policyName);
+    String id = authorizer.createAccessPolicy(accessPolicy);
+    LOG.info("Created policy, ID: {}", id);
   }
 
   private void loadAllRolesFromOM() throws IOException {
