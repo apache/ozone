@@ -36,15 +36,12 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignUserAccessIdRequest;
-import org.apache.hadoop.ozone.om.request.s3.tenant.OMSetRangerServiceVersionRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.security.S3GetSecretResponse;
-import org.apache.hadoop.ozone.om.response.s3.tenant.OMSetRangerServiceVersionResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantAssignUserAccessIdResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantCreateResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretResponse;
@@ -149,19 +146,6 @@ public class TestS3GetSecretRequest {
   public void tearDown() throws Exception {
     omMetrics.unRegister();
     framework().clearInlineMocks();
-  }
-
-  private OMRequest createRangerSyncRequest(long version) {
-
-    return OMRequest.newBuilder()
-        .setClientId(UUID.randomUUID().toString())
-        .setCmdType(Type.SetRangerServiceVersion)
-        .setSetRangerServiceVersionRequest(
-            OzoneManagerProtocolProtos.SetRangerServiceVersionRequest
-                .newBuilder()
-                .setRangerServiceVersion(version)
-                .build()
-        ).build();
   }
 
   private OMRequest createTenantRequest(String tenantNameStr) {
@@ -458,35 +442,5 @@ public class TestS3GetSecretRequest {
         s3Secret.getAwsSecret());
     Assert.assertEquals(originalS3Secret.getKerberosID(),
         s3Secret.getKerberosID());
-  }
-
-  @Test
-  public void testRangerSyncRequest() throws IOException {
-
-    // This effectively makes alice an admin.
-    when(ozoneManager.isAdmin(ugiAlice)).thenReturn(true);
-
-    // 1. CreateTenantRequest: Create tenant "finance".
-    long txLogIndex = 1;
-    // Skip preExecute for OMSetRangerServiceVersionRequest
-    OMSetRangerServiceVersionRequest omSetRangerServiceVersionRequest =
-        new OMSetRangerServiceVersionRequest(
-            new OMSetRangerServiceVersionRequest(
-                createRangerSyncRequest(10)
-            ).preExecute(ozoneManager)
-        );
-    // Run validateAndUpdateCache
-    OMClientResponse omClientResponse =
-        omSetRangerServiceVersionRequest.validateAndUpdateCache(ozoneManager,
-            txLogIndex, ozoneManagerDoubleBufferHelper);
-    // Check response type and cast
-    Assert.assertTrue(omClientResponse
-        instanceof OMSetRangerServiceVersionResponse);
-    final OMSetRangerServiceVersionResponse
-        omSetRangerServiceVersionResponse =
-        (OMSetRangerServiceVersionResponse) omClientResponse;
-    // Check response
-    String verStr = omSetRangerServiceVersionResponse.getNewServiceVersion();
-    Assert.assertEquals(10L, Long.parseLong(verStr));
   }
 }
