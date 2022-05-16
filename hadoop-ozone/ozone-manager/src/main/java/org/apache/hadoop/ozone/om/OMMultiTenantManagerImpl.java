@@ -38,10 +38,14 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
 import com.google.common.base.Optional;
+
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -443,10 +447,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     if (callerUgi == null) {
       return false;
     } else {
-      return isTenantAdmin(
-              callerUgi.getShortUserName(), tenantId, delegated)
-          || isTenantAdmin(
-              callerUgi.getUserName(), tenantId, delegated)
+      return isTenantAdmin(callerUgi.getShortUserName(), tenantId, delegated)
+          || isTenantAdmin(callerUgi.getUserName(), tenantId, delegated)
           || ozoneManager.isAdmin(callerUgi.getShortUserName())
           || ozoneManager.isAdmin(callerUgi.getUserName());
     }
@@ -890,11 +892,61 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     return tenantCache;
   }
 
-  public void acquireTenantCacheReadLock() {
+  /**
+   * Generate and return a mapping from roles to a set of user principals from
+   * tenantCache.
+   */
+  public HashMap<String, HashSet<String>> getAllRolesFromCache() {
+    final HashMap<String, HashSet<String>> mtRoles = new HashMap<>();
+
     tenantCacheLock.readLock().lock();
+
+    try {
+      // tenantCache: tenantId -> CachedTenantState
+      for (Map.Entry<String, CachedTenantState> e1 : tenantCache.entrySet()) {
+        final CachedTenantState cachedTenantState = e1.getValue();
+
+        final String userRoleName = cachedTenantState.getTenantUserRoleName();
+        mtRoles.computeIfAbsent(userRoleName, any -> new HashSet<>());
+        final String adminRoleName = cachedTenantState.getTenantAdminRoleName();
+        mtRoles.computeIfAbsent(adminRoleName, any -> new HashSet<>());
+
+        final Map<String, CachedAccessIdInfo> accessIdInfoMap =
+            cachedTenantState.getAccessIdInfoMap();
+
+        // accessIdInfoMap: accessId -> CachedAccessIdInfo
+        for (Map.Entry<String, CachedAccessIdInfo> e2 :
+            accessIdInfoMap.entrySet()) {
+          final CachedAccessIdInfo cachedAccessIdInfo = e2.getValue();
+
+          final String userPrincipal = cachedAccessIdInfo.getUserPrincipal();
+          final boolean isAdmin = cachedAccessIdInfo.getIsAdmin();
+
+          addUserToMtRoles(mtRoles, userRoleName, userPrincipal);
+
+          if (isAdmin) {
+            addUserToMtRoles(mtRoles, adminRoleName, userPrincipal);
+          }
+        }
+      }
+    } finally {
+      tenantCacheLock.readLock().unlock();
+    }
+
+    return mtRoles;
   }
 
-  public void releaseTenantCacheReadLock() {
-    tenantCacheLock.readLock().unlock();
+  /**
+   * Helper function to add user principal to a role in mtRoles.
+   */
+  private void addUserToMtRoles(HashMap<String, HashSet<String>> mtRoles,
+      String roleName, String userPrincipal) {
+    if (!mtRoles.containsKey(roleName)) {
+      mtRoles.put(roleName, new HashSet<>(
+          Collections.singletonList(userPrincipal)));
+    } else {
+      final HashSet<String> usersInTheRole = mtRoles.get(roleName);
+      usersInTheRole.add(userPrincipal);
+    }
   }
 }

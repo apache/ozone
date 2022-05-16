@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
-import org.apache.hadoop.ozone.om.multitenant.CachedTenantState.CachedAccessIdInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerServiceVersionSyncRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -395,11 +394,14 @@ public class OMRangerBGSyncService extends BackgroundService {
     for (int i = 0; i < policyArray.size(); ++i) {
       JsonObject newPolicy = policyArray.get(i).getAsJsonObject();
       if (!newPolicy.getAsJsonArray("policyLabels").get(0)
-          .getAsString().equals("OzoneMultiTenant")) {
+          .getAsString().equals("OzoneTenant" /* TODO: CONST */)) {
         // Shouldn't get policies without the tag here very often as it is
         // specified in the query param, unless a user removed the tag during
         // the sync
-        LOG.warn("Received a Ranger policy without OzoneMultiTenant tag: {}",
+
+        // TODO: Filter label again
+
+        LOG.warn("Received a Ranger policy without OzoneTenant tag: {}",
             newPolicy.get("name").getAsString());
         continue;
       }
@@ -584,19 +586,6 @@ public class OMRangerBGSyncService extends BackgroundService {
     LOG.error("Unable to recover Ranger policy: {}", policyName);
   }
 
-  /**
-   * Helper function to add user principal to a role in mtOMDBRoles.
-   */
-  private void addUserToMtOMDBRoles(String roleName, String userPrincipal) {
-    if (!mtOMDBRoles.containsKey(roleName)) {
-      mtOMDBRoles.put(roleName, new HashSet<>(
-          Collections.singletonList(userPrincipal)));
-    } else {
-      final HashSet<String> usersInTheRole = mtOMDBRoles.get(roleName);
-      usersInTheRole.add(userPrincipal);
-    }
-  }
-
   private void loadAllRolesFromOM() throws IOException {
     if (multiTenantManager instanceof OMMultiTenantManagerImpl) {
       loadAllRolesFromCache();
@@ -611,42 +600,8 @@ public class OMRangerBGSyncService extends BackgroundService {
 
     final OMMultiTenantManagerImpl impl =
         (OMMultiTenantManagerImpl) multiTenantManager;
-    final Map<String, CachedTenantState> tenantCache = impl.getTenantCache();
 
-    impl.acquireTenantCacheReadLock();
-
-    try {
-      // tenantCache: tenantId -> CachedTenantState
-      for (Map.Entry<String, CachedTenantState> e1 : tenantCache.entrySet()) {
-        final CachedTenantState cachedTenantState = e1.getValue();
-
-        final String userRoleName = cachedTenantState.getTenantUserRoleName();
-        mtOMDBRoles.computeIfAbsent(userRoleName, any -> new HashSet<>());
-        final String adminRoleName = cachedTenantState.getTenantAdminRoleName();
-        mtOMDBRoles.computeIfAbsent(adminRoleName, any -> new HashSet<>());
-
-        final Map<String, CachedAccessIdInfo> accessIdInfoMap =
-            cachedTenantState.getAccessIdInfoMap();
-
-        // accessIdInfoMap: accessId -> CachedAccessIdInfo
-        for (Map.Entry<String, CachedAccessIdInfo> e2 :
-            accessIdInfoMap.entrySet()) {
-          final CachedAccessIdInfo cachedAccessIdInfo = e2.getValue();
-
-          final String userPrincipal = cachedAccessIdInfo.getUserPrincipal();
-          final boolean isAdmin = cachedAccessIdInfo.getIsAdmin();
-
-          addUserToMtOMDBRoles(userRoleName, userPrincipal);
-
-          if (isAdmin) {
-            addUserToMtOMDBRoles(adminRoleName, userPrincipal);
-          }
-        }
-      }
-    } finally {
-      impl.releaseTenantCacheReadLock();
-    }
-
+    mtOMDBRoles.putAll(impl.getAllRoles());
   }
 
   private void loadAllRolesFromDB() throws IOException {
@@ -683,6 +638,19 @@ public class OMRangerBGSyncService extends BackgroundService {
       if (dbAccessIdInfo.getIsAdmin()) {
         addUserToMtOMDBRoles(adminRoleName, userPrincipal);
       }
+    }
+  }
+
+  /**
+   * Helper function to add user principal to a role in mtOMDBRoles.
+   */
+  private void addUserToMtOMDBRoles(String roleName, String userPrincipal) {
+    if (!mtOMDBRoles.containsKey(roleName)) {
+      mtOMDBRoles.put(roleName, new HashSet<>(
+          Collections.singletonList(userPrincipal)));
+    } else {
+      final HashSet<String> usersInTheRole = mtOMDBRoles.get(roleName);
+      usersInTheRole.add(userPrincipal);
     }
   }
 
