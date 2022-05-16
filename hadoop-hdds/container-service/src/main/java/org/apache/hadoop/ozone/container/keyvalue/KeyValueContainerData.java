@@ -365,7 +365,7 @@ public class KeyValueContainerData extends ContainerData {
   public KeyPrefixFilter getUnprefixedKeyFilter() {
     String schemaPrefix = containerPrefix();
     return new KeyPrefixFilter().addFilter(
-        schemaPrefix == null ? "#" : schemaPrefix + "#", true);
+        schemaPrefix.isEmpty() ? "#" : schemaPrefix + "#", true);
   }
 
   public KeyPrefixFilter getDeletingBlockKeyFilter() {

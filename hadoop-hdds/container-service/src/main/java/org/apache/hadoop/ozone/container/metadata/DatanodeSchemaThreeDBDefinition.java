@@ -95,7 +95,7 @@ public class DatanodeSchemaThreeDBDefinition
     super(dbPath, config);
 
     DatanodeConfiguration dc = config.getObject(DatanodeConfiguration.class);
-    this.separator = dc.getContainerSchemaV3KeySeparator();
+    separator = dc.getContainerSchemaV3KeySeparator();
 
     // Get global ColumnFamilyOptions first.
     DatanodeDBProfile dbProfile = DatanodeDBProfile

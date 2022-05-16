@@ -94,11 +94,11 @@ public class TestKeyValueBlockIterator {
   @Parameterized.Parameters
   public static Iterable<Object[]> data() {
     List listA =
-    ContainerTestVersionInfo.layoutList.stream().map(
-        each -> new Object[] {each, ""})
-        .collect(toList());
+        ContainerTestVersionInfo.getLayoutList().stream().map(
+            each -> new Object[] {each, ""})
+            .collect(toList());
     List listB =
-        ContainerTestVersionInfo.layoutList.stream().map(
+        ContainerTestVersionInfo.getLayoutList().stream().map(
             each -> new Object[] {each,
                 new DatanodeConfiguration().getContainerSchemaV3KeySeparator()})
             .collect(toList());
@@ -306,7 +306,7 @@ public class TestKeyValueBlockIterator {
     String schemaPrefix = containerData.containerPrefix();
     MetadataKeyFilters.KeyPrefixFilter secondFilter =
             new MetadataKeyFilters.KeyPrefixFilter()
-            .addFilter(schemaPrefix == null ?
+            .addFilter(schemaPrefix.isEmpty() ?
                 secondPrefix : schemaPrefix + secondPrefix);
     testWithFilter(secondFilter, blockIDs.get(secondPrefix));
   }
@@ -415,7 +415,7 @@ public class TestKeyValueBlockIterator {
           blockIndex++;
           BlockData blockData = new BlockData(blockID);
           blockData.setChunks(chunkList);
-          String blockKey = (schemaPrefix == null ? "" : schemaPrefix) +
+          String blockKey = (schemaPrefix.isEmpty() ? "" : schemaPrefix) +
               prefix + blockID.getLocalID();
           blockDataTable.put(blockKey, blockData);
           blockIDs.get(prefix).add(blockID.getLocalID());

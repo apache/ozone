@@ -43,7 +43,7 @@ public class ContainerTestVersionInfo {
     this.layout = layout;
   }
 
-  public static List<ContainerTestVersionInfo> layoutList = new ArrayList<>();
+  private static List<ContainerTestVersionInfo> layoutList = new ArrayList<>();
   static {
     for (ContainerLayoutVersion ch : ContainerLayoutVersion.getAllVersions()) {
       for (String sch : SCHEMA_VERSIONS) {
@@ -65,6 +65,9 @@ public class ContainerTestVersionInfo {
         .collect(toList());
   }
 
+  public static List<ContainerTestVersionInfo> getLayoutList() {
+    return layoutList;
+  }
   public static void setTestSchemaVersion(String schemaVersion,
       OzoneConfiguration conf) {
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
