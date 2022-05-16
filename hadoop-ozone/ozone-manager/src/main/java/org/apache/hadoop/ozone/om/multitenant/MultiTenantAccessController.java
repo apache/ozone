@@ -70,6 +70,8 @@ public interface MultiTenantAccessController {
 
   void deleteRole(String roleName) throws Exception;
 
+  long getRangerServiceVersion() throws Exception;
+
   static Map<IAccessAuthorizer.ACLType, String> getRangerAclStrings() {
     Map<IAccessAuthorizer.ACLType, String> rangerAclStrings =
         new EnumMap<>(IAccessAuthorizer.ACLType.class);

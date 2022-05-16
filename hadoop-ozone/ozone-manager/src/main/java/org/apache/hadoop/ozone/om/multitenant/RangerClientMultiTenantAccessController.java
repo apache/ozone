@@ -168,6 +168,13 @@ public class RangerClientMultiTenantAccessController implements
     client.deleteRole(roleName, omPrincipal, rangerServiceName);
   }
 
+  @Override
+  public long getRangerServiceVersion() {
+    throw new UnsupportedOperationException("Ranger client implementation " +
+        "does not currently support this method. A workaround will be " +
+        "implemented in HDDS-6755.");
+  }
+
   private static List<RangerRole.RoleMember> toRangerRoleMembers(
       Collection<BasicUserPrincipal> members) {
     return members.stream()

@@ -32,11 +32,13 @@ public class InMemoryMultiTenantAccessController
   private final Map<String, Policy>  policies;
   private final Map<String, Role>  roles;
   private long nextRoleID;
+  private long serviceVersion;
 
   public InMemoryMultiTenantAccessController() {
     nextRoleID = 0;
     policies = new HashMap<>();
     roles = new HashMap<>();
+    serviceVersion = 0;
   }
 
   @Override
@@ -59,6 +61,8 @@ public class InMemoryMultiTenantAccessController
         createRole(new Role.Builder().setName(roleName).build());
       }
     }
+
+    serviceVersion++;
   }
 
   @Override
@@ -87,6 +91,7 @@ public class InMemoryMultiTenantAccessController
       throw new Exception("Policy does not exist.");
     }
     policies.put(policy.getName(), policy);
+    serviceVersion++;
   }
 
   @Override
@@ -95,6 +100,7 @@ public class InMemoryMultiTenantAccessController
       throw new Exception("Policy does not exist.");
     }
     policies.remove(policyName);
+    serviceVersion++;
   }
 
   @Override
@@ -107,6 +113,7 @@ public class InMemoryMultiTenantAccessController
         .build();
     nextRoleID++;
     roles.put(newRole.getName(), newRole);
+    serviceVersion++;
   }
 
   @Override
@@ -128,6 +135,7 @@ public class InMemoryMultiTenantAccessController
     // New role may have same ID but different name.
     roles.remove(originalRole.get().getName());
     roles.put(role.getName(), role);
+    serviceVersion++;
   }
 
   @Override
@@ -136,5 +144,11 @@ public class InMemoryMultiTenantAccessController
       throw new Exception("Role does not exist.");
     }
     roles.remove(roleName);
+    serviceVersion++;
+  }
+
+  @Override
+  public long getRangerServiceVersion() {
+    return serviceVersion;
   }
 }
