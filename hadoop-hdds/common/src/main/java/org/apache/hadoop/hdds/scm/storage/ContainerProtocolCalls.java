@@ -80,7 +80,6 @@ public final class ContainerProtocolCalls  {
    *
    * @param xceiverClient client to perform call
    * @param containerID the ID of the container to list block
-   * @param replicaIndex the index of the replica in pipeline
    * @param startLocalID the localID of the first block to get
    * @param count max number of blocks to get
    * @param token a token for this block (may be null)
@@ -88,7 +87,7 @@ public final class ContainerProtocolCalls  {
    * @throws IOException if there is an I/O error while performing the call
    */
   public static ListBlockResponseProto listBlock(XceiverClientSpi xceiverClient,
-      long containerID, int replicaIndex, Long startLocalID, int count,
+      long containerID, Long startLocalID, int count,
       Token<? extends TokenIdentifier> token) throws IOException {
 
     ListBlockRequestProto.Builder listBlockBuilder =
@@ -99,8 +98,9 @@ public final class ContainerProtocolCalls  {
       listBlockBuilder.setStartLocalID(startLocalID);
     }
 
-    String datanodeID = xceiverClient.getPipeline().getNodesInOrder()
-        .get(replicaIndex).getUuidString();
+    // datanodeID doesn't matter for read only requests
+    String datanodeID =
+        xceiverClient.getPipeline().getFirstNode().getUuidString();
 
     ContainerCommandRequestProto.Builder builder =
         ContainerCommandRequestProto.newBuilder()
