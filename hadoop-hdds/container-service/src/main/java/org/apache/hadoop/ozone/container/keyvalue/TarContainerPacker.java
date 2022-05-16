@@ -43,9 +43,10 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 
 import static java.util.stream.Collectors.toList;
-import static org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl.DUMP_FILE_SUFFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 
 /**
  * Compress/uncompress KeyValueContainer data to a tar.gz archive.
@@ -56,8 +57,6 @@ public class TarContainerPacker
   static final String CHUNKS_DIR_NAME = OzoneConsts.STORAGE_DIR_CHUNKS;
 
   static final String DB_DIR_NAME = "db";
-
-  static final String DUMP_DIR_NAME = "dump";
 
   private static final String CONTAINER_FILE_NAME = "container.yaml";
 
@@ -74,9 +73,8 @@ public class TarContainerPacker
       throws IOException {
     byte[] descriptorFileContent = null;
     KeyValueContainerData containerData = container.getContainerData();
-    Path dbRoot = containerData.getDbFile().toPath();
+    Path dbRoot = getDbPath(containerData);
     Path chunksRoot = Paths.get(containerData.getChunksPath());
-    Path metadataRoot = Paths.get(containerData.getMetadataPath());
 
     try (InputStream decompressed = decompress(input);
          ArchiveInputStream archiveInput = untar(decompressed)) {
@@ -94,11 +92,6 @@ public class TarContainerPacker
           Path destinationPath = chunksRoot
               .resolve(name.substring(CHUNKS_DIR_NAME.length() + 1));
           extractEntry(entry, archiveInput, size, chunksRoot,
-              destinationPath);
-        } else if (name.startsWith(DUMP_DIR_NAME + "/")) {
-          Path destinationPath = metadataRoot
-              .resolve(name.substring(DUMP_DIR_NAME.length() + 1));
-          extractEntry(entry, archiveInput, size, metadataRoot,
               destinationPath);
         } else if (CONTAINER_FILE_NAME.equals(name)) {
           //Don't do anything. Container file should be unpacked in a
@@ -168,7 +161,8 @@ public class TarContainerPacker
     try (OutputStream compressed = compress(output);
          ArchiveOutputStream archiveOutput = tar(compressed)) {
 
-      includeMetadataFiles(containerData, archiveOutput);
+      includePath(getDbPath(containerData), DB_DIR_NAME,
+          archiveOutput);
 
       includePath(Paths.get(containerData.getChunksPath()), CHUNKS_DIR_NAME,
           archiveOutput);
@@ -206,6 +200,15 @@ public class TarContainerPacker
         "Container descriptor is missing from the container archive.");
   }
 
+  public static Path getDbPath(KeyValueContainerData containerData) {
+    if (containerData.getSchemaVersion().equals(SCHEMA_V3)) {
+      return DatanodeStoreSchemaThreeImpl.getDumpDir(
+          new File(containerData.getMetadataPath())).toPath();
+    } else {
+      return containerData.getDbFile().toPath();
+    }
+  }
+
   private byte[] readEntry(InputStream input, final long size)
       throws IOException {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -219,31 +222,6 @@ public class TarContainerPacker
       output.write(buffer, 0, read);
     }
     return output.toByteArray();
-  }
-
-  private void includeMetadataFiles(KeyValueContainerData containerData,
-      ArchiveOutputStream archiveOutput) throws IOException {
-    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
-      includeDumpFiles(Paths.get(containerData.getMetadataPath()),
-          DUMP_DIR_NAME, archiveOutput);
-    } else {
-      includePath(containerData.getDbFile().toPath(),
-          DB_DIR_NAME, archiveOutput);
-    }
-  }
-
-  private void includeDumpFiles(Path dir, String subdir,
-      ArchiveOutputStream archiveOutput) throws IOException {
-    try (Stream<Path> dirEntries = Files.list(dir)) {
-      for (Path path : dirEntries.collect(toList())) {
-        Path filePath = path.getFileName();
-        if (filePath != null &&
-            filePath.toString().endsWith(DUMP_FILE_SUFFIX)) {
-          String entryName = subdir + "/" + path.getFileName();
-          includeFile(path.toFile(), entryName, archiveOutput);
-        }
-      }
-    }
   }
 
   private void includePath(Path dir, String subdir,

@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.keyvalue.helpers;
 import java.io.File;
 import java.io.IOException;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -268,14 +269,24 @@ public final class BlockUtils {
 
       DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
           db.getStore();
+      long containerID = containerData.getContainerID();
       File metaDir = new File(containerData.getMetadataPath());
+      File dumpDir = DatanodeStoreSchemaThreeImpl.getDumpDir(metaDir);
+      // cleanup old files first
+      deleteAllDumpFiles(dumpDir);
+
       try {
-        store.dumpKVContainerData(containerData.getContainerID(), metaDir);
+        if (!dumpDir.mkdirs() && !dumpDir.exists()) {
+          throw new IOException("Failed to create dir "
+              + dumpDir.getAbsolutePath() + " for container " + containerID +
+              " to dump metadata to files");
+        }
+        store.dumpKVContainerData(containerID, dumpDir);
       } catch (IOException e) {
         // cleanup partially dumped files
-        store.cleanupAllDumpFiles(metaDir);
+        deleteAllDumpFiles(dumpDir);
         throw new StorageContainerException("Failed to dump metadata" +
-            " for container " + containerData.getContainerID(), e,
+            " for container " + containerID, e,
             EXPORT_CONTAINER_METADATA_FAILED);
       }
     }
@@ -296,20 +307,31 @@ public final class BlockUtils {
 
       DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
           db.getStore();
+      long containerID = containerData.getContainerID();
       File metaDir = new File(containerData.getMetadataPath());
+      File dumpDir = DatanodeStoreSchemaThreeImpl.getDumpDir(metaDir);
       try {
-        store.loadKVContainerData(metaDir);
+        store.loadKVContainerData(dumpDir);
       } catch (IOException e) {
         // Don't delete unloaded or partially loaded files on failure,
         // but delete all partially loaded metadata.
-        store.removeKVContainerData(containerData.getContainerID());
+        store.removeKVContainerData(containerID);
         throw new StorageContainerException("Failed to load metadata " +
-            "from files for container " + containerData.getContainerID(), e,
+            "from files for container " + containerID, e,
             IMPORT_CONTAINER_METADATA_FAILED);
       } finally {
         // cleanup already loaded files all together
-        store.cleanupAllDumpFiles(metaDir);
+        deleteAllDumpFiles(dumpDir);
       }
+    }
+  }
+
+  public static void deleteAllDumpFiles(File dumpDir) throws IOException {
+    try {
+      FileUtils.deleteDirectory(dumpDir);
+    } catch (IOException e) {
+      throw new IOException("Failed to delete dump files under "
+          + dumpDir.getAbsolutePath(), e);
     }
   }
 }
