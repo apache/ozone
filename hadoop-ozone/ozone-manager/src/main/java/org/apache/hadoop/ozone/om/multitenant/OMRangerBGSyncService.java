@@ -153,10 +153,10 @@ public class OMRangerBGSyncService extends BackgroundService {
    */
   static class PolicyInfo {
 
-    String tenantId;
-    PolicyType policyType;
+    private final String tenantId;
+    private final PolicyType policyType;
 
-    public PolicyInfo(String tenantId, PolicyType policyType) {
+    PolicyInfo(String tenantId, PolicyType policyType) {
       this.tenantId = tenantId;
       this.policyType = policyType;
     }
