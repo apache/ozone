@@ -701,10 +701,10 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
           "DELETE", false);
       int respnseCode = conn.getResponseCode();
       if (respnseCode != 200 && respnseCode != 204) {
-        throw new IOException("Couldnt delete policy " + policyId);
+        throw new IOException("Couldn't delete policy " + policyId);
       }
     } catch (Exception e) {
-      throw new IOException("Couldnt delete policy " + policyId, e);
+      throw new IOException("Couldn't delete policy " + policyId, e);
     }
   }
 

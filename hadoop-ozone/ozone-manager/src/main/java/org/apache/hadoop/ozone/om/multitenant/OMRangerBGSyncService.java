@@ -64,7 +64,19 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
 
 /**
  * Background Sync thread that reads Multi-Tenancy state from OM DB
- * and applies it to Ranger.
+ * and applies it to Ranger. This recovers or cleans up (Multi-Tenant related)
+ * Ranger policies and roles in case of OM crashes or Ranger failure.
+ *
+ * Multi-Tenant related Ranger policies and roles are *eventually* consistent
+ * with OM DB tenant state. OM DB is the source of truth.
+ *
+ * While the sync thread is updating Ranger, user or other applications
+ * editing Ranger Ozone policies or roles could interfere with the update.
+ * In this case, a sync run might leave Ranger in a de-synced state, due to
+ * limited maximum number of update attempts for each run.
+ * But this should eventually be corrected in future sync runs.
+ *
+ * See the comment block in triggerRangerSyncOnce() for more on the core logic.
  */
 public class OMRangerBGSyncService extends BackgroundService {
 
@@ -664,7 +676,7 @@ public class OMRangerBGSyncService extends BackgroundService {
           }
         }
         // We have processed all the Userlist entries in the OMDB. If
-        // ranger Userlist is not empty, we are not in sync with ranger.
+        // ranger Userlist is not empty, Ranger has users that OM DB does not.
         if (!rangerUserList.isEmpty()) {
           pushRoleToRanger = true;
         }
