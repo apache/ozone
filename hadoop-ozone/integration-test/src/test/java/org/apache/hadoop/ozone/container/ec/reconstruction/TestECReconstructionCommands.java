@@ -61,8 +61,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 
-/*
-Test commands used in EC reconstruction.
+/**
+ * This class tests commands used in EC reconstruction.
  */
 public class TestECReconstructionCommands {
 
