@@ -107,7 +107,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     }
     initializeRangerConnection();
 
-    // Get Ranger cm_ozone service ID
+    // Get Ranger Ozone service ID
     rangerOzoneServiceId = retrieveRangerOzoneServiceId();
   }
 
@@ -465,6 +465,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     final HttpURLConnection conn = makeHttpCall(endpointUrl,
         jsonData, "POST", false);
     if (conn.getResponseCode() != HTTP_OK) {
+      // TODO: Do not throw on 400 ?
       throw new IOException("Ranger REST API failure: " + conn.getResponseCode()
           + " " + conn.getResponseMessage()
           + ". Role name '" + role + "' likely already exists in Ranger");
@@ -606,7 +607,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return id;
   }
 
-  public long getCurrentOzoneServiceVersion() throws IOException {
+  public long getLatestOzoneServiceVersion() throws IOException {
     String rangerAdminUrl = rangerHttpsAddress
         + OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT + getRangerOzoneServiceId();
 
@@ -684,14 +685,14 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   @Override
-  public void deletePolicybyName(String policyName) throws IOException {
+  public void deletePolicyByName(String policyName) throws IOException {
     AccessPolicy policy = getAccessPolicyByName(policyName);
     String  policyID = policy.getPolicyID();
     LOG.debug("policyID is: {}", policyID);
-    deletePolicybyId(policyID);
+    deletePolicyById(policyID);
   }
 
-  public void deletePolicybyId(String policyId) throws IOException {
+  public void deletePolicyById(String policyId) throws IOException {
 
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_POLICY_HTTP_ENDPOINT

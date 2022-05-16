@@ -292,7 +292,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     try {
       tenantCacheLock.writeLock().lock();
       for (AccessPolicy policy : tenant.getTenantAccessPolicies()) {
-        authorizer.deletePolicybyId(policy.getPolicyID());
+        authorizer.deletePolicyById(policy.getPolicyID());
       }
       for (String roleId : tenant.getTenantRoles()) {
         authorizer.deleteRole(roleId);

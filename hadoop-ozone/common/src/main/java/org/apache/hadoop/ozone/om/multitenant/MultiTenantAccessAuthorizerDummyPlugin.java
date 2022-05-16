@@ -116,12 +116,12 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public void deletePolicybyId(String policyId) throws IOException {
+  public void deletePolicyById(String policyId) throws IOException {
 
   }
 
   @Override
-  public void deletePolicybyName(String policyName) throws IOException {
+  public void deletePolicyByName(String policyName) throws IOException {
 
   }
 
@@ -174,7 +174,7 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public long getCurrentOzoneServiceVersion() {
+  public long getLatestOzoneServiceVersion() {
     return -1;
   }
 

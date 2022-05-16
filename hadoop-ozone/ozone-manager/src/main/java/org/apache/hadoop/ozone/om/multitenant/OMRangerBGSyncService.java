@@ -274,10 +274,10 @@ public class OMRangerBGSyncService extends BackgroundService {
     int attempt = 0;
     try {
       // TODO: Acquire lock
-      long currentOzoneServiceVerInDB = getOMDBRangerServiceVersion();
-      long proposedOzoneServiceVerInDB = retrieveRangerServiceVersion();
+      long dbOzoneServiceVersion = getOMDBRangerServiceVersion();
+      long rangerOzoneServiceVersion = getLatestRangerServiceVersion();
 
-      // Sync thread enters the while-loop when Ranger (cm_ozone) service
+      // Sync thread enters the while-loop when Ranger service (e.g. cm_ozone)
       // version doesn't match the current policy version persisted in the DB.
       //
       // When Ranger policies are updated, it bumps up the service version.
@@ -294,7 +294,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       // A maximum of MAX_ATTEMPT times will be attempted each time the sync
       // service is run. MAX_ATTEMPT should at least be 2 to make sure OM DB
       // has the up-to-date Ranger service version most of the times.
-      while (currentOzoneServiceVerInDB != proposedOzoneServiceVerInDB) {
+      while (dbOzoneServiceVersion != rangerOzoneServiceVersion) {
         // TODO: Release lock
         if (++attempt > MAX_ATTEMPT) {
           if (LOG.isDebugEnabled()) {
@@ -307,22 +307,22 @@ public class OMRangerBGSyncService extends BackgroundService {
         LOG.info("Executing Multi-Tenancy Ranger Sync: run #{}, attempt #{}. "
                 + "Ranger service version: {}, DB version :{}",
             runCount.get(), attempt,
-            proposedOzoneServiceVerInDB, currentOzoneServiceVerInDB);
+            rangerOzoneServiceVersion, dbOzoneServiceVersion);
 
-        executeOMDBToRangerSync(currentOzoneServiceVerInDB);
+        executeOMDBToRangerSync(dbOzoneServiceVersion);
 
         if (LOG.isDebugEnabled()) {
           LOG.debug("Setting OM DB Ranger Service Version to {} (was {})",
-              proposedOzoneServiceVerInDB, currentOzoneServiceVerInDB);
+              rangerOzoneServiceVersion, dbOzoneServiceVersion);
         }
         // Submit Ratis Request to sync the new service version in OM DB
-        setOMDBRangerServiceVersion(proposedOzoneServiceVerInDB);
+        setOMDBRangerServiceVersion(rangerOzoneServiceVersion);
 
         // TODO: Acquire lock
 
         // Check Ranger ozone service version again
-        currentOzoneServiceVerInDB = proposedOzoneServiceVerInDB;
-        proposedOzoneServiceVerInDB = retrieveRangerServiceVersion();
+        dbOzoneServiceVersion = rangerOzoneServiceVersion;
+        rangerOzoneServiceVersion = getLatestRangerServiceVersion();
       }
     } catch (IOException | ServiceException e) {
       LOG.warn("Exception during Ranger Sync", e);
@@ -334,8 +334,11 @@ public class OMRangerBGSyncService extends BackgroundService {
 
   }
 
-  long retrieveRangerServiceVersion() throws IOException {
-    return authorizer.getCurrentOzoneServiceVersion();
+  /**
+   * Query Ranger endpoint to get the latest Ozone service version.
+   */
+  long getLatestRangerServiceVersion() throws IOException {
+    return authorizer.getLatestOzoneServiceVersion();
   }
 
   private RaftClientRequest newRaftClientRequest(OMRequest omRequest) {
@@ -560,7 +563,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       final String policyName = entry.getKey();
       LOG.info("Deleting policy from Ranger: {}", policyName);
       checkLeader();
-      authorizer.deletePolicybyName(policyName);
+      authorizer.deletePolicyByName(policyName);
     }
 
   }

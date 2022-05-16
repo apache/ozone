@@ -174,14 +174,14 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @param policyId that was returned earlier by the createAccessPolicy().
    * @throws IOException
    */
-  void deletePolicybyId(String policyId) throws IOException;
+  void deletePolicyById(String policyId) throws IOException;
 
   /**
    *
    * @param policyName unique policyName.
    * @throws IOException
    */
-  void deletePolicybyName(String policyName) throws IOException;
+  void deletePolicyByName(String policyName) throws IOException;
   /**
    * Grant user aclType access to bucketNameSpace.
    * @param bucketNameSpace
@@ -258,7 +258,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
   boolean checkAccess(IOzoneObj ozoneObject, RequestContext context)
       throws OMException;
 
-  long getCurrentOzoneServiceVersion() throws IOException;
+  long getLatestOzoneServiceVersion() throws IOException;
 
   String getAllMultiTenantPolicies() throws IOException;
 

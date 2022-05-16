@@ -131,7 +131,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
       Assert.fail(e.getMessage());
     } finally {
       for (String id : policyIdsCreated) {
-        omm.deletePolicybyId(id);
+        omm.deletePolicyById(id);
       }
       for (String id : usersIdsCreated) {
         omm.deleteUser(id);
@@ -190,7 +190,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
       Assert.fail(e.getMessage());
     } finally {
       for (String name : policyIdsCreated) {
-        omm.deletePolicybyName(name);
+        omm.deletePolicyByName(name);
       }
       String userId = omm.getUserId(userPrincipal);
       omm.deleteUser(userId);
