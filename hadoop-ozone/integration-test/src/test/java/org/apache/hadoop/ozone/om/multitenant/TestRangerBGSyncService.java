@@ -96,9 +96,9 @@ import org.slf4j.event.Level;
  * Marking it as Ignore because it needs Ranger access point.
  */
 @Ignore("TODO: Requires a Ranger endpoint")
-public class TestMultiTenantBGSync {
+public class TestRangerBGSyncService {
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestMultiTenantBGSync.class);
+      LoggerFactory.getLogger(TestRangerBGSyncService.class);
 
   /**
    * Timeout for each test.
