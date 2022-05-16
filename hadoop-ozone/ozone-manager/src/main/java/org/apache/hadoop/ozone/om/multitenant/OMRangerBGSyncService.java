@@ -207,11 +207,12 @@ public class OMRangerBGSyncService extends BackgroundService {
     this.metadataManager = ozoneManager.getMetadataManager();
     this.multiTenantManager = ozoneManager.getMultiTenantManager();
 
-    this.authorizer = authorizer;
-
-    if (authorizer == null) {
+    if (authorizer != null) {
+      this.authorizer = authorizer;
+    } else {
       // authorizer can be null for unit tests
-      LOG.warn("MultiTenantAccessAuthorizer is not set");
+      LOG.warn("MultiTenantAccessAuthorizer not set. Using dummy authorizer");
+      this.authorizer = new MultiTenantAccessAuthorizerDummyPlugin();
     }
   }
 
