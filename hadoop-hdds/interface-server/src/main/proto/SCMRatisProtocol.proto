@@ -27,6 +27,9 @@ enum RequestType {
     SEQUENCE_ID = 4;
     CERT_STORE = 5;
     MOVE = 6;
+    START_FINALIZATION = 7;
+    COMPLETE_FINALIZATION = 8;
+    FINALIZE_LAYOUT_FEATURE = 9;
 }
 
 message Method {
