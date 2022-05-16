@@ -56,6 +56,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_COUNT;
 import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix;
+import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition.getContainerKeySeparator;
 
 /**
  * This class represents the KeyValueContainer metadata, which is the
@@ -405,7 +406,8 @@ public class KeyValueContainerData extends ContainerData {
    */
   private String formatKey(String key) {
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
-      key = getContainerKeyPrefix(getContainerID()) + key;
+      key = getContainerKeyPrefix(getContainerID()) +
+          getContainerKeySeparator() + key;
     }
     return key;
   }

@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 import org.rocksdb.ColumnFamilyOptions;
 
@@ -87,9 +88,14 @@ public class DatanodeSchemaThreeDBDefinition
           DeletedBlocksTransaction.class,
           new DeletedBlocksTransactionCodec());
 
+  public static String separator;
+
   public DatanodeSchemaThreeDBDefinition(String dbPath,
       ConfigurationSource config) {
     super(dbPath, config);
+
+    DatanodeConfiguration dc = config.getObject(DatanodeConfiguration.class);
+    this.separator = dc.getContainerSchemaV3KeySeperator();
 
     // Get global ColumnFamilyOptions first.
     DatanodeDBProfile dbProfile = DatanodeDBProfile
@@ -143,5 +149,9 @@ public class DatanodeSchemaThreeDBDefinition
   private static int getContainerKeyPrefixLength() {
     return FixedLengthStringUtils.string2Bytes(
         getContainerKeyPrefix(0L)).length;
+  }
+
+  public static String getContainerKeySeparator() {
+    return separator;
   }
 }
