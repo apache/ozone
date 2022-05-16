@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL;
 import static org.apache.hadoop.ozone.om.multitenant.AccessPolicy.AccessPolicyType.RANGER_POLICY;
 
 /**
@@ -295,7 +296,7 @@ public class RangerAccessPolicy implements AccessPolicy {
         "{\"policyType\":\"0\"," + "\"name\":\"" + policyName + "\","
             + "\"isEnabled\":true," + "\"policyPriority\":0,"
             + "\"description\":\"Policy created by Ozone for Multi-Tenancy\","
-            + "\"policyLabels\":[\"OzoneTenant\"],"
+            + "\"policyLabels\":[\"" + OZONE_TENANT_RANGER_POLICY_LABEL + "\"],"
             + "\"description\":\"\","
             + "\"isAuditEnabled\":true," + createRangerResourceItems()
             + "\"isDenyAllElse\":false," + createRangerPolicyItems()

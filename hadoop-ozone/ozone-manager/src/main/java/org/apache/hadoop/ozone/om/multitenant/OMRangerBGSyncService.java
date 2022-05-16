@@ -60,6 +60,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
 /**
@@ -389,7 +390,7 @@ public class OMRangerBGSyncService extends BackgroundService {
     for (int i = 0; i < policyArray.size(); ++i) {
       JsonObject newPolicy = policyArray.get(i).getAsJsonObject();
       if (!newPolicy.getAsJsonArray("policyLabels").get(0)
-          .getAsString().equals("OzoneTenant" /* TODO: CONST */)) {
+          .getAsString().equals(OZONE_TENANT_RANGER_POLICY_LABEL)) {
         // Shouldn't get policies without the tag here very often as it is
         // specified in the query param, unless a user removed the tag during
         // the sync

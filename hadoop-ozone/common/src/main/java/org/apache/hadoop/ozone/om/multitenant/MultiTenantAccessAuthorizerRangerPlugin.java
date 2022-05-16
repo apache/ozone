@@ -32,6 +32,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_ROLE_ADD
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ALL_POLICIES_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_DOWNLOAD_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
@@ -617,9 +618,9 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
   public String getAllMultiTenantPolicies(int ozoneServiceId)
       throws IOException {
-    String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ALL_POLICIES_ENDPOINT
-            + ozoneServiceId + "?policyLabelsPartial=OzoneTenant";
+    String rangerAdminUrl = rangerHttpsAddress
+        + OZONE_OM_RANGER_ALL_POLICIES_ENDPOINT + ozoneServiceId
+        + "?policyLabelsPartial=" + OZONE_TENANT_RANGER_POLICY_LABEL;
     // Note: policyLabels (not partial) arg doesn't seem to work for Ranger
     // at this point. When Ranger fixed this we could use exact match instead.
 

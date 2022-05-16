@@ -523,4 +523,5 @@ public final class OzoneConsts {
   public static final String OZONE_OM_RANGER_ALL_POLICIES_ENDPOINT =
       "/service/plugins/policies/service/";
 
+  public static final String OZONE_TENANT_RANGER_POLICY_LABEL = "OzoneTenant";
 }
