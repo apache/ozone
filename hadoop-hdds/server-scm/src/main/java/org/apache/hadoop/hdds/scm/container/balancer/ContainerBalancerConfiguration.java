@@ -22,8 +22,11 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBalancerConfigurationProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -131,6 +134,8 @@ public final class ContainerBalancerConfiguration {
           "data node is very high")
   private boolean triggerDuEnable = false;
 
+  private int nextIterationIndex = 0;
+
   /**
    * Gets the threshold value for Container Balancer.
    *
@@ -207,6 +212,10 @@ public final class ContainerBalancerConfiguration {
    */
   public Boolean getTriggerDuEnable() {
     return triggerDuEnable;
+  }
+
+  public void setTriggerDuEnable(boolean enable) {
+    triggerDuEnable = enable;
   }
 
   /**
@@ -315,12 +324,20 @@ public final class ContainerBalancerConfiguration {
     this.moveTimeout = duration.toMillis();
   }
 
+  public void setMoveTimeout(long millis) {
+    this.moveTimeout = millis;
+  }
+
   public Duration getBalancingInterval() {
     return Duration.ofMillis(balancingInterval);
   }
 
   public void setBalancingInterval(Duration balancingInterval) {
     this.balancingInterval = balancingInterval.toMillis();
+  }
+
+  public void setBalancingInterval(long millis) {
+    this.balancingInterval = millis;
   }
 
   /**
@@ -372,6 +389,22 @@ public final class ContainerBalancerConfiguration {
     this.excludeNodes = excludeNodes;
   }
 
+  /**
+   * Gets index of next iteration of ContainerBalancer.
+   * @return index value
+   */
+  int getNextIterationIndex() {
+    return nextIterationIndex;
+  }
+
+  /**
+   * Sets index of next iteration of ContainerBalancer.
+   * @param nextIterationIndex index value
+   */
+  void setNextIterationIndex(int nextIterationIndex) {
+    this.nextIterationIndex = nextIterationIndex;
+  }
+
   @Override
   public String toString() {
     return String.format("Container Balancer Configuration values:%n" +
@@ -389,5 +422,78 @@ public final class ContainerBalancerConfiguration {
         maxSizeEnteringTarget / OzoneConsts.GB,
         "Max Size Leaving Source per Iteration",
         maxSizeLeavingSource / OzoneConsts.GB);
+  }
+
+  ContainerBalancerConfigurationProto.Builder toProtobufBuilder() {
+    ContainerBalancerConfigurationProto.Builder builder =
+        ContainerBalancerConfigurationProto.newBuilder();
+
+    builder.setUtilizationThreshold(threshold)
+        .setDatanodesInvolvedMaxPercentagePerIteration(
+            maxDatanodesPercentageToInvolvePerIteration)
+        .setSizeMovedMaxPerIteration(maxSizeToMovePerIteration)
+        .setSizeEnteringTargetMax(maxSizeEnteringTarget)
+        .setSizeLeavingSourceMax(maxSizeLeavingSource)
+        .setIterations(iterations)
+        .setExcludeContainers(excludeContainers)
+        .setMoveTimeout(moveTimeout)
+        .setBalancingIterationInterval(balancingInterval)
+        .setIncludeDatanodes(includeNodes)
+        .setExcludeDatanodes(excludeNodes)
+        .setMoveNetworkTopologyEnable(networkTopologyEnable)
+        .setTriggerDuBeforeMoveEnable(triggerDuEnable)
+        .setNextIterationIndex(nextIterationIndex);
+    return builder;
+  }
+
+  static ContainerBalancerConfiguration fromProtobuf(
+      @NotNull ContainerBalancerConfigurationProto proto,
+      @NotNull OzoneConfiguration ozoneConfiguration) {
+    ContainerBalancerConfiguration config =
+        ozoneConfiguration.getObject(ContainerBalancerConfiguration.class);
+    if (proto.hasUtilizationThreshold()) {
+      config.setThreshold(Double.parseDouble(proto.getUtilizationThreshold()));
+    }
+    if (proto.hasDatanodesInvolvedMaxPercentagePerIteration()) {
+      config.setMaxDatanodesPercentageToInvolvePerIteration(
+          proto.getDatanodesInvolvedMaxPercentagePerIteration());
+    }
+    if (proto.hasSizeMovedMaxPerIteration()) {
+      config.setMaxSizeToMovePerIteration(proto.getSizeMovedMaxPerIteration());
+    }
+    if (proto.hasSizeEnteringTargetMax()) {
+      config.setMaxSizeEnteringTarget(proto.getSizeEnteringTargetMax());
+    }
+    if (proto.hasSizeLeavingSourceMax()) {
+      config.setMaxSizeLeavingSource(proto.getSizeLeavingSourceMax());
+    }
+    if (proto.hasIterations()) {
+      config.setIterations(proto.getIterations());
+    }
+    if (proto.hasExcludeContainers()) {
+      config.setExcludeContainers(proto.getExcludeContainers());
+    }
+    if (proto.hasMoveTimeout()) {
+      config.setMoveTimeout(proto.getMoveTimeout());
+    }
+    if (proto.hasBalancingIterationInterval()) {
+      config.setBalancingInterval(proto.getBalancingIterationInterval());
+    }
+    if (proto.hasIncludeDatanodes()) {
+      config.setIncludeNodes(proto.getIncludeDatanodes());
+    }
+    if (proto.hasExcludeDatanodes()) {
+      config.setExcludeNodes(proto.getExcludeDatanodes());
+    }
+    if (proto.hasMoveNetworkTopologyEnable()) {
+      config.setNetworkTopologyEnable(proto.getMoveNetworkTopologyEnable());
+    }
+    if (proto.hasTriggerDuBeforeMoveEnable()) {
+      config.setTriggerDuEnable(proto.getTriggerDuBeforeMoveEnable());
+    }
+    if (proto.hasNextIterationIndex()) {
+      config.setNextIterationIndex(proto.getNextIterationIndex());
+    }
+    return config;
   }
 }

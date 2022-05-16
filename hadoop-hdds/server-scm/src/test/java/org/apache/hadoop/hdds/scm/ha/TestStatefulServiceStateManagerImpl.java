@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -85,5 +86,11 @@ public class TestStatefulServiceStateManagerImpl {
     scmhaManager.asSCMHADBTransactionBuffer().flush();
     Assert.assertEquals(ByteString.copyFromUtf8(message),
         stateManager.readConfiguration(serviceName));
+  }
+
+  @Test
+  public void testNullConfiguration() throws IOException {
+    String serviceName = "test";
+    Assert.assertNull(stateManager.readConfiguration(serviceName));
   }
 }
