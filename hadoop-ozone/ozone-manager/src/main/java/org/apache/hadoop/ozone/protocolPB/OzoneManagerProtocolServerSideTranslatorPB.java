@@ -160,7 +160,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         // if current OM is leader and then proceed with processing the request.
         if (request.hasS3Authentication()) {
           s3Auth = true;
-          OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
           S3SecurityUtil.validateS3Credential(request, ozoneManager);
         }
       } catch (IOException ex) {
@@ -267,7 +266,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   /**
    * Submits request directly to OM.
    */
-  private OMResponse submitRequestDirectlyToOM(OMRequest request) {
+  private OMResponse submitRequestDirectlyToOM(OMRequest request) throws
+      ServiceException{
     OMClientResponse omClientResponse = null;
     long index = 0L;
     try {
