@@ -619,7 +619,9 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
       throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ALL_POLICIES_ENDPOINT
-            + ozoneServiceId + "?policyLabelsPartial=OzoneMultiTenant";
+            + ozoneServiceId + "?policyLabelsPartial=OzoneTenant";
+    // Note: policyLabels (not partial) arg doesn't seem to work for Ranger
+    // at this point. When Ranger fixed this we could use exact match instead.
 
     HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl,
         "GET", false);

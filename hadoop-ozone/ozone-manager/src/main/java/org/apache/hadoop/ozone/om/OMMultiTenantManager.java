@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -33,7 +34,7 @@ import org.apache.http.auth.BasicUserPrincipal;
  * OM MultiTenant manager interface.
  */
 public interface OMMultiTenantManager {
-  /*
+  /* TODO: Outdated
    * Init multi-tenant manager. Performs initialization e.g.
    *  - Initialize Multi-Tenant-Gatekeeper-Plugin
    *  - Validate Multi-Tenant Bucket-NameSpaces
@@ -45,8 +46,6 @@ public interface OMMultiTenantManager {
    *       . superusers  <-in-sync-> OzoneConf,
    *       . OM-DB state <-in-sync-> IMultiTenantGateKeeperPluginState
    *       . OM DB state is always the source of truth.
-   *
-   * @throws IOException
    */
 
   /**
@@ -59,6 +58,10 @@ public interface OMMultiTenantManager {
    */
   void stop() throws IOException;
 
+  /**
+   * Returns the instance of OMRangerBGSyncService.
+   */
+  @VisibleForTesting
   OMRangerBGSyncService getOMRangerBGSyncService();
 
   /**

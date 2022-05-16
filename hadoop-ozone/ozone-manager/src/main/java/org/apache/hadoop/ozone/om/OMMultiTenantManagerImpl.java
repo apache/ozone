@@ -261,6 +261,10 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
             + "will be overwritten", tenantId);  // TODO: throw exception?
       }
 
+      // TODO: Move tenantCache update to a separate call createTenantAccessInDB
+      //  createTenantAccessInAuthorizer is called preExecute to update Ranger
+      //  createTenantAccessInDB will be called in validateAndUpdateCache
+      //  Do the same to all other InAuthorizer calls as well.
       // New entry in tenant cache
       tenantCache.put(tenantId, new CachedTenantState(
           tenantId, userRoleName, adminRoleName));
@@ -523,7 +527,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
                 UserAccessIdInfo.newBuilder()
                     .setUserPrincipal(cacheEntry.getUserPrincipal())
                     .setAccessId(accessId)
-//                    .setIsAdmin(cacheEntry.isAdmin())
                     .build());
           });
 

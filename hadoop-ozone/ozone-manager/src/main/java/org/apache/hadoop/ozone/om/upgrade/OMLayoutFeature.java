@@ -30,6 +30,8 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 public enum OMLayoutFeature implements LayoutFeature {
   //////////////////////////////  //////////////////////////////
   INITIAL_VERSION(0, "Initial Layout Version"),
+
+  // TODO: Make this 2 after bringing in EC
   MULTITENANCY_SCHEMA(1, "Multi-Tenancy Schema");
 
   ///////////////////////////////  /////////////////////////////

@@ -295,7 +295,7 @@ public class RangerAccessPolicy implements AccessPolicy {
         "{\"policyType\":\"0\"," + "\"name\":\"" + policyName + "\","
             + "\"isEnabled\":true," + "\"policyPriority\":0,"
             + "\"description\":\"Policy created by Ozone for Multi-Tenancy\","
-            + "\"policyLabels\":[\"OzoneMultiTenant\"],"
+            + "\"policyLabels\":[\"OzoneTenant\"],"
             + "\"description\":\"\","
             + "\"isAuditEnabled\":true," + createRangerResourceItems()
             + "\"isDenyAllElse\":false," + createRangerPolicyItems()

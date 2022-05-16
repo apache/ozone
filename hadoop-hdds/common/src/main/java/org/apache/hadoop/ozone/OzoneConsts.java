@@ -140,6 +140,9 @@ public final class OzoneConsts {
   public static final String OZONE_DB_CHECKPOINT_REQUEST_FLUSH =
       "flushBeforeCheckpoint";
 
+  public static final String RANGER_OZONE_SERVICE_VERSION_KEY =
+      "#RANGEROZONESERVICEVERSION";
+
   /**
    * Supports Bucket Versioning.
    */

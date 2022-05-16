@@ -40,10 +40,10 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
@@ -84,7 +84,7 @@ public class OMRangerBGSyncService extends BackgroundService {
   private final AtomicLong runCount = new AtomicLong(0);
   private int rangerOzoneServiceId;
 
-  private boolean isServiceStarted = false;
+  private volatile boolean isServiceStarted = false;
 
   static class BGRole {
     private final String name;
@@ -113,11 +113,6 @@ public class OMRangerBGSyncService extends BackgroundService {
     }
 
     @Override
-    public int hashCode() {
-      return name.hashCode();
-    }
-
-    @Override
     public boolean equals(Object o) {
       if (this == o) {
         return true;
@@ -125,8 +120,10 @@ public class OMRangerBGSyncService extends BackgroundService {
       if (o == null || getClass() != o.getClass()) {
         return false;
       }
-      // TODO: Do we care about userSet
-      return this.hashCode() == o.hashCode();
+      BGRole bgRole = (BGRole) o;
+      return name.equals(bgRole.name)
+          && id.equals(bgRole.id)
+          && userSet.equals(bgRole.userSet);
     }
   }
 
@@ -245,28 +242,38 @@ public class OMRangerBGSyncService extends BackgroundService {
       // TODO: Acquire lock
       long currentOzoneServiceVerInDB = getOMDBRangerServiceVersion();
       long proposedOzoneServiceVerInDB = retrieveRangerServiceVersion();
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Database version: {}, Ranger version: {}",
-            currentOzoneServiceVerInDB, proposedOzoneServiceVerInDB);
-      }
+
+      // Sync thread enters the while-loop when Ranger (cm_ozone) service
+      // version doesn't match the current policy version persisted in the DB.
+      //
+      // When Ranger policies are updated, it bumps up the service version.
+      // At the end of the loop, Ranger service version is retrieved again.
+      // So in this case the loop most likely be entered a second time. But
+      // this time it is very likely that executeOMDBToRangerSync() won't push
+      // policy or role updates to Ranger as it should already be in-sync from
+      // the previous loop. If this is the case, the DB service version will be
+      // written again, and the loop should be exited.
+      //
+      // If Ranger service version is bumped again, it indicates Ranger policy
+      // is updated by some other problems or a user.
+      //
+      // A maximum of MAX_ATTEMPT times will be attempted each time the sync
+      // service is run. MAX_ATTEMPT should at least be 2 to make sure OM DB
+      // has the up-to-date Ranger service version most of the times.
       while (currentOzoneServiceVerInDB != proposedOzoneServiceVerInDB) {
         // TODO: Release lock
         if (++attempt > MAX_ATTEMPT) {
           if (LOG.isDebugEnabled()) {
-            LOG.debug("Reached maximum number of attempts ({}). Abort",
+            LOG.warn("Reached maximum number of attempts ({}). Abort",
                 MAX_ATTEMPT);
           }
           break;
         }
 
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Ranger Ozone service version ({}) differs from DB's ({}). "
-                  + "Starting to sync.",
-              proposedOzoneServiceVerInDB, currentOzoneServiceVerInDB);
-        }
-
-        LOG.info("Executing Multi-Tenancy Ranger Sync: run #{}, attempt #{}",
-            runCount.get(), attempt);
+        LOG.info("Executing Multi-Tenancy Ranger Sync: run #{}, attempt #{}. "
+                + "Ranger service version: {}, DB version :{}",
+            runCount.get(), attempt,
+            proposedOzoneServiceVerInDB, currentOzoneServiceVerInDB);
 
         executeOMDBToRangerSync(currentOzoneServiceVerInDB);
 
@@ -283,7 +290,7 @@ public class OMRangerBGSyncService extends BackgroundService {
         currentOzoneServiceVerInDB = proposedOzoneServiceVerInDB;
         proposedOzoneServiceVerInDB = retrieveRangerServiceVersion();
       }
-    } catch (IOException e) {
+    } catch (IOException | ServiceException e) {
       LOG.warn("Exception during Ranger Sync", e);
       // TODO: Check specific exception once switched to
       //  RangerRestMultiTenantAccessController
@@ -310,7 +317,7 @@ public class OMRangerBGSyncService extends BackgroundService {
         .build();
   }
 
-  void setOMDBRangerServiceVersion(long version) {
+  void setOMDBRangerServiceVersion(long version) throws ServiceException {
     // OM DB update goes through Ratis
     RangerServiceVersionSyncRequest.Builder versionSyncRequest =
         RangerServiceVersionSyncRequest.newBuilder()
@@ -322,7 +329,6 @@ public class OMRangerBGSyncService extends BackgroundService {
         .setClientId(CLIENT_ID.toString())
         .build();
 
-    // Submit PurgeKeys request to OM
     try {
       RaftClientRequest raftClientRequest = newRaftClientRequest(omRequest);
       ozoneManager.getOmRatisServer().submitRequest(omRequest,
@@ -330,13 +336,14 @@ public class OMRangerBGSyncService extends BackgroundService {
     } catch (ServiceException e) {
       LOG.error("RangerServiceVersionSync request failed. "
           + "Will retry at next run.");
+      throw e;
     }
   }
 
   long getOMDBRangerServiceVersion() throws IOException {
     final Long dbValue = ozoneManager.getMetadataManager()
         .getOmRangerStateTable()
-        .get(OmMetadataManagerImpl.RANGER_OZONE_SERVICE_VERSION_KEY);
+        .get(OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY);
     if (dbValue == null) {
       return -1;
     } else {
@@ -426,7 +433,7 @@ public class OMRangerBGSyncService extends BackgroundService {
    */
   private void checkLeader() throws IOException {
     if (!ozoneManager.isLeaderReady()) {
-      throw new OMException("Not leader. Abort", ResultCodes.INTERNAL_ERROR);
+      throw new OMNotLeaderException("This OM is no longer the leader. Abort");
     }
   }
 
@@ -493,6 +500,7 @@ public class OMRangerBGSyncService extends BackgroundService {
         mtRangerPoliciesToBeCreated.entrySet()) {
       final String policyName = entry.getKey();
       LOG.warn("Expected policy not found in Ranger: {}", policyName);
+      checkLeader();
       // Attempt to recreate the default volume/bucket policy if it's missing
       attemptToRecreateDefaultPolicy(policyName);
     }

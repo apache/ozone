@@ -17,15 +17,16 @@
  */
 package org.apache.hadoop.ozone.om.multitenant;
 
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -244,7 +245,8 @@ public class TestMultiTenantVolume {
   }
 
   @Test
-  public void testOMRangerBGSyncRatisSetVersion() throws IOException {
+  public void testOMRangerBGSyncRatisSetVersion()
+      throws IOException, ServiceException {
     final long writtenVersion = 10L;
 
     cluster.getOzoneManager().getMultiTenantManager()
@@ -253,7 +255,7 @@ public class TestMultiTenantVolume {
 
     long readBackVersion = cluster.getOzoneManager().getMetadataManager()
         .getOmRangerStateTable()
-        .get(OmMetadataManagerImpl.RANGER_OZONE_SERVICE_VERSION_KEY);
+        .get(OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY);
 
     Assert.assertEquals(writtenVersion, readBackVersion);
   }

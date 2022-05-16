@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -230,7 +231,7 @@ public class TestMultiTenantBGSync {
             .getRangerServiceVersion();
         LOG.info("Writing Ranger Ozone Service Version: {}", v);
         ozoneManager.getMetadataManager().getOmRangerStateTable()
-            .put(OmMetadataManagerImpl.RANGER_OZONE_SERVICE_VERSION_KEY, v);
+            .put(OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY, v);
         return null;
       }).when(omRatisServer).submitRequest(Mockito.any(), Mockito.any());
     } catch (ServiceException e) {
@@ -696,4 +697,5 @@ public class TestMultiTenantBGSync {
       tearDownHelper();
     }
   }
+
 }

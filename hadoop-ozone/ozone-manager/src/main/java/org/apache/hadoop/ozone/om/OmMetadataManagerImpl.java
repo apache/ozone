@@ -194,10 +194,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String TENANT_STATE_TABLE = "tenantStateTable";
   public static final String RANGER_STATE_TABLE = "RangerStateTable";
 
-  // TODO: Move this key elsewhere?
-  public static final String RANGER_OZONE_SERVICE_VERSION_KEY =
-      "RangerOzoneServiceVersion";
-
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,
       VOLUME_TABLE,
