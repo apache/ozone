@@ -429,24 +429,20 @@ public class OMFileCreateRequest extends OMKeyRequest {
   )
   public static OMRequest blockCreateFileWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
-    if (!ctx.versionManager()
-        .isAllowed(OMLayoutFeature.BUCKET_LAYOUT_SUPPORT)) {
+    if (req.getCreateFileRequest().hasKeyArgs()) {
 
-      if (req.getCreateFileRequest().hasKeyArgs()) {
+      KeyArgs keyArgs = req.getCreateFileRequest().getKeyArgs();
 
-        KeyArgs keyArgs = req.getCreateFileRequest().getKeyArgs();
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName() &&
+          !ctx.getBucketLayout(
+              keyArgs.getVolumeName(), keyArgs.getBucketName()).isLegacy()) {
 
-        if (keyArgs.hasVolumeName() && keyArgs.hasBucketName() &&
-            !ctx.getBucketLayout(
-                keyArgs.getVolumeName(), keyArgs.getBucketName()).isLegacy()) {
-
-          throw new OMException(
-              "Client is attempting to create a file in a bucket which" +
-                  " uses non-LEGACY bucket layout features. Please upgrade" +
-                  " the client to a compatible version before trying to " +
-                  "modify this bucket.",
-              OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
-        }
+        throw new OMException(
+            "Client is attempting to create a file in a bucket which" +
+                " uses non-LEGACY bucket layout features. Please upgrade" +
+                " the client to a compatible version before trying to " +
+                "modify this bucket.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
       }
     }
     return req;

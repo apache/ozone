@@ -596,4 +596,38 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     }
     return req;
   }
+
+  /**
+   * Validates S3 MPU complete requests.
+   * We do not want to allow older clients to upload MPU keys to buckets which
+   * use non LEGACY layouts.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CompleteMultiPartUpload
+  )
+  public static OMRequest blockMPUCompleteWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    if (req.getCompleteMultiPartUploadRequest().hasKeyArgs()) {
+      KeyArgs keyArgs = req.getCompleteMultiPartUploadRequest().getKeyArgs();
+
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName() &&
+          !ctx.getBucketLayout(keyArgs.getVolumeName(),
+              keyArgs.getBucketName()).isLegacy()) {
+        throw new OMException(
+            "Client is attempting to complete MPU in a bucket which" +
+                " uses non-LEGACY bucket layout features. Please upgrade" +
+                " the client to a compatible version to perform this" +
+                " operation.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+      }
+    }
+    return req;
+  }
 }

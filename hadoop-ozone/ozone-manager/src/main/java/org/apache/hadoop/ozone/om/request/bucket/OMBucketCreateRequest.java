@@ -439,19 +439,15 @@ public class OMBucketCreateRequest extends OMClientRequest {
   )
   public static OMRequest blockCreateBucketWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws OMException {
-    if (!ctx.versionManager()
-        .isAllowed(OMLayoutFeature.BUCKET_LAYOUT_SUPPORT)) {
-      if (req.getCreateBucketRequest()
-          .getBucketInfo().hasBucketLayout()
-          &&
-          !BucketLayout.fromProto(req.getCreateBucketRequest().getBucketInfo()
-              .getBucketLayout()).isLegacy()) {
-        throw new OMException("Client is attempting to delete a bucket which" +
-            " uses non-LEGACY bucket layout features. Please upgrade the" +
-            " client to a compatible version before trying to delete" +
-            " the bucket.",
-            OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
-      }
+    if (req.getCreateBucketRequest().getBucketInfo().hasBucketLayout()
+        &&
+        !BucketLayout.fromProto(req.getCreateBucketRequest().getBucketInfo()
+            .getBucketLayout()).isLegacy()) {
+      throw new OMException("Client is attempting to create a bucket which" +
+          " uses non-LEGACY bucket layout features. Please upgrade the" +
+          " client to a compatible version before trying to create" +
+          " the bucket.",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
     }
     return req;
   }

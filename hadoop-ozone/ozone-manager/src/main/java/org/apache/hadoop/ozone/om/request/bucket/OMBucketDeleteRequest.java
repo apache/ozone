@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -218,22 +217,18 @@ public class OMBucketDeleteRequest extends OMClientRequest {
   )
   public static OMRequest blockBucketDeleteWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
-    if (!ctx.versionManager()
-        .isAllowed(OMLayoutFeature.BUCKET_LAYOUT_SUPPORT)) {
+    DeleteBucketRequest request = req.getDeleteBucketRequest();
 
-      DeleteBucketRequest request = req.getDeleteBucketRequest();
+    if (request.hasBucketName() && request.hasVolumeName() &&
+        !ctx.getBucketLayout(
+                request.getVolumeName(), request.getBucketName())
+            .equals(BucketLayout.LEGACY)) {
 
-      if (request.hasBucketName() && request.hasVolumeName() &&
-          !ctx.getBucketLayout(
-                  request.getVolumeName(), request.getBucketName())
-              .equals(BucketLayout.LEGACY)) {
-
-        throw new OMException("Cluster does not have the Bucket Layout"
-            + " support feature finalized yet, but the request contains"
-            + " a non LEGACY bucket type. Rejecting the request,"
-            + " please finalize the cluster upgrade and then try again.",
-            OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
-      }
+      throw new OMException("Client is attempting to delete a bucket which" +
+          " uses non-LEGACY bucket layout features. Please upgrade the" +
+          " client to a compatible version before trying to delete" +
+          " the bucket.",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
     }
     return req;
   }

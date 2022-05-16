@@ -18,18 +18,26 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import com.google.common.base.Optional;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMOpenKeysDeleteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -37,6 +45,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
@@ -188,4 +197,46 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     }
   }
 
+  /**
+   * Validates open keys delete requests.
+   * We do not want to allow older clients to delete open keys in buckets which
+   * use non LEGACY layouts.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.DeleteOpenKeys
+  )
+  public static OMRequest blockDeleteOpenKeysWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+
+    List<OpenKeyBucket> submittedOpenKeyBuckets =
+        req.getDeleteOpenKeysRequest().getOpenKeysPerBucketList();
+
+    // We add the Volume-Bucket pairs to a set to avoid duplicate RPC calls.
+    HashSet<Pair<String, String>> volumeBucketPairs = new HashSet<>();
+
+    for (OpenKeyBucket openKeyBucket : submittedOpenKeyBuckets) {
+      volumeBucketPairs.add(new ImmutablePair<>(openKeyBucket.getVolumeName(),
+          openKeyBucket.getBucketName()));
+    }
+
+    for (Pair<String, String> volumeBucketPair : volumeBucketPairs) {
+      if (!ctx.getBucketLayout(volumeBucketPair.getLeft(),
+          volumeBucketPair.getRight()).isLegacy()) {
+        throw new OMException(
+            "Client is attempting to delete open keys in a bucket which" +
+                " uses non-LEGACY bucket layout features. Please upgrade" +
+                " the client to a compatible version to perform this" +
+                " operation.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+      }
+    }
+    return req;
+  }
 }
