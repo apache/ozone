@@ -18,10 +18,8 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -44,6 +42,8 @@ import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksIterator;
 import picocli.CommandLine;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Parser for scm.db file.
@@ -106,7 +106,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     iterator.seekToFirst();
 
     if (fileName != null) {
-      try (PrintWriter out = new PrintWriter(new FileWriter(fileName))) {
+      try (PrintWriter out = new PrintWriter(fileName, UTF_8.name())) {
         displayTable(iterator, dbColumnFamilyDefinition, out);
       }
     } else {
@@ -215,7 +215,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
                 columnFamilyMap.get(tableName);
         ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
                 columnFamilyDefinition.getTableName()
-                        .getBytes(StandardCharsets.UTF_8),
+                        .getBytes(UTF_8),
                 columnFamilyHandleList);
         if (columnFamilyHandle == null) {
           throw new IllegalArgumentException("columnFamilyHandle is null");
