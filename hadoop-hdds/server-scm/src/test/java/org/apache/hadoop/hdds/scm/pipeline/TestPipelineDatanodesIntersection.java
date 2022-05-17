@@ -37,41 +37,38 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * Test for pipeline datanodes intersection.
  */
-@RunWith(Parameterized.class)
 public class TestPipelineDatanodesIntersection {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestPipelineDatanodesIntersection.class.getName());
 
-  private int nodeCount;
-  private int nodeHeaviness;
   private OzoneConfiguration conf;
   private boolean end;
   private File testDir;
   private DBStore dbStore;
 
-  @Before
+  @BeforeEach
   public void initialize() throws IOException {
     conf = SCMTestUtils.getConf();
     end = false;
@@ -82,7 +79,7 @@ public class TestPipelineDatanodesIntersection {
         conf, new SCMDBDefinition());
   }
 
-  @After
+  @AfterEach
   public void cleanup() throws Exception {
     if (dbStore != null) {
       dbStore.close();
@@ -91,25 +88,21 @@ public class TestPipelineDatanodesIntersection {
     FileUtil.fullyDelete(testDir);
   }
 
-  public TestPipelineDatanodesIntersection(int nodeCount, int nodeHeaviness) {
-    this.nodeCount = nodeCount;
-    this.nodeHeaviness = nodeHeaviness;
+  public static Stream<Arguments> inputParams() {
+    return Stream.of(
+        arguments(4, 5),
+        arguments(10, 5),
+        arguments(20, 5),
+        arguments(50, 5),
+        arguments(100, 5),
+        arguments(100, 10)
+    );
   }
 
-  @Parameterized.Parameters
-  public static Collection inputParams() {
-    return Arrays.asList(new Object[][] {
-        {4, 5},
-        {10, 5},
-        {20, 5},
-        {50, 5},
-        {100, 5},
-        {100, 10}
-    });
-  }
-
-  @Test
-  public void testPipelineDatanodesIntersection() throws IOException {
+  @ParameterizedTest
+  @MethodSource("inputParams")
+  public void testPipelineDatanodesIntersection(int nodeCount,
+      int nodeHeaviness) throws IOException {
     NodeManager nodeManager = new MockNodeManager(true, nodeCount);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, nodeHeaviness);
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
@@ -162,7 +155,7 @@ public class TestPipelineDatanodesIntersection {
       } catch (IOException e) {
         end = true;
         // Should not throw regular IOException.
-        Assert.fail();
+        Assertions.fail();
       }
     }
 
