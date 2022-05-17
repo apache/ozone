@@ -191,4 +191,41 @@ public class TestContainerCache {
     Assert.assertEquals(1, cache.size());
     db.cleanup();
   }
+
+  @Test
+  public void testUnderlyingDBzIsClosed() throws Exception {
+    File root = new File(testRoot);
+    root.mkdirs();
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
+
+    ContainerCache cache = ContainerCache.getInstance(conf);
+    cache.clear();
+    Assert.assertEquals(0, cache.size());
+    File containerDir1 = new File(root, "cont100");
+
+    createContainerDB(conf, containerDir1);
+    ReferenceCountedDB db1 = cache.getDB(100, "RocksDB",
+        containerDir1.getPath(),
+        VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
+    ReferenceCountedDB db2 = cache.getDB(100, "RocksDB",
+        containerDir1.getPath(),
+        VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
+    Assert.assertEquals(db1, db2);
+    db1.getStore().getStore().close();
+    ReferenceCountedDB db3 = cache.getDB(100, "RocksDB",
+        containerDir1.getPath(),
+        VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
+    ReferenceCountedDB db4 = cache.getDB(100, "RocksDB",
+        containerDir1.getPath(),
+        VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
+    Assert.assertNotEquals(db3, db2);
+    Assert.assertEquals(db4, db3);
+    db1.close();
+    db2.close();
+    db3.close();
+    db4.close();
+    cache.clear();
+  }
 }

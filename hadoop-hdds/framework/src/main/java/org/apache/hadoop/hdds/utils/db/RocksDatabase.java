@@ -35,6 +35,7 @@ import org.rocksdb.WriteOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -58,7 +59,7 @@ import static org.apache.hadoop.hdds.StringUtils.bytes2String;
  * When there is a {@link RocksDBException},
  * this class will close the underlying {@link org.rocksdb.RocksObject}s.
  */
-public final class RocksDatabase {
+public final class RocksDatabase implements Closeable {
   static final Logger LOG = LoggerFactory.getLogger(RocksDatabase.class);
 
   static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
@@ -172,6 +173,10 @@ public final class RocksDatabase {
     };
   }
 
+  public boolean isClosed() {
+    return isClosed.get();
+  }
+
   /**
    * Represents a checkpoint of the db.
    *
@@ -278,7 +283,7 @@ public final class RocksDatabase {
     this.columnFamilies = columnFamilies;
   }
 
-  void close() {
+  public void close() {
     if (isClosed.compareAndSet(false, true)) {
       close(columnFamilies, db, descriptors, writeOptions, dbOptions);
     }

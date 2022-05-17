@@ -327,6 +327,11 @@ public class RDBStore implements DBStore {
     return dbUpdatesWrapper;
   }
 
+  @Override
+  public boolean isClosed() {
+    return db.isClosed();
+  }
+
   @VisibleForTesting
   public RocksDatabase getDb() {
     return db;

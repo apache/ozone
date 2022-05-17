@@ -26,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -70,7 +71,7 @@ public class ReferenceCountedDB implements Closeable {
   }
 
   public boolean cleanup() {
-    if (referenceCount.get() == 0 && store != null) {
+    if (store != null && store.isClosed() || referenceCount.get() == 0) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Close {} refCnt {}", containerDBPath,
             referenceCount.get());
@@ -80,7 +81,7 @@ public class ReferenceCountedDB implements Closeable {
         return true;
       } catch (Exception e) {
         LOG.error("Error closing DB. Container: " + containerDBPath, e);
-        return false;
+        return true;
       }
     } else {
       return false;
@@ -92,7 +93,15 @@ public class ReferenceCountedDB implements Closeable {
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     decrementReference();
+  }
+
+  /**
+   * Returns if the underlying DB is closed. This call is threadsafe.
+   * @return true if the DB is closed.
+   */
+  public boolean isClosed() {
+    return store.isClosed();
   }
 }

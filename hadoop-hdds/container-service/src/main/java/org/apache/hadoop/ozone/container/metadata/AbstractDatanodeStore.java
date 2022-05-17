@@ -190,6 +190,19 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
+  public boolean isClosed() {
+    if (this.store == null) {
+      return true;
+    }
+    return this.store.isClosed();
+  }
+
+  @Override
+  public void close() throws IOException {
+    this.store.close();
+  }
+
+  @Override
   public void flushDB() throws IOException {
     store.flushDB();
   }

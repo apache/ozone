@@ -27,12 +27,13 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 
+import java.io.Closeable;
 import java.io.IOException;
 
 /**
  * Interface for interacting with datanode databases.
  */
-public interface DatanodeStore {
+public interface DatanodeStore extends Closeable {
 
   /**
    * Start datanode manager.
@@ -91,4 +92,11 @@ public interface DatanodeStore {
 
   BlockIterator<BlockData>
       getBlockIterator(MetadataKeyFilters.KeyPrefixFilter filter);
+
+  /**
+   * Returns if the underlying DB is closed. This call is thread safe.
+   * @return true if the DB is closed.
+   */
+  boolean isClosed();
+
 }
