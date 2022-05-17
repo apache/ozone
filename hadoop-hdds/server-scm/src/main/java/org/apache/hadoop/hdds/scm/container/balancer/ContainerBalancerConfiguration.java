@@ -389,22 +389,6 @@ public final class ContainerBalancerConfiguration {
     this.excludeNodes = excludeNodes;
   }
 
-  /**
-   * Gets index of next iteration of ContainerBalancer.
-   * @return index value
-   */
-  int getNextIterationIndex() {
-    return nextIterationIndex;
-  }
-
-  /**
-   * Sets index of next iteration of ContainerBalancer.
-   * @param nextIterationIndex index value
-   */
-  void setNextIterationIndex(int nextIterationIndex) {
-    this.nextIterationIndex = nextIterationIndex;
-  }
-
   @Override
   public String toString() {
     return String.format("Container Balancer Configuration values:%n" +
@@ -441,8 +425,7 @@ public final class ContainerBalancerConfiguration {
         .setIncludeDatanodes(includeNodes)
         .setExcludeDatanodes(excludeNodes)
         .setMoveNetworkTopologyEnable(networkTopologyEnable)
-        .setTriggerDuBeforeMoveEnable(triggerDuEnable)
-        .setNextIterationIndex(nextIterationIndex);
+        .setTriggerDuBeforeMoveEnable(triggerDuEnable);
     return builder;
   }
 
@@ -490,9 +473,6 @@ public final class ContainerBalancerConfiguration {
     }
     if (proto.hasTriggerDuBeforeMoveEnable()) {
       config.setTriggerDuEnable(proto.getTriggerDuBeforeMoveEnable());
-    }
-    if (proto.hasNextIterationIndex()) {
-      config.setNextIterationIndex(proto.getNextIterationIndex());
     }
     return config;
   }

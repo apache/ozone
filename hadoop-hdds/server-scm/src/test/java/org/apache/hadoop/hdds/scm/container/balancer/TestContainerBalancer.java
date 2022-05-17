@@ -918,7 +918,9 @@ public class TestContainerBalancer {
 
   private void stopBalancer() {
     try {
-      containerBalancer.stopBalancer();
+      if (containerBalancer.isBalancerRunning()) {
+        containerBalancer.stopBalancer();
+      }
     } catch (IOException | IllegalContainerBalancerStateException e) {
       LOG.warn("Failed to stop balancer", e);
     }

@@ -111,6 +111,7 @@ public class ContainerBalancer extends StatefulService {
       CompletableFuture<LegacyReplicationManager.MoveResult>>
       moveSelectionToFutureMap;
   private IterationResult iterationResult;
+  private int nextIterationIndex;
 
   /**
    * Constructs ContainerBalancer with the specified arguments. Initializes
@@ -136,6 +137,7 @@ public class ContainerBalancer extends StatefulService {
     this.unBalancedNodes = new ArrayList<>();
     this.placementPolicy = scm.getContainerPlacementPolicy();
     this.networkTopology = scm.getClusterMap();
+    this.nextIterationIndex = 0;
 
     this.lock = new ReentrantLock();
     findSourceStrategy = new FindSourceGreedy(nodeManager);
@@ -154,7 +156,8 @@ public class ContainerBalancer extends StatefulService {
 
     // nextIterationIndex is the iteration that balancer should start from on
     // leader change or restart
-    int i = config.getNextIterationIndex();
+    int i = nextIterationIndex;
+    resetState();
     for (; i < iterations && isBalancerRunning(); i++) {
       if (config.getTriggerDuEnable()) {
         // before starting a new iteration, we trigger all the datanode
@@ -210,9 +213,11 @@ public class ContainerBalancer extends StatefulService {
       if (iR == IterationResult.ITERATION_COMPLETED) {
         lock.lock();
         try {
-          config.setNextIterationIndex(i + 1);
           saveConfiguration(
-              config.toProtobufBuilder().setShouldRun(true).build());
+              config.toProtobufBuilder()
+                  .setShouldRun(true)
+                  .setNextIterationIndex(i + 1)
+                  .build());
         } catch (IOException e) {
           LOG.warn("Could not persist next iteration index value for " +
               "ContainerBalancer after completing an iteration", e);
@@ -310,7 +315,7 @@ public class ContainerBalancer extends StatefulService {
     this.totalNodesInCluster = datanodeUsageInfos.size();
 
     // reset some variables and metrics for this iteration
-    resetIterationState();
+    resetState();
 
     clusterAvgUtilisation = calculateAvgUtilization(datanodeUsageInfos);
     if (LOG.isDebugEnabled()) {
@@ -826,7 +831,7 @@ public class ContainerBalancer extends StatefulService {
   /**
    * Resets some variables and metrics for this iteration.
    */
-  private void resetIterationState() {
+  private void resetState() {
     this.clusterCapacity = 0L;
     this.clusterUsed = 0L;
     this.clusterRemaining = 0L;
@@ -959,6 +964,7 @@ public class ContainerBalancer extends StatefulService {
               ozoneConfiguration);
       validateConfiguration(configuration);
       this.config = configuration;
+      this.nextIterationIndex = proto.getNextIterationIndex();
       startBalancingThread();
     } finally {
       lock.unlock();
@@ -983,7 +989,7 @@ public class ContainerBalancer extends StatefulService {
     lock.lock();
     try {
       // validates state, config, and then saves config
-      setBalancerConfigOnStart(configuration, true);
+      setBalancerConfigOnStartBalancer(configuration);
       startBalancingThread();
     } finally {
       lock.unlock();
@@ -1151,14 +1157,11 @@ public class ContainerBalancer extends StatefulService {
   /**
    * Persists the configuration that ContainerBalancer will use after validating
    * state and the specified configuration.
+   *  @param configuration ContainerBalancerConfiguration to persist
    *
-   * @param configuration ContainerBalancerConfiguration to persist
-   * @param setShouldRun  true if persisted configuration
-   *                      ContainerBalancerConfigurationProto#shouldRun should
-   *                      be "should run", otherwise false
    */
-  public void setBalancerConfigOnStart(
-      ContainerBalancerConfiguration configuration, boolean setShouldRun)
+  private void setBalancerConfigOnStartBalancer(
+      ContainerBalancerConfiguration configuration)
       throws InvalidContainerBalancerConfigurationException,
       IllegalContainerBalancerStateException, IOException {
     validateState(false);
@@ -1166,7 +1169,8 @@ public class ContainerBalancer extends StatefulService {
     lock.lock();
     try {
       saveConfiguration(configuration.toProtobufBuilder()
-          .setShouldRun(setShouldRun)
+          .setShouldRun(true)
+          .setNextIterationIndex(0)
           .build());
       this.config = configuration;
     } finally {
