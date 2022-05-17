@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.UUID;
 
 import org.apache.hadoop.fs.FileUtil;
@@ -25,8 +26,11 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
@@ -42,7 +46,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
 
 
 /**
@@ -56,6 +62,7 @@ public class TestContainerManagerImpl {
   private SCMHAManager scmhaManager;
   private SequenceIdGenerator sequenceIdGen;
   private NodeManager nodeManager;
+  private ContainerReplicaPendingOps pendingOpsMock;
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -73,9 +80,10 @@ public class TestContainerManagerImpl {
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
     pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
         ReplicationFactor.THREE));
+    pendingOpsMock = Mockito.mock(ContainerReplicaPendingOps.class);
     containerManager = new ContainerManagerImpl(conf,
         scmhaManager, sequenceIdGen, pipelineManager,
-        SCMDBDefinition.CONTAINERS.getTable(dbStore));
+        SCMDBDefinition.CONTAINERS.getTable(dbStore), pendingOpsMock);
   }
 
   @AfterEach
@@ -178,6 +186,46 @@ public class TestContainerManagerImpl {
     Assertions.assertEquals(1, containerManager.getContainers().size());
     Assertions.assertNotNull(
         containerManager.getContainer(admin.containerID()));
+  }
+
+  @Test
+  public void testUpdateContainerReplicaInvokesPendingOp() throws IOException {
+    final ContainerInfo container = containerManager.allocateContainer(
+        RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE), "admin");
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    containerManager.updateContainerReplica(container.containerID(),
+        ContainerReplica.newBuilder()
+            .setContainerState(OPEN)
+            .setReplicaIndex(0)
+            .setContainerID(container.containerID())
+            .setDatanodeDetails(dn)
+            .setSequenceId(1)
+            .setBytesUsed(1234)
+            .setKeyCount(123)
+            .build());
+    Mockito.verify(pendingOpsMock, Mockito.times(1))
+        .completeAddReplica(container.containerID(), dn, 0);
+  }
+
+  @Test
+  public void testRemoveContainerReplicaInvokesPendingOp() throws IOException {
+    final ContainerInfo container = containerManager.allocateContainer(
+        RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE), "admin");
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    containerManager.removeContainerReplica(container.containerID(),
+        ContainerReplica.newBuilder()
+            .setContainerState(OPEN)
+            .setReplicaIndex(0)
+            .setContainerID(container.containerID())
+            .setDatanodeDetails(dn)
+            .setSequenceId(1)
+            .setBytesUsed(1234)
+            .setKeyCount(123)
+            .build());
+    Mockito.verify(pendingOpsMock, Mockito.times(1))
+        .completeDeleteReplica(container.containerID(), dn, 0);
   }
 
 }
