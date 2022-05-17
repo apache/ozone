@@ -88,14 +88,14 @@ public class DatanodeSchemaThreeDBDefinition
           DeletedBlocksTransaction.class,
           new DeletedBlocksTransactionCodec());
 
-  private static String separator;
+  private static String separator = "";
 
   public DatanodeSchemaThreeDBDefinition(String dbPath,
       ConfigurationSource config) {
     super(dbPath, config);
 
     DatanodeConfiguration dc = config.getObject(DatanodeConfiguration.class);
-    separator = dc.getContainerSchemaV3KeySeparator();
+    setSeparator(dc.getContainerSchemaV3KeySeparator());
 
     // Get global ColumnFamilyOptions first.
     DatanodeDBProfile dbProfile = DatanodeDBProfile
@@ -150,5 +150,9 @@ public class DatanodeSchemaThreeDBDefinition
   private static int getContainerKeyPrefixLength() {
     return FixedLengthStringUtils.string2Bytes(
         getContainerKeyPrefix(0L)).length;
+  }
+
+  private void setSeparator(String keySeparator) {
+    separator = keySeparator;
   }
 }
