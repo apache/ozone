@@ -22,14 +22,13 @@ package org.apache.hadoop.hdds.utils.db.cache;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Stream;
 
 import com.google.common.base.Optional;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.slf4j.event.Level;
 
 
@@ -39,13 +38,6 @@ import org.slf4j.event.Level;
 public class TestTableCache {
 
   private TableCache<CacheKey<String>, CacheValue<String>> tableCache;
-
-  private static Stream<TableCache.CacheType> policy() {
-    return Stream.of(
-        TableCache.CacheType.FULL_CACHE,
-        TableCache.CacheType.PARTIAL_CACHE
-    );
-  }
 
   @BeforeAll
   public static void setLogLevel() {
@@ -61,7 +53,7 @@ public class TestTableCache {
   }
 
   @ParameterizedTest
-  @MethodSource("policy")
+  @EnumSource(TableCache.CacheType.class)
   public void testPartialTableCache(TableCache.CacheType cacheType) {
 
     createTableCache(cacheType);
@@ -93,7 +85,7 @@ public class TestTableCache {
   }
 
   @ParameterizedTest
-  @MethodSource("policy")
+  @EnumSource(TableCache.CacheType.class)
   public void testTableCacheWithRenameKey(TableCache.CacheType cacheType) {
 
     createTableCache(cacheType);
@@ -143,7 +135,7 @@ public class TestTableCache {
   }
 
   @ParameterizedTest
-  @MethodSource("policy")
+  @EnumSource(TableCache.CacheType.class)
   public void testPartialTableCacheWithNotContinousEntries(
       TableCache.CacheType cacheType) {
 
@@ -195,7 +187,7 @@ public class TestTableCache {
   }
 
   @ParameterizedTest
-  @MethodSource("policy")
+  @EnumSource(TableCache.CacheType.class)
   public void testPartialTableCacheWithOverrideEntries(
       TableCache.CacheType cacheType) {
 
@@ -262,7 +254,7 @@ public class TestTableCache {
   }
 
   @ParameterizedTest
-  @MethodSource("policy")
+  @EnumSource(TableCache.CacheType.class)
   public void testPartialTableCacheWithOverrideAndDelete(
       TableCache.CacheType cacheType) {
 
@@ -355,7 +347,7 @@ public class TestTableCache {
   }
 
   @ParameterizedTest
-  @MethodSource("policy")
+  @EnumSource(TableCache.CacheType.class)
   public void testPartialTableCacheParallel(
       TableCache.CacheType cacheType) throws Exception {
 
@@ -441,7 +433,7 @@ public class TestTableCache {
   }
 
   @ParameterizedTest
-  @MethodSource("policy")
+  @EnumSource(TableCache.CacheType.class)
   public void testTableCache(TableCache.CacheType cacheType) {
 
     createTableCache(cacheType);
@@ -472,7 +464,7 @@ public class TestTableCache {
 
 
   @ParameterizedTest
-  @MethodSource("policy")
+  @EnumSource(TableCache.CacheType.class)
   public void testTableCacheWithNonConsecutiveEpochList(
       TableCache.CacheType cacheType) {
 
