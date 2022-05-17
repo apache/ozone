@@ -49,9 +49,11 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Crea
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.FinalizeNewLayoutVersionCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconstructECContainersCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.RefreshVolumeUsageCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionSupervisor;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
@@ -96,6 +98,7 @@ public class DatanodeStateMachine implements Closeable {
   private volatile Thread stateMachineThread = null;
   private Thread cmdProcessThread = null;
   private final ReplicationSupervisor supervisor;
+  private final ECReconstructionSupervisor ecReconstructionSupervisor;
 
   private JvmPauseMonitor jvmPauseMonitor;
   private CertificateClient dnCertClient;
@@ -178,6 +181,10 @@ public class DatanodeStateMachine implements Closeable {
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);
 
+    ecReconstructionSupervisor =
+        new ECReconstructionSupervisor(container.getContainerSet(), context,
+            replicationConfig.getReplicationMaxStreams());
+
 
     // When we add new handlers just adding a new handler here should do the
     // trick.
@@ -187,6 +194,8 @@ public class DatanodeStateMachine implements Closeable {
             conf, dnConf.getBlockDeleteThreads(),
             dnConf.getBlockDeleteQueueLimit()))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor))
+        .addHandler(new ReconstructECContainersCommandHandler(conf,
+            ecReconstructionSupervisor))
         .addHandler(new DeleteContainerCommandHandler(
             dnConf.getContainerDeleteThreads()))
         .addHandler(new ClosePipelineCommandHandler())

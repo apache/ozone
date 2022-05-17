@@ -135,7 +135,10 @@ public class ReconstructECContainersCommand
     return ecReplicationConfig;
   }
 
-  static class DatanodeDetailsAndReplicaIndex {
+  /**
+   * To store the datanode details with replica index.
+   */
+  public static class DatanodeDetailsAndReplicaIndex {
     private DatanodeDetails dnDetails;
     private int replicaIndex;
 
