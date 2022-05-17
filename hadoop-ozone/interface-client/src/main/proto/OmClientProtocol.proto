@@ -418,6 +418,8 @@ enum Status {
 
     VOLUME_IS_REFERENCED = 83;
     TENANT_NOT_EMPTY = 84;
+
+    FEATURE_NOT_ENABLED = 85;
 }
 
 /**

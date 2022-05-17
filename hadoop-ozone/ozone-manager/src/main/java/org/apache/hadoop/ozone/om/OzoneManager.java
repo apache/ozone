@@ -372,6 +372,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean useRatisForReplication;
   private final String defaultBucketLayout;
 
+  private boolean isS3MultiTenancyEnabled;
+
   private boolean isNativeAuthorizerEnabled;
 
   private ExitManager exitManager;
@@ -534,6 +536,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       blockTokenMgr = createBlockTokenSecretManager(configuration);
     }
 
+    // Enable S3 multi-tenancy if config keys are set
+    this.isS3MultiTenancyEnabled =
+        OMMultiTenantManager.checkAndEnableMultiTenancy(this, conf);
+
     // Get admin list
     omAdminUsernames = getOzoneAdminsFromConfig(configuration);
     instantiateServices(false);
@@ -653,8 +659,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void instantiateServices(boolean withNewSnapshot) throws IOException {
 
     metadataManager = new OmMetadataManagerImpl(configuration);
-    multiTenantManager = new OMMultiTenantManagerImpl(this, configuration);
-    OzoneAclUtils.setOMMultiTenantManager(multiTenantManager);
+    LOG.info("S3 Multi-Tenancy is {}",
+        isS3MultiTenancyEnabled ? "enabled" : "disabled");
+    if (isS3MultiTenancyEnabled) {
+      multiTenantManager = new OMMultiTenantManagerImpl(this, configuration);
+      OzoneAclUtils.setOMMultiTenantManager(multiTenantManager);
+    }
     volumeManager = new VolumeManagerImpl(metadataManager, configuration);
     bucketManager = new BucketManagerImpl(metadataManager, getKmsProvider(),
         isRatisEnabled);
@@ -754,6 +764,26 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isGrpcBlockTokenEnabled() {
     return grpcBlockTokenEnabled;
+  }
+
+  /**
+   * Returns true if S3 multi-tenancy is enabled; false otherwise.
+   */
+  public boolean isS3MultiTenancyEnabled() {
+    return isS3MultiTenancyEnabled;
+  }
+
+  /**
+   * Throws OMException FEATURE_NOT_ENABLED if S3 multi-tenancy is not enabled.
+   */
+  public void checkS3MultiTenancyEnabled() throws OMException {
+    if (isS3MultiTenancyEnabled()) {
+      return;
+    }
+
+    throw new OMException("S3 multi-tenancy feature is not enabled. Please "
+        + "set ozone.om.multitenancy.enabled to true and restart all OMs.",
+        ResultCodes.FEATURE_NOT_ENABLED);
   }
 
   /**
@@ -3133,8 +3163,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
     } else {
       String accessId = s3Auth.getAccessId();
-      Optional<String> optionalTenantId =
-          multiTenantManager.getTenantForAccessID(accessId);
+      // If S3 Multi-Tenancy is not enabled, all S3 requests will be redirected
+      // to the default s3v for compatibility
+      final Optional<String> optionalTenantId = isS3MultiTenancyEnabled() ?
+          multiTenantManager.getTenantForAccessID(accessId) : Optional.absent();
 
       if (!optionalTenantId.isPresent()) {
         final UserGroupInformation s3gUGI =
@@ -3150,6 +3182,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               + "requests to default s3 volume {}.", accessId, s3Volume);
         }
       } else {
+        // S3 Multi-Tenancy is enabled, and the accessId is assigned to a tenant
+
         final String tenantId = optionalTenantId.get();
 
         OmDBTenantState tenantState =
