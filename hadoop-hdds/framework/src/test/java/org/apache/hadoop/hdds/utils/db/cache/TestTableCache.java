@@ -30,8 +30,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 
@@ -39,9 +37,6 @@ import org.slf4j.event.Level;
  * Class tests partial table cache.
  */
 public class TestTableCache {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestTableCache.class);
 
   private TableCache<CacheKey<String>, CacheValue<String>> tableCache;
 
@@ -57,13 +52,12 @@ public class TestTableCache {
     GenericTestUtils.setLogLevel(FullTableCache.LOG, Level.DEBUG);
   }
 
-  public void createTableCache(TableCache.CacheType cacheType) {
+  private void createTableCache(TableCache.CacheType cacheType) {
     if (cacheType == TableCache.CacheType.FULL_CACHE) {
       tableCache = new FullTableCache<>();
     } else {
       tableCache = new PartialTableCache<>();
     }
-    LOG.info("cacheType: {}", cacheType);
   }
 
   @ParameterizedTest
