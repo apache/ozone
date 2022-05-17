@@ -1071,7 +1071,10 @@ public class ContainerBalancer extends StatefulService {
     try {
       // should be leader, out of safe mode, and currently running
       validateState(true);
-      saveConfiguration(config.toProtobufBuilder().setShouldRun(false).build());
+      saveConfiguration(config.toProtobufBuilder()
+          .setShouldRun(false)
+          .setNextIterationIndex(0)
+          .build());
       stop();
     } finally {
       lock.unlock();

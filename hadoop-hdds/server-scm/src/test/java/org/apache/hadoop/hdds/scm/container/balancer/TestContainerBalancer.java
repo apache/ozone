@@ -166,8 +166,8 @@ public class TestContainerBalancer {
     when(scm.getStatefulServiceStateManager()).thenReturn(serviceStateManager);
 
     /*
-    When StatefulServiceStateManager#saveConfiguration is called, save to our
-     map instead.
+    When StatefulServiceStateManager#saveConfiguration is called, save to
+    in-memory serviceToConfigMap instead.
      */
     Mockito.doAnswer(i -> {
       serviceToConfigMap.put(i.getArgument(0, String.class), i.getArgument(1,
@@ -178,8 +178,8 @@ public class TestContainerBalancer {
         Mockito.any(ByteString.class));
 
     /*
-    When StatefulServiceStateManager#readConfiguration is called, read from our
-     map instead.
+    When StatefulServiceStateManager#readConfiguration is called, read from
+    serviceToConfigMap instead.
      */
     when(serviceStateManager.readConfiguration(Mockito.anyString())).thenAnswer(
         i -> serviceToConfigMap.get(i.getArgument(0, String.class)));
