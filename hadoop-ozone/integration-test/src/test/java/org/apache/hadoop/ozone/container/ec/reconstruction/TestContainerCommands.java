@@ -78,12 +78,17 @@ public class TestContainerCommands {
   private static final int EC_PARITY = 4;
   private static final EcCodec EC_CODEC = EcCodec.RS;
   private static final int EC_CHUNK_SIZE = 1024;
+  private static final int STRIPE_DATA_SIZE = EC_DATA * EC_CHUNK_SIZE;
   private static final int NUM_DN = EC_DATA + EC_PARITY;
-  private static final int[] KEY_SIZES = new int[]{
-      EC_CHUNK_SIZE / 2,
-      EC_CHUNK_SIZE * 3 / 2,
-      EC_CHUNK_SIZE * EC_DATA + EC_CHUNK_SIZE / 2,
-      EC_CHUNK_SIZE * EC_DATA + EC_CHUNK_SIZE * 3 / 2,
+
+  // Each key size will be in range [min, max), min inclusive, max exclusive
+  private static final int[][] KEY_SIZE_RANGES = new int[][]{
+      {1, EC_CHUNK_SIZE},
+      {EC_CHUNK_SIZE, EC_CHUNK_SIZE + 1},
+      {EC_CHUNK_SIZE + 1, STRIPE_DATA_SIZE},
+      {STRIPE_DATA_SIZE, STRIPE_DATA_SIZE + 1},
+      {STRIPE_DATA_SIZE + 1, STRIPE_DATA_SIZE + EC_CHUNK_SIZE},
+      {STRIPE_DATA_SIZE + EC_CHUNK_SIZE, STRIPE_DATA_SIZE * 2},
   };
   private static byte[][] values;
   private static long containerID;
@@ -99,7 +104,7 @@ public class TestContainerCommands {
     conf.set(OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     startCluster(conf);
-    prepareData(KEY_SIZES);
+    prepareData(KEY_SIZE_RANGES);
   }
 
   @AfterAll
@@ -150,8 +155,7 @@ public class TestContainerCommands {
         return (dataBlocks + EC_DATA - 1 - i) / EC_DATA;
       };
     } else {
-      return (keySize) -> (keySize + EC_CHUNK_SIZE * EC_DATA - 1) /
-          (EC_CHUNK_SIZE * EC_DATA);
+      return (keySize) -> (keySize + STRIPE_DATA_SIZE - 1) / STRIPE_DATA_SIZE;
     }
   }
 
@@ -206,7 +210,7 @@ public class TestContainerCommands {
         cluster.getStorageContainerLocationClient();
   }
 
-  public static void prepareData(int[] sizes) throws Exception {
+  public static void prepareData(int[][] ranges) throws Exception {
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
@@ -215,9 +219,10 @@ public class TestContainerCommands {
     OzoneBucket bucket = volume.getBucket(bucketName);
     final ReplicationConfig repConfig =
         new ECReplicationConfig(EC_DATA, EC_PARITY, EC_CODEC, EC_CHUNK_SIZE);
-    values = new byte[KEY_SIZES.length][];
-    for (int i = 0; i < sizes.length; i++) {
-      values[i] = RandomUtils.nextBytes(sizes[i]);
+    values = new byte[ranges.length][];
+    for (int i = 0; i < ranges.length; i++) {
+      int keySize = RandomUtils.nextInt(ranges[i][0], ranges[i][1]);
+      values[i] = RandomUtils.nextBytes(keySize);
       final String keyName = UUID.randomUUID().toString();
       try (OutputStream out = bucket.createKey(
           keyName, values[i].length, repConfig, new HashMap<>())) {
