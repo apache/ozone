@@ -31,6 +31,7 @@ import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 
+import static org.apache.hadoop.ozone.OzoneConsts.TENANT_ID_USERNAME_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
@@ -129,7 +130,9 @@ public interface OMMultiTenantManager {
    * @param userPrincipal user name
    * @return access ID in the form of tenantName$username
    */
-  String getDefaultAccessId(String tenantId, String userPrincipal);
+  static String getDefaultAccessId(String tenantId, String userPrincipal) {
+    return tenantId + TENANT_ID_USERNAME_DELIMITER + userPrincipal;
+  }
 
   /**
    * Returns true if user is the tenant's admin or Ozone admin, false otherwise.
