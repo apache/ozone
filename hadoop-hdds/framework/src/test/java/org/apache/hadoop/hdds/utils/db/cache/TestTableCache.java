@@ -75,7 +75,7 @@ public class TestTableCache {
     epochs.add(2L);
     epochs.add(3L);
     epochs.add(4L);
-    // On a full table cache if some one calls cleanup it is a no-op.
+    // On a full table cache if someone calls cleanup it is a no-op.
     tableCache.evictCache(epochs);
 
     for (int i = 5; i < 10; i++) {
@@ -136,7 +136,7 @@ public class TestTableCache {
 
   @ParameterizedTest
   @EnumSource(TableCache.CacheType.class)
-  public void testPartialTableCacheWithNotContinousEntries(
+  public void testPartialTableCacheWithNotContinuousEntries(
       TableCache.CacheType cacheType) {
 
     createTableCache(cacheType);
@@ -246,7 +246,7 @@ public class TestTableCache {
 
       Assertions.assertEquals(0, tableCache.size());
 
-      // Overrided entries would have been deleted.
+      // Overridden entries would have been deleted.
       Assertions.assertEquals(0, tableCache.getEpochEntries().size());
     }
 
@@ -268,13 +268,13 @@ public class TestTableCache {
         new CacheValue<>(Optional.of(Long.toString(2)), 2));
 
 
-    //Override entries
+    // Override entries
     tableCache.put(new CacheKey<>(Long.toString(0)),
         new CacheValue<>(Optional.of(Long.toString(0)), 3));
     tableCache.put(new CacheKey<>(Long.toString(1)),
         new CacheValue<>(Optional.of(Long.toString(1)), 4));
 
-    // Finally mark them for deleted
+    // Finally, mark them for deleted
     tableCache.put(new CacheKey<>(Long.toString(0)),
         new CacheValue<>(Optional.absent(), 5));
     tableCache.put(new CacheKey<>(Long.toString(1)),
@@ -314,7 +314,7 @@ public class TestTableCache {
 
       Assertions.assertEquals(1, tableCache.size());
 
-      // Epoch entries which are overrided also will be cleaned up.
+      // Epoch entries which are overridden also will be cleaned up.
       Assertions.assertEquals(0, tableCache.getEpochEntries().size());
     }
 
@@ -330,7 +330,7 @@ public class TestTableCache {
 
       Assertions.assertEquals(0, tableCache.size());
 
-      // Epoch entries which are overrided now would have been deleted.
+      // Epoch entries which are overridden now would have been deleted.
       Assertions.assertEquals(0, tableCache.getEpochEntries().size());
     } else {
       tableCache.evictCache(epochs);
@@ -393,7 +393,7 @@ public class TestTableCache {
     if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
       int deleted = 5;
 
-      // cleanup first 5 entires
+      // cleanup first 5 entries
 
       ArrayList<Long> epochs = new ArrayList<>();
       epochs.add(1L);
