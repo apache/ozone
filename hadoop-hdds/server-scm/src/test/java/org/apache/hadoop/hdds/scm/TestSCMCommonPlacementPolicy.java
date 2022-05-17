@@ -26,9 +26,9 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
 import java.util.List;
@@ -42,7 +42,7 @@ public class TestSCMCommonPlacementPolicy {
   private NodeManager nodeManager;
   private OzoneConfiguration conf;
 
-  @Before
+  @BeforeEach
   public void setup() {
     nodeManager = new MockNodeManager(true, 10);
     conf = SCMTestUtils.getConf();
@@ -56,7 +56,7 @@ public class TestSCMCommonPlacementPolicy {
         nodeManager.getNodes(NodeStatus.inServiceHealthy());
     List<DatanodeDetails> result = dummyPlacementPolicy.getResultSet(3, list);
     Set<DatanodeDetails> resultSet = new HashSet<>(result);
-    Assert.assertNotEquals(1, resultSet.size());
+    Assertions.assertNotEquals(1, resultSet.size());
   }
 
   private static class DummyPlacementPolicy extends SCMCommonPlacementPolicy {

@@ -33,7 +33,7 @@ import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.lib.Interns;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test metrics that represent container states.
