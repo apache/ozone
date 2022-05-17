@@ -126,6 +126,18 @@ public class ContainerReplicaPendingOps {
   }
 
   /**
+   * Remove a stored pending operation from the given ContainerID.
+   * @param containerID ContainerID for which to remove the op.
+   * @param op ContainerReplicaOp to remove
+   * @return True if an element was found and deleted, false otherwise.
+   */
+  public boolean removeOp(ContainerID containerID,
+      ContainerReplicaOp op) {
+    return completeOp(op.getOpType(), containerID, op.getTarget(),
+        op.getReplicaIndex());
+  }
+
+  /**
    * Iterate over all pending entries and remove any which have expired, meaning
    * they have not completed the operation inside the given time.
    * @param expiryMilliSeconds

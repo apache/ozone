@@ -152,6 +152,26 @@ public class TestContainerReplicaPendingOps {
   }
 
   @Test
+  public void testRemoveSpecificOp() {
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn1, 0);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn2, 0);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn3, 0);
+    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn1, 1);
+
+    ContainerID cid = new ContainerID(1);
+    List<ContainerReplicaOp> ops = pendingOps.getPendingOps(cid);
+    Assert.assertEquals(4, ops.size());
+    for (ContainerReplicaOp op : ops) {
+      Assert.assertTrue(pendingOps.removeOp(cid, op));
+    }
+    // Attempt to remove one that no longer exists
+    Assert.assertFalse(pendingOps.removeOp(cid, ops.get(0)));
+    ops = pendingOps.getPendingOps(cid);
+    Assert.assertEquals(0, ops.size());
+  }
+
+  @Test
   public void testRemoveExpiredEntries() {
     pendingOps.scheduleDeleteReplica(new ContainerID(1), dn1, 0);
     pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0);
