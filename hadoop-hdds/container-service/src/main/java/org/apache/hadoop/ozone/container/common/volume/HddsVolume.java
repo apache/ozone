@@ -67,6 +67,7 @@ public class HddsVolume extends StorageVolume {
 
   private VolumeState state;
   private final VolumeIOStats volumeIOStats;
+  private final VolumeInfoStats volumeInfoStats;
 
   // VERSION file properties
   private String storageID;       // id of the file system
@@ -115,16 +116,26 @@ public class HddsVolume extends StorageVolume {
       this.clusterID = b.clusterID;
       this.datanodeUuid = b.datanodeUuid;
       this.volumeIOStats = new VolumeIOStats(b.getVolumeRootStr());
+      this.volumeInfoStats = new VolumeInfoStats(b.getVolumeRootStr(),this);
       this.committedBytes = new AtomicLong(0);
 
+      System.out.println(volumeInfoStats.getUsed());
+      System.out.println(volumeInfoStats.getStorageType());
+      System.out.println(volumeInfoStats.getAvailable());
+      System.out.println(volumeInfoStats.getReserved());
+      System.out.println(volumeInfoStats.getTotalCapacity());
+      System.out.println(volumeInfoStats.getStorageDirectory());
+      System.out.println(volumeInfoStats.getDatanodeUuid());
+
       LOG.info("Creating HddsVolume: {} of storage type : {} capacity : {}",
-          getStorageDir(), b.getStorageType(), getVolumeInfo().getCapacity());
+              getStorageDir(), b.getStorageType(), getVolumeInfo().getCapacity());
 
       initialize();
     } else {
       // Builder is called with failedVolume set, so create a failed volume
       // HddsVolume Object.
       volumeIOStats = null;
+      volumeInfoStats = null;
       storageID = UUID.randomUUID().toString();
       state = VolumeState.FAILED;
       committedBytes = null;
@@ -141,30 +152,30 @@ public class HddsVolume extends StorageVolume {
   private void initialize() throws IOException {
     VolumeState intialVolumeState = analyzeVolumeState();
     switch (intialVolumeState) {
-    case NON_EXISTENT:
-      // Root directory does not exist. Create it.
-      if (!getStorageDir().mkdirs()) {
-        throw new IOException("Cannot create directory " + getStorageDir());
-      }
-      setState(VolumeState.NOT_FORMATTED);
-      createVersionFile();
-      break;
-    case NOT_FORMATTED:
-      // Version File does not exist. Create it.
-      createVersionFile();
-      break;
-    case NOT_INITIALIZED:
-      // Version File exists. Verify its correctness and update property fields.
-      readVersionFile();
-      setState(VolumeState.NORMAL);
-      break;
-    case INCONSISTENT:
-      // Volume Root is in an inconsistent state. Skip loading this volume.
-      throw new IOException("Volume is in an " + VolumeState.INCONSISTENT +
-          " state. Skipped loading volume: " + getStorageDir().getPath());
-    default:
-      throw new IOException("Unrecognized initial state : " +
-          intialVolumeState + "of volume : " + getStorageDir());
+      case NON_EXISTENT:
+        // Root directory does not exist. Create it.
+        if (!getStorageDir().mkdirs()) {
+          throw new IOException("Cannot create directory " + getStorageDir());
+        }
+        setState(VolumeState.NOT_FORMATTED);
+        createVersionFile();
+        break;
+      case NOT_FORMATTED:
+        // Version File does not exist. Create it.
+        createVersionFile();
+        break;
+      case NOT_INITIALIZED:
+        // Version File exists. Verify its correctness and update property fields.
+        readVersionFile();
+        setState(VolumeState.NORMAL);
+        break;
+      case INCONSISTENT:
+        // Volume Root is in an inconsistent state. Skip loading this volume.
+        throw new IOException("Volume is in an " + VolumeState.INCONSISTENT +
+                " state. Skipped loading volume: " + getStorageDir().getPath());
+      default:
+        throw new IOException("Unrecognized initial state : " +
+                intialVolumeState + "of volume : " + getStorageDir());
     }
   }
 
@@ -176,8 +187,8 @@ public class HddsVolume extends StorageVolume {
     if (!getStorageDir().isDirectory()) {
       // Volume Root exists but is not a directory.
       LOG.warn("Volume {} exists but is not a directory,"
-          + " current volume state: {}.",
-          getStorageDir().getPath(), VolumeState.INCONSISTENT);
+                      + " current volume state: {}.",
+              getStorageDir().getPath(), VolumeState.INCONSISTENT);
       return VolumeState.INCONSISTENT;
     }
     File[] files = getStorageDir().listFiles();
@@ -188,8 +199,8 @@ public class HddsVolume extends StorageVolume {
     if (!getVersionFile().exists()) {
       // Volume Root is non empty but VERSION file does not exist.
       LOG.warn("VERSION file does not exist in volume {},"
-          + " current volume state: {}.",
-          getStorageDir().getPath(), VolumeState.INCONSISTENT);
+                      + " current volume state: {}.",
+              getStorageDir().getPath(), VolumeState.INCONSISTENT);
       return VolumeState.INCONSISTENT;
     }
     // Volume Root and VERSION file exist.
@@ -198,7 +209,7 @@ public class HddsVolume extends StorageVolume {
 
   public void format(String cid) throws IOException {
     Preconditions.checkNotNull(cid, "clusterID cannot be null while " +
-        "formatting Volume");
+            "formatting Volume");
     this.clusterID = cid;
     initialize();
   }
@@ -216,7 +227,7 @@ public class HddsVolume extends StorageVolume {
       // HddsDatanodeService does not have the cluster information yet. Wait
       // for registration with SCM.
       LOG.debug("ClusterID not available. Cannot format the volume {}",
-          getStorageDir().getPath());
+              getStorageDir().getPath());
       setState(VolumeState.NOT_FORMATTED);
     } else {
       // Write the version file to disk.
@@ -227,22 +238,22 @@ public class HddsVolume extends StorageVolume {
 
   private void writeVersionFile() throws IOException {
     Preconditions.checkNotNull(this.storageID,
-        "StorageID cannot be null in Version File");
+            "StorageID cannot be null in Version File");
     Preconditions.checkNotNull(this.clusterID,
-        "ClusterID cannot be null in Version File");
+            "ClusterID cannot be null in Version File");
     Preconditions.checkNotNull(this.datanodeUuid,
-        "DatanodeUUID cannot be null in Version File");
+            "DatanodeUUID cannot be null in Version File");
     Preconditions.checkArgument(this.cTime > 0,
-        "Creation Time should be positive");
+            "Creation Time should be positive");
     Preconditions.checkArgument(this.layoutVersion ==
-            getLatestVersion().getVersion(),
-        "Version File should have the latest LayOutVersion");
+                    getLatestVersion().getVersion(),
+            "Version File should have the latest LayOutVersion");
 
     File versionFile = getVersionFile();
     LOG.debug("Writing Version file to disk, {}", versionFile);
 
     DatanodeVersionFile dnVersionFile = new DatanodeVersionFile(this.storageID,
-        this.clusterID, this.datanodeUuid, this.cTime, this.layoutVersion);
+            this.clusterID, this.datanodeUuid, this.cTime, this.layoutVersion);
     dnVersionFile.createVersionFile(versionFile);
   }
 
@@ -258,15 +269,15 @@ public class HddsVolume extends StorageVolume {
     Properties props = DatanodeVersionFile.readFrom(versionFile);
     if (props.isEmpty()) {
       throw new InconsistentStorageStateException(
-          "Version file " + versionFile + " is missing");
+              "Version file " + versionFile + " is missing");
     }
 
     LOG.debug("Reading Version file from disk, {}", versionFile);
     this.storageID = HddsVolumeUtil.getStorageID(props, versionFile);
     this.clusterID = HddsVolumeUtil.getClusterID(props, versionFile,
-        this.clusterID);
+            this.clusterID);
     this.datanodeUuid = HddsVolumeUtil.getDatanodeUUID(props, versionFile,
-        this.datanodeUuid);
+            this.datanodeUuid);
     this.cTime = HddsVolumeUtil.getCreationTime(props, versionFile);
     this.layoutVersion = HddsVolumeUtil.getLayOutVersion(props, versionFile);
   }
@@ -316,12 +327,19 @@ public class HddsVolume extends StorageVolume {
     return volumeIOStats;
   }
 
+  public VolumeInfoStats getVolumeInfoStats() {
+    return volumeInfoStats;
+  }
+
   @Override
   public void failVolume() {
     setState(VolumeState.FAILED);
     super.failVolume();
     if (volumeIOStats != null) {
       volumeIOStats.unregister();
+    }
+    if (volumeInfoStats != null) {
+      volumeInfoStats.unregister();
     }
   }
 
@@ -331,6 +349,9 @@ public class HddsVolume extends StorageVolume {
     super.shutdown();
     if (volumeIOStats != null) {
       volumeIOStats.unregister();
+    }
+    if (volumeInfoStats != null) {
+      volumeInfoStats.unregister();
     }
   }
 
