@@ -74,8 +74,8 @@ public class TestContainerCommands {
       storageContainerLocationClient;
   private static final String SCM_ID = UUID.randomUUID().toString();
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
-  private static final int EC_DATA = 10;
-  private static final int EC_PARITY = 4;
+  private static final int EC_DATA = 3;
+  private static final int EC_PARITY = 2;
   private static final EcCodec EC_CODEC = EcCodec.RS;
   private static final int EC_CHUNK_SIZE = 1024;
   private static final int STRIPE_DATA_SIZE = EC_DATA * EC_CHUNK_SIZE;
