@@ -85,6 +85,8 @@ public class TestOmBucketReadWriteFileOps {
     conf = getOzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.LEGACY.name());
+    conf.setBoolean(OMConfigKeys.OZONE_OM_LOCK_METRICS_COLLECTION_ENABLE_KEY,
+        true);
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();

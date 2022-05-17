@@ -35,6 +35,7 @@ import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LOCK_METRICS_COLLECTION_ENABLE_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
@@ -450,7 +451,9 @@ public class TestOzoneManagerLock {
                                           String[] resourceName,
                                           int threadCount)
       throws InterruptedException {
-    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_OM_LOCK_METRICS_COLLECTION_ENABLE_KEY, true);
+    OzoneManagerLock lock = new OzoneManagerLock(conf);
     Thread[] threads = new Thread[threadCount];
 
     for (int i = 0; i < threads.length; i++) {
@@ -487,7 +490,9 @@ public class TestOzoneManagerLock {
                                            String[] resourceName,
                                            int threadCount)
       throws InterruptedException {
-    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_OM_LOCK_METRICS_COLLECTION_ENABLE_KEY, true);
+    OzoneManagerLock lock = new OzoneManagerLock(conf);
     Thread[] threads = new Thread[threadCount];
 
     for (int i = 0; i < threads.length; i++) {
@@ -524,7 +529,9 @@ public class TestOzoneManagerLock {
       OzoneManagerLock.Resource resource, String[] resourceName,
       int readThreadCount, int writeThreadCount)
       throws InterruptedException {
-    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_OM_LOCK_METRICS_COLLECTION_ENABLE_KEY, true);
+    OzoneManagerLock lock = new OzoneManagerLock(conf);
     Thread[] readThreads = new Thread[readThreadCount];
     Thread[] writeThreads = new Thread[writeThreadCount];
 

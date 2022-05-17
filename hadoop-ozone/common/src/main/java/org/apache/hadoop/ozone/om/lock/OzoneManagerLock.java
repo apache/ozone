@@ -34,6 +34,8 @@ import org.apache.hadoop.ozone.lock.LockManager;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LOCK_METRICS_COLLECTION_ENABLE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LOCK_METRICS_COLLECTION_ENABLE_KEY;
 
 /**
  * Provides different locks to handle concurrency in OzoneMaster.
@@ -89,6 +91,7 @@ public class OzoneManagerLock {
   private OMLockMetrics omLockMetrics;
   private final ThreadLocal<Short> lockSet = ThreadLocal.withInitial(
       () -> Short.valueOf((short)0));
+  private boolean omLockMetricsCollectionEnabled;
 
   /**
    * Creates new OzoneManagerLock instance.
@@ -97,6 +100,9 @@ public class OzoneManagerLock {
   public OzoneManagerLock(ConfigurationSource conf) {
     boolean fair = conf.getBoolean(OZONE_MANAGER_FAIR_LOCK,
         OZONE_MANAGER_FAIR_LOCK_DEFAULT);
+    omLockMetricsCollectionEnabled =
+        conf.getBoolean(OZONE_OM_LOCK_METRICS_COLLECTION_ENABLE_KEY,
+            OZONE_OM_LOCK_METRICS_COLLECTION_ENABLE_DEFAULT);
     manager = new LockManager<>(conf, fair);
     omLockMetrics = OMLockMetrics.create();
   }
@@ -176,29 +182,37 @@ public class OzoneManagerLock {
       LOG.error(errorMessage);
       throw new RuntimeException(errorMessage);
     } else {
-      long startWaitingTimeNanos = Time.monotonicNowNanos();
-      lockFn.accept(resourceName);
-
-      /**
-       *  read/write lock hold count helps in metrics updation only once in case
-       *  of reentrant locks.
-       */
-      if (lockType.equals(READ_LOCK) &&
-          manager.getReadHoldCount(resourceName) == 1) {
-        updateReadLockMetrics(resource, startWaitingTimeNanos);
+      if (!omLockMetricsCollectionEnabled) {
+        lockFn.accept(resourceName);
+      } else {
+        updateLockMetrics(resource, resourceName, lockFn, lockType);
       }
-      if (lockType.equals(WRITE_LOCK) &&
-          (manager.getWriteHoldCount(resourceName) == 1) &&
-          manager.isWriteLockedByCurrentThread(resourceName)) {
-        updateWriteLockMetrics(resource, startWaitingTimeNanos);
-      }
-
       if (LOG.isDebugEnabled()) {
         LOG.debug("Acquired {} {} lock on resource {}", lockType, resource.name,
             resourceName);
       }
       lockSet.set(resource.setLock(lockSet.get()));
       return true;
+    }
+  }
+
+  private void updateLockMetrics(Resource resource, String resourceName,
+                         Consumer<String> lockFn, String lockType) {
+    long startWaitingTimeNanos = Time.monotonicNowNanos();
+    lockFn.accept(resourceName);
+
+    /**
+     *  read/write lock hold count helps in metrics updation only once in case
+     *  of reentrant locks.
+     */
+    if (lockType.equals(READ_LOCK) &&
+        manager.getReadHoldCount(resourceName) == 1) {
+      updateReadLockMetrics(resource, startWaitingTimeNanos);
+    }
+    if (lockType.equals(WRITE_LOCK) &&
+        (manager.getWriteHoldCount(resourceName) == 1) &&
+        manager.isWriteLockedByCurrentThread(resourceName)) {
+      updateWriteLockMetrics(resource, startWaitingTimeNanos);
     }
   }
 
@@ -406,10 +420,25 @@ public class OzoneManagerLock {
 
   private void unlock(Resource resource, String resourceName,
       Consumer<String> lockFn, String lockType) {
-    boolean isWriteLocked = manager.isWriteLockedByCurrentThread(resourceName);
     // TODO: Not checking release of higher order level lock happened while
     // releasing lower order level lock, as for that we need counter for
     // locks, as some locks support acquiring lock again.
+    if (!omLockMetricsCollectionEnabled) {
+      lockFn.accept(resourceName);
+    } else {
+      updateUnlockMetrics(resource, resourceName, lockFn, lockType);
+    }
+    // clear lock
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Release {} {}, lock on resource {}", lockType, resource.name,
+          resourceName);
+    }
+    lockSet.set(resource.clearLock(lockSet.get()));
+  }
+
+  private void updateUnlockMetrics(Resource resource, String resourceName,
+                                   Consumer<String> lockFn, String lockType) {
+    boolean isWriteLocked = manager.isWriteLockedByCurrentThread(resourceName);
     lockFn.accept(resourceName);
 
     /**
@@ -424,13 +453,6 @@ public class OzoneManagerLock {
         (manager.getWriteHoldCount(resourceName) == 0) && isWriteLocked) {
       updateWriteUnlockMetrics(resource);
     }
-
-    // clear lock
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Release {} {}, lock on resource {}", lockType, resource.name,
-          resourceName);
-    }
-    lockSet.set(resource.clearLock(lockSet.get()));
   }
 
   private void updateReadUnlockMetrics(Resource resource) {

@@ -2867,6 +2867,15 @@
   </property>
 
   <property>
+    <name>ozone.om.lock.metrics.collection.enable</name>
+    <tag>OZONE, OM</tag>
+    <value>false</value>
+    <description>Defaults to false. If true, the OMLockMetrics collection is
+      enabled. If false, it is disabled.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.client.key.provider.cache.expiry</name>
     <tag>OZONE, CLIENT, SECURITY</tag>
     <value>10d</value>

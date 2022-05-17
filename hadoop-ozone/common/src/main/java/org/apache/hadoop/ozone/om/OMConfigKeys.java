@@ -348,4 +348,12 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_KEY_PATH_LOCK_ENABLED =
       "ozone.om.key.path.lock.enabled";
   public static final boolean OZONE_OM_KEY_PATH_LOCK_ENABLED_DEFAULT = false;
+
+  /**
+   * This configuration shall be enabled to use the OMLockMetrics collection.
+   */
+  public static final String OZONE_OM_LOCK_METRICS_COLLECTION_ENABLE_KEY =
+      "ozone.om.lock.metrics.collection.enable";
+  public static final boolean OZONE_OM_LOCK_METRICS_COLLECTION_ENABLE_DEFAULT =
+      false;
 }
