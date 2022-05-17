@@ -46,10 +46,10 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -62,7 +62,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static junit.framework.TestCase.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
@@ -81,7 +81,7 @@ public class TestContainerReportHandler {
   private SCMHAManager scmhaManager;
   private PipelineManager pipelineManager;
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException, InvalidStateTransitionException {
     final OzoneConfiguration conf = SCMTestUtils.getConf();
     nodeManager = new MockNodeManager(true, 10);
@@ -143,7 +143,7 @@ public class TestContainerReportHandler {
 
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     containerStateManager.close();
     if (dbStore != null) {
@@ -203,7 +203,7 @@ public class TestContainerReportHandler {
     final ContainerReportFromDatanode containerReportFromDatanode =
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
-    Assert.assertEquals(2, containerManager.getContainerReplicas(
+    Assertions.assertEquals(2, containerManager.getContainerReplicas(
         containerOne.containerID()).size());
 
   }
@@ -263,7 +263,7 @@ public class TestContainerReportHandler {
         new ContainerReportFromDatanode(datanodeFour, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    Assert.assertEquals(4, containerManager.getContainerReplicas(
+    Assertions.assertEquals(4, containerManager.getContainerReplicas(
         containerOne.containerID()).size());
   }
 
@@ -333,7 +333,7 @@ public class TestContainerReportHandler {
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    Assert.assertEquals(LifeCycleState.CLOSED,
+    Assertions.assertEquals(LifeCycleState.CLOSED,
         containerManager.getContainer(containerOne.containerID()).getState());
   }
 
@@ -401,7 +401,7 @@ public class TestContainerReportHandler {
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    Assert.assertEquals(LifeCycleState.QUASI_CLOSED,
+    Assertions.assertEquals(LifeCycleState.QUASI_CLOSED,
         containerManager.getContainer(containerOne.containerID()).getState());
   }
 
@@ -473,7 +473,7 @@ public class TestContainerReportHandler {
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    Assert.assertEquals(LifeCycleState.CLOSED,
+    Assertions.assertEquals(LifeCycleState.CLOSED,
         containerManager.getContainer(containerOne.containerID()).getState());
   }
 
@@ -817,7 +817,7 @@ public class TestContainerReportHandler {
     Mockito.verify(publisher, Mockito.times(1))
         .fireEvent(Mockito.any(), Mockito.any(CommandForDatanode.class));
 
-    Assert.assertEquals(0, containerManager.getContainerReplicas(
+    Assertions.assertEquals(0, containerManager.getContainerReplicas(
         containerOne.containerID()).size());
   }
 
