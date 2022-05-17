@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.After;
 import org.junit.Assert;
@@ -59,6 +60,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -88,9 +91,11 @@ public class TestPipelineManagerImpl {
   private SCMContext scmContext;
   private SCMServiceManager serviceManager;
   private StorageContainerManager scm;
+  private TestClock testClock;
 
   @Before
   public void init() throws Exception {
+    testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
     conf = SCMTestUtils.getConf();
     testDir = GenericTestUtils.getTestDir(
         TestPipelineManagerImpl.class.getSimpleName() + UUID.randomUUID());
@@ -128,7 +133,8 @@ public class TestPipelineManagerImpl {
         SCMDBDefinition.PIPELINES.getTable(dbStore),
         new EventQueue(),
         scmContext,
-        serviceManager);
+        serviceManager,
+        testClock);
   }
 
   private PipelineManagerImpl createPipelineManager(
@@ -139,7 +145,8 @@ public class TestPipelineManagerImpl {
         SCMDBDefinition.PIPELINES.getTable(dbStore),
         new EventQueue(),
         SCMContext.emptyContext(),
-        serviceManager);
+        serviceManager,
+        new TestClock(Instant.now(), ZoneOffset.UTC));
   }
 
   @Test
@@ -536,10 +543,9 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testScrubPipelines() throws Exception {
-    // No timeout for pipeline scrubber.
+    // Allocated pipelines should not be scrubbed for 50 seconds.
     conf.setTimeDuration(
-        OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
-        TimeUnit.MILLISECONDS);
+        OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, 50, TimeUnit.SECONDS);
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     pipelineManager.setScmContext(scmContext);
@@ -568,29 +574,41 @@ public class TestPipelineManagerImpl {
                 .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.CLOSED).contains(closedPipeline));
 
+    // Set the clock to "now". All pipelines were created before this.
+    testClock.set(Instant.now());
+
     pipelineManager.scrubPipelines();
 
-    // The allocatedPipeline should be scrubbed.
-    Assert.assertFalse(pipelineManager
+    // The allocatedPipeline should not be scrubbed as the interval has not
+    // yet passed.
+    Assert.assertTrue(pipelineManager
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.ALLOCATED).contains(allocatedPipeline));
 
-    // The closedPipeline should be scrubbed.
+    // The closedPipeline should be scrubbed, as they are scrubbed immediately
     Assert.assertFalse(pipelineManager
         .getPipelines(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.CLOSED).contains(closedPipeline));
+
+    testClock.fastForward((60000));
+
+    pipelineManager.scrubPipelines();
+
+    // The allocatedPipeline should now be scrubbed as the interval has passed
+    Assert.assertFalse(pipelineManager
+        .getPipelines(RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE),
+            Pipeline.PipelineState.ALLOCATED).contains(allocatedPipeline));
 
     pipelineManager.close();
   }
 
   @Test
   public void testScrubPipelinesShouldFailOnFollower() throws Exception {
-    // No timeout for pipeline scrubber.
     conf.setTimeDuration(
-        OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
-        TimeUnit.MILLISECONDS);
+        OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, 10, TimeUnit.SECONDS);
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     pipelineManager.setScmContext(scmContext);
@@ -611,6 +629,7 @@ public class TestPipelineManagerImpl {
     assert pipelineManager.getScmhaManager() instanceof SCMHAManagerStub;
     ((SCMHAManagerStub) pipelineManager.getScmhaManager()).setIsLeader(false);
 
+    testClock.fastForward(20000);
     try {
       pipelineManager.scrubPipelines();
     } catch (NotLeaderException ex) {

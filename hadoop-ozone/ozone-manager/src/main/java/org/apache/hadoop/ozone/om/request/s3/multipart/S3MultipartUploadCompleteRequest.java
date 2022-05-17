@@ -222,13 +222,11 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         RepeatedOmKeyInfo oldKeyVersionsToDelete = null;
         OmKeyInfo keyToDelete =
             omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
+        long usedBytesDiff = 0;
         if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
           oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
               keyToDelete, omMetadataManager,
               trxnLogIndex, ozoneManager.isRatisEnabled());
-        }
-        long usedBytesDiff = 0;
-        if (keyToDelete != null) {
           long numCopy = keyToDelete.getReplicationConfig().getRequiredNodes();
           usedBytesDiff -= keyToDelete.getDataSize() * numCopy;
         }

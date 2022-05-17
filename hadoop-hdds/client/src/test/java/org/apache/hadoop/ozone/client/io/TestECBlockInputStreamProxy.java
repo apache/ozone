@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.client.rpc.read;
+package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -25,9 +25,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
-import org.apache.hadoop.ozone.client.io.BadDataLocationException;
-import org.apache.hadoop.ozone.client.io.ECBlockInputStreamFactory;
-import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;

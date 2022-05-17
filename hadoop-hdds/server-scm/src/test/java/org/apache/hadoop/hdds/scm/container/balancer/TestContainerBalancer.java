@@ -32,7 +32,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager.MoveResult;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -134,8 +136,7 @@ public class TestContainerBalancer {
     Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
         Mockito.any(DatanodeDetails.class),
         Mockito.any(DatanodeDetails.class)))
-        .thenReturn(CompletableFuture.completedFuture(
-            ReplicationManager.MoveResult.COMPLETED));
+        .thenReturn(CompletableFuture.completedFuture(MoveResult.COMPLETED));
 
     when(containerManager.getContainerReplicas(Mockito.any(ContainerID.class)))
         .thenAnswer(invocationOnMock -> {
@@ -631,7 +632,7 @@ public class TestContainerBalancer {
             Mockito.any(DatanodeDetails.class),
             Mockito.any(DatanodeDetails.class)))
         .thenReturn(CompletableFuture.completedFuture(
-            ReplicationManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY));
+            MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY));
     balancerConfiguration.setMaxSizeToMovePerIteration(10 * OzoneConsts.GB);
 
     startBalancer(balancerConfiguration);
@@ -868,7 +869,7 @@ public class TestContainerBalancer {
     }
   }
 
-  private CompletableFuture<ReplicationManager.MoveResult>
+  private CompletableFuture<LegacyReplicationManager.MoveResult>
       genCompletableFuture(int sleepMilSec) {
     return CompletableFuture.supplyAsync(() -> {
       try {
@@ -876,7 +877,7 @@ public class TestContainerBalancer {
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
-      return ReplicationManager.MoveResult.COMPLETED;
+      return LegacyReplicationManager.MoveResult.COMPLETED;
     });
   }
 

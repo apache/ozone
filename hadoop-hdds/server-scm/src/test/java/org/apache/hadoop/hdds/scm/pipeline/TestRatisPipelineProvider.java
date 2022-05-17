@@ -323,7 +323,7 @@ public class TestRatisPipelineProvider {
     // Use large enough container or metadata sizes that no node will have
     // enough space to hold one.
     OzoneConfiguration largeContainerConf = new OzoneConfiguration();
-    largeContainerConf.set(OZONE_SCM_CONTAINER_SIZE, "100TB");
+    largeContainerConf.set(OZONE_SCM_CONTAINER_SIZE, "300TB");
     init(1, largeContainerConf);
     for (ReplicationFactor factor: ReplicationFactor.values()) {
       if (factor == ReplicationFactor.ZERO) {
@@ -339,7 +339,7 @@ public class TestRatisPipelineProvider {
     }
 
     OzoneConfiguration largeMetadataConf = new OzoneConfiguration();
-    largeMetadataConf.set(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN, "100TB");
+    largeMetadataConf.set(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN, "300TB");
     init(1, largeMetadataConf);
     for (ReplicationFactor factor: ReplicationFactor.values()) {
       if (factor == ReplicationFactor.ZERO) {
