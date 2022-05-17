@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.util.Time;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -88,10 +87,6 @@ public class TestNodeStateManager {
     Mockito.when(mockVersionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     nsm = new NodeStateManager(conf, eventPublisher, mockVersionManager);
-  }
-
-  @AfterEach
-  public void tearDown() {
   }
 
   @Test

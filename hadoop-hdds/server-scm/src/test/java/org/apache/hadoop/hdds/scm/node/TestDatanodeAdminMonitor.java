@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -82,10 +81,6 @@ public class TestDatanodeAdminMonitor {
 
     monitor =
         new DatanodeAdminMonitorImpl(conf, eventQueue, nodeManager, repManager);
-  }
-
-  @AfterEach
-  public void teardown() {
   }
 
   @Test
