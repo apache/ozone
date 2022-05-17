@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.OzoneConsts.TENANT_ID_USERNAME_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_ACCESS_ID;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_AUTHORIZER_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_NOT_FOUND;
@@ -84,8 +83,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMMultiTenantManagerImpl.class);
 
-  // TODO: Remove when proper testing infra is deployed.
-  // Internal dev flag to skip Ranger communication.
+  // Internal flag to skip Ranger communication,
+  // and to skip Ozone config validation for S3 multi-tenancy
   public static final String OZONE_OM_TENANT_DEV_SKIP_RANGER =
       "ozone.om.tenant.dev.skip.ranger";
 
@@ -347,10 +346,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       controlPathLock.readLock().unlock();
     }
     return null;
-  }
-
-  public String getDefaultAccessId(String tenantId, String userPrincipal) {
-    return tenantId + TENANT_ID_USERNAME_DELIMITER + userPrincipal;
   }
 
   /**

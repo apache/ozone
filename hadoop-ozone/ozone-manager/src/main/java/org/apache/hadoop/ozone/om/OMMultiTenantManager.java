@@ -19,12 +19,25 @@ package org.apache.hadoop.ozone.om;
 import java.io.IOException;
 
 import com.google.common.base.Optional;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.http.auth.BasicUserPrincipal;
+import org.slf4j.Logger;
+
+import static org.apache.hadoop.ozone.OzoneConsts.TENANT_ID_USERNAME_DELIMITER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
 
 /**
  * OM MultiTenant manager interface.
@@ -117,7 +130,9 @@ public interface OMMultiTenantManager {
    * @param userPrincipal user name
    * @return access ID in the form of tenantName$username
    */
-  String getDefaultAccessId(String tenantId, String userPrincipal);
+  static String getDefaultAccessId(String tenantId, String userPrincipal) {
+    return tenantId + TENANT_ID_USERNAME_DELIMITER + userPrincipal;
+  }
 
   /**
    * Returns true if user is the tenant's admin or Ozone admin, false otherwise.
@@ -235,4 +250,75 @@ public interface OMMultiTenantManager {
    * @throws IOException
    */
   boolean isTenantEmpty(String tenantId) throws IOException;
+
+  /**
+   * Returns true if Multi-Tenancy can be successfully enabled given the OM
+   * instance and conf; returns false if ozone.om.multitenancy.enabled = false
+   *
+   * Config validation will be performed on conf if the intent to enable
+   * Multi-Tenancy is specified (i.e. ozone.om.multitenancy.enabled = true),
+   * if the validation failed, an exception will be thrown to prevent OM from
+   * starting up.
+   */
+  static boolean checkAndEnableMultiTenancy(
+      OzoneManager ozoneManager, OzoneConfiguration conf) {
+
+    // Borrow the logger from OM instance
+    final Logger logger = OzoneManager.LOG;
+
+    boolean isS3MultiTenancyEnabled = conf.getBoolean(
+        OZONE_OM_MULTITENANCY_ENABLED, OZONE_OM_MULTITENANCY_ENABLED_DEFAULT);
+
+    final boolean devSkipMTCheck = conf.getBoolean(
+        OZONE_OM_TENANT_DEV_SKIP_RANGER, false);
+
+    // If ozone.om.multitenancy.enabled = false, skip the validation
+    // Or if dev skip check flag is set, skip the validation (used in UT)
+    if (!isS3MultiTenancyEnabled || devSkipMTCheck) {
+      return isS3MultiTenancyEnabled;
+    }
+
+    // Validate configs required to enable S3 multi-tenancy
+    if (!ozoneManager.isSecurityEnabled()) {
+      isS3MultiTenancyEnabled = false;
+      logger.error("Ozone security is required to enable S3 Multi-Tenancy");
+    } else if (!SecurityUtil.getAuthenticationMethod(conf).equals(
+        AuthenticationMethod.KERBEROS)) {
+      isS3MultiTenancyEnabled = false;
+      logger.error("Kerberos authentication is required to enable S3 "
+          + "Multi-Tenancy");
+    }
+
+    // TODO: Validate accessAuthorizer later. We can't do that for now:
+    //  1. Tenant acceptance test env (ozonesecure) uses OzoneNativeAuthorizer
+    //  2. RangerOzoneAuthorizer is external class
+
+    final String rangerAddress = conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY);
+    if (StringUtils.isBlank(rangerAddress)) {
+      isS3MultiTenancyEnabled = false;
+      logger.error("{} is required to enable S3 Multi-Tenancy but not set",
+          OZONE_RANGER_HTTPS_ADDRESS_KEY);
+    }
+
+    // TODO: Do not check Ranger user/passwd if Ranger Java client is enabled
+    final String rangerUser = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER);
+    if (StringUtils.isBlank(rangerUser)) {
+      isS3MultiTenancyEnabled = false;
+      logger.error("{} is required to enable S3 Multi-Tenancy but not set",
+          OZONE_OM_RANGER_HTTPS_ADMIN_API_USER);
+    }
+    final String rangerPw = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD);
+    if (StringUtils.isBlank(rangerPw)) {
+      isS3MultiTenancyEnabled = false;
+      logger.error("{} is required to enable S3 Multi-Tenancy but not set",
+          OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD);
+    }
+
+    if (!isS3MultiTenancyEnabled) {
+      throw new RuntimeException("Failed to meet one or more requirements to "
+          + "enable S3 Multi-Tenancy");
+    }
+
+    return true;
+  }
 }

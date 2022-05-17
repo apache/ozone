@@ -74,8 +74,10 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
   @Override
   @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+
+    final OMRequest omRequest = super.preExecute(ozoneManager);
     final TenantRevokeAdminRequest request =
-        getOmRequest().getTenantRevokeAdminRequest();
+        omRequest.getTenantRevokeAdminRequest();
 
     final String accessId = request.getAccessId();
     String tenantId = request.getTenantId();
@@ -114,25 +116,16 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
           OMException.ResultCodes.INVALID_TENANT_ID);
     }
 
-    // TODO: Call OMMTM to remove user from admin group of the tenant.
-    // The call should remove user (not accessId) from the tenant's admin group
-//    ozoneManager.getMultiTenantManager().revokeTenantAdmin();
+    // Remove user (inferred from access ID) from tenant admin role in Ranger
+    ozoneManager.getMultiTenantManager().revokeTenantAdmin(accessId);
 
-    final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
-        .setUserInfo(getUserInfo())
+    final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
         .setTenantRevokeAdminRequest(
-                // Regenerate request just in case tenantId is not provided
-                //  by the client
-                TenantRevokeAdminRequest.newBuilder()
-                        .setTenantId(tenantId)
-                        .setAccessId(request.getAccessId())
-                        .build())
-        .setCmdType(getOmRequest().getCmdType())
-        .setClientId(getOmRequest().getClientId());
-
-    if (getOmRequest().hasTraceID()) {
-      omRequestBuilder.setTraceID(getOmRequest().getTraceID());
-    }
+            // Regen request just in case tenantId is not provided by the client
+            TenantRevokeAdminRequest.newBuilder()
+                .setTenantId(tenantId)
+                .setAccessId(request.getAccessId())
+                .build());
 
     return omRequestBuilder.build();
   }

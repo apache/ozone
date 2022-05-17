@@ -45,6 +45,7 @@ import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
 
 /**
  * Tests that S3 requests for a tenant are directed to that tenant's volume,
@@ -65,6 +66,7 @@ public class TestMultiTenantVolume {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(
         OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
+    conf.setBoolean(OZONE_OM_MULTITENANCY_ENABLED, true);
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .withoutDatanodes()
         .setOmLayoutVersion(OMLayoutFeature.INITIAL_VERSION.layoutVersion());

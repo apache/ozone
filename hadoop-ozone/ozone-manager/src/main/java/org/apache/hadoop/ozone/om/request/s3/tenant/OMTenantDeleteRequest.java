@@ -74,7 +74,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
 
     // TODO: TBD: Call ozoneManager.getMultiTenantManager().deleteTenant() ?
 
-    return getOmRequest().toBuilder().setUserInfo(getUserInfo()).build();
+    return super.preExecute(ozoneManager);
   }
 
   @Override
