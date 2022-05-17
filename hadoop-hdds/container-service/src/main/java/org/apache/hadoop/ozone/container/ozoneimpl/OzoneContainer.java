@@ -123,10 +123,8 @@ public class OzoneContainer {
    * @throws IOException
    */
   public OzoneContainer(
-      DatanodeDetails datanodeDetails, ConfigurationSource
-      conf, StateContext context, CertificateClient certClient
-  )
-      throws IOException {
+      DatanodeDetails datanodeDetails, ConfigurationSource conf,
+      StateContext context, CertificateClient certClient) throws IOException {
     config = conf;
     this.datanodeDetails = datanodeDetails;
     this.context = context;
@@ -137,13 +135,12 @@ public class OzoneContainer {
     volumeSet.setFailedVolumeListener(this::handleVolumeFailures);
     metaVolumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
         context, VolumeType.META_VOLUME, volumeChecker);
-    if (SchemaV3.isFinalizedAndEnabled(conf)) {
-      dbVolumeSet = HddsServerUtil.getDatanodeDbDirs(conf).isEmpty() ? null :
-          new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
-              context, VolumeType.DB_VOLUME, volumeChecker);
+
+    dbVolumeSet = HddsServerUtil.getDatanodeDbDirs(conf).isEmpty() ? null :
+        new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
+            context, VolumeType.DB_VOLUME, volumeChecker);
+    if (SchemaV3.isFinalizedAndEnabled(config)) {
       HddsVolumeUtil.loadAllHddsVolumeDbStore(volumeSet, dbVolumeSet, LOG);
-    } else {
-      dbVolumeSet = null;
     }
 
     containerSet = new ContainerSet();
