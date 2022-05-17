@@ -74,8 +74,11 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
   @Override
   @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+
+
+    final OMRequest omRequest = super.preExecute(ozoneManager);
     final TenantAssignAdminRequest request =
-        getOmRequest().getTenantAssignAdminRequest();
+        omRequest.getTenantAssignAdminRequest();
 
     final String accessId = request.getAccessId();
     String tenantId = request.getTenantId();
@@ -124,20 +127,13 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     ozoneManager.getMultiTenantManager().assignTenantAdmin(
         request.getAccessId(), delegated);
 
-    final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
-        .setUserInfo(getUserInfo())
+    final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
         .setTenantAssignAdminRequest(
             TenantAssignAdminRequest.newBuilder()
                 .setAccessId(accessId)
                 .setTenantId(tenantId)
                 .setDelegated(delegated)
-                .build())
-        .setCmdType(getOmRequest().getCmdType())
-        .setClientId(getOmRequest().getClientId());
-
-    if (getOmRequest().hasTraceID()) {
-      omRequestBuilder.setTraceID(getOmRequest().getTraceID());
-    }
+                .build());
 
     return omRequestBuilder.build();
   }
