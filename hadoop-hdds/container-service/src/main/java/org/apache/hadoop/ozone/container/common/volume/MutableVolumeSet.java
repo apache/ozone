@@ -455,6 +455,11 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   @VisibleForTesting
+  public void setVolumeMap(Map<String, StorageVolume> map) {
+    this.volumeMap = map;
+  }
+
+  @VisibleForTesting
   public Map<StorageType, List<StorageVolume>> getVolumeStateMap() {
     return ImmutableMap.copyOf(volumeStateMap);
   }
