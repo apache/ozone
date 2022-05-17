@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.ec.reconstruction;
 
 import com.google.common.collect.ImmutableList;
@@ -43,7 +44,6 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.om.OzoneManager;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -64,10 +64,9 @@ import java.util.function.Function;
 /**
  * This class tests commands used in EC reconstruction.
  */
-public class TestECReconstructionCommands {
+public class TestContainerCommands {
 
   private static MiniOzoneCluster cluster;
-  private static OzoneManager om;
   private static StorageContainerManager scm;
   private static OzoneClient client;
   private static ObjectStore store;
@@ -160,24 +159,28 @@ public class TestECReconstructionCommands {
   public void testListBlock() throws Exception {
     for (int i = 0; i < datanodeDetails.size(); i++) {
       final int minKeySize = i < EC_DATA ? i * EC_CHUNK_SIZE : 0;
-      int numExpectedBlocks = (int) Arrays.stream(KEY_SIZES)
-          .filter(size -> size > minKeySize).count();
+      final int numExpectedBlocks = (int) Arrays.stream(values)
+          .mapToInt(v -> v.length).filter(s -> s > minKeySize).count();
       Function<Integer, Integer> expectedChunksFunc = chunksInReplicaFunc(i);
-      int numExpectedChunks = Arrays.stream(KEY_SIZES)
-          .map(expectedChunksFunc::apply).sum();
-      try {
-        ListBlockResponseProto response = ContainerProtocolCalls.listBlock(
-            clients.get(i), containerID, null, numExpectedBlocks + 1, null);
-        Assertions.assertEquals(numExpectedBlocks, response.getBlockDataCount(),
-            "blocks count doesn't match on DN " + i);
-        Assertions.assertEquals(numExpectedChunks,
-            response.getBlockDataList().stream()
-                .mapToInt(BlockData::getChunksCount).sum(),
-            "chunks count doesn't match on DN " + i);
-      } catch (StorageContainerException e) {
-        Assertions.assertTrue(e.getMessage().contains("does not exist"));
-        Assertions.assertEquals(0, numExpectedBlocks);
+      final int numExpectedChunks = Arrays.stream(values)
+          .mapToInt(v -> v.length).map(expectedChunksFunc::apply).sum();
+      if (numExpectedBlocks == 0) {
+        final int j = i;
+        Throwable t = Assertions.assertThrows(StorageContainerException.class,
+            () -> ContainerProtocolCalls.listBlock(clients.get(j),
+                containerID, null, numExpectedBlocks + 1, null));
+        Assertions.assertEquals(
+            "ContainerID " + containerID + " does not exist", t.getMessage());
+        continue;
       }
+      ListBlockResponseProto response = ContainerProtocolCalls.listBlock(
+          clients.get(i), containerID, null, numExpectedBlocks + 1, null);
+      Assertions.assertEquals(numExpectedBlocks, response.getBlockDataCount(),
+          "blocks count doesn't match on DN " + i);
+      Assertions.assertEquals(numExpectedChunks,
+          response.getBlockDataList().stream()
+              .mapToInt(BlockData::getChunksCount).sum(),
+          "chunks count doesn't match on DN " + i);
     }
   }
 
@@ -196,7 +199,6 @@ public class TestECReconstructionCommands {
         .setClusterId(CLUSTER_ID)
         .build();
     cluster.waitForClusterToBeReady();
-    om = cluster.getOzoneManager();
     scm = cluster.getStorageContainerManager();
     client = OzoneClientFactory.getRpcClient(conf);
     store = client.getObjectStore();
