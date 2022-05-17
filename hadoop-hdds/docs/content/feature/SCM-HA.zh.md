@@ -147,10 +147,10 @@ bin/ozone freon randomkeys --numOfVolumes=1 --numOfBuckets=1 --numOfKeys=10000 -
  
  
 // use debug ldb to check scm db on all the machines
-bin/ozone debug ldb --db=/tmp/metadata/scm.db/ ls
+bin/ozone debug ldb --db=/tmp/metadata/scm.db ls
  
  
-bin/ozone debug ldb --db=/tmp/metadata/scm.db/ scan --with-keys --column_family=containers
+bin/ozone debug ldb --db=/tmp/metadata/scm.db scan --column_family=containers
 ```
 
 ## 从现有的SCM迁移

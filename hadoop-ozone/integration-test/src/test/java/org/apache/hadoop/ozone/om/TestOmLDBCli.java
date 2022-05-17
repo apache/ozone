@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -16,10 +16,9 @@
  */
 package org.apache.hadoop.ozone.om;
 
-
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -28,44 +27,84 @@ import org.apache.hadoop.ozone.debug.DBScanner;
 import org.apache.hadoop.ozone.debug.RDBParser;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.Assert;
 import org.junit.rules.TemporaryFolder;
+import picocli.CommandLine;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.ArrayList;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.TreeMap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * This class tests the Debug LDB CLI that reads from an om.db file.
  */
 public class TestOmLDBCli {
-  private OzoneConfiguration conf;
 
-  private RDBParser rdbParser;
-  private DBScanner dbScanner;
-  private DBStore dbStore = null;
-  private List<String> keyNames;
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final String KEY_TABLE = "keyTable";
+
+  private DBStore dbStore;
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
 
+  private CommandLine cmd;
+  private StringWriter output;
+  private StringWriter error;
+  private NavigableMap<String, Map<String, Object>> keys;
+
   @Before
   public void setup() throws Exception {
-    conf = new OzoneConfiguration();
-    rdbParser = new RDBParser();
-    dbScanner = new DBScanner();
-    keyNames = new ArrayList<>();
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    File newFolder = folder.newFolder();
+    if (!newFolder.exists()) {
+      assertTrue(newFolder.mkdirs());
+    }
+    // Dummy om.db with only keyTable
+    dbStore = DBStoreBuilder.newBuilder(conf)
+        .setName("om.db")
+        .setPath(newFolder.toPath())
+        .addTable(KEY_TABLE)
+        .build();
+
+    // insert 5 keys
+    keys = new TreeMap<>();
+    for (int i = 0; i < 5; i++) {
+      OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("sampleVol",
+          "sampleBuck", "key" + (i + 1), HddsProtos.ReplicationType.STAND_ALONE,
+          HddsProtos.ReplicationFactor.ONE);
+      String key = "key" + (i);
+      keys.put(key, toMap(value));
+      Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
+      byte[] arr = value
+          .getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray();
+      keyTable.put(key.getBytes(UTF_8), arr);
+    }
+
+    output = new StringWriter();
+    error = new StringWriter();
+    cmd = new CommandLine(new RDBParser())
+        .addSubcommand(new DBScanner())
+        .setOut(new PrintWriter((output)))
+        .setErr(new PrintWriter((error)));
   }
 
   @After
@@ -76,112 +115,86 @@ public class TestOmLDBCli {
   }
 
   @Test
-  public void testOMDB() throws Exception {
-    File newFolder = folder.newFolder();
-    if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
-    }
-    // Dummy om.db with only keyTable
-    dbStore = DBStoreBuilder.newBuilder(conf)
-      .setName("om.db")
-      .setPath(newFolder.toPath())
-      .addTable("keyTable")
-      .build();
-    // insert 5 keys
-    for (int i = 0; i < 5; i++) {
-      OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("sampleVol",
-          "sampleBuck", "key" + (i + 1), HddsProtos.ReplicationType.STAND_ALONE,
-          HddsProtos.ReplicationFactor.ONE);
-      String key = "key" + (i);
-      Table<byte[], byte[]> keyTable = dbStore.getTable("keyTable");
-      byte[] arr = value
-          .getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray();
-      keyTable.put(key.getBytes(UTF_8), arr);
-    }
-    rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
-    dbScanner.setParent(rdbParser);
-    Assert.assertEquals(5, getKeyNames(dbScanner).size());
-    Assert.assertTrue(getKeyNames(dbScanner).contains("key1"));
-    Assert.assertTrue(getKeyNames(dbScanner).contains("key5"));
-    Assert.assertFalse(getKeyNames(dbScanner).contains("key6"));
+  public void testDefaults() throws Exception {
+    int exitCode = cmd.execute(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column_family", KEY_TABLE);
 
-    DBScanner.setLimit(1);
-    Assert.assertEquals(1, getKeyNames(dbScanner).size());
+    assertNoError(exitCode);
+    assertContents(output.toString(), keys);
+  }
 
-    DBScanner.setLimit(0);
-    try {
-      getKeyNames(dbScanner);
-      Assert.fail("IllegalArgumentException is expected");
-    }  catch (IllegalArgumentException e) {
-      //ignore
-    }
+  @Test
+  public void testLength() throws Exception {
+    int exitCode = cmd.execute(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column_family", KEY_TABLE,
+        "--length", "1");
 
+    assertNoError(exitCode);
+    assertContents(output.toString(), keys.headMap("key0", true));
+  }
+
+  @Test
+  public void testInvalidLength() {
+    int exitCode = cmd.execute(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column_family", KEY_TABLE,
+        "--length", "0");
+
+    assertNotEquals(0, exitCode);
+    assertTrue(error.toString().contains("IllegalArgument"));
+  }
+
+  @Test
+  public void testUnlimitedLength() throws Exception {
     // If set with -1, check if it dumps entire table data.
-    DBScanner.setLimit(-1);
-    Assert.assertEquals(5, getKeyNames(dbScanner).size());
+    int exitCode = cmd.execute(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column_family", KEY_TABLE,
+        "--length", "-1");
 
-    // Test dump to file.
+    assertNoError(exitCode);
+    assertContents(output.toString(), keys);
+  }
+
+  @Test
+  public void testOutputToFile() throws IOException {
     File tempFile = folder.newFolder();
-    String outFile = tempFile.getAbsolutePath() + "keyTable"
+    String outFile = tempFile.getAbsolutePath() + KEY_TABLE
         + LocalDateTime.now();
-    BufferedReader bufferedReader = null;
-    try {
-      DBScanner.setLimit(-1);
-      DBScanner.setFileName(outFile);
-      keyNames = getKeyNames(dbScanner);
-      Assert.assertEquals(5, keyNames.size());
-      Assert.assertTrue(new File(outFile).exists());
+    int exitCode = cmd.execute(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column_family", KEY_TABLE,
+        "--out", outFile,
+        "--length", "-1");
 
-      bufferedReader = new BufferedReader(
-          new InputStreamReader(new FileInputStream(outFile), UTF_8));
-
-      String readLine;
-      int count = 0;
-
-      while ((readLine = bufferedReader.readLine()) != null) {
-        for (String keyName : keyNames) {
-          if (readLine.contains(keyName)) {
-            count++;
-            break;
-          }
-        }
-      }
-
-      // As keyName will be in the file twice for each key.
-      // Once in keyName and second time in fileName.
-
-      // Sample key data.
-      // {
-      // ..
-      // ..
-      // "keyName": "key5",
-      // "fileName": "key5",
-      // ..
-      // ..
-      // }
-
-      Assert.assertEquals("File does not have all keys",
-          keyNames.size() * 2, count);
-    } finally {
-      if (bufferedReader != null) {
-        bufferedReader.close();
-      }
-      if (new File(outFile).exists()) {
-        FileUtils.deleteQuietly(new File(outFile));
-      }
-    }
+    assertNoError(exitCode);
+    File file = new File(outFile);
+    assertTrue(file.exists());
+    assertContents(FileUtils.readFileToString(file, UTF_8), keys);
   }
 
-  private List<String> getKeyNames(DBScanner scanner)
-            throws Exception {
-    keyNames.clear();
-    scanner.setTableName("keyTable");
-    scanner.call();
-    Assert.assertFalse(scanner.getScannedObjects().isEmpty());
-    for (Object o : scanner.getScannedObjects()) {
-      OmKeyInfo keyInfo = (OmKeyInfo)o;
-      keyNames.add(keyInfo.getKeyName());
-    }
-    return keyNames;
+  private void assertNoError(int exitCode) {
+    assertEquals(error.toString(), 0, exitCode);
   }
+
+  private void assertContents(String content, Map<String, ?> expected)
+      throws IOException {
+    Map<String, ? extends Map<String, ?>> result = MAPPER.readValue(content,
+        new TypeReference<Map<String, Map<String, ?>>>() { });
+
+    assertEquals(expected, result);
+  }
+
+  private static Map<String, Object> toMap(OmKeyInfo obj) throws IOException {
+    String json = JsonUtils.toJsonStringWithDefaultPrettyPrinter(obj);
+    return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() { });
+  }
+
 }

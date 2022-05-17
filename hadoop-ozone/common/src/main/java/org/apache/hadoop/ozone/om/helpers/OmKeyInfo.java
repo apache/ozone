@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -145,6 +146,7 @@ public final class OmKeyInfo extends WithParentObjectId {
     this.fileName = fileName;
   }
 
+  @JsonIgnore
   public String getFileName() {
     return fileName;
   }
@@ -726,6 +728,7 @@ public final class OmKeyInfo extends WithParentObjectId {
     this.encInfo = fileEncryptionInfo;
   }
 
+  @JsonIgnore
   public String getPath() {
     if (StringUtils.isBlank(getFileName())) {
       return getKeyName();

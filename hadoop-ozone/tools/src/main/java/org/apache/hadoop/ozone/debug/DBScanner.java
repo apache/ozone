@@ -18,26 +18,26 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.io.Writer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.ozone.OzoneConsts;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -55,112 +55,104 @@ import picocli.CommandLine;
 @MetaInfServices(SubcommandWithParent.class)
 public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
+
   @CommandLine.Option(names = {"--column_family"},
       required = true,
       description = "Table name")
   private String tableName;
 
+  @Deprecated
   @CommandLine.Option(names = {"--with-keys"},
-      description = "List Key -> Value instead of just Value.",
-      defaultValue = "false",
-      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
-  private static boolean withKey;
+      description = "[ignored]",
+      defaultValue = "false")
+  private boolean withKeys;
+
+  @CommandLine.Option(names = {"--omit-keys"},
+      description = "Print only values",
+      defaultValue = "false")
+  private boolean omitKeys;
 
   @CommandLine.Option(names = {"--length", "-l"},
           description = "Maximum number of items to list. " +
               "If -1 dumps the entire table data")
-  private static int limit = 100;
+  private int limit = 100;
 
   @CommandLine.Option(names = {"--out", "-o"},
       description = "File to dump table scan data")
-  private static String fileName;
+  private String fileName;
 
   @CommandLine.Option(names = {"--dnSchema", "-d"},
       description = "Datanode DB Schema Version : V1/V2",
       defaultValue = "V2")
-  private static String dnDBSchemaVersion;
+  private String dnDBSchemaVersion;
 
   @CommandLine.ParentCommand
   private RDBParser parent;
 
   private HashMap<String, DBColumnFamilyDefinition> columnFamilyMap;
 
-  private List<Object> scannedObjects;
+  private PrintWriter err() {
+    return spec.commandLine().getErr();
+  }
 
-  private static List<Object> displayTable(RocksIterator iterator,
+  private PrintWriter out() {
+    return spec.commandLine().getOut();
+  }
+
+  private void displayTable(RocksIterator iterator,
       DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
-    List<Object> outputs = new ArrayList<>();
     iterator.seekToFirst();
 
-    Writer fileWriter = null;
-    PrintWriter printWriter = null;
-    try {
-      if (fileName != null) {
-        fileWriter = new OutputStreamWriter(
-            new FileOutputStream(fileName), StandardCharsets.UTF_8);
-        printWriter = new PrintWriter(fileWriter);
+    if (fileName != null) {
+      try (PrintWriter out = new PrintWriter(new FileWriter(fileName))) {
+        displayTable(iterator, dbColumnFamilyDefinition, out);
       }
-      while (iterator.isValid()) {
-        StringBuilder result = new StringBuilder();
-        if (withKey) {
-          Object key = dbColumnFamilyDefinition.getKeyCodec()
-              .fromPersistedFormat(iterator.key());
-          Gson gson = new GsonBuilder().setPrettyPrinting().create();
-          result.append(gson.toJson(key));
-          result.append(" : ");
-        }
-        Object o = dbColumnFamilyDefinition.getValueCodec()
-            .fromPersistedFormat(iterator.value());
-        outputs.add(o);
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        result.append(gson.toJson(o));
-        if (fileName != null) {
-          printWriter.println(result);
-        } else {
-          System.out.println(result.toString());
-        }
-        limit--;
-        iterator.next();
-        if (limit == 0) {
-          break;
-        }
-      }
-    } finally {
-      if (printWriter != null) {
-        printWriter.close();
-      }
-      if (fileWriter != null) {
-        fileWriter.close();
-      }
+    } else {
+      displayTable(iterator, dbColumnFamilyDefinition, out());
     }
-    return outputs;
   }
 
-  public void setTableName(String tableName) {
-    this.tableName = tableName;
+  private void displayTable(RocksIterator iter,
+      DBColumnFamilyDefinition dbColumnFamilyDefinition, PrintWriter out)
+      throws IOException {
+    Object result;
+    if (omitKeys) {
+      List<Object> list = new ArrayList<>();
+      for (int i = 0; iter.isValid() && withinLimit(i); iter.next(), i++) {
+        list.add(getValue(iter, dbColumnFamilyDefinition));
+      }
+      result = list;
+    } else {
+      Map<Object, Object> map = new LinkedHashMap<>();
+      for (int i = 0; iter.isValid() && withinLimit(i); iter.next(), i++) {
+        Object k = getKey(iter, dbColumnFamilyDefinition);
+        Object v = getValue(iter, dbColumnFamilyDefinition);
+        map.put(k, v);
+      }
+      result = map;
+    }
+    out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(result));
   }
 
-  public RDBParser getParent() {
-    return parent;
+  private boolean withinLimit(int i) {
+    return limit == -1 || i < limit;
   }
 
-  public void setParent(RDBParser parent) {
-    this.parent = parent;
+  private Object getKey(RocksIterator iterator,
+      DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
+    return dbColumnFamilyDefinition.getKeyCodec()
+        .fromPersistedFormat(iterator.key());
   }
 
-  public static void setLimit(int limit) {
-    DBScanner.limit = limit;
+  private Object getValue(RocksIterator iterator,
+      DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
+    return dbColumnFamilyDefinition.getValueCodec()
+            .fromPersistedFormat(iterator.value());
   }
 
-  public List<Object> getScannedObjects() {
-    return scannedObjects;
-  }
-
-  public static void setFileName(String name) {
-    DBScanner.fileName = name;
-  }
-
-  private static ColumnFamilyHandle getColumnFamilyHandle(
+  private ColumnFamilyHandle getColumnFamilyHandle(
             byte[] name, List<ColumnFamilyHandle> columnFamilyHandles) {
     return columnFamilyHandles
             .stream()
@@ -181,13 +173,13 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       System.out.println("Incorrect Db Path");
       return;
     }
-    this.columnFamilyMap = new HashMap<>();
+    columnFamilyMap = new HashMap<>();
     DBColumnFamilyDefinition[] columnFamilyDefinitions = dbDefinition
             .getColumnFamilies();
     for (DBColumnFamilyDefinition definition:columnFamilyDefinitions) {
-      System.out.println("Added definition for table:" +
+      err().println("Added definition for table:" +
           definition.getTableName());
-      this.columnFamilyMap.put(definition.getTableName(), definition);
+      columnFamilyMap.put(definition.getTableName(), definition);
     }
   }
 
@@ -200,8 +192,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         new ArrayList<>();
     RocksDB rocksDB = RocksDB.openReadOnly(parent.getDbPath(),
             cfs, columnFamilyHandleList);
-    this.printAppropriateTable(columnFamilyHandleList,
-           rocksDB, parent.getDbPath());
+    printAppropriateTable(columnFamilyHandleList, rocksDB, parent.getDbPath());
     return null;
   }
 
@@ -213,16 +204,15 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
               "List length should be a positive number. Only allowed negative" +
                   " number is -1 which is to dump entire table");
     }
-    dbPath = removeTrailingSlashIfNeeded(dbPath);
+    Path path = Paths.get(removeTrailingSlashIfNeeded(dbPath));
     DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);
-    this.constructColumnFamilyMap(DBDefinitionFactory.
-            getDefinition(Paths.get(dbPath)));
-    if (this.columnFamilyMap != null) {
-      if (!this.columnFamilyMap.containsKey(tableName)) {
-        System.out.print("Table with name:" + tableName + " does not exist");
+    constructColumnFamilyMap(DBDefinitionFactory.getDefinition(path));
+    if (columnFamilyMap != null) {
+      if (!columnFamilyMap.containsKey(tableName)) {
+        err().print("Table with name:" + tableName + " does not exist");
       } else {
         DBColumnFamilyDefinition columnFamilyDefinition =
-                this.columnFamilyMap.get(tableName);
+                columnFamilyMap.get(tableName);
         ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
                 columnFamilyDefinition.getTableName()
                         .getBytes(StandardCharsets.UTF_8),
@@ -231,10 +221,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           throw new IllegalArgumentException("columnFamilyHandle is null");
         }
         RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle);
-        scannedObjects = displayTable(iterator, columnFamilyDefinition);
+        displayTable(iterator, columnFamilyDefinition);
       }
     } else {
-      System.out.println("Incorrect db Path");
+      err().println("Incorrect db Path");
     }
   }
 

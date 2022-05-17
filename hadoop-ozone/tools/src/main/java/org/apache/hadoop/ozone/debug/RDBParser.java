@@ -49,10 +49,6 @@ public class RDBParser implements Callable<Void>, SubcommandWithParent {
     return dbPath;
   }
 
-  public void setDbPath(String dbPath) {
-    this.dbPath = dbPath;
-  }
-
   @Override
   public Class<?> getParentType() {
     return OzoneDebug.class;
