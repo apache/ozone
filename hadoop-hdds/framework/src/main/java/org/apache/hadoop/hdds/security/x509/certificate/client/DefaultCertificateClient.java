@@ -32,6 +32,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.cert.CertStore;
@@ -41,6 +42,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -82,6 +84,8 @@ import org.slf4j.Logger;
  * eco-system.
  */
 public abstract class DefaultCertificateClient implements CertificateClient {
+
+  private static final Random RANDOM = new SecureRandom();
 
   private static final String CERT_FILE_NAME_FORMAT = "%s.crt";
   private static final String CA_CERT_PREFIX = "CA-";
@@ -822,8 +826,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * */
   protected boolean validateKeyPair(PublicKey pubKey)
       throws CertificateException {
-    byte[] challenge = RandomStringUtils.random(1000).getBytes(
-        StandardCharsets.UTF_8);
+    byte[] challenge =
+        RandomStringUtils.random(1000, 0, 0, false, false, null, RANDOM)
+            .getBytes(StandardCharsets.UTF_8);
     byte[]  sign = signDataStream(new ByteArrayInputStream(challenge));
     return verifySignature(challenge, sign, pubKey);
   }

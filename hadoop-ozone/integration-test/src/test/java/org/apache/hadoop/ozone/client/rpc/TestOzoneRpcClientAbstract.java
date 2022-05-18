@@ -1039,6 +1039,42 @@ public abstract class TestOzoneRpcClientAbstract {
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
   }
 
+  static Stream<BucketLayout> bucketLayouts() {
+    return Stream.of(
+        BucketLayout.OBJECT_STORE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  void bucketUsedBytesOverWrite(BucketLayout bucketLayout)
+      throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OzoneVolume volume = null;
+    String value = "sample value";
+    int valueLength = value.getBytes(UTF_8).length;
+    store.createVolume(volumeName);
+    volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setBucketLayout(bucketLayout).setVersioning(true).build();
+    volume.createBucket(bucketName, bucketArgs);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    String keyName = UUID.randomUUID().toString();
+
+    writeKey(bucket, keyName, ONE, value, valueLength);
+    Assert.assertEquals(valueLength,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+
+    // Overwrite the same key, because this bucket setVersioning is true,
+    // so the bucket usedBytes should increase.
+    writeKey(bucket, keyName, ONE, value, valueLength);
+    Assert.assertEquals(valueLength * 2,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+  }
+
+
   // TODO: testBucketQuota overlaps with testBucketUsedBytes,
   //       do cleanup when EC branch gets merged into master.
   @ParameterizedTest

@@ -65,6 +65,10 @@ public enum BucketLayout {
     return this.equals(FILE_SYSTEM_OPTIMIZED);
   }
 
+  public boolean isLegacy() {
+    return this.equals(LEGACY);
+  }
+
   public boolean shouldNormalizePaths(boolean enableFileSystemPaths) {
     switch (this) {
     case OBJECT_STORE:

@@ -19,10 +19,10 @@ package org.apache.hadoop.hdds.server.events;
 import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.lease.LeaseManager;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Objects;
@@ -43,14 +43,14 @@ public class TestEventWatcher {
 
   private LeaseManager<Long> leaseManager;
 
-  @Before
+  @BeforeEach
   public void startLeaseManager() {
     DefaultMetricsSystem.instance();
     leaseManager = new LeaseManager<>("Test", 2000L);
     leaseManager.start();
   }
 
-  @After
+  @AfterEach
   public void stopLeaseManager() {
     leaseManager.shutdown();
     DefaultMetricsSystem.shutdown();
@@ -79,21 +79,24 @@ public class TestEventWatcher {
     queue.fireEvent(WATCH_UNDER_REPLICATED,
         new UnderreplicatedEvent(id2, "C2"));
 
-    Assert.assertEquals(0, underReplicatedEvents.getReceivedEvents().size());
+    Assertions.assertEquals(0,
+        underReplicatedEvents.getReceivedEvents().size());
 
     Thread.sleep(1000);
 
     queue.fireEvent(REPLICATION_COMPLETED,
         new ReplicationCompletedEvent(id1, "C2", "D1"));
 
-    Assert.assertEquals(0, underReplicatedEvents.getReceivedEvents().size());
+    Assertions.assertEquals(0,
+        underReplicatedEvents.getReceivedEvents().size());
 
     Thread.sleep(1500);
 
     queue.processAll(1000L);
 
-    Assert.assertEquals(1, underReplicatedEvents.getReceivedEvents().size());
-    Assert.assertEquals(id2,
+    Assertions.assertEquals(1,
+        underReplicatedEvents.getReceivedEvents().size());
+    Assertions.assertEquals(id2,
         underReplicatedEvents.getReceivedEvents().get(0).id);
 
   }
@@ -129,14 +132,14 @@ public class TestEventWatcher {
     List<UnderreplicatedEvent> c1todo = replicationWatcher
         .getTimeoutEvents(e -> e.containerId.equalsIgnoreCase("C1"));
 
-    Assert.assertEquals(2, c1todo.size());
-    Assert.assertTrue(replicationWatcher.contains(event1));
+    Assertions.assertEquals(2, c1todo.size());
+    Assertions.assertTrue(replicationWatcher.contains(event1));
     Thread.sleep(1500L);
 
     c1todo = replicationWatcher
         .getTimeoutEvents(e -> e.containerId.equalsIgnoreCase("C1"));
-    Assert.assertEquals(0, c1todo.size());
-    Assert.assertFalse(replicationWatcher.contains(event1));
+    Assertions.assertEquals(0, c1todo.size());
+    Assertions.assertFalse(replicationWatcher.contains(event1));
 
   }
 
@@ -192,19 +195,18 @@ public class TestEventWatcher {
     EventWatcherMetrics metrics = replicationWatcher.getMetrics();
 
     //3 events are received
-    Assert.assertEquals(3, metrics.getTrackedEvents().value());
+    Assertions.assertEquals(3, metrics.getTrackedEvents().value());
 
     //completed + timed out = all messages
-    Assert.assertEquals(
+    Assertions.assertEquals(metrics.getTrackedEvents().value(),
+        metrics.getCompletedEvents().value() +
+            metrics.getTimedOutEvents().value(),
         "number of timed out and completed messages should be the same as the"
-            + " all messages",
-        metrics.getTrackedEvents().value(),
-        metrics.getCompletedEvents().value() + metrics.getTimedOutEvents()
-            .value());
+            + " all messages");
 
     //_at least_ two are timed out.
-    Assert.assertTrue("At least two events should be timed out.",
-        metrics.getTimedOutEvents().value() >= 2);
+    Assertions.assertTrue(metrics.getTimedOutEvents().value() >= 2,
+        "At least two events should be timed out.");
 
     DefaultMetricsSystem.shutdown();
   }

@@ -40,9 +40,9 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,7 +62,7 @@ public class TestNodeReportHandler implements EventPublisher {
   private String metaStoragePath = GenericTestUtils.getRandomizedTempPath()
       .concat("/metadata-" + UUID.randomUUID().toString());
 
-  @Before
+  @BeforeEach
   public void resetEventCollector() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMStorageConfig storageConfig = Mockito.mock(SCMStorageConfig.class);
@@ -90,15 +90,15 @@ public class TestNodeReportHandler implements EventPublisher {
         .createMetadataStorageReport(metaStoragePath, 100, 10, 90, null);
 
     SCMNodeMetric nodeMetric = nodeManager.getNodeStat(dn);
-    Assert.assertNull(nodeMetric);
+    Assertions.assertNull(nodeMetric);
 
     nodeManager.register(dn, getNodeReport(dn, Arrays.asList(storageOne),
         Arrays.asList(metaStorageOne)).getReport(), null);
     nodeMetric = nodeManager.getNodeStat(dn);
 
-    Assert.assertTrue(nodeMetric.get().getCapacity().get() == 100);
-    Assert.assertTrue(nodeMetric.get().getRemaining().get() == 90);
-    Assert.assertTrue(nodeMetric.get().getScmUsed().get() == 10);
+    Assertions.assertTrue(nodeMetric.get().getCapacity().get() == 100);
+    Assertions.assertTrue(nodeMetric.get().getRemaining().get() == 90);
+    Assertions.assertTrue(nodeMetric.get().getScmUsed().get() == 10);
 
     StorageReportProto storageTwo = HddsTestUtils
         .createStorageReport(dn.getUuid(), storagePath, 100, 10, 90, null);
@@ -107,9 +107,9 @@ public class TestNodeReportHandler implements EventPublisher {
             Arrays.asList(metaStorageOne)), this);
     nodeMetric = nodeManager.getNodeStat(dn);
 
-    Assert.assertTrue(nodeMetric.get().getCapacity().get() == 200);
-    Assert.assertTrue(nodeMetric.get().getRemaining().get() == 180);
-    Assert.assertTrue(nodeMetric.get().getScmUsed().get() == 20);
+    Assertions.assertTrue(nodeMetric.get().getCapacity().get() == 200);
+    Assertions.assertTrue(nodeMetric.get().getRemaining().get() == 180);
+    Assertions.assertTrue(nodeMetric.get().getScmUsed().get() == 20);
 
   }
 
