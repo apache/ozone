@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManagerImpl;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmHAUnfinalizedStateValidationAction;
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
@@ -217,6 +218,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private final SCMStorageConfig scmStorageConfig;
   private NodeDecommissionManager scmDecommissionManager;
   private WritableContainerFactory writableContainerFactory;
+  private FinalizationManager finalizationManager;
+  private HDDSLayoutVersionManager scmLayoutVersionManager;
 
   private SCMMetadataStore scmMetadataStore;
   private CertificateStore certificateStore;
@@ -269,8 +272,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private PipelineChoosePolicy pipelineChoosePolicy;
   private SecurityConfig securityConfig;
 
-  private HDDSLayoutVersionManager scmLayoutVersionManager;
-  private UpgradeFinalizer<StorageContainerManager> upgradeFinalizer;
   private final SCMHANodeDetails scmHANodeDetails;
 
   private ContainerBalancer containerBalancer;
@@ -328,10 +329,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       throw new SCMException("SCM not initialized due to storage config " +
           "failure.", ResultCodes.SCM_NOT_INITIALIZED);
     }
-
-    scmLayoutVersionManager = new HDDSLayoutVersionManager(
-        scmStorageConfig.getLayoutVersion());
-    upgradeFinalizer = new SCMUpgradeFinalizer(scmLayoutVersionManager);
 
     primaryScmNodeId = scmStorageConfig.getPrimaryScmNodeId();
     initializeCertificateClient();
@@ -548,6 +545,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private void initializeSystemManagers(OzoneConfiguration conf,
                                         SCMConfigurator configurator)
       throws IOException {
+
+    scmLayoutVersionManager = new HDDSLayoutVersionManager(
+        scmStorageConfig.getLayoutVersion());
+
     if (configurator.getNetworkTopology() != null) {
       clusterMap = configurator.getNetworkTopology();
     } else {
@@ -648,6 +649,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmSafeModeManager = new SCMSafeModeManager(conf,
           containerManager.getContainers(), containerManager,
           pipelineManager, eventQueue, serviceManager, scmContext);
+    }
+    if (configurator.getFinalizationManager() != null) {
+      finalizationManager = configurator.getFinalizationManager();
+    } else {
+      finalizationManager =
+          new FinalizationManagerImpl(scmLayoutVersionManager,
+              pipelineManager, scmNodeManager, scmStorageConfig,
+              scmHAManager.getDBTransactionBuffer(),
+              scmMetadataStore.getMetaTable());
     }
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
         containerManager, scmContext, eventQueue, replicationManager);
@@ -1323,7 +1333,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public void start() throws IOException {
-    upgradeFinalizer.runPrefinalizeStateActions(scmStorageConfig, this);
+    finalizationManager.runPrefinalizeStateActions();
 
     if (LOG.isInfoEnabled()) {
       LOG.info(buildRpcServerStartMessage(
@@ -1857,8 +1867,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   public FinalizationManager getFinalizationManager() {
-    // TODO
-    return null;
+    return finalizationManager;
   }
 
   /**

@@ -830,7 +830,7 @@ public class SCMClientProtocolServer implements
       LOG.error("Authorization failed for finalize scm upgrade", e);
       throw e;
     }
-    return scm.finalizeUpgrade(upgradeClientID);
+    return scm.getFinalizationManager().finalizeUpgrade(upgradeClientID);
   }
 
   @Override
@@ -848,8 +848,8 @@ public class SCMClientProtocolServer implements
       }
     }
 
-    return scm.queryUpgradeFinalizationProgress(upgradeClientID, force,
-        readonly);
+    return scm.getFinalizationManager()
+        .queryUpgradeFinalizationProgress(upgradeClientID, force, readonly);
   }
 
   @Override

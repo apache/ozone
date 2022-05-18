@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 
 /**
@@ -80,10 +81,9 @@ public class DataNodeUpgradeFinalizer extends
   }
 
   @Override
-  public void finalizeUpgrade(DatanodeStateMachine dsm)
-      throws UpgradeException {
-    super.finalizeUpgrade(lf -> ((HDDSLayoutFeature) lf)::datanodeAction,
-        dsm.getLayoutStorage());
+  public void finalizeLayoutFeature(LayoutFeature layoutFeature,
+      DatanodeStateMachine dsm) throws UpgradeException {
+    super.finalizeLayoutFeature(layoutFeature, dsm.getLayoutStorage());
   }
 
   @Override

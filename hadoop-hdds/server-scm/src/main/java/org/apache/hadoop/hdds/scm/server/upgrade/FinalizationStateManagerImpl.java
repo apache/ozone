@@ -1,23 +1,15 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
-import com.sun.org.apache.xpath.internal.functions.FunctionMultiArgs;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdfs.server.datanode.Replica;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
-import org.apache.hadoop.ozone.upgrade.UpgradeException;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.ratis.util.Preconditions;
-import org.jaxen.expr.Step;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 
 // TODO: Synchronization?
 public class FinalizationStateManagerImpl implements FinalizationStateManager {
@@ -26,7 +18,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   // SCM transaction buffer flushes asynchronously, so we must keep the most
   // up-to-date DB information in memory as well for reads.
   private long dbMlv;
-  private boolean hasFinalizationMark;
+  private boolean hasFinalizingMark;
   private final List<ReplicatedFinalizationStep> finalizationSteps;
   private final HDDSLayoutVersionManager versionManager;
 
@@ -39,14 +31,14 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
     dbMlv =
         Long.parseLong(finalizationStore.get(OzoneConsts.LAYOUT_VERSION_KEY));
-    hasFinalizationMark = finalizationStore.isExist(OzoneConsts.FINALIZING_KEY);
+    hasFinalizingMark = finalizationStore.isExist(OzoneConsts.FINALIZING_KEY);
     this.finalizationSteps = new ArrayList<>();
 
     // TODO: Return proxy here for @Replicate?
   }
 
   public FinalizationCheckpoint getFinalizationCheckpoint() {
-    boolean hasFinalizingMark = hasFinalizationMark();
+    boolean hasFinalizingMark = hasFinalizingMark();
     boolean mlvBehindSlv = versionManager.needsFinalization();
 
     FinalizationCheckpoint currentCheckpoint = null;
@@ -69,7 +61,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
   @Override
   public void addFinalizingMark() throws IOException {
-    hasFinalizationMark = true;
+    hasFinalizingMark = true;
     transactionBuffer.addToBuffer(finalizationStore,
         OzoneConsts.FINALIZING_KEY, "");
   }
@@ -87,7 +79,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
   @Override
   public void removeFinalizingMark() throws IOException {
-    hasFinalizationMark = false;
+    hasFinalizingMark = false;
     transactionBuffer.removeFromBuffer(finalizationStore,
         OzoneConsts.FINALIZING_KEY);
   }
@@ -98,8 +90,8 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   }
 
   @Override
-  public boolean hasFinalizationMark() {
-    return hasFinalizationMark;
+  public boolean hasFinalizingMark() {
+    return hasFinalizingMark;
   }
 
   @Override

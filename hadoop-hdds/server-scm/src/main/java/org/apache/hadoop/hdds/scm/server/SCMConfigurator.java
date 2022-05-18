@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority
     .CertificateServer;
 
@@ -75,6 +76,7 @@ public final class SCMConfigurator {
   private SCMHAManager scmHAManager;
   private SCMContext scmContext;
   private WritableContainerFactory writableContainerFactory;
+  private FinalizationManager finalizationManager;
 
   /**
    * Allows user to specify a version of Node manager to use with this SCM.
@@ -184,6 +186,15 @@ public final class SCMConfigurator {
   }
 
   /**
+   * Allows user to set the FinalizationManager to be used with this SCM.
+   * @param finalizationManager - Finalization manager to use.
+   */
+  public void setFinalizationManager(
+      FinalizationManager finalizationManager) {
+    this.finalizationManager = finalizationManager;
+  }
+
+  /**
    * Gets SCM Node Manager.
    * @return Node Manager.
    */
@@ -279,4 +290,11 @@ public final class SCMConfigurator {
     return writableContainerFactory;
   }
 
+  /**
+   * Get the FinalizationManager
+   * @return FinalizationManager.
+   */
+  public FinalizationManager getFinalizationManager() {
+    return finalizationManager;
+  }
 }

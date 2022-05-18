@@ -21,7 +21,6 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 
 import java.io.IOException;
-import java.util.function.Consumer;
 
 /**
  * Manages the state of finalization in SCM.
@@ -59,7 +58,7 @@ public interface FinalizationStateManager {
   @Replicate
   void finalizeLayoutFeature(Integer layoutVersion) throws IOException;
 
-  boolean hasFinalizationMark();
+  boolean hasFinalizingMark();
 
   long getDBMetadataLayoutVersion();
 

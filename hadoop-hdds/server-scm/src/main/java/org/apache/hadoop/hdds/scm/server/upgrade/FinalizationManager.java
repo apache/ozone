@@ -38,4 +38,6 @@ public interface FinalizationManager {
   ) throws IOException;
 
   BasicUpgradeFinalizer<SCMUpgradeFinalizer.SCMUpgradeFinalizationContext, HDDSLayoutVersionManager> getUpgradeFinalizer();
+
+  void runPrefinalizeStateActions() throws IOException;
 }

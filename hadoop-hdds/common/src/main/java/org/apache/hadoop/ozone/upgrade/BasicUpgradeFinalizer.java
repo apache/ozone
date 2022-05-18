@@ -192,6 +192,8 @@ public abstract class BasicUpgradeFinalizer
         || status.equals(FINALIZATION_DONE);
   }
 
+  // TODO: Refactor all components to use upgrade contexts, with an interface
+  //  to retrieve the storage.
   public abstract void finalizeLayoutFeature(LayoutFeature lf, T component)
       throws UpgradeException;
 
@@ -201,22 +203,6 @@ public abstract class BasicUpgradeFinalizer
     updateLayoutVersionInVersionFile(lf, storage);
     versionManager.finalized(lf);
   }
-
-  // TODO: Should not need this method anymore.
-//  protected void finalizeUpgrade(Function<LayoutFeature,
-//      Function<UpgradeActionType, Optional<? extends UpgradeAction>>>
-//      aFunction, Storage storage) throws UpgradeException {
-//    for (LayoutFeature lf: versionManager.unfinalizedFeatures()) {
-////      LayoutFeature lf = (LayoutFeature) obj;
-//      Function<UpgradeActionType, Optional<? extends UpgradeAction>> function =
-//          aFunction.apply(lf);
-//      Optional<? extends UpgradeAction> action = function.apply(ON_FINALIZE);
-//      runFinalizationAction(lf, action);
-//      updateLayoutVersionInVersionFile(lf, storage);
-//      versionManager.finalized(lf);
-//    }
-//    versionManager.completeFinalization();
-//  }
 
   protected void runFinalizationAction(LayoutFeature feature,
       Optional<?extends UpgradeAction> action) throws UpgradeException {

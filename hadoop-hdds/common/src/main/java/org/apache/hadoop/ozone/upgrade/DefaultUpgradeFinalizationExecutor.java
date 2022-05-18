@@ -47,9 +47,10 @@ public class DefaultUpgradeFinalizationExecutor<T> {
 
       finalizer.preFinalizeUpgrade(component);
 
-      for (LayoutFeature lf:
+      for (Object lf:
           finalizer.getVersionManager().unfinalizedFeatures()) {
-        finalizer.finalizeLayoutFeature(lf, component);
+        // TODO: Fix generics so cast is not necessary.
+        finalizer.finalizeLayoutFeature((LayoutFeature) lf, component);
       }
 
       finalizer.postFinalizeUpgrade(component);
