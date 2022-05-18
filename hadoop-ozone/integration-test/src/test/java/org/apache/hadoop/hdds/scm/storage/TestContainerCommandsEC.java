@@ -61,9 +61,9 @@ import java.util.UUID;
 import java.util.function.Function;
 
 /**
- * This class tests commands used in EC reconstruction.
+ * This class tests container commands on EC containers.
  */
-public class TestContainerCommands {
+public class TestContainerCommandsEC {
 
   private static MiniOzoneCluster cluster;
   private static StorageContainerManager scm;
