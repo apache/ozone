@@ -40,6 +40,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockRe
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileResponseProto;
@@ -71,6 +73,50 @@ public final class ContainerProtocolCalls  {
    * There is no need to instantiate this class.
    */
   private ContainerProtocolCalls() {
+  }
+
+  /**
+   * Calls the container protocol to list blocks in container.
+   *
+   * @param xceiverClient client to perform call
+   * @param containerID the ID of the container to list block
+   * @param startLocalID the localID of the first block to get
+   * @param count max number of blocks to get
+   * @param token a token for this block (may be null)
+   * @return container protocol list block response
+   * @throws IOException if there is an I/O error while performing the call
+   */
+  public static ListBlockResponseProto listBlock(XceiverClientSpi xceiverClient,
+      long containerID, Long startLocalID, int count,
+      Token<? extends TokenIdentifier> token) throws IOException {
+
+    ListBlockRequestProto.Builder listBlockBuilder =
+        ListBlockRequestProto.newBuilder()
+            .setCount(count);
+
+    if (startLocalID != null) {
+      listBlockBuilder.setStartLocalID(startLocalID);
+    }
+
+    // datanodeID doesn't matter for read only requests
+    String datanodeID =
+        xceiverClient.getPipeline().getFirstNode().getUuidString();
+
+    ContainerCommandRequestProto.Builder builder =
+        ContainerCommandRequestProto.newBuilder()
+            .setCmdType(Type.ListBlock)
+            .setContainerID(containerID)
+            .setDatanodeUuid(datanodeID)
+            .setListBlock(listBlockBuilder.build());
+
+    if (token != null) {
+      builder.setEncodedToken(token.encodeToUrlString());
+    }
+
+    ContainerCommandRequestProto request = builder.build();
+    ContainerCommandResponseProto response =
+        xceiverClient.sendCommand(request, getValidatorList());
+    return response.getListBlock();
   }
 
   /**
