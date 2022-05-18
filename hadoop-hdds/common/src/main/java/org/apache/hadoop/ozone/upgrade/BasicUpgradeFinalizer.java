@@ -52,12 +52,12 @@ import com.google.common.annotations.VisibleForTesting;
 public abstract class BasicUpgradeFinalizer
     <T, V extends AbstractLayoutVersionManager> implements UpgradeFinalizer<T> {
 
-  private V versionManager;
+  private final V versionManager;
   private String clientID;
   private T component;
   private DefaultUpgradeFinalizationExecutor<T> finalizationExecutor;
 
-  private Queue<String> msgs = new ConcurrentLinkedQueue<>();
+  private final Queue<String> msgs = new ConcurrentLinkedQueue<>();
   private boolean isDone = false;
 
   public BasicUpgradeFinalizer(V versionManager) {
@@ -101,8 +101,6 @@ public abstract class BasicUpgradeFinalizer
   protected void postFinalizeUpgrade(T service) throws IOException {
     // No Op by default.
   }
-
-  public abstract void finalizeUpgrade(T service) throws UpgradeException;
 
   @Override
   public void finalizeAndWaitForCompletion(
@@ -194,20 +192,31 @@ public abstract class BasicUpgradeFinalizer
         || status.equals(FINALIZATION_DONE);
   }
 
-  protected void finalizeUpgrade(Function<LayoutFeature,
-      Function<UpgradeActionType, Optional<? extends UpgradeAction>>>
-      aFunction, Storage storage) throws UpgradeException {
-    for (Object obj : versionManager.unfinalizedFeatures()) {
-      LayoutFeature lf = (LayoutFeature) obj;
-      Function<UpgradeActionType, Optional<? extends UpgradeAction>> function =
-          aFunction.apply(lf);
-      Optional<? extends UpgradeAction> action = function.apply(ON_FINALIZE);
-      runFinalizationAction(lf, action);
-      updateLayoutVersionInVersionFile(lf, storage);
-      versionManager.finalized(lf);
-    }
-    versionManager.completeFinalization();
+  public abstract void finalizeLayoutFeature(LayoutFeature lf, T component)
+      throws UpgradeException;
+
+  protected void finalizeLayoutFeature(LayoutFeature lf, Storage storage)
+      throws UpgradeException {
+    runFinalizationAction(lf, lf.action(ON_FINALIZE));
+    updateLayoutVersionInVersionFile(lf, storage);
+    versionManager.finalized(lf);
   }
+
+  // TODO: Should not need this method anymore.
+//  protected void finalizeUpgrade(Function<LayoutFeature,
+//      Function<UpgradeActionType, Optional<? extends UpgradeAction>>>
+//      aFunction, Storage storage) throws UpgradeException {
+//    for (LayoutFeature lf: versionManager.unfinalizedFeatures()) {
+////      LayoutFeature lf = (LayoutFeature) obj;
+//      Function<UpgradeActionType, Optional<? extends UpgradeAction>> function =
+//          aFunction.apply(lf);
+//      Optional<? extends UpgradeAction> action = function.apply(ON_FINALIZE);
+//      runFinalizationAction(lf, action);
+//      updateLayoutVersionInVersionFile(lf, storage);
+//      versionManager.finalized(lf);
+//    }
+//    versionManager.completeFinalization();
+//  }
 
   protected void runFinalizationAction(LayoutFeature feature,
       Optional<?extends UpgradeAction> action) throws UpgradeException {

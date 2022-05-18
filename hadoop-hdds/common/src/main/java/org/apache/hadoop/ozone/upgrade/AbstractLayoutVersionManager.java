@@ -50,9 +50,9 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   private int metadataLayoutVersion; // MLV.
   private int softwareLayoutVersion; // SLV.
   @VisibleForTesting
-  protected final TreeMap<Integer, T> features = new TreeMap<>();
+  protected final TreeMap<Integer, LayoutFeature> features = new TreeMap<>();
   @VisibleForTesting
-  protected final Map<String, T> featureMap = new HashMap<>();
+  protected final Map<String, LayoutFeature> featureMap = new HashMap<>();
   private volatile Status currentUpgradeState = FINALIZATION_REQUIRED;
   // Allows querying upgrade state while an upgrade is in progress.
   // Note that MLV may have been incremented during the upgrade
@@ -120,6 +120,9 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     try {
       if (layoutFeature.layoutVersion() == metadataLayoutVersion + 1) {
         metadataLayoutVersion = layoutFeature.layoutVersion();
+        if (!needsFinalization()) {
+          completeFinalization();
+        }
       } else {
         String msgStart = "";
         if (layoutFeature.layoutVersion() < metadataLayoutVersion) {
@@ -140,7 +143,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     }
   }
 
-  public void completeFinalization() {
+  private void completeFinalization() {
     lock.writeLock().lock();
     try {
       currentUpgradeState = FINALIZATION_DONE;
@@ -200,12 +203,17 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   }
 
   @Override
-  public T getFeature(String name) {
+  public LayoutFeature getFeature(String name) {
     return featureMap.get(name);
   }
 
   @Override
-  public Iterable<T> unfinalizedFeatures() {
+  public LayoutFeature getFeature(int layoutVersion) {
+    return features.get(layoutVersion);
+  }
+
+  @Override
+  public Iterable<LayoutFeature> unfinalizedFeatures() {
     lock.readLock().lock();
     try {
       return new ArrayList<>(features

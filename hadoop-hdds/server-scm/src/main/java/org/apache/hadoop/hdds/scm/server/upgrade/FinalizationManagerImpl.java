@@ -3,6 +3,7 @@ package org.apache.hadoop.hdds.scm.server.upgrade;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -13,43 +14,31 @@ import java.io.IOException;
 import java.util.Collections;
 
 public class FinalizationManagerImpl implements FinalizationManager {
-  // TODO: Do we need this as a field?
-  private HDDSLayoutVersionManager versionManager;
-  private SCMUpgradeFinalizer upgradeFinalizer;
-  private FinalizationStateManager finalizationStateManager;
+  private final SCMUpgradeFinalizer upgradeFinalizer;
+  private final SCMUpgradeFinalizer.SCMUpgradeFinalizationContext context;
 
 
   public FinalizationManagerImpl(HDDSLayoutVersionManager versionManager,
                                  PipelineManager pipelineManager,
                                  NodeManager nodeManager,
+                                 SCMStorageConfig storage,
                                  DBTransactionBuffer transactionBuffer,
                                  Table<String, String> finalizationStore) throws IOException {
-    this.versionManager = versionManager;
     this.upgradeFinalizer = new SCMUpgradeFinalizer(versionManager);
-    this.finalizationStateManager =
-        new FinalizationStateManagerImpl(finalizationStore, transactionBuffer
-            , lf -> upgradeFinalizer.finalizeLayoutFeature(lf, ));
-  }
-
-  @Override
-  public void markFinalizationStarted() throws IOException {
-    finalizationStateManager.addFinalizingMark();
-  }
-
-  @Override
-  public void finalizeLayoutFeature(HDDSLayoutFeature layoutFeature) throws IOException {
-    finalizationStateManager.setDBMetadataLayoutVersion((long)layoutFeature.layoutVersion());
-  }
-
-  @Override
-  public void markFinalizationCompleted() throws IOException {
-    finalizationStateManager.removeFinalizingMark();
+    FinalizationStateManager finalizationStateManager =
+        new FinalizationStateManagerImpl(versionManager, finalizationStore,
+        transactionBuffer);
+    this.context =
+        new SCMUpgradeFinalizer.SCMUpgradeFinalizationContext(pipelineManager,
+            nodeManager, finalizationStateManager, storage);
+    finalizationStateManager.addReplicatedFinalizationStep(
+        lf -> this.upgradeFinalizer.replicatedFinalizationSteps(lf, context));
   }
 
   @Override
   public UpgradeFinalizer.StatusAndMessages finalizeUpgrade(String upgradeClientID)
       throws IOException {
-    return upgradeFinalizer.finalize(upgradeClientID, this);
+    return upgradeFinalizer.finalize(upgradeClientID, context);
   }
 
   @Override

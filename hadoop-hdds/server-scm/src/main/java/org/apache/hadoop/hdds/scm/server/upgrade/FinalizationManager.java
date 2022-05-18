@@ -30,12 +30,6 @@ import java.util.function.Predicate;
  */
 public interface FinalizationManager {
 
-  void markFinalizationStarted() throws IOException;
-
-  void finalizeLayoutFeature(HDDSLayoutFeature layoutFeature) throws IOException;
-
-  void markFinalizationCompleted() throws IOException;
-
   UpgradeFinalizer.StatusAndMessages finalizeUpgrade(String upgradeClientID)
       throws IOException;
 

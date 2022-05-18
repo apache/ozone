@@ -47,7 +47,10 @@ public class DefaultUpgradeFinalizationExecutor<T> {
 
       finalizer.preFinalizeUpgrade(component);
 
-      finalizer.finalizeUpgrade(component);
+      for (LayoutFeature lf:
+          finalizer.getVersionManager().unfinalizedFeatures()) {
+        finalizer.finalizeLayoutFeature(lf, component);
+      }
 
       finalizer.postFinalizeUpgrade(component);
 
