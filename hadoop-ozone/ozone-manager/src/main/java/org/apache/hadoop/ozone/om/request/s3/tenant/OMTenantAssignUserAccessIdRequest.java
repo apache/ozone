@@ -108,8 +108,10 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
   @Override
   @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+
+    final OMRequest omRequest = super.preExecute(ozoneManager);
     final TenantAssignUserAccessIdRequest request =
-        getOmRequest().getTenantAssignUserAccessIdRequest();
+        omRequest.getTenantAssignUserAccessIdRequest();
 
     final String tenantId = request.getTenantId();
 
@@ -134,8 +136,8 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     }
 
     // HDDS-6366: Disallow specifying custom accessId.
-    final String expectedAccessId = OMMultiTenantManager.getDefaultAccessId(
-        tenantId, userPrincipal);
+    final String expectedAccessId =
+        OMMultiTenantManager.getDefaultAccessId(tenantId, userPrincipal);
     if (!accessId.equals(expectedAccessId)) {
       throw new OMException("Invalid accessId '" + accessId + "'. "
           + "Specifying a custom access ID disallowed. "
@@ -168,15 +170,8 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
             .setAwsSecret(s3Secret)
             .setKerberosID(accessId).build();
 
-    final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
-        .setUserInfo(getUserInfo())
-        .setUpdateGetS3SecretRequest(updateGetS3SecretRequest)
-        .setCmdType(getOmRequest().getCmdType())
-        .setClientId(getOmRequest().getClientId());
-
-    if (getOmRequest().hasTraceID()) {
-      omRequestBuilder.setTraceID(getOmRequest().getTraceID());
-    }
+    final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
+        .setUpdateGetS3SecretRequest(updateGetS3SecretRequest);
 
     return omRequestBuilder.build();
   }

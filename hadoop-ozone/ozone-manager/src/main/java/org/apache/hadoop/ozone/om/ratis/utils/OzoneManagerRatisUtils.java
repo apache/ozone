@@ -191,16 +191,22 @@ public final class OzoneManagerRatisUtils {
     case PurgePaths:
       return new OMPathsPurgeRequestWithFSO(omRequest);
     case CreateTenant:
+      ozoneManager.checkS3MultiTenancyEnabled();
       return new OMTenantCreateRequest(omRequest);
     case DeleteTenant:
+      ozoneManager.checkS3MultiTenancyEnabled();
       return new OMTenantDeleteRequest(omRequest);
     case TenantAssignUserAccessId:
+      ozoneManager.checkS3MultiTenancyEnabled();
       return new OMTenantAssignUserAccessIdRequest(omRequest);
     case TenantRevokeUserAccessId:
+      ozoneManager.checkS3MultiTenancyEnabled();
       return new OMTenantRevokeUserAccessIdRequest(omRequest);
     case TenantAssignAdmin:
+      ozoneManager.checkS3MultiTenancyEnabled();
       return new OMTenantAssignAdminRequest(omRequest);
     case TenantRevokeAdmin:
+      ozoneManager.checkS3MultiTenancyEnabled();
       return new OMTenantRevokeAdminRequest(omRequest);
     case SetRangerServiceVersion:
       return new OMSetRangerServiceVersionRequest(omRequest);

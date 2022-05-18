@@ -118,7 +118,9 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     // Check Ozone cluster admin privilege
     ozoneManager.getMultiTenantManager().checkAdmin();
 
-    final CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
+    final OMRequest omRequest = super.preExecute(ozoneManager);
+    final CreateTenantRequest request = omRequest.getCreateTenantRequest();
+    Preconditions.checkNotNull(request);
     final String tenantId = request.getTenantId();
 
     // Check tenantId validity
@@ -176,7 +178,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     tenantInContext = ozoneManager.getMultiTenantManager()
         .createTenantAccessInAuthorizer(tenantId, userRoleName, adminRoleName);
 
-    final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
+    final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
         .setCreateTenantRequest(
             CreateTenantRequest.newBuilder()
                 .setTenantId(tenantId)
@@ -184,15 +186,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
                 .setUserRoleName(userRoleName)
                 .setAdminRoleName(adminRoleName))
         .setCreateVolumeRequest(
-            CreateVolumeRequest.newBuilder().setVolumeInfo(updatedVolumeInfo))
-        // TODO: Can the three lines below be ignored?
-        .setUserInfo(getUserInfo())
-        .setCmdType(getOmRequest().getCmdType())
-        .setClientId(getOmRequest().getClientId());
-
-    if (getOmRequest().hasTraceID()) {
-      omRequestBuilder.setTraceID(getOmRequest().getTraceID());
-    }
+            CreateVolumeRequest.newBuilder()
+                .setVolumeInfo(updatedVolumeInfo));
 
     return omRequestBuilder.build();
   }

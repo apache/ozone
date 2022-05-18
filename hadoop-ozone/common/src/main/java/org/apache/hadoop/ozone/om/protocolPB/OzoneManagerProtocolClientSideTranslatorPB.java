@@ -995,25 +995,28 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   @Override
   public void createTenant(OmTenantArgs omTenantArgs) throws IOException {
-    final CreateTenantRequest request = CreateTenantRequest.newBuilder()
-        .setTenantId(omTenantArgs.getTenantId())
-        .setVolumeName(omTenantArgs.getVolumeName())
-        // TODO: Add more args like policy names later
-        .build();
+    final CreateTenantRequest.Builder requestBuilder =
+        CreateTenantRequest.newBuilder()
+            .setTenantId(omTenantArgs.getTenantId())
+            .setVolumeName(omTenantArgs.getVolumeName());
+            // Can add more args (like policy names) later if needed
     final OMRequest omRequest = createOMRequest(Type.CreateTenant)
-        .setCreateTenantRequest(request)
+        .setCreateTenantRequest(requestBuilder)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
   }
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public DeleteTenantState deleteTenant(String tenantId) throws IOException {
-    final DeleteTenantRequest request = DeleteTenantRequest.newBuilder()
-        .setTenantId(tenantId)
-        .build();
+    final DeleteTenantRequest.Builder requestBuilder =
+        DeleteTenantRequest.newBuilder()
+            .setTenantId(tenantId);
     final OMRequest omRequest = createOMRequest(Type.DeleteTenant)
-        .setDeleteTenantRequest(request)
+        .setDeleteTenantRequest(requestBuilder)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     final DeleteTenantResponse resp =
@@ -1030,14 +1033,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public S3SecretValue tenantAssignUserAccessId(
       String username, String tenantId, String accessId) throws IOException {
 
-    final TenantAssignUserAccessIdRequest request =
+    final TenantAssignUserAccessIdRequest.Builder requestBuilder =
         TenantAssignUserAccessIdRequest.newBuilder()
-        .setUserPrincipal(username)
-        .setTenantId(tenantId)
-        .setAccessId(accessId)
-        .build();
+            .setUserPrincipal(username)
+            .setTenantId(tenantId)
+            .setAccessId(accessId);
     final OMRequest omRequest = createOMRequest(Type.TenantAssignUserAccessId)
-        .setTenantAssignUserAccessIdRequest(request)
+        .setTenantAssignUserAccessIdRequest(requestBuilder)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     final TenantAssignUserAccessIdResponse resp = handleError(omResponse)
@@ -1053,12 +1055,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public void tenantRevokeUserAccessId(String accessId)
       throws IOException {
 
-    final TenantRevokeUserAccessIdRequest request =
+    final TenantRevokeUserAccessIdRequest.Builder requestBuilder =
         TenantRevokeUserAccessIdRequest.newBuilder()
-            .setAccessId(accessId)
-            .build();
+            .setAccessId(accessId);
     final OMRequest omRequest = createOMRequest(Type.TenantRevokeUserAccessId)
-        .setTenantRevokeUserAccessIdRequest(request)
+        .setTenantRevokeUserAccessIdRequest(requestBuilder)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
@@ -1073,8 +1074,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     final TenantAssignAdminRequest.Builder requestBuilder =
         TenantAssignAdminRequest.newBuilder()
-        .setAccessId(accessId)
-        .setDelegated(delegated);
+            .setAccessId(accessId)
+            .setDelegated(delegated);
     if (tenantId != null) {
       requestBuilder.setTenantId(tenantId);
     }
@@ -1114,12 +1115,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
       throws IOException {
 
-    final TenantGetUserInfoRequest request =
+    final TenantGetUserInfoRequest.Builder requestBuilder =
         TenantGetUserInfoRequest.newBuilder()
-            .setUserPrincipal(userPrincipal)
-            .build();
+            .setUserPrincipal(userPrincipal);
     final OMRequest omRequest = createOMRequest(Type.TenantGetUserInfo)
-        .setTenantGetUserInfoRequest(request)
+        .setTenantGetUserInfoRequest(requestBuilder)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     final TenantGetUserInfoResponse resp = handleError(omResponse)
@@ -1128,15 +1128,20 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return TenantUserInfoValue.fromProtobuf(resp);
   }
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public TenantUserList listUsersInTenant(String tenantId, String prefix)
       throws IOException {
-    TenantListUserRequest.Builder builder =
-        TenantListUserRequest.newBuilder().setTenantId(tenantId);
+
+    final TenantListUserRequest.Builder requestBuilder =
+        TenantListUserRequest.newBuilder()
+            .setTenantId(tenantId);
     if (prefix != null) {
-      builder.setPrefix(prefix);
+      requestBuilder.setPrefix(prefix);
     }
-    TenantListUserRequest request = builder.build();
+    TenantListUserRequest request = requestBuilder.build();
 
     final OMRequest omRequest = createOMRequest(Type.TenantListUser)
         .setTenantListUserRequest(request).build();
@@ -1146,36 +1151,39 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return TenantUserList.fromProtobuf(resp);
   }
 
-  @Override
-  public S3VolumeContext getS3VolumeContext() throws IOException {
-    final GetS3VolumeContextRequest request = GetS3VolumeContextRequest
-        .newBuilder()
-        .build();
-    final OMRequest omRequest = createOMRequest(Type.GetS3VolumeContext)
-        .setGetS3VolumeContextRequest(request)
-        .build();
-    final OMResponse omResponse = submitRequest(omRequest);
-    final GetS3VolumeContextResponse resp =
-        handleError(omResponse).getGetS3VolumeContextResponse();
-    return S3VolumeContext.fromProtobuf(resp);
-  }
-
   /**
    * {@inheritDoc}
    */
   @Override
   public TenantStateList listTenant() throws IOException {
 
-    final ListTenantRequest request = ListTenantRequest.newBuilder()
-        .build();
+    final ListTenantRequest.Builder requestBuilder =
+        ListTenantRequest.newBuilder();
     final OMRequest omRequest = createOMRequest(Type.ListTenant)
-        .setListTenantRequest(request)
+        .setListTenantRequest(requestBuilder)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     final ListTenantResponse resp = handleError(omResponse)
         .getListTenantResponse();
 
     return TenantStateList.fromProtobuf(resp.getTenantStateList());
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public S3VolumeContext getS3VolumeContext() throws IOException {
+
+    final GetS3VolumeContextRequest.Builder requestBuilder =
+        GetS3VolumeContextRequest.newBuilder();
+    final OMRequest omRequest = createOMRequest(Type.GetS3VolumeContext)
+        .setGetS3VolumeContextRequest(requestBuilder)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    final GetS3VolumeContextResponse resp =
+        handleError(omResponse).getGetS3VolumeContextResponse();
+    return S3VolumeContext.fromProtobuf(resp);
   }
 
   /**
