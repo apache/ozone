@@ -30,6 +30,7 @@ import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 
@@ -60,7 +61,12 @@ public class TestBasicUpgradeFinalizer {
     assertEquals(FINALIZATION_DONE, res.status());
 
     inOrder.verify(finalizer).preFinalizeUpgrade(ArgumentMatchers.eq(mockObj));
-    inOrder.verify(finalizer).finalizeUpgrade(ArgumentMatchers.eq(mockObj));
+    inOrder.verify(finalizer).finalizeLayoutFeature(
+        ArgumentMatchers.eq(TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_2),
+        ArgumentMatchers.eq(mockObj));
+    inOrder.verify(finalizer).finalizeLayoutFeature(
+        ArgumentMatchers.eq(TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_3),
+        ArgumentMatchers.eq(mockObj));
     inOrder.verify(finalizer).postFinalizeUpgrade(ArgumentMatchers.eq(mockObj));
 
     assertTrue(finalizer.isFinalizationDone());
@@ -113,9 +119,22 @@ public class TestBasicUpgradeFinalizer {
     }
 
     @Override
-    public void finalizeUpgrade(Object service) {
+    public void finalizeLayoutFeature(LayoutFeature lf, Object service)
+        throws UpgradeException {
+      Storage mockStorage = mock(Storage.class);
+      InOrder inOrder = inOrder(mockStorage);
+
+      super.finalizeLayoutFeature(lf, mockStorage);
+
+      inOrder.verify(mockStorage)
+          .setLayoutVersion(ArgumentMatchers.eq(lf.layoutVersion()));
+      try {
+        inOrder.verify(mockStorage).persistCurrentState();
+      } catch (IOException ex) {
+        throw new UpgradeException(ex,
+            UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
+      }
       finalizeCalled = true;
-      getVersionManager().completeFinalization();
     }
 
     @Override

@@ -64,12 +64,12 @@ public interface LayoutVersionManager {
 
   /**
    * Get Feature given its layout version.
-   * @param name Feature name.
+   * @param layoutVersion Version number of the feature.
    * @return LayoutFeature instance.
    */
   LayoutFeature getFeature(int layoutVersion);
 
-  Iterable<LayoutFeature> unfinalizedFeatures();
+  Iterable<? extends LayoutFeature> unfinalizedFeatures();
 
   /**
    * Generic API for returning a registered handler for a given type.

@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.om.upgrade;
 
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.log4j.Layout;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -237,11 +239,13 @@ public class TestOMUpgradeFinalizer {
   }
 
   private void setupVersionManagerMockToFinalize(
-      Iterable<OMLayoutFeature> lfs
+      Iterable<? extends LayoutFeature> lfs
   ) {
     when(versionManager.getUpgradeState()).thenReturn(FINALIZATION_REQUIRED);
     when(versionManager.needsFinalization()).thenReturn(true);
-    when(versionManager.unfinalizedFeatures()).thenReturn(lfs);
+    List<LayoutFeature> lfIter = new ArrayList<>();
+    lfs.forEach(lfIter::add);
+    when(versionManager.unfinalizedFeatures()).thenReturn(lfIter);
   }
 
   private OMLayoutFeature mockFeature(String name, int version) {

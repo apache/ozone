@@ -38,7 +38,7 @@ public class DefaultUpgradeFinalizationExecutor<T> {
   public DefaultUpgradeFinalizationExecutor() {
   }
 
-  public void execute(T component, BasicUpgradeFinalizer finalizer)
+  public void execute(T component, BasicUpgradeFinalizer<T, ?> finalizer)
       throws IOException {
     try {
       finalizer.emitStartingMsg();
@@ -47,11 +47,8 @@ public class DefaultUpgradeFinalizationExecutor<T> {
 
       finalizer.preFinalizeUpgrade(component);
 
-      for (Object lf:
-          finalizer.getVersionManager().unfinalizedFeatures()) {
-        // TODO: Fix generics so cast is not necessary.
-        finalizer.finalizeLayoutFeature((LayoutFeature) lf, component);
-      }
+      finalizeFeatures(component, finalizer,
+          finalizer.getVersionManager().unfinalizedFeatures());
 
       finalizer.postFinalizeUpgrade(component);
 
@@ -65,6 +62,14 @@ public class DefaultUpgradeFinalizationExecutor<T> {
       }
     } finally {
       finalizer.markFinalizationDone();
+    }
+  }
+
+  protected void finalizeFeatures(T component,
+      BasicUpgradeFinalizer<T, ?> finalizer,  Iterable<LayoutFeature> lfs)
+      throws UpgradeException {
+    for(LayoutFeature lf: lfs) {
+      finalizer.finalizeLayoutFeature(lf, component);
     }
   }
 }
