@@ -76,7 +76,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCA
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.doReturn;
@@ -163,12 +162,12 @@ public class TestPipelineManagerImpl {
     Assert.assertTrue(pipelineManager.getPipelines().isEmpty());
     Pipeline pipeline1 = pipelineManager.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
-    assertEquals(1, pipelineManager.getPipelines().size());
+    Assert.assertEquals(1, pipelineManager.getPipelines().size());
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline1.getId()));
 
     Pipeline pipeline2 = pipelineManager.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.ONE));
-    assertEquals(2, pipelineManager.getPipelines().size());
+    Assert.assertEquals(2, pipelineManager.getPipelines().size());
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline2.getId()));
     buffer1.close();
     pipelineManager.close();
@@ -179,11 +178,11 @@ public class TestPipelineManagerImpl {
         createPipelineManager(true, buffer2);
     // Should be able to load previous pipelines.
     Assert.assertFalse(pipelineManager2.getPipelines().isEmpty());
-    assertEquals(2, pipelineManager.getPipelines().size());
+    Assert.assertEquals(2, pipelineManager.getPipelines().size());
     Pipeline pipeline3 = pipelineManager2.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     buffer2.close();
-    assertEquals(3, pipelineManager2.getPipelines().size());
+    Assert.assertEquals(3, pipelineManager2.getPipelines().size());
     Assert.assertTrue(pipelineManager2.containsPipeline(pipeline3.getId()));
 
     pipelineManager2.close();
@@ -214,11 +213,11 @@ public class TestPipelineManagerImpl {
         SCMDBDefinition.PIPELINES.getTable(dbStore);
     Pipeline pipeline = pipelineManager.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
-    assertEquals(1, pipelineManager.getPipelines().size());
+    Assert.assertEquals(1, pipelineManager.getPipelines().size());
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
-    assertEquals(ALLOCATED, pipeline.getPipelineState());
+    Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
     buffer.flush();
-    assertEquals(ALLOCATED,
+    Assert.assertEquals(ALLOCATED,
         pipelineStore.get(pipeline.getId()).getPipelineState());
     PipelineID pipelineID = pipeline.getId();
 
@@ -232,10 +231,10 @@ public class TestPipelineManagerImpl {
     Assert.assertTrue(pipelineStore.get(pipeline.getId()).isOpen());
 
     pipelineManager.deactivatePipeline(pipeline.getId());
-    assertEquals(Pipeline.PipelineState.DORMANT,
+    Assert.assertEquals(Pipeline.PipelineState.DORMANT,
         pipelineManager.getPipeline(pipelineID).getPipelineState());
     buffer.flush();
-    assertEquals(Pipeline.PipelineState.DORMANT,
+    Assert.assertEquals(Pipeline.PipelineState.DORMANT,
         pipelineStore.get(pipeline.getId()).getPipelineState());
     Assert.assertFalse(pipelineManager
         .getPipelines(RatisReplicationConfig
@@ -263,9 +262,9 @@ public class TestPipelineManagerImpl {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline pipeline = pipelineManager.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
-    assertEquals(1, pipelineManager.getPipelines().size());
+    Assert.assertEquals(1, pipelineManager.getPipelines().size());
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
-    assertEquals(ALLOCATED, pipeline.getPipelineState());
+    Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
     // Change to follower
     assert pipelineManager.getScmhaManager() instanceof SCMHAManagerStub;
     ((SCMHAManagerStub) pipelineManager.getScmhaManager()).setIsLeader(false);
@@ -284,9 +283,9 @@ public class TestPipelineManagerImpl {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline pipeline = pipelineManager.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
-    assertEquals(1, pipelineManager.getPipelines().size());
+    Assert.assertEquals(1, pipelineManager.getPipelines().size());
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
-    assertEquals(ALLOCATED, pipeline.getPipelineState());
+    Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
     // Change to follower
     assert pipelineManager.getScmhaManager() instanceof SCMHAManagerStub;
     ((SCMHAManagerStub) pipelineManager.getScmhaManager()).setIsLeader(false);
@@ -305,9 +304,9 @@ public class TestPipelineManagerImpl {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline pipeline = pipelineManager.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
-    assertEquals(1, pipelineManager.getPipelines().size());
+    Assert.assertEquals(1, pipelineManager.getPipelines().size());
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
-    assertEquals(ALLOCATED, pipeline.getPipelineState());
+    Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
     // Change to follower
     assert pipelineManager.getScmhaManager() instanceof SCMHAManagerStub;
     ((SCMHAManagerStub) pipelineManager.getScmhaManager()).setIsLeader(false);
@@ -328,9 +327,9 @@ public class TestPipelineManagerImpl {
     // Create a pipeline
     Pipeline pipeline = pipelineManager.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
-    assertEquals(1, pipelineManager.getPipelines().size());
+    Assert.assertEquals(1, pipelineManager.getPipelines().size());
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
-    assertEquals(ALLOCATED, pipeline.getPipelineState());
+    Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
 
     // Open the pipeline
     pipelineManager.openPipeline(pipeline.getId());
@@ -353,7 +352,7 @@ public class TestPipelineManagerImpl {
       fail();
     } catch (IOException ioe) {
       // Should not be able to remove the OPEN pipeline.
-      assertEquals(1, pipelineManager.getPipelines().size());
+      Assert.assertEquals(1, pipelineManager.getPipelines().size());
     } catch (Exception e) {
       Assert.fail("Should not reach here.");
     }
@@ -377,9 +376,9 @@ public class TestPipelineManagerImpl {
     pipelineManager.setScmContext(scmContext);
     Pipeline pipeline = pipelineManager.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
-    assertEquals(1, pipelineManager.getPipelines().size());
+    Assert.assertEquals(1, pipelineManager.getPipelines().size());
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
-    assertEquals(ALLOCATED, pipeline.getPipelineState());
+    Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
     // Change to follower
     assert pipelineManager.getScmhaManager() instanceof SCMHAManagerStub;
     ((SCMHAManagerStub) pipelineManager.getScmhaManager()).setIsLeader(false);
@@ -453,7 +452,7 @@ public class TestPipelineManagerImpl {
         SCMPipelineMetrics.class.getSimpleName());
     long numPipelineAllocated = getLongCounter("NumPipelineAllocated",
         metrics);
-    assertEquals(0, numPipelineAllocated);
+    Assert.assertEquals(0, numPipelineAllocated);
 
     // 3 DNs are unhealthy.
     // Create 5 pipelines (Use up 15 Datanodes)
@@ -468,11 +467,11 @@ public class TestPipelineManagerImpl {
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
-    assertEquals(maxPipelineCount, numPipelineAllocated);
+    Assert.assertEquals(maxPipelineCount, numPipelineAllocated);
 
     long numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
-    assertEquals(0, numPipelineCreateFailed);
+    Assert.assertEquals(0, numPipelineCreateFailed);
 
     //This should fail...
     try {
@@ -482,18 +481,18 @@ public class TestPipelineManagerImpl {
       fail();
     } catch (SCMException ioe) {
       // pipeline creation failed this time.
-      assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
+      Assert.assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
           ioe.getResult());
     }
 
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
-    assertEquals(maxPipelineCount, numPipelineAllocated);
+    Assert.assertEquals(maxPipelineCount, numPipelineAllocated);
 
     numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
-    assertEquals(1, numPipelineCreateFailed);
+    Assert.assertEquals(1, numPipelineCreateFailed);
 
     // clean up
     pipelineManager.close();
@@ -514,7 +513,7 @@ public class TestPipelineManagerImpl {
     pipelineManager.close();
     // new pipeline manager loads the pipelines from the db in ALLOCATED state
     pipelineManager = createPipelineManager(true);
-    assertEquals(Pipeline.PipelineState.ALLOCATED,
+    Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
 
     SCMSafeModeManager scmSafeModeManager =
@@ -527,12 +526,12 @@ public class TestPipelineManagerImpl {
 
     // Report pipelines with leaders
     List<DatanodeDetails> nodes = pipeline.getNodes();
-    assertEquals(3, nodes.size());
+    Assert.assertEquals(3, nodes.size());
     // Send report for all but no leader
     nodes.forEach(dn -> sendPipelineReport(dn, pipeline, pipelineReportHandler,
         false));
 
-    assertEquals(Pipeline.PipelineState.ALLOCATED,
+    Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
 
     nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
@@ -540,7 +539,7 @@ public class TestPipelineManagerImpl {
     sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
         pipelineReportHandler, true);
 
-    assertEquals(Pipeline.PipelineState.OPEN,
+    Assert.assertEquals(Pipeline.PipelineState.OPEN,
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
 
     pipelineManager.close();
@@ -621,7 +620,7 @@ public class TestPipelineManagerImpl {
         .createPipeline(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE));
     // At this point, pipeline is not at OPEN stage.
-    assertEquals(Pipeline.PipelineState.ALLOCATED,
+    Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
         pipeline.getPipelineState());
 
     // pipeline should be seen in pipelineManager as ALLOCATED.
@@ -830,9 +829,9 @@ public class TestPipelineManagerImpl {
 
     // test IP change
     List<Pipeline> pipelineList1 = pipelineManager.getStalePipelines(node1);
-    assertEquals(2, pipelineList1.size());
-    assertEquals(pipelines.get(0), pipelineList1.get(0));
-    assertEquals(pipelines.get(3), pipelineList1.get(1));
+    Assert.assertEquals(2, pipelineList1.size());
+    Assert.assertEquals(pipelines.get(0), pipelineList1.get(0));
+    Assert.assertEquals(pipelines.get(3), pipelineList1.get(1));
 
     // node with changed host name
     DatanodeDetails node2 = mock(DatanodeDetails.class);
@@ -842,9 +841,9 @@ public class TestPipelineManagerImpl {
 
     // test IP change
     List<Pipeline> pipelineList2 = pipelineManager.getStalePipelines(node2);
-    assertEquals(2, pipelineList1.size());
-    assertEquals(pipelines.get(0), pipelineList2.get(0));
-    assertEquals(pipelines.get(3), pipelineList2.get(1));
+    Assert.assertEquals(2, pipelineList1.size());
+    Assert.assertEquals(pipelines.get(0), pipelineList2.get(0));
+    Assert.assertEquals(pipelines.get(3), pipelineList2.get(1));
   }
 
   public void testCreatePipelineForRead() throws IOException {
