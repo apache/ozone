@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
+import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.http.auth.BasicUserPrincipal;
@@ -83,7 +85,8 @@ public class RangerClientMultiTenantAccessController implements
     Preconditions.checkNotNull(keytabPath);
 
     client = new RangerClient(rangerHttpsAddress,
-        "kerberos", omPrincipal, keytabPath, rangerServiceName, "ozone");
+        KERBEROS.name().toLowerCase(), omPrincipal, keytabPath,
+        rangerServiceName, OzoneConsts.OZONE);
   }
 
   @Override

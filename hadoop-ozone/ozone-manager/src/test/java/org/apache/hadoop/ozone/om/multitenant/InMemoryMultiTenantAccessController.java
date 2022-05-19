@@ -29,8 +29,8 @@ import java.util.Optional;
 public class InMemoryMultiTenantAccessController
     implements MultiTenantAccessController {
 
-  private final Map<String, Policy>  policies;
-  private final Map<String, Role>  roles;
+  private final Map<String, Policy> policies;
+  private final Map<String, Role> roles;
   private long nextRoleID;
   private long serviceVersion;
 
@@ -55,7 +55,7 @@ public class InMemoryMultiTenantAccessController
       }
     }
     policies.put(policy.getName(), policy);
-    // Ranger will create roles if specified with poicy creation.
+    // Ranger will create roles if specified with policy creation.
     for (String roleName: policy.getRoleAcls().keySet()) {
       if (!roles.containsKey(roleName)) {
         createRole(new Role.Builder().setName(roleName).build());
