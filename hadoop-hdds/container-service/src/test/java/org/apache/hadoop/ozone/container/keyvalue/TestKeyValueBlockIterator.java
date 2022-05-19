@@ -306,8 +306,7 @@ public class TestKeyValueBlockIterator {
     String schemaPrefix = containerData.containerPrefix();
     MetadataKeyFilters.KeyPrefixFilter secondFilter =
             new MetadataKeyFilters.KeyPrefixFilter()
-            .addFilter(schemaPrefix.isEmpty() ?
-                secondPrefix : schemaPrefix + secondPrefix);
+            .addFilter(schemaPrefix + secondPrefix);
     testWithFilter(secondFilter, blockIDs.get(secondPrefix));
   }
 
@@ -415,8 +414,7 @@ public class TestKeyValueBlockIterator {
           blockIndex++;
           BlockData blockData = new BlockData(blockID);
           blockData.setChunks(chunkList);
-          String blockKey = (schemaPrefix.isEmpty() ? "" : schemaPrefix) +
-              prefix + blockID.getLocalID();
+          String blockKey = schemaPrefix + prefix + blockID.getLocalID();
           blockDataTable.put(blockKey, blockData);
           blockIDs.get(prefix).add(blockID.getLocalID());
         }
