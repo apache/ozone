@@ -55,13 +55,13 @@ public class TestRDBTableStore {
           "Eighth");
   private RDBStore rdbStore = null;
   private DBOptions options = null;
-  private static byte[][] byteOfNum;
+  private static byte[][] bytesOf;
 
   @BeforeAll
   public static void initConstants() {
-    byteOfNum = new byte[4][];
+    bytesOf = new byte[4][];
     for (int i = 1; i <= 3; i++) {
-      byteOfNum[i] = Integer.toString(i).getBytes(StandardCharsets.UTF_8);
+      bytesOf[i] = Integer.toString(i).getBytes(StandardCharsets.UTF_8);
     }
   }
 
@@ -379,9 +379,9 @@ public class TestRDBTableStore {
       TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
           testTable.iterator();
       iterator.removeFromDB();
-      Assertions.assertNull(testTable.get(byteOfNum[1]));
-      Assertions.assertNotNull(testTable.get(byteOfNum[2]));
-      Assertions.assertNotNull(testTable.get(byteOfNum[3]));
+      Assertions.assertNull(testTable.get(bytesOf[1]));
+      Assertions.assertNotNull(testTable.get(bytesOf[2]));
+      Assertions.assertNotNull(testTable.get(bytesOf[3]));
     }
 
     // Remove after seekToLast removes lastEntry
@@ -391,9 +391,9 @@ public class TestRDBTableStore {
           testTable.iterator();
       iterator.seekToLast();
       iterator.removeFromDB();
-      Assertions.assertNotNull(testTable.get(byteOfNum[1]));
-      Assertions.assertNotNull(testTable.get(byteOfNum[2]));
-      Assertions.assertNull(testTable.get(byteOfNum[3]));
+      Assertions.assertNotNull(testTable.get(bytesOf[1]));
+      Assertions.assertNotNull(testTable.get(bytesOf[2]));
+      Assertions.assertNull(testTable.get(bytesOf[3]));
     }
 
     // Remove after seek deletes that entry.
@@ -401,11 +401,11 @@ public class TestRDBTableStore {
       writeToTable(testTable, 3);
       TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
           testTable.iterator();
-      iterator.seek(byteOfNum[3]);
+      iterator.seek(bytesOf[3]);
       iterator.removeFromDB();
-      Assertions.assertNotNull(testTable.get(byteOfNum[1]));
-      Assertions.assertNotNull(testTable.get(byteOfNum[2]));
-      Assertions.assertNull(testTable.get(byteOfNum[3]));
+      Assertions.assertNotNull(testTable.get(bytesOf[1]));
+      Assertions.assertNotNull(testTable.get(bytesOf[2]));
+      Assertions.assertNull(testTable.get(bytesOf[3]));
     }
 
     // Remove after next() deletes entry that was returned by next.
@@ -413,18 +413,18 @@ public class TestRDBTableStore {
       writeToTable(testTable, 3);
       TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
           testTable.iterator();
-      iterator.seek(byteOfNum[2]);
+      iterator.seek(bytesOf[2]);
       iterator.next();
       iterator.removeFromDB();
-      Assertions.assertNotNull(testTable.get(byteOfNum[1]));
-      Assertions.assertNull(testTable.get(byteOfNum[2]));
-      Assertions.assertNotNull(testTable.get(byteOfNum[3]));
+      Assertions.assertNotNull(testTable.get(bytesOf[1]));
+      Assertions.assertNull(testTable.get(bytesOf[2]));
+      Assertions.assertNotNull(testTable.get(bytesOf[3]));
     }
   }
 
   private void writeToTable(Table testTable, int num) throws IOException {
     for (int i = 1; i <= num; i++) {
-      byte[] key = byteOfNum[i];
+      byte[] key = bytesOf[i];
       byte[] value =
           RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
       testTable.put(key, value);
