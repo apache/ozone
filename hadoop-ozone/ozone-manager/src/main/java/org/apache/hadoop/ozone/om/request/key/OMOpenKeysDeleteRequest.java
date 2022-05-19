@@ -97,7 +97,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
       }
 
       omClientResponse = new OMOpenKeysDeleteResponse(omResponse.build(),
-          deletedOpenKeys, ozoneManager.isRatisEnabled());
+          deletedOpenKeys, ozoneManager.isRatisEnabled(), getBucketLayout());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
