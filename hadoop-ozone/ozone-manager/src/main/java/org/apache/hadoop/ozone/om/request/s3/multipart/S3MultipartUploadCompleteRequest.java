@@ -240,7 +240,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
         if (usedBytesDiff != 0) {
           omBucketInfo.incrUsedBytes(usedBytesDiff);
-        } else if (!isNamespaceUpdate){
+        } else if (!isNamespaceUpdate) {
           // If no bucket size and Namespace changed, prevent from updating
           // bucket object.
           omBucketInfo = null;
