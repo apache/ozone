@@ -77,6 +77,9 @@ public final class DatanodeMetadata {
   @XmlElement(name = "layoutVersion")
   private int layoutVersion;
 
+  @XmlElement(name = "networkLocation")
+  private String networkLocation;
+
   private DatanodeMetadata(Builder builder) {
     this.hostname = builder.hostname;
     this.uuid = builder.uuid;
@@ -93,6 +96,7 @@ public final class DatanodeMetadata {
     this.revision = builder.revision;
     this.buildDate = builder.buildDate;
     this.layoutVersion = builder.layoutVersion;
+    this.networkLocation = builder.networkLocation;
   }
 
   public String getHostname() {
@@ -183,6 +187,7 @@ public final class DatanodeMetadata {
     private String revision;
     private String buildDate;
     private int layoutVersion;
+    private String networkLocation;
 
     public Builder() {
       this.containers = 0;
@@ -266,6 +271,10 @@ public final class DatanodeMetadata {
       return this;
     }
 
+    public Builder withNetworkLocation(String networkLocation) {
+      this.networkLocation = networkLocation;
+      return this;
+    }
     /**
      * Constructs DatanodeMetadata.
      *
