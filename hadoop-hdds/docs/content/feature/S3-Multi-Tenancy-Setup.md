@@ -42,9 +42,13 @@ Follow [this guide]({{< ref "interface/S3.md" >}}) the cluster to set up at leas
 First make sure ACL is enabled, and `RangerOzoneAuthorizer` is the effective ACL authorizer implementation in-use for Ozone.
 If that is not the case, [follow this]({{< ref "security/SecurityWithRanger.md" >}}). 
 
-Then simply add the following configs to `ozone-site.xml`:
+Then add the following configs to all Ozone Managers' `ozone-site.xml`:
 
 ```xml
+<property>
+   <name>ozone.om.multitenancy.enabled</name>
+   <value>true</value>
+</property>
 <property>
 	<name>ozone.om.ranger.https-address</name>
 	<value>https://RANGER_HOSTNAME:6182</value>

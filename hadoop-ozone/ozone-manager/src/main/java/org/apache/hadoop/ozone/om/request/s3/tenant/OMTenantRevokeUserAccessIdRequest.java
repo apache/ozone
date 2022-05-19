@@ -82,8 +82,10 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
   @Override
   @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+
+    final OMRequest omRequest = super.preExecute(ozoneManager);
     final TenantRevokeUserAccessIdRequest request =
-        getOmRequest().getTenantRevokeUserAccessIdRequest();
+        omRequest.getTenantRevokeUserAccessIdRequest();
 
     final String accessId = request.getAccessId();
 
@@ -129,19 +131,12 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     // TODO: Check destroyUser() behavior
     ozoneManager.getMultiTenantManager().revokeUserAccessId(accessId);
 
-    final Builder omRequestBuilder = getOmRequest().toBuilder()
-        .setUserInfo(getUserInfo())
+    final Builder omRequestBuilder = omRequest.toBuilder()
         .setTenantRevokeUserAccessIdRequest(
             TenantRevokeUserAccessIdRequest.newBuilder()
                 .setAccessId(accessId)
                 .setTenantId(tenantId)
-                .build())
-        .setCmdType(getOmRequest().getCmdType())
-        .setClientId(getOmRequest().getClientId());
-
-    if (getOmRequest().hasTraceID()) {
-      omRequestBuilder.setTraceID(getOmRequest().getTraceID());
-    }
+                .build());
 
     return omRequestBuilder.build();
   }
