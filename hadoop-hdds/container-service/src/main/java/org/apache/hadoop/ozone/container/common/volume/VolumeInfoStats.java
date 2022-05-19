@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -36,17 +35,11 @@ public class VolumeInfoStats {
     private String VolumeRootStr;
     private HddsVolume volume;
 
-    private StorageType storageType;
-    private @Metric
-    MutableGaugeLong spaceUsed;
-    private @Metric
-    MutableGaugeLong spaceAvailable;
-    private @Metric
-    MutableGaugeLong spaceReserved;
-    private @Metric
-    MutableGaugeLong capacity;
-    private @Metric
-    MutableGaugeLong totalCapacity;
+    private @Metric MutableGaugeLong spaceUsed;
+    private @Metric MutableGaugeLong spaceAvailable;
+    private @Metric MutableGaugeLong spaceReserved;
+    private @Metric MutableGaugeLong capacity;
+    private @Metric MutableGaugeLong totalCapacity;
 
 
     @Deprecated
@@ -67,7 +60,12 @@ public class VolumeInfoStats {
     public void init() {
         MetricsSystem ms = DefaultMetricsSystem.instance();
         ms.register(metricsSourceName, "Volume Info Statistics", this);
-        storageType = volume.getStorageType();
+        spaceUsed.set(volume.getVolumeInfo().getScmUsed());
+        spaceAvailable.set(volume.getVolumeInfo().getAvailable());
+        spaceReserved.set(volume.getVolumeInfo().getReservedInBytes());
+        capacity.set(spaceUsed.value() + spaceAvailable.value());
+        totalCapacity.set(
+                spaceUsed.value() + spaceAvailable.value() + spaceReserved.value());
     }
 
     public void unregister() {
@@ -77,31 +75,6 @@ public class VolumeInfoStats {
 
     public String getMetricsSourceName() {
         return metricsSourceName;
-    }
-
-    /**
-     * Return the Storage Directory for the Volume
-     */
-    public String getStorageDirectory() {
-        return volume.getStorageDir().toString();
-    }
-
-    /**
-     * Return the Storage Directory for the Volume
-     */
-    public String getDatanodeUuid() {
-        return volume.getDatanodeUuid();
-    }
-
-
-    /**
-     * Return the Storage type for the Volume
-     */
-    public String getStorageType() {
-        if (storageType != volume.getStorageType()) {
-            storageType = volume.getStorageType();
-        }
-        return storageType.name();
     }
 
     /**
