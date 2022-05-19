@@ -29,10 +29,10 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.StringUtils;
-
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -55,10 +55,15 @@ public class TestRDBTableStore {
           "Eighth");
   private RDBStore rdbStore = null;
   private DBOptions options = null;
+  private static byte[][] byteOfNum;
 
-  @SuppressWarnings("checkstyle:visibilitymodifier")
-  @TempDir
-  File rdbDir;
+  @BeforeAll
+  public static void initConstants() {
+    byteOfNum = new byte[4][];
+    for (int i = 1; i <= 3; i++) {
+      byteOfNum[i] = Integer.toString(i).getBytes(StandardCharsets.UTF_8);
+    }
+  }
 
   private static boolean consume(Table.KeyValue keyValue)  {
     count++;
@@ -71,7 +76,7 @@ public class TestRDBTableStore {
   }
 
   @BeforeEach
-  public void setUp() throws Exception {
+  public void setUp(@TempDir File tempDir) throws Exception {
     options = new DBOptions();
     options.setCreateIfMissing(true);
     options.setCreateMissingColumnFamilies(true);
@@ -85,7 +90,7 @@ public class TestRDBTableStore {
       TableConfig newConfig = new TableConfig(name, new ColumnFamilyOptions());
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(rdbDir, options, configSet);
+    rdbStore = new RDBStore(tempDir, options, configSet);
   }
 
   @AfterEach
@@ -229,16 +234,27 @@ public class TestRDBTableStore {
   }
 
   @Test
-  public void testIsExist() throws Exception {
+  public void testIsExist(@TempDir File rdbLocation) throws Exception {
+    DBOptions rocksDBOptions = new DBOptions();
+    rocksDBOptions.setCreateIfMissing(true);
+    rocksDBOptions.setCreateMissingColumnFamilies(true);
 
-    final String tableName = families.get(0);
+    String tableName = StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY);
+
+    Set<TableConfig> configSet = new HashSet<>();
+    TableConfig newConfig = new TableConfig(tableName,
+        new ColumnFamilyOptions());
+    configSet.add(newConfig);
+
+    rdbStore.close(); // TODO: HDDS-6773
+    RDBStore dbStore = new RDBStore(rdbLocation, rocksDBOptions, configSet);
 
     byte[] key = RandomStringUtils.random(10, true, false)
         .getBytes(StandardCharsets.UTF_8);
     byte[] value = RandomStringUtils.random(10, true, false)
         .getBytes(StandardCharsets.UTF_8);
 
-    try (Table<byte[], byte[]> testTable = rdbStore.getTable(tableName)) {
+    try (Table<byte[], byte[]> testTable = dbStore.getTable(tableName)) {
       testTable.put(key, value);
 
       // Test if isExist returns true for a key that definitely exists.
@@ -253,34 +269,50 @@ public class TestRDBTableStore {
       // Test if isExist returns false for a key that is definitely not present.
       Assertions.assertFalse(testTable.isExist(invalidKey));
 
-      RDBMetrics rdbMetrics = rdbStore.getMetrics();
+      RDBMetrics rdbMetrics = dbStore.getMetrics();
       Assertions.assertEquals(3, rdbMetrics.getNumDBKeyMayExistChecks());
       Assertions.assertEquals(0, rdbMetrics.getNumDBKeyMayExistMisses());
 
       // Reinsert key for further testing.
       testTable.put(key, value);
     }
-    rdbStore.close();
-    // Reopen rdbStore
-    setUp();
-    try (Table<byte[], byte[]> testTable = rdbStore.getTable(tableName)) {
+
+    dbStore.close();
+    rocksDBOptions = new DBOptions();
+    rocksDBOptions.setCreateIfMissing(true);
+    rocksDBOptions.setCreateMissingColumnFamilies(true);
+    dbStore = new RDBStore(rdbLocation, rocksDBOptions, configSet);
+    try (Table<byte[], byte[]> testTable = dbStore.getTable(tableName)) {
       // Verify isExist works with key not in block cache.
       Assertions.assertTrue(testTable.isExist(key));
+    } finally {
+      dbStore.close();
     }
   }
 
 
   @Test
-  public void testGetIfExist() throws Exception {
+  public void testGetIfExist(@TempDir File rdbLocation) throws Exception {
+    DBOptions rocksDBOptions = new DBOptions();
+    rocksDBOptions.setCreateIfMissing(true);
+    rocksDBOptions.setCreateMissingColumnFamilies(true);
 
-    final String tableName = families.get(0);
+    String tableName = StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY);
+
+    Set<TableConfig> configSet = new HashSet<>();
+    TableConfig newConfig = new TableConfig(tableName,
+        new ColumnFamilyOptions());
+    configSet.add(newConfig);
+
+    rdbStore.close(); // TODO: HDDS-6773
+    RDBStore dbStore = new RDBStore(rdbLocation, rocksDBOptions, configSet);
 
     byte[] key = RandomStringUtils.random(10, true, false)
         .getBytes(StandardCharsets.UTF_8);
     byte[] value = RandomStringUtils.random(10, true, false)
         .getBytes(StandardCharsets.UTF_8);
 
-    try (Table<byte[], byte[]> testTable = rdbStore.getTable(tableName)) {
+    try (Table<byte[], byte[]> testTable = dbStore.getTable(tableName)) {
       testTable.put(key, value);
 
       // Test if isExist returns value for a key that definitely exists.
@@ -295,9 +327,8 @@ public class TestRDBTableStore {
       // Test if isExist returns null for a key that is definitely not present.
       Assertions.assertNull(testTable.getIfExist(invalidKey));
 
-      RDBMetrics rdbMetrics = rdbStore.getMetrics();
+      RDBMetrics rdbMetrics = dbStore.getMetrics();
       Assertions.assertEquals(3, rdbMetrics.getNumDBKeyGetIfExistChecks());
-
 
       Assertions.assertEquals(0, rdbMetrics.getNumDBKeyGetIfExistMisses());
 
@@ -307,12 +338,16 @@ public class TestRDBTableStore {
       testTable.put(key, value);
     }
 
-    rdbStore.close();
-    // Reopen rdbStore
-    setUp();
-    try (Table<byte[], byte[]> testTable = rdbStore.getTable(tableName)) {
+    dbStore.close();
+    rocksDBOptions = new DBOptions();
+    rocksDBOptions.setCreateIfMissing(true);
+    rocksDBOptions.setCreateMissingColumnFamilies(true);
+    dbStore = new RDBStore(rdbLocation, rocksDBOptions, configSet);
+    try (Table<byte[], byte[]> testTable = dbStore.getTable(tableName)) {
       // Verify getIfExists works with key not in block cache.
       Assertions.assertNotNull(testTable.getIfExist(key));
+    } finally {
+      dbStore.close();
     }
   }
 
@@ -344,12 +379,9 @@ public class TestRDBTableStore {
       TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
           testTable.iterator();
       iterator.removeFromDB();
-      Assertions.assertNull(
-          testTable.get("1".getBytes(StandardCharsets.UTF_8)));
-      Assertions.assertNotNull(
-          testTable.get("2".getBytes(StandardCharsets.UTF_8)));
-      Assertions.assertNotNull(
-          testTable.get("3".getBytes(StandardCharsets.UTF_8)));
+      Assertions.assertNull(testTable.get(byteOfNum[1]));
+      Assertions.assertNotNull(testTable.get(byteOfNum[2]));
+      Assertions.assertNotNull(testTable.get(byteOfNum[3]));
     }
 
     // Remove after seekToLast removes lastEntry
@@ -359,12 +391,9 @@ public class TestRDBTableStore {
           testTable.iterator();
       iterator.seekToLast();
       iterator.removeFromDB();
-      Assertions.assertNotNull(
-          testTable.get("1".getBytes(StandardCharsets.UTF_8)));
-      Assertions.assertNotNull(
-          testTable.get("2".getBytes(StandardCharsets.UTF_8)));
-      Assertions.assertNull(
-          testTable.get("3".getBytes(StandardCharsets.UTF_8)));
+      Assertions.assertNotNull(testTable.get(byteOfNum[1]));
+      Assertions.assertNotNull(testTable.get(byteOfNum[2]));
+      Assertions.assertNull(testTable.get(byteOfNum[3]));
     }
 
     // Remove after seek deletes that entry.
@@ -372,14 +401,11 @@ public class TestRDBTableStore {
       writeToTable(testTable, 3);
       TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
           testTable.iterator();
-      iterator.seek("3".getBytes(StandardCharsets.UTF_8));
+      iterator.seek(byteOfNum[3]);
       iterator.removeFromDB();
-      Assertions.assertNotNull(
-          testTable.get("1".getBytes(StandardCharsets.UTF_8)));
-      Assertions.assertNotNull(
-          testTable.get("2".getBytes(StandardCharsets.UTF_8)));
-      Assertions.assertNull(
-          testTable.get("3".getBytes(StandardCharsets.UTF_8)));
+      Assertions.assertNotNull(testTable.get(byteOfNum[1]));
+      Assertions.assertNotNull(testTable.get(byteOfNum[2]));
+      Assertions.assertNull(testTable.get(byteOfNum[3]));
     }
 
     // Remove after next() deletes entry that was returned by next.
@@ -387,21 +413,18 @@ public class TestRDBTableStore {
       writeToTable(testTable, 3);
       TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
           testTable.iterator();
-      iterator.seek("2".getBytes(StandardCharsets.UTF_8));
+      iterator.seek(byteOfNum[2]);
       iterator.next();
       iterator.removeFromDB();
-      Assertions.assertNotNull(
-          testTable.get("1".getBytes(StandardCharsets.UTF_8)));
-      Assertions.assertNull(
-          testTable.get("2".getBytes(StandardCharsets.UTF_8)));
-      Assertions.assertNotNull(
-          testTable.get("3".getBytes(StandardCharsets.UTF_8)));
+      Assertions.assertNotNull(testTable.get(byteOfNum[1]));
+      Assertions.assertNull(testTable.get(byteOfNum[2]));
+      Assertions.assertNotNull(testTable.get(byteOfNum[3]));
     }
   }
 
   private void writeToTable(Table testTable, int num) throws IOException {
     for (int i = 1; i <= num; i++) {
-      byte[] key = (i + "").getBytes(StandardCharsets.UTF_8);
+      byte[] key = byteOfNum[i];
       byte[] value =
           RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
       testTable.put(key, value);
