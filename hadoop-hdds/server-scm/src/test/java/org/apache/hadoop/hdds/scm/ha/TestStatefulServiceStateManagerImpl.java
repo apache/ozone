@@ -28,10 +28,10 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
@@ -45,7 +45,7 @@ public class TestStatefulServiceStateManagerImpl {
   private Table<String, ByteString> statefulServiceConfig;
   private StatefulServiceStateManager stateManager;
 
-  @Before
+  @BeforeEach
   public void setup() throws AuthenticationException, IOException {
     conf = new OzoneConfiguration();
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
@@ -64,7 +64,7 @@ public class TestStatefulServiceStateManagerImpl {
             .build();
   }
 
-  @After
+  @AfterEach
   public void cleanup() throws Exception {
     if (dbStore != null) {
       dbStore.close();
@@ -83,7 +83,7 @@ public class TestStatefulServiceStateManagerImpl {
     stateManager.saveConfiguration(serviceName,
         ByteString.copyFromUtf8(message));
     scmhaManager.asSCMHADBTransactionBuffer().flush();
-    Assert.assertEquals(ByteString.copyFromUtf8(message),
+    Assertions.assertEquals(ByteString.copyFromUtf8(message),
         stateManager.readConfiguration(serviceName));
   }
 }

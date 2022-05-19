@@ -18,8 +18,8 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.rocksdb.RocksIterator;
@@ -27,9 +27,10 @@ import org.rocksdb.RocksIterator;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -49,7 +50,7 @@ public class TestRDBStoreIterator {
   private RocksIterator rocksDBIteratorMock;
   private RDBTable rocksTableMock;
 
-  @Before
+  @BeforeEach
   public void setup() {
     rocksDBIteratorMock = mock(RocksIterator.class);
     rocksTableMock = mock(RDBTable.class);
@@ -221,10 +222,11 @@ public class TestRDBStoreIterator {
     verifier.verify(rocksTableMock, times(1)).delete(testKey);
   }
 
-  @Test(expected = UnsupportedOperationException.class)
-  public void testRemoveFromDBWithoutDBTableSet() throws Exception {
+  @Test
+  public void testRemoveFromDBWithoutDBTableSet() {
     RDBStoreIterator iter = new RDBStoreIterator(rocksDBIteratorMock);
-    iter.removeFromDB();
+    assertThrows(UnsupportedOperationException.class,
+        iter::removeFromDB);
   }
 
   @Test

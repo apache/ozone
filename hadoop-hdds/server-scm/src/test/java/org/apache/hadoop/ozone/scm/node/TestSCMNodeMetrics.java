@@ -48,11 +48,11 @@ import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import static org.junit.Assert.assertEquals;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 /**
@@ -64,7 +64,7 @@ public class TestSCMNodeMetrics {
 
   private static DatanodeDetails registeredDatanode;
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() throws Exception {
 
     OzoneConfiguration source = new OzoneConfiguration();
@@ -92,7 +92,7 @@ public class TestSCMNodeMetrics {
 
   }
 
-  @AfterClass
+  @AfterAll
   public static void teardown() throws IOException {
     nodeManager.close();
   }
@@ -114,8 +114,8 @@ public class TestSCMNodeMetrics {
         .build();
     nodeManager.processHeartbeat(registeredDatanode, layoutInfo);
 
-    assertEquals("NumHBProcessed", hbProcessed + 1,
-        getCounter("NumHBProcessed"));
+    assertEquals(hbProcessed + 1, getCounter("NumHBProcessed"),
+        "NumHBProcessed");
   }
 
   /**
@@ -134,8 +134,8 @@ public class TestSCMNodeMetrics {
     nodeManager.processHeartbeat(MockDatanodeDetails
         .randomDatanodeDetails(), layoutInfo);
 
-    assertEquals("NumHBProcessingFailed", hbProcessedFailed + 1,
-        getCounter("NumHBProcessingFailed"));
+    assertEquals(hbProcessedFailed + 1, getCounter("NumHBProcessingFailed"),
+        "NumHBProcessingFailed");
   }
 
   /**
@@ -155,8 +155,9 @@ public class TestSCMNodeMetrics {
         .addStorageReport(storageReport).build();
 
     nodeManager.processNodeReport(registeredDatanode, nodeReport);
-    Assert.assertEquals("NumNodeReportProcessed", nrProcessed + 1,
-        getCounter("NumNodeReportProcessed"));
+    Assertions.assertEquals(nrProcessed + 1,
+        getCounter("NumNodeReportProcessed"),
+        "NumNodeReportProcessed");
   }
 
   /**
@@ -176,8 +177,8 @@ public class TestSCMNodeMetrics {
         .addStorageReport(storageReport).build();
 
     nodeManager.processNodeReport(randomDatanode, nodeReport);
-    assertEquals("NumNodeReportProcessingFailed", nrProcessed + 1,
-        getCounter("NumNodeReportProcessingFailed"));
+    assertEquals(nrProcessed + 1, getCounter("NumNodeReportProcessingFailed"),
+        "NumNodeReportProcessingFailed");
   }
 
   /**

@@ -31,9 +31,9 @@ import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,7 +54,7 @@ public class TestCommandQueueReportHandler implements EventPublisher {
   private SCMNodeManager nodeManager;
 
 
-  @Before
+  @BeforeEach
   public void resetEventCollector() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMStorageConfig storageConfig = Mockito.mock(SCMStorageConfig.class);
@@ -85,8 +85,9 @@ public class TestCommandQueueReportHandler implements EventPublisher {
     for (int i = 0; i < commandCount; i++) {
       int storedCount = nodeManager.getNodeQueuedCommandCount(dn,
           commandReport.getReport().getCommand(i));
-      Assert.assertEquals(commandReport.getReport().getCount(i), storedCount);
-      Assert.assertTrue(storedCount > 0);
+      Assertions.assertEquals(commandReport.getReport().getCount(i),
+          storedCount);
+      Assertions.assertTrue(storedCount > 0);
     }
   }
 
