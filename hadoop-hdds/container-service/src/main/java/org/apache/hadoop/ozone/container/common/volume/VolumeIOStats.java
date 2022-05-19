@@ -114,7 +114,7 @@ public class VolumeIOStats {
    * @return long
    */
   public long getReadBytes() {
-    return 1000L;
+    return readBytes.value();
   }
 
   /**
