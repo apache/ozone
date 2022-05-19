@@ -722,7 +722,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
       scmStore = new SCMStorageConfig(conf);
       initializeScmStorage(scmStore);
-      StorageContainerManager scm = HddsTestUtils.getScmSimple(conf);
+      StorageContainerManager scm = HddsTestUtils.getScmSimple(conf,
+          scmConfigurator);
       HealthyPipelineSafeModeRule rule =
           scm.getScmSafeModeManager().getHealthyPipelineSafeModeRule();
       if (rule != null) {

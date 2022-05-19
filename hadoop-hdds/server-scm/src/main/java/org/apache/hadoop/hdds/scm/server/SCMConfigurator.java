@@ -22,6 +22,7 @@ package org.apache.hadoop.hdds.scm.server;
 
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.ha.ExecutionUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -31,9 +32,10 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizer.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.hdds.security.x509.certificate.authority
     .CertificateServer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 
 /**
  * This class acts as an SCM builder Class. This class is important for us
@@ -76,7 +78,7 @@ public final class SCMConfigurator {
   private SCMHAManager scmHAManager;
   private SCMContext scmContext;
   private WritableContainerFactory writableContainerFactory;
-  private FinalizationManager finalizationManager;
+  private UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> finalizationExecutor;
 
   /**
    * Allows user to specify a version of Node manager to use with this SCM.
@@ -186,12 +188,12 @@ public final class SCMConfigurator {
   }
 
   /**
-   * Allows user to set the FinalizationManager to be used with this SCM.
-   * @param finalizationManager - Finalization manager to use.
+   * Allows user to set the executor for upgrade finalization.
+   * @param executor - Finalization executor to use.
    */
-  public void setFinalizationManager(
-      FinalizationManager finalizationManager) {
-    this.finalizationManager = finalizationManager;
+  public void setUpgradeFinalizationExecutor(
+      UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor) {
+    this.finalizationExecutor = executor;
   }
 
   /**
@@ -291,10 +293,11 @@ public final class SCMConfigurator {
   }
 
   /**
-   * Get the FinalizationManager
-   * @return FinalizationManager.
+   * Get the upgrade finalization executor.
+   * @return UpgradeFinalizationExecutor.
    */
-  public FinalizationManager getFinalizationManager() {
-    return finalizationManager;
+  public UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
+      getUpgradeFinalizationExecutor() {
+    return finalizationExecutor;
   }
 }

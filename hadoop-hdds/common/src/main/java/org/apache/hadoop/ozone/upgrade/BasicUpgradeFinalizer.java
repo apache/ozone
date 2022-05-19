@@ -55,14 +55,19 @@ public abstract class BasicUpgradeFinalizer
   private final V versionManager;
   private String clientID;
   private T component;
-  private DefaultUpgradeFinalizationExecutor<T> finalizationExecutor;
+  private UpgradeFinalizationExecutor<T> finalizationExecutor;
 
   private final Queue<String> msgs = new ConcurrentLinkedQueue<>();
   private boolean isDone = false;
 
   public BasicUpgradeFinalizer(V versionManager) {
+    this(versionManager, new DefaultUpgradeFinalizationExecutor<>());
+  }
+
+  public BasicUpgradeFinalizer(V versionManager,
+                               UpgradeFinalizationExecutor<T> executor) {
     this.versionManager = versionManager;
-    this.finalizationExecutor = new DefaultUpgradeFinalizationExecutor<>();
+    this.finalizationExecutor = executor;
   }
 
   public StatusAndMessages finalize(String upgradeClientID, T service)
@@ -357,7 +362,7 @@ public abstract class BasicUpgradeFinalizer
   }
 
   @VisibleForTesting
-  public void setFinalizationExecutor(DefaultUpgradeFinalizationExecutor
+  public void setFinalizationExecutor(DefaultUpgradeFinalizationExecutor<T>
                                             executor) {
     finalizationExecutor = executor;
   }

@@ -650,15 +650,17 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           containerManager.getContainers(), containerManager,
           pipelineManager, eventQueue, serviceManager, scmContext);
     }
-    if (configurator.getFinalizationManager() != null) {
-      finalizationManager = configurator.getFinalizationManager();
-    } else {
-      finalizationManager =
-          new FinalizationManagerImpl(conf, scmLayoutVersionManager,
-              pipelineManager, scmNodeManager, scmStorageConfig,
-              scmHAManager,
-              scmMetadataStore.getMetaTable());
-    }
+    finalizationManager = new FinalizationManagerImpl.Builder()
+        .setConfiguration(conf)
+        .setLayoutVersionManager(scmLayoutVersionManager)
+        .setPipelineManager(pipelineManager)
+        .setNodeManager(scmNodeManager)
+        .setStorage(scmStorageConfig)
+        .setHAManager(scmHAManager)
+        .setFinalizationStore(scmMetadataStore.getMetaTable())
+        .setFinalizationExecutor(configurator.getUpgradeFinalizationExecutor())
+        .build();
+
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
         containerManager, scmContext, eventQueue, replicationManager);
   }

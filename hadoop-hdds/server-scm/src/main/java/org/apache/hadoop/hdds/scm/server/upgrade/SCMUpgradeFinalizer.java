@@ -34,12 +34,9 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager.FinalizationCheckpoint;
-import org.apache.ratis.util.ExitUtils;
-import org.apache.ratis.util.Preconditions;
-
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 
 /**
  * UpgradeFinalizer for the Storage Container Manager service.
@@ -49,6 +46,11 @@ public class SCMUpgradeFinalizer extends
 
   public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
     super(versionManager);
+  }
+
+  public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager,
+      UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor) {
+    super(versionManager, executor);
   }
 
   // This should be called in the context of a separate finalize upgrade thread.

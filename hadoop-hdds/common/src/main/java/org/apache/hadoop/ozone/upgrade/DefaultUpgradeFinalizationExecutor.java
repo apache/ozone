@@ -31,7 +31,8 @@ import org.slf4j.LoggerFactory;
  * Unit/Integration tests can override this to provide error injected version
  * of this class.
  */
-public class DefaultUpgradeFinalizationExecutor<T> {
+public class DefaultUpgradeFinalizationExecutor<T>
+    implements UpgradeFinalizationExecutor<T> {
   static final Logger LOG =
       LoggerFactory.getLogger(DefaultUpgradeFinalizationExecutor.class);
 

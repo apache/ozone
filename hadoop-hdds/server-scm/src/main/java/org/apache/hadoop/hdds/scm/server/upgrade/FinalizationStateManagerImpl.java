@@ -29,7 +29,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   private final DBTransactionBuffer transactionBuffer;
   // SCM transaction buffer flushes asynchronously, so we must keep the most
   // up-to-date DB information in memory as well for reads.
-  private int dbMlv;
   private boolean hasFinalizingMark;
   private final List<ReplicatedFinalizationStep> finalizationSteps;
   private final HDDSLayoutVersionManager versionManager;
@@ -39,26 +38,19 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     this.transactionBuffer = builder.transactionBuffer;
     this.versionManager = builder.versionManager;
 
-    if (finalizationStore.isExist(OzoneConsts.LAYOUT_VERSION_KEY)) {
-      dbMlv = Integer
-          .parseInt(finalizationStore.get(OzoneConsts.LAYOUT_VERSION_KEY));
-    } else {
-      // No layout version in the DB implies the initial layout version.
-      dbMlv  = HDDSLayoutFeature.INITIAL_VERSION.layoutVersion();
-    }
     hasFinalizingMark = finalizationStore.isExist(OzoneConsts.FINALIZING_KEY);
     this.finalizationSteps = new ArrayList<>();
   }
 
   public FinalizationCheckpoint getFinalizationCheckpoint() {
-    boolean hasFinalizingMark = hasFinalizingMark();
     boolean mlvBehindSlv = versionManager.needsFinalization();
 
     FinalizationCheckpoint currentCheckpoint = null;
     // Enum constants must be iterated in order to resume from the correct
     // checkpoint.
     for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
-      if (checkpoint.isCurrent(hasFinalizingMark, mlvBehindSlv)) {
+      if (checkpoint.isCurrent(hasFinalizingMark,
+          versionManager.needsFinalization())) {
         currentCheckpoint = checkpoint;
         break;
       }
@@ -86,7 +78,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     for(ReplicatedFinalizationStep step: finalizationSteps) {
       step.run(feature);
     }
-    dbMlv = layoutVersion;
     transactionBuffer.addToBuffer(finalizationStore,
         OzoneConsts.LAYOUT_VERSION_KEY, String.valueOf(layoutVersion));
   }
@@ -109,11 +100,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
           FinalizationCheckpoint.FINALIZATION_COMPLETE, checkpoint);
       ExitUtils.terminate(1, errorMessage, LOG);
     }
-  }
-
-  @Override
-  public boolean hasFinalizingMark() {
-    return hasFinalizingMark;
   }
 
   @Override
