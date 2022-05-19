@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.shell;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileUtil;
@@ -335,6 +336,19 @@ public class TestOzoneTenantShell {
     stream.reset();
   }
 
+  private void checkOutput(ByteArrayOutputStream stream, String stringToMatch,
+      boolean exactMatch, boolean expectValidJSON) throws IOException {
+    stream.flush();
+    final String str = stream.toString(DEFAULT_ENCODING);
+    if (expectValidJSON) {
+      // Verify if the String can be parsed as a valid JSON
+      final ObjectMapper objectMapper = new ObjectMapper();
+      objectMapper.readTree(str);
+    }
+    checkOutput(str, stringToMatch, exactMatch);
+    stream.reset();
+  }
+
   private void checkOutput(String str, String stringToMatch,
                            boolean exactMatch) {
     if (exactMatch) {
@@ -374,7 +388,7 @@ public class TestOzoneTenantShell {
           "--delegated=true"});
       checkOutput(out, "{\n" + "  \"accessId\": \"devaa$alice\",\n"
           + "  \"tenantId\": \"devaa\",\n" + "  \"isAdmin\": true,\n"
-          + "  \"isDelegatedAdmin\": true\n" + "}\n", true);
+          + "  \"isDelegatedAdmin\": true\n" + "}\n", true, true);
       checkOutput(err, "", true);
 
       // Clean up
@@ -382,7 +396,7 @@ public class TestOzoneTenantShell {
           tenantName + "$" + userName, "--tenant=" + tenantName});
       checkOutput(out, "{\n" + "  \"accessId\": \"devaa$alice\",\n"
           + "  \"tenantId\": \"devaa\",\n" + "  \"isAdmin\": false,\n"
-          + "  \"isDelegatedAdmin\": false\n" + "}\n", true);
+          + "  \"isDelegatedAdmin\": false\n" + "}\n", true, true);
       checkOutput(err, "", true);
 
       executeHA(tenantShell, new String[] {
@@ -462,7 +476,7 @@ public class TestOzoneTenantShell {
     executeHA(tenantShell, new String[] {
         "user", "getsecret", "finance$bob"});
     checkOutput(out, "", false);
-    checkOutput(err, "AccessId 'finance$bob' doesn't exist\n",
+    checkOutput(err, "accessId 'finance$bob' doesn't exist\n",
         true);
 
     // Assign user accessId
@@ -527,7 +541,7 @@ public class TestOzoneTenantShell {
         + "      \"accessId\": \"dev$bob\",\n"
         + "      \"tenantId\": \"dev\",\n" + "      \"isAdmin\": true,\n"
         + "      \"isDelegatedAdmin\": true\n" + "    }\n" + "  ]\n" + "}\n",
-        true);
+        true, true);
     checkOutput(err, "", true);
 
     // Revoke admin
@@ -644,7 +658,7 @@ public class TestOzoneTenantShell {
     executeHA(tenantShell, new String[] {"--verbose", "delete", "dev"});
     checkOutput(out, "{\n" + "  \"tenantId\": \"dev\",\n"
         + "  \"volumeName\": \"dev\",\n" + "  \"volumeRefCount\": 0\n" + "}\n",
-        true);
+        true, true);
     checkOutput(err, "Deleted tenant 'dev'.\n", false);
     deleteVolume("dev");
 
@@ -657,7 +671,8 @@ public class TestOzoneTenantShell {
   @Test
   public void testListTenantUsers() throws IOException {
     executeHA(tenantShell, new String[] {"--verbose", "create", "tenant1"});
-    checkOutput(out, "{\n" + "  \"tenantId\": \"tenant1\"\n" + "}\n", true);
+    checkOutput(out, "{\n" +
+        "  \"tenantId\": \"tenant1\"\n" + "}\n", true, true);
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
