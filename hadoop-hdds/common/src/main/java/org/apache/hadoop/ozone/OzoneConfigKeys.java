@@ -448,6 +448,16 @@ public final class OzoneConfigKeys {
   public static final boolean OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION_DEFAULT =
       true;
 
+  public static final String OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED =
+          "ozone.network.flexible.fqdn.resolution.enabled";
+  public static final boolean OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT =
+          false;
+
+  public static final String OZONE_JVM_NETWORK_ADDRESS_CACHE_ENABLED =
+          "ozone.network.jvm.address.cache.enabled";
+  public static final boolean OZONE_JVM_NETWORK_ADDRESS_CACHE_ENABLED_DEFAULT =
+          true;
+
   public static final String OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY =
       "ozone.client.required.om.version.min";
 

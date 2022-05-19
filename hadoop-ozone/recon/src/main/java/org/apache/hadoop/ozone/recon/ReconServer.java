@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -86,6 +87,8 @@ public class ReconServer extends GenericCli {
   private volatile boolean isStarted = false;
 
   public static void main(String[] args) {
+    OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
+            new OzoneConfiguration());
     new ReconServer().run(args);
   }
 

@@ -50,10 +50,10 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -89,7 +89,7 @@ public class TestIncrementalContainerReportHandler {
   private DBStore dbStore;
   private SCMHAManager scmhaManager;
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException, InvalidStateTransitionException {
     final OzoneConfiguration conf = new OzoneConfiguration();
     final String path =
@@ -171,7 +171,7 @@ public class TestIncrementalContainerReportHandler {
 
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     containerStateManager.close();
     if (dbStore != null) {
@@ -211,7 +211,7 @@ public class TestIncrementalContainerReportHandler {
         new IncrementalContainerReportFromDatanode(
             datanodeOne, containerReport);
     reportHandler.onMessage(icrFromDatanode, publisher);
-    Assert.assertEquals(LifeCycleState.CLOSED,
+    Assertions.assertEquals(LifeCycleState.CLOSED,
         containerManager.getContainer(container.containerID()).getState());
   }
 
@@ -245,7 +245,7 @@ public class TestIncrementalContainerReportHandler {
         new IncrementalContainerReportFromDatanode(
             datanodeOne, containerReport);
     reportHandler.onMessage(icrFromDatanode, publisher);
-    Assert.assertEquals(LifeCycleState.QUASI_CLOSED,
+    Assertions.assertEquals(LifeCycleState.QUASI_CLOSED,
         containerManager.getContainer(container.containerID()).getState());
   }
 
@@ -282,7 +282,7 @@ public class TestIncrementalContainerReportHandler {
         new IncrementalContainerReportFromDatanode(
             datanodeOne, containerReport);
     reportHandler.onMessage(icr, publisher);
-    Assert.assertEquals(LifeCycleState.CLOSED,
+    Assertions.assertEquals(LifeCycleState.CLOSED,
         containerManager.getContainer(container.containerID()).getState());
   }
 
@@ -306,7 +306,7 @@ public class TestIncrementalContainerReportHandler {
     containerStateManager.addContainer(container.getProtobuf());
     containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
         container.containerID(), r));
-    Assert.assertEquals(3, containerStateManager
+    Assertions.assertEquals(3, containerStateManager
         .getContainerReplicas(container.containerID()).size());
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
@@ -316,7 +316,7 @@ public class TestIncrementalContainerReportHandler {
         new IncrementalContainerReportFromDatanode(
             datanodeOne, containerReport);
     reportHandler.onMessage(icr, publisher);
-    Assert.assertEquals(2, containerStateManager
+    Assertions.assertEquals(2, containerStateManager
         .getContainerReplicas(container.containerID()).size());
   }
 
@@ -339,7 +339,7 @@ public class TestIncrementalContainerReportHandler {
     containerStateManager.addContainer(container.getProtobuf());
     containerStateManager.addContainer(containerTwo.getProtobuf());
 
-    Assert.assertEquals(0, nodeManager.getContainers(datanode).size());
+    Assertions.assertEquals(0, nodeManager.getContainers(datanode).size());
 
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
@@ -375,21 +375,21 @@ public class TestIncrementalContainerReportHandler {
         if (nmContainers.contains(container.containerID())) {
           // If we find "container" in the NM, then we must also have it in
           // Container Manager.
-          Assert.assertEquals(1, containerStateManager
+          Assertions.assertEquals(1, containerStateManager
               .getContainerReplicas(container.containerID())
               .size());
-          Assert.assertEquals(2, nmContainers.size());
+          Assertions.assertEquals(2, nmContainers.size());
         } else {
           // If the race condition occurs as mentioned in HDDS-5249, then this
           // assert should fail. We will have found nothing for "container" in
           // NM, but have found something for it in ContainerManager, and that
           // should not happen. It should be in both, or neither.
-          Assert.assertEquals(0, containerStateManager
+          Assertions.assertEquals(0, containerStateManager
               .getContainerReplicas(container.containerID())
               .size());
-          Assert.assertEquals(1, nmContainers.size());
+          Assertions.assertEquals(1, nmContainers.size());
         }
-        Assert.assertEquals(1, containerStateManager
+        Assertions.assertEquals(1, containerStateManager
             .getContainerReplicas(containerTwo.containerID())
             .size());
       }
