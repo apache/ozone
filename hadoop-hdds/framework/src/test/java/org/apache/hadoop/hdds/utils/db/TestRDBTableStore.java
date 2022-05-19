@@ -235,26 +235,13 @@ public class TestRDBTableStore {
 
   @Test
   public void testIsExist(@TempDir File rdbLocation) throws Exception {
-    DBOptions rocksDBOptions = new DBOptions();
-    rocksDBOptions.setCreateIfMissing(true);
-    rocksDBOptions.setCreateMissingColumnFamilies(true);
-
-    String tableName = StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY);
-
-    Set<TableConfig> configSet = new HashSet<>();
-    TableConfig newConfig = new TableConfig(tableName,
-        new ColumnFamilyOptions());
-    configSet.add(newConfig);
-
-    rdbStore.close(); // TODO: HDDS-6773
-    RDBStore dbStore = new RDBStore(rdbLocation, rocksDBOptions, configSet);
-
     byte[] key = RandomStringUtils.random(10, true, false)
         .getBytes(StandardCharsets.UTF_8);
     byte[] value = RandomStringUtils.random(10, true, false)
         .getBytes(StandardCharsets.UTF_8);
 
-    try (Table<byte[], byte[]> testTable = dbStore.getTable(tableName)) {
+    final String tableName = families.get(0);
+    try (Table<byte[], byte[]> testTable = rdbStore.getTable(tableName)) {
       testTable.put(key, value);
 
       // Test if isExist returns true for a key that definitely exists.
@@ -269,7 +256,7 @@ public class TestRDBTableStore {
       // Test if isExist returns false for a key that is definitely not present.
       Assertions.assertFalse(testTable.isExist(invalidKey));
 
-      RDBMetrics rdbMetrics = dbStore.getMetrics();
+      RDBMetrics rdbMetrics = rdbStore.getMetrics();
       Assertions.assertEquals(3, rdbMetrics.getNumDBKeyMayExistChecks());
       Assertions.assertEquals(0, rdbMetrics.getNumDBKeyMayExistMisses());
 
@@ -277,42 +264,24 @@ public class TestRDBTableStore {
       testTable.put(key, value);
     }
 
-    dbStore.close();
-    rocksDBOptions = new DBOptions();
-    rocksDBOptions.setCreateIfMissing(true);
-    rocksDBOptions.setCreateMissingColumnFamilies(true);
-    dbStore = new RDBStore(rdbLocation, rocksDBOptions, configSet);
-    try (Table<byte[], byte[]> testTable = dbStore.getTable(tableName)) {
+    rdbStore.close();
+    setUp(rdbLocation);
+    try (Table<byte[], byte[]> testTable = rdbStore.getTable(tableName)) {
       // Verify isExist works with key not in block cache.
       Assertions.assertTrue(testTable.isExist(key));
-    } finally {
-      dbStore.close();
     }
   }
 
 
   @Test
   public void testGetIfExist(@TempDir File rdbLocation) throws Exception {
-    DBOptions rocksDBOptions = new DBOptions();
-    rocksDBOptions.setCreateIfMissing(true);
-    rocksDBOptions.setCreateMissingColumnFamilies(true);
-
-    String tableName = StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY);
-
-    Set<TableConfig> configSet = new HashSet<>();
-    TableConfig newConfig = new TableConfig(tableName,
-        new ColumnFamilyOptions());
-    configSet.add(newConfig);
-
-    rdbStore.close(); // TODO: HDDS-6773
-    RDBStore dbStore = new RDBStore(rdbLocation, rocksDBOptions, configSet);
-
     byte[] key = RandomStringUtils.random(10, true, false)
         .getBytes(StandardCharsets.UTF_8);
     byte[] value = RandomStringUtils.random(10, true, false)
         .getBytes(StandardCharsets.UTF_8);
 
-    try (Table<byte[], byte[]> testTable = dbStore.getTable(tableName)) {
+    final String tableName = families.get(0);
+    try (Table<byte[], byte[]> testTable = rdbStore.getTable(tableName)) {
       testTable.put(key, value);
 
       // Test if isExist returns value for a key that definitely exists.
@@ -327,7 +296,7 @@ public class TestRDBTableStore {
       // Test if isExist returns null for a key that is definitely not present.
       Assertions.assertNull(testTable.getIfExist(invalidKey));
 
-      RDBMetrics rdbMetrics = dbStore.getMetrics();
+      RDBMetrics rdbMetrics = rdbStore.getMetrics();
       Assertions.assertEquals(3, rdbMetrics.getNumDBKeyGetIfExistChecks());
 
       Assertions.assertEquals(0, rdbMetrics.getNumDBKeyGetIfExistMisses());
@@ -338,16 +307,11 @@ public class TestRDBTableStore {
       testTable.put(key, value);
     }
 
-    dbStore.close();
-    rocksDBOptions = new DBOptions();
-    rocksDBOptions.setCreateIfMissing(true);
-    rocksDBOptions.setCreateMissingColumnFamilies(true);
-    dbStore = new RDBStore(rdbLocation, rocksDBOptions, configSet);
-    try (Table<byte[], byte[]> testTable = dbStore.getTable(tableName)) {
+    rdbStore.close();
+    setUp(rdbLocation);
+    try (Table<byte[], byte[]> testTable = rdbStore.getTable(tableName)) {
       // Verify getIfExists works with key not in block cache.
       Assertions.assertNotNull(testTable.getIfExist(key));
-    } finally {
-      dbStore.close();
     }
   }
 
