@@ -56,6 +56,10 @@ public enum OMAction implements AuditAction {
   LIST_MULTIPART_UPLOAD_PARTS,
   LIST_MULTIPART_UPLOADS,
   ABORT_MULTIPART_UPLOAD,
+  GET_DELEGATION_TOKEN,
+  RENEW_DELEGATION_TOKEN,
+  CANCEL_DELEGATION_TOKEN,
+  GET_SERVICE_LIST,
 
   //ACL Actions
   ADD_ACL,
@@ -70,7 +74,8 @@ public enum OMAction implements AuditAction {
   LOOKUP_FILE,
   LIST_STATUS,
 
-  GET_S3_SECRET;
+  GET_S3_SECRET,
+  REVOKE_S3_SECRET;
 
   @Override
   public String getAction() {

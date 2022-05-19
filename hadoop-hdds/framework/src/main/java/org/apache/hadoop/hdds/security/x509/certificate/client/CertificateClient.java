@@ -19,15 +19,21 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+import org.apache.hadoop.hdds.security.OzoneSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.util.List;
+import java.util.Objects;
+
+import static org.apache.hadoop.hdds.security.OzoneSecurityException.ResultCodes.OM_PUBLIC_PRIVATE_KEY_FILE_NOT_EXIST;
 
 /**
  * Certificate client provides and interface to certificate operations that
@@ -211,5 +217,100 @@ public interface CertificateClient {
    * @return security provider
    */
   String getSecurityProvider();
+
+  /**
+   * Return component name of this certificate client.
+   * @return component name
+   */
+  String getComponentName();
+
+  /**
+   * Return the latest Root CA certificate known to the client.
+   * @return latest Root CA certificate known to the client.
+   */
+  X509Certificate getRootCACertificate();
+
+  /**
+   * Store RootCA certificate.
+   * @param pemEncodedCert
+   * @param force
+   * @throws CertificateException
+   */
+  void storeRootCACertificate(String pemEncodedCert, boolean force)
+      throws CertificateException;
+
+  /**
+   * Return the pem encoded CA certificate list.
+   *
+   * If initialized return list of pem encoded CA certificates, else return
+   * null.
+   * @return list of pem encoded CA certificates.
+   */
+  List<String> getCAList();
+
+  /**
+   * Return the pem encoded  CA certificate list.
+   *
+   * If list is null, fetch the list from SCM and returns the list.
+   * If list is not null, return the pem encoded  CA certificate list.
+   *
+   * @return list of pem encoded  CA certificates.
+   * @throws IOException
+   */
+  List<String> listCA() throws IOException;
+
+  /**
+   * Update and returns the pem encoded CA certificate list.
+   * @return list of pem encoded  CA certificates.
+   * @throws IOException
+   */
+  List<String> updateCAList() throws IOException;
+
+  /**
+   * Get the CRLInfo based on the CRL Ids from SCM.
+   * @param crlIds - list of crl ids
+   * @return list of CRLInfo
+   * @throws IOException
+   */
+  List<CRLInfo> getCrls(List<Long> crlIds) throws IOException;
+
+  /**
+   * Get the latest CRL id from SCM.
+   * @return latest CRL id.
+   * @throws IOException
+   */
+  long getLatestCrlId() throws IOException;
+
+  default void assertValidKeysAndCertificate() throws OzoneSecurityException {
+    try {
+      Objects.requireNonNull(getPublicKey());
+      Objects.requireNonNull(getPrivateKey());
+      Objects.requireNonNull(getCertificate());
+    } catch (Exception e) {
+      throw new OzoneSecurityException("Error reading keypair & certificate", e,
+          OM_PUBLIC_PRIVATE_KEY_FILE_NOT_EXIST);
+    }
+  }
+
+  /**
+   * Get Local CRL id received.
+   * @return
+   */
+  long getLocalCrlId();
+
+  /**
+   * Set Local CRL id.
+   * @param crlId
+   */
+  void setLocalCrlId(long crlId);
+
+  /**
+   * Process crl and remove the certificates in the revoked cert list from
+   * client.
+   * @param crl
+   * @return true if the client's own cert needs to be reinit
+   * false otherwise;
+   */
+  boolean processCrl(CRLInfo crl);
 
 }

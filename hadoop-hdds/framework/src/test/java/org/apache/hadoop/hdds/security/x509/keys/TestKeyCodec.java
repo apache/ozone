@@ -42,7 +42,7 @@ import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -150,9 +150,10 @@ public class TestKeyCodec {
 
     // Now let us assert the permissions on the Directories and files are as
     // expected.
-    Set<PosixFilePermission> expectedSet = pemWriter.getPermissionSet();
+    Set<PosixFilePermission> expectedSet = pemWriter.getFilePermissionSet();
     Set<PosixFilePermission> currentSet =
         Files.getPosixFilePermissions(privateKeyPath);
+    Assert.assertEquals(expectedSet.size(), currentSet.size());
     currentSet.removeAll(expectedSet);
     Assert.assertEquals(0, currentSet.size());
 
@@ -161,8 +162,10 @@ public class TestKeyCodec {
     currentSet.removeAll(expectedSet);
     Assert.assertEquals(0, currentSet.size());
 
+    expectedSet = pemWriter.getDirPermissionSet();
     currentSet =
         Files.getPosixFilePermissions(keyLocation);
+    Assert.assertEquals(expectedSet.size(), currentSet.size());
     currentSet.removeAll(expectedSet);
     Assert.assertEquals(0, currentSet.size());
   }

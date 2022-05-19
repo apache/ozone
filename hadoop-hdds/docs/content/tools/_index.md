@@ -62,6 +62,5 @@ Admin commands:
 Test tools:
 
    * **freon** -  Runs the ozone load generator.
-   * **genesis**  - Developer Only, Ozone micro-benchmark application.
 
  For more information see the following subpages:

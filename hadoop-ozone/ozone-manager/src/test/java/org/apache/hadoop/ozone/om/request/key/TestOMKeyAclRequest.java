@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequest;
@@ -44,18 +46,22 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
   @Test
   public void testKeyAddAclRequest() throws Exception {
     // Manually add volume, bucket and key to DB
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
-    TestOMRequestUtils.addKeyToTable(false, false, volumeName, bucketName,
-        keyName, clientID, replicationType, replicationFactor, 1L,
-        omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    String ozoneKey = addKeyToTable();
+
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+
+    // As we added manually to key table.
+    Assert.assertNotNull(omKeyInfo);
 
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rwdlncxy[ACCESS]");
 
     // Create KeyAddAcl request
     OMRequest originalRequest = createAddAclkeyRequest(acl);
-    OMKeyAddAclRequest omKeyAddAclRequest = new OMKeyAddAclRequest(
-        originalRequest);
+    OMKeyAclRequest omKeyAddAclRequest =
+        getOmKeyAddAclRequest(originalRequest);
     OMRequest preExecuteRequest = omKeyAddAclRequest.preExecute(ozoneManager);
 
     // When preExecute() of adding acl,
@@ -68,7 +74,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
 
     // Execute original request
     OMClientResponse omClientResponse = omKeyAddAclRequest
-        .validateAndUpdateCache(ozoneManager, 2,
+        .validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
@@ -77,21 +83,25 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
 
   @Test
   public void testKeyRemoveAclRequest() throws Exception {
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
-    TestOMRequestUtils.addKeyToTable(false, false, volumeName, bucketName,
-        keyName, clientID, replicationType, replicationFactor, 1L,
-        omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    String ozoneKey = addKeyToTable();
+
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+
+    // As we added manually to key table.
+    Assert.assertNotNull(omKeyInfo);
 
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rwdlncxy[ACCESS]");
 
     // Add acl.
     OMRequest addAclRequest = createAddAclkeyRequest(acl);
-    OMKeyAddAclRequest omKeyAddAclRequest =
-        new OMKeyAddAclRequest(addAclRequest);
+    OMKeyAclRequest omKeyAddAclRequest =
+        getOmKeyAddAclRequest(addAclRequest);
     omKeyAddAclRequest.preExecute(ozoneManager);
     OMClientResponse omClientAddAclResponse = omKeyAddAclRequest
-        .validateAndUpdateCache(ozoneManager, 1,
+        .validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
     OMResponse omAddAclResponse = omClientAddAclResponse.getOMResponse();
     Assert.assertNotNull(omAddAclResponse.getAddAclResponse());
@@ -99,17 +109,16 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         omAddAclResponse.getStatus());
 
     // Verify result of adding acl.
-    String ozoneKey = omMetadataManager
-        .getOzoneKey(volumeName, bucketName, keyName);
-    List<OzoneAcl> keyAcls = omMetadataManager.getKeyTable().get(ozoneKey)
-        .getAcls();
+    List<OzoneAcl> keyAcls =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
+            .getAcls();
     Assert.assertEquals(1, keyAcls.size());
     Assert.assertEquals(acl, keyAcls.get(0));
 
     // Remove acl.
     OMRequest removeAclRequest = createRemoveAclKeyRequest(acl);
-    OMKeyRemoveAclRequest omKeyRemoveAclRequest =
-        new OMKeyRemoveAclRequest(removeAclRequest);
+    OMKeyAclRequest omKeyRemoveAclRequest =
+        getOmKeyRemoveAclRequest(removeAclRequest);
     OMRequest preExecuteRequest = omKeyRemoveAclRequest
         .preExecute(ozoneManager);
 
@@ -122,7 +131,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
     Assert.assertTrue(newModTime > originModTime);
 
     OMClientResponse omClientRemoveAclResponse = omKeyRemoveAclRequest
-        .validateAndUpdateCache(ozoneManager, 2,
+        .validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
     OMResponse omRemoveAclResponse = omClientRemoveAclResponse.getOMResponse();
     Assert.assertNotNull(omRemoveAclResponse.getRemoveAclResponse());
@@ -130,24 +139,29 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         omRemoveAclResponse.getStatus());
 
     // Verify result of removing acl.
-    List<OzoneAcl> newAcls = omMetadataManager.getKeyTable().get(ozoneKey)
-        .getAcls();
+    List<OzoneAcl> newAcls =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
+            .getAcls();
     Assert.assertEquals(0, newAcls.size());
   }
 
   @Test
   public void testKeySetAclRequest() throws Exception {
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
-    TestOMRequestUtils.addKeyToTable(false, false, volumeName, bucketName,
-        keyName, clientID, replicationType, replicationFactor, 1L,
-        omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    String ozoneKey = addKeyToTable();
+
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+
+    // As we added manually to key table.
+    Assert.assertNotNull(omKeyInfo);
 
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rwdlncxy[ACCESS]");
 
     OMRequest setAclRequest = createSetAclKeyRequest(acl);
-    OMKeySetAclRequest omKeySetAclRequest =
-        new OMKeySetAclRequest(setAclRequest);
+    OMKeyAclRequest omKeySetAclRequest =
+        getOmKeySetAclRequest(setAclRequest);
     OMRequest preExecuteRequest = omKeySetAclRequest.preExecute(ozoneManager);
 
     // When preExecute() of setting acl,
@@ -159,7 +173,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
     Assert.assertTrue(newModTime > originModTime);
 
     OMClientResponse omClientResponse = omKeySetAclRequest
-        .validateAndUpdateCache(ozoneManager, 1,
+        .validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
     OMResponse omSetAclResponse = omClientResponse.getOMResponse();
     Assert.assertNotNull(omSetAclResponse.getSetAclResponse());
@@ -167,17 +181,16 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         omSetAclResponse.getStatus());
 
     // Verify result of setting acl.
-    String ozoneKey = omMetadataManager
-        .getOzoneKey(volumeName, bucketName, keyName);
-    List<OzoneAcl> newAcls = omMetadataManager.getKeyTable().get(ozoneKey)
-        .getAcls();
+    List<OzoneAcl> newAcls =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
+            .getAcls();
     Assert.assertEquals(newAcls.get(0), acl);
   }
 
   /**
    * Create OMRequest which encapsulates OMKeyAddAclRequest.
    */
-  private OMRequest createAddAclkeyRequest(OzoneAcl acl) {
+  protected OMRequest createAddAclkeyRequest(OzoneAcl acl) {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
         .setBucketName(bucketName)
         .setVolumeName(volumeName)
@@ -232,5 +245,27 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         .setCmdType(OzoneManagerProtocolProtos.Type.SetAcl)
         .setSetAclRequest(setAclRequest)
         .build();
+  }
+
+  protected String addKeyToTable() throws Exception {
+    OMRequestTestUtils.addKeyToTable(false, false, volumeName, bucketName,
+        keyName, clientID, replicationType, replicationFactor, 1L,
+        omMetadataManager);
+
+    return omMetadataManager.getOzoneKey(volumeName, bucketName,
+        keyName);
+  }
+
+  protected OMKeyAclRequest getOmKeyAddAclRequest(OMRequest originalRequest) {
+    return new OMKeyAddAclRequest(originalRequest, ozoneManager);
+  }
+
+  protected OMKeyAclRequest getOmKeyRemoveAclRequest(
+      OMRequest removeAclRequest) {
+    return new OMKeyRemoveAclRequest(removeAclRequest, ozoneManager);
+  }
+
+  protected OMKeyAclRequest getOmKeySetAclRequest(OMRequest setAclRequest) {
+    return new OMKeySetAclRequest(setAclRequest, ozoneManager);
   }
 }

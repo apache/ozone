@@ -64,7 +64,7 @@ public class Hadoop3OmTransport implements OmTransport {
         ProtobufRpcEngine.class);
 
     this.omFailoverProxyProvider = new OMFailoverProxyProvider(conf, ugi,
-        omServiceId);
+        omServiceId, OzoneManagerProtocolPB.class);
 
     int maxFailovers = conf.getInt(
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
@@ -84,7 +84,8 @@ public class Hadoop3OmTransport implements OmTransport {
 
         // Failover to the OM node returned by OMResponse leaderOMNodeId if
         // current proxy is not pointing to that node.
-        omFailoverProxyProvider.performFailoverIfRequired(leaderOmId);
+        omFailoverProxyProvider.setNextOmProxy(leaderOmId);
+        omFailoverProxyProvider.performFailover(null);
       }
       return omResponse;
     } catch (ServiceException e) {

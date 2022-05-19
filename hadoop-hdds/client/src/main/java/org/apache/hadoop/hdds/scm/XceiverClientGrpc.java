@@ -67,6 +67,8 @@ import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
+
 /**
  * A Client for the storageContainer protocol for read object data.
  */
@@ -82,7 +84,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private final long timeout;
   private SecurityConfig secConfig;
   private final boolean topologyAwareRead;
-  private X509Certificate caCert;
+  private List<X509Certificate> caCerts;
   // Cache the DN which returned the GetBlock command so that the ReadChunk
   // command can be sent to the same DN.
   private Map<DatanodeBlockID, DatanodeDetails> getBlockDNcache;
@@ -93,10 +95,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    *
    * @param pipeline - Pipeline that defines the machines.
    * @param config   -- Ozone Config
-   * @param caCert   - SCM ca certificate.
+   * @param caCerts   - SCM ca certificate.
    */
   public XceiverClientGrpc(Pipeline pipeline, ConfigurationSource config,
-      X509Certificate caCert) {
+      List<X509Certificate> caCerts) {
     super();
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkNotNull(config);
@@ -114,7 +116,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     this.topologyAwareRead = config.getBoolean(
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
-    this.caCert = caCert;
+    this.caCerts = caCerts;
     this.getBlockDNcache = new ConcurrentHashMap<>();
   }
 
@@ -157,7 +159,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   private synchronized void connectToDatanode(DatanodeDetails dn)
       throws IOException {
-    if (isConnected(dn)){
+    if (isConnected(dn)) {
       return;
     }
     // read port from the data node, on failure use default configured
@@ -179,8 +181,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
             .intercept(new GrpcClientInterceptor());
     if (secConfig.isGrpcTlsEnabled()) {
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
-      if (caCert != null) {
-        sslContextBuilder.trustManager(caCert);
+      if (caCerts != null) {
+        sslContextBuilder.trustManager(caCerts);
       }
       if (secConfig.useTestCert()) {
         channelBuilder.overrideAuthority("localhost");
@@ -218,9 +220,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       channel.shutdownNow();
       try {
         channel.awaitTermination(60, TimeUnit.MINUTES);
-      } catch (Exception e) {
-        LOG.error("Unexpected exception while waiting for channel termination",
+      } catch (InterruptedException e) {
+        LOG.error("InterruptedException while waiting for channel termination",
             e);
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
       }
     }
   }
@@ -237,12 +241,12 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       return sendCommandWithTraceIDAndRetry(request, null).
           getResponse().get();
     } catch (ExecutionException e) {
-      throw new IOException("Failed to execute command " + request, e);
+      throw getIOExceptionForSendCommand(request, e);
     } catch (InterruptedException e) {
       LOG.error("Command execution was interrupted.");
       Thread.currentThread().interrupt();
       throw (IOException) new InterruptedIOException(
-          "Command " + request + " was interrupted.")
+          "Command " + processForDebug(request) + " was interrupted.")
           .initCause(e);
     }
   }
@@ -261,18 +265,22 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         futureHashMap.put(dn, sendCommandAsync(request, dn).getResponse());
       } catch (InterruptedException e) {
         LOG.error("Command execution was interrupted.");
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
       }
     }
-    try{
+    try {
       for (Map.Entry<DatanodeDetails,
               CompletableFuture<ContainerCommandResponseProto> >
-              entry : futureHashMap.entrySet()){
+              entry : futureHashMap.entrySet()) {
         responseProtoHashMap.put(entry.getKey(), entry.getValue().get());
       }
     } catch (InterruptedException e) {
       LOG.error("Command execution was interrupted.");
+      // Re-interrupt the thread while catching InterruptedException
+      Thread.currentThread().interrupt();
     } catch (ExecutionException e) {
-      LOG.error("Failed to execute command " + request, e);
+      LOG.error("Failed to execute command {}", processForDebug(request), e);
     }
     return responseProtoHashMap;
   }
@@ -286,12 +294,12 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       reply = sendCommandWithTraceIDAndRetry(request, validators);
       return reply.getResponse().get();
     } catch (ExecutionException e) {
-      throw new IOException("Failed to execute command " + request, e);
+      throw getIOExceptionForSendCommand(request, e);
     } catch (InterruptedException e) {
       LOG.error("Command execution was interrupted.");
       Thread.currentThread().interrupt();
       throw (IOException) new InterruptedIOException(
-          "Command " + request + " was interrupted.")
+          "Command " + processForDebug(request) + " was interrupted.")
           .initCause(e);
     }
   }
@@ -362,7 +370,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     for (DatanodeDetails dn : datanodeList) {
       try {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Executing command {} on datanode {}", request, dn);
+          LOG.debug("Executing command {} on datanode {}",
+              processForDebug(request), dn);
         }
         // In case the command gets retried on a 2nd datanode,
         // sendCommandAsyncCall will create a new channel and async stub
@@ -382,9 +391,15 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       } catch (IOException e) {
         ioException = e;
         responseProto = null;
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Failed to execute command {} on datanode {}",
+              processForDebug(request), dn, e);
+        }
       } catch (ExecutionException e) {
-        LOG.debug("Failed to execute command {} on datanode {}",
-            request, dn, e);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Failed to execute command {} on datanode {}",
+              processForDebug(request), dn, e);
+        }
         if (Status.fromThrowable(e.getCause()).getCode()
             == Status.UNAUTHENTICATED.getCode()) {
           throw new SCMSecurityException("Failed to authenticate with "
@@ -405,8 +420,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       return reply;
     } else {
       Preconditions.checkNotNull(ioException);
-      LOG.error("Failed to execute command {} on the pipeline {}.", request,
-          pipeline);
+      LOG.error("Failed to execute command {} on the pipeline {}.",
+          processForDebug(request), pipeline);
       throw ioException;
     }
   }
@@ -445,7 +460,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       // served out of order over XceiverClientGrpc. This needs to be fixed
       // if this API is to be used for I/O path. Currently, this is not
       // used for Read/Write Operation but for tests.
-      if (!HddsUtils.isReadOnly(request)) {
+      if (shouldBlockAndWaitAsyncReply(request)) {
         asyncReply.getResponse().get();
       }
       return asyncReply;
@@ -455,11 +470,26 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     }
   }
 
+  /**
+   * During data writes the ordering of WriteChunk and PutBlock is not ensured
+   * by any outside logic, therefore in this original implementation, all reads
+   * and writes are synchronized.
+   * This method is providing the possibility for subclasses to override this
+   * behaviour.
+   *
+   * @param request the request we need the decision about
+   * @return true if the request is a write request.
+   */
+  protected boolean shouldBlockAndWaitAsyncReply(
+      ContainerCommandRequestProto request) {
+    return !HddsUtils.isReadOnly(request);
+  }
+
   @VisibleForTesting
   public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request, DatanodeDetails dn)
       throws IOException, InterruptedException {
-    checkOpen(dn, request.getEncodedToken());
+    checkOpen(dn);
     UUID dnId = dn.getUuid();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Send command {} to datanode {}",
@@ -487,7 +517,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
                     cost);
                 if (LOG.isDebugEnabled()) {
                   LOG.debug("Executed command {} on datanode {}, cost = {}, "
-                          + "cmdType = {}", request, dn,
+                          + "cmdType = {}", processForDebug(request), dn,
                       cost, request.getCmdType());
                 }
                 semaphore.release();
@@ -502,7 +532,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
                     System.currentTimeMillis() - requestTime);
                 if (LOG.isDebugEnabled()) {
                   LOG.debug("Executed command {} on datanode {}, cost = {}, "
-                          + "cmdType = {}", request, dn,
+                          + "cmdType = {}", processForDebug(request), dn,
                       cost, request.getCmdType());
                 }
                 semaphore.release();
@@ -512,7 +542,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
               public void onCompleted() {
                 if (!replyFuture.isDone()) {
                   replyFuture.completeExceptionally(new IOException(
-                      "Stream completed but no reply for request " + request));
+                      "Stream completed but no reply for request " +
+                          processForDebug(request)));
                 }
               }
             });
@@ -521,8 +552,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return new XceiverClientReply(replyFuture);
   }
 
-  private synchronized void checkOpen(DatanodeDetails dn, String encodedToken)
-      throws IOException{
+  private synchronized void checkOpen(DatanodeDetails dn)
+      throws IOException {
     if (closed) {
       throw new IOException("This channel is not connected.");
     }
@@ -531,12 +562,12 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     // If the channel doesn't exist for this specific datanode or the channel
     // is closed, just reconnect
     if (!isConnected(channel)) {
-      reconnect(dn, encodedToken);
+      reconnect(dn);
     }
 
   }
 
-  private void reconnect(DatanodeDetails dn, String encodedToken)
+  private void reconnect(DatanodeDetails dn)
       throws IOException {
     ManagedChannel channel;
     try {
@@ -571,5 +602,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   @Override
   public HddsProtos.ReplicationType getPipelineType() {
     return HddsProtos.ReplicationType.STAND_ALONE;
+  }
+
+  @VisibleForTesting
+  public static Logger getLogger() {
+    return LOG;
   }
 }

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -32,6 +33,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import com.google.common.base.Preconditions;
@@ -70,11 +72,8 @@ public final class KeyValueContainerUtil {
    * @param containerMetaDataPath Path to the container's metadata directory.
    * @param chunksPath Path were chunks for this container should be stored.
    * @param dbFile Path to the container's .db file.
-   * @param schemaVersion The schema version of the container. Since this
-   * method is used when creating new containers, the
-   * {@link OzoneConsts#SCHEMA_LATEST} variable can be
-   * used to construct the container. If this method has
-   * not been updated after a schema version addition
+   * @param schemaVersion The schema version of the container. If this method
+   * has not been updated after a schema version addition
    * and does not recognize the latest SchemaVersion, an
    * {@link IllegalArgumentException} is thrown.
    * @param conf The configuration to use for this container.
@@ -169,7 +168,7 @@ public final class KeyValueContainerUtil {
     File metadataPath = new File(kvContainerData.getMetadataPath());
 
     // Verify Checksum
-    ContainerUtils.verifyChecksum(kvContainerData);
+    ContainerUtils.verifyChecksum(kvContainerData, config);
 
     File dbFile = KeyValueContainerLocationUtil.getContainerDBFile(
         metadataPath, containerID);
@@ -192,8 +191,10 @@ public final class KeyValueContainerUtil {
     DatanodeStore store = null;
     try {
       try {
+        boolean readOnly = ContainerInspectorUtil.isReadOnly(
+            ContainerProtos.ContainerType.KeyValueContainer);
         store = BlockUtils.getUncachedDatanodeStore(
-            kvContainerData, config, true);
+            kvContainerData, config, readOnly);
       } catch (IOException e) {
         // If an exception is thrown, then it may indicate the RocksDB is
         // already open in the container cache. As this code is only executed at
@@ -252,11 +253,22 @@ public final class KeyValueContainerUtil {
       Long blockCount = metadataTable.get(OzoneConsts.BLOCK_COUNT);
       if (blockCount != null) {
         isBlockMetadataSet = true;
-        kvContainerData.setKeyCount(blockCount);
+        kvContainerData.setBlockCount(blockCount);
       }
       if (!isBlockMetadataSet) {
         initializeUsedBytesAndBlockCount(store, kvContainerData);
       }
+
+      // If the container is missing a chunks directory, possibly due to the
+      // bug fixed by HDDS-6235, create it here.
+      File chunksDir = new File(kvContainerData.getChunksPath());
+      if (!chunksDir.exists()) {
+        Files.createDirectories(chunksDir.toPath());
+      }
+      // Run advanced container inspection/repair operations if specified on
+      // startup. If this method is called but not as a part of startup,
+      // The inspectors will be unloaded and this will be a no-op.
+      ContainerInspectorUtil.process(kvContainerData, store);
     } finally {
       if (cachedDB != null) {
         // If we get a cached instance, calling close simply decrements the
@@ -318,10 +330,10 @@ public final class KeyValueContainerUtil {
       }
     }
     kvData.setBytesUsed(usedBytes);
-    kvData.setKeyCount(blockCount);
+    kvData.setBlockCount(blockCount);
   }
 
-  private static long getBlockLength(BlockData block) throws IOException {
+  public static long getBlockLength(BlockData block) throws IOException {
     long blockLen = 0;
     List<ContainerProtos.ChunkInfo> chunkInfoList = block.getChunks();
 

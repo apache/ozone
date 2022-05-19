@@ -18,48 +18,24 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
-import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.Checksum;
-import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
-import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.RandomAccessFile;
-import java.util.Arrays;
-import java.util.ArrayList;
-import java.nio.ByteBuffer;
-import java.util.Collection;
-import java.util.List;
-import java.util.UUID;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
 
@@ -67,43 +43,13 @@ import static org.junit.Assert.assertFalse;
 /**
  * Basic sanity test for the KeyValueContainerCheck class.
  */
-@RunWith(Parameterized.class) public class TestKeyValueContainerCheck {
+@RunWith(Parameterized.class)
+public class TestKeyValueContainerCheck
+    extends TestKeyValueContainerIntegrityChecks {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestKeyValueContainerCheck.class);
-
-  private final ChunkLayoutTestInfo chunkManagerTestInfo;
-  private KeyValueContainer container;
-  private KeyValueContainerData containerData;
-  private MutableVolumeSet volumeSet;
-  private OzoneConfiguration conf;
-  private File testRoot;
-  private ChunkManager chunkManager;
-
-  public TestKeyValueContainerCheck(ChunkLayoutTestInfo chunkManagerTestInfo) {
-    this.chunkManagerTestInfo = chunkManagerTestInfo;
-  }
-
-  @Parameterized.Parameters public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[][] {
-        {ChunkLayoutTestInfo.FILE_PER_CHUNK},
-        {ChunkLayoutTestInfo.FILE_PER_BLOCK}
-    });
-  }
-
-  @Before public void setUp() throws Exception {
-    LOG.info("Testing  layout:{}", chunkManagerTestInfo.getLayout());
-    this.testRoot = GenericTestUtils.getRandomizedTestDir();
-    conf = new OzoneConfiguration();
-    conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
-    chunkManagerTestInfo.updateConfig(conf);
-    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf);
-    chunkManager = chunkManagerTestInfo.createChunkManager(true, null);
-  }
-
-  @After public void teardown() {
-    volumeSet.shutdown();
-    FileUtil.fullyDelete(testRoot);
+  public TestKeyValueContainerCheck(ContainerLayoutTestInfo
+      containerLayoutTestInfo) {
+    super(containerLayoutTestInfo);
   }
 
   /**
@@ -114,13 +60,14 @@ import static org.junit.Assert.assertFalse;
     long containerID = 101;
     int deletedBlocks = 1;
     int normalBlocks = 3;
-    int chunksPerBlock = 4;
+    OzoneConfiguration conf = getConf();
     ContainerScrubberConfiguration c = conf.getObject(
         ContainerScrubberConfiguration.class);
 
     // test Closed Container
-    createContainerWithBlocks(containerID, normalBlocks, deletedBlocks,
-        chunksPerBlock);
+    KeyValueContainer container = createContainerWithBlocks(containerID,
+        normalBlocks, deletedBlocks);
+    KeyValueContainerData containerData = container.getContainerData();
 
     KeyValueContainerCheck kvCheck =
         new KeyValueContainerCheck(containerData.getMetadataPath(), conf,
@@ -146,13 +93,14 @@ import static org.junit.Assert.assertFalse;
     long containerID = 102;
     int deletedBlocks = 1;
     int normalBlocks = 3;
-    int chunksPerBlock = 4;
+    OzoneConfiguration conf = getConf();
     ContainerScrubberConfiguration sc = conf.getObject(
         ContainerScrubberConfiguration.class);
 
     // test Closed Container
-    createContainerWithBlocks(containerID, normalBlocks, deletedBlocks,
-        chunksPerBlock);
+    KeyValueContainer container = createContainerWithBlocks(containerID,
+        normalBlocks, deletedBlocks);
+    KeyValueContainerData containerData = container.getContainerData();
 
     container.close();
 
@@ -173,7 +121,7 @@ import static org.junit.Assert.assertFalse;
       ContainerProtos.ChunkInfo c = block.getChunks().get(0);
       BlockID blockID = block.getBlockID();
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(c);
-      File chunkFile = chunkManagerTestInfo.getLayout()
+      File chunkFile = getChunkLayout()
           .getChunkFile(containerData, blockID, chunkInfo);
       long length = chunkFile.length();
       assertTrue(length > 0);
@@ -181,7 +129,7 @@ import static org.junit.Assert.assertFalse;
       try (RandomAccessFile file = new RandomAccessFile(chunkFile, "rws")) {
         file.setLength(length / 2);
       }
-      assertEquals(length/2, chunkFile.length());
+      assertEquals(length / 2, chunkFile.length());
     }
 
     // metadata check should pass.
@@ -193,75 +141,4 @@ import static org.junit.Assert.assertFalse;
             sc.getBandwidthPerVolume()), null);
     assertFalse(valid);
   }
-
-  /**
-   * Creates a container with normal and deleted blocks.
-   * First it will insert normal blocks, and then it will insert
-   * deleted blocks.
-   */
-  private void createContainerWithBlocks(long containerId, int normalBlocks,
-      int deletedBlocks, int chunksPerBlock) throws Exception {
-    String strBlock = "block";
-    String strChunk = "-chunkFile";
-    long totalBlocks = normalBlocks + deletedBlocks;
-    int unitLen = 1024;
-    int chunkLen = 3 * unitLen;
-    int bytesPerChecksum = 2 * unitLen;
-    Checksum checksum = new Checksum(ContainerProtos.ChecksumType.SHA256,
-        bytesPerChecksum);
-    byte[] chunkData = RandomStringUtils.randomAscii(chunkLen).getBytes(UTF_8);
-    ChecksumData checksumData = checksum.computeChecksum(chunkData);
-    DispatcherContext writeStage = new DispatcherContext.Builder()
-        .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
-        .build();
-    DispatcherContext commitStage = new DispatcherContext.Builder()
-        .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
-        .build();
-
-    containerData = new KeyValueContainerData(containerId,
-        chunkManagerTestInfo.getLayout(),
-        (long) chunksPerBlock * chunkLen * totalBlocks,
-        UUID.randomUUID().toString(), UUID.randomUUID().toString());
-    container = new KeyValueContainer(containerData, conf);
-    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
-        UUID.randomUUID().toString());
-    try (ReferenceCountedDB metadataStore = BlockUtils.getDB(containerData,
-        conf)) {
-      assertNotNull(containerData.getChunksPath());
-      File chunksPath = new File(containerData.getChunksPath());
-      chunkManagerTestInfo.validateFileCount(chunksPath, 0, 0);
-
-      List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
-      for (int i = 0; i < totalBlocks; i++) {
-        BlockID blockID = new BlockID(containerId, i);
-        BlockData blockData = new BlockData(blockID);
-
-        chunkList.clear();
-        for (long chunkCount = 0; chunkCount < chunksPerBlock; chunkCount++) {
-          String chunkName = strBlock + i + strChunk + chunkCount;
-          long offset = chunkCount * chunkLen;
-          ChunkInfo info = new ChunkInfo(chunkName, offset, chunkLen);
-          info.setChecksumData(checksumData);
-          chunkList.add(info.getProtoBufMessage());
-          chunkManager.writeChunk(container, blockID, info,
-              ByteBuffer.wrap(chunkData), writeStage);
-          chunkManager.writeChunk(container, blockID, info,
-              ByteBuffer.wrap(chunkData), commitStage);
-        }
-        blockData.setChunks(chunkList);
-
-        // normal key
-        String key = Long.toString(blockID.getLocalID());
-        if (i >= normalBlocks) {
-          // deleted key
-          key = OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID();
-        }
-        metadataStore.getStore().getBlockDataTable().put(key, blockData);
-      }
-
-      chunkManagerTestInfo.validateFileCount(chunksPath, totalBlocks,
-          totalBlocks * chunksPerBlock);
-    }
-  }
-
 }

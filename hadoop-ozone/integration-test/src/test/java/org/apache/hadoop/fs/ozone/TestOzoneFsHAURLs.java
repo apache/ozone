@@ -27,21 +27,23 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ratis.util.LifeCycle;
 import org.hamcrest.core.StringContains;
-import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,13 +71,13 @@ public class TestOzoneFsHAURLs {
       TestOzoneFsHAURLs.class);
 
   private OzoneConfiguration conf;
-  private MiniOzoneCluster cluster;
-  private String omId;
-  private String omServiceId;
-  private String clusterId;
-  private String scmId;
-  private OzoneManager om;
-  private int numOfOMs;
+  private static MiniOzoneCluster cluster;
+  private static String omId;
+  private static String omServiceId;
+  private static String clusterId;
+  private static String scmId;
+  private static OzoneManager om;
+  private static int numOfOMs;
 
   private String volumeName;
   private String bucketName;
@@ -86,9 +88,9 @@ public class TestOzoneFsHAURLs {
   private final String o3fsImplValue =
       "org.apache.hadoop.fs.ozone.OzoneFileSystem";
 
-  @Before
-  public void init() throws Exception {
-    conf = new OzoneConfiguration();
+  @BeforeClass
+  public static void initClass() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
     omId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     numOfOMs = 3;
@@ -100,14 +102,17 @@ public class TestOzoneFsHAURLs {
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 3);
 
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        BucketLayout.LEGACY.name());
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+
     OMStorage omStore = new OMStorage(conf);
     omStore.setClusterId(clusterId);
-    omStore.setScmId(scmId);
     // writes the version file properties
     omStore.initialize();
 
     // Start the cluster
-    cluster = MiniOzoneCluster.newHABuilder(conf)
+    cluster = MiniOzoneCluster.newOMHABuilder(conf)
         .setNumDatanodes(7)
         .setTotalPipelineNumLimit(10)
         .setClusterId(clusterId)
@@ -118,6 +123,14 @@ public class TestOzoneFsHAURLs {
     cluster.waitForClusterToBeReady();
 
     om = cluster.getOzoneManager();
+  }
+
+  @Before
+  public void init() throws Exception {
+    // Duplicate the conf for each test, so the client can change it, and each
+    // test will still get the same base conf used to start the cluster.
+    conf = new OzoneConfiguration(cluster.getConf());
+
     Assert.assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 
     volumeName = "volume" + RandomStringUtils.randomNumeric(5);
@@ -143,8 +156,8 @@ public class TestOzoneFsHAURLs {
     fs.mkdirs(dir2);
   }
 
-  @After
-  public void shutdown() {
+  @AfterClass
+  public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -160,7 +173,7 @@ public class TestOzoneFsHAURLs {
         omLeader);
     String omNodeId = omLeader.getOMNodeId();
     // omLeaderAddrKey=ozone.om.address.omServiceId.omNodeId
-    String omLeaderAddrKey = OmUtils.addKeySuffixes(
+    String omLeaderAddrKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodeId);
     String omLeaderAddr = conf.get(omLeaderAddrKey);
     LOG.info("OM leader: nodeId={}, {}={}", omNodeId, omLeaderAddrKey,
@@ -175,7 +188,7 @@ public class TestOzoneFsHAURLs {
    */
   private String getHostFromAddress(String addr) {
     Optional<String> hostOptional = getHostName(addr);
-    assert(hostOptional.isPresent());
+    assert (hostOptional.isPresent());
     return hostOptional.get();
   }
 
@@ -186,7 +199,7 @@ public class TestOzoneFsHAURLs {
    */
   private int getPortFromAddress(String addr) {
     OptionalInt portOptional = getHostPort(addr);
-    assert(portOptional.isPresent());
+    assert (portOptional.isPresent());
     return portOptional.getAsInt();
   }
 

@@ -33,12 +33,12 @@ public class ReconTaskConfig {
 
   @Config(key = "pipelinesync.interval",
       type = ConfigType.TIME,
-      defaultValue = "600s",
+      defaultValue = "300s",
       tags = { ConfigTag.RECON, ConfigTag.OZONE },
       description = "The time interval of periodic sync of pipeline state " +
           "from SCM to Recon."
   )
-  private long pipelineSyncTaskInterval = Duration.ofMinutes(10).toMillis();
+  private long pipelineSyncTaskInterval = Duration.ofMinutes(5).toMillis();
 
   public Duration getPipelineSyncTaskInterval() {
     return Duration.ofMillis(pipelineSyncTaskInterval);

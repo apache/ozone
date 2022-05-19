@@ -23,7 +23,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.security.OzoneSecurityException;
+import org.apache.hadoop.hdds.security.OzoneSecurityException;
 import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
-import static org.apache.hadoop.ozone.security.OzoneSecurityException.ResultCodes.S3_SECRET_NOT_FOUND;
+import static org.apache.hadoop.hdds.security.OzoneSecurityException.ResultCodes.S3_SECRET_NOT_FOUND;
 
 /**
  * S3 Secret manager.
@@ -65,7 +65,7 @@ public class S3SecretManagerImpl implements S3SecretManager {
     try {
       S3SecretValue s3Secret =
           omMetadataManager.getS3SecretTable().get(kerberosID);
-      if(s3Secret == null) {
+      if (s3Secret == null) {
         byte[] secret = OmUtils.getSHADigest();
         result = new S3SecretValue(kerberosID, DigestUtils.sha256Hex(secret));
         omMetadataManager.getS3SecretTable().put(kerberosID, result);

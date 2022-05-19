@@ -41,6 +41,8 @@ public final class ReconConstants {
   public static final String CONTAINER_KEY_COUNT_TABLE =
       "containerKeyCountTable";
 
+  public static final String RECON_SCM_SNAPSHOT_DB = "scm.snapshot.db";
+
   // By default, limit the number of results returned
   public static final String DEFAULT_FETCH_COUNT = "1000";
   public static final String DEFAULT_BATCH_NUMBER = "1";
@@ -58,4 +60,11 @@ public final class ReconConstants {
       + PIPELINE_DB_SUFFIX;
   public static final String RECON_SCM_NODE_DB =
       "recon-node.db";
+  // 1125899906842624L = 1PB
+  public static final long MAX_FILE_SIZE_UPPER_BOUND = 1125899906842624L;
+  public static final long MIN_FILE_SIZE_UPPER_BOUND = 1024L;
+  // 41 bins
+  public static final int NUM_OF_BINS = (int) Math.ceil(Math.log(
+      (double) MAX_FILE_SIZE_UPPER_BOUND / MIN_FILE_SIZE_UPPER_BOUND) /
+      Math.log(2)) + 1;
 }

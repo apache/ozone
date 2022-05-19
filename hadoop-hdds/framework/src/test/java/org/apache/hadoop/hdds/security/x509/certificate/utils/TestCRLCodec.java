@@ -50,6 +50,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
+import org.apache.hadoop.hdds.security.x509.crl.CRLCodec;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.CRLReason;
@@ -137,7 +138,7 @@ public class TestCRLCodec {
     assertTrue(crlFile.exists());
 
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-        new FileInputStream(crlFile), UTF_8))){
+        new FileInputStream(crlFile), UTF_8))) {
 
       // Verify contents of the file
       String header = reader.readLine();

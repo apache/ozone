@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.request.bucket.acl;
 
 import com.google.common.collect.Lists;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.bucket.TestBucketRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -42,7 +42,7 @@ public class TestOMBucketSetAclRequest extends TestBucketRequest {
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl acl = OzoneAcl.parseAcl("user:testUser:rw");
 
-    OMRequest originalRequest = TestOMRequestUtils
+    OMRequest originalRequest = OMRequestTestUtils
         .createBucketSetAclRequest(volumeName, bucketName,
             Lists.newArrayList(acl));
     long originModTime = originalRequest.getSetAclRequest()
@@ -67,15 +67,15 @@ public class TestOMBucketSetAclRequest extends TestBucketRequest {
     String bucketName = UUID.randomUUID().toString();
     String ownerName = "owner";
 
-    TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     OzoneAcl userAcl = OzoneAcl.parseAcl("user:newUser:rw");
     OzoneAcl groupAcl = OzoneAcl.parseAcl("group:newGroup:rw");
     List<OzoneAcl> acls = Lists.newArrayList(userAcl, groupAcl);
 
-    OMRequest originalRequest = TestOMRequestUtils
+    OMRequest originalRequest = OMRequestTestUtils
         .createBucketSetAclRequest(volumeName, bucketName, acls);
     OMBucketSetAclRequest omBucketSetAclRequest =
         new OMBucketSetAclRequest(originalRequest);
@@ -106,7 +106,7 @@ public class TestOMBucketSetAclRequest extends TestBucketRequest {
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl acl = OzoneAcl.parseAcl("user:newUser:rw");
 
-    OMRequest originalRequest = TestOMRequestUtils
+    OMRequest originalRequest = OMRequestTestUtils
         .createBucketSetAclRequest(volumeName, bucketName,
             Lists.newArrayList(acl));
     OMBucketSetAclRequest omBucketSetAclRequest =

@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -68,8 +69,8 @@ public class OMKeysRenameRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeysRenameRequest.class);
 
-  public OMKeysRenameRequest(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeysRenameRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -160,7 +161,8 @@ public class OMKeysRenameRequest extends OMKeyRequest {
             fromKeyName);
         String toKey =
             omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName);
-        OmKeyInfo toKeyValue = omMetadataManager.getKeyTable().get(toKey);
+        OmKeyInfo toKeyValue =
+            omMetadataManager.getKeyTable(getBucketLayout()).get(toKey);
 
         if (toKeyValue != null) {
 
@@ -173,7 +175,8 @@ public class OMKeysRenameRequest extends OMKeyRequest {
         }
 
         // fromKeyName should exist
-        fromKeyValue = omMetadataManager.getKeyTable().get(fromKey);
+        fromKeyValue =
+            omMetadataManager.getKeyTable(getBucketLayout()).get(fromKey);
         if (fromKeyValue == null) {
           renameStatus = false;
           unRenamedKeys.add(
@@ -194,7 +197,8 @@ public class OMKeysRenameRequest extends OMKeyRequest {
         // Add to cache.
         // fromKey should be deleted, toKey should be added with newly updated
         // omKeyInfo.
-        Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
+        Table<String, OmKeyInfo> keyTable =
+            omMetadataManager.getKeyTable(getBucketLayout());
         keyTable.addCacheEntry(new CacheKey<>(fromKey),
             new CacheValue<>(Optional.absent(), trxnLogIndex));
         keyTable.addCacheEntry(new CacheKey<>(toKey),

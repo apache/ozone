@@ -102,9 +102,9 @@ public class OzoneSecretStore implements Closeable {
     int loadedToken = 0;
     try (TableIterator<OzoneTokenIdentifier, ? extends
         KeyValue<OzoneTokenIdentifier, Long>> iterator =
-             omMetadataManager.getDelegationTokenTable().iterator()){
+             omMetadataManager.getDelegationTokenTable().iterator()) {
       iterator.seekToFirst();
-      while(iterator.hasNext()) {
+      while (iterator.hasNext()) {
         KeyValue<OzoneTokenIdentifier, Long> kv = iterator.next();
         state.tokenState.put(kv.getKey(), kv.getValue());
         loadedToken++;

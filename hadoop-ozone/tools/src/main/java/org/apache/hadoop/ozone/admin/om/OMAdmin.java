@@ -32,14 +32,16 @@ import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
-import org.apache.hadoop.security.UserGroupInformation;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import org.apache.ratis.protocol.ClientId;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
+
+import java.util.Collection;
 
 /**
  * Subcommand for admin operations related to OM.
@@ -50,7 +52,12 @@ import picocli.CommandLine.Spec;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
     subcommands = {
-        GetServiceRolesSubcommand.class
+        FinalizeUpgradeSubCommand.class,
+        GetServiceRolesSubcommand.class,
+        PrepareSubCommand.class,
+        CancelPrepareSubCommand.class,
+        FinalizationStatusSubCommand.class,
+        DecommissionOMSubcommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class OMAdmin extends GenericCli implements SubcommandWithParent {
@@ -86,15 +93,29 @@ public class OMAdmin extends GenericCli implements SubcommandWithParent {
   }
 
   public OzoneManagerProtocolClientSideTranslatorPB createOmClient(
-      String omServiceID) throws Exception {
+      String omServiceID
+  ) throws Exception {
+    return createOmClient(omServiceID, null, true);
+  }
+
+  public OzoneManagerProtocolClientSideTranslatorPB createOmClient(
+      String omServiceID,
+      String omHost,
+      boolean forceHA
+  ) throws Exception {
     OzoneConfiguration conf = parent.getOzoneConf();
-    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    if (omHost != null && !omHost.isEmpty()) {
+      omServiceID = null;
+      conf.set(OZONE_OM_ADDRESS_KEY, omHost);
+    } else if (omServiceID == null || omServiceID.isEmpty()) {
+      omServiceID = getTheOnlyConfiguredOmServiceIdOrThrow();
+    }
     RPC.setProtocolEngine(conf, OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
     String clientId = ClientId.randomId().toString();
-    if (OmUtils.isOmHAServiceId(conf, omServiceID)) {
+    if (!forceHA || (forceHA && OmUtils.isOmHAServiceId(conf, omServiceID))) {
       OmTransport omTransport = new Hadoop3OmTransportFactory()
-          .createOmTransport(conf, ugi, omServiceID);
+          .createOmTransport(conf, parent.getUser(), omServiceID);
       return new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
           clientId);
     } else {
@@ -104,6 +125,22 @@ public class OMAdmin extends GenericCli implements SubcommandWithParent {
             "configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY + " are " +
             conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY) + "\n");
     }
+  }
+
+  private String getTheOnlyConfiguredOmServiceIdOrThrow() {
+    if (getConfiguredServiceIds().size() != 1) {
+      throw new IllegalArgumentException("There is no Ozone Manager service ID"
+          + "specified, but there are either zero, or more than one service "
+          + "configured. Please specify the service ID to be finalized.");
+    }
+    return getConfiguredServiceIds().iterator().next();
+  }
+
+  private Collection<String> getConfiguredServiceIds() {
+    OzoneConfiguration conf = parent.getOzoneConf();
+    Collection<String> omServiceIds =
+        conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY);
+    return omServiceIds;
   }
 
   @Override

@@ -24,16 +24,21 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.test.PathUtils;
 
 import org.apache.commons.io.FileUtils;
+
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_DATANODE_ID_FILE_DEFAULT;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import org.junit.Rule;
@@ -51,10 +56,10 @@ public class TestHddsServerUtils {
       TestHddsServerUtils.class);
 
   @Rule
-  public Timeout timeout = Timeout.seconds(300);;
+  public Timeout timeout = Timeout.seconds(300);
 
   @Rule
-  public ExpectedException thrown= ExpectedException.none();
+  public ExpectedException thrown = ExpectedException.none();
 
   /**
    * Test getting OZONE_SCM_DATANODE_ADDRESS_KEY with port.
@@ -66,7 +71,8 @@ public class TestHddsServerUtils {
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_DATANODE_ADDRESS_KEY, scmHost);
     final InetSocketAddress address =
-        HddsServerUtil.getScmAddressForDataNodes(conf);
+        NetUtils.createSocketAddr(
+            SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
     assertEquals(address.getHostName(), scmHost.split(":")[0]);
     assertEquals(address.getPort(), Integer.parseInt(scmHost.split(":")[1]));
   }
@@ -80,7 +86,8 @@ public class TestHddsServerUtils {
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_DATANODE_ADDRESS_KEY, scmHost);
     final InetSocketAddress address =
-        HddsServerUtil.getScmAddressForDataNodes(conf);
+        NetUtils.createSocketAddr(
+            SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
     assertEquals(scmHost, address.getHostName());
     assertEquals(OZONE_SCM_DATANODE_PORT_DEFAULT, address.getPort());
   }
@@ -95,7 +102,8 @@ public class TestHddsServerUtils {
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, scmHost);
     final InetSocketAddress address =
-        HddsServerUtil.getScmAddressForDataNodes(conf);
+        NetUtils.createSocketAddr(
+            SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
     assertEquals(scmHost, address.getHostName());
     assertEquals(OZONE_SCM_DATANODE_PORT_DEFAULT, address.getPort());
   }
@@ -112,7 +120,8 @@ public class TestHddsServerUtils {
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, scmHost);
     final InetSocketAddress address =
-        HddsServerUtil.getScmAddressForDataNodes(conf);
+        NetUtils.createSocketAddr(
+            SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
     assertEquals(address.getHostName(), scmHost.split(":")[0]);
     assertEquals(address.getPort(), OZONE_SCM_DATANODE_PORT_DEFAULT);
   }
@@ -126,8 +135,8 @@ public class TestHddsServerUtils {
     final String scmHost = "host123";
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_NAMES, scmHost);
-    final InetSocketAddress address =
-        HddsServerUtil.getScmAddressForDataNodes(conf);
+    final InetSocketAddress address = NetUtils.createSocketAddr(
+        SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
     assertEquals(scmHost, address.getHostName());
     assertEquals(OZONE_SCM_DATANODE_PORT_DEFAULT, address.getPort());
   }
@@ -144,22 +153,10 @@ public class TestHddsServerUtils {
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_NAMES, scmHost);
     final InetSocketAddress address =
-        HddsServerUtil.getScmAddressForDataNodes(conf);
+        NetUtils.createSocketAddr(
+            SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
     assertEquals(address.getHostName(), scmHost.split(":")[0]);
     assertEquals(OZONE_SCM_DATANODE_PORT_DEFAULT, address.getPort());
-  }
-
-  /**
-   * getScmAddressForDataNodes should fail when OZONE_SCM_NAMES has
-   * multiple addresses.
-   */
-  @Test
-  public void testClientFailsWithMultipleScmNames() {
-    final String scmHost = "host123,host456";
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_NAMES, scmHost);
-    thrown.expect(IllegalArgumentException.class);
-    HddsServerUtil.getScmAddressForDataNodes(conf);
   }
 
   /**
@@ -224,5 +221,35 @@ public class TestHddsServerUtils {
     conf.setInt(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 100);
     // the min limit value will be returned
     assertEquals(90000, HddsServerUtil.getStaleNodeInterval(conf));
+  }
+
+  @Test
+  public void testGetDatanodeIdFilePath() {
+    final File testDir = PathUtils.getTestDir(TestHddsServerUtils.class);
+    final File metaDir = new File(testDir, "metaDir");
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
+
+    try {
+      // test fallback if not set
+      assertEquals(new File(metaDir,
+              OZONE_SCM_DATANODE_ID_FILE_DEFAULT).toString(),
+          HddsServerUtil.getDatanodeIdFilePath(conf));
+
+      // test fallback if set empty
+      conf.set(OZONE_SCM_DATANODE_ID_DIR, "");
+      assertEquals(new File(metaDir,
+              OZONE_SCM_DATANODE_ID_FILE_DEFAULT).toString(),
+          HddsServerUtil.getDatanodeIdFilePath(conf));
+
+      // test use specific value if set
+      final File dnIdDir = new File(testDir, "datanodeIDDir");
+      conf.set(OZONE_SCM_DATANODE_ID_DIR, dnIdDir.getPath());
+      assertEquals(new File(dnIdDir,
+              OZONE_SCM_DATANODE_ID_FILE_DEFAULT).toString(),
+          HddsServerUtil.getDatanodeIdFilePath(conf));
+    } finally {
+      FileUtils.deleteQuietly(metaDir);
+    }
   }
 }

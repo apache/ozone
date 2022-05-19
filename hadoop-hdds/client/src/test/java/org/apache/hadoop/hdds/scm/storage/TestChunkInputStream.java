@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
@@ -172,16 +172,26 @@ public class TestChunkInputStream {
     // buffers and the chunkPosition should be reset to -1.
     Assert.assertEquals(-1, chunkStream.getChunkPosition());
 
-    // Seek to a position within the current buffers. Current buffers contain
-    // data from index 20 to 59. ChunkPosition should still not be used to
-    // set the position.
-    seekAndVerify(35);
+    // Only the last BYTES_PER_CHECKSUM will be cached in the buffers as
+    // buffers are released after each checksum boundary is read. So the
+    // buffers should contain data from index 40 to 59.
+    // Seek to a position within the cached buffers. ChunkPosition should
+    // still not be used to set the position.
+    seekAndVerify(45);
     Assert.assertEquals(-1, chunkStream.getChunkPosition());
 
-    // Seek to a position outside the current buffers. In this case, the
+    // Seek to a position outside the current cached buffers. In this case, the
     // chunkPosition should be updated to the seeked position.
     seekAndVerify(75);
     Assert.assertEquals(75, chunkStream.getChunkPosition());
+
+    // Read upto checksum boundary should result in all the buffers being
+    // released and hence chunkPosition updated with current position of chunk.
+    seekAndVerify(25);
+    b = new byte[15];
+    chunkStream.read(b, 0, 15);
+    matchWithInputData(b, 25, 15);
+    Assert.assertEquals(40, chunkStream.getChunkPosition());
   }
 
   @Test
@@ -229,8 +239,9 @@ public class TestChunkInputStream {
     ChunkInputStream subject = new ChunkInputStream(chunkInfo, null,
         clientFactory, pipelineRef::get, false, null) {
       @Override
-      protected List<ByteBuffer> readChunk(ChunkInfo readChunkInfo) {
-        return ByteString.copyFrom(chunkData).asReadOnlyByteBufferList();
+      protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo) {
+        return ByteString.copyFrom(chunkData).asReadOnlyByteBufferList()
+            .toArray(new ByteBuffer[0]);
       }
     };
 

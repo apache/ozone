@@ -53,7 +53,7 @@ public class LeaseCallbackExecutor<T> implements Runnable {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Executing callbacks for lease on {}", resource);
     }
-    for(Callable<Void> callback : callbacks) {
+    for (Callable<Void> callback : callbacks) {
       try {
         callback.call();
       } catch (Exception e) {

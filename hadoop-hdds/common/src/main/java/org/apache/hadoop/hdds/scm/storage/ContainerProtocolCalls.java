@@ -40,6 +40,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockRe
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileResponseProto;
@@ -50,7 +52,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.BlockNotCommittedException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -72,6 +73,50 @@ public final class ContainerProtocolCalls  {
    * There is no need to instantiate this class.
    */
   private ContainerProtocolCalls() {
+  }
+
+  /**
+   * Calls the container protocol to list blocks in container.
+   *
+   * @param xceiverClient client to perform call
+   * @param containerID the ID of the container to list block
+   * @param startLocalID the localID of the first block to get
+   * @param count max number of blocks to get
+   * @param token a token for this block (may be null)
+   * @return container protocol list block response
+   * @throws IOException if there is an I/O error while performing the call
+   */
+  public static ListBlockResponseProto listBlock(XceiverClientSpi xceiverClient,
+      long containerID, Long startLocalID, int count,
+      Token<? extends TokenIdentifier> token) throws IOException {
+
+    ListBlockRequestProto.Builder listBlockBuilder =
+        ListBlockRequestProto.newBuilder()
+            .setCount(count);
+
+    if (startLocalID != null) {
+      listBlockBuilder.setStartLocalID(startLocalID);
+    }
+
+    // datanodeID doesn't matter for read only requests
+    String datanodeID =
+        xceiverClient.getPipeline().getFirstNode().getUuidString();
+
+    ContainerCommandRequestProto.Builder builder =
+        ContainerCommandRequestProto.newBuilder()
+            .setCmdType(Type.ListBlock)
+            .setContainerID(containerID)
+            .setDatanodeUuid(datanodeID)
+            .setListBlock(listBlockBuilder.build());
+
+    if (token != null) {
+      builder.setEncodedToken(token.encodeToUrlString());
+    }
+
+    ContainerCommandRequestProto request = builder.build();
+    ContainerCommandResponseProto response =
+        xceiverClient.sendCommand(request, getValidatorList());
+    return response.getListBlock();
   }
 
   /**
@@ -104,10 +149,6 @@ public final class ContainerProtocolCalls  {
     ContainerCommandRequestProto request = builder.build();
     ContainerCommandResponseProto response =
         xceiverClient.sendCommand(request, getValidatorList());
-    if (ContainerProtos.Result.CONTAINER_NOT_FOUND.equals(
-        response.getResult())) {
-      throw new ContainerNotFoundException(response.getMessage());
-    }
     return response.getGetBlock();
   }
 
@@ -287,17 +328,27 @@ public final class ContainerProtocolCalls  {
    */
   public static XceiverClientReply writeChunkAsync(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
-      ByteString data, Token<? extends TokenIdentifier> token)
+      ByteString data, Token<? extends TokenIdentifier> token,
+      int replicationIndex
+  )
       throws IOException, ExecutionException, InterruptedException {
     WriteChunkRequestProto.Builder writeChunkRequest =
         WriteChunkRequestProto.newBuilder()
-            .setBlockID(blockID.getDatanodeBlockIDProtobuf())
-            .setChunkData(chunk).setData(data);
+            .setBlockID(DatanodeBlockID.newBuilder()
+                .setContainerID(blockID.getContainerID())
+                .setLocalID(blockID.getLocalID())
+                .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId())
+                .setReplicaIndex(replicationIndex)
+                .build())
+            .setChunkData(chunk)
+            .setData(data);
     String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
     ContainerCommandRequestProto.Builder builder =
-        ContainerCommandRequestProto.newBuilder().setCmdType(Type.WriteChunk)
+        ContainerCommandRequestProto.newBuilder()
+            .setCmdType(Type.WriteChunk)
             .setContainerID(blockID.getContainerID())
-            .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);
+            .setDatanodeUuid(id)
+            .setWriteChunk(writeChunkRequest);
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
     }
@@ -439,7 +490,7 @@ public final class ContainerProtocolCalls  {
     request.setContainerID(containerID);
     request.setCloseContainer(CloseContainerRequestProto.getDefaultInstance());
     request.setDatanodeUuid(id);
-    if(encodedToken != null) {
+    if (encodedToken != null) {
       request.setEncodedToken(encodedToken);
     }
     client.sendCommand(request.build(), getValidatorList());
@@ -463,7 +514,7 @@ public final class ContainerProtocolCalls  {
     request.setContainerID(containerID);
     request.setReadContainer(ReadContainerRequestProto.getDefaultInstance());
     request.setDatanodeUuid(id);
-    if(encodedToken != null) {
+    if (encodedToken != null) {
       request.setEncodedToken(encodedToken);
     }
     ContainerCommandResponseProto response =
@@ -565,8 +616,8 @@ public final class ContainerProtocolCalls  {
     ContainerCommandRequestProto request = builder.build();
     Map<DatanodeDetails, ContainerCommandResponseProto> responses =
             xceiverClient.sendCommandOnAllNodes(request);
-    for(Map.Entry<DatanodeDetails, ContainerCommandResponseProto> entry:
-           responses.entrySet()){
+    for (Map.Entry<DatanodeDetails, ContainerCommandResponseProto> entry:
+           responses.entrySet()) {
       datanodeToResponseMap.put(entry.getKey(), entry.getValue().getGetBlock());
     }
     return datanodeToResponseMap;

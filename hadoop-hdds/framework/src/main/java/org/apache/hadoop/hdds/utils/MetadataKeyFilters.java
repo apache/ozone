@@ -82,7 +82,7 @@ public final class MetadataKeyFilters {
     private int keysScanned = 0;
     private int keysHinted = 0;
 
-    public KeyPrefixFilter() {}
+    public KeyPrefixFilter() { }
 
     /**
      * KeyPrefixFilter constructor. It is made of positive and negative prefix
@@ -104,7 +104,7 @@ public final class MetadataKeyFilters {
 
     public KeyPrefixFilter addFilter(String keyPrefix, boolean negative) {
       Preconditions.checkArgument(!Strings.isNullOrEmpty(keyPrefix),
-          "KeyPrefix is null or empty: " + keyPrefix);
+          "KeyPrefix is null or empty: %s", keyPrefix);
       // keyPrefix which needs to be added should not be prefix of any opposing
       // filter already present. If keyPrefix is a negative filter it should not
       // be a prefix of any positive filter. Nor should any opposing filter be

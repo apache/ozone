@@ -45,7 +45,7 @@ public class BlockDeletingServiceTestImpl
   public BlockDeletingServiceTestImpl(OzoneContainer container,
       int serviceInterval, ConfigurationSource conf) {
     super(container, serviceInterval, SERVICE_TIMEOUT_IN_MILLISECONDS,
-        TimeUnit.MILLISECONDS, conf);
+        TimeUnit.MILLISECONDS, 10, conf);
   }
 
   @VisibleForTesting

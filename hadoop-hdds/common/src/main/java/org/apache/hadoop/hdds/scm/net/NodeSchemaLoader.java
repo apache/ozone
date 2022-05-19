@@ -68,7 +68,7 @@ public final class NodeSchemaLoader {
 
   private static final int LAYOUT_VERSION = 1;
   private static volatile NodeSchemaLoader instance = null;
-  private NodeSchemaLoader() {}
+  private NodeSchemaLoader() { }
 
   public static NodeSchemaLoader getInstance() {
     if (instance == null) {
@@ -324,7 +324,7 @@ public final class NodeSchemaLoader {
     // Integrity check, only one ROOT and one LEAF is allowed
     boolean foundRoot = false;
     boolean foundLeaf = false;
-    for(NodeSchema schema: schemas.values()) {
+    for (NodeSchema schema: schemas.values()) {
       if (schema.getType() == LayerType.ROOT) {
         if (foundRoot) {
           throw new IllegalArgumentException("Multiple ROOT layers are found" +
@@ -385,7 +385,7 @@ public final class NodeSchemaLoader {
               + "> is null");
         }
         if (TOPOLOGY_PATH.equals(tagName)) {
-          if(value.startsWith(NetConstants.PATH_SEPARATOR_STR)) {
+          if (value.startsWith(NetConstants.PATH_SEPARATOR_STR)) {
             value = value.substring(1);
           }
           String[] layerIDs = value.split(NetConstants.PATH_SEPARATOR_STR);
@@ -403,7 +403,7 @@ public final class NodeSchemaLoader {
             throw new IllegalArgumentException("Topology path doesn't start "
                 + "with ROOT layer");
           }
-          if (schemas.get(layerIDs[layerIDs.length -1]).getType() !=
+          if (schemas.get(layerIDs[layerIDs.length - 1]).getType() !=
               LayerType.LEAF_NODE) {
             throw new IllegalArgumentException("Topology path doesn't end "
                 + "with LEAF layer");
