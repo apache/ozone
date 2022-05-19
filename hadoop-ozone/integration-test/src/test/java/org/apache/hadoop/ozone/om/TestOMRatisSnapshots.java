@@ -52,6 +52,7 @@ import static org.junit.Assert.assertTrue;
 
 import org.assertj.core.api.Fail;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -228,7 +229,7 @@ public class TestOMRatisSnapshots {
      */
   }
 
-  @Test
+  @Ignore("Enable this unit test after RATIS-1481 used")
   public void testInstallSnapshotWithClientWrite() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
