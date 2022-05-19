@@ -261,13 +261,13 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * Returns the names of up to {@code count} open keys whose age is
    * greater than or equal to {@code expireThreshold}.
    *
-   * @param limit The maximum number of open keys to return.
+   * @param count The maximum number of open keys to return.
    * @param expireThreshold The threshold of open key expire age.
    * @param bucketLayout The type of open keys to get (e.g. DEFAULT or FSO).
    * @return a {@link List} of {@link OpenKeyBucket}, the expired open keys.
    * @throws IOException
    */
-  List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold, int limit,
+  List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold, int count,
       BucketLayout bucketLayout) throws IOException;
 
   /**

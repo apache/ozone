@@ -1196,7 +1196,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold,
-      int limit, BucketLayout bucketLayout) throws IOException {
+      int count, BucketLayout bucketLayout) throws IOException {
     Map<String, OpenKeyBucket.Builder> expiredKeys = new HashMap<>();
 
     // Only check for expired keys in the open key table, not its cache.
@@ -1210,8 +1210,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
       OpenKey.Builder builder = OpenKey.newBuilder();
 
-      int count = 0;
-      while (count < limit && keyValueTableIterator.hasNext()) {
+      int num = 0;
+      while (num < count && keyValueTableIterator.hasNext()) {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
         String dbOpenKeyName = openKeyValue.getKey();
         OmKeyInfo openKeyInfo = openKeyValue.getValue();
@@ -1228,7 +1228,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
           }
           expiredKeys.get(mapKey)
               .addKeys(builder.setName(dbOpenKeyName).build());
-          count++;
+          num++;
         }
       }
     }
