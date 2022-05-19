@@ -654,9 +654,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       finalizationManager = configurator.getFinalizationManager();
     } else {
       finalizationManager =
-          new FinalizationManagerImpl(scmLayoutVersionManager,
+          new FinalizationManagerImpl(conf, scmLayoutVersionManager,
               pipelineManager, scmNodeManager, scmStorageConfig,
-              scmHAManager.getDBTransactionBuffer(),
+              scmHAManager,
               scmMetadataStore.getMetaTable());
     }
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,

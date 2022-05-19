@@ -1,6 +1,7 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
-import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
@@ -18,20 +19,31 @@ public class FinalizationManagerImpl implements FinalizationManager {
   private final SCMStorageConfig storage;
 
 
-  public FinalizationManagerImpl(HDDSLayoutVersionManager versionManager,
+  public FinalizationManagerImpl(OzoneConfiguration conf,
+                                 HDDSLayoutVersionManager versionManager,
                                  PipelineManager pipelineManager,
                                  NodeManager nodeManager,
                                  SCMStorageConfig storage,
-                                 DBTransactionBuffer transactionBuffer,
+                                 SCMHAManager scmHAManager,
                                  Table<String, String> finalizationStore) throws IOException {
     this.storage = storage;
     this.upgradeFinalizer = new SCMUpgradeFinalizer(versionManager);
     FinalizationStateManager finalizationStateManager =
-        new FinalizationStateManagerImpl(versionManager, finalizationStore,
-        transactionBuffer);
+        new FinalizationStateManagerImpl.Builder()
+            .setVersionManager(versionManager)
+            .setFinalizationStore(finalizationStore)
+            .setTransactionBuffer(scmHAManager.getDBTransactionBuffer())
+            .setRatisServer(scmHAManager.getRatisServer())
+            .build();
     this.context =
-        new SCMUpgradeFinalizer.SCMUpgradeFinalizationContext(pipelineManager,
-            nodeManager, finalizationStateManager, this.storage);
+        new SCMUpgradeFinalizer.SCMUpgradeFinalizationContext.Builder()
+            .setStorage(this.storage)
+            .setFinalizationStateManager(finalizationStateManager)
+            .setConfiguration(conf)
+            .setNodeManager(nodeManager)
+            .setPipelineManager(pipelineManager)
+            .setLayoutVersionManager(versionManager)
+            .build();
     finalizationStateManager.addReplicatedFinalizationStep(
         lf -> this.upgradeFinalizer.replicatedFinalizationSteps(lf, context));
   }

@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -33,6 +34,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager.FinalizationCheckpoint;
 import org.apache.ratis.util.Preconditions;
@@ -186,15 +188,16 @@ public class SCMUpgradeFinalizer extends
     private final NodeManager nodeManager;
     private final FinalizationStateManager finalizationStateManager;
     private final SCMStorageConfig storage;
+    private final HDDSLayoutVersionManager versionManager;
+    private final OzoneConfiguration conf;
 
-    public SCMUpgradeFinalizationContext(PipelineManager pipelineManager,
-        NodeManager nodeManager,
-        FinalizationStateManager finalizationStateManager,
-        SCMStorageConfig storage) {
-      this.nodeManager = nodeManager;
-      this.pipelineManager = pipelineManager;
-      this.finalizationStateManager = finalizationStateManager;
-      this.storage = storage;
+    private SCMUpgradeFinalizationContext(Builder builder) {
+      pipelineManager = builder.pipelineManager;
+      nodeManager = builder.nodeManager;
+      finalizationStateManager = builder.finalizationStateManager;
+      storage = builder.storage;
+      versionManager = builder.versionManager;
+      conf = builder.conf;
     }
 
     public NodeManager getNodeManager() {
@@ -209,8 +212,62 @@ public class SCMUpgradeFinalizer extends
       return finalizationStateManager;
     }
 
+    public OzoneConfiguration getConfiguration() {
+      return conf;
+    }
+
+    public HDDSLayoutVersionManager getLayoutVersionManager() {
+      return versionManager;
+    }
+
     public SCMStorageConfig getStorage() {
       return storage;
+    }
+
+    public static final class Builder {
+      private PipelineManager pipelineManager;
+      private NodeManager nodeManager;
+      private FinalizationStateManager finalizationStateManager;
+      private SCMStorageConfig storage;
+      private HDDSLayoutVersionManager versionManager;
+      private OzoneConfiguration conf;
+
+      public Builder() {
+      }
+
+      public Builder setPipelineManager(PipelineManager pipelineManager) {
+        this.pipelineManager = pipelineManager;
+        return this;
+      }
+
+      public Builder setNodeManager(NodeManager nodeManager) {
+        this.nodeManager = nodeManager;
+        return this;
+      }
+
+      public Builder setFinalizationStateManager(FinalizationStateManager finalizationStateManager) {
+        this.finalizationStateManager = finalizationStateManager;
+        return this;
+      }
+
+      public Builder setStorage(SCMStorageConfig storage) {
+        this.storage = storage;
+        return this;
+      }
+
+      public Builder setLayoutVersionManager(HDDSLayoutVersionManager versionManager) {
+        this.versionManager = versionManager;
+        return this;
+      }
+
+      public Builder setConfiguration(OzoneConfiguration conf) {
+        this.conf = conf;
+        return this;
+      }
+
+      public SCMUpgradeFinalizationContext build() {
+        return new SCMUpgradeFinalizationContext(this);
+      }
     }
   }
 }
