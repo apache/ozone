@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager.FinalizationCheckpoint;
+import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.Preconditions;
 
 
@@ -100,14 +101,6 @@ public class SCMUpgradeFinalizer extends
     if (stateManager.getFinalizationCheckpoint() == FinalizationCheckpoint.MLV_EQUALS_SLV) {
         createPipelinesAfterFinalization(context.getPipelineManager());
     }
-
-    // All prior checkpoints should have been crossed by this state, leaving
-    // us at the finalization complete checkpoint.
-    String errorMessage = String.format("SCM upgrade finalization " +
-            "is in an unknown state. Expected %s but was %s",
-        FinalizationCheckpoint.FINALIZATION_COMPLETE, stateManager.getFinalizationCheckpoint());
-    Preconditions.assertTrue(stateManager.getFinalizationCheckpoint() ==
-        FinalizationCheckpoint.FINALIZATION_COMPLETE, errorMessage);
     stateManager.removeFinalizingMark();
   }
 

@@ -1,8 +1,6 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
-import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
-import org.apache.hadoop.hdds.scm.container.ContainerStateManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
@@ -12,6 +10,9 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import com.google.common.base.Preconditions;
+import org.apache.ratis.util.ExitUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
@@ -20,6 +21,10 @@ import java.util.List;
 
 // TODO: Synchronization?
 public class FinalizationStateManagerImpl implements FinalizationStateManager {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(FinalizationStateManagerImpl.class);
+
   private final Table<String, String> finalizationStore;
   private final DBTransactionBuffer transactionBuffer;
   // SCM transaction buffer flushes asynchronously, so we must keep the most
@@ -50,10 +55,10 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     boolean mlvBehindSlv = versionManager.needsFinalization();
 
     FinalizationCheckpoint currentCheckpoint = null;
-    // Enum constants must be iterated in order.
-    // TODO: Unit test for enum ordering.
+    // Enum constants must be iterated in order to resume from the correct
+    // checkpoint.
     for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
-      if (checkpoint.isPassed(hasFinalizingMark, mlvBehindSlv)) {
+      if (checkpoint.isCurrent(hasFinalizingMark, mlvBehindSlv)) {
         currentCheckpoint = checkpoint;
         break;
       }
@@ -91,11 +96,19 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     hasFinalizingMark = false;
     transactionBuffer.removeFromBuffer(finalizationStore,
         OzoneConsts.FINALIZING_KEY);
-  }
 
-  @Override
-  public long getDBMetadataLayoutVersion() {
-    return dbMlv;
+    // All prior checkpoints should have been crossed when this method is
+    // called, leaving us at the finalization complete checkpoint.
+    // If this is not the case, this SCM (leader or follower) has encountered
+    // a bug leaving it in an inconsistent upgrade finalization state.
+    // It should terminate to avoid further damage.
+    FinalizationCheckpoint checkpoint = getFinalizationCheckpoint();
+    if (checkpoint != FinalizationCheckpoint.FINALIZATION_COMPLETE) {
+      String errorMessage = String.format("SCM upgrade finalization " +
+              "is in an unknown state. Expected %s but was %s",
+          FinalizationCheckpoint.FINALIZATION_COMPLETE, checkpoint);
+      ExitUtils.terminate(1, errorMessage, LOG);
+    }
   }
 
   @Override

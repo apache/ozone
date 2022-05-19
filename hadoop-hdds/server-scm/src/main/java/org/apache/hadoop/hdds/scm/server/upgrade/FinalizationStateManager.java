@@ -41,8 +41,8 @@ public interface FinalizationStateManager {
       this.needsMlvBehindSlv = needsMlvBehindSlv;
     }
 
-    public boolean isPassed(boolean hasFinalizationMark,
-                            boolean hasMlvBehindSlv) {
+    public boolean isCurrent(boolean hasFinalizationMark,
+                             boolean hasMlvBehindSlv) {
       return hasFinalizationMark == needsFinalizingMark &&
           hasMlvBehindSlv == needsMlvBehindSlv;
     }
@@ -54,13 +54,10 @@ public interface FinalizationStateManager {
   @Replicate
   void removeFinalizingMark() throws IOException;
 
-  // TODO Integer codec
   @Replicate
   void finalizeLayoutFeature(Integer layoutVersion) throws IOException;
 
   boolean hasFinalizingMark();
-
-  long getDBMetadataLayoutVersion();
 
   FinalizationCheckpoint getFinalizationCheckpoint();
 
