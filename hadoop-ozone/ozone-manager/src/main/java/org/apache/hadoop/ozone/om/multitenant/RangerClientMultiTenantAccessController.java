@@ -30,6 +30,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -65,15 +67,20 @@ public class RangerClientMultiTenantAccessController implements
     stringToAcl = new HashMap<>();
     aclToString.forEach((type, string) -> stringToAcl.put(string, type));
 
-    // TODO: Double check configuration set up after HDDS-6612 is merged.
+    // Should have passed the check in OMMultiTenantManager
     String rangerHttpsAddress = conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY);
+    Preconditions.checkNotNull(rangerHttpsAddress);
     rangerServiceName = conf.get(OZONE_RANGER_SERVICE);
+    Preconditions.checkNotNull(rangerServiceName);
+
     String configuredOmPrincipal = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
+    Preconditions.checkNotNull(configuredOmPrincipal);
     // Replace _HOST pattern with host name in the Kerberos principal. Ranger
     // client currently does not do this automatically.
     omPrincipal = SecurityUtil.getServerPrincipal(
         configuredOmPrincipal, OmUtils.getOmAddress(conf).getHostName());
     String keytabPath = conf.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY);
+    Preconditions.checkNotNull(keytabPath);
 
     client = new RangerClient(rangerHttpsAddress,
         "kerberos", omPrincipal, keytabPath, rangerServiceName, "ozone");
