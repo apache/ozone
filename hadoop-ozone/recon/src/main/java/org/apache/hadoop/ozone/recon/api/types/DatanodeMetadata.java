@@ -154,8 +154,13 @@ public final class DatanodeMetadata {
   public String getBuildDate() {
     return buildDate;
   }
+
   public int getLayoutVersion() {
     return layoutVersion;
+  }
+
+  public String getNetworkLocation() {
+    return networkLocation;
   }
 
   /**
