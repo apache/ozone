@@ -113,14 +113,6 @@ public class TestRangerBGSyncService {
 
   private TemporaryFolder folder = new TemporaryFolder();
 
-  // The following values need to be set before this test can be enabled.
-  private static final String RANGER_ENDPOINT =
-      System.getenv("RANGER_ENDPOINT");
-  private static final String RANGER_ENDPOINT_USER =
-      System.getenv("RANGER_ENDPOINT_USER");
-  private static final String RANGER_ENDPOINT_USER_PASSWD =
-      System.getenv("RANGER_ENDPOINT_USER_PASSWD");
-
   private MultiTenantAccessAuthorizer auth;
   private OMRangerBGSyncService bgSync;
 
@@ -146,6 +138,22 @@ public class TestRangerBGSyncService {
   private static final String USER_ALICE_SHORT = "alice";
   private UserGroupInformation ugiAlice;
   private static final String USER_BOB_SHORT = "bob";
+
+  private static void simulateOzoneSiteXmlConfig() {
+    // The following configs need to be set before the test can be enabled.
+    // Pass them in as JVM properties. e.g.:
+    //
+    // -Dozone.om.ranger.https-address=http://ranger:6080
+    // -Dozone.om.ranger.https.admin.api.user=admin
+    // -Dozone.om.ranger.https.admin.api.passwd=passwd
+
+    conf.setStrings(OZONE_RANGER_HTTPS_ADDRESS_KEY,
+        System.getProperty(OZONE_RANGER_HTTPS_ADDRESS_KEY));
+    conf.setStrings(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER,
+        System.getProperty(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER));
+    conf.setStrings(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD,
+        System.getProperty(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD));
+  }
 
   @BeforeClass
   public static void init() {
@@ -256,13 +264,6 @@ public class TestRangerBGSyncService {
     cleanupPoliciesRolesUsers();
     omMetrics.unRegister();
     framework().clearInlineMocks();
-  }
-
-  private static void simulateOzoneSiteXmlConfig() {
-    conf.setStrings(OZONE_RANGER_HTTPS_ADDRESS_KEY, RANGER_ENDPOINT);
-    conf.setStrings(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER, RANGER_ENDPOINT_USER);
-    conf.setStrings(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD,
-        RANGER_ENDPOINT_USER_PASSWD);
   }
 
   private AccessPolicy newVolumeAccessPolicy(String vol, String tenantId)
