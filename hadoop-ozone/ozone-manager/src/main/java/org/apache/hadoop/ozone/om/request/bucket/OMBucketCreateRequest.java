@@ -418,37 +418,4 @@ public class OMBucketCreateRequest extends OMClientRequest {
     }
     return req;
   }
-
-  /**
-   * Validates bucket create requests.
-   * Handles the cases where an older client attempts to create a bucket
-   * (without passing any bucket layout) and the cluster's protobuf definition
-   * defaults the missing value to a non LEGACY layout.
-   * We do not want to allow this to happen, since this would cause the client
-   * to be able to create buckets it cannot understand.
-   *
-   * @param req - the request to validate
-   * @param ctx - the validation context
-   * @return the validated request
-   * @throws OMException if the request is invalid
-   */
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
-      processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.CreateBucket
-  )
-  public static OMRequest blockCreateBucketWithBucketLayoutFromOldClient(
-      OMRequest req, ValidationContext ctx) throws OMException {
-    if (req.getCreateBucketRequest().getBucketInfo().hasBucketLayout()
-        &&
-        !BucketLayout.fromProto(req.getCreateBucketRequest().getBucketInfo()
-            .getBucketLayout()).isLegacy()) {
-      throw new OMException("Client is attempting to create a bucket which" +
-          " uses non-LEGACY bucket layout features. Please upgrade the" +
-          " client to a compatible version before trying to create" +
-          " the bucket.",
-          OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
-    }
-    return req;
-  }
 }
