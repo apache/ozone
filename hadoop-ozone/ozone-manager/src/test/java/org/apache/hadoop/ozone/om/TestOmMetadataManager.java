@@ -582,20 +582,13 @@ public class TestOmMetadataManager {
     // cache, since they will be picked up once the cache is flushed.
     Set<String> expiredKeys = new HashSet<>();
     for (int i = 0; i < numExpiredOpenKeys + numUnexpiredOpenKeys; i++) {
-      OmKeyInfo keyInfo;
+      final long creationTime = i < numExpiredOpenKeys ?
+          expiredOpenKeyCreationTime : Instant.now().toEpochMilli();
+      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+          bucketName, "expired" + i, HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.ONE, 0L, creationTime);
 
-      if (i < numExpiredOpenKeys) {
-        keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-            bucketName, "expired" + i, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, 0L, expiredOpenKeyCreationTime);
-      } else {
-        keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-            bucketName, "unexpired" + i, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE);
-      }
-
-      String dbOpenKeyName;
-
+      final String dbOpenKeyName;
       if (bucketLayout.isFileSystemOptimized()) {
         keyInfo.setParentObjectID(i);
         keyInfo.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
