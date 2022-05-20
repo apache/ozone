@@ -41,8 +41,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,11 +49,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
-import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * Test for pipeline datanodes intersection.
@@ -88,19 +85,15 @@ public class TestPipelineDatanodesIntersection {
     FileUtil.fullyDelete(testDir);
   }
 
-  public static Stream<Arguments> inputParams() {
-    return Stream.of(
-        arguments(4, 5),
-        arguments(10, 5),
-        arguments(20, 5),
-        arguments(50, 5),
-        arguments(100, 5),
-        arguments(100, 10)
-    );
-  }
-
   @ParameterizedTest
-  @MethodSource("inputParams")
+  @CsvSource({
+      "4, 5",
+      "10, 5",
+      "20, 5",
+      "50, 5",
+      "100, 5",
+      "100, 10"
+  })
   public void testPipelineDatanodesIntersection(int nodeCount,
       int nodeHeaviness) throws IOException {
     NodeManager nodeManager = new MockNodeManager(true, nodeCount);
@@ -116,8 +109,8 @@ public class TestPipelineDatanodesIntersection {
         .build();
 
 
-    PipelineProvider provider = new MockRatisPipelineProvider(nodeManager,
-        stateManager, conf);
+    PipelineProvider<RatisReplicationConfig> provider =
+        new MockRatisPipelineProvider(nodeManager, stateManager, conf);
 
     int healthyNodeCount = nodeManager
         .getNodeCount(NodeStatus.inServiceHealthy());
