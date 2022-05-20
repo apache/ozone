@@ -89,6 +89,7 @@ public class TestKeyValueBlockIterator {
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
     DatanodeConfiguration dc = conf.getObject(DatanodeConfiguration.class);
     dc.setContainerSchemaV3KeySeparator(keySeparator);
+    conf.setFromObject(dc);
   }
 
   @Parameterized.Parameters
