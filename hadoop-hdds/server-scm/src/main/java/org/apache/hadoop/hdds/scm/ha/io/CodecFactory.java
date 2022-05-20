@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
+import com.google.protobuf.ByteString;
 import com.google.protobuf.GeneratedMessage;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.ProtocolMessageEnum;
@@ -45,6 +46,7 @@ public final class CodecFactory {
     codecs.put(Boolean.class, new BooleanCodec());
     codecs.put(BigInteger.class, new BigIntegerCodec());
     codecs.put(X509Certificate.class, new X509CertificateCodec());
+    codecs.put(ByteString.class, new ByteStringCodec());
   }
 
   private CodecFactory() { }
