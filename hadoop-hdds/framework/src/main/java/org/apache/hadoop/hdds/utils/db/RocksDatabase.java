@@ -166,7 +166,7 @@ public final class RocksDatabase {
     }
   }
 
-  private static Predicate<TableConfig> extraColumnFamily(Set<TableConfig> families) {
+  static Predicate<TableConfig> extraColumnFamily(Set<TableConfig> families) {
     return f -> {
       if (families.contains(f)) {
         return false;
@@ -377,7 +377,8 @@ public final class RocksDatabase {
       return db.get(family.getHandle(), key);
     } catch (RocksDBException e) {
       closeOnError(e);
-      throw toIOException(this, "get " + bytes2String(key) + " from " + family, e);
+      final String message = "get " + bytes2String(key) + " from " + family;
+      throw toIOException(this, message, e);
     }
   }
 
@@ -404,7 +405,8 @@ public final class RocksDatabase {
       return db.getLongProperty(family.getHandle(), key);
     } catch (RocksDBException e) {
       closeOnError(e);
-      throw toIOException(this, "getLongProperty " + key + " from " + family, e);
+      final String message = "getLongProperty " + key + " from " + family;
+      throw toIOException(this, message, e);
     }
   }
 
@@ -471,7 +473,8 @@ public final class RocksDatabase {
       db.delete(family.getHandle(), key);
     } catch (RocksDBException e) {
       closeOnError(e);
-      throw toIOException(this, "delete " + bytes2String(key) + " from " + family, e);
+      final String message = "delete " + bytes2String(key) + " from " + family;
+      throw toIOException(this, message, e);
     }
   }
 
