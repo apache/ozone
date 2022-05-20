@@ -47,8 +47,8 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractLayoutVersionManager.class);
 
-  private int metadataLayoutVersion; // MLV.
-  private int softwareLayoutVersion; // SLV.
+  private volatile int metadataLayoutVersion; // MLV.
+  private volatile int softwareLayoutVersion; // SLV.
   @VisibleForTesting
   protected final TreeMap<Integer, LayoutFeature> features = new TreeMap<>();
   @VisibleForTesting

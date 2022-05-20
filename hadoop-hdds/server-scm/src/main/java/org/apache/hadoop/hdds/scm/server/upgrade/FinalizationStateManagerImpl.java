@@ -4,7 +4,6 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -18,8 +17,9 @@ import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-// TODO: Synchronization?
 public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
   private static final Logger LOG =
@@ -27,30 +27,44 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
   private final Table<String, String> finalizationStore;
   private final DBTransactionBuffer transactionBuffer;
-  // SCM transaction buffer flushes asynchronously, so we must keep the most
-  // up-to-date DB information in memory as well for reads.
-  private boolean hasFinalizingMark;
   private final List<ReplicatedFinalizationStep> finalizationSteps;
   private final HDDSLayoutVersionManager versionManager;
+  // Ensures that we are not in the process of updating checkpoint state as
+  // we read it to determine the current checkpoint.
+  private final ReadWriteLock checkpointLock;
+  // SCM transaction buffer flushes asynchronously, so we must keep the most
+  // up-to-date DB information in memory as well for reads.
+  private volatile boolean hasFinalizingMark;
 
   private FinalizationStateManagerImpl(Builder builder) throws IOException {
     this.finalizationStore = builder.finalizationStore;
     this.transactionBuffer = builder.transactionBuffer;
     this.versionManager = builder.versionManager;
+    this.checkpointLock = new ReentrantReadWriteLock();
 
     hasFinalizingMark = finalizationStore.isExist(OzoneConsts.FINALIZING_KEY);
     this.finalizationSteps = new ArrayList<>();
   }
 
   public FinalizationCheckpoint getFinalizationCheckpoint() {
-    boolean mlvBehindSlv = versionManager.needsFinalization();
+    // Get a point-in-time snapshot of the finalization state, then use this to
+    // determine which checkpoint we were on at that time.
+    boolean mlvBehindSlvSnapshot;
+    boolean hasFinalizingMarkSnapshot;
+    checkpointLock.readLock().lock();
+    try {
+      mlvBehindSlvSnapshot = versionManager.needsFinalization();
+      hasFinalizingMarkSnapshot = hasFinalizingMark;
+    } finally {
+      checkpointLock.readLock().unlock();
+    }
 
     FinalizationCheckpoint currentCheckpoint = null;
     // Enum constants must be iterated in order to resume from the correct
     // checkpoint.
     for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
-      if (checkpoint.isCurrent(hasFinalizingMark,
-          versionManager.needsFinalization())) {
+      if (checkpoint.isCurrent(hasFinalizingMarkSnapshot,
+          mlvBehindSlvSnapshot)) {
         currentCheckpoint = checkpoint;
         break;
       }
@@ -59,7 +73,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     String errorMessage = String.format("SCM upgrade finalization " +
         "is in an unknown state.\nFinalizing mark present? %b\n" +
         "Metadata layout version behind software layout version? %b",
-        hasFinalizingMark, mlvBehindSlv);
+        hasFinalizingMarkSnapshot, mlvBehindSlvSnapshot);
     Preconditions.checkNotNull(currentCheckpoint, errorMessage);
     return currentCheckpoint;
   }
@@ -67,16 +81,26 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
   @Override
   public void addFinalizingMark() throws IOException {
-    hasFinalizingMark = true;
+    checkpointLock.writeLock().lock();
+    try {
+      hasFinalizingMark = true;
+    } finally {
+      checkpointLock.writeLock().unlock();
+    }
     transactionBuffer.addToBuffer(finalizationStore,
         OzoneConsts.FINALIZING_KEY, "");
   }
 
   @Override
   public void finalizeLayoutFeature(Integer layoutVersion) throws IOException {
-    LayoutFeature feature = versionManager.getFeature(layoutVersion);
-    for(ReplicatedFinalizationStep step: finalizationSteps) {
-      step.run(feature);
+    checkpointLock.writeLock().lock();
+    try {
+      LayoutFeature feature = versionManager.getFeature(layoutVersion);
+      for(ReplicatedFinalizationStep step: finalizationSteps) {
+        step.run(feature);
+      }
+    } finally {
+      checkpointLock.writeLock().unlock();
     }
     transactionBuffer.addToBuffer(finalizationStore,
         OzoneConsts.LAYOUT_VERSION_KEY, String.valueOf(layoutVersion));
@@ -84,7 +108,12 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
   @Override
   public void removeFinalizingMark() throws IOException {
-    hasFinalizingMark = false;
+    checkpointLock.writeLock().lock();
+    try {
+      hasFinalizingMark = false;
+    } finally {
+      checkpointLock.writeLock().unlock();
+    }
     transactionBuffer.removeFromBuffer(finalizationStore,
         OzoneConsts.FINALIZING_KEY);
 
