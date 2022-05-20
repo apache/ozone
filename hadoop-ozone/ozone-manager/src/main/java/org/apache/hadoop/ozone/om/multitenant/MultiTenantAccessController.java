@@ -254,7 +254,7 @@ public interface MultiTenantAccessController {
     private final String description;
     private final Map<String, Collection<Acl>> roleAcls;
     private final Set<String> labels;
-    private boolean isEnabled;
+    private final boolean isEnabled;
 
     private Policy(Builder builder) {
       name = builder.name;
@@ -264,6 +264,7 @@ public interface MultiTenantAccessController {
       description = builder.description;
       roleAcls = builder.roleAcls;
       labels = builder.labels;
+      isEnabled = builder.isEnabled;
     }
 
     public Set<String> getVolumes() {
