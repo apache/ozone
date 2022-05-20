@@ -20,11 +20,12 @@ package org.apache.hadoop.ozone.shell.tenant;
 
 import java.io.IOException;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.ozone.client.ObjectStore;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.s3.S3Handler;
 
@@ -41,34 +42,40 @@ public class TenantListUsersHandler extends S3Handler {
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
-  @CommandLine.Option(names = {"-t", "--tenant"},
-      description = "Tenant name")
+  @CommandLine.Parameters(description = "Tenant name", arity = "1..1")
   private String tenantId;
 
-  @CommandLine.Option(names = {"-p", "--prefix"},
+  @CommandLine.Option(names = {"--prefix", "-p"},
       description = "Filter users with this prefix.")
   private String prefix;
 
-  // TODO: HDDS-6340. Add an option to print JSON result
+  @CommandLine.Option(names = {"--json", "-j"},
+      description = "Print detailed result in JSON")
+  private boolean printJson;
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address) {
-    final ObjectStore objStore = client.getObjectStore();
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
 
-    if (StringUtils.isEmpty(tenantId)) {
-      err().println("Please specify a tenant name with -t.");
-      return;
-    }
-    try {
-      TenantUserList usersInTenant =
-          objStore.listUsersInTenant(tenantId, prefix);
-      for (UserAccessIdInfo accessIdInfo : usersInTenant.getUserAccessIds()) {
+    final TenantUserList usersInTenant =
+        client.getObjectStore().listUsersInTenant(tenantId, prefix);
+
+    if (!printJson) {
+      usersInTenant.getUserAccessIds().forEach(accessIdInfo -> {
         out().println("- User '" + accessIdInfo.getUserPrincipal() +
             "' with accessId '" + accessIdInfo.getAccessId() + "'");
-      }
-    } catch (IOException e) {
-      err().println("Failed to Get Users in tenant '" + tenantId
-          + "': " + e.getMessage());
+      });
+    } else {
+      final JsonArray resArray = new JsonArray();
+      usersInTenant.getUserAccessIds().forEach(accessIdInfo -> {
+        final JsonObject obj = new JsonObject();
+        obj.addProperty("user", accessIdInfo.getUserPrincipal());
+        obj.addProperty("accessId", accessIdInfo.getAccessId());
+        resArray.add(obj);
+      });
+      final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+      out().println(gson.toJson(resArray));
     }
+
   }
 }

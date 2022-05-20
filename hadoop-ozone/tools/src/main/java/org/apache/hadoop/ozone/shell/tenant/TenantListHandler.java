@@ -17,7 +17,10 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
-import org.apache.hadoop.ozone.client.ObjectStore;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -33,56 +36,37 @@ import java.io.IOException;
     description = "List tenants")
 public class TenantListHandler extends TenantHandler {
 
-  @CommandLine.Option(names = {"--long"},
-      // Not using -l here as it potentially collides with -l inside ListOptions
-      //  if we do need pagination at some point.
-      description = "List in long format")
-  private boolean longFormat;
-
-  @CommandLine.Option(names = {"--header", "-H"},
-      description = "Print header")
-  private boolean printHeader;
-
-  // TODO: HDDS-6340. Add an option to print JSON result
-//  @CommandLine.Option(names = {"--json", "-j"},
-//      description = "Print the result in JSON.")
-//  private boolean printJson;
+  @CommandLine.Option(names = {"--json", "-j"},
+      description = "Print detailed result in JSON")
+  private boolean printJson;
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address) {
-    final ObjectStore objStore = client.getObjectStore();
-    try {
-      TenantStateList tenantStateList = objStore.listTenant();
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
 
-      if (printHeader) {
-        // Assuming default terminal width 120 / 6 ~= 20. +1 for space
-        out().format(longFormat ? "%-21s" : "%s%n",
-            "Tenant");
-        if (longFormat) {
-          out().format("%-21s%-21s%-21s%-21s%s%n",
-              "BucketNS",
-              "UserRole",
-              "AdminRole",
-              "BucketNSPolicy",
-              "BucketPolicy");
-        }
-      }
+    TenantStateList tenantStateList = client.getObjectStore().listTenant();
 
+    if (!printJson) {
+      tenantStateList.getTenantStateList().forEach(tenantState ->
+          out().println(tenantState.getTenantId()));
+    } else {
+      final JsonArray resArray = new JsonArray();
       tenantStateList.getTenantStateList().forEach(tenantState -> {
-        out().format(longFormat ? "%-21s" : "%s%n",
-            tenantState.getTenantId());
-        if (longFormat) {
-          out().format("%-21s%-21s%-21s%-21s%s%n",
-              tenantState.getBucketNamespaceName(),
-              tenantState.getUserRoleName(),
-              tenantState.getAdminRoleName(),
-              tenantState.getBucketNamespacePolicyName(),
-              tenantState.getBucketPolicyName());
-        }
+        final JsonObject obj = new JsonObject();
+        obj.addProperty("tenantId", tenantState.getTenantId());
+        obj.addProperty("bucketNamespaceName",
+            tenantState.getBucketNamespaceName());
+        obj.addProperty("userRoleName", tenantState.getUserRoleName());
+        obj.addProperty("adminRoleName", tenantState.getAdminRoleName());
+        obj.addProperty("bucketNamespacePolicyName",
+            tenantState.getBucketNamespacePolicyName());
+        obj.addProperty("bucketPolicyName",
+            tenantState.getBucketPolicyName());
+        resArray.add(obj);
       });
-
-    } catch (IOException e) {
-      LOG.error("Failed to list tenants: {}", e.getMessage());
+      final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+      out().println(gson.toJson(resArray));
     }
+
   }
 }

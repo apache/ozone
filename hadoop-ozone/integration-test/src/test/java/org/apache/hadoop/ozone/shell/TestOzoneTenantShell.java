@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.shell;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileUtil;
@@ -339,6 +340,19 @@ public class TestOzoneTenantShell {
     stream.reset();
   }
 
+  private void checkOutput(ByteArrayOutputStream stream, String stringToMatch,
+      boolean exactMatch, boolean expectValidJSON) throws IOException {
+    stream.flush();
+    final String str = stream.toString(DEFAULT_ENCODING);
+    if (expectValidJSON) {
+      // Verify if the String can be parsed as a valid JSON
+      final ObjectMapper objectMapper = new ObjectMapper();
+      objectMapper.readTree(str);
+    }
+    checkOutput(str, stringToMatch, exactMatch);
+    stream.reset();
+  }
+
   private void checkOutput(String str, String stringToMatch,
                            boolean exactMatch) {
     if (exactMatch) {
@@ -363,7 +377,7 @@ public class TestOzoneTenantShell {
     final String userName = "alice";
 
     executeHA(tenantShell, new String[] {"create", tenantName});
-    checkOutput(out, "Created tenant", false);
+    checkOutput(out, "", true);
     checkOutput(err, "", true);
 
     // Loop assign-revoke 4 times
@@ -371,31 +385,34 @@ public class TestOzoneTenantShell {
       executeHA(tenantShell, new String[] {
           "user", "assign", userName, "--tenant=" + tenantName});
       checkOutput(out, "export AWS_ACCESS_KEY_ID=", false);
-      checkOutput(err, "Assigned", false);
+      checkOutput(err, "", true);
 
-      executeHA(tenantShell, new String[] {"user", "assign-admin",
+      executeHA(tenantShell, new String[] {"--verbose", "user", "assign-admin",
           tenantName + "$" + userName, "--tenant=" + tenantName,
           "--delegated=true"});
-      checkOutput(out, "", true);
-      checkOutput(err, "Assigned admin", false);
+      checkOutput(out, "{\n" + "  \"accessId\": \"devaa$alice\",\n"
+          + "  \"tenantId\": \"devaa\",\n" + "  \"isAdmin\": true,\n"
+          + "  \"isDelegatedAdmin\": true\n" + "}\n", true, true);
+      checkOutput(err, "", true);
 
       // Clean up
-      executeHA(tenantShell, new String[] {
-          "user", "revoke-admin", tenantName + "$" + userName,
-          "--tenant=" + tenantName});
-      checkOutput(out, "", true);
-      checkOutput(err, "Revoked admin role of", false);
+      executeHA(tenantShell, new String[] {"--verbose", "user", "revoke-admin",
+          tenantName + "$" + userName, "--tenant=" + tenantName});
+      checkOutput(out, "{\n" + "  \"accessId\": \"devaa$alice\",\n"
+          + "  \"tenantId\": \"devaa\",\n" + "  \"isAdmin\": false,\n"
+          + "  \"isDelegatedAdmin\": false\n" + "}\n", true, true);
+      checkOutput(err, "", true);
 
       executeHA(tenantShell, new String[] {
           "user", "revoke", tenantName + "$" + userName});
       checkOutput(out, "", true);
-      checkOutput(err, "Revoked accessId", false);
+      checkOutput(err, "", true);
     }
 
     // Clean up
     executeHA(tenantShell, new String[] {"delete", tenantName});
-    checkOutput(out, "Deleted tenant '" + tenantName + "'.\n", false);
-    checkOutput(err, "", true);
+    checkOutput(out, "", true);
+    checkOutput(err, "Deleted tenant '" + tenantName + "'.\n", false);
     deleteVolume(tenantName);
 
     // Sanity check: tenant list should be empty
@@ -422,7 +439,7 @@ public class TestOzoneTenantShell {
     // Create tenants
     // Equivalent to `ozone tenant create finance`
     executeHA(tenantShell, new String[] {"create", "finance"});
-    checkOutput(out, "Created tenant 'finance'.\n", true);
+    checkOutput(out, "", true);
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {"list"});
@@ -440,36 +457,36 @@ public class TestOzoneTenantShell {
     // Creating the tenant with the same name again should fail
     executeHA(tenantShell, new String[] {"create", "finance"});
     checkOutput(out, "", true);
-    checkOutput(err, "Failed to create tenant 'finance'", false);
+    checkOutput(err, "Tenant 'finance' already exists\n", true);
 
     executeHA(tenantShell, new String[] {"create", "research"});
-    checkOutput(out, "Created tenant 'research'.\n", true);
+    checkOutput(out, "", true);
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {"create", "dev"});
-    checkOutput(out, "Created tenant 'dev'.\n", true);
+    checkOutput(out, "", true);
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {"ls"});
     checkOutput(out, "dev\nfinance\nresearch\n", true);
     checkOutput(err, "", true);
 
-    executeHA(tenantShell, new String[] {"list", "--long", "--header"});
-    // Not checking the entire output here yet
-    checkOutput(out, "Policy", false);
+    executeHA(tenantShell, new String[] {"list", "--json"});
+    // Not checking the full output here
+    checkOutput(out, "\"tenantId\": \"dev\",", false);
     checkOutput(err, "", true);
 
     // Attempt user getsecret before assignment, should fail
     executeHA(tenantShell, new String[] {
         "user", "getsecret", "finance$bob"});
     checkOutput(out, "", false);
-    checkOutput(err, "AccessId 'finance$bob' doesn't exist\n",
+    checkOutput(err, "accessId 'finance$bob' doesn't exist\n",
         true);
 
     // Assign user accessId
     // Equivalent to `ozone tenant user assign bob --tenant=finance`
     executeHA(tenantShell, new String[] {
-        "user", "assign", "bob", "--tenant=finance"});
+        "--verbose", "user", "assign", "bob", "--tenant=finance"});
     checkOutput(out, "export AWS_ACCESS_KEY_ID='finance$bob'\n"
         + "export AWS_SECRET_ACCESS_KEY='", false);
     checkOutput(err, "Assigned 'bob' to 'finance' with accessId"
@@ -478,18 +495,12 @@ public class TestOzoneTenantShell {
     // Try user getsecret again after assignment, should succeed
     executeHA(tenantShell, new String[] {
         "user", "getsecret", "finance$bob"});
-    checkOutput(out, "awsAccessKey=finance$bob\n", false);
-    checkOutput(err, "", true);
-
-    // Try user getsecret again with -e option
-    executeHA(tenantShell, new String[] {
-        "user", "getsecret", "-e", "finance$bob"});
     checkOutput(out, "export AWS_ACCESS_KEY_ID='finance$bob'\n",
             false);
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
-        "user", "assign", "bob", "--tenant=research"});
+        "--verbose", "user", "assign", "bob", "--tenant=research"});
     checkOutput(out, "export AWS_ACCESS_KEY_ID='research$bob'\n"
         + "export AWS_SECRET_ACCESS_KEY='", false);
     checkOutput(err, "Assigned 'bob' to 'research' with accessId"
@@ -499,8 +510,7 @@ public class TestOzoneTenantShell {
         "user", "assign", "bob", "--tenant=dev"});
     checkOutput(out, "export AWS_ACCESS_KEY_ID='dev$bob'\n"
         + "export AWS_SECRET_ACCESS_KEY='", false);
-    checkOutput(err, "Assigned 'bob' to 'dev' with accessId"
-        + " 'dev$bob'.\n", true);
+    checkOutput(err, "", true);
 
     // Get user info
     // Equivalent to `ozone tenant user info bob`
@@ -516,20 +526,33 @@ public class TestOzoneTenantShell {
     executeHA(tenantShell, new String[] {
         "user", "assign-admin", "dev$bob", "--tenant=dev"});
     checkOutput(out, "", true);
-    checkOutput(err,
-        "Assigned admin to 'dev$bob' in tenant 'dev'\n", true);
+    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
         "user", "info", "bob"});
     checkOutput(out, "Tenant 'dev' delegated admin with accessId", false);
     checkOutput(err, "", true);
 
+    executeHA(tenantShell, new String[] {
+        "user", "info", "--json", "bob"});
+    checkOutput(out, "{\n" + "  \"user\": \"bob\",\n" + "  \"tenants\": [\n"
+        + "    {\n" + "      \"accessId\": \"research$bob\",\n"
+        + "      \"tenantId\": \"research\",\n" + "      \"isAdmin\": false,\n"
+        + "      \"isDelegatedAdmin\": false\n" + "    },\n" + "    {\n"
+        + "      \"accessId\": \"finance$bob\",\n"
+        + "      \"tenantId\": \"finance\",\n" + "      \"isAdmin\": false,\n"
+        + "      \"isDelegatedAdmin\": false\n" + "    },\n" + "    {\n"
+        + "      \"accessId\": \"dev$bob\",\n"
+        + "      \"tenantId\": \"dev\",\n" + "      \"isAdmin\": true,\n"
+        + "      \"isDelegatedAdmin\": true\n" + "    }\n" + "  ]\n" + "}\n",
+        true, true);
+    checkOutput(err, "", true);
+
     // Revoke admin
     executeHA(tenantShell, new String[] {
         "user", "revoke-admin", "dev$bob", "--tenant=dev"});
     checkOutput(out, "", true);
-    checkOutput(err, "Revoked admin role of 'dev$bob' "
-        + "from tenant 'dev'.\n", true);
+    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
         "user", "info", "bob"});
@@ -543,7 +566,7 @@ public class TestOzoneTenantShell {
     executeHA(tenantShell, new String[] {
         "user", "revoke", "research$bob"});
     checkOutput(out, "", true);
-    checkOutput(err, "Revoked accessId 'research$bob'.\n", true);
+    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
         "user", "info", "bob"});
@@ -557,16 +580,14 @@ public class TestOzoneTenantShell {
         "user", "assign", "bob", "--tenant=research"});
     checkOutput(out, "export AWS_ACCESS_KEY_ID='research$bob'\n"
         + "export AWS_SECRET_ACCESS_KEY='", false);
-    checkOutput(err, "Assigned 'bob' to 'research' with accessId"
-        + " 'research$bob'.\n", true);
+    checkOutput(err, "", true);
 
     // Attempt to assign the user to the tenant again
     executeHA(tenantShell, new String[] {
         "user", "assign", "bob", "--tenant=research",
         "--accessId=research$bob"});
     checkOutput(out, "", false);
-    checkOutput(err, "Failed to assign 'bob' to 'research': "
-        + "accessId 'research$bob' already exists!\n", true);
+    checkOutput(err, "accessId 'research$bob' already exists!\n", true);
 
     // Attempt to assign the user to the tenant with a custom accessId
     executeHA(tenantShell, new String[] {
@@ -574,16 +595,9 @@ public class TestOzoneTenantShell {
         "--accessId=research$bob42"});
     checkOutput(out, "", false);
     // HDDS-6366: Disallow specifying custom accessId.
-    checkOutput(err, "Failed to assign 'bob' to 'research': "
-        + "Invalid accessId 'research$bob42'. "
+    checkOutput(err, "Invalid accessId 'research$bob42'. "
         + "Specifying a custom access ID disallowed. "
         + "Expected accessId to be assigned is 'research$bob'\n", true);
-    /*  Once HDDS-6366 is lifted, the following check should be used instead
-    checkOutput(err, "Failed to assign 'bob' to 'research': "
-        + "The same user is not allowed to be assigned to the same tenant "
-        + "more than once. User 'bob' is already assigned to tenant 'research' "
-        + "with accessId 'research$bob'.\n", true);
-    */
 
     executeHA(tenantShell, new String[] {"list"});
     checkOutput(out, "dev\nfinance\nresearch\n", true);
@@ -593,25 +607,25 @@ public class TestOzoneTenantShell {
     executeHA(tenantShell, new String[] {
         "user", "revoke", "research$bob"});
     checkOutput(out, "", true);
-    checkOutput(err, "Revoked accessId", false);
+    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {"delete", "research"});
-    checkOutput(out, "Deleted tenant 'research'.\n", false);
-    checkOutput(err, "", true);
+    checkOutput(out, "", true);
+    checkOutput(err, "Deleted tenant 'research'.\n", false);
     deleteVolume("research");
 
     executeHA(tenantShell, new String[] {
         "user", "revoke", "finance$bob"});
     checkOutput(out, "", true);
-    checkOutput(err, "Revoked accessId", false);
+    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {"list"});
     checkOutput(out, "dev\nfinance\n", true);
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {"delete", "finance"});
-    checkOutput(out, "Deleted tenant 'finance'.\n", false);
-    checkOutput(err, "", true);
+    checkOutput(out, "", true);
+    checkOutput(err, "Deleted tenant 'finance'.\n", false);
     deleteVolume("finance");
 
     executeHA(tenantShell, new String[] {"list"});
@@ -622,7 +636,9 @@ public class TestOzoneTenantShell {
     int exitCode = executeHA(tenantShell, new String[] {"delete", "dev"});
     Assert.assertTrue("Tenant delete should fail!", exitCode != 0);
     checkOutput(out, "", true);
-    checkOutput(err, "Failed to delete tenant 'dev'", false);
+    checkOutput(err, "Tenant 'dev' is not empty. All accessIds associated "
+        + "to this tenant must be revoked before the tenant can be deleted. "
+        + "See `ozone tenant user revoke`\n", true);
 
     // Delete dev volume should fail because the volume reference count > 0L
     exitCode = execute(ozoneSh, new String[] {"volume", "delete", "dev"});
@@ -640,12 +656,14 @@ public class TestOzoneTenantShell {
     executeHA(tenantShell, new String[] {
         "user", "revoke", "dev$bob"});
     checkOutput(out, "", true);
-    checkOutput(err, "Revoked accessId", false);
+    checkOutput(err, "", true);
 
     // Then delete tenant, should succeed
-    executeHA(tenantShell, new String[] {"delete", "dev"});
-    checkOutput(out, "Deleted tenant 'dev'.\n", false);
-    checkOutput(err, "", true);
+    executeHA(tenantShell, new String[] {"--verbose", "delete", "dev"});
+    checkOutput(out, "{\n" + "  \"tenantId\": \"dev\",\n"
+        + "  \"volumeName\": \"dev\",\n" + "  \"volumeRefCount\": 0\n" + "}\n",
+        true, true);
+    checkOutput(err, "Deleted tenant 'dev'.\n", false);
     deleteVolume("dev");
 
     // Sanity check: tenant list should be empty
@@ -656,12 +674,13 @@ public class TestOzoneTenantShell {
 
   @Test
   public void testListTenantUsers() throws IOException {
-    executeHA(tenantShell, new String[] {"create", "tenant1"});
-    checkOutput(out, "Created tenant 'tenant1'.\n", true);
+    executeHA(tenantShell, new String[] {"--verbose", "create", "tenant1"});
+    checkOutput(out, "{\n" +
+        "  \"tenantId\": \"tenant1\"\n" + "}\n", true, true);
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
-        "user", "assign", "alice", "--tenant=tenant1"});
+        "--verbose", "user", "assign", "alice", "--tenant=tenant1"});
     checkOutput(out, "export AWS_ACCESS_KEY_ID='tenant1$alice'\n"
         + "export AWS_SECRET_ACCESS_KEY='", false);
     checkOutput(err, "Assigned 'alice' to 'tenant1'" +
@@ -671,40 +690,54 @@ public class TestOzoneTenantShell {
         "user", "assign", "bob", "--tenant=tenant1"});
     checkOutput(out, "export AWS_ACCESS_KEY_ID='tenant1$bob'\n"
         + "export AWS_SECRET_ACCESS_KEY='", false);
-    checkOutput(err, "Assigned 'bob' to 'tenant1'" +
-        " with accessId 'tenant1$bob'.\n", true);
+    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
-        "user", "list", "--tenant=tenant1"});
+        "user", "list", "tenant1"});
     checkOutput(out, "- User 'bob' with accessId 'tenant1$bob'\n" +
         "- User 'alice' with accessId 'tenant1$alice'\n", true);
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
-        "user", "list", "--tenant=tenant1", "--prefix=b"});
+        "user", "list", "tenant1", "--json"});
+    checkOutput(out, "[\n" + "  {\n" + "    \"user\": \"bob\",\n"
+        + "    \"accessId\": \"tenant1$bob\"\n" + "  },\n" + "  {\n"
+        + "    \"user\": \"alice\",\n" + "    \"accessId\": \"tenant1$alice\"\n"
+        + "  }\n" + "]\n", true);
+    checkOutput(err, "", true);
+
+    executeHA(tenantShell, new String[] {
+        "user", "list", "tenant1", "--prefix=b"});
     checkOutput(out, "- User 'bob' with accessId " +
         "'tenant1$bob'\n", true);
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
-        "user", "list", "--tenant=unknown"});
-    checkOutput(err, "Failed to Get Users in tenant 'unknown': " +
-        "Tenant 'unknown' doesn't exist.\n", true);
+        "user", "list", "tenant1", "--prefix=b", "--json"});
+    checkOutput(out, "[\n" + "  {\n" + "    \"user\": \"bob\",\n"
+        + "    \"accessId\": \"tenant1$bob\"\n" + "  }\n" + "]\n", true);
+    checkOutput(err, "", true);
+
+    int exitCode = executeHA(tenantShell, new String[] {
+        "user", "list", "unknown"});
+    Assert.assertTrue("Expected non-zero exit code", exitCode != 0);
+    checkOutput(out, "", true);
+    checkOutput(err, "Tenant 'unknown' doesn't exist.\n", true);
 
     // Clean up
     executeHA(tenantShell, new String[] {
         "user", "revoke", "tenant1$alice"});
     checkOutput(out, "", true);
-    checkOutput(err, "Revoked accessId", false);
+    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
-        "user", "revoke", "tenant1$bob"});
+        "--verbose", "user", "revoke", "tenant1$bob"});
     checkOutput(out, "", true);
     checkOutput(err, "Revoked accessId", false);
 
     executeHA(tenantShell, new String[] {"delete", "tenant1"});
-    checkOutput(out, "Deleted tenant 'tenant1'.\n", false);
-    checkOutput(err, "", true);
+    checkOutput(out, "", true);
+    checkOutput(err, "Deleted tenant 'tenant1'.\n", false);
     deleteVolume("tenant1");
 
     // Sanity check: tenant list should be empty
@@ -720,28 +753,26 @@ public class TestOzoneTenantShell {
 
     // Create test tenant
     executeHA(tenantShell, new String[] {"create", tenantName});
-    checkOutput(out, "Created tenant '" + tenantName + "'.\n", true);
+    checkOutput(out, "", true);
     checkOutput(err, "", true);
 
     // Set secret for non-existent accessId. Expect failure
     executeHA(tenantShell, new String[] {
         "user", "set-secret", tenantName + "$alice", "--secret=somesecret0"});
     checkOutput(out, "", true);
-    checkOutput(err, "AccessId '" + tenantName + "$alice' doesn't exist\n",
-        true);
+    checkOutput(err, "accessId '" + tenantName + "$alice' not found.\n", true);
 
     // Assign a user to the tenant so that we have an accessId entry
     executeHA(tenantShell, new String[] {
         "user", "assign", "alice", "--tenant=" + tenantName});
     checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
         "export AWS_SECRET_ACCESS_KEY='", false);
-    checkOutput(err, "Assigned 'alice' to '" + tenantName + "'" +
-        " with accessId '" + tenantName + "$alice'.\n", true);
+    checkOutput(err, "", true);
 
     // Set secret as OM admin should succeed
     executeHA(tenantShell, new String[] {
         "user", "setsecret", tenantName + "$alice",
-        "--secret=somesecret1", "--export"});
+        "--secret=somesecret1"});
     checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
         "export AWS_SECRET_ACCESS_KEY='somesecret1'\n", true);
     checkOutput(err, "", true);
@@ -749,8 +780,8 @@ public class TestOzoneTenantShell {
     // Set empty secret key should fail
     int exitCode = executeHA(tenantShell, new String[] {
         "user", "setsecret", tenantName + "$alice",
-        "--secret=short", "--export"});
-    Assert.assertTrue("Command should have non-zero exit code!", exitCode != 0);
+        "--secret=short"});
+    Assert.assertTrue("Expected non-zero exit code", exitCode != 0);
     checkOutput(out, "", true);
     checkOutput(err, "Secret key length should be at least 8 characters\n",
         true);
@@ -768,7 +799,7 @@ public class TestOzoneTenantShell {
     ugiAlice.doAs((PrivilegedExceptionAction<Void>) () -> {
       executeHA(tenantShell, new String[] {
           "user", "setsecret", tenantName + "$alice",
-          "--secret=somesecret2", "--export"});
+          "--secret=somesecret2"});
       checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
           "export AWS_SECRET_ACCESS_KEY='somesecret2'\n", true);
       checkOutput(err, "", true);
@@ -780,8 +811,7 @@ public class TestOzoneTenantShell {
         "user", "assign", "bob", "--tenant=" + tenantName});
     checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$bob'\n" +
         "export AWS_SECRET_ACCESS_KEY='", false);
-    checkOutput(err, "Assigned 'bob' to '" + tenantName + "'" +
-        " with accessId '" + tenantName + "$bob'.\n", true);
+    checkOutput(err, "", true);
 
     final UserGroupInformation ugiBob = UserGroupInformation
         .createUserForTesting("bob",  new String[] {"usergroup"});
@@ -789,7 +819,7 @@ public class TestOzoneTenantShell {
     ugiBob.doAs((PrivilegedExceptionAction<Void>) () -> {
       int exitC = executeHA(tenantShell, new String[] {
           "user", "setsecret", tenantName + "$alice",
-          "--secret=somesecret2", "--export"});
+          "--secret=somesecret2"});
       Assert.assertTrue("Should return non-zero exit code!", exitC != 0);
       checkOutput(out, "", true);
       checkOutput(err, "Permission denied. Requested accessId "
@@ -808,13 +838,13 @@ public class TestOzoneTenantShell {
         tenantName + "$" + ugiBob.getShortUserName(),
         "--tenant=" + tenantName, "--delegated=false"});
     checkOutput(out, "", true);
-    checkOutput(err, "Assigned admin", false);
+    checkOutput(err, "", true);
 
     // Set secret should succeed now
     ugiBob.doAs((PrivilegedExceptionAction<Void>) () -> {
       executeHA(tenantShell, new String[] {
           "user", "setsecret", tenantName + "$alice",
-          "--secret=somesecret2", "--export"});
+          "--secret=somesecret2"});
       checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
           "export AWS_SECRET_ACCESS_KEY='somesecret2'\n", true);
       checkOutput(err, "", true);
@@ -825,21 +855,21 @@ public class TestOzoneTenantShell {
     executeHA(tenantShell, new String[] {"user", "revoke-admin",
         tenantName + "$" + ugiBob.getShortUserName()});
     checkOutput(out, "", true);
-    checkOutput(err, "Revoked admin", false);
+    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
         "user", "revoke", tenantName + "$bob"});
     checkOutput(out, "", true);
-    checkOutput(err, "Revoked accessId", false);
+    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
         "user", "revoke", tenantName + "$alice"});
     checkOutput(out, "", true);
-    checkOutput(err, "Revoked accessId", false);
+    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {"delete", tenantName});
-    checkOutput(out, "Deleted tenant '" + tenantName + "'.\n", false);
-    checkOutput(err, "", true);
+    checkOutput(out, "", true);
+    checkOutput(err, "Deleted tenant '" + tenantName + "'.\n", false);
     deleteVolume(tenantName);
 
     // Sanity check: tenant list should be empty
@@ -863,7 +893,7 @@ public class TestOzoneTenantShell {
 
     // Create test tenant
     executeHA(tenantShell, new String[] {"create", tenantName});
-    checkOutput(out, "Created tenant '" + tenantName + "'.\n", true);
+    checkOutput(out, "", true);
     checkOutput(err, "", true);
 
     // Assign alice and bob as tenant users
@@ -871,29 +901,27 @@ public class TestOzoneTenantShell {
         "user", "assign", "alice", "--tenant=" + tenantName});
     checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
         "export AWS_SECRET_ACCESS_KEY='", false);
-    checkOutput(err, "Assigned 'alice' to '" + tenantName + "'" +
-        " with accessId '" + tenantName + "$alice'.\n", true);
+    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
         "user", "assign", "bob", "--tenant=" + tenantName});
     checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$bob'\n" +
         "export AWS_SECRET_ACCESS_KEY='", false);
-    checkOutput(err, "Assigned 'bob' to '" + tenantName + "'" +
-        " with accessId '" + tenantName + "$bob'.\n", true);
+    checkOutput(err, "", true);
 
     // Make alice a delegated tenant admin
     executeHA(tenantShell, new String[] {"user", "assign-admin",
         tenantName + "$" + ugiAlice.getShortUserName(),
         "--tenant=" + tenantName, "--delegated=true"});
     checkOutput(out, "", true);
-    checkOutput(err, "Assigned admin", false);
+    checkOutput(err, "", true);
 
     // Make bob a non-delegated tenant admin
     executeHA(tenantShell, new String[] {"user", "assign-admin",
         tenantName + "$" + ugiBob.getShortUserName(),
         "--tenant=" + tenantName, "--delegated=false"});
     checkOutput(out, "", true);
-    checkOutput(err, "Assigned admin", false);
+    checkOutput(err, "", true);
 
     // Start test matrix
 
@@ -907,13 +935,12 @@ public class TestOzoneTenantShell {
           "user", "assign", "carol", "--tenant=" + tenantName});
       checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$carol'\n"
           + "export AWS_SECRET_ACCESS_KEY='", false);
-      checkOutput(err, "Assigned 'carol' to '" + tenantName + "' with accessId"
-          + " '" + tenantName + "$carol'.\n", true);
+      checkOutput(err, "", true);
 
       // Set secret should work
       executeHA(tenantShell, new String[] {
           "user", "setsecret", tenantName + "$alice",
-          "--secret=somesecret2", "--export"});
+          "--secret=somesecret2"});
       checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
           "export AWS_SECRET_ACCESS_KEY='somesecret2'\n", true);
       checkOutput(err, "", true);
@@ -923,32 +950,32 @@ public class TestOzoneTenantShell {
           tenantName + "$carol",
           "--tenant=" + tenantName, "--delegated=true"});
       checkOutput(out, "", true);
-      checkOutput(err, "Assigned admin", false);
+      checkOutput(err, "", true);
 
       // Revoke carol's tenant admin privilege
       executeHA(tenantShell, new String[] {"user", "revoke-admin",
           tenantName + "$carol"});
       checkOutput(out, "", true);
-      checkOutput(err, "Revoked admin", false);
+      checkOutput(err, "", true);
 
       // Make carol a tenant non-delegated tenant admin
       executeHA(tenantShell, new String[] {"user", "assign-admin",
           tenantName + "$carol",
           "--tenant=" + tenantName, "--delegated=false"});
       checkOutput(out, "", true);
-      checkOutput(err, "Assigned admin", false);
+      checkOutput(err, "", true);
 
       // Revoke carol's tenant admin privilege
       executeHA(tenantShell, new String[] {"user", "revoke-admin",
           tenantName + "$carol"});
       checkOutput(out, "", true);
-      checkOutput(err, "Revoked admin", false);
+      checkOutput(err, "", true);
 
       // Revoke carol's accessId from this tenant
       executeHA(tenantShell, new String[] {
           "user", "revoke", tenantName + "$carol"});
       checkOutput(out, "", true);
-      checkOutput(err, "Revoked accessId", false);
+      checkOutput(err, "", true);
       return null;
     });
 
@@ -964,13 +991,12 @@ public class TestOzoneTenantShell {
           "user", "assign", "carol", "--tenant=" + tenantName});
       checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$carol'\n"
           + "export AWS_SECRET_ACCESS_KEY='", false);
-      checkOutput(err, "Assigned 'carol' to '" + tenantName + "' with accessId"
-          + " '" + tenantName + "$carol'.\n", true);
+      checkOutput(err, "", true);
 
       // Set secret should work, even for a non-delegated admin
       executeHA(tenantShell, new String[] {
           "user", "setsecret", tenantName + "$alice",
-          "--secret=somesecret2", "--export"});
+          "--secret=somesecret2"});
       checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
           "export AWS_SECRET_ACCESS_KEY='somesecret2'\n", true);
       checkOutput(err, "", true);
@@ -980,27 +1006,29 @@ public class TestOzoneTenantShell {
           tenantName + "$carol",
           "--tenant=" + tenantName, "--delegated=true"});
       checkOutput(out, "", true);
-      checkOutput(err, "Failed to assign admin", false);
+      checkOutput(err, "User 'bob' is neither an Ozone admin "
+          + "nor a delegated admin of tenant", false);
 
       // Attempt to make carol a tenant non-delegated tenant admin, should fail
       executeHA(tenantShell, new String[] {"user", "assign-admin",
           tenantName + "$carol",
           "--tenant=" + tenantName, "--delegated=false"});
       checkOutput(out, "", true);
-      checkOutput(err, "Failed to assign admin", false);
+      checkOutput(err, "User 'bob' is neither an Ozone admin "
+          + "nor a delegated admin of tenant", false);
 
       // Attempt to revoke tenant admin, should fail at the permission check
       executeHA(tenantShell, new String[] {"user", "revoke-admin",
           tenantName + "$carol"});
       checkOutput(out, "", true);
-      checkOutput(err, "User 'bob' is neither an Ozone admin nor a delegated "
-          + "admin of tenant", false);
+      checkOutput(err, "User 'bob' is neither an Ozone admin "
+          + "nor a delegated admin of tenant", false);
 
       // Revoke carol's accessId from this tenant
       executeHA(tenantShell, new String[] {
           "user", "revoke", tenantName + "$carol"});
       checkOutput(out, "", true);
-      checkOutput(err, "Revoked accessId", false);
+      checkOutput(err, "", true);
       return null;
     });
 
@@ -1008,26 +1036,26 @@ public class TestOzoneTenantShell {
     executeHA(tenantShell, new String[] {"user", "revoke-admin",
         tenantName + "$" + ugiAlice.getShortUserName()});
     checkOutput(out, "", true);
-    checkOutput(err, "Revoked admin", false);
+    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
         "user", "revoke", tenantName + "$" + ugiAlice.getShortUserName()});
     checkOutput(out, "", true);
-    checkOutput(err, "Revoked accessId", false);
+    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {"user", "revoke-admin",
         tenantName + "$" + ugiBob.getShortUserName()});
     checkOutput(out, "", true);
-    checkOutput(err, "Revoked admin", false);
+    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
         "user", "revoke", tenantName + "$" + ugiBob.getShortUserName()});
     checkOutput(out, "", true);
-    checkOutput(err, "Revoked accessId", false);
+    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {"delete", tenantName});
-    checkOutput(out, "Deleted tenant '" + tenantName + "'.\n", false);
-    checkOutput(err, "", true);
+    checkOutput(out, "", true);
+    checkOutput(err, "Deleted tenant '" + tenantName + "'.\n", false);
     deleteVolume(tenantName);
   }
 }
