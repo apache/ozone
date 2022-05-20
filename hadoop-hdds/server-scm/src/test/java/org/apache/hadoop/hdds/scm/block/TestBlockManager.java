@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
@@ -159,7 +161,9 @@ public class TestBlockManager {
             scmHAManager,
             sequenceIdGen,
             pipelineManager,
-            scmMetadataStore.getContainerTable());
+            scmMetadataStore.getContainerTable(),
+            new ContainerReplicaPendingOps(conf,
+                new MonotonicClock(ZoneId.systemDefault())));
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
         containerManager.getContainers(), containerManager,
         pipelineManager, eventQueue, serviceManager, scmContext) {
