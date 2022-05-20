@@ -17133,7 +17133,7 @@ specifiers:
   '@typescript-eslint/eslint-plugin': ^2.31.0
   '@typescript-eslint/parser': ^2.31.0
   antd: ^3.26.9
-  axios: ^0.21.2
+  axios: ^0.21.4
   babel-jest: ^24.9.0
   babel-plugin-import: ^1.11.0
   classnames: ^2.2.6
