@@ -245,7 +245,7 @@ public class TestRangerBGSyncService {
         OMRequest request = invocation.getArgument(0);
         long v = request.getSetRangerServiceVersionRequest()
             .getRangerServiceVersion();
-        LOG.info("Writing Ranger Ozone Service Version: {}", v);
+        LOG.info("Writing Ranger Ozone Service Version to DB: {}", v);
         ozoneManager.getMetadataManager().getMetaTable().put(
             OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY, String.valueOf(v));
         return null;
@@ -490,17 +490,23 @@ public class TestRangerBGSyncService {
     // Create roles and policies in ranger that are NOT
     // backed up by OzoneManger Multi-Tenant tables
     createRolesAndPoliciesInRanger(false);
-    long rangerVersionAfterCreation = bgSync.getLatestRangerServiceVersion();
-    Assert.assertTrue(rangerVersionAfterCreation >= startingRangerVersion);
 
+    final long rangerSvcVersionBefore = bgSync.getLatestRangerServiceVersion();
+    Assert.assertTrue(rangerSvcVersionBefore >= startingRangerVersion);
+
+    // Note: DB Service Version will be -1 if the test starts with an empty DB
+    final long dbSvcVersionBefore = bgSync.getOMDBRangerServiceVersion();
     bgSync.start();
     // Wait for sync to finish once.
     // The counter is incremented at the beginning of the run, hence the ">"
     GenericTestUtils.waitFor(() -> bgSync.getRangerSyncRunCount() > 1L,
         CHECK_SYNC_MILLIS, WAIT_SYNC_TIMEOUT_MILLIS);
     bgSync.shutdown();
-    long ozoneVersionAfterSync = bgSync.getOMDBRangerServiceVersion();
-    Assert.assertTrue(ozoneVersionAfterSync > rangerVersionAfterCreation);
+    final long dbSvcVersionAfter = bgSync.getOMDBRangerServiceVersion();
+    final long rangerSvcVersionAfter = bgSync.getLatestRangerServiceVersion();
+    Assert.assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
+    Assert.assertTrue(dbSvcVersionAfter > dbSvcVersionBefore);
+    Assert.assertTrue(rangerSvcVersionAfter > rangerSvcVersionBefore);
 
     // Verify that the Ranger policies and roles not backed up
     // by OzoneManager Multi-Tenancy tables are cleaned up by sync thread
@@ -532,17 +538,25 @@ public class TestRangerBGSyncService {
     // Create roles and policies in ranger that are
     // backed up by OzoneManger Multi-Tenant tables
     createRolesAndPoliciesInRanger(true);
-    long rangerVersionAfterCreation = bgSync.getLatestRangerServiceVersion();
-    Assert.assertTrue(rangerVersionAfterCreation >= startingRangerVersion);
 
+    long rangerSvcVersionBefore = bgSync.getLatestRangerServiceVersion();
+    Assert.assertTrue(rangerSvcVersionBefore >= startingRangerVersion);
+
+    // Note: DB Service Version will be -1 if the test starts with an empty DB
+    final long dbSvcVersionBefore = bgSync.getOMDBRangerServiceVersion();
     bgSync.start();
     // Wait for sync to finish once.
     // The counter is incremented at the beginning of the run, hence the ">"
     GenericTestUtils.waitFor(() -> bgSync.getRangerSyncRunCount() > 1L,
         CHECK_SYNC_MILLIS, WAIT_SYNC_TIMEOUT_MILLIS);
     bgSync.shutdown();
-    long ozoneVersionAfterSync = bgSync.getOMDBRangerServiceVersion();
-    Assert.assertEquals(rangerVersionAfterCreation, ozoneVersionAfterSync);
+    final long dbSvcVersionAfter = bgSync.getOMDBRangerServiceVersion();
+    final long rangerSvcVersionAfter = bgSync.getLatestRangerServiceVersion();
+    Assert.assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
+    Assert.assertEquals(rangerSvcVersionAfter, rangerSvcVersionBefore);
+    if (dbSvcVersionBefore != -1L) {
+      Assert.assertEquals(dbSvcVersionBefore, dbSvcVersionAfter);
+    }
 
     for (String policy : policiesCreated) {
       try {
@@ -577,9 +591,12 @@ public class TestRangerBGSyncService {
    */
   @Test
   public void testRecoverRangerRole() throws Exception {
-    long ozoneVersion = initBGSync();
+    long startingRangerVersion = initBGSync();
 
     createRolesAndPoliciesInRanger(true);
+
+    long rangerVersionAfterCreation = bgSync.getLatestRangerServiceVersion();
+    Assert.assertTrue(rangerVersionAfterCreation >= startingRangerVersion);
 
     // Delete a user from user role, expect Ranger sync thread to update it
     String userRoleName = new JsonParser().parse(rolesCreated.get(0))
@@ -594,7 +611,10 @@ public class TestRangerBGSyncService {
     userSet.add(USER_ALICE_SHORT);
     userSet.add(USER_BOB_SHORT);
 
-    long currRunCount = bgSync.getRangerSyncRunCount();
+    // Note: DB Service Version will be -1 if the test starts with an empty DB
+    final long dbSvcVersionBefore = bgSync.getOMDBRangerServiceVersion();
+    final long rangerSvcVersionBefore = bgSync.getLatestRangerServiceVersion();
+    final long currRunCount = bgSync.getRangerSyncRunCount();
     bgSync.start();
     // Wait for sync to finish once.
     // The counter is incremented at the beginning of the run, hence the ">"
@@ -602,7 +622,11 @@ public class TestRangerBGSyncService {
         () -> bgSync.getRangerSyncRunCount() > currRunCount + 1L,
         CHECK_SYNC_MILLIS, WAIT_SYNC_TIMEOUT_MILLIS);
     bgSync.shutdown();
-    Assert.assertTrue(bgSync.getOMDBRangerServiceVersion() >= ozoneVersion);
+    final long dbSvcVersionAfter = bgSync.getOMDBRangerServiceVersion();
+    final long rangerSvcVersionAfter = bgSync.getLatestRangerServiceVersion();
+    Assert.assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
+    Assert.assertTrue(dbSvcVersionAfter > dbSvcVersionBefore);
+    Assert.assertTrue(rangerSvcVersionAfter > rangerSvcVersionBefore);
 
     for (String policy : policiesCreated) {
       final AccessPolicy verifier = auth.getAccessPolicyByName(policy);
@@ -645,6 +669,7 @@ public class TestRangerBGSyncService {
     // Create roles and policies in ranger that are
     // backed up by OzoneManger Multi-Tenant tables
     createRolesAndPoliciesInRanger(true);
+
     long rangerVersionAfterCreation = bgSync.getLatestRangerServiceVersion();
     Assert.assertTrue(rangerVersionAfterCreation >= startingRangerVersion);
 
@@ -654,14 +679,20 @@ public class TestRangerBGSyncService {
     auth.deletePolicyByName(
         OMMultiTenantManager.getDefaultBucketPolicyName(TENANT_ID));
 
+    final long rangerSvcVersionBefore = bgSync.getLatestRangerServiceVersion();
+    // Note: DB Service Version will be -1 if the test starts with an empty DB
+    final long dbSvcVersionBefore = bgSync.getOMDBRangerServiceVersion();
     bgSync.start();
     // Wait for sync to finish once.
     // The counter is incremented at the beginning of the run, hence the ">"
     GenericTestUtils.waitFor(() -> bgSync.getRangerSyncRunCount() > 1L,
         CHECK_SYNC_MILLIS, WAIT_SYNC_TIMEOUT_MILLIS);
     bgSync.shutdown();
-    long ozoneVersionAfterSync = bgSync.getOMDBRangerServiceVersion();
-    Assert.assertTrue(ozoneVersionAfterSync > rangerVersionAfterCreation);
+    long dbSvcVersionAfter = bgSync.getOMDBRangerServiceVersion();
+    final long rangerSvcVersionAfter = bgSync.getLatestRangerServiceVersion();
+    Assert.assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
+    Assert.assertTrue(dbSvcVersionAfter > dbSvcVersionBefore);
+    Assert.assertTrue(rangerSvcVersionAfter > rangerSvcVersionBefore);
 
     for (String policy : policiesCreated) {
       try {

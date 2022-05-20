@@ -762,6 +762,11 @@ public class OMRangerBGSyncService extends BackgroundService {
     authorizer.assignAllUsers(omdbUserList, roleJsonStr);
   }
 
+  /**
+   * Return the number of runs the sync is triggered.
+   *
+   * This doesn't count attempts inside each sync run.
+   */
   public long getRangerSyncRunCount() {
     return runCount.get();
   }
