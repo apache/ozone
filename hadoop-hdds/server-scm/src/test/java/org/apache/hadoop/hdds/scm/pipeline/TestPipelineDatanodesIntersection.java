@@ -127,7 +127,7 @@ public class TestPipelineDatanodesIntersection {
         List<Pipeline> overlapPipelines = RatisPipelineUtils
             .checkPipelineContainSameDatanodes(stateManager, pipeline);
 
-        if (overlapPipelines.isEmpty()) {
+        if (!overlapPipelines.isEmpty()) {
           intersectionCount++;
           for (Pipeline overlapPipeline : overlapPipelines) {
             LOG.info("This pipeline: " + pipeline.getId().toString() +
