@@ -134,8 +134,6 @@ public final class ContainerBalancerConfiguration {
           "data node is very high")
   private boolean triggerDuEnable = false;
 
-  private int nextIterationIndex = 0;
-
   /**
    * Gets the threshold value for Container Balancer.
    *

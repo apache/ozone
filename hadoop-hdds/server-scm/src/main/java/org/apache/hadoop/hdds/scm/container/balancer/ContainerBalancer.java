@@ -141,6 +141,7 @@ public class ContainerBalancer extends StatefulService {
 
     this.lock = new ReentrantLock();
     findSourceStrategy = new FindSourceGreedy(nodeManager);
+    scm.getSCMServiceManager().register(this);
   }
 
   /**
@@ -279,7 +280,7 @@ public class ContainerBalancer extends StatefulService {
    */
   private boolean initializeIteration() {
     if (scmContext.isInSafeMode()) {
-      LOG.warn("Container Balancer cannot operate while SCM is in Safe Mode.");
+      LOG.error("Container Balancer cannot operate while SCM is in Safe Mode.");
       return false;
     }
     if (!scmContext.isLeader()) {
