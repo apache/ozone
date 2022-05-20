@@ -20,6 +20,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto
     .ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -94,8 +95,14 @@ public class CloseContainerCommandHandler implements CommandHandler {
       switch (container.getContainerState()) {
       case OPEN:
       case CLOSING:
-        // If the container is part of open pipeline, close it via write channel
-        if (ozoneContainer.getWriteChannel()
+        // Only RATIS containers should go into a quasi-closed state if the
+        // pipeline is missing. Standalone containers should always just move
+        // to closed. If the container is not RATIS or is RATIS and the pipeline
+        // exists, close it via the write channel
+        HddsProtos.ReplicationType replicationType =
+            ozoneContainer.getWriteChannel().getServerType();
+        if (replicationType != HddsProtos.ReplicationType.RATIS
+            || ozoneContainer.getWriteChannel()
             .isExist(closeCommand.getPipelineID())) {
           ContainerCommandRequestProto request =
               getContainerCommandRequestProto(datanodeDetails,
