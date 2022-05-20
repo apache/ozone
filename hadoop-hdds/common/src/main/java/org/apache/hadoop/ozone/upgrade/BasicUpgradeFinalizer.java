@@ -197,8 +197,6 @@ public abstract class BasicUpgradeFinalizer
         || status.equals(FINALIZATION_DONE);
   }
 
-  // TODO: Refactor all components to use upgrade contexts, with an interface
-  //  to retrieve the storage.
   public abstract void finalizeLayoutFeature(LayoutFeature lf, T component)
       throws UpgradeException;
 
