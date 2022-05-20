@@ -31,16 +31,10 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.UUID;
-import java.util.stream.Stream;
-
-import static org.junit.jupiter.params.provider.Arguments.arguments;
-
 
 /**
  * Tests that the SCM HA pre-finalize validation action is only triggered in
@@ -55,9 +49,6 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
  * the action. This is tested by all other tests that run non-HA clusters.
  */
 public class TestSCMHAUnfinalizedStateValidationAction {
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  @TempDir
-  Path dataPath;
 
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
 
@@ -66,21 +57,15 @@ public class TestSCMHAUnfinalizedStateValidationAction {
     ExitUtils.disableSystemExit();
   }
 
-  public static Stream<Arguments> cases() {
-    Stream.Builder<Arguments> params = Stream.builder();
-
-    for (boolean haBefore: Arrays.asList(true, false)) {
-      for (boolean haAfter: Arrays.asList(true, false)) {
-        params.add(arguments(haBefore, haAfter));
-      }
-    }
-    return params.build();
-  }
-
   @ParameterizedTest
-  @MethodSource("cases")
+  @CsvSource({
+      "true, true",
+      "true, false",
+      "false, true",
+      "false, false",
+  })
   public void testUpgrade(boolean haEnabledBefore,
-      boolean haEnabledPreFinalized) throws Exception {
+      boolean haEnabledPreFinalized, @TempDir Path dataPath) throws Exception {
     // Write version file for original version.
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION,
