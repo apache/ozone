@@ -57,9 +57,8 @@ public class TestRDBTableStore {
   private DBOptions options = null;
   private static byte[][] bytesOf;
 
-  @SuppressWarnings("checkstyle:VisibilityModifier")
   @TempDir
-  File tempDir;
+  private File tempDir;
 
   @BeforeAll
   public static void initConstants() {
