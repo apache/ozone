@@ -360,14 +360,15 @@ public class SequenceIdGenerator {
     // upgrade containerId
     if (sequenceIdTable.get(CONTAINER_ID) == null) {
       long largestContainerId = 0;
-      TableIterator<ContainerID, ? extends KeyValue<ContainerID, ContainerInfo>>
-          iterator = scmMetadataStore.getContainerTable().iterator();
-      while (iterator.hasNext()) {
-        ContainerInfo containerInfo = iterator.next().getValue();
-        largestContainerId
-            = Long.max(containerInfo.getContainerID(), largestContainerId);
+      try (TableIterator<ContainerID,
+          ? extends KeyValue<ContainerID, ContainerInfo>> iterator =
+          scmMetadataStore.getContainerTable().iterator()) {
+        while (iterator.hasNext()) {
+          ContainerInfo containerInfo = iterator.next().getValue();
+          largestContainerId =
+              Long.max(containerInfo.getContainerID(), largestContainerId);
+        }
       }
-      iterator.close();
 
       sequenceIdTable.put(CONTAINER_ID, largestContainerId);
       LOG.info("upgrade {} to {}",
