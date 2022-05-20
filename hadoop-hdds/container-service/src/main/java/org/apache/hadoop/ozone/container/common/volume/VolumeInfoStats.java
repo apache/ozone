@@ -26,7 +26,7 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
- * This class is used to track Volume IO stats for each HDDS Volume.
+ * This class is used to track Volume Info stats for each HDDS Volume.
  */
 @Metrics(about = "Ozone Volume Information Metrics", context = OzoneConsts.OZONE)
 public class VolumeInfoStats {
@@ -41,17 +41,11 @@ public class VolumeInfoStats {
     private @Metric MutableGaugeLong capacity;
     private @Metric MutableGaugeLong totalCapacity;
 
-
-    @Deprecated
-    public VolumeInfoStats() {
-        init();
-    }
-
     /**
      * @param identifier Typically, path to volume root. e.g. /data/hdds
      */
     public VolumeInfoStats(String identifier, HddsVolume ref) {
-        this.metricsSourceName += '-' + identifier;
+        this.metricsSourceName += '-' + identifier+ StorageVolume.VolumeType.DATA_VOLUME.toString();
         this.VolumeRootStr = identifier;
         this.volume = ref;
         init();
@@ -83,7 +77,8 @@ public class VolumeInfoStats {
      * |<------- capacity ------->|
      * |<------------------- Total capacity -------------->|
      * A) avail = capacity - used
-     * B) avail = fsAvail - Max(reserved - other, 0);
+     * B) capacity = used + avail
+     * C) Total capacity = used + avail + reserved
      */
 
     /**
