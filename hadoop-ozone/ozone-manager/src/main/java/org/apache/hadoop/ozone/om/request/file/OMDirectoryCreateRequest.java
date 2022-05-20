@@ -438,16 +438,10 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     if (req.getCreateDirectoryRequest().hasKeyArgs()) {
       KeyArgs keyArgs = req.getCreateDirectoryRequest().getKeyArgs();
 
-      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName() &&
-          !ctx.getBucketLayout(
-              keyArgs.getVolumeName(), keyArgs.getBucketName()).isLegacy()) {
-
-        throw new OMException(
-            "Client is attempting to create a directory in a bucket which" +
-                " uses non-LEGACY bucket layout features. Please upgrade" +
-                " the client to a compatible version before trying to " +
-                "modify this bucket.",
-            OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
       }
     }
     return req;

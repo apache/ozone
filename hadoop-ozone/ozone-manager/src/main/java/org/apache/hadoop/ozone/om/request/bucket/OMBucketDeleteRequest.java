@@ -219,16 +219,10 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       OMRequest req, ValidationContext ctx) throws IOException {
     DeleteBucketRequest request = req.getDeleteBucketRequest();
 
-    if (request.hasBucketName() && request.hasVolumeName() &&
-        !ctx.getBucketLayout(
-                request.getVolumeName(), request.getBucketName())
-            .equals(BucketLayout.LEGACY)) {
-
-      throw new OMException("Client is attempting to delete a bucket which" +
-          " uses non-LEGACY bucket layout features. Please upgrade the" +
-          " client to a compatible version before trying to delete" +
-          " the bucket.",
-          OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    if (request.hasBucketName() && request.hasVolumeName()) {
+      BucketLayout bucketLayout = ctx.getBucketLayout(
+          request.getVolumeName(), request.getBucketName());
+      bucketLayout.validateSupportedOperation();
     }
     return req;
   }

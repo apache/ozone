@@ -433,16 +433,10 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
       KeyArgs keyArgs = req.getCreateFileRequest().getKeyArgs();
 
-      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName() &&
-          !ctx.getBucketLayout(
-              keyArgs.getVolumeName(), keyArgs.getBucketName()).isLegacy()) {
-
-        throw new OMException(
-            "Client is attempting to create a file in a bucket which" +
-                " uses non-LEGACY bucket layout features. Please upgrade" +
-                " the client to a compatible version before trying to " +
-                "modify this bucket.",
-            OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
       }
     }
     return req;

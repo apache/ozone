@@ -304,15 +304,10 @@ public class OMKeysRenameRequest extends OMKeyRequest {
     if (req.getRenameKeysRequest().hasRenameKeysArgs()) {
       RenameKeysArgs keyArgs = req.getRenameKeysRequest().getRenameKeysArgs();
 
-      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName() &&
-          !ctx.getBucketLayout(keyArgs.getVolumeName(),
-              keyArgs.getBucketName()).isLegacy()) {
-        throw new OMException(
-            "Client is attempting to rename keys in a bucket which" +
-                " uses non-LEGACY bucket layout features. Please upgrade" +
-                " the client to a compatible version to perform this" +
-                " operation.",
-            OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
       }
     }
     return req;

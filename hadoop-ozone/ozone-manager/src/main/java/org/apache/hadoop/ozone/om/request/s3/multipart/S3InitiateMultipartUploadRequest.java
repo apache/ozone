@@ -320,15 +320,10 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     if (req.getInitiateMultiPartUploadRequest().hasKeyArgs()) {
       KeyArgs keyArgs = req.getInitiateMultiPartUploadRequest().getKeyArgs();
 
-      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName() &&
-          !ctx.getBucketLayout(keyArgs.getVolumeName(),
-              keyArgs.getBucketName()).isLegacy()) {
-        throw new OMException(
-            "Client is attempting to initiate MPU in a bucket which" +
-                " uses non-LEGACY bucket layout features. Please upgrade" +
-                " the client to a compatible version to perform this" +
-                " operation.",
-            OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
       }
     }
     return req;
