@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -62,7 +63,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
 /**
  * Background Sync thread that reads Multi-Tenancy state from OM DB
@@ -223,6 +223,7 @@ public class OMRangerBGSyncService extends BackgroundService {
     return queue;
   }
 
+  @Override
   public void start() {
     if (authorizer == null) {
       LOG.error("Failed to start the background sync service: "
@@ -233,6 +234,7 @@ public class OMRangerBGSyncService extends BackgroundService {
     super.start();
   }
 
+  @Override
   public void shutdown() {
     isServiceStarted = false;
     super.shutdown();
@@ -278,9 +280,10 @@ public class OMRangerBGSyncService extends BackgroundService {
       long rangerOzoneServiceVersion = getLatestRangerServiceVersion();
 
       // Sync thread enters the while-loop when Ranger service (e.g. cm_ozone)
-      // version doesn't match the current policy version persisted in the DB.
+      // version doesn't match the current service version persisted in the DB.
       //
-      // When Ranger policies are updated, it bumps up the service version.
+      // When Ranger state related to the Ozone service (e.g. policies or roles)
+      // is updated, it bumps up the service version.
       // At the end of the loop, Ranger service version is retrieved again.
       // So in this case the loop most likely be entered a second time. But
       // this time it is very likely that executeOMDBToRangerSync() won't push
@@ -288,8 +291,9 @@ public class OMRangerBGSyncService extends BackgroundService {
       // the previous loop. If this is the case, the DB service version will be
       // written again, and the loop should be exited.
       //
-      // If Ranger service version is bumped again, it indicates Ranger policy
-      // is updated by some other problems or a user.
+      // If Ranger service version is bumped again, it indicates that Ranger
+      // roles or policies were updated by ongoing OM multi-tenancy requests,
+      // or manually by a user.
       //
       // A maximum of MAX_ATTEMPT times will be attempted each time the sync
       // service is run. MAX_ATTEMPT should at least be 2 to make sure OM DB
@@ -391,7 +395,7 @@ public class OMRangerBGSyncService extends BackgroundService {
     clearPolicyAndRoleMaps();
 
     // TODO: Acquire global lock
-    loadAllPoliciesRolesFromRanger(baseVersion);
+    loadAllPoliciesAndRoleNamesFromRanger(baseVersion);
     loadAllRolesFromRanger();
     loadAllRolesFromOM();
     // TODO: Release global lock
@@ -416,7 +420,7 @@ public class OMRangerBGSyncService extends BackgroundService {
   /**
    * TODO: Test and make sure invalid JSON response from Ranger won't crash OM.
    */
-  private void loadAllPoliciesRolesFromRanger(long baseVersion)
+  private void loadAllPoliciesAndRoleNamesFromRanger(long baseVersion)
       throws IOException {
 
     if (LOG.isDebugEnabled()) {
@@ -523,29 +527,21 @@ public class OMRangerBGSyncService extends BackgroundService {
 
     // Iterate all DB tenant states. For each tenant,
     // queue or dequeue bucketNamespacePolicyName and bucketPolicyName
-    TableIterator<String, ? extends Table.KeyValue<String, OmDBTenantState>>
-        tenantStateTableIter = metadataManager.getTenantStateTable().iterator();
-    while (tenantStateTableIter.hasNext()) {
-      final Table.KeyValue<String, OmDBTenantState> tableKeyValue =
-          tenantStateTableIter.next();
-      final OmDBTenantState dbTenantState = tableKeyValue.getValue();
-      final String tenantId = dbTenantState.getTenantId();
-      final String volumeName = dbTenantState.getBucketNamespaceName();
-      Preconditions.checkNotNull(volumeName);
+    try (TableIterator<String, ? extends KeyValue<String, OmDBTenantState>>
+        tenantStateTableIt = metadataManager.getTenantStateTable().iterator()) {
 
-      boolean acquiredVolumeLock = false;
-      try {
-        acquiredVolumeLock = metadataManager.getLock().acquireWriteLock(
-            VOLUME_LOCK, volumeName);
+      while (tenantStateTableIt.hasNext()) {
+        final KeyValue<String, OmDBTenantState> tableKeyValue =
+            tenantStateTableIt.next();
+        final OmDBTenantState dbTenantState = tableKeyValue.getValue();
+        final String tenantId = dbTenantState.getTenantId();
+        final String volumeName = dbTenantState.getBucketNamespaceName();
+        Preconditions.checkNotNull(volumeName);
 
         mtRangerPoliciesOpHelper(dbTenantState.getBucketNamespacePolicyName(),
             new PolicyInfo(tenantId, PolicyType.BUCKET_NAMESPACE_POLICY));
         mtRangerPoliciesOpHelper(dbTenantState.getBucketPolicyName(),
             new PolicyInfo(tenantId, PolicyType.BUCKET_POLICY));
-      } finally {
-        if (acquiredVolumeLock) {
-          metadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
-        }
       }
     }
 
@@ -639,29 +635,38 @@ public class OMRangerBGSyncService extends BackgroundService {
 
     // Iterate all DB ExtendedUserAccessIdInfo. For each accessId,
     // add to userRole. And add to adminRole if isAdmin is set.
-    TableIterator<String, ? extends Table.KeyValue<String, OmDBAccessIdInfo>>
+    try (TableIterator<String, ? extends KeyValue<String, OmDBAccessIdInfo>>
         tenantAccessIdTableIter =
-        metadataManager.getTenantAccessIdTable().iterator();
-    while (tenantAccessIdTableIter.hasNext()) {
-      final Table.KeyValue<String, OmDBAccessIdInfo> tableKeyValue =
-          tenantAccessIdTableIter.next();
-      final OmDBAccessIdInfo dbAccessIdInfo = tableKeyValue.getValue();
+        metadataManager.getTenantAccessIdTable().iterator()) {
 
-      final String tenantId = dbAccessIdInfo.getTenantId();
-      final String userPrincipal = dbAccessIdInfo.getUserPrincipal();
+      while (tenantAccessIdTableIter.hasNext()) {
+        final KeyValue<String, OmDBAccessIdInfo> tableKeyValue =
+            tenantAccessIdTableIter.next();
+        final OmDBAccessIdInfo dbAccessIdInfo = tableKeyValue.getValue();
 
-      final OmDBTenantState dbTenantState = tenantStateTable.get(tenantId);
-      final String userRoleName = dbTenantState.getUserRoleName();
-      mtOMDBRoles.computeIfAbsent(userRoleName, any -> new HashSet<>());
-      final String adminRoleName = dbTenantState.getAdminRoleName();
-      mtOMDBRoles.computeIfAbsent(adminRoleName, any -> new HashSet<>());
+        final String tenantId = dbAccessIdInfo.getTenantId();
+        final String userPrincipal = dbAccessIdInfo.getUserPrincipal();
 
-      // Every tenant user should be in the tenant's userRole
-      addUserToMtOMDBRoles(userRoleName, userPrincipal);
+        final OmDBTenantState dbTenantState = tenantStateTable.get(tenantId);
 
-      // If the accessId has admin flag set, add to adminRole as well
-      if (dbAccessIdInfo.getIsAdmin()) {
-        addUserToMtOMDBRoles(adminRoleName, userPrincipal);
+        if (dbTenantState == null) {
+          // tenant state might have been deleted by some other ongoing requests
+          LOG.warn("OmDBTenantState for tenant '{}' doesn't exist!", tenantId);
+          continue;
+        }
+
+        final String userRoleName = dbTenantState.getUserRoleName();
+        mtOMDBRoles.computeIfAbsent(userRoleName, any -> new HashSet<>());
+        final String adminRoleName = dbTenantState.getAdminRoleName();
+        mtOMDBRoles.computeIfAbsent(adminRoleName, any -> new HashSet<>());
+
+        // Every tenant user should be in the tenant's userRole
+        addUserToMtOMDBRoles(userRoleName, userPrincipal);
+
+        // If the accessId has admin flag set, add to adminRole as well
+        if (dbAccessIdInfo.getIsAdmin()) {
+          addUserToMtOMDBRoles(adminRoleName, userPrincipal);
+        }
       }
     }
   }
@@ -741,8 +746,9 @@ public class OMRangerBGSyncService extends BackgroundService {
         authorizer.deleteRole(new JsonParser().parse(roleObj)
             .getAsJsonObject().get("id").getAsString());
       } catch (IOException e) {
-        LOG.error("Failed to delete role: {}. Already deleted or is depended?",
-            roleName);
+        // The role might have been deleted already.
+        // Or the role could be referenced in other roles or policies.
+        LOG.error("Failed to delete role: {}", roleName);
         throw e;
       }
       // TODO: Server returned HTTP response code: 400

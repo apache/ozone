@@ -140,8 +140,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * | principalToAccessIdsTable | userPrincipal -> OmDBUserPrincipalInfo   |
    * |----------------------------------------------------------------------|
-   * | RangerStateTable         | "ranger State key"-> ranger state Value   |
-   * |----------------------------------------------------------------------|
    *
    *
    * Simple Tables:
