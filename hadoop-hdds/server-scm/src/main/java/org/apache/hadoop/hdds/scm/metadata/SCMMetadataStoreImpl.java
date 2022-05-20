@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 
+import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -48,6 +49,7 @@ import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.MOVE;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.PIPELINES;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS_V2;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.STATEFUL_SERVICE_CONFIG;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.TRANSACTIONINFO;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_CERTS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_SCM_CERTS;
@@ -90,6 +92,8 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   private Table<ContainerID, MoveDataNodePair> moveTable;
 
   private Table<String, String> metaTable;
+
+  private Table<String, ByteString> statefulServiceConfigTable;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMMetadataStoreImpl.class);
@@ -181,6 +185,11 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
       metaTable = META.getTable(store);
 
       checkTableStatus(moveTable, META.getName());
+
+      statefulServiceConfigTable = STATEFUL_SERVICE_CONFIG.getTable(store);
+
+      checkTableStatus(statefulServiceConfigTable,
+          STATEFUL_SERVICE_CONFIG.getName());
     }
   }
 
@@ -289,6 +298,10 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   @Override
   public Table<String, String> getMetaTable() {
     return metaTable;
+  }
+
+  public Table<String, ByteString> getStatefulServiceConfigTable() {
+    return statefulServiceConfigTable;
   }
 
   private void checkTableStatus(Table table, String name) throws IOException {

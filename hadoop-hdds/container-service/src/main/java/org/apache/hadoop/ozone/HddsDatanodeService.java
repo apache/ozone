@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -151,6 +152,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   public static void main(String[] args) {
     try {
+      OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
+              new OzoneConfiguration());
       Introspector.checkCompliance(DNMXBeanImpl.class);
       HddsDatanodeService hddsDatanodeService =
           createHddsDatanodeService(args, true);

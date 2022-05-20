@@ -196,10 +196,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.5.1</protobuf-maven-plugin.version>
     <grpc.protobuf-compile.version>3.12.0</grpc.protobuf-compile.version>
-    <grpc-compile.version>1.33.0</grpc-compile.version>
     <os-maven-plugin.version>1.5.0.Final</os-maven-plugin.version>
 
     <netty.version>4.1.63.Final</netty.version>
+    <io.grpc.version>1.38.0</io.grpc.version>
+    <tcnative.version>2.0.38.Final</tcnative.version> <!-- See table for correct version -->
+    <!-- Table for netty, grpc & tcnative version combinations  -->
+    <!-- https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty -->
 
     <!-- define the Java language version used by the compiler -->
     <javac.version>1.8</javac.version>
@@ -1433,12 +1436,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
       <dependency>
         <groupId>com.github.spotbugs</groupId>
-        <artifactId>spotbugs</artifactId>
-        <version>${spotbugs.version}</version>
-        <scope>provided</scope>
-      </dependency>
-      <dependency>
-        <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-annotations</artifactId>
         <version>${spotbugs.version}</version>
         <scope>provided</scope>
@@ -2225,7 +2222,41 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
-      <id>filesystem-hdds</id>
+      <id>om</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <includes>
+                <include>org.apache.hadoop.ozone.om.**</include>
+              </includes>
+              <excludedGroups>flaky | slow</excludedGroups>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>scm</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <includes>
+                <include>org.apache.hadoop.ozone.scm.**</include>
+              </includes>
+              <excludedGroups>flaky | slow</excludedGroups>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>filesystem</id>
       <build>
         <plugins>
           <plugin>
@@ -2234,6 +2265,22 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <configuration>
               <includes>
                 <include>org.apache.hadoop.fs.ozone.**</include>
+              </includes>
+              <excludedGroups>flaky | slow</excludedGroups>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>hdds</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <includes>
                 <include>org.apache.hadoop.hdds.**</include>
               </includes>
               <excludedGroups>flaky | slow</excludedGroups>
@@ -2255,6 +2302,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               </includes>
               <excludes>
                 <exclude>org.apache.hadoop.ozone.client.**</exclude>
+                <exclude>org.apache.hadoop.ozone.om.**</exclude>
+                <exclude>org.apache.hadoop.ozone.scm.**</exclude>
               </excludes>
               <excludedGroups>flaky | slow</excludedGroups>
             </configuration>

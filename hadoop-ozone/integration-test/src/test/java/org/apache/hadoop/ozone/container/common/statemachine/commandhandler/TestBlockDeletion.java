@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.apache.hadoop.hdds.scm.block.ScmBlockDeletingServiceMetrics;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -113,10 +113,9 @@ public class TestBlockDeletion {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     GenericTestUtils.setLogLevel(DeletedBlockLogImpl.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(SCMBlockDeletingService.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(ReplicationManager.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(LegacyReplicationManager.LOG, Level.DEBUG);
 
     String path =
         GenericTestUtils.getTempPath(TestBlockDeletion.class.getSimpleName());
@@ -368,7 +367,7 @@ public class TestBlockDeletion {
         Assert.assertEquals(HddsProtos.LifeCycleState.DELETING,
             container.getState()));
     LogCapturer logCapturer =
-        LogCapturer.captureLogs(ReplicationManager.LOG);
+        LogCapturer.captureLogs(LegacyReplicationManager.LOG);
     logCapturer.clearOutput();
 
     scm.getReplicationManager().processAll();

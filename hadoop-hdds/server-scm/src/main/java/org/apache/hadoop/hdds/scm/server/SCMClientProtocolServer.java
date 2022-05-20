@@ -687,7 +687,7 @@ public class SCMClientProtocolServer implements
   @Override
   public void activatePipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.ACTIVATE_PIPELINE, null));
     scm.getPipelineManager().activatePipeline(
         PipelineID.getFromProtobuf(pipelineID));
@@ -697,7 +697,7 @@ public class SCMClientProtocolServer implements
   public void deactivatePipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
     getScm().checkAdminAccess(getRemoteUser());
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.DEACTIVATE_PIPELINE, null));
     scm.getPipelineManager().deactivatePipeline(
         PipelineID.getFromProtobuf(pipelineID));
@@ -806,7 +806,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public boolean getReplicationManagerStatus() {
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_REPLICATION_MANAGER_STATUS, null));
     return scm.getReplicationManager().isRunning();
   }
@@ -815,7 +815,7 @@ public class SCMClientProtocolServer implements
   public ReplicationManagerReport getReplicationManagerReport()
       throws IOException {
     getScm().checkAdminAccess(getRemoteUser());
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_REPLICATION_MANAGER_REPORT, null));
     return scm.getReplicationManager().getContainerReport();
   }
@@ -938,7 +938,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public boolean getContainerBalancerStatus() {
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_CONTAINER_BALANCER_STATUS, null));
     return scm.getContainerBalancer().isBalancerRunning();
   }

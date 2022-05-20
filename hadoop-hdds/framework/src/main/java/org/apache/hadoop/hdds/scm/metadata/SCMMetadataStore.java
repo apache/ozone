@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 
+import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -159,4 +160,6 @@ public interface SCMMetadataStore extends DBStoreHAManager {
    * finalization status and metadata layout version.
    */
   Table<String, String> getMetaTable();
+
+  Table<String, ByteString> getStatefulServiceConfigTable();
 }

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.metadata;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 
+import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -166,6 +167,15 @@ public class SCMDBDefinition implements DBDefinition {
       String.class,
       new StringCodec());
 
+  public static final DBColumnFamilyDefinition<String, ByteString>
+      STATEFUL_SERVICE_CONFIG =
+      new DBColumnFamilyDefinition<>(
+          "statefulServiceConfig",
+          String.class,
+          new StringCodec(),
+          ByteString.class,
+          new ByteStringCodec());
+
   @Override
   public String getName() {
     return "scm.db";
@@ -180,6 +190,7 @@ public class SCMDBDefinition implements DBDefinition {
   public DBColumnFamilyDefinition[] getColumnFamilies() {
     return new DBColumnFamilyDefinition[] {DELETED_BLOCKS, VALID_CERTS,
         VALID_SCM_CERTS, REVOKED_CERTS, REVOKED_CERTS_V2, PIPELINES, CONTAINERS,
-        TRANSACTIONINFO, CRLS, CRL_SEQUENCE_ID, SEQUENCE_ID, MOVE, META};
+        TRANSACTIONINFO, CRLS, CRL_SEQUENCE_ID, SEQUENCE_ID, MOVE, META,
+        STATEFUL_SERVICE_CONFIG};
   }
 }

@@ -21,6 +21,7 @@ Resource            ../commonlib.robot
 Resource            ./commonawslib.robot
 Test Timeout        5 minutes
 Suite Setup         Setup s3 tests
+Default Tags        no-bucket-type
 
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878

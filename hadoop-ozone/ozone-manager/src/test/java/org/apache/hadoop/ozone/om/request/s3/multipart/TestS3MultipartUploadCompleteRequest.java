@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.junit.Assert;
@@ -148,6 +150,12 @@ public class TestS3MultipartUploadCompleteRequest
     Assert.assertNotNull(omMetadataManager
         .getKeyTable(s3MultipartUploadCompleteRequest.getBucketLayout())
         .get(getOzoneDBKey(volumeName, bucketName, keyName)));
+
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable()
+        .getCacheValue(new CacheKey<>(
+            omMetadataManager.getBucketKey(volumeName, bucketName)))
+        .getCacheValue();
+    Assert.assertEquals(1L, omBucketInfo.getUsedNamespace());
   }
 
   protected void addVolumeAndBucket(String volumeName, String bucketName)

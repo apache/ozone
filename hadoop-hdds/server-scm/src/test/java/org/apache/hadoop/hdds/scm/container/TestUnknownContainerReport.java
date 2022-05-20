@@ -52,9 +52,9 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 /**
@@ -72,7 +72,7 @@ public class TestUnknownContainerReport {
   private DBStore dbStore;
   private SCMHAManager scmhaManager;
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     final OzoneConfiguration conf = SCMTestUtils.getConf();
     this.nodeManager = new MockNodeManager(true, 10);
@@ -98,7 +98,7 @@ public class TestUnknownContainerReport {
         .thenThrow(new ContainerNotFoundException());
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     containerStateManager.close();
     if (dbStore != null) {

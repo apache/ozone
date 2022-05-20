@@ -1031,7 +1031,7 @@ message OpenKeyBucket {
 
 message OpenKey {
   required string name = 1;
-  required uint64 clientID = 2;
+  optional uint64 clientID = 2 [deprecated=true];
 }
 
 message OMTokenProto {

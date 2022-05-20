@@ -403,6 +403,12 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT =
       "120s";
 
+  public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL =
+      "ozone.scm.pipeline.scrub.interval";
+  public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT =
+      "5m";
+
+
   // Allow SCM to auto create factor ONE ratis pipeline.
   public static final String OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE =
       "ozone.scm.pipeline.creation.auto.factor.one";
@@ -437,7 +443,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HA_ENABLE_KEY
       = "ozone.scm.ratis.enable";
   public static final boolean OZONE_SCM_HA_ENABLE_DEFAULT
-      = true;
+      = false;
   public static final String OZONE_SCM_RATIS_PORT_KEY
       = "ozone.scm.ratis.port";
   public static final int OZONE_SCM_RATIS_PORT_DEFAULT

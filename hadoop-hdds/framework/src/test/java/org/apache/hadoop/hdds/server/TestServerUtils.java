@@ -25,20 +25,17 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.test.PathUtils;
 
 import org.apache.commons.io.FileUtils;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Unit tests for {@link ServerUtils}.
  */
 public class TestServerUtils {
-
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
 
   /**
    * Test {@link ServerUtils#getScmDbDir}.
@@ -84,14 +81,14 @@ public class TestServerUtils {
 
   @Test
   public void testNoScmDbDirConfigured() {
-    thrown.expect(IllegalArgumentException.class);
-    ServerUtils.getScmDbDir(new OzoneConfiguration());
+    assertThrows(IllegalArgumentException.class,
+        () -> ServerUtils.getScmDbDir(new OzoneConfiguration()));
   }
 
   @Test
   public void ozoneMetadataDirIsMandatory() {
-    thrown.expect(IllegalArgumentException.class);
-    ServerUtils.getOzoneMetaDirPath(new OzoneConfiguration());
+    assertThrows(IllegalArgumentException.class,
+        () -> ServerUtils.getOzoneMetaDirPath(new OzoneConfiguration()));
   }
 
   @Test
@@ -114,9 +111,8 @@ public class TestServerUtils {
   public void ozoneMetadataDirRejectsList() {
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, "/data/meta1,/data/meta2");
-    thrown.expect(IllegalArgumentException.class);
-
-    ServerUtils.getOzoneMetaDirPath(conf);
+    assertThrows(IllegalArgumentException.class,
+        () -> ServerUtils.getOzoneMetaDirPath(conf));
   }
 
 }
