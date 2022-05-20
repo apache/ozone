@@ -43,13 +43,7 @@ sublayer:
     type: INNER_NODE
     sublayer:
         -
-          cost: 1
-          prefix: ng
-          defaultName: nodegroup
-          type: INNER_NODE
-          sublayer:
-            -
-              defaultName: node
-              type: LEAF_NODE
-              prefix: node
+          defaultName: node
+          type: LEAF_NODE
+          prefix: node
 ...
