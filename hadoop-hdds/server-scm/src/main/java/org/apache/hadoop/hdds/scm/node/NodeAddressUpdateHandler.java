@@ -29,19 +29,19 @@ import org.slf4j.LoggerFactory;
 /**
  * Handles datanode ip or hostname change event.
  */
-public class NodeIpOrHostnameUpdateHandler
+public class NodeAddressUpdateHandler
         implements EventHandler<DatanodeDetails> {
   private static final Logger LOG =
-          LoggerFactory.getLogger(NodeIpOrHostnameUpdateHandler.class);
+          LoggerFactory.getLogger(NodeAddressUpdateHandler.class);
 
   private final PipelineManager pipelineManager;
   private final NodeDecommissionManager decommissionManager;
   private final SCMServiceManager serviceManager;
 
-  public NodeIpOrHostnameUpdateHandler(PipelineManager pipelineManager,
-                                       NodeDecommissionManager
+  public NodeAddressUpdateHandler(PipelineManager pipelineManager,
+                                  NodeDecommissionManager
                                                decommissionManager,
-                                       SCMServiceManager serviceManager) {
+                                  SCMServiceManager serviceManager) {
     this.pipelineManager = pipelineManager;
     this.decommissionManager = decommissionManager;
     this.serviceManager = serviceManager;
@@ -54,7 +54,7 @@ public class NodeIpOrHostnameUpdateHandler
       LOG.info("Closing stale pipelines for datanode: {}", datanodeDetails);
       pipelineManager.closeStalePipelines(datanodeDetails);
       serviceManager.notifyEventTriggered(SCMService.Event
-              .NODE_IP_OR_HOSTNAME_UPDATE_HANDLER_TRIGGERED);
+              .NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED);
 
       decommissionManager.continueAdminForNode(datanodeDetails);
     } catch (NodeNotFoundException e) {

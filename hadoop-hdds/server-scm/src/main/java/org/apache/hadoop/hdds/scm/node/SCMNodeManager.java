@@ -432,7 +432,7 @@ public class SCMNodeManager implements NodeManager {
           processNodeReport(datanodeDetails, nodeReport);
           LOG.info("Updated Datanode to: {}", dn);
           scmNodeEventPublisher
-                  .fireEvent(SCMEvents.NODE_IP_OR_HOSTNAME_UPDATE, dn);
+                  .fireEvent(SCMEvents.NODE_ADDRESS_UPDATE, dn);
         }
       } catch (NodeNotFoundException e) {
         LOG.error("Cannot find datanode {} from nodeStateManager",

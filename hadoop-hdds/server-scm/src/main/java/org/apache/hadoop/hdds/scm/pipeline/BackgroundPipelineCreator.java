@@ -44,7 +44,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
-import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NODE_IP_OR_HOSTNAME_UPDATE_HANDLER_TRIGGERED;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NEW_NODE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.PRE_CHECK_COMPLETED;
@@ -269,7 +269,7 @@ public class BackgroundPipelineCreator implements SCMService {
       return;
     }
     if (event == NEW_NODE_HANDLER_TRIGGERED
-            || event == NODE_IP_OR_HOSTNAME_UPDATE_HANDLER_TRIGGERED
+            || event == NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED
             || event == UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
             || event == PRE_CHECK_COMPLETED) {
       LOG.info("trigger a one-shot run on {}.", THREAD_NAME);

@@ -161,8 +161,8 @@ public final class SCMEvents {
    * This event will be triggered whenever a datanode is registered with
    * SCM with a different Ip or host name.
    */
-  public static final TypedEvent<DatanodeDetails> NODE_IP_OR_HOSTNAME_UPDATE =
-          new TypedEvent<>(DatanodeDetails.class, "Node_Ip_Or_Hostname_Update");
+  public static final TypedEvent<DatanodeDetails> NODE_ADDRESS_UPDATE =
+          new TypedEvent<>(DatanodeDetails.class, "Node_Address_Update");
 
   /**
    * This event will be triggered whenever a datanode is moved from healthy to

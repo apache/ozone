@@ -842,9 +842,9 @@ public class TestPipelineManagerImpl {
 
     // test IP change
     List<Pipeline> pipelineList2 = pipelineManager.getStalePipelines(node2);
-    Assertions.assertEquals(2, pipelineList1.size());
-    Assertions.assertEquals(pipelines.get(0), pipelineList2.get(0));
-    Assertions.assertEquals(pipelines.get(3), pipelineList2.get(1));
+    assertEquals(2, pipelineList2.size());
+    assertEquals(pipelines.get(0), pipelineList2.get(0));
+    assertEquals(pipelines.get(3), pipelineList2.get(1));
   }
 
   public void testCreatePipelineForRead() throws IOException {
