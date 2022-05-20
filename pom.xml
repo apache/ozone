@@ -190,8 +190,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <hamcrest.version>1.3</hamcrest.version>
     <powermock1.version>1.6.5</powermock1.version>
     <powermock2.version>2.0.4</powermock2.version>
-    <junit.jupiter.version>5.7.0</junit.jupiter.version>
-    <junit.platform.version>1.7.0</junit.platform.version>
+    <junit.jupiter.version>5.8.2</junit.jupiter.version>
+    <junit.platform.version>1.8.2</junit.platform.version>
 
     <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.5.1</protobuf-maven-plugin.version>
