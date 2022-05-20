@@ -57,6 +57,10 @@ public class TestRDBTableStore {
   private DBOptions options = null;
   private static byte[][] bytesOf;
 
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  @TempDir
+  File tempDir;
+
   @BeforeAll
   public static void initConstants() {
     bytesOf = new byte[4][];
@@ -76,7 +80,7 @@ public class TestRDBTableStore {
   }
 
   @BeforeEach
-  public void setUp(@TempDir File tempDir) throws Exception {
+  public void setUp() throws Exception {
     options = new DBOptions();
     options.setCreateIfMissing(true);
     options.setCreateMissingColumnFamilies(true);
@@ -234,7 +238,7 @@ public class TestRDBTableStore {
   }
 
   @Test
-  public void testIsExist(@TempDir File rdbLocation) throws Exception {
+  public void testIsExist() throws Exception {
     byte[] key = RandomStringUtils.random(10, true, false)
         .getBytes(StandardCharsets.UTF_8);
     byte[] value = RandomStringUtils.random(10, true, false)
@@ -265,7 +269,7 @@ public class TestRDBTableStore {
     }
 
     rdbStore.close();
-    setUp(rdbLocation);
+    setUp();
     try (Table<byte[], byte[]> testTable = rdbStore.getTable(tableName)) {
       // Verify isExist works with key not in block cache.
       Assertions.assertTrue(testTable.isExist(key));
@@ -274,7 +278,7 @@ public class TestRDBTableStore {
 
 
   @Test
-  public void testGetIfExist(@TempDir File rdbLocation) throws Exception {
+  public void testGetIfExist() throws Exception {
     byte[] key = RandomStringUtils.random(10, true, false)
         .getBytes(StandardCharsets.UTF_8);
     byte[] value = RandomStringUtils.random(10, true, false)
@@ -308,7 +312,7 @@ public class TestRDBTableStore {
     }
 
     rdbStore.close();
-    setUp(rdbLocation);
+    setUp();
     try (Table<byte[], byte[]> testTable = rdbStore.getTable(tableName)) {
       // Verify getIfExists works with key not in block cache.
       Assertions.assertNotNull(testTable.getIfExist(key));
