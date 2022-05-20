@@ -17,14 +17,11 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
-import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * ozone tenant user revoke.
@@ -33,26 +30,16 @@ import java.util.List;
     description = "Revoke user accessId to tenant")
 public class TenantRevokeUserAccessIdHandler extends TenantHandler {
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
-  @CommandLine.Parameters(description = "List of user accessIds", arity = "1..")
-  private List<String> accessIds = new ArrayList<>();
-
-  // TODO: HDDS-6340. Add an option to print JSON result
+  @CommandLine.Parameters(description = "Access ID", arity = "1..1")
+  private String accessId;
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address) {
-    final ObjectStore objStore = client.getObjectStore();
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
 
-    accessIds.forEach(accessId -> {
-      try {
-        objStore.tenantRevokeUserAccessId(accessId);
-        err().format("Revoked accessId '%s'.%n", accessId);
-      } catch (IOException e) {
-        err().format("Failed to revoke accessId '%s': %s%n",
-            accessId, e.getMessage());
-      }
-    });
+    client.getObjectStore().tenantRevokeUserAccessId(accessId);
+    if (isVerbose()) {
+      err().format("Revoked accessId '%s'.%n", accessId);
+    }
   }
 }

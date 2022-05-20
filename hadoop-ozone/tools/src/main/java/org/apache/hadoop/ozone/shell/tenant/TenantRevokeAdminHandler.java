@@ -17,17 +17,14 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
-import org.apache.hadoop.ozone.client.ObjectStore;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 
 /**
  * ozone tenant user revoke-admin.
@@ -37,37 +34,28 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERM
     description = "Revoke admin role from accessIds in a tenant")
 public class TenantRevokeAdminHandler extends TenantHandler {
 
-  @CommandLine.Parameters(description = "List of accessIds", arity = "1..")
-  private List<String> accessIds = new ArrayList<>();
+  @CommandLine.Parameters(description = "Access ID", arity = "1..1")
+  private String accessId;
 
   @CommandLine.Option(names = {"-t", "--tenant"},
       description = "Tenant name")
   private String tenantId;
 
-  // TODO: HDDS-6340. Add an option to print JSON result
-
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address) {
-    final ObjectStore objStore = client.getObjectStore();
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
 
-    for (final String accessId : accessIds) {
-      try {
-        // TODO: Make tenantRevokeAdmin return accessId, tenantId, user later.
-        objStore.tenantRevokeAdmin(accessId, tenantId);
-        err().println("Revoked admin role of '" + accessId +
-            (tenantId != null ? "' from tenant '" + tenantId : "") + "'.");
-      } catch (IOException e) {
-        err().println("Failed to revoke admin role of '" + accessId +
-            (tenantId != null ? "' from tenant '" + tenantId : "") + "'" +
-            ": " + e.getMessage());
-        if (e instanceof OMException) {
-          final OMException omEx = (OMException) e;
-          // Don't bother continuing the loop if current user isn't Ozone admin
-          if (omEx.getResult().equals(PERMISSION_DENIED)) {
-            break;
-          }
-        }
-      }
+    client.getObjectStore().tenantRevokeAdmin(accessId, tenantId);
+
+    if (isVerbose()) {
+      final JsonObject obj = new JsonObject();
+      obj.addProperty("accessId", accessId);
+      obj.addProperty("tenantId", tenantId);
+      obj.addProperty("isAdmin", false);
+      obj.addProperty("isDelegatedAdmin", false);
+      final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+      out().println(gson.toJson(obj));
     }
+
   }
 }
