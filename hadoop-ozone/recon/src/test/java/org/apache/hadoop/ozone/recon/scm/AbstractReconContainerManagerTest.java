@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
+import java.time.ZoneId;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -28,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -44,6 +46,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -111,6 +114,8 @@ public class AbstractReconContainerManagerTest {
         eventQueue,
         scmhaManager,
         scmContext);
+    ContainerReplicaPendingOps pendingOps = new ContainerReplicaPendingOps(
+        conf, new MonotonicClock(ZoneId.systemDefault()));
 
     containerManager = new ReconContainerManager(
         conf,
@@ -121,7 +126,8 @@ public class AbstractReconContainerManagerTest {
         mock(ContainerHealthSchemaManager.class),
         mock(ReconContainerMetadataManager.class),
         scmhaManager,
-        sequenceIdGen);
+        sequenceIdGen,
+        pendingOps);
   }
 
   @After
