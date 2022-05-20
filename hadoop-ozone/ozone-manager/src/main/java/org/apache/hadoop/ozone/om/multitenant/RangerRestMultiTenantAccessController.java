@@ -29,6 +29,7 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -49,9 +50,11 @@ import java.lang.reflect.Type;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -73,10 +76,22 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
 public class RangerRestMultiTenantAccessController
     implements MultiTenantAccessController {
 
-  public static final String OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT =
+  public static final String OZONE_RANGER_POLICY_HTTP_ENDPOINT =
       "/service/public/v2/api/policy/";
-  public static final String OZONE_OM_RANGER_ADMIN_ROLE_HTTP_ENDPOINT =
+
+  public static final String OZONE_RANGER_ROLE_HTTP_ENDPOINT =
       "/service/public/v2/api/roles/";
+
+  private String getPolicyByNameEndpoint(String policyName) {
+    // /service/public/v2/api/service/{servicename}/policy/{policyname}
+    return rangerHttpsAddress + "/service/public/v2/api/service/" +
+        rangerService + "/policy/" + policyName;
+  }
+
+  private String getRoleByNameEndpoint(String roleName) {
+    // /service/public/v2/api/roles/name/
+    return rangerHttpsAddress + "/service/public/v2/api/roles/name/" + roleName;
+  }
 
   private static final Logger LOG = LoggerFactory
       .getLogger(RangerRestMultiTenantAccessController.class);
@@ -199,35 +214,28 @@ public class RangerRestMultiTenantAccessController
 
 
   @Override
-  public long createPolicy(Policy policy) throws IOException {
+  public void createPolicy(Policy policy) throws IOException {
     String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT;
+        rangerHttpsAddress + OZONE_RANGER_POLICY_HTTP_ENDPOINT;
     HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl,
         jsonConverter.toJsonTree(policy).getAsJsonObject());
     if (!successfulResponseCode(conn.getResponseCode())) {
       throw new IOException(String.format("Failed to create policy %s. " +
           "Http response code: %d", policy.getName(), conn.getResponseCode()));
     }
-    String policyInfo = getResponseData(conn);
-    long policyID;
-    JsonObject jObject = new JsonParser().parse(policyInfo).getAsJsonObject();
-    policyID = jObject.get("id").getAsLong();
-    return policyID;
+    getResponseData(conn);
   }
 
   @Override
-  public void deletePolicy(long policyID) throws IOException {
-    String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT
-            + policyID;
+  public void deletePolicy(String policyName) throws IOException {
+    String rangerAdminUrl = getPolicyByNameEndpoint(policyName);
     HttpsURLConnection conn = makeHttpsDeleteCall(rangerAdminUrl);
     if (!successfulResponseCode(conn.getResponseCode())) {
-      throw new IOException(String.format("Failed to delete policy %d. " +
-          "Http response code: %d", policyID, conn.getResponseCode()));
+      throw new IOException(String.format("Failed to delete policy '%s'. " +
+          "Http response code: %d", policyName, conn.getResponseCode()));
     }
   }
 
-  @Override
   public Map<Long, Policy> getPolicies() throws Exception {
     // This API gets all policies for all services. The
     // /public/v2/api/policies/{serviceDefName}/for-resource endpoint is
@@ -235,7 +243,7 @@ public class RangerRestMultiTenantAccessController
     // seem to work. This implementation should be ok for testing purposes as
     // this class is intended.
     String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT;
+        rangerHttpsAddress + OZONE_RANGER_POLICY_HTTP_ENDPOINT;
     HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl);
     if (!successfulResponseCode(conn.getResponseCode())) {
       throw new IOException(String.format("Failed to get all policies. " +
@@ -260,23 +268,31 @@ public class RangerRestMultiTenantAccessController
   }
 
   @Override
-  public Policy getPolicy(long policyID) throws IOException {
-    String rangerAdminUrl = rangerHttpsAddress +
-        OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT + policyID;
+  public Policy getPolicy(String policyName) throws IOException {
+    String rangerAdminUrl = getPolicyByNameEndpoint(policyName);
 
     HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl);
     if (!successfulResponseCode(conn.getResponseCode())) {
-      throw new IOException(String.format("Failed to get policy %d. " +
-          "Http response code: %d", policyID, conn.getResponseCode()));
+      throw new IOException(String.format("Failed to get policy '%s'. " +
+          "Http response code: %d", policyName, conn.getResponseCode()));
     }
     String policyInfo = getResponseData(conn);
     return jsonConverter.fromJson(policyInfo, Policy.class);
   }
 
   @Override
+  public List<Policy> getLabeledPolicies(String label) throws Exception {
+    throw new NotImplementedException("Not Implemented");
+  }
+
+  @Override
+  public void updatePolicy(Policy policy) throws Exception {
+    throw new NotImplementedException("Not Implemented");
+  }
+
   public void updatePolicy(long policyID, Policy policy) throws IOException {
-    String rangerAdminUrl = rangerHttpsAddress +
-        OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT + policyID;
+    String rangerAdminUrl =
+        rangerHttpsAddress + OZONE_RANGER_POLICY_HTTP_ENDPOINT + policyID;
 
     HttpsURLConnection conn = makeHttpsPutCall(rangerAdminUrl,
         jsonConverter.toJsonTree(policy));
@@ -287,9 +303,9 @@ public class RangerRestMultiTenantAccessController
   }
 
   @Override
-  public long createRole(Role role) throws IOException {
+  public void createRole(Role role) throws IOException {
     String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_ROLE_HTTP_ENDPOINT;
+        rangerHttpsAddress + OZONE_RANGER_ROLE_HTTP_ENDPOINT;
 
     HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl,
         jsonConverter.toJsonTree(role).getAsJsonObject());
@@ -300,25 +316,27 @@ public class RangerRestMultiTenantAccessController
     String responseString = getResponseData(conn);
     JsonObject jObject = new JsonParser().parse(responseString)
         .getAsJsonObject();
-    return jObject.get("id").getAsLong();
+//    return jObject.get("id").getAsLong();
   }
 
   @Override
-  public void deleteRole(long roleID) throws IOException {
-    String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT
-            + roleID;
+  public void deleteRole(String roleName) throws IOException {
+    String rangerAdminUrl = getRoleByNameEndpoint(roleName);
     HttpsURLConnection conn = makeHttpsDeleteCall(rangerAdminUrl);
     if (!successfulResponseCode(conn.getResponseCode())) {
-      throw new IOException(String.format("Failed to delete role %d. " +
-          "Http response code: %d", roleID, conn.getResponseCode()));
+      throw new IOException(String.format("Failed to delete role '%s'. " +
+          "Http response code: %d", roleName, conn.getResponseCode()));
     }
   }
 
   @Override
+  public long getRangerServiceVersion() throws Exception {
+    throw new NotImplementedException("Not Implemented");
+  }
+
   public Map<Long, Role> getRoles() throws Exception {
     String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_ROLE_HTTP_ENDPOINT;
+        rangerHttpsAddress + OZONE_RANGER_ROLE_HTTP_ENDPOINT;
     HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl);
     if (!successfulResponseCode(conn.getResponseCode())) {
       throw new IOException(String.format("Failed to get all roles. " +
@@ -338,14 +356,13 @@ public class RangerRestMultiTenantAccessController
   }
 
   @Override
-  public Role getRole(long roleID) throws IOException {
-    String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_ROLE_HTTP_ENDPOINT + roleID;
+  public Role getRole(String roleName) throws IOException {
+    String rangerAdminUrl = getRoleByNameEndpoint(roleName);
 
     HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl);
     if (!successfulResponseCode(conn.getResponseCode())) {
-      throw new IOException(String.format("Failed to get role %d. " +
-          "Http response code: %d", roleID, conn.getResponseCode()));
+      throw new IOException(String.format("Failed to get role '%s'. " +
+          "Http response code: %d", roleName, conn.getResponseCode()));
     }
     String roleInfo = getResponseData(conn);
     return jsonConverter.fromJson(roleInfo, Role.class);
@@ -354,7 +371,7 @@ public class RangerRestMultiTenantAccessController
   @Override
   public void updateRole(long roleID, Role role) throws IOException {
     String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_ROLE_HTTP_ENDPOINT + roleID;
+        rangerHttpsAddress + OZONE_RANGER_ROLE_HTTP_ENDPOINT + roleID;
 
     HttpsURLConnection conn = makeHttpsPutCall(rangerAdminUrl,
         jsonConverter.toJsonTree(role));
@@ -444,11 +461,12 @@ public class RangerRestMultiTenantAccessController
             throws JsonParseException {
           JsonObject policyJson = jsonElement.getAsJsonObject();
           String name = policyJson.get("name").getAsString();
-          Policy policy = new Policy(name);
+          Policy.Builder policyB = new Policy.Builder();
+          policyB.setName(name);
           if (policyJson.has("description")) {
-            policy.setDescription(policyJson.get("description").getAsString());
+            policyB.setDescription(policyJson.get("description").getAsString());
           }
-          policy.setEnabled(policyJson.get("isEnabled").getAsBoolean());
+          policyB.setEnabled(policyJson.get("isEnabled").getAsBoolean());
 
           // Read volume, bucket, keys from json.
           JsonObject resourcesJson =
@@ -457,21 +475,21 @@ public class RangerRestMultiTenantAccessController
           JsonObject jsonVolumeResource =
               resourcesJson.get("volume").getAsJsonObject();
           JsonArray volumes = jsonVolumeResource.get("values").getAsJsonArray();
-          volumes.forEach(vol -> policy.addVolumes(vol.getAsString()));
+          volumes.forEach(vol -> policyB.addVolume(vol.getAsString()));
 
           if (resourcesJson.has("bucket")) {
             JsonObject jsonBucketResource =
                 resourcesJson.get("bucket").getAsJsonObject();
             JsonArray buckets =
                 jsonBucketResource.get("values").getAsJsonArray();
-            buckets.forEach(bucket -> policy.addBuckets(bucket.getAsString()));
+            buckets.forEach(bucket -> policyB.addBucket(bucket.getAsString()));
           }
 
           if (resourcesJson.has("key")) {
             JsonObject jsonKeysResource =
                 resourcesJson.get("key").getAsJsonObject();
             JsonArray keys = jsonKeysResource.get("values").getAsJsonArray();
-            keys.forEach(key -> policy.addKeys(key.getAsString()));
+            keys.forEach(key -> policyB.addKey(key.getAsString()));
           }
 
           // Read Roles and their ACLs.
@@ -492,12 +510,13 @@ public class RangerRestMultiTenantAccessController
               }
 
               for (JsonElement roleNameJson : jsonRoles) {
-                policy.addRoleAcls(roleNameJson.getAsString(), acl);
+                policyB.addRoleAcl(roleNameJson.getAsString(),
+                    Collections.singleton(acl));
               }
             }
           }
 
-          return policy;
+          return policyB.build();
         }
       };
 
@@ -508,17 +527,18 @@ public class RangerRestMultiTenantAccessController
             throws JsonParseException {
           JsonObject roleJson = jsonElement.getAsJsonObject();
           String name = roleJson.get("name").getAsString();
-          Role role = new Role(name);
+          Role.Builder role = new Role.Builder();
+          role.setName(name);
           if (roleJson.has("description")) {
             role.setDescription(roleJson.get("description").getAsString());
           }
           for (JsonElement jsonUser : roleJson.get("users").getAsJsonArray()) {
             String userName =
                 jsonUser.getAsJsonObject().get("name").getAsString();
-            role.addUsers(new BasicUserPrincipal(userName));
+            role.addUser(new BasicUserPrincipal(userName));
           }
 
-          return role;
+          return role.build();
         }
       };
 
@@ -636,17 +656,14 @@ public class RangerRestMultiTenantAccessController
         }
       };
 
-  @Override
   public void setPolicyLastUpdateTime(long mtime) {
     lastPolicyUpdateTimeEpochMillis = mtime;
   }
 
-  @Override
   public long getPolicyLastUpdateTime() {
     return lastPolicyUpdateTimeEpochMillis;
   }
 
-  @Override
   public HashSet<String> getRoleList() {
     return null;
   }
