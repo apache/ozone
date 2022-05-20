@@ -110,6 +110,9 @@ public class TestRangerBGSyncService {
   private static final long TEST_SYNC_INTERVAL_SEC = 1L;
   private static final long TEST_SYNC_TIMEOUT_SEC = 3L;
 
+  private static final int CHECK_SYNC_MILLIS = 1000;
+  private static final int WAIT_SYNC_TIMEOUT_MILLIS = 60000;
+
   private TemporaryFolder folder = new TemporaryFolder();
 
   private MultiTenantAccessAuthorizer auth;
@@ -493,8 +496,8 @@ public class TestRangerBGSyncService {
     bgSync.start();
     // Wait for sync to finish once.
     // The counter is incremented at the beginning of the run, hence the ">"
-    GenericTestUtils.waitFor(
-        () -> bgSync.getRangerSyncRunCount() > 1L, 1000, 60000);
+    GenericTestUtils.waitFor(() -> bgSync.getRangerSyncRunCount() > 1L,
+        CHECK_SYNC_MILLIS, WAIT_SYNC_TIMEOUT_MILLIS);
     bgSync.shutdown();
     long ozoneVersionAfterSync = bgSync.getOMDBRangerServiceVersion();
     Assert.assertTrue(ozoneVersionAfterSync > rangerVersionAfterCreation);
@@ -535,8 +538,8 @@ public class TestRangerBGSyncService {
     bgSync.start();
     // Wait for sync to finish once.
     // The counter is incremented at the beginning of the run, hence the ">"
-    GenericTestUtils.waitFor(
-        () -> bgSync.getRangerSyncRunCount() > 1L, 1000, 60000);
+    GenericTestUtils.waitFor(() -> bgSync.getRangerSyncRunCount() > 1L,
+        CHECK_SYNC_MILLIS, WAIT_SYNC_TIMEOUT_MILLIS);
     bgSync.shutdown();
     long ozoneVersionAfterSync = bgSync.getOMDBRangerServiceVersion();
     Assert.assertEquals(rangerVersionAfterCreation, ozoneVersionAfterSync);
@@ -596,7 +599,8 @@ public class TestRangerBGSyncService {
     // Wait for sync to finish once.
     // The counter is incremented at the beginning of the run, hence the ">"
     GenericTestUtils.waitFor(
-        () -> bgSync.getRangerSyncRunCount() > currRunCount + 1L, 1000, 60000);
+        () -> bgSync.getRangerSyncRunCount() > currRunCount + 1L,
+        CHECK_SYNC_MILLIS, WAIT_SYNC_TIMEOUT_MILLIS);
     bgSync.shutdown();
     Assert.assertTrue(bgSync.getOMDBRangerServiceVersion() >= ozoneVersion);
 
@@ -653,8 +657,8 @@ public class TestRangerBGSyncService {
     bgSync.start();
     // Wait for sync to finish once.
     // The counter is incremented at the beginning of the run, hence the ">"
-    GenericTestUtils.waitFor(
-        () -> bgSync.getRangerSyncRunCount() > 1L, 1000, 60000);
+    GenericTestUtils.waitFor(() -> bgSync.getRangerSyncRunCount() > 1L,
+        CHECK_SYNC_MILLIS, WAIT_SYNC_TIMEOUT_MILLIS);
     bgSync.shutdown();
     long ozoneVersionAfterSync = bgSync.getOMDBRangerServiceVersion();
     Assert.assertTrue(ozoneVersionAfterSync > rangerVersionAfterCreation);
