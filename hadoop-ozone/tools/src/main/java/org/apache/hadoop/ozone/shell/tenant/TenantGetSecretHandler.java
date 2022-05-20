@@ -17,65 +17,37 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
-import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ACCESS_ID_NOT_FOUND;
 
 /**
  * ozone tenant user get-secret.
  */
 @CommandLine.Command(name = "get-secret",
     aliases = {"getsecret"},
-    description = "Get secret for tenant user accessIds. " +
+    description = "Get secret given tenant user accessId. " +
         "This differs from `ozone s3 getsecret` that this would not " +
-        "generate a key/secret pair when the accessId doesn't exist.")
+        "generate secret when the given access ID doesn't exist.")
 public class TenantGetSecretHandler extends TenantHandler {
 
-  @CommandLine.Parameters(description = "List of accessIds", arity = "1..")
-  private List<String> accessIds = new ArrayList<>();
-
-  @CommandLine.Option(names = {"-e", "--export"},
-      description = "Print out variables together with 'export' prefix")
-  private boolean export;
+  @CommandLine.Parameters(description = "Access ID", arity = "1..1")
+  private String accessId;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
-    final ObjectStore objectStore = client.getObjectStore();
 
-    for (final String accessId : accessIds) {
+    final S3SecretValue accessIdSecretKeyPair =
+        client.getObjectStore().getS3Secret(accessId, false);
+    // Always print in export format
+    out().printf("export AWS_ACCESS_KEY_ID='%s'%n",
+        accessIdSecretKeyPair.getAwsAccessKey());
+    out().printf("export AWS_SECRET_ACCESS_KEY='%s'%n",
+        accessIdSecretKeyPair.getAwsSecret());
 
-      try {
-        final S3SecretValue accessIdSecretKeyPair =
-            objectStore.getS3Secret(accessId, false);
-        if (export) {
-          out().println("export AWS_ACCESS_KEY_ID='" +
-              accessIdSecretKeyPair.getAwsAccessKey() + "'");
-          out().println("export AWS_SECRET_ACCESS_KEY='" +
-              accessIdSecretKeyPair.getAwsSecret() + "'");
-        } else {
-          out().println(accessIdSecretKeyPair);
-        }
-      } catch (OMException omEx) {
-        if (omEx.getResult().equals(ACCESS_ID_NOT_FOUND)) {
-          // Print to stderr here in order not to contaminate stdout just in
-          // case -e is specified.
-          err().println("AccessId '" + accessId + "' doesn't exist");
-          // Continue the loop if it's just ACCESSID_NOT_FOUND
-        } else {
-          throw omEx;
-        }
-      }
-
-    }
   }
 }

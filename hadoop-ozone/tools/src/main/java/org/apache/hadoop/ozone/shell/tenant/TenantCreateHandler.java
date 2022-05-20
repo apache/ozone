@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
@@ -34,18 +37,19 @@ public class TenantCreateHandler extends TenantHandler {
   @CommandLine.Parameters(description = "Tenant name", arity = "1..1")
   private String tenantId;
 
-  // TODO: HDDS-6340. Add an option to print JSON result
-
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
-    try {
-      client.getObjectStore().createTenant(tenantId);
-      // Note: RpcClient#createTenant prints volume name in info level LOG
-      out().println("Created tenant '" + tenantId + "'.");
-    } catch (IOException e) {
-      // Throw exception to make client exit code non-zero
-      throw new IOException("Failed to create tenant '" + tenantId + "'", e);
+
+    client.getObjectStore().createTenant(tenantId);
+    // RpcClient#createTenant prints INFO level log of tenant and volume name
+
+    if (isVerbose()) {
+      final JsonObject obj = new JsonObject();
+      obj.addProperty("tenantId", tenantId);
+      final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+      out().println(gson.toJson(obj));
     }
+
   }
 }
