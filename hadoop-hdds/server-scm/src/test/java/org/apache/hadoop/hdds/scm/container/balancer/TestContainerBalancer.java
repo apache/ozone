@@ -39,6 +39,8 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacem
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMService;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
@@ -111,6 +113,7 @@ public class TestContainerBalancer {
     containerManager = Mockito.mock(ContainerManager.class);
     replicationManager = Mockito.mock(ReplicationManager.class);
     serviceStateManager = Mockito.mock(StatefulServiceStateManagerImpl.class);
+    SCMServiceManager scmServiceManager = Mockito.mock(SCMServiceManager.class);
 
     // these configs will usually be specified in each test
     balancerConfiguration =
@@ -164,6 +167,7 @@ public class TestContainerBalancer {
     when(scm.getEventQueue()).thenReturn(mock(EventPublisher.class));
     when(scm.getConfiguration()).thenReturn(conf);
     when(scm.getStatefulServiceStateManager()).thenReturn(serviceStateManager);
+    when(scm.getSCMServiceManager()).thenReturn(scmServiceManager);
 
     /*
     When StatefulServiceStateManager#saveConfiguration is called, save to
@@ -184,6 +188,8 @@ public class TestContainerBalancer {
     when(serviceStateManager.readConfiguration(Mockito.anyString())).thenAnswer(
         i -> serviceToConfigMap.get(i.getArgument(0, String.class)));
 
+    Mockito.doNothing().when(scmServiceManager)
+        .register(Mockito.any(SCMService.class));
     containerBalancer = new ContainerBalancer(scm);
   }
 
