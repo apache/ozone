@@ -367,6 +367,8 @@ public class SequenceIdGenerator {
         largestContainerId
             = Long.max(containerInfo.getContainerID(), largestContainerId);
       }
+      iterator.close();
+
       sequenceIdTable.put(CONTAINER_ID, largestContainerId);
       LOG.info("upgrade {} to {}",
           CONTAINER_ID, sequenceIdTable.get(CONTAINER_ID));

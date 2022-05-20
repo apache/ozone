@@ -1305,6 +1305,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         break;
       }
     }
+    iterator.close();
+
     return response;
   }
 
