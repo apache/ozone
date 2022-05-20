@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 
 import org.apache.hadoop.conf.StorageUnit;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
@@ -116,7 +118,9 @@ public class TestCloseContainerEventHandler {
         scmhaManager,
         sequenceIdGen,
         pipelineManager,
-        scmMetadataStore.getContainerTable());
+        scmMetadataStore.getContainerTable(),
+        new ContainerReplicaPendingOps(configuration,
+            new MonotonicClock(ZoneId.systemDefault())));
 
     // trigger BackgroundPipelineCreator to take effect.
     serviceManager.notifyEventTriggered(Event.PRE_CHECK_COMPLETED);

@@ -124,6 +124,7 @@ public class ReplicationManager implements SCMService {
   private final long waitTimeInMillis;
   private long lastTimeToBeReadyInMillis = 0;
   private final Clock clock;
+  private final ContainerReplicaPendingOps containerReplicaPendingOps;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -143,7 +144,8 @@ public class ReplicationManager implements SCMService {
              final NodeManager nodeManager,
              final Clock clock,
              final SCMHAManager scmhaManager,
-             final Table<ContainerID, MoveDataNodePair> moveTable)
+             final Table<ContainerID, MoveDataNodePair> moveTable,
+             final ContainerReplicaPendingOps replicaPendingOps)
              throws IOException {
     this.containerManager = containerManager;
     this.scmContext = scmContext;
@@ -156,6 +158,7 @@ public class ReplicationManager implements SCMService {
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
         TimeUnit.MILLISECONDS);
+    this.containerReplicaPendingOps = replicaPendingOps;
     this.legacyReplicationManager = new LegacyReplicationManager(
         conf, containerManager, containerPlacement, eventPublisher,
         scmContext, nodeManager, scmhaManager, clock, moveTable);
