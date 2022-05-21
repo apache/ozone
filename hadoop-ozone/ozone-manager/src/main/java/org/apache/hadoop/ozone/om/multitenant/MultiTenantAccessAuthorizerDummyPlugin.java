@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.http.auth.BasicUserPrincipal;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 
 /**
@@ -40,14 +41,26 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public void shutdown() throws Exception {
+  public void shutdown() throws IOException {
 
   }
 
   @Override
-  public String assignUser(BasicUserPrincipal principal, String existingRole,
-      boolean isAdmin) throws IOException {
-    return "assignUser-roleName-returned";
+  public String assignUserToRole(BasicUserPrincipal principal,
+      String existingRole, boolean isAdmin) {
+    return "roleId";
+  }
+
+  @Override
+  public String revokeUserFromRole(BasicUserPrincipal principal,
+      String existingRole) {
+    return "roleId";
+  }
+
+  @Override
+  public String assignAllUsers(HashSet<String> users, String existingRole)
+      throws IOException {
+    return null;
   }
 
   @Override
@@ -61,12 +74,23 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
+  public String getRole(String roleName) throws IOException {
+    return null;
+  }
+
+  @Override
   public void deleteUser(String opaqueUserID) throws IOException {
 
   }
 
   @Override
-  public String createRole(OzoneTenantRolePrincipal role, String adminRoleName)
+  public String createRole(String role, String adminRoleName)
+      throws IOException {
+    return null;
+  }
+
+  @Override
+  public String createUser(String userName, String password)
       throws IOException {
     return null;
   }
@@ -77,23 +101,27 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public String createAccessPolicy(AccessPolicy policy) throws Exception {
+  public String createAccessPolicy(AccessPolicy policy) throws IOException {
     return null;
   }
 
   @Override
-  public AccessPolicy getAccessPolicyByName(String policyName)
-      throws Exception {
+  public AccessPolicy getAccessPolicyByName(String policyName) {
     return null;
   }
 
   @Override
-  public void deletePolicybyId(String policyId) throws IOException {
+  public AccessPolicy getAccessPolicyById(String policyName) {
+    return null;
+  }
+
+  @Override
+  public void deletePolicyById(String policyId) throws IOException {
 
   }
 
   @Override
-  public void deletePolicybyName(String policyName) throws Exception {
+  public void deletePolicyByName(String policyName) throws IOException {
 
   }
 
@@ -143,5 +171,20 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   public boolean checkAccess(IOzoneObj ozoneObject, RequestContext context)
       throws OMException {
     return false;
+  }
+
+  @Override
+  public long getLatestOzoneServiceVersion() {
+    return -1;
+  }
+
+  @Override
+  public String getAllMultiTenantPolicies() {
+    return null;
+  }
+
+  @Override
+  public MultiTenantAccessController getMultiTenantAccessController() {
+    return null;
   }
 }

@@ -254,6 +254,7 @@ public interface MultiTenantAccessController {
     private final String description;
     private final Map<String, Collection<Acl>> roleAcls;
     private final Set<String> labels;
+    private final boolean isEnabled;
 
     private Policy(Builder builder) {
       name = builder.name;
@@ -263,6 +264,7 @@ public interface MultiTenantAccessController {
       description = builder.description;
       roleAcls = builder.roleAcls;
       labels = builder.labels;
+      isEnabled = builder.isEnabled;
     }
 
     public Set<String> getVolumes() {
@@ -316,6 +318,10 @@ public interface MultiTenantAccessController {
           Objects.equals(getLabels(), policy.getLabels());
     }
 
+    public boolean isEnabled() {
+      return isEnabled;
+    }
+
     /**
      * Builder class for a policy.
      */
@@ -327,6 +333,7 @@ public interface MultiTenantAccessController {
       private String description;
       private final Map<String, Collection<Acl>> roleAcls;
       private final Set<String> labels;
+      private boolean isEnabled;
 
       public Builder() {
         this.volumes = new HashSet<>();
@@ -338,6 +345,11 @@ public interface MultiTenantAccessController {
 
       public Builder setName(String policyName) {
         this.name = policyName;
+        return this;
+      }
+
+      public Builder setEnabled(boolean enabled) {
+        this.isEnabled = enabled;
         return this;
       }
 

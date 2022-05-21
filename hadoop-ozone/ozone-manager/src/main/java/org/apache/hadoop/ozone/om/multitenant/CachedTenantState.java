@@ -17,33 +17,72 @@
 
 package org.apache.hadoop.ozone.om.multitenant;
 
-import java.util.HashSet;
-import java.util.Set;
-
-import org.apache.commons.lang3.tuple.Pair;
+import java.util.HashMap;
 
 /**
  * A collection of things that we want to maintain about a tenant in memory.
  */
 public class CachedTenantState {
 
-  private String tenantId;
-  private Set<Pair<String, String>> tenantUserAccessIds;
+  private final String tenantId;
+  private final String tenantUserRoleName;
+  private final String tenantAdminRoleName;
+  // accessId -> userPrincipal and isAdmin flag
+  private final HashMap<String, CachedAccessIdInfo> accessIdInfoMap;
 
-  public CachedTenantState(String tenantId) {
-    this.tenantId = tenantId;
-    tenantUserAccessIds = new HashSet<>();
+  public String getTenantUserRoleName() {
+    return tenantUserRoleName;
   }
 
-  public Set<Pair<String, String>> getTenantUsers() {
-    return tenantUserAccessIds;
+  public String getTenantAdminRoleName() {
+    return tenantAdminRoleName;
+  }
+
+  /**
+   * Stores cached Access ID info.
+   */
+  public static class CachedAccessIdInfo {
+    private final String userPrincipal;
+    /**
+     * Stores if the accessId is a tenant admin (either delegated or not).
+     */
+    private boolean isAdmin;
+
+    public CachedAccessIdInfo(String userPrincipal, boolean isAdmin) {
+      this.userPrincipal = userPrincipal;
+      this.isAdmin = isAdmin;
+    }
+
+    public String getUserPrincipal() {
+      return userPrincipal;
+    }
+
+    public void setIsAdmin(boolean isAdmin) {
+      this.isAdmin = isAdmin;
+    }
+
+    public boolean getIsAdmin() {
+      return isAdmin;
+    }
+  }
+
+  public CachedTenantState(String tenantId,
+      String tenantUserRoleName, String tenantAdminRoleName) {
+    this.tenantId = tenantId;
+    this.tenantUserRoleName = tenantUserRoleName;
+    this.tenantAdminRoleName = tenantAdminRoleName;
+    this.accessIdInfoMap = new HashMap<>();
   }
 
   public String getTenantId() {
     return tenantId;
   }
 
+  public HashMap<String, CachedAccessIdInfo> getAccessIdInfoMap() {
+    return accessIdInfoMap;
+  }
+
   public boolean isTenantEmpty() {
-    return tenantUserAccessIds.size() == 0;
+    return accessIdInfoMap.isEmpty();
   }
 }

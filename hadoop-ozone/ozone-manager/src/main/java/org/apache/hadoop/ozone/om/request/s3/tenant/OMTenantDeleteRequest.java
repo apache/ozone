@@ -72,6 +72,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
     // Check Ozone cluster admin privilege
     ozoneManager.getMultiTenantManager().checkAdmin();
 
+    // TODO: Acquire some lock
     // TODO: TBD: Call ozoneManager.getMultiTenantManager().deleteTenant() ?
 
     return super.preExecute(ozoneManager);
@@ -114,7 +115,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       final OmDBTenantState dbTenantState =
           omMetadataManager.getTenantStateTable().get(tenantId);
       volumeName = dbTenantState.getBucketNamespaceName();
-      assert (volumeName != null);
+      Preconditions.checkNotNull(volumeName);
 
       LOG.debug("Tenant '{}' has volume '{}'", tenantId, volumeName);
       // decVolumeRefCount is true if volumeName is not empty string
@@ -185,9 +186,9 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredVolumeLock) {
-        Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
+      // TODO: Release some lock
     }
 
     // Perform audit logging

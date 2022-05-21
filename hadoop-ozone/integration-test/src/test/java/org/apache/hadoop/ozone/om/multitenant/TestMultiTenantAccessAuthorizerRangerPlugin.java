@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.http.auth.BasicUserPrincipal;
@@ -100,15 +101,15 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
 
     try {
       OzoneTenantRolePrincipal adminRole =
-          OzoneTenantRolePrincipal.getAdminRole("tenant1-AdminRole");
+          new OzoneTenantRolePrincipal("tenant1-AdminRole");
       OzoneTenantRolePrincipal userRole =
-          OzoneTenantRolePrincipal.getUserRole("tenant1-UserRole");
+          new OzoneTenantRolePrincipal("tenant1-UserRole");
 
       BasicUserPrincipal userPrincipal = new BasicUserPrincipal("user1Test");
       usersIdsCreated.add(
-          omm.assignUser(userPrincipal, userRole.getName(), false));
+          omm.assignUserToRole(userPrincipal, userRole.getName(), false));
       usersIdsCreated.add(
-          omm.assignUser(userPrincipal, adminRole.getName(), true));
+          omm.assignUserToRole(userPrincipal, adminRole.getName(), true));
 
       AccessPolicy tenant1VolumeAccessPolicy = createVolumeAccessPolicy(
           "vol1", "tenant1");
@@ -130,7 +131,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
       Assert.fail(e.getMessage());
     } finally {
       for (String id : policyIdsCreated) {
-        omm.deletePolicybyId(id);
+        omm.deletePolicyById(id);
       }
       for (String id : usersIdsCreated) {
         omm.deleteUser(id);
@@ -153,17 +154,17 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
 
     try {
       Assert.assertTrue(policyIdsCreated.size() == 0);
-      OzoneTenantRolePrincipal group1Principal =
-          OzoneTenantRolePrincipal.getAdminRole("tenant1");
-      OzoneTenantRolePrincipal group2Principal =
-          OzoneTenantRolePrincipal.getUserRole("tenant1");
-      omm.createRole(group1Principal, null);
+      OzoneTenantRolePrincipal group1Principal = new OzoneTenantRolePrincipal(
+          OMMultiTenantManager.getDefaultAdminRoleName("tenant1"));
+      OzoneTenantRolePrincipal group2Principal = new OzoneTenantRolePrincipal(
+          OMMultiTenantManager.getDefaultUserRoleName("tenant1"));
+      omm.createRole(group1Principal.getName(), null);
       groupIdsCreated.add(omm.getRole(group1Principal));
-      omm.createRole(group2Principal, group1Principal.getName());
+      omm.createRole(group2Principal.getName(), group1Principal.getName());
       groupIdsCreated.add(omm.getRole(group2Principal));
 
       userPrincipal = new BasicUserPrincipal("user1Test");
-      omm.assignUser(userPrincipal, group2Principal.getName(), false);
+      omm.assignUserToRole(userPrincipal, group2Principal.getName(), false);
 
       AccessPolicy tenant1VolumeAccessPolicy = createVolumeAccessPolicy(
           "vol1", "tenant1");
@@ -189,7 +190,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
       Assert.fail(e.getMessage());
     } finally {
       for (String name : policyIdsCreated) {
-        omm.deletePolicybyName(name);
+        omm.deletePolicyByName(name);
       }
       String userId = omm.getUserId(userPrincipal);
       omm.deleteUser(userId);
@@ -199,13 +200,12 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
     }
   }
 
-  private AccessPolicy createVolumeAccessPolicy(String vol, String tenant)
+  private AccessPolicy createVolumeAccessPolicy(String vol, String tenantId)
       throws IOException {
-    OzoneTenantRolePrincipal principal =
-        OzoneTenantRolePrincipal.getUserRole(tenant);
+    OzoneTenantRolePrincipal principal = new OzoneTenantRolePrincipal(
+        OMMultiTenantManager.getDefaultUserRoleName(tenantId));
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
-        // principal already contains volume name
-        principal.getName() + "VolumeAccess");
+        OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantId));
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
         .setResType(VOLUME).setStoreType(OZONE).setVolumeName(vol)
         .setBucketName("").setKeyName("").build();
@@ -216,13 +216,12 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
     return tenantVolumeAccessPolicy;
   }
 
-  private AccessPolicy allowCreateBucketPolicy(String vol, String tenant)
+  private AccessPolicy allowCreateBucketPolicy(String vol, String tenantId)
       throws IOException {
-    OzoneTenantRolePrincipal principal =
-        OzoneTenantRolePrincipal.getUserRole(tenant);
+    OzoneTenantRolePrincipal principal = new OzoneTenantRolePrincipal(
+        OMMultiTenantManager.getDefaultUserRoleName(tenantId));
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
-        // principal already contains volume name
-        principal.getName() + "BucketAccess");
+        OMMultiTenantManager.getDefaultBucketPolicyName(tenantId));
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
         .setResType(BUCKET).setStoreType(OZONE).setVolumeName(vol)
         .setBucketName("*").setKeyName("").build();
@@ -230,12 +229,10 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
     return tenantVolumeAccessPolicy;
   }
 
-
-  // TODO: REMOVE THIS?
   private AccessPolicy allowAccessBucketPolicy(String vol, String bucketName,
-      String tenant) throws IOException {
-    OzoneTenantRolePrincipal principal =
-        OzoneTenantRolePrincipal.getUserRole(tenant);
+      String tenantId) throws IOException {
+    OzoneTenantRolePrincipal principal = new OzoneTenantRolePrincipal(
+        OMMultiTenantManager.getDefaultUserRoleName(tenantId));
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         principal.getName() + "AllowBucketAccess" + vol + bucketName +
             "Policy");
@@ -252,9 +249,9 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
   }
 
   private AccessPolicy allowAccessKeyPolicy(String vol, String bucketName,
-      String tenant) throws IOException {
-    OzoneTenantRolePrincipal principal =
-        OzoneTenantRolePrincipal.getUserRole(tenant);
+      String tenantId) throws IOException {
+    OzoneTenantRolePrincipal principal = new OzoneTenantRolePrincipal(
+        OMMultiTenantManager.getDefaultUserRoleName(tenantId));
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         principal.getName() + "AllowBucketKeyAccess" + vol + bucketName +
             "Policy");

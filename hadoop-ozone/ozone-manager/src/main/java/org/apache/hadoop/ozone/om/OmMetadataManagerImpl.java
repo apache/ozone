@@ -141,6 +141,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * | principalToAccessIdsTable | userPrincipal -> OmDBUserPrincipalInfo   |
    * |----------------------------------------------------------------------|
    *
+   *
    * Simple Tables:
    * |----------------------------------------------------------------------|
    * |  Column Family     |        VALUE                                    |
@@ -1366,8 +1367,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public Table<String, OmDBUserPrincipalInfo>
-      getPrincipalToAccessIdsTable() {
+  public Table<String, OmDBUserPrincipalInfo> getPrincipalToAccessIdsTable() {
     return principalToAccessIdsTable;
   }
 

@@ -127,8 +127,8 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           ResultCodes.PERMISSION_DENIED);
     }
 
+    // TODO: Acquire some lock
     // Call OMMTM to revoke user access to tenant
-    // TODO: Check destroyUser() behavior
     ozoneManager.getMultiTenantManager().revokeUserAccessId(accessId);
 
     final Builder omRequestBuilder = omRequest.toBuilder()
@@ -219,10 +219,8 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       omClientResponse = new OMTenantRevokeUserAccessIdResponse(
           createErrorOMResponse(omResponse, ex));
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper
-            .add(omClientResponse, transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (acquiredS3SecretLock) {
         omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, accessId);
       }
@@ -230,6 +228,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
+      // TODO: Release some lock
     }
 
     // Audit

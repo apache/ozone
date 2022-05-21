@@ -118,6 +118,8 @@ enum Type {
   TenantListUser = 105;
 
   SetS3Secret = 106;
+
+  SetRangerServiceVersion = 107;
 }
 
 message OMRequest {
@@ -218,6 +220,8 @@ message OMRequest {
   optional TenantListUserRequest            tenantListUserRequest          = 105;
 
   optional SetS3SecretRequest               SetS3SecretRequest             = 106;
+
+  optional SetRangerServiceVersionRequest   SetRangerServiceVersionRequest = 107;
 }
 
 message OMResponse {
@@ -301,8 +305,8 @@ message OMResponse {
   optional ListTenantResponse                ListTenantResponse            = 98;
 
   optional TenantGetUserInfoResponse         TenantGetUserInfoResponse     = 99;
-  optional TenantAssignUserAccessIdResponse  TenantAssignUserAccessIdResponse= 100;
-  optional TenantRevokeUserAccessIdResponse  TenantRevokeUserAccessIdResponse= 101;
+  optional TenantAssignUserAccessIdResponse  TenantAssignUserAccessIdResponse = 100;
+  optional TenantRevokeUserAccessIdResponse  TenantRevokeUserAccessIdResponse = 101;
 
   optional TenantAssignAdminResponse         TenantAssignAdminResponse     = 102;
   optional TenantRevokeAdminResponse         TenantRevokeAdminResponse     = 103;
@@ -311,6 +315,8 @@ message OMResponse {
   optional TenantListUserResponse            tenantListUserResponse        = 105;
 
   optional SetS3SecretResponse               SetS3SecretResponse           = 106;
+
+  optional SetRangerServiceVersionResponse   SetRangerServiceVersionResponse = 107;
 }
 
 enum Status {
@@ -1486,6 +1492,12 @@ message RevokeS3SecretRequest {
 message CreateTenantRequest {
     optional string tenantId = 1;  // Tenant name
     optional string volumeName = 2;
+    optional string userRoleName = 3;
+    optional string adminRoleName = 4;
+}
+
+message SetRangerServiceVersionRequest {
+    required uint64 rangerServiceVersion = 1;
 }
 
 message DeleteTenantRequest {
@@ -1520,6 +1532,9 @@ message GetS3VolumeContextRequest {
 
 message CreateTenantResponse {
 
+}
+
+message SetRangerServiceVersionResponse {
 }
 
 message DeleteTenantResponse {

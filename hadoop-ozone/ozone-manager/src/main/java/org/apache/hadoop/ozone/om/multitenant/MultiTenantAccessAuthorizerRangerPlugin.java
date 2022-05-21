@@ -20,13 +20,19 @@ package org.apache.hadoop.ozone.om.multitenant;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_CREATE_POLICY_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_CREATE_ROLE_HTTP_ENDPOINT;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_DELETE_GROUP_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_CREATE_USER_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_DELETE_POLICY_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_DELETE_ROLE_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_DELETE_USER_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_GET_POLICY_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_GET_POLICY_ID_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_GET_ROLE_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_GET_USER_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_ROLE_ADD_USER_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ALL_POLICIES_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_DOWNLOAD_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
@@ -41,8 +47,10 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -74,18 +82,37 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   public static final Logger LOG = LoggerFactory
       .getLogger(MultiTenantAccessAuthorizerRangerPlugin.class);
 
+  private MultiTenantAccessController accessController;
+
   private OzoneConfiguration conf;
-  private boolean ignoreServerCert = false;
+  private boolean ignoreServerCert = true;
   private int connectionTimeout;
   private int connectionRequestTimeout;
   private String authHeaderValue;
   private String rangerHttpsAddress;
+  // Stores Ranger cm_ozone service ID. This value should not change (unless
+  // somehow Ranger cm_ozone service is deleted and re-created while OM is
+  // still running and not reloaded / restarted).
+  private int rangerOzoneServiceId;
 
   @Override
   public void init(Configuration configuration) throws IOException {
     conf = new OzoneConfiguration(configuration);
+    accessController = new RangerRestMultiTenantAccessController(conf);
     rangerHttpsAddress = conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY);
+    if (rangerHttpsAddress == null) {
+      throw new OMException("Config ozone.om.ranger.https-address is not set! "
+          + "Multi-Tenancy feature requires Apache Ranger to function properly",
+          OMException.ResultCodes.INTERNAL_ERROR);
+    }
     initializeRangerConnection();
+
+    // Get Ranger Ozone service ID
+    rangerOzoneServiceId = retrieveRangerOzoneServiceId();
+  }
+
+  int getRangerOzoneServiceId() {
+    return rangerOzoneServiceId;
   }
 
   private void initializeRangerConnection() {
@@ -152,7 +179,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
 
   @Override
-  public void shutdown() throws Exception {
+  public void shutdown() throws IOException {
     // TBD
   }
 
@@ -214,7 +241,18 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_ROLE_HTTP_ENDPOINT +
             principal.getName();
 
-    HttpsURLConnection conn = makeHttpsGetCall(endpointUrl, "GET", false);
+    HttpURLConnection conn = makeHttpGetCall(endpointUrl, "GET", false);
+    return getResponseData(conn);
+  }
+
+  @Override
+  public String getRole(String roleName) throws IOException {
+
+    String endpointUrl =
+        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_ROLE_HTTP_ENDPOINT +
+            roleName;
+
+    HttpURLConnection conn = makeHttpGetCall(endpointUrl, "GET", false);
     return getResponseData(conn);
   }
 
@@ -224,7 +262,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_USER_HTTP_ENDPOINT +
         principal.getName();
 
-    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
+    HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl,
         "GET", false);
     String response = getResponseData(conn);
     String userIDCreated = null;
@@ -253,12 +291,66 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
    *
    * @param principal contains user name, must be an existing user in Ranger.
    * @param existingRole An existing role's JSON response String from Ranger.
+   * @return roleId (not useful for now)
+   * @throws IOException
+   */
+  @Override
+  public String revokeUserFromRole(BasicUserPrincipal principal,
+      String existingRole) throws IOException {
+    JsonObject roleObj = new JsonParser().parse(existingRole).getAsJsonObject();
+    // Parse Json
+    final String roleId = roleObj.get("id").getAsString();
+    LOG.debug("Got roleId: {}", roleId);
+
+    JsonArray oldUsersArray = roleObj.getAsJsonArray("users");
+    JsonArray newUsersArray = new JsonArray();
+
+    for (int i = 0; i < oldUsersArray.size(); ++i) {
+      JsonObject newUserEntry = oldUsersArray.get(i).getAsJsonObject();
+      if (!newUserEntry.get("name").getAsString().equals(principal.getName())) {
+        newUsersArray.add(newUserEntry);
+      }
+      // Update Json array
+    }
+    roleObj.add("users", newUsersArray);
+
+    LOG.debug("Updated: {}", roleObj);
+
+    final String endpointUrl = rangerHttpsAddress +
+        OZONE_OM_RANGER_ADMIN_ROLE_ADD_USER_HTTP_ENDPOINT + roleId;
+    final String jsonData = roleObj.toString();
+
+    HttpURLConnection conn =
+        makeHttpCall(endpointUrl, jsonData, "PUT", false);
+    if (conn.getResponseCode() != HTTP_OK) {
+      throw new IOException("Ranger REST API failure: " + conn.getResponseCode()
+          + " " + conn.getResponseMessage()
+          + ". Error updating Ranger role.");
+    }
+    String resp = getResponseData(conn);
+    String returnedRoleId;
+    try {
+      JsonObject jObject = new JsonParser().parse(resp).getAsJsonObject();
+      returnedRoleId = jObject.get("id").getAsString();
+      LOG.debug("Ranger returns roleId: {}", roleId);
+    } catch (JsonParseException e) {
+      e.printStackTrace();
+      throw e;
+    }
+    return returnedRoleId;
+  }
+
+  /**
+   * Update the exising role details and push the changes to Ranger.
+   *
+   * @param principal contains user name, must be an existing user in Ranger.
+   * @param existingRole An existing role's JSON response String from Ranger.
    * @param isAdmin Make it delegated admin of the role.
    * @return roleId (not useful for now)
    * @throws IOException
    */
-  public String assignUser(BasicUserPrincipal principal, String existingRole,
-      boolean isAdmin) throws IOException {
+  public String assignUserToRole(BasicUserPrincipal principal,
+      String existingRole, boolean isAdmin) throws IOException {
 
     JsonObject roleObj = new JsonParser().parse(existingRole).getAsJsonObject();
     // Parse Json
@@ -279,7 +371,61 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         OZONE_OM_RANGER_ADMIN_ROLE_ADD_USER_HTTP_ENDPOINT + roleId;
     final String jsonData = roleObj.toString();
 
-    HttpsURLConnection conn =
+    HttpURLConnection conn =
+        makeHttpCall(endpointUrl, jsonData, "PUT", false);
+    if (conn.getResponseCode() != HTTP_OK) {
+      throw new IOException("Ranger REST API failure: " + conn.getResponseCode()
+          + " " + conn.getResponseMessage()
+          + ". Error updating Ranger role.");
+    }
+    String resp = getResponseData(conn);
+    String returnedRoleId;
+    try {
+      JsonObject jObject = new JsonParser().parse(resp).getAsJsonObject();
+      returnedRoleId = jObject.get("id").getAsString();
+      LOG.debug("Ranger returns roleId: {}", roleId);
+    } catch (JsonParseException e) {
+      e.printStackTrace();
+      throw e;
+    }
+    return returnedRoleId;
+  }
+
+  /**
+   * Update the exising role details and push the changes to Ranger.
+   *
+   * @param users must be existing users in Ranger.
+   * @param existingRole An existing role's JSON response String from Ranger.
+   * @return roleId (not useful for now)
+   * @throws IOException
+   */
+  @Override
+  public String assignAllUsers(HashSet<String> users,
+                               String existingRole) throws IOException {
+
+    JsonObject roleObj = new JsonParser().parse(existingRole).getAsJsonObject();
+    // Parse Json
+    final String roleId = roleObj.get("id").getAsString();
+    LOG.debug("Got roleId: {}", roleId);
+
+    JsonArray usersArray = new JsonArray();
+    for (String user: users) {
+      JsonObject newUserEntry = new JsonObject();
+      newUserEntry.addProperty("name", user);
+      newUserEntry.addProperty("isAdmin", false);
+      usersArray.add(newUserEntry);
+    }
+    // Update Json array
+    roleObj.remove("users"); // remove the old users
+    roleObj.add("users", usersArray);
+
+    LOG.debug("Updated: {}", roleObj);
+
+    final String endpointUrl = rangerHttpsAddress +
+        OZONE_OM_RANGER_ADMIN_ROLE_ADD_USER_HTTP_ENDPOINT + roleId;
+    final String jsonData = roleObj.toString();
+
+    HttpURLConnection conn =
         makeHttpCall(endpointUrl, jsonData, "PUT", false);
     if (conn.getResponseCode() != HTTP_OK) {
       throw new IOException("Ranger REST API failure: " + conn.getResponseCode()
@@ -308,17 +454,18 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         + "}";
   }
 
-  public String createRole(OzoneTenantRolePrincipal role, String adminRoleName)
+  public String createRole(String role, String adminRoleName)
       throws IOException {
 
     String endpointUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_CREATE_ROLE_HTTP_ENDPOINT;
 
-    String jsonData = getCreateRoleJsonStr(role.toString(), adminRoleName);
+    String jsonData = getCreateRoleJsonStr(role, adminRoleName);
 
-    final HttpsURLConnection conn = makeHttpCall(endpointUrl,
+    final HttpURLConnection conn = makeHttpCall(endpointUrl,
         jsonData, "POST", false);
     if (conn.getResponseCode() != HTTP_OK) {
+      // TODO: Do not throw on 400 ?
       throw new IOException("Ranger REST API failure: " + conn.getResponseCode()
           + " " + conn.getResponseMessage()
           + ". Role name '" + role + "' likely already exists in Ranger");
@@ -336,11 +483,49 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return roleId;
   }
 
-  public String createAccessPolicy(AccessPolicy policy) throws Exception {
+  private String getCreateUserJsonStr(String userName, String password) {
+    return "{"
+        + "  \"name\":\"" +  userName + "\","
+        + "  \"password\":\"" +  password + "\","
+        + "  \"firstName\":\"" +  userName + "\","
+        + "  \"userRoleList\":[\"ROLE_USER\"]"
+        + "}";
+  }
+
+  public String createUser(String userName, String password)
+      throws IOException {
+
+    String endpointUrl =
+        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_CREATE_USER_HTTP_ENDPOINT;
+
+    String jsonData = getCreateUserJsonStr(userName, password);
+
+    final HttpURLConnection conn = makeHttpCall(endpointUrl,
+        jsonData, "POST", false);
+    if (conn.getResponseCode() != HTTP_OK) {
+      throw new IOException("Ranger REST API failure: " + conn.getResponseCode()
+          + " " + conn.getResponseMessage()
+          + ". User name '" + userName + "' likely already exists in Ranger");
+    }
+    String userInfo = getResponseData(conn);
+    String userId;
+    try {
+      JsonObject jObject = new JsonParser().parse(userInfo).getAsJsonObject();
+      userId = jObject.get("id").getAsString();
+      LOG.debug("Ranger returned userId: {}", userId);
+    } catch (JsonParseException e) {
+      e.printStackTrace();
+      throw e;
+    }
+    return userId;
+  }
+
+
+  public String createAccessPolicy(AccessPolicy policy) throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_CREATE_POLICY_HTTP_ENDPOINT;
 
-    HttpsURLConnection conn = makeHttpCall(rangerAdminUrl,
+    HttpURLConnection conn = makeHttpCall(rangerAdminUrl,
         policy.serializePolicyToJsonString(),
         "POST", false);
     String policyInfo = getResponseData(conn);
@@ -358,19 +543,117 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   public AccessPolicy getAccessPolicyByName(String policyName)
-      throws Exception {
+      throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_POLICY_HTTP_ENDPOINT +
         policyName;
 
-    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
+    HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl,
+        "GET", false);
+    String policyInfo = getResponseData(conn);
+    JsonArray jArry = new JsonParser().parse(policyInfo).getAsJsonArray();
+    if (jArry.size() > 0) {
+      JsonObject jsonObject = jArry.get(0).getAsJsonObject();
+      AccessPolicy policy = new RangerAccessPolicy(policyName);
+      policy.deserializePolicyFromJsonString(jsonObject);
+      return policy;
+    } else {
+      // Returns null when policyInfo is an empty array
+      return null;
+    }
+  }
+
+  @Override
+  public AccessPolicy getAccessPolicyById(String policyId)
+      throws IOException {
+    String rangerAdminUrl =
+        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_POLICY_ID_HTTP_ENDPOINT +
+            policyId;
+
+    HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl,
         "GET", false);
     String policyInfo = getResponseData(conn);
     JsonArray jArry = new JsonParser().parse(policyInfo).getAsJsonArray();
     JsonObject jsonObject = jArry.get(0).getAsJsonObject();
-    AccessPolicy policy = new RangerAccessPolicy(policyName);
+    AccessPolicy policy =
+        new RangerAccessPolicy(jsonObject.get("name").getAsString());
     policy.deserializePolicyFromJsonString(jsonObject);
     return policy;
+  }
+
+  /**
+   * Returns the service ID for Ozone service in Ranger.
+   * TODO: Error handling when Ozone service doesn't exist in Ranger.
+   */
+  public int retrieveRangerOzoneServiceId() throws IOException {
+
+    String rangerAdminUrl =
+        rangerHttpsAddress + OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT;
+    int id = 0;
+
+    HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl,
+        "GET", false);
+    String sInfo = getResponseData(conn);
+    JsonObject jObject = new JsonParser().parse(sInfo).getAsJsonObject();
+    JsonArray jArry = jObject.getAsJsonArray("services");
+    for (int i = 0; i < jArry.size(); ++i) {
+      JsonObject serviceObj = jArry.get(i).getAsJsonObject();
+      String serviceName = serviceObj.get("type").getAsString();
+      if (!serviceName.equals("ozone")) {
+        continue;
+      }
+      id = serviceObj.get("id").getAsInt();
+    }
+    return id;
+  }
+
+  public long getLatestOzoneServiceVersion() throws IOException {
+    String rangerAdminUrl = rangerHttpsAddress
+        + OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT + getRangerOzoneServiceId();
+
+    HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl, "GET", false);
+    String sInfo = getResponseData(conn);
+    JsonObject jObject = new JsonParser().parse(sInfo).getAsJsonObject();
+    return jObject.get("policyVersion").getAsLong();
+  }
+
+  public String getIncrementalRangerChanges(long baseVersion)
+      throws IOException {
+    String rangerAdminUrl =
+        rangerHttpsAddress + OZONE_OM_RANGER_DOWNLOAD_ENDPOINT + baseVersion;
+
+    HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl, "GET", false);
+    String sInfo = getResponseData(conn);
+    return sInfo;
+  }
+
+  public String getAllMultiTenantPolicies() throws IOException {
+
+    // Note: Ranger incremental policies API is broken. So we use policy label
+    // filter to get all Multi-Tenant policies.
+
+    String rangerAdminUrl = rangerHttpsAddress
+        + OZONE_OM_RANGER_ALL_POLICIES_ENDPOINT + getRangerOzoneServiceId()
+        + "?policyLabelsPartial=" + OZONE_TENANT_RANGER_POLICY_LABEL;
+
+    // Also note: policyLabels (not partial) arg doesn't seem to work for Ranger
+    // at this point. When Ranger fixed this we could use exact match instead,
+    // then we can remove the verification logic in
+    // loadAllPoliciesRolesFromRanger().
+
+    HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl, "GET", false);
+    final String jsonStr = getResponseData(conn);
+
+    if (jsonStr == null) {
+      throw new IOException("Invalid response from " + rangerAdminUrl);
+    }
+
+    return jsonStr;
+  }
+
+  @Override
+  public MultiTenantAccessController getMultiTenantAccessController() {
+    return this.accessController;
   }
 
   public void deleteUser(String userId) throws IOException {
@@ -379,54 +662,54 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_USER_HTTP_ENDPOINT
             + userId + "?forceDelete=true";
 
-    HttpsURLConnection conn = makeHttpCall(rangerAdminUrl, null,
+    HttpURLConnection conn = makeHttpCall(rangerAdminUrl, null,
         "DELETE", false);
     int respnseCode = conn.getResponseCode();
     if (respnseCode != 200 && respnseCode != 204) {
-      throw new IOException("Couldnt delete user " + userId);
+      throw new IOException("Couldn't delete user " + userId);
     }
   }
 
-  public void deleteRole(String groupId) throws IOException {
+  public void deleteRole(String roleName) throws IOException {
 
     String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_GROUP_HTTP_ENDPOINT
-            + groupId + "?forceDelete=true";
+        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_ROLE_HTTP_ENDPOINT
+            + roleName + "?forceDelete=true";
 
-    HttpsURLConnection conn = makeHttpCall(rangerAdminUrl, null,
+    HttpURLConnection conn = makeHttpCall(rangerAdminUrl, null,
         "DELETE", false);
     int respnseCode = conn.getResponseCode();
     if (respnseCode != 200 && respnseCode != 204) {
-      throw new IOException("Couldnt delete group " + groupId);
+      throw new IOException("Couldn't delete role " + roleName);
     }
   }
 
   @Override
-  public void deletePolicybyName(String policyName) throws Exception {
+  public void deletePolicyByName(String policyName) throws IOException {
     AccessPolicy policy = getAccessPolicyByName(policyName);
     String  policyID = policy.getPolicyID();
     LOG.debug("policyID is: {}", policyID);
-    deletePolicybyId(policyID);
+    deletePolicyById(policyID);
   }
 
-  public void deletePolicybyId(String policyId) throws IOException {
+  public void deletePolicyById(String policyId) throws IOException {
 
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_POLICY_HTTP_ENDPOINT
             + policyId + "?forceDelete=true";
     try {
-      HttpsURLConnection conn = makeHttpCall(rangerAdminUrl, null,
+      HttpURLConnection conn = makeHttpCall(rangerAdminUrl, null,
           "DELETE", false);
       int respnseCode = conn.getResponseCode();
       if (respnseCode != 200 && respnseCode != 204) {
-        throw new IOException("Couldnt delete policy " + policyId);
+        throw new IOException("Couldn't delete policy " + policyId);
       }
     } catch (Exception e) {
-      throw new IOException("Couldnt delete policy " + policyId, e);
+      throw new IOException("Couldn't delete policy " + policyId, e);
     }
   }
 
-  private String getResponseData(HttpsURLConnection urlConnection)
+  private String getResponseData(HttpURLConnection urlConnection)
       throws IOException {
     StringBuilder response = new StringBuilder();
     try (BufferedReader br = new BufferedReader(
@@ -437,20 +720,50 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         response.append(responseLine.trim());
       }
       LOG.debug("Got response: {}", response);
-    } catch (Exception e) {
-      e.printStackTrace();
-      throw e;
+    } catch (IOException e) {
+      // Common exceptions:
+      // 1. Server returned HTTP response code: 401
+      //   - Possibly incorrect Ranger credentials
+      // 2. Server returned HTTP response code: 400
+      //   - Policy or role does not exist
+      switch (urlConnection.getResponseCode()) {
+      case 400:
+        LOG.error("The policy or role likely does not exist in Ranger");
+        return null;
+      case 401:
+        LOG.error("Check Ranger credentials");
+//        break;
+      default:
+        e.printStackTrace();
+        throw e;
+      }
     }
     return response.toString();
   }
 
-  private HttpsURLConnection makeHttpCall(String urlString,
-                                              String jsonInputString,
-                                              String method, boolean isSpnego)
+  private HttpURLConnection openURLConnection(URL url) throws IOException {
+    final HttpURLConnection urlConnection;
+    if (url.getProtocol().equals("https")) {
+      urlConnection = (HttpsURLConnection) url.openConnection();
+    } else if (url.getProtocol().equals("http")) {
+      urlConnection = (HttpURLConnection) url.openConnection();
+    } else {
+      throw new IOException("Unsupported protocol: " + url.getProtocol() +
+          "URL: " + url);
+    }
+    return urlConnection;
+  }
+
+  /**
+   * Can make either http or https request.
+   */
+  private HttpURLConnection makeHttpCall(String urlString,
+      String jsonInputString, String method, boolean isSpnego)
       throws IOException {
 
     URL url = new URL(urlString);
-    HttpsURLConnection urlConnection = (HttpsURLConnection)url.openConnection();
+    final HttpURLConnection urlConnection = openURLConnection(url);
+
     urlConnection.setRequestMethod(method);
     urlConnection.setConnectTimeout(connectionTimeout);
     urlConnection.setReadTimeout(connectionRequestTimeout);
@@ -470,11 +783,15 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return urlConnection;
   }
 
-  private HttpsURLConnection makeHttpsGetCall(String urlString,
+  /**
+   * Can make either http or https request.
+   */
+  private HttpURLConnection makeHttpGetCall(String urlString,
       String method, boolean isSpnego) throws IOException {
 
     URL url = new URL(urlString);
-    HttpsURLConnection urlConnection = (HttpsURLConnection)url.openConnection();
+    final HttpURLConnection urlConnection = openURLConnection(url);
+
     urlConnection.setRequestMethod(method);
     urlConnection.setConnectTimeout(connectionTimeout);
     urlConnection.setReadTimeout(connectionRequestTimeout);

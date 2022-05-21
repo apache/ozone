@@ -19,16 +19,20 @@ package org.apache.hadoop.ozone.om.multitenant;
 
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 import java.io.IOException;
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL;
 import static org.apache.hadoop.ozone.om.multitenant.AccessPolicy.AccessPolicyType.RANGER_POLICY;
 
 /**
@@ -38,14 +42,17 @@ public class RangerAccessPolicy implements AccessPolicy {
 
   // For now RangerAccessPolicy supports only one object per policy
   private OzoneObj accessObject;
-  private Map<String, List<AccessPolicyElem>> policyMap;
+  private final Map<String, List<AccessPolicyElem>> policyMap;
+  private final HashSet<String> roleList;
   private String policyID;
   private String policyJsonString;
   private String policyName;
+  private long lastPolicyUpdateTimeEpochMillis;
 
   public RangerAccessPolicy(String name) {
     policyMap = new ConcurrentHashMap<>();
     policyName = name;
+    roleList = new HashSet<>();
   }
 
   public void setPolicyID(String id) {
@@ -60,17 +67,51 @@ public class RangerAccessPolicy implements AccessPolicy {
     return policyName;
   }
 
+  public HashSet<String> getRoleList() {
+    return roleList;
+  }
+
   @Override
-  public String serializePolicyToJsonString() throws Exception {
+  public void setPolicyLastUpdateTime(long mtime) {
+    lastPolicyUpdateTimeEpochMillis = mtime;
+  }
+
+  @Override
+  public long getPolicyLastUpdateTime() {
+    return lastPolicyUpdateTimeEpochMillis;
+  }
+
+  @Override
+  public String serializePolicyToJsonString() throws IOException {
     updatePolicyJsonString();
     return policyJsonString;
   }
 
   @Override
-  public String deserializePolicyFromJsonString(JsonObject jsonObject)
-      throws Exception {
+  public String deserializePolicyFromJsonString(JsonObject jsonObject) {
     setPolicyID(jsonObject.get("id").getAsString());
+    try {
+      JsonArray policyItems = jsonObject
+          .getAsJsonArray("policyItems");
+      for (int j = 0; j < policyItems.size(); ++j) {
+        JsonObject policy = policyItems.get(j).getAsJsonObject();
+        JsonArray roles = policy.getAsJsonArray("roles");
+        for (int k = 0; k < roles.size(); ++k) {
+          if (!roleList.contains(roles.get(k).getAsString())) {
+            // We only get the role name here. We need to query and populate it.
+            roleList.add(roles.get(k).getAsString());
+          }
+        }
+      }
+    } catch (Exception e) {
+      // Ignore Exception here.
+    }
     // TODO : retrieve other policy fields as well.
+    try {
+      setPolicyLastUpdateTime(jsonObject.get("updateTime").getAsLong());
+    } catch (Exception e) {
+      // lets ignore the exception in case the field is not set.
+    }
     return null;
   }
 
@@ -146,7 +187,7 @@ public class RangerAccessPolicy implements AccessPolicy {
         "removeAccessPolicyElem:  aclType not found." + object.toString());
   }
 
-  private String createRangerResourceItems() throws IOException {
+  private String createRangerResourceItems() {
     StringBuilder resourceItems = new StringBuilder();
     resourceItems.append("\"resources\":{" +
         "\"volume\":{" +
@@ -250,11 +291,13 @@ public class RangerAccessPolicy implements AccessPolicy {
     }
   }
 
-  private void updatePolicyJsonString() throws Exception {
+  private void updatePolicyJsonString() throws IOException {
     policyJsonString =
         "{\"policyType\":\"0\"," + "\"name\":\"" + policyName + "\","
             + "\"isEnabled\":true," + "\"policyPriority\":0,"
-            + "\"policyLabels\":[]," + "\"description\":\"\","
+            + "\"description\":\"Policy created by Ozone for Multi-Tenancy\","
+            + "\"policyLabels\":[\"" + OZONE_TENANT_RANGER_POLICY_LABEL + "\"],"
+            + "\"description\":\"\","
             + "\"isAuditEnabled\":true," + createRangerResourceItems()
             + "\"isDenyAllElse\":false," + createRangerPolicyItems()
             + "\"allowExceptions\":[]," + "\"denyPolicyItems\":[],"

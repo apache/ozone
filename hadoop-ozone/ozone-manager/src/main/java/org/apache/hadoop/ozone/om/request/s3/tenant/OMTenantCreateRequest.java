@@ -166,16 +166,25 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
             .setModificationTime(initialTime)
             .build();
 
+    final String userRoleName =
+        OMMultiTenantManager.getDefaultUserRoleName(tenantId);
+    final String adminRoleName =
+        OMMultiTenantManager.getDefaultAdminRoleName(tenantId);
+
+    // TODO: Acquire some lock
+
     // If we fail after pre-execute. handleRequestFailure() callback
     // would clean up any state maintained by the getMultiTenantManager.
     tenantInContext = ozoneManager.getMultiTenantManager()
-        .createTenantAccessInAuthorizer(tenantId);
+        .createTenantAccessInAuthorizer(tenantId, userRoleName, adminRoleName);
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
         .setCreateTenantRequest(
             CreateTenantRequest.newBuilder()
                 .setTenantId(tenantId)
-                .setVolumeName(volumeName))
+                .setVolumeName(volumeName)
+                .setUserRoleName(userRoleName)
+                .setAdminRoleName(adminRoleName))
         .setCreateVolumeRequest(
             CreateVolumeRequest.newBuilder()
                 .setVolumeInfo(updatedVolumeInfo));
@@ -217,14 +226,20 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final String owner = getOmRequest().getUserInfo().getUserName();
     Map<String, String> auditMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
     final CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
     final String tenantId = request.getTenantId();
+    final String userRoleName = request.getUserRoleName();
+    final String adminRoleName = request.getAdminRoleName();
+
     final VolumeInfo volumeInfo =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
     final String volumeName = volumeInfo.getVolume();
+    Preconditions.checkNotNull(volumeName);
     Preconditions.checkState(request.getVolumeName().equals(volumeName),
         "CreateTenantRequest's volumeName value should match VolumeInfo's");
     final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
+
     IOException exception = null;
 
     try {
@@ -285,10 +300,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantId);
       final String bucketPolicyName =
           OMMultiTenantManager.getDefaultBucketPolicyName(tenantId);
-      final String userRoleName =
-          OMMultiTenantManager.getDefaultUserRoleName(tenantId);
-      final String adminRoleName =
-          OMMultiTenantManager.getDefaultAdminRoleName(tenantId);
       final OmDBTenantState omDBTenantState = new OmDBTenantState(
           tenantId, bucketNamespaceName, userRoleName, adminRoleName,
           bucketNamespacePolicyName, bucketPolicyName);
@@ -323,17 +334,15 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           createErrorOMResponse(omResponse, ex));
       exception = ex;
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper
-            .add(omClientResponse, transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (acquiredUserLock) {
         omMetadataManager.getLock().releaseWriteLock(USER_LOCK, owner);
       }
       if (acquiredVolumeLock) {
-        Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
+      // TODO: Release some lock
     }
 
     // Perform audit logging
