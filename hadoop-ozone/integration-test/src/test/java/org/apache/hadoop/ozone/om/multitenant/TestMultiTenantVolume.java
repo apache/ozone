@@ -17,9 +17,11 @@
  */
 package org.apache.hadoop.ozone.om.multitenant;
 
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -242,5 +244,21 @@ public class TestMultiTenantVolume {
     client.setThreadLocalS3Auth(
         new S3Auth("unused1", "unused2", accessID, accessID));
     return new ObjectStore(conf, client);
+  }
+
+  @Test
+  public void testOMRangerBGSyncRatisSetVersion()
+      throws IOException, ServiceException {
+    final long writtenVersion = 10L;
+
+    cluster.getOzoneManager().getMultiTenantManager()
+        .getOMRangerBGSyncService().setOMDBRangerServiceVersion(writtenVersion);
+
+    String readBackVersionStr = cluster.getOzoneManager().getMetadataManager()
+        .getMetaTable()
+        .get(OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY);
+    long readBackVersion = Long.parseLong(readBackVersionStr);
+
+    Assert.assertEquals(writtenVersion, readBackVersion);
   }
 }

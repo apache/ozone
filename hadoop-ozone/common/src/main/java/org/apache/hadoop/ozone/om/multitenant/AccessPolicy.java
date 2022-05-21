@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om.multitenant;
 
 import java.io.IOException;
 import java.security.Principal;
+import java.util.HashSet;
 import java.util.List;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -106,16 +107,16 @@ public interface AccessPolicy {
    * All Authorizer policy engines are supposed to provide an implementation
    * of AccessPolicy interface.
    */
-  String serializePolicyToJsonString() throws Exception;
+  String serializePolicyToJsonString() throws IOException;
 
   /**
    * Given a serialized accessPolicy in a Json format, deserializes and
    * constructs a valid access Policy.
    * @return
-   * @throws Exception
+   * @throws IOException
    */
   String deserializePolicyFromJsonString(JsonObject jsonObject)
-      throws Exception;
+      throws IOException;
 
   /**
    * @return AccessPolicyType (Native or otherwise).
@@ -132,4 +133,20 @@ public interface AccessPolicy {
       throws IOException;
 
   List<AccessPolicyElem> getAccessPolicyElem();
+
+  /**
+   * Sets the last update time to mtime.
+   * @param mtime Time in epoch milliseconds
+   */
+  void setPolicyLastUpdateTime(long mtime);
+
+  /**
+   * Returns the last update time of Ranger policies.
+   */
+  long getPolicyLastUpdateTime();
+
+  /**
+   * @return list of roles associated with this policy
+   */
+  HashSet<String> getRoleList();
 }

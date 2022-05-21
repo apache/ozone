@@ -86,26 +86,7 @@ docker-compose up -d --scale datanode=3
 docker-compose exec scm bash
 ```
 
-It might be necessary to run the following command first before testing the tenant commands in the `compose/ozonesecure` Docker environment
-in order to workaround a Docker-specific DNS issue when first contacting Ranger.
-
-```shell
-bash-4.2$ curl -k https://ranger:6182/
-{}
-```
-
-Then all subsequent requests to Ranger (mock server) should work as expected.
-
-Otherwise you might see such DNS error:
-
-```shell
-bash-4.2$ ozone tenant create tenantone
-2022-02-16 00:00:00,000 [main] INFO rpc.RpcClient: Creating Tenant: 'tenantone', with new volume: 'tenantone'
-INTERNAL_ERROR No subject alternative DNS name matching ranger found.
-```
-
-
-Operations requiring Ozone cluster administrator privilege are run as `om/om` user:
+Operations requiring Ozone cluster administrator privilege should be run as `om` user:
 
 ```shell
 kinit -kt /etc/security/keytabs/om.keytab om/om@EXAMPLE.COM

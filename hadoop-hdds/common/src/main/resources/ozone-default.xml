@@ -3126,4 +3126,27 @@
     <description>Enable S3 Multi-Tenancy. If disabled, all S3 multi-tenancy requests are rejected.
     </description>
   </property>
+
+  <property>
+    <name>ozone.om.multitenancy.ranger.sync.interval</name>
+    <value>10m</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Determines how often the Multi-Tenancy Ranger background sync thread
+      service should run. Background thread periodically checks
+      Ranger policies and roles created by Multi-Tenancy feature.
+      And overwrites them if obvious discrepancies are detected.
+      Value should be set with a unit suffix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.multitenancy.ranger.sync.timeout</name>
+    <value>10s</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      The timeout for each Multi-Tenancy Ranger background sync thread run.
+      If the timeout has been reached, a warning message will be logged.
+    </description>
+  </property>
 </configuration>

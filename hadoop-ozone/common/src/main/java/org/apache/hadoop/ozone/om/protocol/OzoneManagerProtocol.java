@@ -579,7 +579,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Create a tenant.
    * @param omTenantArgs OmTenantArgs

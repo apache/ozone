@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -28,7 +29,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.http.auth.BasicUserPrincipal;
-
 
 /**
  * Public API for Ozone MultiTenant Gatekeeper. Security providers providing
@@ -44,13 +44,13 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @param configuration
    * @throws IOException
    */
-  void init(Configuration configuration) throws IOException;;
+  void init(Configuration configuration) throws IOException;
 
   /**
    * Shutdown for the MultiTenantGateKeeper.
-   * @throws Exception
+   * @throws IOException
    */
-  void shutdown() throws Exception;
+  void shutdown() throws IOException;
 
   /**
    * Assign user to an existing role in the Authorizer.
@@ -62,8 +62,27 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * MultiTenantGateKeeperplugin Implementation. E.g. a Ranger
    * based Implementation can return some ID thats relevant for it.
    */
-  String assignUser(BasicUserPrincipal principal, String existingRole,
+  String assignUserToRole(BasicUserPrincipal principal, String existingRole,
       boolean isAdmin) throws IOException;
+
+  /**
+   * Update the exising role details and push the changes to Ranger.
+   *
+   * @param principal contains user name, must be an existing user in Ranger.
+   * @param existingRole An existing role's JSON response String from Ranger.
+   * @return roleId (not useful for now)
+   * @throws IOException
+   */
+  String revokeUserFromRole(BasicUserPrincipal principal,
+                                   String existingRole) throws IOException;
+
+  /**
+   * Assign all the users to an existing role.
+   * @param users list of user principals
+   * @param existingRole roleName
+   */
+  String assignAllUsers(HashSet<String> users,
+                               String existingRole) throws IOException;
 
   /**
    * @param principal
@@ -78,6 +97,15 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @throws IOException
    */
   String getRole(OzoneTenantRolePrincipal principal)
+      throws IOException;
+
+  /**
+   * Returs the details of a role, given the rolename.
+   * @param roleName
+   * @return
+   * @throws IOException
+   */
+  String getRole(String roleName)
       throws IOException;
 
   /**
@@ -97,7 +125,17 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * MultiTenantGateKeeper plugin Implementation e.g. corresponding ID on the
    * Ranger end for a ranger based implementation .
    */
-  String createRole(OzoneTenantRolePrincipal role, String adminRoleName)
+  String createRole(String role, String adminRoleName)
+      throws IOException;
+
+  /**
+   * Creates a new user.
+   * @param userName
+   * @param password
+   * @return
+   * @throws IOException
+   */
+  String createUser(String userName, String password)
       throws IOException;
 
   /**
@@ -111,31 +149,39 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    *
    * @param policy
    * @return unique and opaque policy ID that is maintained by the plugin.
-   * @throws Exception
+   * @throws IOException
    */
-  String createAccessPolicy(AccessPolicy policy) throws Exception;
+  String createAccessPolicy(AccessPolicy policy) throws IOException;
 
   /**
    *
    * @param policyName
    * @return unique and opaque policy ID that is maintained by the plugin.
-   * @throws Exception
+   * @throws IOException
    */
-  AccessPolicy getAccessPolicyByName(String policyName) throws Exception;
+  AccessPolicy getAccessPolicyByName(String policyName) throws IOException;
+
+  /**
+   * given a policy Id, returs the policy.
+   * @param policyId
+   * @return
+   * @throws IOException
+   */
+  AccessPolicy getAccessPolicyById(String policyId) throws IOException;
 
   /**
    *
    * @param policyId that was returned earlier by the createAccessPolicy().
-   * @throws Exception
+   * @throws IOException
    */
-  void deletePolicybyId(String policyId) throws IOException;
+  void deletePolicyById(String policyId) throws IOException;
 
   /**
    *
    * @param policyName unique policyName.
-   * @throws Exception
+   * @throws IOException
    */
-  void deletePolicybyName(String policyName) throws Exception;
+  void deletePolicyByName(String policyName) throws IOException;
   /**
    * Grant user aclType access to bucketNameSpace.
    * @param bucketNameSpace
@@ -211,4 +257,10 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
   @Override
   boolean checkAccess(IOzoneObj ozoneObject, RequestContext context)
       throws OMException;
+
+  long getLatestOzoneServiceVersion() throws IOException;
+
+  String getAllMultiTenantPolicies() throws IOException;
+
+  MultiTenantAccessController getMultiTenantAccessController();
 }

@@ -62,7 +62,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.OzoneConsts.TENANT_ID_USERNAME_DELIMITER;
 import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
@@ -92,7 +91,7 @@ public class TestS3GetSecretRequest {
   private static final String TENANT_ID = "finance";
   private static final String USER_BOB = "bob@EXAMPLE.COM";
   private static final String ACCESS_ID_BOB =
-      TENANT_ID + TENANT_ID_USERNAME_DELIMITER + USER_BOB;
+      OMMultiTenantManager.getDefaultAccessId(TENANT_ID, USER_BOB);
 
   private UserGroupInformation ugiAlice;
 
@@ -137,7 +136,9 @@ public class TestS3GetSecretRequest {
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
 
     when(tenant.getTenantAccessPolicies()).thenReturn(new ArrayList<>());
-    when(omMultiTenantManager.createTenantAccessInAuthorizer(TENANT_ID))
+    when(omMultiTenantManager.createTenantAccessInAuthorizer(TENANT_ID,
+            OMMultiTenantManager.getDefaultUserRoleName(TENANT_ID),
+            OMMultiTenantManager.getDefaultAdminRoleName(TENANT_ID)))
         .thenReturn(tenant);
   }
 

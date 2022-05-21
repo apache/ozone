@@ -132,7 +132,7 @@ OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,recon,s3g,kdc,localhost,127.0.0.1
 
-OZONE-SITE.XML_ozone.om.ranger.https-address=https://ranger:6182
+OZONE-SITE.XML_ozone.om.ranger.https-address=http://ranger:6080
 OZONE-SITE.XML_ozone.om.multitenancy.enabled=true
 OZONE-SITE.XML_ozone.om.ranger.https.admin.api.user=admin
 OZONE-SITE.XML_ozone.om.ranger.https.admin.api.passwd=passwd

@@ -15,27 +15,21 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.om.multitenant;
+package org.apache.hadoop.ozone;
 
-import java.security.Principal;
+import org.junit.Assert;
+import org.junit.Test;
 
 /**
- * Used to identify a tenant's Ranger Role.
+ * Test Ozone Constants (e.g. for compatibility).
  */
-public final class OzoneTenantRolePrincipal implements Principal {
-  private final String tenantRoleName;
+public class TestOzoneConsts {
 
-  public OzoneTenantRolePrincipal(String tenantRoleName) {
-    this.tenantRoleName = tenantRoleName;
+  @Test
+  public void testOzoneTenantPolicyLabelCompatibility() {
+    // Value of the policy label should not be changed
+    Assert.assertEquals(
+        "OzoneTenant", OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL);
   }
 
-  @Override
-  public String toString() {
-    return getName();
-  }
-
-  @Override
-  public String getName() {
-    return tenantRoleName;
-  }
 }
