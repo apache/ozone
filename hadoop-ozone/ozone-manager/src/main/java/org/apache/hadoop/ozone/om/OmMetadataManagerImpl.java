@@ -1290,21 +1290,23 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       }
     }
 
-    TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
-        iterator = getMultipartInfoTable().iterator();
-    iterator.seek(prefixKey);
+    try (TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
+        iterator = getMultipartInfoTable().iterator()) {
+      iterator.seek(prefixKey);
 
-    while (iterator.hasNext()) {
-      KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
-      if (entry.getKey().startsWith(prefixKey)) {
-        // If it is marked for abort, skip it.
-        if (!aborted.contains(entry.getKey())) {
-          response.add(entry.getKey());
+      while (iterator.hasNext()) {
+        KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
+        if (entry.getKey().startsWith(prefixKey)) {
+          // If it is marked for abort, skip it.
+          if (!aborted.contains(entry.getKey())) {
+            response.add(entry.getKey());
+          }
+        } else {
+          break;
         }
-      } else {
-        break;
       }
     }
+
     return response;
   }
 
