@@ -106,6 +106,15 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
+  public void enableAccessPolicy(AccessPolicy policy) throws IOException {
+  }
+
+  @Override
+  public void disableAccessPolicy(AccessPolicy policy) throws IOException {
+
+  }
+
+  @Override
   public AccessPolicy getAccessPolicyByName(String policyName) {
     return null;
   }

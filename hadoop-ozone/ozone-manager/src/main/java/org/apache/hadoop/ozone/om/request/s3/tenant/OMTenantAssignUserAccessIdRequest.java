@@ -110,13 +110,17 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
     final OMRequest omRequest = super.preExecute(ozoneManager);
+
     final TenantAssignUserAccessIdRequest request =
         omRequest.getTenantAssignUserAccessIdRequest();
 
     final String tenantId = request.getTenantId();
 
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
+
     // Caller should be an Ozone admin, or at least a tenant non-delegated admin
-    ozoneManager.getMultiTenantManager().checkTenantAdmin(tenantId, false);
+    multiTenantManager.checkTenantAdmin(tenantId, false);
 
     final String userPrincipal = request.getUserPrincipal();
     final String accessId = request.getAccessId();
@@ -145,18 +149,21 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
           OMException.ResultCodes.INVALID_ACCESS_ID);
     }
 
-    ozoneManager.getMultiTenantManager().checkTenantExistence(tenantId);
+    multiTenantManager.checkTenantExistence(tenantId);
 
     // Below call implies user existence check in authorizer.
     // If the user doesn't exist, Ranger return 400 and the call should throw.
 
-    // TODO: Acquire some lock
-    // Call OMMTM
-    // Inform MultiTenantManager of user assignment so it could
-    //  initialize some policies in Ranger.
-    final String roleId = ozoneManager.getMultiTenantManager()
-        .assignUserToTenant(new BasicUserPrincipal(userPrincipal), tenantId,
-            accessId);
+    // Acquire write lock to authorizer (Ranger)
+    multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
+
+    // Update roles with the user in authorizer (Ranger)
+    final String roleId = multiTenantManager.assignUserToTenant(
+        new BasicUserPrincipal(userPrincipal), tenantId, accessId);
+
+    // Release write lock to authorizer (Ranger)
+    multiTenantManager.releaseAuthorizerAccessWriteLock();
+
     if (LOG.isDebugEnabled()) {
       LOG.debug("roleId that the user is assigned to: {}", roleId);
     }

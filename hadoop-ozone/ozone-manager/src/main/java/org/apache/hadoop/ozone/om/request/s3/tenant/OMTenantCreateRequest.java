@@ -115,8 +115,11 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
   @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
+
     // Check Ozone cluster admin privilege
-    ozoneManager.getMultiTenantManager().checkAdmin();
+    multiTenantManager.checkAdmin();
 
     final OMRequest omRequest = super.preExecute(ozoneManager);
     final CreateTenantRequest request = omRequest.getCreateTenantRequest();
@@ -171,12 +174,16 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final String adminRoleName =
         OMMultiTenantManager.getDefaultAdminRoleName(tenantId);
 
-    // TODO: Acquire some lock
+    // Acquire write lock to authorizer (Ranger)
+    multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
 
     // If we fail after pre-execute. handleRequestFailure() callback
     // would clean up any state maintained by the getMultiTenantManager.
-    tenantInContext = ozoneManager.getMultiTenantManager()
-        .createTenantAccessInAuthorizer(tenantId, userRoleName, adminRoleName);
+    tenantInContext = multiTenantManager.createTenantInAuthorizer(
+        tenantId, userRoleName, adminRoleName);
+
+    // Release write lock to authorizer (Ranger)
+    multiTenantManager.releaseAuthorizerAccessWriteLock();
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
         .setCreateTenantRequest(
@@ -198,7 +205,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       // Cleanup any state maintained by OMMultiTenantManager
       if (tenantInContext != null) {
         ozoneManager.getMultiTenantManager()
-            .removeTenantAccessFromAuthorizer(tenantInContext);
+            .removeTenantFromAuthorizer(tenantInContext);
       }
     } catch (Exception e) {
       // TODO: Ignore for now. Multi-Tenant Manager is responsible for

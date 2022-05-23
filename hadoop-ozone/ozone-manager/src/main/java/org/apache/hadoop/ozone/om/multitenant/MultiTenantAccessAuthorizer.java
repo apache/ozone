@@ -146,12 +146,17 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
   void deleteRole(String groupID) throws IOException;
 
   /**
-   *
-   * @param policy
+   * Create access policy with the given parameters in the authorizer
+   * (e.g. Ranger).
+   * @param policy AccessPolicy
    * @return unique and opaque policy ID that is maintained by the plugin.
    * @throws IOException
    */
   String createAccessPolicy(AccessPolicy policy) throws IOException;
+
+  void enableAccessPolicy(AccessPolicy policy) throws IOException;
+
+  void disableAccessPolicy(AccessPolicy policy) throws IOException;
 
   /**
    *

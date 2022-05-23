@@ -84,25 +84,33 @@ public interface OMMultiTenantManager {
   OMMetadataManager getOmMetadataManager();
 
   /**
-   * Given a TenantID String, Create and return Tenant Interface.
-   *
+   * Given a tenant name, create tenant roles and policies in the authorizer
+   * (Ranger). Then return a Tenant object.
    * @param tenantID
    * @param userRoleName
    * @param adminRoleName
    * @return Tenant interface.
    */
-  Tenant createTenantAccessInAuthorizer(String tenantID, String userRoleName,
+  Tenant createTenantInAuthorizer(String tenantID, String userRoleName,
       String adminRoleName) throws IOException;
 
   /**
-   * Given a TenantID, destroys all state associated with that tenant.
-   * This is different from deactivateTenant() above.
+   * Given a Tenant object, disable (but not delete) the policies added during
+   * tenant creation.
+   * @param tenant
+   * @throws IOException
+   */
+  void deactivateTenant(Tenant tenant) throws IOException;
+
+  /**
+   * Given a Tenant object, remove all policies and roles from Ranger that are
+   * added during tenant creation.
+   * Note this differs from deactivateTenant() above.
    * @param tenant
    * @return
    * @throws IOException
    */
-  void removeTenantAccessFromAuthorizer(Tenant tenant) throws Exception;
-
+  void removeTenantFromAuthorizer(Tenant tenant) throws IOException;
 
   /**
    * Creates a new user that exists for S3 API access to Ozone.
@@ -210,12 +218,17 @@ public interface OMMultiTenantManager {
     return tenantId + OzoneConsts.DEFAULT_TENANT_BUCKET_POLICY_SUFFIX;
   }
 
+  void assignTenantAdminInDBCache(String accessID, boolean delegated)
+      throws IOException;
+
   /**
    * Given a user, make him an admin of the corresponding Tenant.
+   * This makes a request to Ranger.
    * @param accessID
    * @param delegated
    */
-  void assignTenantAdmin(String accessID, boolean delegated) throws IOException;
+  void assignTenantAdminInAuthorizer(String accessID, boolean delegated)
+      throws IOException;
 
   /**
    * Given a user, remove him as admin of the corresponding Tenant.
@@ -266,6 +279,14 @@ public interface OMMultiTenantManager {
    * @return tenant user role name
    */
   String getTenantAdminRoleName(String tenantId) throws IOException;
+
+  /**
+   *
+   * @param tenantId
+   * @return
+   * @throws IOException
+   */
+  Tenant getTenantFromDBById(String tenantId) throws IOException;
 
   boolean isUserAccessIdPrincipalOrTenantAdmin(String accessId,
       UserGroupInformation ugi) throws IOException;
@@ -362,4 +383,36 @@ public interface OMMultiTenantManager {
    */
   AccessPolicy newDefaultBucketAccessPolicy(String tenantId,
       OzoneTenantRolePrincipal userRole) throws IOException;
+
+  boolean tryAcquireAuthorizerAccessReadLock(long timeout)
+      throws InterruptedException;
+
+  void tryAcquireAuthorizerAccessReadLockInRequest() throws IOException;
+
+  void releaseAuthorizerAccessReadLock();
+
+  /**
+   * Attempt to acquire the write lock to authorizer (Ranger) with a timeout.
+   * @param timeout
+   * @return
+   * @throws InterruptedException
+   */
+  boolean tryAcquireAuthorizerAccessWriteLock(long timeout)
+      throws InterruptedException;
+
+  /**
+   * Helper wrapper for tryAcquireAuthorizerAccessWriteLock() that should be
+   * used in tenant write requests' preExecute() before making requests to the
+   * authorizer.
+   * @throws IOException
+   */
+  void tryAcquireAuthorizerAccessWriteLockInRequest()
+      throws IOException;
+
+  void acquireAuthorizerAccessWriteLock();
+
+  /**
+   * Release the write lock to authorizer.
+   */
+  void releaseAuthorizerAccessWriteLock();
 }

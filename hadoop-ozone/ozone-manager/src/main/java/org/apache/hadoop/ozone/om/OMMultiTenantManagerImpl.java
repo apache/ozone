@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_TIMEOUT;
@@ -58,6 +59,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
@@ -219,7 +221,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    * @throws IOException
    */
   @Override
-  public Tenant createTenantAccessInAuthorizer(String tenantId,
+  public Tenant createTenantInAuthorizer(String tenantId,
       String userRoleName, String adminRoleName)
       throws IOException {
 
@@ -275,7 +277,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
     } catch (IOException e) {
       try {
-        removeTenantAccessFromAuthorizer(tenant);
+        removeTenantFromAuthorizer(tenant);
       } catch (IOException ignored) {
         // Best effort cleanup.
       }
@@ -287,8 +289,18 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public void removeTenantAccessFromAuthorizer(Tenant tenant)
-      throws IOException {
+  public void deactivateTenant(Tenant tenant) throws IOException {
+    for (AccessPolicy policy : tenant.getTenantAccessPolicies()) {
+      authorizer.disableAccessPolicy(policy);
+    }
+  }
+
+//  @Override
+//  public void activateTenant(Tenant tenant) throws IOException {
+//  }
+
+  @Override
+  public void removeTenantFromAuthorizer(Tenant tenant) throws IOException {
     try {
       tenantCacheLock.writeLock().lock();
       for (AccessPolicy policy : tenant.getTenantAccessPolicies()) {
@@ -551,8 +563,28 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public void assignTenantAdmin(String accessId, boolean delegated)
+  public void assignTenantAdminInDBCache(String accessID, boolean delegated)
       throws IOException {
+
+  }
+
+  private void checkAcquiredAuthorizerWriteLock() throws OMException {
+
+    // Check that lock is acquired
+    if (!authorizerAccessLock.writeLock().isHeldByCurrentThread()) {
+      throw new OMException("Authorizer write lock must have been held before "
+          + "calling this method", INTERNAL_ERROR);
+    }
+
+  }
+
+  @Override
+  public void assignTenantAdminInAuthorizer(String accessId, boolean delegated)
+      throws IOException {
+
+    // TODO: Add this at the beginning of ALL other InAuthorizer methods as well
+    checkAcquiredAuthorizerWriteLock();
+
     try {
       tenantCacheLock.writeLock().lock();
 
@@ -835,6 +867,34 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
+  public Tenant getTenantFromDBById(String tenantId) throws IOException {
+
+    // Policy names (not cached at the moment) have to retrieved from OM DB.
+    // TODO: Store policy names in cache as well if needed.
+
+    final OmDBTenantState tenantState =
+        omMetadataManager.getTenantStateTable().get(tenantId);
+
+    if (tenantState == null) {
+      throw new OMException("Potential DB error or race condition. "
+          + "OmDBTenantState entry is missing for tenant '" + tenantId + "'.",
+          OMException.ResultCodes.TENANT_NOT_FOUND);
+    }
+
+    final Tenant tenantObj = new OzoneTenant(tenantState.getTenantId());
+
+    tenantObj.addTenantAccessPolicy(
+        new RangerAccessPolicy(tenantState.getBucketNamespacePolicyName()));
+    tenantObj.addTenantAccessPolicy(
+        new RangerAccessPolicy(tenantState.getBucketNamespaceName()));
+
+    tenantObj.addTenantAccessRole(tenantState.getUserRoleName());
+    tenantObj.addTenantAccessRole(tenantState.getAdminRoleName());
+
+    return tenantObj;
+  }
+
+  @Override
   public boolean isUserAccessIdPrincipalOrTenantAdmin(String accessId,
       UserGroupInformation ugi) throws IOException {
 
@@ -948,5 +1008,72 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       final HashSet<String> usersInTheRole = mtRoles.get(roleName);
       usersInTheRole.add(userPrincipal);
     }
+  }
+
+  private final ReentrantReadWriteLock authorizerAccessLock =
+      new ReentrantReadWriteLock();
+
+  @Override
+  public boolean tryAcquireAuthorizerAccessReadLock(long timeout)
+      throws InterruptedException {
+    return authorizerAccessLock.readLock().tryLock(
+        timeout, TimeUnit.MILLISECONDS);
+  }
+
+  @Override
+  public void tryAcquireAuthorizerAccessReadLockInRequest() throws IOException {
+
+    boolean lockAcquired;
+    try {
+      lockAcquired = tryAcquireAuthorizerAccessReadLock(
+          OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
+    } catch (InterruptedException e) {
+      throw new OMException("Failed to acquire read lock: " + e.getMessage(),
+          INTERNAL_ERROR);
+    }
+    if (!lockAcquired) {
+      throw new OMException("Timed out acquiring authorizer read lock",
+          ResultCodes.TIMEOUT);
+    }
+  }
+
+  @Override
+  public void releaseAuthorizerAccessReadLock() {
+    authorizerAccessLock.readLock().unlock();
+  }
+
+  @Override
+  public boolean tryAcquireAuthorizerAccessWriteLock(long timeout)
+      throws InterruptedException {
+    return authorizerAccessLock.writeLock().tryLock(
+        timeout, TimeUnit.MILLISECONDS);
+  }
+
+  @Override
+  public void tryAcquireAuthorizerAccessWriteLockInRequest()
+      throws IOException {
+
+    boolean lockAcquired;
+    try {
+      lockAcquired = tryAcquireAuthorizerAccessWriteLock(
+          OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
+    } catch (InterruptedException e) {
+      throw new OMException("Failed to acquire write lock: " + e.getMessage(),
+          INTERNAL_ERROR);
+    }
+    if (!lockAcquired) {
+      throw new OMException("Timed out acquiring authorizer write lock",
+          ResultCodes.TIMEOUT);
+    }
+  }
+
+  @Override
+  public void acquireAuthorizerAccessWriteLock() {
+    authorizerAccessLock.writeLock().lock();
+  }
+
+  @Override
+  public void releaseAuthorizerAccessWriteLock() {
+    authorizerAccessLock.writeLock().unlock();
   }
 }

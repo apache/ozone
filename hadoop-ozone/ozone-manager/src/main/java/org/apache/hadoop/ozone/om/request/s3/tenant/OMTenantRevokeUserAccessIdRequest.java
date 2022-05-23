@@ -120,6 +120,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     // Caller should be an Ozone admin, or at least a tenant non-delegated admin
     multiTenantManager.checkTenantAdmin(tenantId, false);
 
+    // Prevent a tenant admin from being revoked user access
     if (accessIdInfo.getIsAdmin()) {
       throw new OMException("accessId '" + accessId + "' is a tenant admin of "
           + "tenant'" + tenantId + "'. Please revoke its tenant admin "
@@ -127,9 +128,14 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           ResultCodes.PERMISSION_DENIED);
     }
 
-    // TODO: Acquire some lock
-    // Call OMMTM to revoke user access to tenant
+    // Acquire write lock to authorizer (Ranger)
+    multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
+
+    // Remove user from role in tenant
     ozoneManager.getMultiTenantManager().revokeUserAccessId(accessId);
+
+    // Release write lock to authorizer (Ranger)
+    multiTenantManager.releaseAuthorizerAccessWriteLock();
 
     final Builder omRequestBuilder = omRequest.toBuilder()
         .setTenantRevokeUserAccessIdRequest(

@@ -101,7 +101,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     // Caller should be an Ozone admin, or a tenant delegated admin
     multiTenantManager.checkTenantAdmin(tenantId, true);
 
-    OmDBAccessIdInfo accessIdInfo = ozoneManager.getMetadataManager()
+    final OmDBAccessIdInfo accessIdInfo = ozoneManager.getMetadataManager()
         .getTenantAccessIdTable().get(accessId);
 
     if (accessIdInfo == null) {
@@ -116,9 +116,14 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
           OMException.ResultCodes.INVALID_TENANT_ID);
     }
 
-    // TODO: Acquire some lock
+    // Acquire write lock to authorizer (Ranger)
+    multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
+
     // Remove user (inferred from access ID) from tenant admin role in Ranger
     ozoneManager.getMultiTenantManager().revokeTenantAdmin(accessId);
+
+    // Release write lock to authorizer (Ranger)
+    multiTenantManager.releaseAuthorizerAccessWriteLock();
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
         .setTenantRevokeAdminRequest(

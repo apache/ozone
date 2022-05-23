@@ -62,6 +62,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL;
 
 /**
@@ -273,9 +274,19 @@ public class OMRangerBGSyncService extends BackgroundService {
   }
 
   private void triggerRangerSyncOnce() {
-    int attempt = 0;
+    boolean lockAcquired = false;
     try {
-      // TODO: Acquire lock
+      // Acquire write lock to authorizer (Ranger)
+      lockAcquired = multiTenantManager.tryAcquireAuthorizerAccessWriteLock(
+          OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
+      if (!lockAcquired) {
+
+        LOG.warn("Timed out waiting for write lock acquisition."
+            + "Another authorizer operation is in-progress."
+            + "Skipping this sync run.");
+        // TODO: Maybe schedule the next run sooner?
+        return;
+      }
       long dbOzoneServiceVersion = getOMDBRangerServiceVersion();
       long rangerOzoneServiceVersion = getLatestRangerServiceVersion();
 
@@ -298,8 +309,12 @@ public class OMRangerBGSyncService extends BackgroundService {
       // A maximum of MAX_ATTEMPT times will be attempted each time the sync
       // service is run. MAX_ATTEMPT should at least be 2 to make sure OM DB
       // has the up-to-date Ranger service version most of the times.
+      int attempt = 0;
       while (dbOzoneServiceVersion != rangerOzoneServiceVersion) {
-        // TODO: Release lock
+        // Release write lock to authorizer temporarily to allow other ops to
+        // interleave
+        multiTenantManager.releaseAuthorizerAccessWriteLock();
+        lockAcquired = false;
         if (++attempt > MAX_ATTEMPT) {
           if (LOG.isDebugEnabled()) {
             LOG.warn("Reached maximum number of attempts ({}). Abort",
@@ -322,18 +337,31 @@ public class OMRangerBGSyncService extends BackgroundService {
         // Submit Ratis Request to sync the new service version in OM DB
         setOMDBRangerServiceVersion(rangerOzoneServiceVersion);
 
-        // TODO: Acquire lock
+        // Acquire lock
+        lockAcquired = multiTenantManager.tryAcquireAuthorizerAccessWriteLock(
+            OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
+        if (!lockAcquired) {
+          // TODO: Should be okay to fail here? Double check
+
+          LOG.warn("Timed out waiting for write lock acquisition."
+              + "Another authorizer operation is in-progress."
+              + "Skipping this sync run.");
+          // TODO: Maybe schedule the next run sooner?
+          return;
+        }
 
         // Check Ranger ozone service version again
         dbOzoneServiceVersion = rangerOzoneServiceVersion;
         rangerOzoneServiceVersion = getLatestRangerServiceVersion();
       }
-    } catch (IOException | ServiceException e) {
+    } catch (IOException | ServiceException | InterruptedException e) {
       LOG.warn("Exception during Ranger Sync", e);
       // TODO: Check specific exception once switched to
       //  RangerRestMultiTenantAccessController
-//    } finally {
-//      // TODO: Release lock
+    } finally {
+      if (lockAcquired) {
+        multiTenantManager.releaseAuthorizerAccessWriteLock();
+      }
     }
 
   }
@@ -394,11 +422,15 @@ public class OMRangerBGSyncService extends BackgroundService {
   private void executeOMDBToRangerSync(long baseVersion) throws IOException {
     clearPolicyAndRoleMaps();
 
-    // TODO: Acquire global lock
+    // Acquire read lock to authorizer (Ranger)
+    multiTenantManager.tryAcquireAuthorizerAccessReadLockInRequest();
+
     loadAllPoliciesAndRoleNamesFromRanger(baseVersion);
     loadAllRolesFromRanger();
     loadAllRolesFromOM();
-    // TODO: Release global lock
+
+    // Release read lock to authorizer (Ranger)
+    multiTenantManager.releaseAuthorizerAccessReadLock();
 
     // This should isolate policies into two groups
     // 1. mtRangerPoliciesTobeDeleted and

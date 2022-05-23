@@ -26,10 +26,12 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
@@ -69,13 +71,32 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
   @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
+    final OMRequest omRequest = super.preExecute(ozoneManager);
+
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
+
     // Check Ozone cluster admin privilege
-    ozoneManager.getMultiTenantManager().checkAdmin();
+    multiTenantManager.checkAdmin();
 
-    // TODO: Acquire some lock
-    // TODO: TBD: Call ozoneManager.getMultiTenantManager().deleteTenant() ?
+    // First get tenant name
+    final String tenantId = omRequest.getDeleteTenantRequest().getTenantId();
+    Preconditions.checkNotNull(tenantId);
 
-    return super.preExecute(ozoneManager);
+    // Get tenant object by tenant name
+    final Tenant tenantObj = multiTenantManager.getTenantFromDBById(tenantId);
+
+    // Acquire write lock to authorizer (Ranger)
+    multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
+
+    // Remove policies and roles from authorizer (Ranger)
+    // TODO: Better deactivate policies instead of delete ? Maybe do this later
+    multiTenantManager.removeTenantFromAuthorizer(tenantObj);
+
+    // Release write lock to authorizer (Ranger)
+    multiTenantManager.releaseAuthorizerAccessWriteLock();
+
+    return omRequest;
   }
 
   @Override

@@ -524,4 +524,6 @@ public final class OzoneConsts {
       "/service/plugins/policies/service/";
 
   public static final String OZONE_TENANT_RANGER_POLICY_LABEL = "OzoneTenant";
+
+  public static final long OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS = 1000L;
 }
