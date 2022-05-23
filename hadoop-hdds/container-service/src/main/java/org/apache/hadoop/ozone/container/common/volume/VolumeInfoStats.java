@@ -71,9 +71,8 @@ public class VolumeInfoStats {
      * Return the Total Available capacity of the Volume.
      */
     @Metric("Metric to return the Storage Type")
-    public long getStorageType() {
-        spaceAvailable.set(volume.getVolumeInfo().getAvailable());
-        return spaceAvailable.value();
+    public String getStorageType() {
+        return "DISK";
     }
 
     public String getMetricsSourceName() {
