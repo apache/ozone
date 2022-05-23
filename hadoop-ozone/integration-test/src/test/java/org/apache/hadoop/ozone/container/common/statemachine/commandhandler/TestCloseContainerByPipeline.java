@@ -148,8 +148,9 @@ public class TestCloseContainerByPipeline {
             .getCloseContainerHandler();
     int lastInvocationCount = closeContainerHandler.getInvocationCount();
     //send the order to close the container
-    SCMCommand<?> command = new CloseContainerCommand(
-        containerID, pipeline.getId());
+    SCMCommand<?> command = new CloseContainerCommand(containerID,
+        pipeline.getId(),
+        container.getReplicationConfig().getReplicationType());
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
@@ -199,8 +200,9 @@ public class TestCloseContainerByPipeline {
 
     // Send the order to close the container, give random pipeline id so that
     // the container will not be closed via RATIS
-    SCMCommand<?> command = new CloseContainerCommand(
-        containerID, pipeline.getId());
+    SCMCommand<?> command = new CloseContainerCommand(containerID,
+        pipeline.getId(),
+        container.getReplicationConfig().getReplicationType());
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
@@ -254,8 +256,9 @@ public class TestCloseContainerByPipeline {
     for (DatanodeDetails details : datanodes) {
       Assert.assertFalse(isContainerClosed(cluster, containerID, details));
       //send the order to close the container
-      SCMCommand<?> command = new CloseContainerCommand(
-          containerID, pipeline.getId());
+      SCMCommand<?> command = new CloseContainerCommand(containerID,
+          pipeline.getId(),
+          container.getReplicationConfig().getReplicationType());
       command.setTerm(cluster.getStorageContainerManager()
           .getScmContext().getTermOfLeader());
       cluster.getStorageContainerManager().getScmNodeManager()
@@ -336,7 +339,8 @@ public class TestCloseContainerByPipeline {
     // Send close container command from SCM to datanode with forced flag as
     // true
     SCMCommand<?> command = new CloseContainerCommand(
-        containerID, pipeline.getId(), true);
+        containerID, pipeline.getId(),
+        container.getReplicationConfig().getReplicationType(), true);
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()

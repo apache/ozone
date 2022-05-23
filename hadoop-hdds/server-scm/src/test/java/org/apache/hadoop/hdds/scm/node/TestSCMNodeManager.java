@@ -1633,7 +1633,7 @@ public class TestSCMNodeManager {
       eq.fireEvent(DATANODE_COMMAND,
           new CommandForDatanode<>(datanodeDetails.getUuid(),
               new CloseContainerCommand(1L,
-                  PipelineID.randomId())));
+                  PipelineID.randomId(), HddsProtos.ReplicationType.RATIS)));
 
       LayoutVersionManager versionManager =
           nodemanager.getLayoutVersionManager();

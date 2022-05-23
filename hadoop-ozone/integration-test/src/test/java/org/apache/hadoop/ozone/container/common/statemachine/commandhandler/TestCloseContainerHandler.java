@@ -129,7 +129,8 @@ public class TestCloseContainerHandler {
         cluster.getHddsDatanodes().get(0).getDatanodeDetails();
     //send the order to close the container
     SCMCommand<?> command = new CloseContainerCommand(
-        containerId.getId(), pipeline.getId());
+        containerId.getId(), pipeline.getId(),
+        container.getReplicationConfig().getReplicationType());
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -232,19 +233,23 @@ public class TestCloseContainerCommandHandler {
   }
 
   private CloseContainerCommand closeWithKnownPipeline() {
-    return new CloseContainerCommand(CONTAINER_ID, pipelineID);
+    return new CloseContainerCommand(CONTAINER_ID, pipelineID,
+        HddsProtos.ReplicationType.RATIS);
   }
 
   private CloseContainerCommand closeWithUnknownPipeline() {
-    return new CloseContainerCommand(CONTAINER_ID, nonExistentPipelineID);
+    return new CloseContainerCommand(CONTAINER_ID, nonExistentPipelineID,
+        HddsProtos.ReplicationType.RATIS);
   }
 
   private CloseContainerCommand forceCloseWithPipeline() {
-    return new CloseContainerCommand(CONTAINER_ID, pipelineID, true);
+    return new CloseContainerCommand(CONTAINER_ID, pipelineID,
+        HddsProtos.ReplicationType.RATIS, true);
   }
 
   private CloseContainerCommand forceCloseWithoutPipeline() {
-    return new CloseContainerCommand(CONTAINER_ID, nonExistentPipelineID, true);
+    return new CloseContainerCommand(CONTAINER_ID, nonExistentPipelineID,
+        HddsProtos.ReplicationType.RATIS, true);
   }
 
   /**

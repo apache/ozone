@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.protocol.commands;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -31,17 +32,20 @@ public class CloseContainerCommand
 
   private final PipelineID pipelineID;
   private boolean force;
+  private final HddsProtos.ReplicationType replicationType;
 
   public CloseContainerCommand(final long containerID,
-      final PipelineID pipelineID) {
-    this(containerID, pipelineID, false);
+      final PipelineID pipelineID, HddsProtos.ReplicationType replicationType) {
+    this(containerID, pipelineID, replicationType, false);
   }
 
   public CloseContainerCommand(final long containerID,
-      final PipelineID pipelineID, boolean force) {
+      final PipelineID pipelineID, HddsProtos.ReplicationType replicationType,
+      boolean force) {
     super(containerID);
     this.pipelineID = pipelineID;
     this.force = force;
+    this.replicationType = replicationType;
   }
 
   /**
@@ -61,6 +65,7 @@ public class CloseContainerCommand
         .setCmdId(getId())
         .setPipelineID(pipelineID.getProtobuf())
         .setForce(force)
+        .setReplicationType(replicationType)
         .build();
   }
 
@@ -69,6 +74,7 @@ public class CloseContainerCommand
     Preconditions.checkNotNull(closeContainerProto);
     return new CloseContainerCommand(closeContainerProto.getCmdId(),
         PipelineID.getFromProtobuf(closeContainerProto.getPipelineID()),
+        closeContainerProto.getReplicationType(),
         closeContainerProto.getForce());
   }
 
@@ -78,5 +84,9 @@ public class CloseContainerCommand
 
   public PipelineID getPipelineID() {
     return pipelineID;
+  }
+
+  public HddsProtos.ReplicationType getReplicationType() {
+    return replicationType;
   }
 }

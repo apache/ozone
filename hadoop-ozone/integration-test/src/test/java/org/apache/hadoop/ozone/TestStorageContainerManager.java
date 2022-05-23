@@ -791,7 +791,8 @@ public class TestStorageContainerManager {
 
       CloseContainerCommand closeContainerCommand =
           new CloseContainerCommand(selectedContainer.getContainerID(),
-              selectedContainer.getPipelineID(), false);
+              selectedContainer.getPipelineID(),
+              HddsProtos.ReplicationType.RATIS, false);
 
       CommandForDatanode commandForDatanode = new CommandForDatanode(
           dnUuid, closeContainerCommand);
