@@ -30,17 +30,17 @@ start_k8s_env
 
 export SCM=scm-0
 
-execute_robot_test ${SCM} -v PREFIX:pre freon/generate.robot
-execute_robot_test ${SCM} -v PREFIX:pre freon/validate.robot
+execute_robot_test ${SCM} -v PREFIX:pre smoketest/freon/generate.robot
+execute_robot_test ${SCM} -v PREFIX:pre smoketest/freon/validate.robot
 
 # restart datanodes
 kubectl delete pod datanode-0 datanode-1 datanode-2
 
 wait_for_startup
 
-execute_robot_test ${SCM} -v PREFIX:pre freon/validate.robot
-execute_robot_test ${SCM} -v PREFIX:post freon/generate.robot
-execute_robot_test ${SCM} -v PREFIX:post freon/validate.robot
+execute_robot_test ${SCM} -v PREFIX:pre smoketest/freon/validate.robot
+execute_robot_test ${SCM} -v PREFIX:post smoketest/freon/generate.robot
+execute_robot_test ${SCM} -v PREFIX:post smoketest/freon/validate.robot
 
 combine_reports
 
