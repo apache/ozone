@@ -32,7 +32,7 @@ public interface DumpFileLoader extends Closeable {
   void load(File externalFile) throws IOException;
 
   /**
-   * Close this file loader
+   * Close this file loader.
    */
   void close();
 }
