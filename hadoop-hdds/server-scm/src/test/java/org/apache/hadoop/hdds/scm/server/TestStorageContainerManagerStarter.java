@@ -18,9 +18,9 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -29,10 +29,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 
 /**
@@ -49,14 +49,14 @@ public class TestStorageContainerManagerStarter {
 
   private MockSCMStarter mock;
 
-  @Before
+  @BeforeEach
   public void setUpStreams() throws UnsupportedEncodingException {
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
     mock = new MockSCMStarter();
   }
 
-  @After
+  @AfterEach
   public void restoreStreams() {
     System.setOut(originalOut);
     System.setErr(originalErr);
