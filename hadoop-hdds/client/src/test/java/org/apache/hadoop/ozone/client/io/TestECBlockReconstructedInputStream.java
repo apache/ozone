@@ -107,7 +107,7 @@ public class TestECBlockReconstructedInputStream {
 
   @Test
   public void testReadDataByteBufferMultipleStripes() throws IOException {
-    int readBufferSize = random.nextInt(4096);
+    int readBufferSize = 4096;
     // 3 stripes and a partial chunk
     int blockLength = repConfig.getEcChunkSize() * repConfig.getData() * 3
         + repConfig.getEcChunkSize() - 1;
@@ -155,7 +155,7 @@ public class TestECBlockReconstructedInputStream {
   @Test
   public void testReadDataWithUnbuffer() throws IOException {
     // Read buffer is 16kb + 5 bytes so it does not align with stripes exactly
-    int readBufferSize = random.nextInt(1024 * 16 + 5);
+    int readBufferSize = 1024 * 16 + 5;
     // 3 stripes and a partial chunk
     int blockLength = repConfig.getEcChunkSize() * repConfig.getData() * 3
         + repConfig.getEcChunkSize() - 1;

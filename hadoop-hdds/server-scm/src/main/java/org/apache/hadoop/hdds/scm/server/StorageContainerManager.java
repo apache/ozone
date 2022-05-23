@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.crl.CRLStatusReportHandler;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -278,6 +279,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   private ContainerBalancer containerBalancer;
   private StatefulServiceStateManager statefulServiceStateManager;
+  // Used to keep track of pending replication and pending deletes for
+  // container replicas.
+  private ContainerReplicaPendingOps containerReplicaPendingOps;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be
@@ -620,11 +624,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               );
     }
 
+    containerReplicaPendingOps = new ContainerReplicaPendingOps(conf, clock);
     if (configurator.getContainerManager() != null) {
       containerManager = configurator.getContainerManager();
     } else {
       containerManager = new ContainerManagerImpl(conf, scmHAManager,
-          sequenceIdGen, pipelineManager, scmMetadataStore.getContainerTable());
+          sequenceIdGen, pipelineManager, scmMetadataStore.getContainerTable(),
+          containerReplicaPendingOps);
     }
 
     pipelineChoosePolicy = PipelineChoosePolicyFactory.getPolicy(conf);
@@ -651,7 +657,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmNodeManager,
           clock,
           scmHAManager,
-          getScmMetadataStore().getMoveTable());
+          getScmMetadataStore().getMoveTable(),
+          containerReplicaPendingOps);
     }
     if (configurator.getScmSafeModeManager() != null) {
       scmSafeModeManager = configurator.getScmSafeModeManager();

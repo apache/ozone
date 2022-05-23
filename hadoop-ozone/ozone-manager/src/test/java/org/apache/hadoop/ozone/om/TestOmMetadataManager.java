@@ -27,7 +27,10 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -41,8 +44,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT;
@@ -546,12 +550,22 @@ public class TestOmMetadataManager {
 
   @Test
   public void testGetExpiredOpenKeys() throws Exception {
-    final String bucketName = "bucket";
-    final String volumeName = "volume";
+    testGetExpiredOpenKeys(BucketLayout.DEFAULT);
+  }
+
+  @Test
+  public void testGetExpiredOpenKeysFSO() throws Exception {
+    testGetExpiredOpenKeys(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  private void testGetExpiredOpenKeys(BucketLayout bucketLayout)
+      throws Exception {
+    final String bucketName = UUID.randomUUID().toString();
+    final String volumeName = UUID.randomUUID().toString();
     final int numExpiredOpenKeys = 4;
     final int numUnexpiredOpenKeys = 1;
     final long clientID = 1000L;
-    // To create expired keys, they will be assigned a creation time twice as
+    // To create expired keys, they will be assigned a creation time as
     // old as the minimum expiration time.
     final long expireThresholdMillis = ozoneConfiguration.getTimeDuration(
         OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
@@ -560,65 +574,68 @@ public class TestOmMetadataManager {
 
     final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
 
-    final long expiredOpenKeyCreationTime = Instant.now()
-        .minus(expireThresholdMillis * 2, ChronoUnit.MILLIS).toEpochMilli();
+    final long expiredOpenKeyCreationTime =
+        Instant.now().minus(expireThreshold).toEpochMilli();
 
     // Add expired keys to open key table.
     // The method under test does not check for expired open keys in the
     // cache, since they will be picked up once the cache is flushed.
     Set<String> expiredKeys = new HashSet<>();
-    for (int i = 0; i < numExpiredOpenKeys; i++) {
-      OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+    for (int i = 0; i < numExpiredOpenKeys + numUnexpiredOpenKeys; i++) {
+      final long creationTime = i < numExpiredOpenKeys ?
+          expiredOpenKeyCreationTime : Instant.now().toEpochMilli();
+      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
           bucketName, "expired" + i, HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.ONE, 0L, expiredOpenKeyCreationTime);
+          HddsProtos.ReplicationFactor.ONE, 0L, creationTime);
 
-      OMRequestTestUtils.addKeyToTable(true, false,
-          keyInfo, clientID, 0L, omMetadataManager);
-
-      String groupID = omMetadataManager.getOpenKey(volumeName, bucketName,
-          keyInfo.getKeyName(), clientID);
-      expiredKeys.add(groupID);
-    }
-
-    // Add unexpired keys to open key table.
-    for (int i = 0; i < numUnexpiredOpenKeys; i++) {
-      OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-          bucketName, "unexpired" + i, HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.ONE);
-
-      OMRequestTestUtils.addKeyToTable(true, false,
-          keyInfo, clientID, 0L, omMetadataManager);
+      final String dbOpenKeyName;
+      if (bucketLayout.isFileSystemOptimized()) {
+        keyInfo.setParentObjectID(i);
+        keyInfo.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
+        OMRequestTestUtils.addFileToKeyTable(true, false,
+            keyInfo.getFileName(), keyInfo, clientID, 0L, omMetadataManager);
+        dbOpenKeyName = omMetadataManager.getOpenFileName(
+            keyInfo.getParentObjectID(), keyInfo.getFileName(), clientID);
+      } else {
+        OMRequestTestUtils.addKeyToTable(true, false,
+            keyInfo, clientID, 0L, omMetadataManager);
+        dbOpenKeyName = omMetadataManager.getOpenKey(volumeName, bucketName,
+            keyInfo.getKeyName(), clientID);
+      }
+      expiredKeys.add(dbOpenKeyName);
     }
 
     // Test retrieving fewer expired keys than actually exist.
-    List<String> someExpiredKeys =
+    List<OpenKeyBucket> someExpiredKeys =
         omMetadataManager.getExpiredOpenKeys(expireThreshold,
-            numExpiredOpenKeys - 1);
-
-    Assert.assertEquals(numExpiredOpenKeys - 1, someExpiredKeys.size());
-    for (String key: someExpiredKeys) {
-      Assert.assertTrue(expiredKeys.contains(key));
-    }
+            numExpiredOpenKeys - 1, bucketLayout);
+    List<String> names = getOpenKeyNames(someExpiredKeys);
+    Assert.assertEquals(numExpiredOpenKeys - 1, names.size());
+    Assert.assertTrue(expiredKeys.containsAll(names));
 
     // Test attempting to retrieving more expired keys than actually exist.
-    List<String> allExpiredKeys =
+    List<OpenKeyBucket> allExpiredKeys =
         omMetadataManager.getExpiredOpenKeys(expireThreshold,
-            numExpiredOpenKeys + 1);
-
-    Assert.assertEquals(numExpiredOpenKeys, allExpiredKeys.size());
-    for (String key: allExpiredKeys) {
-      Assert.assertTrue(expiredKeys.contains(key));
-    }
+            numExpiredOpenKeys + 1, bucketLayout);
+    names = getOpenKeyNames(allExpiredKeys);
+    Assert.assertEquals(numExpiredOpenKeys, names.size());
+    Assert.assertTrue(expiredKeys.containsAll(names));
 
     // Test retrieving exact amount of expired keys that exist.
     allExpiredKeys =
         omMetadataManager.getExpiredOpenKeys(expireThreshold,
-            numExpiredOpenKeys);
+            numExpiredOpenKeys, bucketLayout);
+    names = getOpenKeyNames(allExpiredKeys);
+    Assert.assertEquals(numExpiredOpenKeys, names.size());
+    Assert.assertTrue(expiredKeys.containsAll(names));
+  }
 
-    Assert.assertEquals(numExpiredOpenKeys, allExpiredKeys.size());
-    for (String key: allExpiredKeys) {
-      Assert.assertTrue(expiredKeys.contains(key));
-    }
+  private List<String> getOpenKeyNames(List<OpenKeyBucket> openKeyBuckets) {
+    return openKeyBuckets.stream()
+        .map(OpenKeyBucket::getKeysList)
+        .flatMap(List::stream)
+        .map(OpenKey::getName)
+        .collect(Collectors.toList());
   }
 
   private void addKeysToOM(String volumeName, String bucketName,

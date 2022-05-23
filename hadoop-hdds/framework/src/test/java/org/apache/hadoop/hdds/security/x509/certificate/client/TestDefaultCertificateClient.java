@@ -22,10 +22,9 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -56,11 +55,11 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test class for {@link DefaultCertificateClient}.
@@ -81,7 +80,7 @@ public class TestDefaultCertificateClient {
   private KeyCodec omKeyCodec;
   private KeyCodec dnKeyCodec;
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     OzoneConfiguration config = new OzoneConfiguration();
     config.setStrings(OZONE_SCM_NAMES, "localhost");
@@ -116,7 +115,7 @@ public class TestDefaultCertificateClient {
     dnCertClient = new DNCertificateClient(dnSecurityConfig, certSerialId);
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     omCertClient = null;
     dnCertClient = null;
@@ -186,7 +185,7 @@ public class TestDefaultCertificateClient {
         x509Certificate.getSerialNumber().toString());
     assertNotNull(cert);
     assertTrue(cert.getEncoded().length > 0);
-    assertEquals(cert, x509Certificate);
+    assertEquals(x509Certificate, cert);
 
     // TODO: test verifyCertificate once implemented.
   }
@@ -230,7 +229,7 @@ public class TestDefaultCertificateClient {
             omSecurityConfig.getProvider());
     rsaSignature.initVerify(omCertClient.getPublicKey());
     rsaSignature.update(data);
-    Assert.assertTrue(rsaSignature.verify(hash));
+    assertTrue(rsaSignature.verify(hash));
   }
 
   /**
@@ -385,16 +384,14 @@ public class TestDefaultCertificateClient {
 
 
     // Check for DN.
-    assertEquals(dnCertClient.init(), FAILURE);
-    assertTrue(dnClientLog.getOutput().contains("Keypair validation " +
-        "failed"));
+    assertEquals(FAILURE, dnCertClient.init());
+    assertTrue(dnClientLog.getOutput().contains("Keypair validation failed"));
     dnClientLog.clearOutput();
     omClientLog.clearOutput();
 
     // Check for OM.
-    assertEquals(omCertClient.init(), FAILURE);
-    assertTrue(omClientLog.getOutput().contains("Keypair validation " +
-        "failed"));
+    assertEquals(FAILURE, omCertClient.init());
+    assertTrue(omClientLog.getOutput().contains("Keypair validation failed"));
     dnClientLog.clearOutput();
     omClientLog.clearOutput();
 
@@ -418,14 +415,13 @@ public class TestDefaultCertificateClient {
     dnCertCodec.writeCertificate(new X509CertificateHolder(
         x509Certificate.getEncoded()));
     // Check for DN.
-    assertEquals(dnCertClient.init(), FAILURE);
-    assertTrue(dnClientLog.getOutput().contains("Keypair validation " +
-        "failed"));
+    assertEquals(FAILURE, dnCertClient.init());
+    assertTrue(dnClientLog.getOutput().contains("Keypair validation failed"));
     dnClientLog.clearOutput();
     omClientLog.clearOutput();
 
     // Check for OM.
-    assertEquals(omCertClient.init(), FAILURE);
+    assertEquals(FAILURE, omCertClient.init());
     assertTrue(omClientLog.getOutput().contains("Keypair validation failed"));
     dnClientLog.clearOutput();
     omClientLog.clearOutput();
@@ -433,7 +429,7 @@ public class TestDefaultCertificateClient {
     // Case 3. Expect failure when certificate is generated from different
     // private key and certificate validation fails.
 
-    // Re write the correct public key.
+    // Re-write the correct public key.
     FileUtils.deleteQuietly(Paths.get(
         omSecurityConfig.getKeyLocation(OM_COMPONENT).toString(),
         omSecurityConfig.getPublicKeyFileName()).toFile());
@@ -445,16 +441,16 @@ public class TestDefaultCertificateClient {
     dnKeyCodec.writePublicKey(keyPair.getPublic());
 
     // Check for DN.
-    assertEquals(dnCertClient.init(), FAILURE);
-    assertTrue(dnClientLog.getOutput().contains("Stored certificate is " +
-        "generated with different"));
+    assertEquals(FAILURE, dnCertClient.init());
+    assertTrue(dnClientLog.getOutput()
+        .contains("Stored certificate is generated with different"));
     dnClientLog.clearOutput();
     omClientLog.clearOutput();
 
     //Check for OM.
-    assertEquals(omCertClient.init(), FAILURE);
-    assertTrue(omClientLog.getOutput().contains("Stored certificate is " +
-        "generated with different"));
+    assertEquals(FAILURE, omCertClient.init());
+    assertTrue(omClientLog.getOutput()
+        .contains("Stored certificate is generated with different"));
     dnClientLog.clearOutput();
     omClientLog.clearOutput();
 
@@ -468,11 +464,11 @@ public class TestDefaultCertificateClient {
         dnSecurityConfig.getPublicKeyFileName()).toFile());
 
     // Check for DN.
-    assertEquals(dnCertClient.init(), FAILURE);
+    assertEquals(FAILURE, dnCertClient.init());
     assertTrue(dnClientLog.getOutput().contains("Can't recover public key"));
 
     // Check for OM.
-    assertEquals(omCertClient.init(), FAILURE);
+    assertEquals(FAILURE, omCertClient.init());
     assertTrue(omClientLog.getOutput().contains("Can't recover public key"));
     dnClientLog.clearOutput();
     omClientLog.clearOutput();
