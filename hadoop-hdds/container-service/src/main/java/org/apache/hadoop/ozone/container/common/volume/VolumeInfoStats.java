@@ -54,12 +54,6 @@ public class VolumeInfoStats {
     public void init() {
         MetricsSystem ms = DefaultMetricsSystem.instance();
         ms.register(metricsSourceName, "Volume Info Statistics", this);
-        spaceUsed.set(volume.getVolumeInfo().getScmUsed());
-        spaceAvailable.set(volume.getVolumeInfo().getAvailable());
-        spaceReserved.set(volume.getVolumeInfo().getReservedInBytes());
-        capacity.set(spaceUsed.value() + spaceAvailable.value());
-        totalCapacity.set(
-                spaceUsed.value() + spaceAvailable.value() + spaceReserved.value());
     }
 
     public void unregister() {
@@ -72,7 +66,28 @@ public class VolumeInfoStats {
      */
     @Metric("Metric to return the Storage Type")
     public String getStorageType() {
-        return "DISK";
+        return volume.getStorageType().toString();
+    }
+    /**
+     * Return the Storage Directory for the Volume
+     */
+    @Metric("Returns the Directory name for the volume")
+    public String getStorageDirectory() {
+        return volume.getStorageDir().toString();
+    }
+
+    /**
+     * Return the DataNode UID for the respective volume
+     */
+    public String getDatanodeUuid() {
+        return volume.getDatanodeUuid();
+    }
+
+    /**
+     * Return the Layout version of the storage data
+     */
+    public int getLayoutVersion() {
+        return volume.getLayoutVersion();
     }
 
     public String getMetricsSourceName() {
@@ -92,17 +107,17 @@ public class VolumeInfoStats {
     /**
      * Return the Storage type for the Volume
      */
+    @Metric("Returns the Used space")
     public long getUsed() {
-        spaceUsed.set(volume.getVolumeInfo().getScmUsed());
-        return spaceUsed.value();
+        return (volume.getVolumeInfo().getScmUsed());
     }
 
     /**
      * Return the Total Available capacity of the Volume.
      */
+    @Metric("Returns the Available space")
     public long getAvailable() {
-        spaceAvailable.set(volume.getVolumeInfo().getAvailable());
-        return spaceAvailable.value();
+        return (volume.getVolumeInfo().getAvailable());
     }
 
     /**
@@ -110,25 +125,23 @@ public class VolumeInfoStats {
      */
     @Metric("Fetches the Reserved Space")
     public long getReserved() {
-        spaceReserved.set(volume.getVolumeInfo().getReservedInBytes());
-        return spaceReserved.value();
+        return (volume.getVolumeInfo().getReservedInBytes());
     }
 
     /**
      * Return the Total capacity of the Volume.
      */
+    @Metric("Returns the Capacity of the Volume")
     public long getCapacity() {
-        capacity.set(spaceUsed.value() + spaceAvailable.value());
-        return capacity.value();
+        return spaceUsed.value() + spaceAvailable.value();
     }
 
     /**
      * Return the Total capacity of the Volume.
      */
-//    public long getTotalCapacity() {
-//        totalCapacity.set(
-//                spaceUsed.value() + spaceAvailable.value() + spaceReserved.value());
-//        return totalCapacity.value();
-//    }
+    @Metric("Returns the Total Capacity of the Volume")
+    public long getTotalCapacity() {
+        return (spaceUsed.value() + spaceAvailable.value() + spaceReserved.value());
+    }
 
 }
