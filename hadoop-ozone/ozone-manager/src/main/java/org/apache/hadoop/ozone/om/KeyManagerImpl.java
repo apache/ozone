@@ -1500,9 +1500,19 @@ public class KeyManagerImpl implements KeyManager {
     if (numEntries <= 0) {
       return fileStatusList;
     }
+
+    boolean useNewIterator = true;
     if (isBucketFSOptimized(volName, buckName)) {
-      return listStatusFSO(args, recursive, startKey, numEntries,
-          clientAddress);
+      if (useNewIterator) {
+        OzoneListStatusHelper statusHelper =
+            new OzoneListStatusHelper(metadataManager, scmBlockSize,
+                this::getOzoneFileStatusFSO);
+        return statusHelper.listStatusFSO(args, recursive, startKey, numEntries,
+            clientAddress);
+      } else {
+        return listStatusFSO(args, recursive, startKey, numEntries,
+            clientAddress);
+      }
     }
 
     String volumeName = args.getVolumeName();
