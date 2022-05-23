@@ -23,15 +23,23 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
-import org.apache.hadoop.ozone.client.*;
+import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.junit.*;
+import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.AfterClass;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.UUID;
+import java.util.List;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 
@@ -151,11 +159,12 @@ public class TestListStatus {
     // checkKeyList("b", "b5", 100, 2);
   }
 
-  private static void createFile(OzoneBucket bucket, String keyName) throws IOException {
+  private static void createFile(OzoneBucket bucket, String keyName)
+      throws IOException {
     try (OzoneOutputStream oos = bucket.createFile(keyName, 0,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
         true, false)) {
-
+      oos.flush();
     }
   }
   private static void buildNameSpaceTree(OzoneBucket ozoneBucket)
@@ -168,20 +177,21 @@ public class TestListStatus {
     createFile(ozoneBucket, "/a10");
 
     ozoneBucket.createDirectory("/a1/a11");
-    createFile(ozoneBucket,"/a1/a12");
-    createFile(ozoneBucket,"/a1/a13");
+    createFile(ozoneBucket, "/a1/a12");
+    createFile(ozoneBucket, "/a1/a13");
 
     ozoneBucket.createDirectory("/a3/a31");
-    createFile(ozoneBucket,"/a3/a32");
+    createFile(ozoneBucket, "/a3/a32");
 
-    createFile(ozoneBucket,"/b1");
-    createFile(ozoneBucket,"/b2");
-    createFile(ozoneBucket,"/b7");
-    createFile(ozoneBucket,"/b8");
+    createFile(ozoneBucket, "/b1");
+    createFile(ozoneBucket, "/b2");
+    createFile(ozoneBucket, "/b7");
+    createFile(ozoneBucket, "/b8");
   }
 
   private void checkKeyList(String keyPrefix, String startKey,
-                            long numEntries, int expectedNumKeys) throws Exception {
+                            long numEntries, int expectedNumKeys)
+      throws Exception {
 
     List<OzoneFileStatus> statuses =
         fsoOzoneBucket.listStatus(keyPrefix, false, startKey, numEntries);
