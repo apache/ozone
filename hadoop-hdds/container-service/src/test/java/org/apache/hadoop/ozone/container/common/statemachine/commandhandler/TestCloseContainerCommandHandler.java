@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -112,8 +111,6 @@ public class TestCloseContainerCommandHandler {
     when(ozoneContainer.getController()).thenReturn(controller);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
     when(ozoneContainer.getWriteChannel()).thenReturn(writeChannel);
-    when(writeChannel.getServerType())
-        .thenReturn(HddsProtos.ReplicationType.RATIS);
     when(writeChannel.isExist(pipelineID.getProtobuf())).thenReturn(true);
     when(writeChannel.isExist(nonExistentPipelineID.getProtobuf()))
         .thenReturn(false);
@@ -144,20 +141,6 @@ public class TestCloseContainerCommandHandler {
     // Container in CLOSING state is moved to UNHEALTHY if pipeline does not
     // exist. Container should not exist in CLOSING state without a pipeline.
     verify(containerHandler)
-        .quasiCloseContainer(container);
-  }
-
-  @Test
-  public void closeStandaloneContainerWithoutPipeline() throws IOException {
-    when(writeChannel.getServerType())
-        .thenReturn(HddsProtos.ReplicationType.STAND_ALONE);
-    subject.handle(closeWithUnknownPipeline(), ozoneContainer, context, null);
-
-    verify(containerHandler)
-        .markContainerForClose(container);
-    verify(writeChannel)
-        .submitRequest(any(), eq(nonExistentPipelineID.getProtobuf()));
-    verify(containerHandler, never())
         .quasiCloseContainer(container);
   }
 
