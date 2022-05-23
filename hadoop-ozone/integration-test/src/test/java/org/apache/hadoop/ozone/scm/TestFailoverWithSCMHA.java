@@ -280,10 +280,22 @@ public class TestFailoverWithSCMHA {
         10, 500);
     Assertions.assertFalse(containerBalancer.isBalancerRunning());
 
+    long leaderTermIndex =
+        leader.getScmHAManager().getRatisServer().getSCMStateMachine()
+        .getLastAppliedTermIndex().getIndex();
+
     /*
     Fetch persisted configuration to verify that `shouldRun` is set to false.
      */
     for (StorageContainerManager scm : cluster.getStorageContainerManagers()) {
+      if (!scm.checkLeader()) {
+        // Wait and retry for follower to update transactions to leader
+        // snapshot index.
+        // Timeout error if follower does not load update within 3s
+        GenericTestUtils.waitFor(() -> scm.getScmHAManager().getRatisServer()
+            .getSCMStateMachine().getLastAppliedTermIndex()
+            .getIndex() >= leaderTermIndex, 100, 3000);
+      }
       ByteString byteString =
           scm.getScmMetadataStore().getStatefulServiceConfigTable().get(
               containerBalancer.getServiceName());

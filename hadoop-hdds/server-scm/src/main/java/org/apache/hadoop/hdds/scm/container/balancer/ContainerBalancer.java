@@ -212,18 +212,11 @@ public class ContainerBalancer extends StatefulService {
 
       // persist next iteration index
       if (iR == IterationResult.ITERATION_COMPLETED) {
-        lock.lock();
         try {
-          saveConfiguration(
-              config.toProtobufBuilder()
-                  .setShouldRun(true)
-                  .setNextIterationIndex(i + 1)
-                  .build());
+          saveConfiguration(config, true, i + 1);
         } catch (IOException e) {
           LOG.warn("Could not persist next iteration index value for " +
               "ContainerBalancer after completing an iteration", e);
-        } finally {
-          lock.unlock();
         }
       }
 
@@ -1072,10 +1065,7 @@ public class ContainerBalancer extends StatefulService {
     try {
       // should be leader, out of safe mode, and currently running
       validateState(true);
-      saveConfiguration(config.toProtobufBuilder()
-          .setShouldRun(false)
-          .setNextIterationIndex(0)
-          .build());
+      saveConfiguration(config, false, 0);
       stop();
     } finally {
       lock.unlock();
@@ -1102,6 +1092,20 @@ public class ContainerBalancer extends StatefulService {
       }
     }
     LOG.info("Container Balancer stopped successfully.");
+  }
+
+  private void saveConfiguration(ContainerBalancerConfiguration configuration,
+                                 boolean shouldRun, int index)
+      throws IOException {
+    lock.lock();
+    try {
+      saveConfiguration(configuration.toProtobufBuilder()
+          .setShouldRun(shouldRun)
+          .setNextIterationIndex(index)
+          .build());
+    } finally {
+      lock.unlock();
+    }
   }
 
   private void validateConfiguration(ContainerBalancerConfiguration conf)
@@ -1159,10 +1163,15 @@ public class ContainerBalancer extends StatefulService {
   }
 
   /**
-   * Persists the configuration that ContainerBalancer will use after validating
-   * state and the specified configuration.
-   *  @param configuration ContainerBalancerConfiguration to persist
-   *
+   * Persists the configuration that ContainerBalancer will use after
+   * validating state and the specified configuration.
+   * @param configuration ContainerBalancerConfiguration to persist
+   * @throws InvalidContainerBalancerConfigurationException on failure to
+   * validate the specified configuration
+   * @throws IllegalContainerBalancerStateException if this SCM is not leader
+   * or not out of safe mode or if ContainerBalancer is currently running in
+   * this SCM
+   * @throws IOException on failure to persist configuration
    */
   private void setBalancerConfigOnStartBalancer(
       ContainerBalancerConfiguration configuration)
@@ -1170,16 +1179,7 @@ public class ContainerBalancer extends StatefulService {
       IllegalContainerBalancerStateException, IOException {
     validateState(false);
     validateConfiguration(configuration);
-    lock.lock();
-    try {
-      saveConfiguration(configuration.toProtobufBuilder()
-          .setShouldRun(true)
-          .setNextIterationIndex(0)
-          .build());
-      this.config = configuration;
-    } finally {
-      lock.unlock();
-    }
+    saveConfiguration(configuration, true, 0);
   }
 
   /**
