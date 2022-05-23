@@ -54,7 +54,6 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -101,10 +100,9 @@ public class BasicRootedOzoneClientAdapterImpl
   private OzoneClient ozoneClient;
   private ObjectStore objectStore;
   private ClientProtocol proxy;
-  private ReplicationConfig replicationConfig;
+  private ReplicationConfig clientConfiguredReplicationConfig;
   private boolean securityEnabled;
   private int configuredDnPort;
-  private BucketLayout defaultOFSBucketLayout;
   private OzoneConfiguration config;
 
   /**
@@ -171,7 +169,8 @@ public class BasicRootedOzoneClientAdapterImpl
         this.securityEnabled = true;
       }
 
-      replicationConfig = ReplicationConfig.getDefault(conf);
+      clientConfiguredReplicationConfig =
+          OzoneClientUtils.getClientConfiguredReplicationConfig(conf);
 
       if (OmUtils.isOmHAServiceId(conf, omHost)) {
         // omHost is listed as one of the service ids in the config,
@@ -191,11 +190,6 @@ public class BasicRootedOzoneClientAdapterImpl
       this.configuredDnPort = conf.getInt(
           OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
           OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
-
-      // Fetches the bucket layout to be used by OFS.
-      this.defaultOFSBucketLayout = BucketLayout.fromString(
-          conf.get(OzoneConfigKeys.OZONE_CLIENT_TEST_OFS_DEFAULT_BUCKET_LAYOUT,
-              OzoneConfigKeys.OZONE_CLIENT_TEST_OFS_BUCKET_LAYOUT_DEFAULT));
       config = conf;
     } finally {
       Thread.currentThread().setContextClassLoader(contextClassLoader);
@@ -264,9 +258,7 @@ public class BasicRootedOzoneClientAdapterImpl
           // Create the bucket
           try {
             // Buckets created by OFS should be in FSO layout
-            volume.createBucket(bucketStr,
-                BucketArgs.newBuilder().setBucketLayout(
-                    this.defaultOFSBucketLayout).build());
+            volume.createBucket(bucketStr);
           } catch (OMException newBucEx) {
             // Ignore the case where another client created the bucket
             if (!newBucEx.getResult().equals(BUCKET_ALREADY_EXISTS)) {
@@ -288,9 +280,20 @@ public class BasicRootedOzoneClientAdapterImpl
     return bucket;
   }
 
+  /**
+   * This API returns the value what is configured at client side only. It could
+   * differ from the server side default values. If no replication config
+   * configured at client, it will return 3.
+   */
   @Override
   public short getDefaultReplication() {
-    return (short) replicationConfig.getRequiredNodes();
+    if (clientConfiguredReplicationConfig == null) {
+      // to provide backward compatibility, we are just retuning 3;
+      // However we need to handle with the correct behavior.
+      // TODO: Please see HDDS-5646
+      return (short) ReplicationFactor.THREE.getValue();
+    }
+    return (short) clientConfiguredReplicationConfig.getRequiredNodes();
   }
 
   @Override
@@ -333,18 +336,10 @@ public class BasicRootedOzoneClientAdapterImpl
     try {
       // Hadoop CopyCommands class always sets recursive to true
       OzoneBucket bucket = getBucket(ofsPath, recursive);
-      OzoneOutputStream ozoneOutputStream = null;
-      if (replication == ReplicationFactor.ONE.getValue()
-          || replication == ReplicationFactor.THREE.getValue()) {
-
-        ozoneOutputStream = bucket.createFile(key, 0,
-            ReplicationConfig.adjustReplication(
-                replicationConfig, replication, config),
-            overWrite, recursive);
-      } else {
-        ozoneOutputStream =
-            bucket.createFile(key, 0, replicationConfig, overWrite, recursive);
-      }
+      OzoneOutputStream ozoneOutputStream = bucket.createFile(key, 0,
+          OzoneClientUtils.resolveClientSideReplicationConfig(replication,
+              this.clientConfiguredReplicationConfig,
+              bucket.getReplicationConfig(), config), overWrite, recursive);
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS

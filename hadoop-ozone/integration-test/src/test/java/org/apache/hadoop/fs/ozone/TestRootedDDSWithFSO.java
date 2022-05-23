@@ -51,6 +51,7 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.fs.ozone.TestDirectoryDeletingServiceWithFSO.assertSubPathsCount;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -198,15 +199,10 @@ public class TestRootedDDSWithFSO {
     // There is an immediate file under bucket,
     // which was moved along with bucket delete.
     int movedFilesCount = totalFilesCount - 1;
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(),
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount,
         movedFilesCount);
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(),
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount,
         totalDirCount);
-  }
-
-  private void assertSubPathsCount(long pathCount, long expectedCount)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> pathCount >= expectedCount, 1000, 120000);
   }
 
   private void checkPath(Path path) {

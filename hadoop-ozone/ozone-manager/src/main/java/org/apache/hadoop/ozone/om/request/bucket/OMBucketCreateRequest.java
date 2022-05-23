@@ -41,8 +41,13 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketEncryptionInfoProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
@@ -51,6 +56,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateB
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -124,7 +130,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     newCreateBucketRequest.setBucketInfo(newBucketInfo.build());
 
     return getOmRequest().toBuilder().setUserInfo(getUserInfo())
-       .setCreateBucketRequest(newCreateBucketRequest.build()).build();
+        .setCreateBucketRequest(newCreateBucketRequest.build()).build();
   }
 
   @Override
@@ -265,6 +271,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
   /**
    * Add default acls for bucket. These acls are inherited from volume
    * default acl list.
+   *
    * @param omBucketInfo
    * @param omVolumeArgs
    */
@@ -365,4 +372,50 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
   }
 
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CreateBucket
+  )
+  public static OMRequest disallowCreateBucketWithECReplicationConfig(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
+      if (req.getCreateBucketRequest()
+          .getBucketInfo().hasDefaultReplicationConfig()
+          && req.getCreateBucketRequest().getBucketInfo()
+          .getDefaultReplicationConfig().hasEcReplicationConfig()) {
+        throw new OMException("Cluster does not have the Erasure Coded"
+            + " Storage support feature finalized yet, but the request contains"
+            + " an Erasure Coded replication type. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CreateBucket
+  )
+  public static OMRequest disallowCreateBucketWithBucketLayoutDuringPreFinalize(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.BUCKET_LAYOUT_SUPPORT)) {
+      if (req.getCreateBucketRequest()
+          .getBucketInfo().hasBucketLayout()
+          &&
+          !BucketLayout.fromProto(req.getCreateBucketRequest().getBucketInfo()
+              .getBucketLayout()).isLegacy()) {
+        throw new OMException("Cluster does not have the Bucket Layout"
+            + " support feature finalized yet, but the request contains"
+            + " a non LEGACY bucket type. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
 }

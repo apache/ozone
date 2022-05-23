@@ -29,7 +29,7 @@ OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
 OZONE-SITE.XML_ozone.scm.block.client.address=scm
 OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_ozone.scm.client.address=scm
-OZONE-SITE.XML_ozone.scm.ratis.enable=false
+
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon

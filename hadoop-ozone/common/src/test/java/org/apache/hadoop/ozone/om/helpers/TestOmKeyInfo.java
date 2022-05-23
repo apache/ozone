@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -26,6 +28,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo.Builder;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
@@ -36,6 +39,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 
 /**
@@ -45,23 +51,67 @@ public class TestOmKeyInfo {
 
   @Test
   public void protobufConversion() {
-    OmKeyInfo key = new Builder()
+    OmKeyInfo key = createOmKeyInfo(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+
+    OmKeyInfo keyAfterSerialization = OmKeyInfo.getFromProtobuf(
+        key.getProtobuf(ClientVersion.CURRENT_VERSION));
+
+    Assert.assertEquals(key, keyAfterSerialization);
+  }
+
+  @Test
+  public void getProtobufMessageEC() {
+    OmKeyInfo key = createOmKeyInfo(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+    OzoneManagerProtocolProtos.KeyInfo omKeyProto =
+        key.getProtobuf(ClientVersion.CURRENT_VERSION);
+
+    // No EC Config
+    Assert.assertFalse(omKeyProto.hasEcReplicationConfig());
+    Assert.assertEquals(THREE, omKeyProto.getFactor());
+    Assert.assertEquals(RATIS, omKeyProto.getType());
+
+    // Reconstruct object from Proto
+    OmKeyInfo recovered = OmKeyInfo.getFromProtobuf(omKeyProto);
+    Assert.assertEquals(RATIS,
+        recovered.getReplicationConfig().getReplicationType());
+    Assert.assertTrue(
+        recovered.getReplicationConfig() instanceof RatisReplicationConfig);
+
+    // EC Config
+    key = createOmKeyInfo(new ECReplicationConfig(3, 2));
+    omKeyProto = key.getProtobuf(ClientVersion.CURRENT_VERSION);
+
+    Assert.assertEquals(3, omKeyProto.getEcReplicationConfig().getData());
+    Assert.assertEquals(2, omKeyProto.getEcReplicationConfig().getParity());
+    Assert.assertFalse(omKeyProto.hasFactor());
+    Assert.assertEquals(EC, omKeyProto.getType());
+
+    // Reconstruct object from Proto
+    recovered = OmKeyInfo.getFromProtobuf(omKeyProto);
+    Assert.assertEquals(EC,
+        recovered.getReplicationConfig().getReplicationType());
+    Assert.assertTrue(
+        recovered.getReplicationConfig() instanceof ECReplicationConfig);
+    ECReplicationConfig config =
+        (ECReplicationConfig) recovered.getReplicationConfig();
+    Assert.assertEquals(3, config.getData());
+    Assert.assertEquals(2, config.getParity());
+  }
+
+  private OmKeyInfo createOmKeyInfo(ReplicationConfig replicationConfig) {
+    return new Builder()
         .setKeyName("key1")
         .setBucketName("bucket")
         .setVolumeName("vol1")
         .setCreationTime(123L)
         .setModificationTime(123L)
         .setDataSize(123L)
-        .setReplicationConfig(
-            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setReplicationConfig(replicationConfig)
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
         .build();
-
-    OmKeyInfo keyAfterSerialization = OmKeyInfo.getFromProtobuf(
-        key.getProtobuf(ClientVersion.CURRENT_VERSION));
-
-    Assert.assertEquals(key, keyAfterSerialization);
   }
 
   @Test

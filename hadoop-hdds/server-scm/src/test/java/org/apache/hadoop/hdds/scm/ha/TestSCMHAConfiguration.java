@@ -22,9 +22,9 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.net.InetSocketAddress;
 
@@ -53,7 +53,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 public class TestSCMHAConfiguration {
   private OzoneConfiguration conf;
 
-  @Before
+  @BeforeEach
   public void setup() {
     conf = new OzoneConfiguration();
   }
@@ -121,64 +121,64 @@ public class TestSCMHAConfiguration {
     port = 9880;
 
     // Validate configs.
-    Assert.assertEquals("localhost:" + port++,
+    Assertions.assertEquals("localhost:" + port++,
         conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
         scmServiceId, "scm1")));
-    Assert.assertEquals(port,
+    Assertions.assertEquals(port,
         conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
         scmServiceId, "scm1"), 9999));
-    Assert.assertEquals("172.28.9.1",
+    Assertions.assertEquals("172.28.9.1",
         conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY,
             scmServiceId, "scm1")));
 
 
-    Assert.assertEquals("localhost:" + port++,
+    Assertions.assertEquals("localhost:" + port++,
         conf.get(ConfUtils.addKeySuffixes(
             OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY, scmServiceId, "scm1")));
-    Assert.assertEquals(port, conf.getInt(ConfUtils.addKeySuffixes(
+    Assertions.assertEquals(port, conf.getInt(ConfUtils.addKeySuffixes(
         OZONE_SCM_SECURITY_SERVICE_PORT_KEY, scmServiceId, "scm1"), 9999));
-    Assert.assertEquals("172.28.9.1",
+    Assertions.assertEquals("172.28.9.1",
         conf.get(ConfUtils.addKeySuffixes(
             OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY, scmServiceId, "scm1")));
 
 
-    Assert.assertEquals("localhost:" + port++,
+    Assertions.assertEquals("localhost:" + port++,
         conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_ADDRESS_KEY,
             scmServiceId, "scm1")));
-    Assert.assertEquals(port,
+    Assertions.assertEquals(port,
         conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_PORT_KEY,
             scmServiceId, "scm1"), 9999));
-    Assert.assertEquals("172.28.9.1", conf.get(
+    Assertions.assertEquals("172.28.9.1", conf.get(
         ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_BIND_HOST_KEY, scmServiceId,
         "scm1")));
 
-    Assert.assertEquals("localhost:" + port++,
+    Assertions.assertEquals("localhost:" + port++,
         conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_ADDRESS_KEY,
             scmServiceId, "scm1")));
-    Assert.assertEquals(port,
+    Assertions.assertEquals(port,
         conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
             scmServiceId, "scm1"), 9999));
-    Assert.assertEquals("172.28.9.1", conf.get(
+    Assertions.assertEquals("172.28.9.1", conf.get(
         ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_BIND_HOST_KEY, scmServiceId,
         "scm1")));
 
 
-    Assert.assertEquals("localhost:" + port++,
+    Assertions.assertEquals("localhost:" + port++,
         conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_HTTP_ADDRESS_KEY,
         scmServiceId, "scm1")));
-    Assert.assertEquals("172.28.9.1",
+    Assertions.assertEquals("172.28.9.1",
         conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_HTTP_BIND_HOST_KEY,
         scmServiceId, "scm1")));
 
-    Assert.assertEquals("localhost", conf.get(ConfUtils.addKeySuffixes(
+    Assertions.assertEquals("localhost", conf.get(ConfUtils.addKeySuffixes(
         OZONE_SCM_ADDRESS_KEY, scmServiceId,
         "scm1")));
 
-    Assert.assertEquals("/var/scm-metadata1",
+    Assertions.assertEquals("/var/scm-metadata1",
         conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_DB_DIRS, scmServiceId,
         "scm1")));
 
-    Assert.assertEquals(port++,
+    Assertions.assertEquals(port++,
         conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_RATIS_PORT_KEY,
         scmServiceId, "scm1"), 9999));
 
@@ -212,8 +212,8 @@ public class TestSCMHAConfiguration {
 
     SCMHANodeDetails scmhaNodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
 
-    Assert.assertEquals("10000", conf.get(OZONE_SCM_RATIS_PORT_KEY));
-    Assert.assertEquals("10001", conf.get(OZONE_SCM_GRPC_PORT_KEY));
+    Assertions.assertEquals("10000", conf.get(OZONE_SCM_RATIS_PORT_KEY));
+    Assertions.assertEquals("10001", conf.get(OZONE_SCM_GRPC_PORT_KEY));
 
 
     InetSocketAddress clientAddress =
@@ -223,33 +223,37 @@ public class TestSCMHAConfiguration {
         NetUtils.createSocketAddr("0.0.0.0", 9896);
     InetSocketAddress datanodeAddress =
         NetUtils.createSocketAddr("0.0.0.0", 9898);
-    Assert.assertEquals(clientAddress, scmhaNodeDetails.getLocalNodeDetails()
+    Assertions.assertEquals(clientAddress,
+        scmhaNodeDetails.getLocalNodeDetails()
             .getClientProtocolServerAddress());
-    Assert.assertEquals(blockAddress, scmhaNodeDetails.getLocalNodeDetails()
+    Assertions.assertEquals(blockAddress, scmhaNodeDetails.getLocalNodeDetails()
         .getBlockProtocolServerAddress());
-    Assert.assertEquals(datanodeAddress, scmhaNodeDetails.getLocalNodeDetails()
-        .getDatanodeProtocolServerAddress());
+    Assertions.assertEquals(datanodeAddress,
+        scmhaNodeDetails.getLocalNodeDetails()
+            .getDatanodeProtocolServerAddress());
 
-    Assert.assertEquals(10000,
+    Assertions.assertEquals(10000,
         scmhaNodeDetails.getLocalNodeDetails().getRatisPort());
-    Assert.assertEquals(10001,
+    Assertions.assertEquals(10001,
         scmhaNodeDetails.getLocalNodeDetails().getGrpcPort());
 
     for (SCMNodeDetails peer : scmhaNodeDetails.getPeerNodeDetails()) {
-      Assert.assertEquals(clientAddress, peer.getClientProtocolServerAddress());
-      Assert.assertEquals(blockAddress, peer.getBlockProtocolServerAddress());
-      Assert.assertEquals(datanodeAddress,
+      Assertions.assertEquals(clientAddress,
+          peer.getClientProtocolServerAddress());
+      Assertions.assertEquals(blockAddress,
+          peer.getBlockProtocolServerAddress());
+      Assertions.assertEquals(datanodeAddress,
           peer.getDatanodeProtocolServerAddress());
 
-      Assert.assertEquals(10000, peer.getRatisPort());
-      Assert.assertEquals(10001,
+      Assertions.assertEquals(10000, peer.getRatisPort());
+      Assertions.assertEquals(10001,
           peer.getGrpcPort());
     }
 
 
     // Security protocol address is not set in SCMHANode Details.
     // Check conf is properly set with expected port.
-    Assert.assertEquals(
+    Assertions.assertEquals(
         NetUtils.createSocketAddr("0.0.0.0", 9899),
         HddsServerUtil.getScmSecurityInetAddress(conf));
 

@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
@@ -37,6 +39,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
@@ -66,6 +69,7 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
@@ -73,6 +77,7 @@ import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
+
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -143,7 +148,8 @@ public class TestBlockManager {
             scmMetadataStore.getPipelineTable(),
             eventQueue,
             scmContext,
-            serviceManager);
+            serviceManager,
+            new MonotonicClock(ZoneOffset.UTC));
 
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
@@ -155,7 +161,9 @@ public class TestBlockManager {
             scmHAManager,
             sequenceIdGen,
             pipelineManager,
-            scmMetadataStore.getContainerTable());
+            scmMetadataStore.getContainerTable(),
+            new ContainerReplicaPendingOps(conf,
+                new MonotonicClock(ZoneId.systemDefault())));
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
         containerManager.getContainers(), containerManager,
         pipelineManager, eventQueue, serviceManager, scmContext) {

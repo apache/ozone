@@ -228,6 +228,26 @@ public final class HddsUtils {
   }
 
   /**
+   * Retrieve a number, trying the supplied config keys in order.
+   * Each config value may be absent
+   *
+   * @param conf Conf
+   * @param keys a list of configuration key names.
+   *
+   * @return first number found from the given keys, or absent.
+   */
+  public static OptionalInt getNumberFromConfigKeys(
+      ConfigurationSource conf, String... keys) {
+    for (final String key : keys) {
+      final String value = conf.getTrimmed(key);
+      if (value != null) {
+        return OptionalInt.of(Integer.parseInt(value));
+      }
+    }
+    return OptionalInt.empty();
+  }
+
+  /**
    * Retrieve the port number, trying the supplied config keys in order.
    * Each config value may be absent, or if present in the format
    * host:port (the :port part is optional).

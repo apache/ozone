@@ -60,6 +60,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -71,6 +73,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -133,6 +136,7 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
+import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
 import org.apache.hadoop.ozone.om.protocol.OMConfiguration;
 import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolClientSideImpl;
@@ -220,6 +224,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
@@ -236,6 +242,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KEY_PATH_LOCK_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KEY_PATH_LOCK_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
@@ -243,12 +251,18 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
@@ -300,6 +314,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final Text omRpcAddressTxt;
   private OzoneConfiguration configuration;
   private RPC.Server omRpcServer;
+  private GrpcOzoneManagerServer omS3gGrpcServer;
   private InetSocketAddress omRpcAddress;
   private String omId;
 
@@ -339,7 +354,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private JvmPauseMonitor jvmPauseMonitor;
   private final SecurityConfig secConfig;
   private S3SecretManager s3SecretManager;
+  private final boolean isOmGrpcServerEnabled;
   private volatile boolean isOmRpcServerRunning = false;
+  private volatile boolean isOmGrpcServerRunning = false;
   private String omComponent;
   private OzoneManagerProtocolServerSideTranslatorPB omServerProtocol;
 
@@ -386,6 +403,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // Test flags
   private static boolean testReloadConfigFlag = false;
   private static boolean testSecureOmFlag = false;
+
+  private OzoneLockProvider ozoneLockProvider;
 
   /**
    * OM Startup mode.
@@ -461,6 +480,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     this.isSpnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
         .equals("kerberos");
+    this.isOmGrpcServerEnabled = conf.getBoolean(
+        OZONE_OM_S3_GPRC_SERVER_ENABLED,
+        OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT);
     this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
         OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
     this.preallocateBlocksMax = conf.getInt(
@@ -568,6 +590,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omRpcAddress = updateRPCListenAddress(configuration,
         OZONE_OM_ADDRESS_KEY, omNodeRpcAddr, omRpcServer);
 
+    // Start S3g Om gRPC Server.
+    if (isOmGrpcServerEnabled) {
+      omS3gGrpcServer = getOmS3gGrpcServer(configuration);
+    }
     shutdownHook = () -> {
       saveOmMetrics();
     };
@@ -1047,7 +1073,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return omRpcServer;
     }
 
+    LOG.info("Creating RPC Server");
     InetSocketAddress omNodeRpcAddr = OmUtils.getOmAddress(conf);
+    boolean flexibleFqdnResolutionEnabled = conf.getBoolean(
+            OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
+            OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT);
+    if (flexibleFqdnResolutionEnabled && omNodeRpcAddr.getAddress() == null) {
+      omNodeRpcAddr =
+              OzoneNetUtils.getAddressWithHostNameLocal(omNodeRpcAddr);
+    }
 
     final int handlerCount = conf.getInt(OZONE_OM_HANDLER_COUNT_KEY,
         OZONE_OM_HANDLER_COUNT_DEFAULT);
@@ -1119,6 +1153,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OMLeaderNotReadyException.class);
 
     return rpcServer;
+  }
+
+  /**
+   * Starts an s3g OmGrpc server.
+   *
+   * @param conf         configuration
+   * @return gRPC server
+   * @throws IOException if there is an I/O error while creating RPC server
+   */
+  private GrpcOzoneManagerServer startGrpcServer(OzoneConfiguration conf)
+          throws IOException {
+    return new GrpcOzoneManagerServer(conf,
+            this.omServerProtocol,
+            this.delegationTokenMgr,
+            this.certClient);
   }
 
   private static boolean isOzoneSecurityEnabled() {
@@ -1475,7 +1524,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     isOmRpcServerRunning = true;
 
     startTrashEmptier(configuration);
-
+    if (isOmGrpcServerEnabled) {
+      omS3gGrpcServer.start();
+      isOmGrpcServerRunning = true;
+    }
     registerMXBean();
 
     startJVMPauseMonitor();
@@ -1484,6 +1536,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (omState == State.BOOTSTRAPPING) {
       bootstrap(omNodeDetails);
     }
+
+    ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
+        getEnableFileSystemPaths());
 
     omState = State.RUNNING;
   }
@@ -1533,7 +1588,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     omRpcServer = getRpcServer(configuration);
-
+    if (isOmGrpcServerEnabled) {
+      omS3gGrpcServer = getOmS3gGrpcServer(configuration);
+    }
     try {
       httpServer = new OzoneManagerHttpServer(configuration, this);
       httpServer.start();
@@ -1547,6 +1604,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     startTrashEmptier(configuration);
     registerMXBean();
 
+    if (isOmGrpcServerEnabled) {
+      omS3gGrpcServer.start();
+      isOmGrpcServerRunning = true;
+    }
     startJVMPauseMonitor();
     setStartTime();
     omState = State.RUNNING;
@@ -1826,34 +1887,49 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @throws IOException
    */
   private void startTrashEmptier(Configuration conf) throws IOException {
-    float hadoopTrashInterval =
-        conf.getFloat(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
-    // check whether user has configured ozone specific trash-interval
-    // if not fall back to hadoop configuration
-    long trashInterval =
-        (long)(conf.getFloat(
-            OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, hadoopTrashInterval)
-            * MSECS_PER_MINUTE);
-    if (trashInterval == 0) {
-      LOG.info("Trash Interval set to 0. Files deleted will not move to trash");
-      return;
-    } else if (trashInterval < 0) {
-      throw new IOException("Cannot start trash emptier with negative interval."
-              + " Set " + FS_TRASH_INTERVAL_KEY + " to a positive value.");
-    }
+    if (emptier == null) {
+      float hadoopTrashInterval =
+          conf.getFloat(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
+      // check whether user has configured ozone specific trash-interval
+      // if not fall back to hadoop configuration
+      long trashInterval =
+          (long) (conf.getFloat(
+              OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, hadoopTrashInterval)
+              * MSECS_PER_MINUTE);
+      if (trashInterval == 0) {
+        LOG.info("Trash Interval set to 0. Files deleted won't move to trash");
+        return;
+      } else if (trashInterval < 0) {
+        throw new IOException("Cannot start trash emptier with negative " +
+            "interval. Set " + FS_TRASH_INTERVAL_KEY + " to a positive value.");
+      }
 
-    OzoneManager i = this;
-    FileSystem fs = SecurityUtil.doAsLoginUser(
-        new PrivilegedExceptionAction<FileSystem>() {
-          @Override
-          public FileSystem run() throws IOException {
-            return new TrashOzoneFileSystem(i);
-          }
-        });
-    this.emptier = new Thread(new OzoneTrash(fs, conf, this).
-      getEmptier(), "Trash Emptier");
-    this.emptier.setDaemon(true);
-    this.emptier.start();
+      OzoneManager i = this;
+      FileSystem fs = SecurityUtil.doAsLoginUser(
+          new PrivilegedExceptionAction<FileSystem>() {
+            @Override
+            public FileSystem run() throws IOException {
+              return new TrashOzoneFileSystem(i);
+            }
+          });
+      this.emptier = new Thread(new OzoneTrash(fs, conf, this).
+          getEmptier(), "Trash Emptier");
+      this.emptier.setDaemon(true);
+      this.emptier.start();
+    }
+  }
+
+  /**
+   * Creates a new instance of gRPC OzoneManagerServiceGrpc transport server
+   * for serving s3g OmRequests.  If an earlier instance is already running
+   * then returns the same.
+   */
+  private GrpcOzoneManagerServer getOmS3gGrpcServer(OzoneConfiguration conf)
+      throws IOException {
+    if (isOmGrpcServerRunning) {
+      return omS3gGrpcServer;
+    }
+    return startGrpcServer(configuration);
   }
 
   /**
@@ -1949,6 +2025,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         scheduleOMMetricsWriteTask = null;
       }
       omRpcServer.stop();
+      if (isOmGrpcServerEnabled) {
+        omS3gGrpcServer.stop();
+      }
       // When ratis is not enabled, we need to call stop() to stop
       // OzoneManageDoubleBuffer in OM server protocol.
       if (!isRatisEnabled) {
@@ -1959,10 +2038,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omRatisServer = null;
       }
       isOmRpcServerRunning = false;
+      if (isOmGrpcServerEnabled) {
+        isOmGrpcServerRunning = false;
+      }
       keyManager.stop();
       stopSecretManager();
       if (httpServer != null) {
         httpServer.stop();
+      }
+      if (multiTenantManager != null) {
+        multiTenantManager.stop();
       }
       stopTrashEmptier();
       metadataManager.stop();
@@ -2017,17 +2102,35 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     CertificateSignRequest.Builder builder = client.getCSRBuilder();
     KeyPair keyPair = new KeyPair(client.getPublicKey(),
         client.getPrivateKey());
-    InetSocketAddress omRpcAdd;
-    omRpcAdd = OmUtils.getOmAddress(config);
-    if (omRpcAdd == null || omRpcAdd.getAddress() == null) {
+    boolean flexibleFqdnResolutionEnabled = config.getBoolean(
+            OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
+            OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT);
+    InetSocketAddress omRpcAdd = OmUtils.getOmAddress(config);
+    String ip = null;
+
+    boolean addressResolved = omRpcAdd != null && omRpcAdd.getAddress() != null;
+    if (flexibleFqdnResolutionEnabled && !addressResolved && omRpcAdd != null) {
+      InetSocketAddress omRpcAddWithHostName =
+              OzoneNetUtils.getAddressWithHostNameLocal(omRpcAdd);
+      if (omRpcAddWithHostName != null
+              && omRpcAddWithHostName.getAddress() != null) {
+        addressResolved = true;
+        ip = omRpcAddWithHostName.getAddress().getHostAddress();
+      }
+    }
+
+    if (!addressResolved) {
       LOG.error("Incorrect om rpc address. omRpcAdd:{}", omRpcAdd);
       throw new RuntimeException("Can't get SCM signed certificate. " +
           "omRpcAdd: " + omRpcAdd);
     }
-    // Get host name.
-    String hostname = omRpcAdd.getAddress().getHostName();
-    String ip = omRpcAdd.getAddress().getHostAddress();
 
+    if (ip == null) {
+      ip = omRpcAdd.getAddress().getHostAddress();
+    }
+
+    String hostname = omRpcAdd.getHostName();
+    int port = omRpcAdd.getPort();
     String subject;
     if (builder.hasDnsName()) {
       subject = UserGroupInformation.getCurrentUser().getShortUserName()
@@ -2057,12 +2160,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     HddsProtos.OzoneManagerDetailsProto.Builder omDetailsProtoBuilder =
         HddsProtos.OzoneManagerDetailsProto.newBuilder()
-            .setHostName(omRpcAdd.getHostName())
+            .setHostName(hostname)
             .setIpAddress(ip)
             .setUuid(omStore.getOmId())
             .addPorts(HddsProtos.Port.newBuilder()
                 .setName(RPC_PORT)
-                .setValue(omRpcAdd.getPort())
+                .setValue(port)
                 .build());
 
     PKCS10CertificationRequest csr = builder.build();
@@ -2666,7 +2769,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.BUCKET, bucket);
     try {
       metrics.incNumBucketInfos();
-      return bucketManager.getBucketInfo(volume, bucket);
+      final OmBucketInfo bucketInfo =
+          bucketManager.getBucketInfo(volume, bucket);
+      return bucketInfo;
     } catch (Exception ex) {
       metrics.incNumBucketInfoFails();
       auditSuccess = false;
@@ -3247,12 +3352,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       OmMultipartUploadListParts omMultipartUploadListParts =
           keyManager.listParts(bucket.realVolume(), bucket.realBucket(),
               keyName, uploadID, partNumberMarker, maxParts);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction
           .LIST_MULTIPART_UPLOAD_PARTS, auditMap));
       return omMultipartUploadListParts;
     } catch (IOException ex) {
       metrics.incNumListMultipartUploadPartFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction
           .LIST_MULTIPART_UPLOAD_PARTS, auditMap, ex));
       throw ex;
     }
@@ -3272,13 +3377,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       OmMultipartUploadList omMultipartUploadList =
           keyManager.listMultipartUploads(bucket.realVolume(),
               bucket.realBucket(), prefix);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction
           .LIST_MULTIPART_UPLOADS, auditMap));
       return omMultipartUploadList;
 
     } catch (IOException ex) {
       metrics.incNumListMultipartUploadFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction
           .LIST_MULTIPART_UPLOADS, auditMap, ex));
       throw ex;
     }
@@ -3338,12 +3443,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (Exception ex) {
       metrics.incNumLookupFileFails();
       auditSuccess = false;
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.LOOKUP_FILE,
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LOOKUP_FILE,
           auditMap, ex));
       throw ex;
     } finally {
       if (auditSuccess) {
-        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(
             OMAction.LOOKUP_FILE, auditMap));
       }
     }
@@ -3383,22 +3488,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  private void auditAcl(OzoneObj ozoneObj, List<OzoneAcl> ozoneAcl,
-      OMAction omAction, Exception ex) {
-    Map<String, String> auditMap = ozoneObj.toAuditMap();
-    if (ozoneAcl != null) {
-      auditMap.put(OzoneConsts.ACL, ozoneAcl.toString());
-    }
-
-    if (ex == null) {
-      AUDIT.logWriteSuccess(
-          buildAuditMessageForSuccess(omAction, auditMap));
-    } else {
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(omAction, auditMap, ex));
-    }
-  }
-
   /**
    * Returns list of ACLs for given Ozone object.
    *
@@ -3431,11 +3520,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
     } catch (Exception ex) {
       auditSuccess = false;
-      auditAcl(obj, null, OMAction.GET_ACL, ex);
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(OMAction.GET_ACL, obj.toAuditMap(), ex));
       throw ex;
     } finally {
       if (auditSuccess) {
-        auditAcl(obj, null, OMAction.GET_ACL, null);
+        AUDIT.logReadSuccess(
+            buildAuditMessageForSuccess(OMAction.GET_ACL, obj.toAuditMap()));
       }
     }
   }
@@ -3488,11 +3579,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   TermIndex installCheckpoint(String leaderId, Path checkpointLocation,
       TransactionInfo checkpointTrxnInfo) throws Exception {
-
+    long startTime = Time.monotonicNow();
     File oldDBLocation = metadataManager.getStore().getDbLocation();
     try {
       // Stop Background services
-      stopServices();
+      keyManager.stop();
+      stopSecretManager();
+      stopTrashEmptier();
 
       // Pause the State Machine so that no new transactions can be applied.
       // This action also clears the OM Double Buffer so that if there are any
@@ -3501,9 +3594,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (Exception e) {
       LOG.error("Failed to stop/ pause the services. Cannot proceed with " +
           "installing the new checkpoint.");
-      // During stopServices, if KeyManager was stopped successfully and
-      // OMMetadataManager stop failed, we should restart the KeyManager.
+      // Stop the checkpoint install process and restart the services.
       keyManager.start(configuration);
+      startSecretManagerIfNecessary();
       startTrashEmptier(configuration);
       throw e;
     }
@@ -3520,14 +3613,39 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     boolean canProceed = OzoneManagerRatisUtils.verifyTransactionInfo(
         checkpointTrxnInfo, lastAppliedIndex, leaderId, checkpointLocation);
 
+    boolean oldOmMetadataManagerStopped = false;
+    boolean newMetadataManagerStarted = false;
+    boolean omRpcServerStopped = false;
+    long time = Time.monotonicNow();
     if (canProceed) {
+      // Stop RPC server before stop metadataManager
+      omRpcServer.stop();
+      isOmRpcServerRunning = false;
+      omRpcServerStopped = true;
+      LOG.info("RPC server is stopped. Spend " +
+          (Time.monotonicNow() - time) + " ms.");
       try {
+        // Stop old metadataManager before replacing DB Dir
+        time = Time.monotonicNow();
+        metadataManager.stop();
+        oldOmMetadataManagerStopped = true;
+        LOG.info("metadataManager is stopped. Spend " +
+            (Time.monotonicNow() - time) + " ms.");
+      } catch (Exception e) {
+        String errorMsg = "Failed to stop metadataManager. Cannot proceed " +
+            "with installing the new checkpoint.";
+        LOG.error(errorMsg);
+        exitManager.exitSystem(1, errorMsg, e, LOG);
+      }
+      try {
+        time = Time.monotonicNow();
         dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
             checkpointLocation);
         term = checkpointTrxnInfo.getTerm();
         lastAppliedIndex = checkpointTrxnInfo.getTransactionIndex();
-        LOG.info("Replaced DB with checkpoint from OM: {}, term: {}, index: {}",
-            leaderId, term, lastAppliedIndex);
+        LOG.info("Replaced DB with checkpoint from OM: {}, term: {}, " +
+            "index: {}, time: {} ms", leaderId, term, lastAppliedIndex,
+            Time.monotonicNow() - time);
       } catch (Exception e) {
         LOG.error("Failed to install Snapshot from {} as OM failed to replace" +
             " DB with downloaded checkpoint. Reloading old OM state.", e);
@@ -3542,13 +3660,41 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Restart (unpause) the state machine and update its last applied index
     // to the installed checkpoint's snapshot index.
     try {
-      reloadOMState(lastAppliedIndex, term);
-      omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
-      LOG.info("Reloaded OM state with Term: {} and Index: {}", term,
-          lastAppliedIndex);
+      if (oldOmMetadataManagerStopped) {
+        time = Time.monotonicNow();
+        reloadOMState(lastAppliedIndex, term);
+        omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
+        newMetadataManagerStarted = true;
+        LOG.info("Reloaded OM state with Term: {} and Index: {}. Spend {} ms",
+            term, lastAppliedIndex, Time.monotonicNow() - time);
+      } else {
+        // OM DB is not stopped. Start the services.
+        keyManager.start(configuration);
+        startSecretManagerIfNecessary();
+        startTrashEmptier(configuration);
+        omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
+        LOG.info("OM DB is not stopped. Started services with Term: {} and " +
+            "Index: {}", term, lastAppliedIndex);
+      }
     } catch (Exception ex) {
+
       String errorMsg = "Failed to reload OM state and instantiate services.";
       exitManager.exitSystem(1, errorMsg, ex, LOG);
+    }
+
+    if (omRpcServerStopped && newMetadataManagerStarted) {
+      // Start the RPC server. RPC server start requires metadataManager
+      try {
+        time = Time.monotonicNow();
+        omRpcServer = getRpcServer(configuration);
+        omRpcServer.start();
+        isOmRpcServerRunning = true;
+        LOG.info("RPC server is re-started. Spend " +
+            (Time.monotonicNow() - time) + " ms.");
+      } catch (Exception e) {
+        String errorMsg = "Failed to start RPC Server.";
+        exitManager.exitSystem(1, errorMsg, e, LOG);
+      }
     }
 
     // Delete the backup DB
@@ -3569,6 +3715,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // TODO: We should only return the snpashotIndex to the leader.
     //  Should be fixed after RATIS-586
     TermIndex newTermIndex = TermIndex.valueOf(term, lastAppliedIndex);
+    LOG.info("Install Checkpoint is finished with Term: {} and Index: {}. " +
+        "Spend {} ms.", newTermIndex.getTerm(), newTermIndex.getIndex(),
+        (Time.monotonicNow() - startTime));
     return newTermIndex;
   }
 
@@ -3589,16 +3738,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Failed to download checkpoint from OM leader {}", leaderId, e);
     }
     return null;
-  }
-
-  void stopServices() throws Exception {
-    keyManager.stop();
-    stopSecretManager();
-    if (multiTenantManager != null) {
-      multiTenantManager.stop();
-    }
-    metadataManager.stop();
-    stopTrashEmptier();
   }
 
   private void stopTrashEmptier() {
@@ -3674,6 +3813,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Restart required services
     metadataManager.start(configuration);
     keyManager.start(configuration);
+    startSecretManagerIfNecessary();
     startTrashEmptier(configuration);
 
     // Set metrics and start metrics back ground thread
@@ -3911,7 +4051,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     Pair<String, String> resolved;
     if (isAclEnabled) {
-      UserGroupInformation ugi = Server.getRemoteUser();
+      UserGroupInformation ugi = getRemoteUser();
       if (getS3Auth() != null) {
         ugi = UserGroupInformation.createRemoteUser(
             OzoneAclUtils.accessIdToUserPrincipal(getS3Auth().getAccessId()));
@@ -3983,6 +4123,26 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public boolean getEnableFileSystemPaths() {
     return configuration.getBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS,
         OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
+  }
+
+  public boolean getKeyPathLockEnabled() {
+    return configuration.getBoolean(OZONE_OM_KEY_PATH_LOCK_ENABLED,
+        OZONE_OM_KEY_PATH_LOCK_ENABLED_DEFAULT);
+  }
+
+  public OzoneLockProvider getOzoneLockProvider() {
+    return this.ozoneLockProvider;
+  }
+
+  public ReplicationConfig getDefaultReplicationConfig() {
+    final String replication = configuration.getTrimmed(
+        OZONE_SERVER_DEFAULT_REPLICATION_KEY,
+        OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT);
+    final String type = configuration.getTrimmed(
+        OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY,
+        OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT);
+    return ReplicationConfig.parse(ReplicationType.valueOf(type),
+        replication, configuration);
   }
 
   public String getOMDefaultBucketLayout() {
@@ -4195,7 +4355,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.minMultipartUploadPartSize = partSizeForTest;
   }
 
-
+  @VisibleForTesting
+  public boolean isOmRpcServerRunning() {
+    return isOmRpcServerRunning;
+  }
   /**
    * Write down Layout version of a finalized feature to DB on finalization.
    * @param lvm OMLayoutVersionManager

@@ -411,21 +411,22 @@ enum Status {
     LAYOUT_FEATURE_FINALIZATION_FAILED = 72;
     PREPARE_FAILED = 73;
     NOT_SUPPORTED_OPERATION_WHEN_PREPARED = 74;
+    NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION = 75;
 
-    TENANT_NOT_FOUND = 75;
-    TENANT_ALREADY_EXISTS = 76;
-    INVALID_TENANT_ID = 77;
+    TENANT_NOT_FOUND = 76;
+    TENANT_ALREADY_EXISTS = 77;
+    INVALID_TENANT_ID = 78;
 
-    ACCESS_ID_NOT_FOUND = 78;
-    TENANT_USER_ACCESS_ID_ALREADY_EXISTS = 79;
-    INVALID_TENANT_USERNAME = 80;
-    INVALID_ACCESS_ID = 81;
-    TENANT_AUTHORIZER_ERROR = 82;
+    ACCESS_ID_NOT_FOUND = 79;
+    TENANT_USER_ACCESS_ID_ALREADY_EXISTS = 80;
+    INVALID_TENANT_USERNAME = 81;
+    INVALID_ACCESS_ID = 82;
+    TENANT_AUTHORIZER_ERROR = 83;
 
-    VOLUME_IS_REFERENCED = 83;
-    TENANT_NOT_EMPTY = 84;
+    VOLUME_IS_REFERENCED = 84;
+    TENANT_NOT_EMPTY = 85;
 
-    FEATURE_NOT_ENABLED = 85;
+    FEATURE_NOT_ENABLED = 86;
 }
 
 /**
@@ -617,6 +618,7 @@ message BucketInfo {
     optional uint64 usedNamespace = 17;
     optional BucketLayoutProto bucketLayout = 18;
     optional string owner = 19;
+    optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 20;
 }
 
 enum StorageTypeProto {
@@ -695,6 +697,7 @@ message BucketArgs {
     optional uint64 quotaInBytes = 8;
     optional uint64 quotaInNamespace = 9;
     optional string ownerName = 10;
+    optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 11;
 }
 
 message PrefixInfo {
@@ -831,8 +834,8 @@ message KeyArgs {
     required string bucketName = 2;
     required string keyName = 3;
     optional uint64 dataSize = 4;
-    optional hadoop.hdds.ReplicationType type = 5;
-    optional hadoop.hdds.ReplicationFactor factor = 6;
+    optional hadoop.hdds.ReplicationType type = 5 [default = NONE];
+    optional hadoop.hdds.ReplicationFactor factor = 6 [default = ZERO];
     repeated KeyLocation keyLocations = 7;
     optional bool isMultipartKey = 8;
     optional string multipartUploadID = 9;
@@ -854,6 +857,7 @@ message KeyArgs {
 
     // When it is a head operation which is to check whether key exist
     optional bool headOp = 18;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 19;
 }
 
 message KeyLocation {
@@ -887,7 +891,7 @@ message KeyInfo {
     required string keyName = 3;
     required uint64 dataSize = 4;
     required hadoop.hdds.ReplicationType type = 5;
-    required hadoop.hdds.ReplicationFactor factor = 6;
+    optional hadoop.hdds.ReplicationFactor factor = 6;
     repeated KeyLocationList keyLocationList = 7;
     required uint64 creationTime = 8;
     required uint64 modificationTime = 9;
@@ -898,6 +902,7 @@ message KeyInfo {
     optional uint64 objectID = 14;
     optional uint64 updateID = 15;
     optional uint64 parentID = 16;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
 }
 
 message DirectoryInfo {
@@ -1097,7 +1102,7 @@ message OpenKeyBucket {
 
 message OpenKey {
   required string name = 1;
-  required uint64 clientID = 2;
+  optional uint64 clientID = 2 [deprecated=true];
 }
 
 message OMTokenProto {
@@ -1282,11 +1287,12 @@ message MultipartKeyInfo {
     required string uploadID = 1;
     required uint64 creationTime = 2;
     required hadoop.hdds.ReplicationType type = 3;
-    required hadoop.hdds.ReplicationFactor factor = 4;
+    optional hadoop.hdds.ReplicationFactor factor = 4;
     repeated PartKeyInfo partKeyInfoList = 5;
     optional uint64 objectID = 6;
     optional uint64 updateID = 7;
     optional uint64 parentID = 8;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 9;
 }
 
 message PartKeyInfo {
@@ -1344,7 +1350,7 @@ message MultipartUploadListPartsResponse {
     optional uint32 nextPartNumberMarker = 4;
     optional bool isTruncated = 5;
     repeated PartInfo partsList = 6;
-
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 7;
 }
 
 message ListMultipartUploadsRequest {
@@ -1365,8 +1371,8 @@ message MultipartUploadInfo {
     required string uploadId = 4;
     required uint64 creationTime = 5;
     required hadoop.hdds.ReplicationType type = 6;
-    required hadoop.hdds.ReplicationFactor factor = 7;
-
+    optional hadoop.hdds.ReplicationFactor factor = 7;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 8;
 }
 
 message PartInfo {

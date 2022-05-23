@@ -27,6 +27,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
@@ -619,6 +621,48 @@ public class SCMNodeManager implements NodeManager {
             "not leader.", ex);
       }
     }
+  }
+
+  /**
+   * Process Command Queue Reports from the Datanode Heartbeat.
+   *
+   * @param datanodeDetails
+   * @param commandQueueReportProto
+   */
+  @Override
+  public void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
+      CommandQueueReportProto commandQueueReportProto) {
+    LOG.debug("Processing Command Queue Report from [datanode={}]",
+        datanodeDetails.getHostName());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Command Queue Report is received from [datanode={}]: " +
+          "<json>{}</json>", datanodeDetails.getHostName(),
+          commandQueueReportProto.toString().replaceAll("\n", "\\\\n"));
+    }
+    try {
+      DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
+      if (commandQueueReportProto != null) {
+        datanodeInfo.setCommandCounts(commandQueueReportProto);
+        metrics.incNumNodeCommandQueueReportProcessed();
+      }
+    } catch (NodeNotFoundException e) {
+      metrics.incNumNodeCommandQueueReportProcessingFailed();
+      LOG.warn("Got Command Queue Report from unregistered datanode {}",
+          datanodeDetails);
+    }
+  }
+
+  /**
+   * Get the number of commands of the given type queued on the datanode at the
+   * last heartbeat. If the Datanode has not reported information for the given
+   * command type, -1 will be returned.
+   * @param cmdType
+   * @return The queued count or -1 if no data has been received from the DN.
+   */
+  public int getNodeQueuedCommandCount(DatanodeDetails datanodeDetails,
+      SCMCommandProto.Type cmdType) throws NodeNotFoundException {
+    DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
+    return datanodeInfo.getCommandCount(cmdType);
   }
 
   /**

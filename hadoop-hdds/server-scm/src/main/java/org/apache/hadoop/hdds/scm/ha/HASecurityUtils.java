@@ -262,7 +262,7 @@ public final class HASecurityUtils {
         client.getPrivateKey());
 
     // Get host name.
-    String hostname = scmAddress.getAddress().getHostName();
+    String hostname = scmAddress.getHostName();
 
     String subject = SCM_SUB_CA_PREFIX + hostname;
 

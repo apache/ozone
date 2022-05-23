@@ -155,11 +155,22 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       RepeatedOmKeyInfo oldKeyVersionsToDelete = null;
       OmKeyInfo keyToDelete =
           omMetadataManager.getKeyTable(getBucketLayout()).get(dbFileKey);
+
+      long correctedSpace = omKeyInfo.getReplicatedSize();
+
       if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
+        // Subtract the size of blocks to be overwritten.
+        correctedSpace -= keyToDelete.getReplicatedSize();
         oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbFileKey,
             keyToDelete, omMetadataManager,
             trxnLogIndex, ozoneManager.isRatisEnabled());
+      } else {
+        // if keyToDelete isn't null, usedNamespace shouldn't check and
+        // increase.
+        checkBucketQuotaInNamespace(omBucketInfo, 1L);
+        omBucketInfo.incrUsedNamespace(1L);
       }
+      checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
 
       // Add to cache of open key table and key table.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, dbFileKey,
@@ -173,19 +184,6 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
                 oldKeyVersionsToDelete, trxnLogIndex);
       }
 
-      long scmBlockSize = ozoneManager.getScmBlockSize();
-      int factor = omKeyInfo.getReplicationConfig().getRequiredNodes();
-      // Block was pre-requested and UsedBytes updated when createKey and
-      // AllocatedBlock. The space occupied by the Key shall be based on
-      // the actual Key size, and the total Block size applied before should
-      // be subtracted.
-      long correctedSpace = omKeyInfo.getDataSize() * factor -
-          allocatedLocationInfoList.size() * scmBlockSize * factor;
-      // Subtract the size of blocks to be overwritten.
-      if (keyToDelete != null) {
-        correctedSpace -= keyToDelete.getDataSize() *
-            keyToDelete.getReplicationConfig().getRequiredNodes();
-      }
       omBucketInfo.incrUsedBytes(correctedSpace);
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
