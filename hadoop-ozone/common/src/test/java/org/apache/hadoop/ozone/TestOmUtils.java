@@ -101,11 +101,11 @@ public class TestOmUtils {
     assertFalse(rpcAddrs.isEmpty());
     assertFalse(rpcAddrs.isEmpty());
     assertTrue(rpcAddrs.stream().anyMatch(
-            a -> a.getAddress().getHostAddress().equals("1.1.1.1")));
+        a -> a.getAddress().getHostAddress().equals("1.1.1.1")));
     assertTrue(rpcAddrs.stream().anyMatch(
-            a -> a.getAddress().getHostAddress().equals("1.1.1.2")));
+        a -> a.getAddress().getHostAddress().equals("1.1.1.2")));
     assertTrue(rpcAddrs.stream().anyMatch(
-            a -> a.getAddress().getHostAddress().equals("1.1.1.3")));
+        a -> a.getAddress().getHostAddress().equals("1.1.1.3")));
   }
 
   @Test

@@ -46,7 +46,7 @@ public class OzoneManagersCommandHandler implements Callable<Void> {
         OzoneConfiguration.of(tool.getConf());
     if (OmUtils.isServiceIdsDefined(configSource)) {
       Collection<InetSocketAddress> addresses = OmUtils.getOmHAAddressesById(
-        configSource);
+          configSource);
       for (InetSocketAddress addr : addresses) {
         tool.printOut(addr.getHostName());
       }

@@ -114,7 +114,7 @@ public final class OmUtils {
    * @return {service.id -> [{@link InetSocketAddress}]}
    */
   public static Collection<InetSocketAddress> getOmHAAddressesById(
-          ConfigurationSource conf) {
+      ConfigurationSource conf) {
     Map<String, List<InetSocketAddress>> result = new HashMap<>();
     Collection<InetSocketAddress> omAddressList = new HashSet<>();
     for (String serviceId : conf.getTrimmedStringCollection(
@@ -129,7 +129,7 @@ public final class OmUtils {
           result.get(serviceId).add(NetUtils.createSocketAddr(rpcAddr));
         } else {
           LOG.warn("Address undefined for nodeId: {} for service {}", nodeId,
-                  serviceId);
+              serviceId);
         }
       }
 
