@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.conf;
 
+import java.net.InetSocketAddress;
+import java.util.Collection;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -44,7 +46,10 @@ public class OzoneManagersCommandHandler implements Callable<Void> {
         OzoneConfiguration.of(tool.getConf());
     if (OmUtils.isServiceIdsDefined(
         configSource)) {
-      tool.printOut(OmUtils.getOmHAAddressesById(configSource).toString());
+      Collection<InetSocketAddress> addresses = OmUtils.getOmHAAddressesById(configSource);
+      for (InetSocketAddress addr : addresses) {
+        tool.printOut(addr.getHostName());
+      }
     } else {
       tool.printOut(OmUtils.getOmAddress(configSource).getHostName());
     }
