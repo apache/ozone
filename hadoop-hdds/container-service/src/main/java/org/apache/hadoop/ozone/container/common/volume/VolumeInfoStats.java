@@ -67,6 +67,15 @@ public class VolumeInfoStats {
         ms.unregisterSource(metricsSourceName);
     }
 
+    /**
+     * Return the Total Available capacity of the Volume.
+     */
+    @Metric("Metric to return the Storage Type")
+    public long getStorageType() {
+        spaceAvailable.set(volume.getVolumeInfo().getAvailable());
+        return spaceAvailable.value();
+    }
+
     public String getMetricsSourceName() {
         return metricsSourceName;
     }
@@ -100,6 +109,7 @@ public class VolumeInfoStats {
     /**
      * Return the Total Reserved of the Volume.
      */
+    @Metric("Fetches the Reserved Space")
     public long getReserved() {
         spaceReserved.set(volume.getVolumeInfo().getReservedInBytes());
         return spaceReserved.value();
@@ -116,10 +126,10 @@ public class VolumeInfoStats {
     /**
      * Return the Total capacity of the Volume.
      */
-    public long getTotalCapacity() {
-        totalCapacity.set(
-                spaceUsed.value() + spaceAvailable.value() + spaceReserved.value());
-        return totalCapacity.value();
-    }
+//    public long getTotalCapacity() {
+//        totalCapacity.set(
+//                spaceUsed.value() + spaceAvailable.value() + spaceReserved.value());
+//        return totalCapacity.value();
+//    }
 
 }
