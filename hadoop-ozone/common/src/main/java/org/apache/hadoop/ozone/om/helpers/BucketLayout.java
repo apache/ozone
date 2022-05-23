@@ -98,7 +98,7 @@ public enum BucketLayout {
    */
   public void validateSupportedOperation() throws OMException {
     // Older clients do not support any bucket layout other than LEGACY.
-    if (isLegacy()) {
+    if (!isLegacy()) {
       throw new OMException("Client is attempting to modify a bucket which" +
           " uses non-LEGACY bucket layout features. Please upgrade the client" +
           " to a compatible version before performing this operation.",

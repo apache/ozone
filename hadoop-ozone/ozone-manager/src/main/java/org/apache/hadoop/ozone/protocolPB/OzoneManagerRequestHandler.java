@@ -1017,8 +1017,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
           volumeBucket.getRight()).isLegacy()) {
         resp = resp.toBuilder()
             .setStatus(Status.NOT_SUPPORTED_OPERATION)
-            .setMessage("The list of keys contains keys with Erasure Coded"
-                + " replication set, hence the client is not able to"
+            .setMessage("The list of keys is present in a bucket using bucket"
+                + " layout features, hence the client is not able to"
                 + " represent all the keys returned."
                 + " Please upgrade the client to get the list of keys.")
             .clearListStatusResponse()
