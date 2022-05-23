@@ -22,6 +22,7 @@ import org.rocksdb.Options;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.SstFileWriter;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -31,9 +32,9 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.toIOException;
 /**
  * DumpFileWriter using rocksdb sst files.
  */
-public class RDBSstFileWriter implements DumpFileWriter {
+public class RDBSstFileWriter implements DumpFileWriter, Closeable {
 
-  private final SstFileWriter sstFileWriter;
+  private SstFileWriter sstFileWriter;
   private File sstFile;
   private AtomicLong keyCounter;
 
@@ -51,6 +52,7 @@ public class RDBSstFileWriter implements DumpFileWriter {
       // Here will create a new sst file each time, not append to existing
       sstFileWriter.open(sstFile.getAbsolutePath());
     } catch (RocksDBException e) {
+      closeOnFailure();
       throw toIOException("Failed to open external file for dump "
           + sstFile.getAbsolutePath(), e);
     }
@@ -62,6 +64,7 @@ public class RDBSstFileWriter implements DumpFileWriter {
       sstFileWriter.put(key, value);
       keyCounter.incrementAndGet();
     } catch (RocksDBException e) {
+      closeOnFailure();
       throw toIOException("Failed to put kv into dump file "
           + sstFile.getAbsolutePath(), e);
     }
@@ -69,18 +72,28 @@ public class RDBSstFileWriter implements DumpFileWriter {
 
   @Override
   public void close() throws IOException {
-    try {
-      // We should check for empty sst file, or we'll get exception.
-      if (keyCounter.get() > 0) {
-        sstFileWriter.finish();
+    if (sstFileWriter != null) {
+      try {
+        // We should check for empty sst file, or we'll get exception.
+        if (keyCounter.get() > 0) {
+          sstFileWriter.finish();
+        }
+      } catch (RocksDBException e) {
+        throw toIOException("Failed to finish dumping into file "
+            + sstFile.getAbsolutePath(), e);
+      } finally {
+        sstFileWriter.close();
+        sstFileWriter = null;
       }
-    } catch (RocksDBException e) {
-      throw toIOException("Failed to finish dumping into file "
-          + sstFile.getAbsolutePath(), e);
-    } finally {
-      sstFileWriter.close();
-    }
 
-    keyCounter.set(0);
+      keyCounter.set(0);
+    }
+  }
+
+  private void closeOnFailure() {
+    if (sstFileWriter != null) {
+      sstFileWriter.close();
+      sstFileWriter = null;
+    }
   }
 }
