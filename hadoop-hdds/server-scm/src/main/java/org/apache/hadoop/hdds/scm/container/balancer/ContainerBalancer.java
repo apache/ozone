@@ -1180,6 +1180,7 @@ public class ContainerBalancer extends StatefulService {
     validateState(false);
     validateConfiguration(configuration);
     saveConfiguration(configuration, true, 0);
+    this.config = configuration;
   }
 
   /**
