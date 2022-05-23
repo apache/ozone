@@ -254,7 +254,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           VOLUME_LOCK, volumeName);
 
       // Check volume existence
-      if (omMetadataManager.getVolumeTable().isExist(volumeName)) {
+      if (omMetadataManager.getVolumeTable().isExist(dbVolumeKey)) {
         LOG.debug("volume: '{}' already exists", volumeName);
         throw new OMException("Volume already exists", VOLUME_ALREADY_EXISTS);
       }

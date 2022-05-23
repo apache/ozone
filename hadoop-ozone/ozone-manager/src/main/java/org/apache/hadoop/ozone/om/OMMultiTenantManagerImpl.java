@@ -731,8 +731,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     if (!ozoneManager.isAdmin(ugi)) {
-      throw new OMException("User '" + ugi.getUserName() +
-          "' is not an Ozone admin.",
+      throw new OMException("User '" + ugi.getUserName() + "' or '" +
+          ugi.getShortUserName() + "' is not an Ozone admin.",
           OMException.ResultCodes.PERMISSION_DENIED);
     }
   }
