@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 import org.rocksdb.ColumnFamilyOptions;
 
@@ -87,9 +88,14 @@ public class DatanodeSchemaThreeDBDefinition
           DeletedBlocksTransaction.class,
           new DeletedBlocksTransactionCodec());
 
+  private static String separator = "";
+
   public DatanodeSchemaThreeDBDefinition(String dbPath,
       ConfigurationSource config) {
     super(dbPath, config);
+
+    DatanodeConfiguration dc = config.getObject(DatanodeConfiguration.class);
+    setSeparator(dc.getContainerSchemaV3KeySeparator());
 
     // Get global ColumnFamilyOptions first.
     DatanodeDBProfile dbProfile = DatanodeDBProfile
@@ -137,11 +143,16 @@ public class DatanodeSchemaThreeDBDefinition
 
   public static String getContainerKeyPrefix(long containerID) {
     // NOTE: Rocksdb normally needs a fixed length prefix.
-    return FixedLengthStringUtils.bytes2String(Longs.toByteArray(containerID));
+    return FixedLengthStringUtils.bytes2String(Longs.toByteArray(containerID))
+        + separator;
   }
 
   private static int getContainerKeyPrefixLength() {
     return FixedLengthStringUtils.string2Bytes(
         getContainerKeyPrefix(0L)).length;
+  }
+
+  private void setSeparator(String keySeparator) {
+    separator = keySeparator;
   }
 }

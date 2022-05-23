@@ -41,12 +41,14 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.ozone.test.GenericTestUtils;
 
+import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 
 import org.junit.After;
@@ -79,16 +81,31 @@ public class TestKeyValueBlockIterator {
   private String datanodeID = UUID.randomUUID().toString();
   private String clusterID = UUID.randomUUID().toString();
 
-  public TestKeyValueBlockIterator(ContainerTestVersionInfo versionInfo) {
+  public TestKeyValueBlockIterator(ContainerTestVersionInfo versionInfo,
+      String keySeparator) {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+    DatanodeConfiguration dc = conf.getObject(DatanodeConfiguration.class);
+    dc.setContainerSchemaV3KeySeparator(keySeparator);
+    conf.setFromObject(dc);
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> data() {
-    return ContainerTestVersionInfo.versionParameters();
+    List listA =
+        ContainerTestVersionInfo.getLayoutList().stream().map(
+            each -> new Object[] {each, ""})
+            .collect(toList());
+    List listB =
+        ContainerTestVersionInfo.getLayoutList().stream().map(
+            each -> new Object[] {each,
+                new DatanodeConfiguration().getContainerSchemaV3KeySeparator()})
+            .collect(toList());
+
+    listB.addAll(listA);
+    return listB;
   }
 
   @Before
@@ -290,8 +307,7 @@ public class TestKeyValueBlockIterator {
     String schemaPrefix = containerData.containerPrefix();
     MetadataKeyFilters.KeyPrefixFilter secondFilter =
             new MetadataKeyFilters.KeyPrefixFilter()
-            .addFilter(schemaPrefix == null ?
-                secondPrefix : schemaPrefix + secondPrefix);
+            .addFilter(schemaPrefix + secondPrefix);
     testWithFilter(secondFilter, blockIDs.get(secondPrefix));
   }
 
@@ -399,8 +415,7 @@ public class TestKeyValueBlockIterator {
           blockIndex++;
           BlockData blockData = new BlockData(blockID);
           blockData.setChunks(chunkList);
-          String blockKey = (schemaPrefix == null ? "" : schemaPrefix) +
-              prefix + blockID.getLocalID();
+          String blockKey = schemaPrefix + prefix + blockID.getLocalID();
           blockDataTable.put(blockKey, blockData);
           blockIDs.get(prefix).add(blockID.getLocalID());
         }

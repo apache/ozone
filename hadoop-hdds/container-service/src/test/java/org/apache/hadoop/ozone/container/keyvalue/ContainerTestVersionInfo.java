@@ -65,6 +65,9 @@ public class ContainerTestVersionInfo {
         .collect(toList());
   }
 
+  public static List<ContainerTestVersionInfo> getLayoutList() {
+    return layoutList;
+  }
   public static void setTestSchemaVersion(String schemaVersion,
       OzoneConfiguration conf) {
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {

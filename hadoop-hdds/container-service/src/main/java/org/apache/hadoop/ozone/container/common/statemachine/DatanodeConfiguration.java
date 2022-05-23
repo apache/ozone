@@ -271,6 +271,15 @@ public class DatanodeConfiguration {
   private boolean containerSchemaV3Enabled =
       CONTAINER_SCHEMA_V3_ENABLED_DEFAULT;
 
+  @Config(key = "container.schema.v3.key.separator",
+      defaultValue = "|",
+      type = ConfigType.STRING,
+      tags = { DATANODE },
+      description = "The default separator between Container ID and container" +
+           " meta key name."
+  )
+  private String containerSchemaV3KeySeparator = "|";
+
   @PostConstruct
   public void validate() {
     if (containerDeleteThreads < 1) {
@@ -420,5 +429,13 @@ public class DatanodeConfiguration {
 
   public void setContainerSchemaV3Enabled(boolean containerSchemaV3Enabled) {
     this.containerSchemaV3Enabled = containerSchemaV3Enabled;
+  }
+
+  public String getContainerSchemaV3KeySeparator() {
+    return this.containerSchemaV3KeySeparator;
+  }
+
+  public void setContainerSchemaV3KeySeparator(String separator) {
+    this.containerSchemaV3KeySeparator = separator;
   }
 }
