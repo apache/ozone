@@ -43,9 +43,9 @@ import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.security.authentication.client
     .AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -61,7 +61,7 @@ public class TestStatisticsUpdate {
   private NodeManager nodeManager;
   private NodeReportHandler nodeReportHandler;
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException, AuthenticationException {
     final OzoneConfiguration conf = new OzoneConfiguration();
     final String storageDir = GenericTestUtils.getTempPath(
@@ -117,14 +117,14 @@ public class TestStatisticsUpdate {
         Mockito.mock(EventPublisher.class));
 
     SCMNodeStat stat = nodeManager.getStats();
-    Assert.assertEquals(300L, stat.getCapacity().get().longValue());
-    Assert.assertEquals(270L, stat.getRemaining().get().longValue());
-    Assert.assertEquals(30L, stat.getScmUsed().get().longValue());
+    Assertions.assertEquals(300L, stat.getCapacity().get());
+    Assertions.assertEquals(270L, stat.getRemaining().get());
+    Assertions.assertEquals(30L, stat.getScmUsed().get());
 
     SCMNodeMetric nodeStat = nodeManager.getNodeStat(datanode1);
-    Assert.assertEquals(100L, nodeStat.get().getCapacity().get().longValue());
-    Assert.assertEquals(90L, nodeStat.get().getRemaining().get().longValue());
-    Assert.assertEquals(10L, nodeStat.get().getScmUsed().get().longValue());
+    Assertions.assertEquals(100L, nodeStat.get().getCapacity().get());
+    Assertions.assertEquals(90L, nodeStat.get().getRemaining().get());
+    Assertions.assertEquals(10L, nodeStat.get().getScmUsed().get());
 
     //TODO: Support logic to mark a node as dead in NodeManager.
 
@@ -143,10 +143,10 @@ public class TestStatisticsUpdate {
     nodeManager.processHeartbeat(datanode2, layoutInfo);
     //THEN statistics in SCM should changed.
     stat = nodeManager.getStats();
-    Assert.assertEquals(200L, stat.getCapacity().get().longValue());
-    Assert.assertEquals(180L,
-        stat.getRemaining().get().longValue());
-    Assert.assertEquals(20L, stat.getScmUsed().get().longValue());
+    Assertions.assertEquals(200L, stat.getCapacity().get());
+    Assertions.assertEquals(180L,
+        stat.getRemaining().get());
+    Assertions.assertEquals(20L, stat.getScmUsed().get());
   }
 
 }

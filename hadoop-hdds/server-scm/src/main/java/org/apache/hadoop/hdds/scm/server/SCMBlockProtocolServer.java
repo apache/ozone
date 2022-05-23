@@ -309,13 +309,13 @@ public class SCMBlockProtocolServer implements
       return scm.getScmHAManager().addSCM(request);
     } catch (Exception ex) {
       auditSuccess = false;
-      AUDIT.logReadFailure(
+      AUDIT.logWriteFailure(
           buildAuditMessageForFailure(SCMAction.ADD_SCM, auditMap, ex)
       );
       throw ex;
     } finally {
       if (auditSuccess) {
-        AUDIT.logReadSuccess(
+        AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(SCMAction.ADD_SCM, auditMap)
         );
       }

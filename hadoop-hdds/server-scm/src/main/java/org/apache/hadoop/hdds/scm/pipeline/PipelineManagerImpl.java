@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -41,16 +42,17 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.management.ObjectName;
 import java.io.IOException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +76,7 @@ public class PipelineManagerImpl implements PipelineManager {
   private PipelineFactory pipelineFactory;
   private PipelineStateManager stateManager;
   private BackgroundPipelineCreator backgroundPipelineCreator;
+  private BackgroundPipelineScrubber backgroundPipelineScrubber;
   private final ConfigurationSource conf;
   private final EventPublisher eventPublisher;
   // Pipeline Manager MXBean
@@ -86,14 +89,17 @@ public class PipelineManagerImpl implements PipelineManager {
   // This allows for freezing/resuming the new pipeline creation while the
   // SCM is already out of SafeMode.
   private AtomicBoolean freezePipelineCreation;
+  private final Clock clock;
 
+  @SuppressWarnings("checkstyle:parameterNumber")
   protected PipelineManagerImpl(ConfigurationSource conf,
                                 SCMHAManager scmhaManager,
                                 NodeManager nodeManager,
                                 PipelineStateManager pipelineStateManager,
                                 PipelineFactory pipelineFactory,
                                 EventPublisher eventPublisher,
-                                SCMContext scmContext) {
+                                SCMContext scmContext,
+                                Clock clock) {
     this.lock = new ReentrantReadWriteLock();
     this.pipelineFactory = pipelineFactory;
     this.stateManager = pipelineStateManager;
@@ -102,6 +108,7 @@ public class PipelineManagerImpl implements PipelineManager {
     this.nodeManager = nodeManager;
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
+    this.clock = clock;
     this.pmInfoBean = MBeans.register("SCMPipelineManager",
         "SCMPipelineManagerInfo", this);
     this.metrics = SCMPipelineMetrics.create();
@@ -112,6 +119,7 @@ public class PipelineManagerImpl implements PipelineManager {
     this.freezePipelineCreation = new AtomicBoolean();
   }
 
+  @SuppressWarnings("checkstyle:parameterNumber")
   public static PipelineManagerImpl newPipelineManager(
       ConfigurationSource conf,
       SCMHAManager scmhaManager,
@@ -119,7 +127,9 @@ public class PipelineManagerImpl implements PipelineManager {
       Table<PipelineID, Pipeline> pipelineStore,
       EventPublisher eventPublisher,
       SCMContext scmContext,
-      SCMServiceManager serviceManager) throws IOException {
+      SCMServiceManager serviceManager,
+      Clock clock) throws IOException {
+
     // Create PipelineStateManagerImpl
     PipelineStateManager stateManager = PipelineStateManagerImpl
         .newBuilder().setPipelineStore(pipelineStore)
@@ -135,14 +145,21 @@ public class PipelineManagerImpl implements PipelineManager {
     // Create PipelineManager
     PipelineManagerImpl pipelineManager = new PipelineManagerImpl(conf,
         scmhaManager, nodeManager, stateManager, pipelineFactory,
-        eventPublisher, scmContext);
+        eventPublisher, scmContext, clock);
 
     // Create background thread.
     BackgroundPipelineCreator backgroundPipelineCreator =
-        new BackgroundPipelineCreator(
-            pipelineManager, conf, serviceManager, scmContext);
+        new BackgroundPipelineCreator(pipelineManager, conf, scmContext, clock);
+
+    BackgroundPipelineScrubber backgroundPipelineScrubber =
+        new BackgroundPipelineScrubber(pipelineManager, conf, scmContext,
+            clock);
 
     pipelineManager.setBackgroundPipelineCreator(backgroundPipelineCreator);
+    pipelineManager.setBackgroundPipelineScrubber(backgroundPipelineScrubber);
+
+    serviceManager.register(backgroundPipelineCreator);
+    serviceManager.register(backgroundPipelineScrubber);
 
     return pipelineManager;
   }
@@ -151,6 +168,14 @@ public class PipelineManagerImpl implements PipelineManager {
   public Pipeline createPipeline(
       ReplicationConfig replicationConfig
   ) throws IOException {
+    return createPipeline(replicationConfig, Collections.emptyList(),
+        Collections.emptyList());
+  }
+
+  @Override
+  public Pipeline createPipeline(ReplicationConfig replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      throws IOException {
     if (!isPipelineCreationAllowed() && !factorOne(replicationConfig)) {
       LOG.debug("Pipeline creation is not allowed until safe mode prechecks " +
           "complete");
@@ -167,7 +192,8 @@ public class PipelineManagerImpl implements PipelineManager {
 
     acquireWriteLock();
     try {
-      Pipeline pipeline = pipelineFactory.create(replicationConfig);
+      Pipeline pipeline = pipelineFactory.create(replicationConfig,
+          excludedNodes, favoredNodes);
       stateManager.addPipeline(pipeline.getProtobufMessage(
           ClientVersion.CURRENT_VERSION));
       recordMetricsForPipeline(pipeline);
@@ -204,6 +230,12 @@ public class PipelineManagerImpl implements PipelineManager {
     // This will mostly be used to create dummy pipeline for SimplePipelines.
     // We don't update the metrics for SimplePipelines.
     return pipelineFactory.create(replicationConfig, nodes);
+  }
+
+  @Override
+  public Pipeline createPipelineForRead(
+      ReplicationConfig replicationConfig, Set<ContainerReplica> replicas) {
+    return pipelineFactory.createForRead(replicationConfig, replicas);
   }
 
   @Override
@@ -245,6 +277,19 @@ public class PipelineManagerImpl implements PipelineManager {
       Collection<PipelineID> excludePipelines) {
     return stateManager
         .getPipelines(replicationConfig, state, excludeDns, excludePipelines);
+  }
+
+  @Override
+  /**
+   * Returns the count of pipelines meeting the given ReplicationConfig and
+   * state.
+   * @param replicationConfig The ReplicationConfig of the pipelines to count
+   * @param state The current state of the pipelines to count
+   * @return The count of pipelines meeting the above criteria
+   */
+  public int getPipelineCount(ReplicationConfig config,
+                                     Pipeline.PipelineState state) {
+    return stateManager.getPipelineCount(config, state);
   }
 
   @Override
@@ -378,15 +423,14 @@ public class PipelineManagerImpl implements PipelineManager {
    * Scrub pipelines.
    */
   @Override
-  public void scrubPipeline(ReplicationConfig config)
-      throws IOException {
-    Instant currentTime = Instant.now();
+  public void scrubPipelines() throws IOException {
+    Instant currentTime = clock.instant();
     Long pipelineScrubTimeoutInMills = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    List<Pipeline> candidates = stateManager.getPipelines(config);
+    List<Pipeline> candidates = stateManager.getPipelines();
 
     for (Pipeline p : candidates) {
       // scrub pipelines who stay ALLOCATED for too long.
@@ -407,7 +451,6 @@ public class PipelineManagerImpl implements PipelineManager {
         removePipeline(p);
       }
     }
-    return;
   }
 
   /**
@@ -487,7 +530,7 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public void waitPipelineReady(PipelineID pipelineID, long timeout)
       throws IOException {
-    long st = Time.monotonicNow();
+    long st = clock.millis();
     if (timeout == 0) {
       timeout = pipelineWaitDefaultTimeout;
     }
@@ -509,7 +552,7 @@ public class PipelineManagerImpl implements PipelineManager {
           Thread.currentThread().interrupt();
         }
       }
-    } while (!ready && Time.monotonicNow() - st < timeout);
+    } while (!ready && clock.millis() - st < timeout);
 
     if (!ready) {
       throw new IOException(String.format("Pipeline %s is not ready in %d ms",
@@ -561,6 +604,9 @@ public class PipelineManagerImpl implements PipelineManager {
     if (backgroundPipelineCreator != null) {
       backgroundPipelineCreator.stop();
     }
+    if (backgroundPipelineScrubber != null) {
+      backgroundPipelineScrubber.stop();
+    }
 
     if (pmInfoBean != null) {
       MBeans.unregister(this.pmInfoBean);
@@ -607,6 +653,16 @@ public class PipelineManagerImpl implements PipelineManager {
   @VisibleForTesting
   public BackgroundPipelineCreator getBackgroundPipelineCreator() {
     return this.backgroundPipelineCreator;
+  }
+
+  private void setBackgroundPipelineScrubber(
+      BackgroundPipelineScrubber backgroundPipelineScrubber) {
+    this.backgroundPipelineScrubber = backgroundPipelineScrubber;
+  }
+
+  @VisibleForTesting
+  public BackgroundPipelineScrubber getBackgroundPipelineScrubber() {
+    return this.backgroundPipelineScrubber;
   }
 
   @VisibleForTesting

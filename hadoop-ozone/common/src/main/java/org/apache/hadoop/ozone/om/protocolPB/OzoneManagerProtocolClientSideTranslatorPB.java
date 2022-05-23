@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .UpgradeFinalizationStatus;
@@ -212,7 +213,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   private OmTransport transport;
   private ThreadLocal<S3Auth> threadLocalS3Auth
       = new ThreadLocal<>();
-
+    
   private boolean s3AuthCheck;
   public OzoneManagerProtocolClientSideTranslatorPB(OmTransport omTransport,
       String clientId) {
@@ -245,7 +246,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * @param cmdType type of the request
    */
   private OMRequest.Builder createOMRequest(Type cmdType) {
-
     return OMRequest.newBuilder()
         .setCmdType(cmdType)
         .setVersion(ClientVersion.CURRENT_VERSION)
@@ -643,8 +643,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
 
     if (args.getReplicationConfig() != null) {
-      keyArgs.setFactor(
-          ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      if (args.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgs.setEcReplicationConfig(
+            ((ECReplicationConfig) args.getReplicationConfig()).toProto());
+      } else {
+        keyArgs.setFactor(
+            ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      }
       keyArgs.setType(args.getReplicationConfig().getReplicationType());
     }
 
@@ -701,8 +706,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(args.getDataSize());
 
     if (args.getReplicationConfig() != null) {
-      keyArgs.setFactor(
-          ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      if (args.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgs.setEcReplicationConfig(
+            ((ECReplicationConfig) args.getReplicationConfig()).toProto());
+      } else {
+        keyArgs.setFactor(
+            ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      }
       keyArgs.setType(args.getReplicationConfig().getReplicationType());
     }
 
@@ -736,8 +746,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .collect(Collectors.toList()));
 
     if (args.getReplicationConfig() != null) {
-      keyArgsBuilder.setFactor(
-          ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      if (args.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgsBuilder.setEcReplicationConfig(
+            ((ECReplicationConfig) args.getReplicationConfig()).toProto());
+      } else {
+        keyArgsBuilder.setFactor(
+            ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      }
       keyArgsBuilder.setType(args.getReplicationConfig().getReplicationType());
     }
 
@@ -1206,9 +1221,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
 
     if (omKeyArgs.getReplicationConfig() != null) {
-      keyArgs.setFactor(
-              ReplicationConfig
-                      .getLegacyFactor(omKeyArgs.getReplicationConfig()));
+      if (omKeyArgs.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgs.setEcReplicationConfig(
+            ((ECReplicationConfig) omKeyArgs.getReplicationConfig()).toProto());
+      } else {
+        keyArgs.setFactor(ReplicationConfig
+            .getLegacyFactor(omKeyArgs.getReplicationConfig()));
+      }
       keyArgs.setType(omKeyArgs.getReplicationConfig().getReplicationType());
     }
 
@@ -1343,8 +1362,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OmMultipartUploadListParts omMultipartUploadListParts =
         new OmMultipartUploadListParts(
-                ReplicationConfig.fromProtoTypeAndFactor(response.getType(),
-                response.getFactor()),
+            ReplicationConfig.fromProto(
+                response.getType(), response.getFactor(),
+                response.getEcReplicationConfig()),
             response.getNextPartNumberMarker(), response.getIsTruncated());
     omMultipartUploadListParts.addProtoPartList(response.getPartsListList());
 
@@ -1379,8 +1399,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                 proto.getKeyName(),
                 proto.getUploadId(),
                 Instant.ofEpochMilli(proto.getCreationTime()),
-                ReplicationConfig.fromProtoTypeAndFactor(proto.getType(),
-                        proto.getFactor())
+                ReplicationConfig.fromProto(proto.getType(), proto.getFactor(),
+                    proto.getEcReplicationConfig())
             ))
             .collect(Collectors.toList());
 
@@ -1790,9 +1810,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .addAllAcls(args.getAcls().stream().map(a ->
             OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
     if (args.getReplicationConfig() != null) {
-      keyArgsBuilder.setFactor(
-              ReplicationConfig
-                      .getLegacyFactor(args.getReplicationConfig()));
+      if (args.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgsBuilder.setEcReplicationConfig(
+            ((ECReplicationConfig) args.getReplicationConfig()).toProto());
+      } else {
+        keyArgsBuilder.setFactor(
+            ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      }
       keyArgsBuilder.setType(args.getReplicationConfig().getReplicationType());
     }
     CreateFileRequest createFileRequest = CreateFileRequest.newBuilder()

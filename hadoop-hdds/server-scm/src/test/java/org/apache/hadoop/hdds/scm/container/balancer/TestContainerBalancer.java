@@ -32,7 +32,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager.MoveResult;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -134,8 +136,7 @@ public class TestContainerBalancer {
     Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
         Mockito.any(DatanodeDetails.class),
         Mockito.any(DatanodeDetails.class)))
-        .thenReturn(CompletableFuture.completedFuture(
-            ReplicationManager.MoveResult.COMPLETED));
+        .thenReturn(CompletableFuture.completedFuture(MoveResult.COMPLETED));
 
     when(containerManager.getContainerReplicas(Mockito.any(ContainerID.class)))
         .thenAnswer(invocationOnMock -> {
@@ -631,7 +632,7 @@ public class TestContainerBalancer {
             Mockito.any(DatanodeDetails.class),
             Mockito.any(DatanodeDetails.class)))
         .thenReturn(CompletableFuture.completedFuture(
-            ReplicationManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY));
+            MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY));
     balancerConfiguration.setMaxSizeToMovePerIteration(10 * OzoneConsts.GB);
 
     startBalancer(balancerConfiguration);
@@ -640,6 +641,40 @@ public class TestContainerBalancer {
     Assert.assertEquals(ContainerBalancer.IterationResult.ITERATION_COMPLETED,
         containerBalancer.getIterationResult());
     containerBalancer.stop();
+  }
+
+  @Test
+  public void checkIterationResultTimeout()
+      throws NodeNotFoundException, ContainerNotFoundException {
+
+    Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
+            Mockito.any(DatanodeDetails.class),
+            Mockito.any(DatanodeDetails.class)))
+        .thenReturn(genCompletableFuture(500), genCompletableFuture(2000));
+
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setIterations(1);
+    balancerConfiguration.setMaxSizeEnteringTarget(10 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    balancerConfiguration.setMoveTimeout(Duration.ofMillis(1000));
+
+    startBalancer(balancerConfiguration);
+    sleepWhileBalancing(2000);
+
+    /*
+    According to the setup and configurations, this iteration's result should
+    be ITERATION_COMPLETED.
+     */
+    Assert.assertEquals(ContainerBalancer.IterationResult.ITERATION_COMPLETED,
+        containerBalancer.getIterationResult());
+    Assert.assertEquals(1,
+        containerBalancer.getMetrics()
+            .getNumContainerMovesCompletedInLatestIteration());
+    Assert.assertTrue(containerBalancer.getMetrics()
+            .getNumContainerMovesTimeoutInLatestIteration() > 1);
+    containerBalancer.stop();
+
   }
 
   /**
@@ -832,6 +867,18 @@ public class TestContainerBalancer {
         InvalidContainerBalancerConfigurationException e) {
       LOG.info("Could not start ContainerBalancer while testing", e);
     }
+  }
+
+  private CompletableFuture<LegacyReplicationManager.MoveResult>
+      genCompletableFuture(int sleepMilSec) {
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        Thread.sleep(sleepMilSec);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+      return LegacyReplicationManager.MoveResult.COMPLETED;
+    });
   }
 
 }

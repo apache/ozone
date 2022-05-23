@@ -102,7 +102,7 @@ public class BlockOutputStreamEntryPool {
         .setMultipartUploadPartNumber(partNumber).build();
     this.requestID = requestId;
     this.openID = openID;
-    this.excludeList = new ExcludeList();
+    this.excludeList = createExcludeList();
 
     this.bufferPool =
         new BufferPool(config.getStreamBufferSize(),
@@ -110,6 +110,10 @@ public class BlockOutputStreamEntryPool {
                 .getStreamBufferSize()),
             ByteStringConversion
                 .createByteBufferConversion(unsafeByteBufferConversion));
+  }
+
+  ExcludeList createExcludeList() {
+    return new ExcludeList();
   }
 
   /**
@@ -216,7 +220,7 @@ public class BlockOutputStreamEntryPool {
                 .setLength(streamEntry.getCurrentPosition())
                 .setOffset(0)
                 .setToken(streamEntry.getToken())
-                .setPipeline(streamEntry.getPipelineForOMLocationReport())
+                .setPipeline(streamEntry.getPipeline())
                 .build();
         locationInfoList.add(info);
       }
@@ -319,7 +323,8 @@ public class BlockOutputStreamEntryPool {
     if (keyArgs != null) {
       // in test, this could be null
       long length = getKeyLength();
-      Preconditions.checkArgument(offset == length);
+      Preconditions.checkArgument(offset == length,
+          "Epected offset: " + offset + " expected len: " + length);
       keyArgs.setDataSize(length);
       keyArgs.setLocationInfoList(getLocationInfoList());
       // When the key is multipart upload part file upload, we should not

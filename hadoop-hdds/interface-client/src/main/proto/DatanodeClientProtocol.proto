@@ -146,6 +146,7 @@ enum Result {
   BLOCK_TOKEN_VERIFICATION_FAILED = 41;
   ERROR_IN_DB_SYNC = 42;
   CHUNK_FILE_INCONSISTENCY = 43;
+  DELETE_ON_NON_EMPTY_CONTAINER = 44;
 }
 
 /**
@@ -155,6 +156,8 @@ message DatanodeBlockID {
   required int64 containerID = 1;
   required int64 localID = 2;
   optional uint64 blockCommitSequenceId = 3 [default = 0];
+  optional int32 replicaIndex = 4;
+
 }
 
 message KeyValue {
@@ -266,6 +269,7 @@ enum ContainerType {
 message  CreateContainerRequestProto {
   repeated KeyValue metadata = 2;
   optional ContainerType containerType = 3 [default = KeyValueContainer];
+  optional int32 replicaIndex = 4;
 }
 
 message  CreateContainerResponseProto {

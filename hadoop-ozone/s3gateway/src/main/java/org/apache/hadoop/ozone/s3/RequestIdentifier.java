@@ -23,18 +23,24 @@ import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 
 import org.apache.commons.lang3.RandomStringUtils;
 
+import java.security.SecureRandom;
+import java.util.Random;
+
 /**
  * Request specific identifiers.
  */
 @RequestScoped
 public class RequestIdentifier {
 
+  private static final Random RANDOM = new SecureRandom();
+
   private final String requestId;
 
   private final String amzId;
 
   public RequestIdentifier() {
-    amzId = RandomStringUtils.randomAlphanumeric(8, 16);
+    int count = 8 + RANDOM.nextInt(8);
+    amzId = RandomStringUtils.random(count, 0, 0, true, true, null, RANDOM);
     requestId = OzoneUtils.getRequestID();
   }
 

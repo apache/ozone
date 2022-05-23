@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -53,6 +54,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.After;
@@ -264,7 +266,8 @@ public class TestSCMSafeModeManager {
               scmMetadataStore.getPipelineTable(),
               queue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              new MonotonicClock(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -290,7 +293,8 @@ public class TestSCMSafeModeManager {
               scmMetadataStore.getPipelineTable(),
               queue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              new MonotonicClock(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -315,7 +319,8 @@ public class TestSCMSafeModeManager {
               scmMetadataStore.getPipelineTable(),
               queue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              new MonotonicClock(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -347,13 +352,15 @@ public class TestSCMSafeModeManager {
             scmMetadataStore.getPipelineTable(),
             queue,
             scmContext,
-            serviceManager);
+            serviceManager,
+            new MonotonicClock(ZoneOffset.UTC));
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,
             pipelineManager.getStateManager(), config);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
     pipelineManager.getBackgroundPipelineCreator().stop();
+    pipelineManager.getBackgroundPipelineScrubber().stop();
 
     for (int i = 0; i < pipelineCount; i++) {
       // Create pipeline
@@ -601,7 +608,8 @@ public class TestSCMSafeModeManager {
               scmMetadataStore.getPipelineTable(),
               queue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              new MonotonicClock(ZoneOffset.UTC));
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -666,7 +674,8 @@ public class TestSCMSafeModeManager {
             scmMetadataStore.getPipelineTable(),
             queue,
             scmContext,
-            serviceManager);
+            serviceManager,
+            new MonotonicClock(ZoneOffset.UTC));
 
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
