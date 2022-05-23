@@ -22,7 +22,6 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
@@ -35,11 +34,10 @@ public class VolumeInfoStats {
     private String VolumeRootStr;
     private HddsVolume volume;
 
-    private @Metric MutableGaugeLong spaceUsed;
-    private @Metric MutableGaugeLong spaceAvailable;
-    private @Metric MutableGaugeLong spaceReserved;
-    private @Metric MutableGaugeLong capacity;
-    private @Metric MutableGaugeLong totalCapacity;
+    private long spaceUsed;
+    private long spaceAvailable;
+    private long spaceReserved;
+
 
     /**
      * @param identifier Typically, path to volume root. e.g. /data/hdds
@@ -61,33 +59,29 @@ public class VolumeInfoStats {
         ms.unregisterSource(metricsSourceName);
     }
 
-    /**
-     * Return the Total Available capacity of the Volume.
-     */
     @Metric("Metric to return the Storage Type")
     public String getStorageType() {
         return volume.getStorageType().toString();
     }
-    /**
-     * Return the Storage Directory for the Volume
-     */
+
     @Metric("Returns the Directory name for the volume")
     public String getStorageDirectory() {
         return volume.getStorageDir().toString();
     }
 
-    /**
-     * Return the DataNode UID for the respective volume
-     */
+    @Metric("Return the DataNode UID for the respective volume")
     public String getDatanodeUuid() {
         return volume.getDatanodeUuid();
     }
 
-    /**
-     * Return the Layout version of the storage data
-     */
+    @Metric("Return the Layout Version for the volume")
     public int getLayoutVersion() {
         return volume.getLayoutVersion();
+    }
+
+    @Metric("Returns the Volume Type")
+    public String getVolumeType() {
+        return volume.getType().name();
     }
 
     public String getMetricsSourceName() {
@@ -109,7 +103,8 @@ public class VolumeInfoStats {
      */
     @Metric("Returns the Used space")
     public long getUsed() {
-        return (volume.getVolumeInfo().getScmUsed());
+        spaceUsed = volume.getVolumeInfo().getScmUsed();
+        return spaceUsed;
     }
 
     /**
@@ -117,7 +112,8 @@ public class VolumeInfoStats {
      */
     @Metric("Returns the Available space")
     public long getAvailable() {
-        return (volume.getVolumeInfo().getAvailable());
+        spaceAvailable = volume.getVolumeInfo().getAvailable();
+        return spaceAvailable;
     }
 
     /**
@@ -125,7 +121,8 @@ public class VolumeInfoStats {
      */
     @Metric("Fetches the Reserved Space")
     public long getReserved() {
-        return (volume.getVolumeInfo().getReservedInBytes());
+        spaceReserved = volume.getVolumeInfo().getReservedInBytes();
+        return spaceReserved;
     }
 
     /**
@@ -133,7 +130,7 @@ public class VolumeInfoStats {
      */
     @Metric("Returns the Capacity of the Volume")
     public long getCapacity() {
-        return spaceUsed.value() + spaceAvailable.value();
+        return spaceUsed+spaceAvailable;
     }
 
     /**
@@ -141,7 +138,7 @@ public class VolumeInfoStats {
      */
     @Metric("Returns the Total Capacity of the Volume")
     public long getTotalCapacity() {
-        return (spaceUsed.value() + spaceAvailable.value() + spaceReserved.value());
+        return (spaceUsed+spaceAvailable+spaceReserved);
     }
 
 }

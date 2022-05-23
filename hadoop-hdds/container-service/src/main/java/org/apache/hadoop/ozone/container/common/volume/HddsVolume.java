@@ -26,6 +26,7 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
@@ -77,6 +78,7 @@ public class HddsVolume extends StorageVolume {
   private int layoutVersion;      // layout version of the storage data
   private final AtomicLong committedBytes; // till Open containers become full
 
+  private final VolumeType type = VolumeType.DATA_VOLUME;     // Mentions the type of volume
   /**
    * Builder for HddsVolume.
    */
@@ -301,6 +303,10 @@ public class HddsVolume extends StorageVolume {
 
   public int getLayoutVersion() {
     return layoutVersion;
+  }
+
+  public VolumeType getType() {
+    return type;
   }
 
   public VolumeState getStorageState() {

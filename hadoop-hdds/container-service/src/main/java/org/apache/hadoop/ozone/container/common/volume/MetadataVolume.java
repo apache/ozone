@@ -27,8 +27,14 @@ import java.io.IOException;
  */
 public class MetadataVolume extends StorageVolume {
 
+  private final VolumeType type = VolumeType.META_VOLUME;
+
   protected MetadataVolume(Builder b) throws IOException {
     super(b);
+  }
+
+  public VolumeType getType() {
+    return type;
   }
 
   /**
