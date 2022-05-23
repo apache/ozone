@@ -2870,8 +2870,8 @@
     <name>ozone.om.lock.metrics.collection.enable</name>
     <tag>OZONE, OM</tag>
     <value>false</value>
-    <description>Defaults to false. If true, the OMLockMetrics collection is
-      enabled. If false, it is disabled.
+    <description>If set to true, enables OMLockMetrics collection. Defaults to
+      false/disabled.
     </description>
   </property>
 

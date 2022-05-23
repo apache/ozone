@@ -182,11 +182,25 @@ public class OzoneManagerLock {
       LOG.error(errorMessage);
       throw new RuntimeException(errorMessage);
     } else {
-      if (!omLockMetricsCollectionEnabled) {
+
+      if (omLockMetricsCollectionEnabled) {
+        long startWaitingTimeNanos = Time.monotonicNowNanos();
         lockFn.accept(resourceName);
+
+        switch (lockType) {
+        case READ_LOCK:
+          updateReadLockMetrics(resource, resourceName, startWaitingTimeNanos);
+          break;
+        case WRITE_LOCK:
+          updateWriteLockMetrics(resource, resourceName, startWaitingTimeNanos);
+          break;
+        default:
+          break;
+        }
       } else {
-        updateLockMetrics(resource, resourceName, lockFn, lockType);
+        lockFn.accept(resourceName);
       }
+
       if (LOG.isDebugEnabled()) {
         LOG.debug("Acquired {} {} lock on resource {}", lockType, resource.name,
             resourceName);
@@ -196,48 +210,42 @@ public class OzoneManagerLock {
     }
   }
 
-  private void updateLockMetrics(Resource resource, String resourceName,
-                         Consumer<String> lockFn, String lockType) {
-    long startWaitingTimeNanos = Time.monotonicNowNanos();
-    lockFn.accept(resourceName);
-
+  private void updateReadLockMetrics(Resource resource, String resourceName,
+                                     long startWaitingTimeNanos) {
     /**
-     *  read/write lock hold count helps in metrics updation only once in case
+     *  readHoldCount helps in metrics updation only once in case
      *  of reentrant locks.
      */
-    if (lockType.equals(READ_LOCK) &&
-        manager.getReadHoldCount(resourceName) == 1) {
-      updateReadLockMetrics(resource, startWaitingTimeNanos);
-    }
-    if (lockType.equals(WRITE_LOCK) &&
-        (manager.getWriteHoldCount(resourceName) == 1) &&
-        manager.isWriteLockedByCurrentThread(resourceName)) {
-      updateWriteLockMetrics(resource, startWaitingTimeNanos);
+    if (manager.getReadHoldCount(resourceName) == 1) {
+      long readLockWaitingTimeNanos =
+          Time.monotonicNowNanos() - startWaitingTimeNanos;
+
+      // Adds a snapshot to the metric readLockWaitingTimeMsStat.
+      omLockMetrics.setReadLockWaitingTimeMsStat(
+          TimeUnit.NANOSECONDS.toMillis(readLockWaitingTimeNanos));
+
+      resource.setStartReadHeldTimeNanos(Time.monotonicNowNanos());
     }
   }
 
-  private void updateReadLockMetrics(Resource resource,
-                                     long startWaitingTimeNanos) {
-    long readLockWaitingTimeNanos =
-        Time.monotonicNowNanos() - startWaitingTimeNanos;
-
-    // Adds a snapshot to the metric readLockWaitingTimeMsStat.
-    omLockMetrics.setReadLockWaitingTimeMsStat(
-        TimeUnit.NANOSECONDS.toMillis(readLockWaitingTimeNanos));
-
-    resource.setStartReadHeldTimeNanos(Time.monotonicNowNanos());
-  }
-
-  private void updateWriteLockMetrics(Resource resource,
+  private void updateWriteLockMetrics(Resource resource, String resourceName,
                                       long startWaitingTimeNanos) {
-    long writeLockWaitingTimeNanos =
-        Time.monotonicNowNanos() - startWaitingTimeNanos;
+    /**
+     *  writeHoldCount helps in metrics updation only once in case
+     *  of reentrant locks. Metrics are updated only if the write lock is held
+     *  by the current thread.
+     */
+    if ((manager.getWriteHoldCount(resourceName) == 1) &&
+        manager.isWriteLockedByCurrentThread(resourceName)) {
+      long writeLockWaitingTimeNanos =
+          Time.monotonicNowNanos() - startWaitingTimeNanos;
 
-    // Adds a snapshot to the metric writeLockWaitingTimeMsStat.
-    omLockMetrics.setWriteLockWaitingTimeMsStat(
-        TimeUnit.NANOSECONDS.toMillis(writeLockWaitingTimeNanos));
+      // Adds a snapshot to the metric writeLockWaitingTimeMsStat.
+      omLockMetrics.setWriteLockWaitingTimeMsStat(
+          TimeUnit.NANOSECONDS.toMillis(writeLockWaitingTimeNanos));
 
-    resource.setStartWriteHeldTimeNanos(Time.monotonicNowNanos());
+      resource.setStartWriteHeldTimeNanos(Time.monotonicNowNanos());
+    }
   }
 
   /**
@@ -423,11 +431,26 @@ public class OzoneManagerLock {
     // TODO: Not checking release of higher order level lock happened while
     // releasing lower order level lock, as for that we need counter for
     // locks, as some locks support acquiring lock again.
-    if (!omLockMetricsCollectionEnabled) {
+
+    if (omLockMetricsCollectionEnabled) {
+      boolean isWriteLocked =
+          manager.isWriteLockedByCurrentThread(resourceName);
       lockFn.accept(resourceName);
+
+      switch (lockType) {
+      case READ_LOCK:
+        updateReadUnlockMetrics(resource, resourceName);
+        break;
+      case WRITE_LOCK:
+        updateWriteUnlockMetrics(resource, resourceName, isWriteLocked);
+        break;
+      default:
+        break;
+      }
     } else {
-      updateUnlockMetrics(resource, resourceName, lockFn, lockType);
+      lockFn.accept(resourceName);
     }
+
     // clear lock
     if (LOG.isDebugEnabled()) {
       LOG.debug("Release {} {}, lock on resource {}", lockType, resource.name,
@@ -436,41 +459,36 @@ public class OzoneManagerLock {
     lockSet.set(resource.clearLock(lockSet.get()));
   }
 
-  private void updateUnlockMetrics(Resource resource, String resourceName,
-                                   Consumer<String> lockFn, String lockType) {
-    boolean isWriteLocked = manager.isWriteLockedByCurrentThread(resourceName);
-    lockFn.accept(resourceName);
-
+  private void updateReadUnlockMetrics(Resource resource, String resourceName) {
     /**
-     *  read/write lock hold count helps in metrics updation only once in case
+     *  readHoldCount helps in metrics updation only once in case
      *  of reentrant locks.
      */
-    if (lockType.equals(READ_LOCK) &&
-        manager.getReadHoldCount(resourceName) == 0) {
-      updateReadUnlockMetrics(resource);
-    }
-    if (lockType.equals(WRITE_LOCK) &&
-        (manager.getWriteHoldCount(resourceName) == 0) && isWriteLocked) {
-      updateWriteUnlockMetrics(resource);
+    if (manager.getReadHoldCount(resourceName) == 0) {
+      long readLockHeldTimeNanos =
+          Time.monotonicNowNanos() - resource.getStartReadHeldTimeNanos();
+
+      // Adds a snapshot to the metric readLockHeldTimeMsStat.
+      omLockMetrics.setReadLockHeldTimeMsStat(
+          TimeUnit.NANOSECONDS.toMillis(readLockHeldTimeNanos));
     }
   }
 
-  private void updateReadUnlockMetrics(Resource resource) {
-    long readLockHeldTimeNanos =
-        Time.monotonicNowNanos() - resource.getStartReadHeldTimeNanos();
+  private void updateWriteUnlockMetrics(Resource resource, String resourceName,
+                                        boolean isWriteLocked) {
+    /**
+     *  writeHoldCount helps in metrics updation only once in case
+     *  of reentrant locks. Metrics are updated only if the write lock is held
+     *  by the current thread.
+     */
+    if ((manager.getWriteHoldCount(resourceName) == 0) && isWriteLocked) {
+      long writeLockHeldTimeNanos =
+          Time.monotonicNowNanos() - resource.getStartWriteHeldTimeNanos();
 
-    // Adds a snapshot to the metric readLockHeldTimeMsStat.
-    omLockMetrics.setReadLockHeldTimeMsStat(
-        TimeUnit.NANOSECONDS.toMillis(readLockHeldTimeNanos));
-  }
-
-  private void updateWriteUnlockMetrics(Resource resource) {
-    long writeLockHeldTimeNanos =
-        Time.monotonicNowNanos() - resource.getStartWriteHeldTimeNanos();
-
-    // Adds a snapshot to the metric writeLockHeldTimeMsStat.
-    omLockMetrics.setWriteLockHeldTimeMsStat(
-        TimeUnit.NANOSECONDS.toMillis(writeLockHeldTimeNanos));
+      // Adds a snapshot to the metric writeLockHeldTimeMsStat.
+      omLockMetrics.setWriteLockHeldTimeMsStat(
+          TimeUnit.NANOSECONDS.toMillis(writeLockHeldTimeNanos));
+    }
   }
 
   /**
