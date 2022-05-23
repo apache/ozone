@@ -117,13 +117,14 @@ public final class OmUtils {
           ConfigurationSource conf) {
     Map<String, List<InetSocketAddress>> result = new HashMap<>();
     Collection<InetSocketAddress> omAddressList = new HashSet<>();
-    for (String serviceId : conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY)) {
+    for (String serviceId : conf.getTrimmedStringCollection(
+        OZONE_OM_SERVICE_IDS_KEY)) {
       if (!result.containsKey(serviceId)) {
         result.put(serviceId, new ArrayList<>());
       }
       for (String nodeId : getActiveOMNodeIds(conf, serviceId)) {
         String rpcAddr = getOmRpcAddress(conf,
-                ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, serviceId, nodeId));
+            ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, serviceId, nodeId));
         if (rpcAddr != null) {
           result.get(serviceId).add(NetUtils.createSocketAddr(rpcAddr));
         } else {
