@@ -55,6 +55,9 @@ spec:
         args:
         - ozone
         - datanode
+        env:
+        - name: OZONE-SITE.XML_dfs.datanode.use.datanode.hostname
+          value: "true"
         envFrom:
         - configMapRef:
             name: config

@@ -28,7 +28,19 @@ regenerate_resources
 
 start_k8s_env
 
-execute_robot_test scm-0 smoketest/basic/basic.robot
+export SCM=scm-0
+
+execute_robot_test ${SCM} -v PREFIX:pre freon/generate.robot
+execute_robot_test ${SCM} -v PREFIX:pre freon/validate.robot
+
+# restart datanodes
+kubectl delete pod datanode-0 datanode-1 datanode-2
+
+wait_for_startup
+
+execute_robot_test ${SCM} -v PREFIX:pre freon/validate.robot
+execute_robot_test ${SCM} -v PREFIX:post freon/generate.robot
+execute_robot_test ${SCM} -v PREFIX:post freon/validate.robot
 
 combine_reports
 
