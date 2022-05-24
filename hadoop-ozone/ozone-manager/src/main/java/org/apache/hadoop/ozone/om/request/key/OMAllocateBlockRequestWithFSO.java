@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -31,6 +32,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -141,10 +143,16 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
               volumeName, bucketName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // check bucket and volume quota
-      long preAllocatedSpace = newLocationList.size()
-              * ozoneManager.getScmBlockSize()
-              * openKeyInfo.getReplicationConfig().getRequiredNodes();
-      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
+      long preAllocatedKeySize = newLocationList.size()
+          * ozoneManager.getScmBlockSize();
+      long hadAllocatedKeySize =
+          openKeyInfo.getLatestVersionLocations().getLocationList().size()
+              * ozoneManager.getScmBlockSize();
+      ReplicationConfig repConfig = openKeyInfo.getReplicationConfig();
+      long totalAllocatedSpace = QuotaUtil.getReplicatedSize(
+          preAllocatedKeySize, repConfig) + QuotaUtil.getReplicatedSize(
+          hadAllocatedKeySize, repConfig);
+      checkBucketQuotaInBytes(omBucketInfo, totalAllocatedSpace);
       // Append new block
       openKeyInfo.appendNewBlocks(newLocationList, false);
 
@@ -157,7 +165,6 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       // Add to cache.
       addOpenTableCacheEntry(trxnLogIndex, omMetadataManager, openKeyName,
               openKeyInfo);
-      omBucketInfo.incrUsedBytes(preAllocatedSpace);
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
               .setKeyLocation(blockLocation).build());
@@ -223,6 +230,6 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       OMResponse.Builder omResponse, OmKeyInfo openKeyInfo,
       OmBucketInfo omBucketInfo) {
     return new OMAllocateBlockResponseWithFSO(omResponse.build(), openKeyInfo,
-            clientID, omBucketInfo, getBucketLayout());
+            clientID, getBucketLayout());
   }
 }

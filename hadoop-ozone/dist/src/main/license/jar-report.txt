@@ -67,6 +67,7 @@ share/ozone/lib/hdds-common.jar
 share/ozone/lib/hdds-config.jar
 share/ozone/lib/hdds-container-service.jar
 share/ozone/lib/hdds-docs.jar
+share/ozone/lib/hdds-erasurecode.jar
 share/ozone/lib/hdds-hadoop-dependency-client.jar
 share/ozone/lib/hdds-hadoop-dependency-server.jar
 share/ozone/lib/hdds-interface-admin.jar
@@ -188,8 +189,12 @@ share/ozone/lib/netty-common.Final.jar
 share/ozone/lib/netty-handler.Final.jar
 share/ozone/lib/netty-handler-proxy.Final.jar
 share/ozone/lib/netty-resolver.Final.jar
+share/ozone/lib/netty-tcnative-boringssl-static.Final.jar
+share/ozone/lib/netty-tcnative-classes.Final.jar
+share/ozone/lib/netty-tcnative.Final.jar
 share/ozone/lib/netty-transport.Final.jar
-share/ozone/lib/netty-transport-native-epoll.Final.jar
+share/ozone/lib/netty-transport-classes-epoll.Final.jar
+share/ozone/lib/netty-transport-native-epoll.Final-linux-x86_64.jar
 share/ozone/lib/netty-transport-native-unix-common.Final.jar
 share/ozone/lib/nimbus-jose-jwt.jar
 share/ozone/lib/okhttp.jar

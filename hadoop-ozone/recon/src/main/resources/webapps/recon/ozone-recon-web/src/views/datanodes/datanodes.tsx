@@ -82,7 +82,7 @@ interface IDatanode {
 interface IPipeline {
   pipelineID: string;
   replicationType: string;
-  replicationFactor: number;
+  replicationFactor: string;
   leaderNode: string;
 }
 

@@ -88,11 +88,6 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
 
     OMFileRequest.addToOpenFileTable(omMetadataMgr, batchOp, getOmKeyInfo(),
             getOpenKeySessionID());
-
-    // update bucket usedBytes.
-    omMetadataMgr.getBucketTable().putWithBatch(batchOp,
-            omMetadataMgr.getBucketKey(getOmKeyInfo().getVolumeName(),
-                    getOmKeyInfo().getBucketName()), getOmBucketInfo());
   }
 
   @Override

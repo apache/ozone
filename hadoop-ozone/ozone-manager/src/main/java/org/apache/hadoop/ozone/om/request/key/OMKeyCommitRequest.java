@@ -38,6 +38,12 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -190,24 +196,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         }
       }
 
-      omKeyInfo =
-          omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
-      if (omKeyInfo == null) {
-        throw new OMException("Failed to commit key, as " + dbOpenKey +
-            "entry is not found in the OpenKey table", KEY_NOT_FOUND);
-      }
-      omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
-
-      omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
-
-      // Update the block length for each block
-      List<OmKeyLocationInfo> allocatedLocationInfoList =
-          omKeyInfo.getLatestVersionLocations().getLocationList();
-      omKeyInfo.updateLocationInfoList(locationInfoList, false);
-
-      // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
-
       // If bucket versioning is turned on during the update, between key
       // creation and key commit, old versions will be just overwritten and
       // not kept. Bucket versioning will be effective from the first key
@@ -215,11 +203,36 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       RepeatedOmKeyInfo oldKeyVersionsToDelete = null;
       OmKeyInfo keyToDelete =
           omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
+
+      omKeyInfo =
+          omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
+      if (omKeyInfo == null) {
+        throw new OMException("Failed to commit key, as " + dbOpenKey +
+            "entry is not found in the OpenKey table", KEY_NOT_FOUND);
+      }
+      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
+      omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
+      // Update the block length for each block
+      omKeyInfo.updateLocationInfoList(locationInfoList, false);
+      // Set the UpdateID to current transactionLogIndex
+      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+
+      long correctedSpace = omKeyInfo.getReplicatedSize();
       if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
+        // Subtract the size of blocks to be overwritten.
+        correctedSpace -= keyToDelete.getReplicatedSize();
         oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
             keyToDelete, omMetadataManager,
             trxnLogIndex, ozoneManager.isRatisEnabled());
+      } else {
+        // if keyToDelete isn't null, usedNamespace needn't check and
+        // increase.
+        checkBucketQuotaInNamespace(omBucketInfo, 1L);
+        omBucketInfo.incrUsedNamespace(1L);
       }
+      checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
+
       // Add to cache of open key table and key table.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(dbOpenKey),
@@ -232,21 +245,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       if (oldKeyVersionsToDelete != null) {
         OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbOzoneKey,
             oldKeyVersionsToDelete, trxnLogIndex);
-      }
-
-      long scmBlockSize = ozoneManager.getScmBlockSize();
-      int factor = omKeyInfo.getReplicationConfig().getRequiredNodes();
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
-      // Block was pre-requested and UsedBytes updated when createKey and
-      // AllocatedBlock. The space occupied by the Key shall be based on
-      // the actual Key size, and the total Block size applied before should
-      // be subtracted.
-      long correctedSpace = omKeyInfo.getDataSize() * factor -
-          allocatedLocationInfoList.size() * scmBlockSize * factor;
-      // Subtract the size of blocks to be overwritten.
-      if (keyToDelete != null) {
-        correctedSpace -= keyToDelete.getDataSize() *
-            keyToDelete.getReplicationConfig().getRequiredNodes();
       }
 
       omBucketInfo.incrUsedBytes(correctedSpace);
@@ -321,5 +319,25 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       LOG.error("Unrecognized Result for OMKeyCommitRequest: {}",
               commitKeyRequest);
     }
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CommitKey
+  )
+  public static OMRequest disallowCommitKeyWithECReplicationConfig(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
+      if (req.getCommitKeyRequest().getKeyArgs().hasEcReplicationConfig()) {
+        throw new OMException("Cluster does not have the Erasure Coded"
+            + " Storage support feature finalized yet, but the request contains"
+            + " an Erasure Coded replication type. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
   }
 }

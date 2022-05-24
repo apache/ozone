@@ -23,8 +23,10 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -33,6 +35,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
@@ -50,6 +53,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.container.TestHelper.countReplicas;
 import static org.junit.Assert.fail;
@@ -95,6 +99,24 @@ public class TestKeyInputStream extends TestInputStreamBase {
   }
 
   /**
+   * This method does random seeks and reads and validates the reads are
+   * correct or not.
+   * @param dataLength
+   * @param keyInputStream
+   * @param inputData
+   * @param readSize
+   * @throws Exception
+   */
+  private void randomPositionSeek(int dataLength, KeyInputStream keyInputStream,
+      byte[] inputData, int readSize) throws Exception {
+    Random rand = new Random();
+    for (int i = 0; i < 100; i++) {
+      int position = rand.nextInt(dataLength - readSize);
+      validate(keyInputStream, inputData, position, readSize);
+    }
+  }
+
+  /**
    * This method seeks to specified seek value and read the data specified by
    * readLength and validate the read is correct or not.
    * @param keyInputStream
@@ -125,6 +147,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
     testReadChunkWithByteArray();
     testReadChunkWithByteBuffer();
     testSkip();
+    testECSeek();
   }
 
   public void testInputStreams() throws Exception {
@@ -137,11 +160,13 @@ public class TestKeyInputStream extends TestInputStreamBase {
     // Verify BlockStreams and ChunkStreams
     int expectedNumBlockStreams = BufferUtils.getNumberOfBins(
         dataLength, BLOCK_SIZE);
-    List<BlockInputStream> blockStreams = keyInputStream.getBlockStreams();
+    List<BlockExtendedInputStream> blockStreams =
+        keyInputStream.getBlockStreams();
     Assert.assertEquals(expectedNumBlockStreams, blockStreams.size());
 
     int readBlockLength = 0;
-    for (BlockInputStream blockStream : blockStreams) {
+    for (BlockExtendedInputStream stream : blockStreams) {
+      BlockInputStream blockStream = (BlockInputStream) stream;
       int blockStreamLength = Math.min(BLOCK_SIZE,
           dataLength - readBlockLength);
       Assert.assertEquals(blockStreamLength, blockStream.getLength());
@@ -193,6 +218,36 @@ public class TestKeyInputStream extends TestInputStreamBase {
     validate(keyInputStream, inputData, 0, dataLength);
 
     keyInputStream.close();
+  }
+
+  public void testECSeek() throws Exception {
+    int ecChunkSize = 1024 * 1024;
+    ECReplicationConfig repConfig = new ECReplicationConfig(3, 2, RS,
+        ecChunkSize);
+    String keyName = getNewKeyName();
+    // 3 full EC blocks plus one chunk
+    int dataLength = (9 * BLOCK_SIZE + ecChunkSize);
+
+    byte[] inputData = writeRandomBytes(keyName, repConfig, dataLength);
+    try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
+
+      validate(keyInputStream, inputData, 0, ecChunkSize + 1234);
+
+      validate(keyInputStream, inputData, 200, ecChunkSize);
+
+      validate(keyInputStream, inputData, BLOCK_SIZE * 4, ecChunkSize);
+
+      validate(keyInputStream, inputData, BLOCK_SIZE * 4 + 200, ecChunkSize);
+
+      validate(keyInputStream, inputData, dataLength - ecChunkSize - 100,
+          ecChunkSize + 50);
+
+      randomPositionSeek(dataLength, keyInputStream, inputData,
+          ecChunkSize + 200);
+
+      // Read entire key.
+      validate(keyInputStream, inputData, 0, dataLength);
+    }
   }
 
   public void testSeek() throws Exception {

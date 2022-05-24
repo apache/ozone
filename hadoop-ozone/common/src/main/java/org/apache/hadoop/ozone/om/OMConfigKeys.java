@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om;
 
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ratis.util.TimeDuration;
 
@@ -57,7 +59,8 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_BIND_HOST_DEFAULT =
       "0.0.0.0";
   public static final int OZONE_OM_PORT_DEFAULT = 9862;
-
+  public static final String OZONE_OM_GRPC_PORT_KEY =
+      "ozone.om.grpc.port";
   public static final String OZONE_OM_HTTP_ENABLED_KEY =
       "ozone.om.http.enabled";
   public static final String OZONE_OM_HTTP_BIND_HOST_KEY =
@@ -257,6 +260,16 @@ public final class OMConfigKeys {
   public static final boolean OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT =
       false;
 
+  public static final String OZONE_SERVER_DEFAULT_REPLICATION_KEY =
+      "ozone.server.default.replication";
+  public static final String OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT =
+      ReplicationFactor.THREE.toString();
+
+  public static final String OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY =
+      "ozone.server.default.replication.type";
+  public static final String OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT =
+      ReplicationType.RATIS.toString();
+
   public static final String OZONE_OM_HA_PREFIX = "ozone.om.ha";
 
   public static final String OZONE_FS_TRASH_INTERVAL_KEY =
@@ -280,9 +293,11 @@ public final class OMConfigKeys {
   public static final String OZONE_DEFAULT_BUCKET_LAYOUT =
       "ozone.default.bucket.layout";
   public static final String OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT =
-      BucketLayout.OBJECT_STORE.name();
+      BucketLayout.LEGACY.name();
   public static final String OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED =
       BucketLayout.FILE_SYSTEM_OPTIMIZED.name();
+  public static final String OZONE_BUCKET_LAYOUT_OBJECT_STORE =
+      BucketLayout.OBJECT_STORE.name();
 
   /**
    * Configuration properties for Directory Deleting Service.
@@ -296,6 +311,16 @@ public final class OMConfigKeys {
       "ozone.path.deleting.limit.per.task";
   public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 10000;
 
+  public static final String OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH =
+      "ozone.om.grpc.maximum.response.length";
+  /** Default value for GRPC_MAXIMUM_RESPONSE_LENGTH. */
+  public static final int OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT =
+      128 * 1024 * 1024;
+
+  public static final String OZONE_OM_S3_GPRC_SERVER_ENABLED =
+      "ozone.om.s3.grpc.server_enabled";
+  public static final boolean OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT =
+      false;
   /**
    * Configuration properties for OMAdminProtcol service.
    */
@@ -306,11 +331,23 @@ public final class OMConfigKeys {
       "ozone.om.admin.protocol.wait.between.retries";
   public static final long OZONE_OM_ADMIN_PROTOCOL_WAIT_BETWEEN_RETRIES_DEFAULT
       = 1000;
-
+  public static final String OZONE_OM_TRANSPORT_CLASS =
+      "ozone.om.transport.class";
+  public static final String OZONE_OM_TRANSPORT_CLASS_DEFAULT =
+      "org.apache.hadoop.ozone.om.protocolPB"
+          + ".Hadoop3OmTransportFactory";
   public static final String OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT =
       "ozone.om.unflushed.transaction.max.count";
   public static final int OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT_DEFAULT
       = 10000;
+
+  /**
+   * This configuration shall be enabled to utilize the functionality of the
+   * fine-grained KEY_PATH_LOCK.
+   */
+  public static final String OZONE_OM_KEY_PATH_LOCK_ENABLED =
+      "ozone.om.key.path.lock.enabled";
+  public static final boolean OZONE_OM_KEY_PATH_LOCK_ENABLED_DEFAULT = false;
 
   public static final String OZONE_OM_MULTITENANCY_ENABLED =
       "ozone.om.multitenancy.enabled";

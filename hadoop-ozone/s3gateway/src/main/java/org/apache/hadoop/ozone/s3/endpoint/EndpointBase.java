@@ -23,7 +23,9 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Context;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -76,6 +78,12 @@ public abstract class EndpointBase implements Auditor {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
+      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3Auth.getAccessID(), ex);
+      } else if (ex.getResult() == ResultCodes.TIMEOUT ||
+          ex.getResult() == ResultCodes.INTERNAL_ERROR) {
+        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
       } else {
         throw ex;
       }
@@ -107,8 +115,14 @@ public abstract class EndpointBase implements Auditor {
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND
           || ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
+      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3Auth.getAccessID(), ex);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
+      } else if (ex.getResult() == ResultCodes.TIMEOUT ||
+          ex.getResult() == ResultCodes.INTERNAL_ERROR) {
+        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
       } else {
         throw ex;
       }
@@ -135,6 +149,12 @@ public abstract class EndpointBase implements Auditor {
       getMetrics().incCreateBucketFailure();
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
+      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3Auth.getAccessID(), ex);
+      } else if (ex.getResult() == ResultCodes.TIMEOUT ||
+          ex.getResult() == ResultCodes.INTERNAL_ERROR) {
+        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
       } else if (ex.getResult() != ResultCodes.BUCKET_ALREADY_EXISTS) {
         // S3 does not return error for bucket already exists, it just
         // returns the location.
@@ -155,9 +175,17 @@ public abstract class EndpointBase implements Auditor {
       client.getObjectStore().deleteS3Bucket(s3BucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, s3BucketName, ex);
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3BucketName, ex);
+      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3Auth.getAccessID(), ex);
+      } else if (ex.getResult() == ResultCodes.TIMEOUT ||
+          ex.getResult() == ResultCodes.INTERNAL_ERROR) {
+        throw newError(S3ErrorTable.INTERNAL_ERROR, s3BucketName, ex);
+      } else {
+        throw ex;
       }
-      throw ex;
     }
   }
 
@@ -198,7 +226,15 @@ public abstract class EndpointBase implements Auditor {
       if (e.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
         return Collections.emptyIterator();
       } else  if (e.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, "listBuckets", e);
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            "listBuckets", e);
+      } else if (e.getResult() == ResultCodes.INVALID_TOKEN) {
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3Auth.getAccessID(), e);
+      } else if (e.getResult() == ResultCodes.TIMEOUT ||
+          e.getResult() == ResultCodes.INTERNAL_ERROR) {
+        throw newError(S3ErrorTable.INTERNAL_ERROR,
+            "listBuckets", e);
       } else {
         throw e;
       }
@@ -255,5 +291,21 @@ public abstract class EndpointBase implements Auditor {
 
   public String getClientIpAddress() {
     return context.getHeaderString(CLIENT_IP_HEADER);
+  }
+
+  protected Map<String, String> getAuditParameters() {
+    Map<String, String> res = new HashMap<>();
+    if (context != null) {
+      for (Map.Entry<String, List<String>> entry :
+          context.getUriInfo().getPathParameters().entrySet()) {
+        res.put(entry.getKey(), entry.getValue().toString());
+
+      }
+      for (Map.Entry<String, List<String>> entry :
+          context.getUriInfo().getQueryParameters().entrySet()) {
+        res.put(entry.getKey(), entry.getValue().toString());
+      }
+    }
+    return res;
   }
 }

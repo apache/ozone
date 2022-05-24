@@ -265,6 +265,7 @@ public final class OzoneConsts {
   public static final String ORIGIN_PIPELINE_ID = "originPipelineId";
   public static final String ORIGIN_NODE_ID = "originNodeId";
   public static final String SCHEMA_VERSION = "schemaVersion";
+  public static final String REPLICA_INDEX = "replicaIndex";
 
   // Supported .container datanode schema versions.
   // Since containers in older schema versions are currently not reformatted to
@@ -472,6 +473,9 @@ public final class OzoneConsts {
   public static final String DELEGATION_TOKEN_KIND = "kind";
   public static final String DELEGATION_TOKEN_SERVICE = "service";
   public static final String DELEGATION_TOKEN_RENEWER = "renewer";
+
+  // EC Constants
+  public static final String BLOCK_GROUP_LEN_KEY_IN_PUT_BLOCK = "blockGroupLen";
 
   public static final String OZONE_OM_RANGER_ADMIN_CREATE_USER_HTTP_ENDPOINT =
       "/service/xusers/secure/users";

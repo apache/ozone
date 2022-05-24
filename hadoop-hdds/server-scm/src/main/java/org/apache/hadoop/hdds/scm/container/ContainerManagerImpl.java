@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
@@ -42,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -93,7 +95,13 @@ public class ContainerManagerImpl implements ContainerManager {
   private final SCMContainerManagerMetrics scmContainerManagerMetrics;
 
   private final int numContainerPerVolume;
+
+  @SuppressWarnings("java:S2245") // no need for secure random
   private final Random random = new Random();
+  // Used to track pending replication and delete for container replicas. In
+  // ContainerManager, we try to remove any replicas we see added or deleted
+  // in case they have been created by replication / delete command
+  private final ContainerReplicaPendingOps containerReplicaPendingOps;
 
   /**
    *
@@ -103,7 +111,8 @@ public class ContainerManagerImpl implements ContainerManager {
       final SCMHAManager scmHaManager,
       final SequenceIdGenerator sequenceIdGen,
       final PipelineManager pipelineManager,
-      final Table<ContainerID, ContainerInfo> containerStore)
+      final Table<ContainerID, ContainerInfo> containerStore,
+      final ContainerReplicaPendingOps containerReplicaPendingOps)
       throws IOException {
     // Introduce builder for this class?
     this.lock = new ReentrantLock();
@@ -123,6 +132,7 @@ public class ContainerManagerImpl implements ContainerManager {
             ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
 
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
+    this.containerReplicaPendingOps = containerReplicaPendingOps;
   }
 
   @Override
@@ -261,7 +271,8 @@ public class ContainerManagerImpl implements ContainerManager {
         "Cannot allocate container, negative container id" +
             " generated. %s.", uniqueId);
     final ContainerID containerID = ContainerID.valueOf(uniqueId);
-    final ContainerInfoProto containerInfo = ContainerInfoProto.newBuilder()
+    final ContainerInfoProto.Builder containerInfoBuilder = ContainerInfoProto
+        .newBuilder()
         .setState(LifeCycleState.OPEN)
         .setPipelineID(pipeline.getId().getProtobuf())
         .setUsedBytes(0)
@@ -270,11 +281,17 @@ public class ContainerManagerImpl implements ContainerManager {
         .setOwner(owner)
         .setContainerID(containerID.getId())
         .setDeleteTransactionId(0)
-        .setReplicationFactor(
-            ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()))
-        .setReplicationType(pipeline.getType())
-        .build();
-    containerStateManager.addContainer(containerInfo);
+        .setReplicationType(pipeline.getType());
+
+    if (pipeline.getReplicationConfig() instanceof ECReplicationConfig) {
+      containerInfoBuilder.setEcReplicationConfig(
+          ((ECReplicationConfig) pipeline.getReplicationConfig()).toProto());
+    } else {
+      containerInfoBuilder.setReplicationFactor(
+          ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()));
+    }
+
+    containerStateManager.addContainer(containerInfoBuilder.build());
     scmContainerManagerMetrics.incNumSuccessfulCreateContainers();
     return containerStateManager.getContainer(containerID);
   }
@@ -310,6 +327,9 @@ public class ContainerManagerImpl implements ContainerManager {
       throws ContainerNotFoundException {
     if (containerExist(cid)) {
       containerStateManager.updateContainerReplica(cid, replica);
+      // Clear any pending additions for this replica as we have now seen it.
+      containerReplicaPendingOps.completeAddReplica(cid,
+          replica.getDatanodeDetails(), replica.getReplicaIndex());
     } else {
       throwContainerNotFoundException(cid);
     }
@@ -321,6 +341,10 @@ public class ContainerManagerImpl implements ContainerManager {
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
     if (containerExist(cid)) {
       containerStateManager.removeContainerReplica(cid, replica);
+      // Remove any pending delete replication operations for the deleted
+      // replica.
+      containerReplicaPendingOps.completeDeleteReplica(cid,
+          replica.getDatanodeDetails(), replica.getReplicaIndex());
     } else {
       throwContainerNotFoundException(cid);
     }

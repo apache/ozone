@@ -19,9 +19,9 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -35,13 +35,13 @@ import java.util.regex.Pattern;
 import org.mockito.Mockito;
 import picocli.CommandLine;
 
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Matchers.anyListOf;
 import static org.mockito.Mockito.mock;
 
 /**
- * Unit tests to validate the the DecommissionSubCommand class includes the
+ * Unit tests to validate the DecommissionSubCommand class includes the
  * correct output when executed against a mock client.
  */
 public class TestDecommissionSubCommand {
@@ -53,14 +53,14 @@ public class TestDecommissionSubCommand {
   private final PrintStream originalErr = System.err;
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
-  @Before
+  @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     cmd = new DecommissionSubCommand();
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     System.setOut(originalOut);
     System.setErr(originalErr);
