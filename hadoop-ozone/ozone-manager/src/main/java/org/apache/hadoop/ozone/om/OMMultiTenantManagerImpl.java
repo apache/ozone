@@ -305,11 +305,11 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     LOG.info("Removing tenant policies and roles from Ranger: {}", tenant);
 
     for (AccessPolicy policy : tenant.getTenantAccessPolicies()) {
-      authorizer.deletePolicyById(policy.getPolicyID());
+      authorizer.deletePolicyByName(policy.getPolicyName());
     }
 
-    for (String roleId : tenant.getTenantRoles()) {
-      authorizer.deleteRole(roleId);
+    for (String roleName : tenant.getTenantRoles()) {
+      authorizer.deleteRoleByName(roleName);
     }
   }
 
@@ -574,12 +574,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     return Optional.of(omDBAccessIdInfo.getTenantId());
   }
 
-  @Override
-  public void assignTenantAdminInDBCache(String accessID, boolean delegated)
-      throws IOException {
-
-  }
-
   private void checkAcquiredAuthorizerWriteLock() throws OMException {
 
     // Check that lock is acquired
@@ -587,6 +581,12 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       throw new OMException("Authorizer write lock must have been held before "
           + "calling this method", INTERNAL_ERROR);
     }
+
+  }
+
+  @Override
+  public void assignTenantAdminInDBCache(String accessID, boolean delegated)
+      throws IOException {
 
   }
 

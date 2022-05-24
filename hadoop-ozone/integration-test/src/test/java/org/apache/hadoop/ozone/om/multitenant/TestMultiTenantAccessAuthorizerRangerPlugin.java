@@ -137,7 +137,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
         omm.deleteUser(id);
       }
       for (String id : groupIdsCreated) {
-        omm.deleteRole(id);
+        omm.deleteRoleById(id);
       }
     }
   }
@@ -195,7 +195,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
       String userId = omm.getUserId(userPrincipal);
       omm.deleteUser(userId);
       for (String id : groupIdsCreated) {
-        omm.deleteRole(id);
+        omm.deleteRoleById(id);
       }
     }
   }

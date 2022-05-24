@@ -96,7 +96,7 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public void deleteRole(String groupID) throws IOException {
+  public void deleteRoleById(String groupID) throws IOException {
 
   }
 
@@ -126,6 +126,11 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
 
   @Override
   public void deletePolicyById(String policyId) throws IOException {
+
+  }
+
+  @Override
+  public void deleteRoleByName(String roleName) throws IOException {
 
   }
 

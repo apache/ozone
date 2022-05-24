@@ -439,7 +439,7 @@ public class TestRangerBGSyncService {
       final String roleName = jObj.get("name").getAsString();
       try {
         LOG.info("Deleting role: {}", roleName);
-        auth.deleteRole(roleId);
+        auth.deleteRoleById(roleId);
       } catch (Exception e) {
         LOG.error(e.getMessage());
       }

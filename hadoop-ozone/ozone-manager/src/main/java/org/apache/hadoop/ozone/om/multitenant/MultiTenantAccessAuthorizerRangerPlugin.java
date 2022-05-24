@@ -710,10 +710,26 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     }
   }
 
-  public void deleteRole(String roleName) throws IOException {
+  @Override
+  public void deleteRoleById(String roleId) throws IOException {
 
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_ROLE_HTTP_ENDPOINT
+            + roleId + "?forceDelete=true";
+
+    HttpURLConnection conn = makeHttpCall(rangerAdminUrl, null,
+        "DELETE", false);
+    int respnseCode = conn.getResponseCode();
+    if (respnseCode != 200 && respnseCode != 204) {
+      throw new IOException("Couldn't delete role " + roleId);
+    }
+  }
+
+  @Override
+  public void deleteRoleByName(String roleName) throws IOException {
+
+    String rangerAdminUrl =
+        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_ROLE_HTTP_ENDPOINT
             + roleName + "?forceDelete=true";
 
     HttpURLConnection conn = makeHttpCall(rangerAdminUrl, null,
@@ -722,12 +738,13 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     if (respnseCode != 200 && respnseCode != 204) {
       throw new IOException("Couldn't delete role " + roleName);
     }
+
   }
 
   @Override
   public void deletePolicyByName(String policyName) throws IOException {
     AccessPolicy policy = getAccessPolicyByName(policyName);
-    String  policyID = policy.getPolicyID();
+    String policyID = policy.getPolicyID();
     LOG.debug("policyID is: {}", policyID);
     deletePolicyById(policyID);
   }

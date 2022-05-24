@@ -143,7 +143,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @param groupID : unique opaque ID that was returned by
    *                MultiTenantGatekeeper in createGroup().
    */
-  void deleteRole(String groupID) throws IOException;
+  void deleteRoleById(String groupID) throws IOException;
 
   /**
    * Create access policy with the given parameters in the authorizer
@@ -180,6 +180,8 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @throws IOException
    */
   void deletePolicyById(String policyId) throws IOException;
+
+  void deleteRoleByName(String roleName) throws IOException;
 
   /**
    *

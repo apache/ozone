@@ -775,7 +775,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       checkLeader();
       try {
         final String roleObj = authorizer.getRole(roleName);
-        authorizer.deleteRole(new JsonParser().parse(roleObj)
+        authorizer.deleteRoleById(new JsonParser().parse(roleObj)
             .getAsJsonObject().get("id").getAsString());
       } catch (IOException e) {
         // The role might have been deleted already.
