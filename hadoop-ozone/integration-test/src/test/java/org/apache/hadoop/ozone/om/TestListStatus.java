@@ -38,6 +38,7 @@ import org.junit.AfterClass;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.UUID;
 import java.util.List;
 
@@ -199,9 +200,18 @@ public class TestListStatus {
 
     System.out.println("BEGIN:::keyPrefix---> " + keyPrefix + ":::---> " +
         startKey);
-    for (OzoneFileStatus st : statuses) {
-      System.out.println("status:"  + st);
+
+    for (int i = 0; i < statuses.size() - 1; i++) {
+      OzoneFileStatus stCurr = statuses.get(i);
+      OzoneFileStatus stNext = statuses.get(i + 1);
+
+      System.out.println("status:"  + stCurr);
+      Assert.assertTrue(stCurr.getPath().compareTo(stNext.getPath()) < 0);
     }
+
+    OzoneFileStatus stNext = statuses.get(statuses.size() - 1);
+    System.out.println("status:"  + stNext);
+
     System.out.println("END:::keyPrefix---> " + keyPrefix + ":::---> " +
         startKey);
   }
