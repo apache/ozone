@@ -37,11 +37,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 import java.util.TreeMap;
 import java.util.Map;
 import java.util.TreeSet;
@@ -83,7 +80,8 @@ public class OzoneListStatusHelper {
 
   public void listStatusFSO(OmKeyArgs args,
       boolean recursive, String startKey, long numEntries,
-      String clientAddress, Map<String, OzoneFileStatus> cacheDirMap, Map<String, OzoneFileStatus> cacheFileMap)
+      String clientAddress, Map<String, OzoneFileStatus> cacheDirMap,
+                            Map<String, OzoneFileStatus> cacheFileMap)
       throws IOException {
     Preconditions.checkArgument(!recursive);
     Preconditions.checkNotNull(args, "Key args can not be null");
@@ -176,7 +174,7 @@ public class OzoneListStatusHelper {
         } else {
           cacheFileMap.put(status.getPath(), status);
         }
-       count++;
+        count++;
       }
     }
   }
@@ -185,7 +183,6 @@ public class OzoneListStatusHelper {
   private String getDbKey(String key, OmKeyArgs args,
                           OmBucketInfo omBucketInfo) throws IOException {
     long startKeyParentId;
-    java.nio.file.Path file = Paths.get(key);
     String parent = OzoneFSUtils.getParentDir(key);
 
     OmKeyArgs startKeyArgs = args.toBuilder()
@@ -197,7 +194,7 @@ public class OzoneListStatusHelper {
     Preconditions.checkNotNull(fileStatusInfo);
     startKeyParentId = getId(fileStatusInfo, omBucketInfo);
     return metadataManager.
-        getOzonePathKey(startKeyParentId, file.getFileName().toString());
+        getOzonePathKey(startKeyParentId, OzoneFSUtils.getFileName(key));
   }
 
   private long getId(OzoneFileStatus fileStatus, OmBucketInfo omBucketInfo) {
@@ -297,7 +294,7 @@ public class OzoneListStatusHelper {
   }
 
   /**
-   * Iterator class for Ozone keys
+   * Iterator class for Ozone keys.
    */
   public interface OzoneKeyIterator extends
       Iterator<HeapEntry<? extends WithParentObjectId>>, Closeable {

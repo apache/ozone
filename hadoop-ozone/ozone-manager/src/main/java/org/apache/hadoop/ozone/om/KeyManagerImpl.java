@@ -1511,7 +1511,8 @@ public class KeyManagerImpl implements KeyManager {
         Map<String, OzoneFileStatus> cacheDirMap = new HashMap<>();
         statusHelper.listStatusFSO(args, recursive, startKey, numEntries,
             clientAddress, cacheDirMap, cacheFileMap);
-        return buildFinalStatusList(cacheFileMap, cacheDirMap, args, clientAddress);
+        return buildFinalStatusList(cacheFileMap, cacheDirMap,
+            args, clientAddress);
       } else {
         return listStatusFSO(args, recursive, startKey, numEntries,
             clientAddress);
