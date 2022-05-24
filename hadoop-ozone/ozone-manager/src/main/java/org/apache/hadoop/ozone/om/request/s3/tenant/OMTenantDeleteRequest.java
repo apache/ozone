@@ -183,6 +183,9 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
         // TODO: Set response dbVolumeKey?
       }
 
+      // Remove tenant from tenant cache
+      ozoneManager.getMultiTenantManager().removeTenantFromDBCache(tenantId);
+
       // Compose response
 
       // If decVolumeRefCount is false, return -1 to the client, otherwise

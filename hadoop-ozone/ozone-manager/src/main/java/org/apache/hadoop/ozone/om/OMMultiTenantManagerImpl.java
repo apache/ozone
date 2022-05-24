@@ -301,18 +301,30 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   @Override
   public void removeTenantFromAuthorizer(Tenant tenant) throws IOException {
+
+    LOG.info("Removing tenant policies and roles from Ranger: {}", tenant);
+
+    for (AccessPolicy policy : tenant.getTenantAccessPolicies()) {
+      authorizer.deletePolicyById(policy.getPolicyID());
+    }
+
+    for (String roleId : tenant.getTenantRoles()) {
+      authorizer.deleteRole(roleId);
+    }
+  }
+
+  @Override
+  public void removeTenantFromDBCache(String tenantId) throws IOException {
+
     try {
       tenantCacheLock.writeLock().lock();
-      for (AccessPolicy policy : tenant.getTenantAccessPolicies()) {
-        authorizer.deletePolicyById(policy.getPolicyID());
-      }
-      for (String roleId : tenant.getTenantRoles()) {
-        authorizer.deleteRole(roleId);
-      }
-      if (tenantCache.containsKey(tenant.getTenantId())) {
-        LOG.info("Removing tenant {} from in memory cached state",
-            tenant.getTenantId());
-        tenantCache.remove(tenant.getTenantId());
+
+      if (tenantCache.containsKey(tenantId)) {
+        LOG.info("Removing tenant from in-memory cache: {}", tenantId);
+        tenantCache.remove(tenantId);
+      } else {
+        throw new OMException("Tenant does not exist in cache: " + tenantId,
+            INTERNAL_ERROR);
       }
     } finally {
       tenantCacheLock.writeLock().unlock();

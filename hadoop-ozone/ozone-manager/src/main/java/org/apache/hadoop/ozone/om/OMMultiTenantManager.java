@@ -112,6 +112,8 @@ public interface OMMultiTenantManager {
    */
   void removeTenantFromAuthorizer(Tenant tenant) throws IOException;
 
+  void removeTenantFromDBCache(String tenantId) throws IOException;
+
   /**
    * Creates a new user that exists for S3 API access to Ozone.
    * @param principal
@@ -281,9 +283,9 @@ public interface OMMultiTenantManager {
   String getTenantAdminRoleName(String tenantId) throws IOException;
 
   /**
-   *
-   * @param tenantId
-   * @return
+   * Get Tenant object of given tenant name from OM DB.
+   * @param tenantId tenant name
+   * @return Tenant
    * @throws IOException
    */
   Tenant getTenantFromDBById(String tenantId) throws IOException;
