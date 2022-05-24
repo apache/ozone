@@ -35,7 +35,6 @@ import org.rocksdb.WriteOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -56,19 +55,24 @@ import static org.apache.hadoop.hdds.StringUtils.bytes2String;
 
 /**
  * A wrapper class for {@link RocksDB}.
- * When there is a {@link RocksDBException},
+ * When there is a {@link RocksDBException} with error,
  * this class will close the underlying {@link org.rocksdb.RocksObject}s.
  */
-public final class RocksDatabase implements Closeable {
+public final class RocksDatabase {
   static final Logger LOG = LoggerFactory.getLogger(RocksDatabase.class);
 
   static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
 
+
+  static IOException toIOException(Object name, String op, RocksDBException e) {
+    return HddsServerUtil.toIOException(name + ": Failed to " + op, e);
+  }
+
   /**
    * Read DB and return existing column families.
    *
-   * @return List of column families
-   * @throws RocksDBException on Error.
+   * @return a list of column families.
+   * @see RocksDB#listColumnFamilies(Options, String)
    */
   private static List<TableConfig> getColumnFamilies(File file)
       throws RocksDBException {
@@ -117,7 +121,7 @@ public final class RocksDatabase implements Closeable {
           descriptors, Collections.unmodifiableMap(columnFamilies));
     } catch (RocksDBException e) {
       close(columnFamilies, db, descriptors, writeOptions, dbOptions);
-      throw HddsServerUtil.toIOException("open " + dbFile, e);
+      throw toIOException(RocksDatabase.class, "open " + dbFile, e);
     }
   }
 
@@ -194,7 +198,7 @@ public final class RocksDatabase implements Closeable {
         checkpoint.createCheckpoint(path.toString());
       } catch (RocksDBException e) {
         closeOnError(e);
-        throw toIOException("createCheckpoint " + path, e);
+        throw toIOException(this, "createCheckpoint " + path, e);
       }
     }
 
@@ -241,8 +245,7 @@ public final class RocksDatabase implements Closeable {
       try {
         writeBatch.delete(getHandle(), key);
       } catch (RocksDBException e) {
-        throw HddsServerUtil.toIOException("Failed to batchDelete key "
-            + bytes2String(key) + " from " + this, e);
+        throw toIOException(this, "batchDelete key " + bytes2String(key), e);
       }
     }
 
@@ -251,8 +254,7 @@ public final class RocksDatabase implements Closeable {
       try {
         writeBatch.put(getHandle(), key, value);
       } catch (RocksDBException e) {
-        throw HddsServerUtil.toIOException("Failed to batchPut key "
-            + bytes2String(key) + " from " + this, e);
+        throw toIOException(this, "batchPut key " + bytes2String(key), e);
       }
     }
 
@@ -311,7 +313,7 @@ public final class RocksDatabase implements Closeable {
       db.put(family.getHandle(), writeOptions, key, value);
     } catch (RocksDBException e) {
       closeOnError(e);
-      throw toIOException("put " + bytes2String(key), e);
+      throw toIOException(this, "put " + bytes2String(key), e);
     }
   }
 
@@ -321,7 +323,7 @@ public final class RocksDatabase implements Closeable {
       db.flush(options);
     } catch (RocksDBException e) {
       closeOnError(e);
-      throw toIOException("flush", e);
+      throw toIOException(this, "flush", e);
     }
   }
 
@@ -330,7 +332,7 @@ public final class RocksDatabase implements Closeable {
       db.flushWal(sync);
     } catch (RocksDBException e) {
       closeOnError(e);
-      throw toIOException("flushWal with sync=" + sync, e);
+      throw toIOException(this, "flushWal with sync=" + sync, e);
     }
   }
 
@@ -339,7 +341,7 @@ public final class RocksDatabase implements Closeable {
       db.compactRange();
     } catch (RocksDBException e) {
       closeOnError(e);
-      throw toIOException("compactRange", e);
+      throw toIOException(this, "compactRange", e);
     }
   }
 
@@ -349,21 +351,20 @@ public final class RocksDatabase implements Closeable {
 
   /**
    * @return false if the key definitely does not exist in the database;
-   * otherwise, return true.
+   *         otherwise, return true.
    * @see RocksDB#keyMayExist(ColumnFamilyHandle, byte[], Holder)
    */
-  public boolean keyMayExist(ColumnFamily family, byte[] key)
-      throws IOException {
+  public boolean keyMayExist(ColumnFamily family, byte[] key) {
     return db.keyMayExist(family.getHandle(), key, null);
   }
 
   /**
    * @return the null if the key definitely does not exist in the database;
-   * otherwise, return a {@link Supplier}.
+   *         otherwise, return a {@link Supplier}.
    * @see RocksDB#keyMayExist(ColumnFamilyHandle, byte[], Holder)
    */
   public Supplier<byte[]> keyMayExistHolder(ColumnFamily family,
-      byte[] key) throws IOException {
+      byte[] key) {
     final Holder<byte[]> out = new Holder<>();
     return db.keyMayExist(family.getHandle(), key, out) ? out::getValue : null;
   }
@@ -381,7 +382,8 @@ public final class RocksDatabase implements Closeable {
       return db.get(family.getHandle(), key);
     } catch (RocksDBException e) {
       closeOnError(e);
-      throw toIOException("get " + bytes2String(key) + " from " + family, e);
+      final String message = "get " + bytes2String(key) + " from " + family;
+      throw toIOException(this, message, e);
     }
   }
 
@@ -398,7 +400,7 @@ public final class RocksDatabase implements Closeable {
       return db.getLongProperty(key);
     } catch (RocksDBException e) {
       closeOnError(e);
-      throw toIOException("getLongProperty " + key, e);
+      throw toIOException(this, "getLongProperty " + key, e);
     }
   }
 
@@ -408,7 +410,8 @@ public final class RocksDatabase implements Closeable {
       return db.getLongProperty(family.getHandle(), key);
     } catch (RocksDBException e) {
       closeOnError(e);
-      throw toIOException("getLongProperty " + key + " from " + family, e);
+      final String message = "getLongProperty " + key + " from " + family;
+      throw toIOException(this, message, e);
     }
   }
 
@@ -417,7 +420,7 @@ public final class RocksDatabase implements Closeable {
       return db.getProperty(key);
     } catch (RocksDBException e) {
       closeOnError(e);
-      throw toIOException("getProperty " + key, e);
+      throw toIOException(this, "getProperty " + key, e);
     }
   }
 
@@ -427,7 +430,7 @@ public final class RocksDatabase implements Closeable {
       return db.getProperty(family.getHandle(), key);
     } catch (RocksDBException e) {
       closeOnError(e);
-      throw toIOException("getProperty " + key + " from " + family, e);
+      throw toIOException(this, "getProperty " + key + " from " + family, e);
     }
   }
 
@@ -437,7 +440,7 @@ public final class RocksDatabase implements Closeable {
       return db.getUpdatesSince(sequenceNumber);
     } catch (RocksDBException e) {
       closeOnError(e);
-      throw toIOException("getUpdatesSince " + sequenceNumber, e);
+      throw toIOException(this, "getUpdatesSince " + sequenceNumber, e);
     }
   }
 
@@ -462,7 +465,7 @@ public final class RocksDatabase implements Closeable {
       db.write(options, writeBatch);
     } catch (RocksDBException e) {
       closeOnError(e);
-      throw toIOException("batchWrite", e);
+      throw toIOException(this, "batchWrite", e);
     }
   }
 
@@ -475,12 +478,9 @@ public final class RocksDatabase implements Closeable {
       db.delete(family.getHandle(), key);
     } catch (RocksDBException e) {
       closeOnError(e);
-      throw toIOException("delete " + bytes2String(key) + " from " + family, e);
+      final String message = "delete " + bytes2String(key) + " from " + family;
+      throw toIOException(this, message, e);
     }
-  }
-
-  private IOException toIOException(String op, RocksDBException e) {
-    return HddsServerUtil.toIOException(this + ": Failed to " + op, e);
   }
 
   @Override
