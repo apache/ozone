@@ -107,8 +107,8 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       Optional<String> optionalTenantId =
           multiTenantManager.getTenantForAccessID(accessId);
       if (!optionalTenantId.isPresent()) {
-        throw new OMException("OmDBAccessIdInfo is missing for accessId '" +
-            accessId + "' in DB.", OMException.ResultCodes.METADATA_ERROR);
+        throw new OMException("accessId '" + accessId + "' is not assigned to "
+            + "any tenant", OMException.ResultCodes.TENANT_NOT_FOUND);
       }
       tenantId = optionalTenantId.get();
       assert (!StringUtils.isEmpty(tenantId));
