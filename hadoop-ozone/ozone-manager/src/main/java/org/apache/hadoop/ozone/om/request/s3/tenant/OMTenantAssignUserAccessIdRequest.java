@@ -56,6 +56,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeSet;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
@@ -124,6 +125,13 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
 
     final String userPrincipal = request.getUserPrincipal();
     final String accessId = request.getAccessId();
+
+    // Check accessId length.
+    if (accessId.length() >= OZONE_MAXIMUM_ACCESS_ID_LENGTH) {
+      throw new OMException(
+          "accessId length exceeds the maximum length allowed",
+          OMException.ResultCodes.INVALID_ACCESS_ID);
+    }
 
     // Check userPrincipal (username) validity.
     if (userPrincipal.contains(OzoneConsts.TENANT_ID_USERNAME_DELIMITER)) {

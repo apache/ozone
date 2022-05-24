@@ -526,4 +526,6 @@ public final class OzoneConsts {
   public static final String OZONE_TENANT_RANGER_POLICY_LABEL = "OzoneTenant";
 
   public static final long OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS = 1000L;
+
+  public static final int OZONE_MAXIMUM_ACCESS_ID_LENGTH = 100;
 }
