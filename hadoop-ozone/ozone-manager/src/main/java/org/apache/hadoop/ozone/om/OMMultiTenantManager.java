@@ -224,16 +224,16 @@ public interface OMMultiTenantManager {
     return tenantId + OzoneConsts.DEFAULT_TENANT_BUCKET_POLICY_SUFFIX;
   }
 
-  void assignTenantAdminInDBCache(String accessID, boolean delegated)
+  void assignTenantAdminInDBCache(String accessId, boolean delegated)
       throws IOException;
 
   /**
    * Given a user, make him an admin of the corresponding Tenant.
    * This makes a request to Ranger.
-   * @param accessID
+   * @param accessId
    * @param delegated
    */
-  void assignTenantAdminInAuthorizer(String accessID, boolean delegated)
+  void assignTenantAdminInAuthorizer(String accessId, boolean delegated)
       throws IOException;
 
   /**

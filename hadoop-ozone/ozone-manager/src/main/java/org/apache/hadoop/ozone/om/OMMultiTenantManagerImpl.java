@@ -584,10 +584,33 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   }
 
+  /**
+   * This should be called in validateAndUpdateCache after
+   * the InAuthorizer variant (called in preExecute).
+   */
   @Override
-  public void assignTenantAdminInDBCache(String accessID, boolean delegated)
+  public void assignTenantAdminInDBCache(String accessId, boolean delegated)
       throws IOException {
 
+    tenantCacheLock.readLock().lock();
+
+    try {
+      // tenantId (tenant name) is necessary to retrieve role name
+      final Optional<String> optionalTenant = getTenantForAccessID(accessId);
+      if (!optionalTenant.isPresent()) {
+        throw new OMException("No tenant found for access ID " + accessId,
+            INVALID_ACCESS_ID);
+      }
+      final String tenantId = optionalTenant.get();
+
+      final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
+
+      // Update cache
+      cachedTenantState.getAccessIdInfoMap().get(accessId).setIsAdmin(true);
+
+    } finally {
+      tenantCacheLock.readLock().unlock();
+    }
   }
 
   @Override
@@ -597,11 +620,11 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     // TODO: Add this at the beginning of ALL other InAuthorizer methods as well
     checkAcquiredAuthorizerWriteLock();
 
-    try {
-      tenantCacheLock.writeLock().lock();
+    tenantCacheLock.writeLock().lock();
 
+    try {
       // tenantId (tenant name) is necessary to retrieve role name
-      Optional<String> optionalTenant = getTenantForAccessID(accessId);
+      final Optional<String> optionalTenant = getTenantForAccessID(accessId);
       if (!optionalTenant.isPresent()) {
         throw new OMException("No tenant found for access ID " + accessId,
             INVALID_ACCESS_ID);
@@ -609,6 +632,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       final String tenantId = optionalTenant.get();
 
       final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
+
       final String tenantAdminRoleName =
           cachedTenantState.getTenantAdminRoleName();
       final OzoneTenantRolePrincipal existingAdminRole =
@@ -621,8 +645,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
           new BasicUserPrincipal(userPrincipal), roleJsonStr, delegated);
       assert (roleId != null);
 
-      // Update cache
-      cachedTenantState.getAccessIdInfoMap().get(accessId).setIsAdmin(true);
+      // Does NOT update tenant cache
 
     } catch (IOException e) {
       revokeTenantAdmin(accessId);

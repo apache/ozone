@@ -218,6 +218,10 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
           new CacheValue<>(Optional.of(newOmDBAccessIdInfo),
               transactionLogIndex));
 
+      // Update tenant cache
+      ozoneManager.getMultiTenantManager().assignTenantAdminInDBCache(
+          request.getAccessId(), delegated);
+
       omResponse.setTenantAssignAdminResponse(
           TenantAssignAdminResponse.newBuilder()
               .build());
