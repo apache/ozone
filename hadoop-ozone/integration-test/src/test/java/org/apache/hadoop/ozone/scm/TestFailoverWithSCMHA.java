@@ -302,7 +302,14 @@ public class TestFailoverWithSCMHA {
         GenericTestUtils.waitFor(() -> scm.getScmHAManager().getRatisServer()
             .getSCMStateMachine().getLastAppliedTermIndex()
             .getIndex() >= leaderTermIndex, 100, 3000);
+        ContainerBalancer followerBalancer = scm.getContainerBalancer();
+        GenericTestUtils.waitFor(
+            () -> !followerBalancer.isBalancerRunning(), 50, 5000);
+        GenericTestUtils.waitFor(() -> !followerBalancer.shouldRun(), 100,
+            5000);
       }
+      scm.getStatefulServiceStateManager().readConfiguration(
+          containerBalancer.getServiceName());
       byteString =
           scm.getScmMetadataStore().getStatefulServiceConfigTable().get(
               containerBalancer.getServiceName());
