@@ -41,8 +41,8 @@ public final class BackgroundSCMService implements SCMService {
   private final long waitTimeInMillis;
   private long lastTimeToBeReadyInMillis = 0;
   private final Clock clock;
-  private String serviceName;
-  private Runnable periodicalTask;
+  private final String serviceName;
+  private final Runnable periodicalTask;
   private volatile boolean runImmediately = false;
 
   private BackgroundSCMService(

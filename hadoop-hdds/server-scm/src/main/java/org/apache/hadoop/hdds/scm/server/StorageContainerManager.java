@@ -627,19 +627,19 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     containerReplicaPendingOps = new ContainerReplicaPendingOps(conf, clock);
 
-    long intervalInMillis = conf.getTimeDuration(
+    long containerReplicaOpScrubberIntervalMs = conf.getTimeDuration(
         ScmConfigKeys
             .OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL,
         ScmConfigKeys
             .OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    long expiryMilliSeconds = conf.getTimeDuration(
+    long containerReplicaOpExpiryMs = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT,
         ScmConfigKeys.OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    long waitTimeInMillis = conf.getTimeDuration(
+    long backgroundServiceSafemodeWaitMs = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
         TimeUnit.MILLISECONDS);
@@ -649,10 +649,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new BackgroundSCMService.Builder().setClock(clock)
             .setScmContext(scmContext)
             .setServiceName(backgroundServiceName)
-            .setIntervalInMillis(intervalInMillis)
-            .setWaitTimeInMillis(waitTimeInMillis)
+            .setIntervalInMillis(containerReplicaOpScrubberIntervalMs)
+            .setWaitTimeInMillis(backgroundServiceSafemodeWaitMs)
             .setPeriodicalTask(() -> containerReplicaPendingOps
-                .removeExpiredEntries(expiryMilliSeconds)).build();
+                .removeExpiredEntries(containerReplicaOpExpiryMs)).build();
 
     serviceManager.register(expiredContainerReplicaOpScrubber);
 
