@@ -21,6 +21,8 @@ import java.io.IOException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -45,6 +47,8 @@ import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENAN
 /**
  * OM MultiTenant manager interface.
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public interface OMMultiTenantManager {
   /* TODO: Outdated
    * Init multi-tenant manager. Performs initialization e.g.
