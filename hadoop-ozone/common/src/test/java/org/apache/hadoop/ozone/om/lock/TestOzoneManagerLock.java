@@ -25,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -891,6 +892,28 @@ public class TestOzoneManagerLock {
       String message = "cannot acquire " + higherResource.getName() + " lock " +
           "while holding [" + resource.getName() + "] lock(s).";
       Assert.assertTrue(ex.getMessage(), ex.getMessage().contains(message));
+    }
+  }
+
+  @Test
+  public void testOMLockMetricsRecords() {
+    OMLockMetrics omLockMetrics = OMLockMetrics.create();
+    try {
+      MetricsCollectorImpl metricsCollector = new MetricsCollectorImpl();
+      omLockMetrics.getMetrics(metricsCollector, true);
+      Assert.assertEquals(1, metricsCollector.getRecords().size());
+
+      String omLockMetricsRecords = metricsCollector.getRecords().toString();
+      Assert.assertTrue(omLockMetricsRecords,
+          omLockMetricsRecords.contains("ReadLockWaitingTime"));
+      Assert.assertTrue(omLockMetricsRecords,
+          omLockMetricsRecords.contains("ReadLockHeldTime"));
+      Assert.assertTrue(omLockMetricsRecords,
+          omLockMetricsRecords.contains("WriteLockWaitingTime"));
+      Assert.assertTrue(omLockMetricsRecords,
+          omLockMetricsRecords.contains("WriteLockHeldTime"));
+    } finally {
+      omLockMetrics.unRegister();
     }
   }
 }
