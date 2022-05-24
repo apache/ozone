@@ -25,7 +25,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBl
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -34,6 +36,8 @@ import java.util.Map;
 public class MockDatanodeStorage {
 
   private final Map<DatanodeBlockID, BlockData> blocks = new HashedMap();
+  private final Map<Long, List<DatanodeBlockID>>
+      containerBlocks = new HashedMap();
   private final Map<BlockID, String> fullBlockData = new HashMap<>();
 
   private final Map<String, ChunkInfo> chunks = new HashMap<>();
@@ -48,10 +52,23 @@ public class MockDatanodeStorage {
 
   public void putBlock(DatanodeBlockID blockID, BlockData blockData) {
     blocks.put(blockID, blockData);
+    List<DatanodeBlockID> dnBlocks = containerBlocks
+        .getOrDefault(blockID.getContainerID(), new ArrayList<>());
+    dnBlocks.add(blockID);
+    containerBlocks.put(blockID.getContainerID(), dnBlocks);
   }
 
   public BlockData getBlock(DatanodeBlockID blockID) {
     return blocks.get(blockID);
+  }
+
+  public List<BlockData> listBlock(long containerID) {
+    List<DatanodeBlockID> datanodeBlockIDS = containerBlocks.get(containerID);
+    List<BlockData> listBlocksData = new ArrayList<>();
+    for (DatanodeBlockID dBlock : datanodeBlockIDS) {
+      listBlocksData.add(blocks.get(dBlock));
+    }
+    return listBlocksData;
   }
 
   public void writeChunk(
