@@ -280,6 +280,13 @@ public class TestFailoverWithSCMHA {
         10, 500);
     Assertions.assertFalse(containerBalancer.isBalancerRunning());
 
+    ByteString byteString =
+        leader.getScmMetadataStore().getStatefulServiceConfigTable().get(
+            containerBalancer.getServiceName());
+    ContainerBalancerConfigurationProto proto =
+        ContainerBalancerConfigurationProto.parseFrom(byteString);
+    GenericTestUtils.waitFor(() -> !proto.getShouldRun(), 5, 50);
+
     long leaderTermIndex =
         leader.getScmHAManager().getRatisServer().getSCMStateMachine()
         .getLastAppliedTermIndex().getIndex();
@@ -296,12 +303,12 @@ public class TestFailoverWithSCMHA {
             .getSCMStateMachine().getLastAppliedTermIndex()
             .getIndex() >= leaderTermIndex, 100, 3000);
       }
-      ByteString byteString =
+      byteString =
           scm.getScmMetadataStore().getStatefulServiceConfigTable().get(
               containerBalancer.getServiceName());
-      ContainerBalancerConfigurationProto proto =
+      ContainerBalancerConfigurationProto protobuf =
           ContainerBalancerConfigurationProto.parseFrom(byteString);
-      Assertions.assertFalse(proto.getShouldRun());
+      Assertions.assertFalse(protobuf.getShouldRun());
     }
   }
 
