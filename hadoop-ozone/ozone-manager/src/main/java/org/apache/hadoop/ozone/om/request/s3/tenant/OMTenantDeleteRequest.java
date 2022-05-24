@@ -91,7 +91,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
 
     try {
       // Remove policies and roles from authorizer (Ranger)
-      // TODO: Better deactivate policies instead of delete ? Maybe do this later
+      // TODO: Better deactivate policies instead of delete later?
       multiTenantManager.removeTenantFromAuthorizer(tenantObj);
     } finally {
       // Release write lock to authorizer (Ranger)
