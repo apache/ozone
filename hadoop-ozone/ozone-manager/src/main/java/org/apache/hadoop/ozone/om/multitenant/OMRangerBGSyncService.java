@@ -337,7 +337,7 @@ public class OMRangerBGSyncService extends BackgroundService {
         // Submit Ratis Request to sync the new service version in OM DB
         setOMDBRangerServiceVersion(rangerOzoneServiceVersion);
 
-        // Acquire lock
+        // Acquire lock before reading the latest Ranger service version
         lockAcquired = multiTenantManager.tryAcquireAuthorizerAccessWriteLock(
             OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
         if (!lockAcquired) {
@@ -425,12 +425,15 @@ public class OMRangerBGSyncService extends BackgroundService {
     // Acquire read lock to authorizer (Ranger)
     multiTenantManager.tryAcquireAuthorizerAccessReadLockInRequest();
 
-    loadAllPoliciesAndRoleNamesFromRanger(baseVersion);
-    loadAllRolesFromRanger();
-    loadAllRolesFromOM();
+    try {
+      loadAllPoliciesAndRoleNamesFromRanger(baseVersion);
+      loadAllRolesFromRanger();
+      loadAllRolesFromOM();
+    } finally {
+      // Release read lock to authorizer (Ranger)
+      multiTenantManager.releaseAuthorizerAccessReadLock();
+    }
 
-    // Release read lock to authorizer (Ranger)
-    multiTenantManager.releaseAuthorizerAccessReadLock();
 
     // This should isolate policies into two groups
     // 1. mtRangerPoliciesTobeDeleted and

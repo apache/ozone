@@ -128,12 +128,14 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     // Acquire write lock to authorizer (Ranger)
     multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
 
-    // Call OMMTM to add user to tenant admin role
-    ozoneManager.getMultiTenantManager().assignTenantAdminInAuthorizer(
-        request.getAccessId(), delegated);
-
-    // Release write lock to authorizer (Ranger)
-    multiTenantManager.releaseAuthorizerAccessWriteLock();
+    try {
+      // Call OMMTM to add user to tenant admin role
+      ozoneManager.getMultiTenantManager().assignTenantAdminInAuthorizer(
+          request.getAccessId(), delegated);
+    } finally {
+      // Release write lock to authorizer (Ranger)
+      multiTenantManager.releaseAuthorizerAccessWriteLock();
+    }
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
         .setTenantAssignAdminRequest(

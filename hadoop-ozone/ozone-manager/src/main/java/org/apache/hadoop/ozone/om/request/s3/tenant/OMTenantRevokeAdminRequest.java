@@ -120,11 +120,13 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     // Acquire write lock to authorizer (Ranger)
     multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
 
-    // Remove user (inferred from access ID) from tenant admin role in Ranger
-    ozoneManager.getMultiTenantManager().revokeTenantAdmin(accessId);
-
-    // Release write lock to authorizer (Ranger)
-    multiTenantManager.releaseAuthorizerAccessWriteLock();
+    try {
+      // Remove user (inferred from access ID) from tenant admin role in Ranger
+      ozoneManager.getMultiTenantManager().revokeTenantAdmin(accessId);
+    } finally {
+      // Release write lock to authorizer (Ranger)
+      multiTenantManager.releaseAuthorizerAccessWriteLock();
+    }
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
         .setTenantRevokeAdminRequest(

@@ -177,13 +177,15 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     // Acquire write lock to authorizer (Ranger)
     multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
 
-    // If we fail after pre-execute. handleRequestFailure() callback
-    // would clean up any state maintained by the getMultiTenantManager.
-    tenantInContext = multiTenantManager.createTenantInAuthorizer(
-        tenantId, userRoleName, adminRoleName);
-
-    // Release write lock to authorizer (Ranger)
-    multiTenantManager.releaseAuthorizerAccessWriteLock();
+    try {
+      // If we fail after pre-execute. handleRequestFailure() callback
+      // would clean up any state maintained by the getMultiTenantManager.
+      tenantInContext = multiTenantManager.createTenantInAuthorizer(
+          tenantId, userRoleName, adminRoleName);
+    } finally {
+      // Release write lock to authorizer (Ranger)
+      multiTenantManager.releaseAuthorizerAccessWriteLock();
+    }
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
         .setCreateTenantRequest(
