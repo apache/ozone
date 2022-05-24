@@ -20,6 +20,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto
     .ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -94,6 +95,18 @@ public class CloseContainerCommandHandler implements CommandHandler {
       switch (container.getContainerState()) {
       case OPEN:
       case CLOSING:
+        HddsProtos.ReplicationType replicationType
+            = HddsProtos.ReplicationType.RATIS;
+        if (closeCommand.hasReplicationType()) {
+          replicationType = closeCommand.getReplicationType();
+        }
+        if (replicationType != HddsProtos.ReplicationType.RATIS) {
+          // There is no pipeline to replicate the close command to, so just
+          // close the container.
+          controller.closeContainer(containerId);
+          break;
+        }
+        // Only containers with RATIS replication can get here
         // If the container is part of open pipeline, close it via write channel
         if (ozoneContainer.getWriteChannel()
             .isExist(closeCommand.getPipelineID())) {
