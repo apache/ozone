@@ -17,17 +17,20 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -39,20 +42,27 @@ public class TestBackgroundSCMService {
   private BackgroundSCMService backgroundSCMService;
   private TestClock testClock;
   private SCMContext scmContext;
-  private Object obj;
+  private PipelineManager pipelineManager;
 
   @BeforeEach
-  public void setup() {
+  public void setup() throws IOException {
     testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
     scmContext = SCMContext.emptyContext();
-    obj = mock(Object.class);
+    this.pipelineManager = mock(PipelineManager.class);
+    doNothing().when(pipelineManager).scrubPipelines();
     this.backgroundSCMService = new BackgroundSCMService.Builder()
         .setClock(testClock)
         .setScmContext(scmContext)
         .setServiceName("testBackgroundService")
         .setIntervalInMillis(1L)
         .setWaitTimeInMillis(1L)
-        .setPeriodicalTask(() -> obj.hashCode()).build();
+        .setPeriodicalTask(() -> {
+          try {
+            pipelineManager.scrubPipelines();
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }).build();
   }
 
   @AfterEach
@@ -88,7 +98,7 @@ public class TestBackgroundSCMService {
   }
 
   @Test
-  public void testRun() {
+  public void testRun() throws IOException {
     assertFalse(backgroundSCMService.shouldRun());
     // kick a run
     synchronized (backgroundSCMService) {
@@ -98,6 +108,6 @@ public class TestBackgroundSCMService {
       assertTrue(backgroundSCMService.shouldRun());
       backgroundSCMService.runImmediately();
     }
-    verify(obj, timeout(3000).atLeastOnce()).hashCode();
+    verify(pipelineManager, timeout(3000).atLeastOnce()).scrubPipelines();
   }
 }
