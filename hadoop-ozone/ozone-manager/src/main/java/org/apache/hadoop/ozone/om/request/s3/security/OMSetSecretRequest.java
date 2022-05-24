@@ -96,31 +96,10 @@ public class OMSetSecretRequest extends OMClientRequest {
           OMException.ResultCodes.INVALID_REQUEST);
     }
 
-    // TODO: Check if secretKey matches other requirements? e.g. combination
-
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
-    final String username = ugi.getUserName();
-
-    // Permission check. To pass the check, any one of the following conditions
-    // shall be satisfied:
-    // 1. username matches accessId exactly
-    // 2. user is an OM admin
-    // 3. user is assigned to a tenant under this accessId
-    // 4. user is an admin of the tenant where the accessId is assigned
-
-    if (!username.equals(accessId) && !ozoneManager.isAdmin(ugi)) {
-      // Attempt to retrieve tenant info using the accessId
-      if (!ozoneManager.getMultiTenantManager()
-          .isUserAccessIdPrincipalOrTenantAdmin(accessId, ugi)) {
-        throw new OMException("Permission denied. Requested accessId '" +
-                accessId + "' and user doesn't satisfy any of:\n" +
-                "1) accessId match current username: '" + username + "';\n" +
-                "2) is an OM admin;\n" +
-                "3) user is assigned to a tenant under this accessId;\n" +
-                "4) user is an admin of the tenant where the accessId is " +
-                "assigned", OMException.ResultCodes.PERMISSION_DENIED);
-      }
-    }
+    // Permission check
+    S3SecretRequestHelper.checkAccessIdSecretOpPermission(
+        ozoneManager, ugi, accessId);
 
     return getOmRequest();
   }
