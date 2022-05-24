@@ -38,7 +38,16 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.Collections;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.TreeMap;
+import java.util.Map;
+import java.util.TreeSet;
+import java.util.PriorityQueue;
+import java.util.Set;
+import java.util.NoSuchElementException;
 
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
@@ -91,15 +100,20 @@ public class OzoneListStatusHelper {
     /**
      * a) If the keyname is a file just return one entry
      * b) if the keyname is root, then return the value of the bucket
-     * c) if the keyname is a different bucket than root, fetch the direcoty parent id
+     * c) if the keyname is a different bucket than root,
+     * fetch the direcoty parent id
      *
      * if the startkey exists
      * a) check the start key is a child ot key, else return emptry list
-     * b) chekc if the start key is a child chil of keynae, then reset the key to parent of start key
+     * b) chekc if the start key is a child chil of keynae,
+     * then reset the key to parent of start key
      * c) if start key is non existent then seek to the neatest key
-     * d) if the keyname is not a dir or a file, it can either be invalid name or a prefix path
-     *     in case, this is called as part of listStatus fail as the real dir/file should exist
-     *     else, try to find the parent of keyname and use that as the prefix, use the rest of the path to construct prefix path
+     * d) if the keyname is not a dir or a file, it can either be
+     * invalid name or a prefix path
+     *     in case, this is called as part of listStatus fail as the
+     *     real dir/file should exist
+     *     else, try to find the parent of keyname and use that as the prefix,
+     *     use the rest of the path to construct prefix path
      */
 
 
@@ -193,7 +207,7 @@ public class OzoneListStatusHelper {
   }
 
   /**
-   * Enum of types of entries
+   * Enum of types of entries.
    */
   public enum EntryType {
     DIR_CACHE,
@@ -211,15 +225,16 @@ public class OzoneListStatusHelper {
         return false;
       default:
         throw new IllegalArgumentException();
-    }
+      }
     }
   }
 
   /**
-   * Entry which is added to heap
+   * Entry which is added to heap.
    * @param <T>
    */
-  private static class HeapEntry<T extends WithParentObjectId> implements Comparable<HeapEntry> {
+  private static class HeapEntry<T extends WithParentObjectId>
+      implements Comparable<HeapEntry> {
     private final EntryType entryType;
     private final String key;
     private final T value;
@@ -239,7 +254,7 @@ public class OzoneListStatusHelper {
         return false;
       }
 
-      if (! (other instanceof HeapEntry)) {
+      if (!(other instanceof HeapEntry)) {
         return false;
       }
 
@@ -276,10 +291,17 @@ public class OzoneListStatusHelper {
     }
   }
 
+  /**
+   * Iterator class for Ozone keys
+   */
   public interface OzoneKeyIterator extends
       Iterator<HeapEntry<? extends WithParentObjectId>>, Closeable {
   }
 
+  /**
+   * Raw iterator over db tables.
+   * @param <T>
+   */
   private static class RawIter<T extends WithParentObjectId>
       implements OzoneKeyIterator {
 
@@ -372,7 +394,7 @@ public class OzoneListStatusHelper {
 
     private final EntryType entryType;
 
-    public CacheIter(EntryType entryType, Iterator<Map.Entry<CacheKey<String>,
+    CacheIter(EntryType entryType, Iterator<Map.Entry<CacheKey<String>,
         CacheValue<T>>> cacheIter, String startKey, String prefixKey) {
       this.cacheDeletedKeySet = new TreeSet<>();
       this.cacheKeyMap = new TreeMap<>();
