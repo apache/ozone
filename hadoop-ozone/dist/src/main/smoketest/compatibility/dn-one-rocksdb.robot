@@ -22,8 +22,7 @@ Test Timeout        5 minutes
 
 
 *** Test Cases ***
-Create a container, check container schema version is V2 (SchemaV3 is by
-default disabled)
+Create a container and check container schema version
     ${output} =         Execute          ozone admin container create
                         Should not contain  ${output}       Failed
     ${output} =         Execute          ozone debug container list
