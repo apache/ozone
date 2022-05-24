@@ -1507,11 +1507,10 @@ public class KeyManagerImpl implements KeyManager {
         OzoneListStatusHelper statusHelper =
             new OzoneListStatusHelper(metadataManager, scmBlockSize,
                 this::getOzoneFileStatusFSO);
-        Map<String, OzoneFileStatus> cacheFileMap = new HashMap<>();
-        Map<String, OzoneFileStatus> cacheDirMap = new HashMap<>();
-        statusHelper.listStatusFSO(args, recursive, startKey, numEntries,
-            clientAddress, cacheDirMap, cacheFileMap);
-        return buildFinalStatusList(cacheFileMap, cacheDirMap,
+        Collection<OzoneFileStatus> statuses =
+            statusHelper.listStatusFSO(args, recursive, startKey, numEntries,
+            clientAddress);
+        return buildFinalStatusList(statuses,
             args, clientAddress);
       } else {
         return listStatusFSO(args, recursive, startKey, numEntries,
@@ -1903,6 +1902,34 @@ public class KeyManagerImpl implements KeyManager {
       fileStatusFinalList.add(fileStatus);
     }
 
+    return sortPipelineInfo(fileStatusFinalList, keyInfoList,
+        omKeyArgs, clientAddress);
+  }
+
+  private List<OzoneFileStatus> buildFinalStatusList(
+      Collection<OzoneFileStatus> statusesCollection, OmKeyArgs omKeyArgs,
+      String clientAddress)
+      throws IOException {
+    List<OzoneFileStatus> fileStatusFinalList = new ArrayList<>();
+    List<OmKeyInfo> keyInfoList = new ArrayList<>();
+
+    for (OzoneFileStatus fileStatus : statusesCollection) {
+      if (fileStatus.isFile()) {
+        keyInfoList.add(fileStatus.getKeyInfo());
+      }
+      fileStatusFinalList.add(fileStatus);
+    }
+
+    return sortPipelineInfo(fileStatusFinalList, keyInfoList,
+        omKeyArgs, clientAddress);
+  }
+
+
+  private List<OzoneFileStatus> sortPipelineInfo(
+      List<OzoneFileStatus> fileStatusFinalList, List<OmKeyInfo> keyInfoList,
+      OmKeyArgs omKeyArgs, String clientAddress) throws IOException {
+
+
     if (omKeyArgs.getLatestVersionLocation()) {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
     }
@@ -1917,6 +1944,7 @@ public class KeyManagerImpl implements KeyManager {
 
     return fileStatusFinalList;
   }
+
 
   /***
    * Build files, directories and marked for deleted entries from dir/file
