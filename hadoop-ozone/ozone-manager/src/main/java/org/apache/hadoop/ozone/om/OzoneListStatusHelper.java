@@ -81,15 +81,15 @@ public class OzoneListStatusHelper {
     this.getStatusHelper = func;
   }
 
-  public List<OzoneFileStatus> listStatusFSO(OmKeyArgs args,
+  public void listStatusFSO(OmKeyArgs args,
       boolean recursive, String startKey, long numEntries,
-      String clientAddress)
+      String clientAddress, Map<String, OzoneFileStatus> cacheDirMap, Map<String, OzoneFileStatus> cacheFileMap)
       throws IOException {
     Preconditions.checkArgument(!recursive);
     Preconditions.checkNotNull(args, "Key args can not be null");
 
     if (numEntries <= 0) {
-      return new ArrayList<>();
+      return;
     }
 
     final String volumeName = args.getVolumeName();
@@ -123,7 +123,7 @@ public class OzoneListStatusHelper {
         LOG.debug("StartKey {} is not an immediate child of keyName {}. " +
             "Returns empty list", startKey, keyName);
       }
-      return Collections.emptyList();
+      return;
     }
 
     String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
@@ -134,7 +134,7 @@ public class OzoneListStatusHelper {
         LOG.debug("StartKey {} is not an immediate child of keyName {}. " +
             "Returns empty list", startKey, keyName);
       }
-      return Collections.emptyList();
+      return;
     }
 
     BucketLayout bucketLayout = omBucketInfo.getBucketLayout();
@@ -148,8 +148,10 @@ public class OzoneListStatusHelper {
       prefixKey = OzoneFSUtils.getParentDir(keyName);
     } else {
       if (fileStatus.isFile()) {
-        return Collections.singletonList(fileStatus);
+        cacheFileMap.put(fileStatus.getPath(), fileStatus);
+        return;
       }
+
       long id = getId(fileStatus, omBucketInfo);
       dbPrefixKey = metadataManager.getOzonePathKey(id, "");
     }
@@ -158,23 +160,25 @@ public class OzoneListStatusHelper {
         Strings.isNullOrEmpty(startKey) ? "" :
             getDbKey(startKey, args, omBucketInfo);
 
-    TreeMap<String, OzoneFileStatus> cacheKeyMap = new TreeMap<>();
-
     try (MinHeapIterator heapIterator =
              new MinHeapIterator(metadataManager, dbPrefixKey, bucketLayout,
                  startKeyPrefix, volumeName, bucketName)) {
 
-      while (cacheKeyMap.size() < numEntries && heapIterator.hasNext()) {
+      int count = 0;
+      while (count < numEntries && heapIterator.hasNext()) {
         HeapEntry entry = heapIterator.next();
         OzoneFileStatus status = entry.getStatus(prefixKey,
-            scmBlockSize, volumeName, bucketName);
+            scmBlockSize, volumeName, bucketName, args);
         LOG.info("returning status:{} keyname:{} startkey:{} numEntries:{}",
             status, prefixKey, startKey, numEntries);
-        cacheKeyMap.put(entry.getKey(), status);
+        if (entry.entryType.isDir()) {
+          cacheDirMap.put(status.getPath(), status);
+        } else {
+          cacheFileMap.put(status.getPath(), status);
+        }
+       count++;
       }
     }
-
-    return new ArrayList<>(cacheKeyMap.values());
   }
 
 
@@ -272,7 +276,8 @@ public class OzoneListStatusHelper {
     }
 
     public OzoneFileStatus getStatus(String prefixPath, long scmBlockSize,
-                                     String volumeName, String bucketName) {
+                                     String volumeName, String bucketName,
+                                     OmKeyArgs args) {
       OmKeyInfo keyInfo;
       if (entryType.isDir()) {
         OmDirectoryInfo dirInfo = (OmDirectoryInfo) value;
