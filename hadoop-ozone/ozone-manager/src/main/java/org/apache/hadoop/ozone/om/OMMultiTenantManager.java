@@ -87,6 +87,9 @@ public interface OMMultiTenantManager {
    */
   OMMetadataManager getOmMetadataManager();
 
+  void createTenantInCache(String tenantId, String userRoleName,
+      String adminRoleName) throws IOException;
+
   /**
    * Given a tenant name, create tenant roles and policies in the authorizer
    * (Ranger). Then return a Tenant object.
@@ -106,6 +109,8 @@ public interface OMMultiTenantManager {
    */
   void deactivateTenant(Tenant tenant) throws IOException;
 
+  void activateTenant(Tenant tenant) throws IOException;
+
   /**
    * Given a Tenant object, remove all policies and roles from Ranger that are
    * added during tenant creation.
@@ -118,6 +123,9 @@ public interface OMMultiTenantManager {
 
   void removeTenantFromDBCache(String tenantId) throws IOException;
 
+  void assignUserToTenantInCache(BasicUserPrincipal principal, String tenantId,
+      String accessId) throws IOException;
+
   /**
    * Creates a new user that exists for S3 API access to Ozone.
    * @param principal
@@ -126,26 +134,18 @@ public interface OMMultiTenantManager {
    * @return Unique UserID.
    * @throws IOException if there is any error condition detected.
    */
-  String assignUserToTenant(BasicUserPrincipal principal, String tenantId,
-                            String accessId) throws IOException;
+  String assignUserToTenantInAuthorizer(BasicUserPrincipal principal,
+      String tenantId, String accessId) throws IOException;
 
   /**
    * Revoke user accessId.
    * @param accessId
    * @throws IOException
    */
-  void revokeUserAccessId(String accessId) throws IOException;
+  void revokeUserAccessIdInAuthorizer(String accessId) throws IOException;
 
-  /**
-   * A placeholder method to remove a failed-to-assign accessId from
-   * tenantCache.
-   * Triggered in OMAssignUserToTenantRequest#handleRequestFailure.
-   * Most likely becomes unnecessary if we move OMMTM call to the end of the
-   * request (current it runs in preExecute).
-   * TODO: Remove this if unneeded when Ranger thread patch lands.
-   */
-  void removeUserAccessIdFromCache(String accessId, String userPrincipal,
-                                   String tenantId);
+  void revokeUserAccessIdInCache(String accessId, String tenantId)
+      throws IOException;
 
   /**
    * Given an accessId, return kerberos user name for the tenant user.
@@ -224,7 +224,7 @@ public interface OMMultiTenantManager {
     return tenantId + OzoneConsts.DEFAULT_TENANT_BUCKET_POLICY_SUFFIX;
   }
 
-  void assignTenantAdminInDBCache(String accessId, boolean delegated)
+  void assignTenantAdminInCache(String accessId, boolean delegated)
       throws IOException;
 
   /**
@@ -236,10 +236,12 @@ public interface OMMultiTenantManager {
   void assignTenantAdminInAuthorizer(String accessId, boolean delegated)
       throws IOException;
 
+  void revokeTenantAdminInCache(String accessId) throws IOException;
+
   /**
    * Given a user, remove him as admin of the corresponding Tenant.
    */
-  void revokeTenantAdmin(String accessID) throws IOException;
+  void revokeTenantAdminInAuthorizer(String accessID) throws IOException;
 
   /**
    * Passes check only when caller is an Ozone (cluster) admin, throws
@@ -412,8 +414,7 @@ public interface OMMultiTenantManager {
    * authorizer.
    * @throws IOException
    */
-  void tryAcquireAuthorizerAccessWriteLockInRequest()
-      throws IOException;
+  void tryAcquireAuthorizerAccessWriteLockInRequest() throws IOException;
 
   void acquireAuthorizerAccessWriteLock();
 

@@ -75,7 +75,6 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
   @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
-
     final OMRequest omRequest = super.preExecute(ozoneManager);
     final TenantAssignAdminRequest request =
         omRequest.getTenantAssignAdminRequest();
@@ -131,9 +130,10 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
       // Call OMMTM to add user to tenant admin role
       ozoneManager.getMultiTenantManager().assignTenantAdminInAuthorizer(
           request.getAccessId(), delegated);
-    } finally {
+    } catch (Exception e) {
       // Release write lock to authorizer (Ranger)
       multiTenantManager.releaseAuthorizerAccessWriteLock();
+      throw e;
     }
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
@@ -148,23 +148,13 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
   }
 
   @Override
-  public void handleRequestFailure(OzoneManager ozoneManager) {
-    final TenantAssignAdminRequest request =
-        getOmRequest().getTenantAssignAdminRequest();
-
-    try {
-      ozoneManager.getMultiTenantManager().revokeTenantAdmin(
-          request.getAccessId());
-    } catch (Exception e) {
-      // TODO: Ignore for now. See OMTenantCreateRequest#handleRequestFailure
-    }
-  }
-
-  @Override
   @SuppressWarnings("checkstyle:methodlength")
   public OMClientResponse validateAndUpdateCache(
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
 
     final OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumTenantAssignAdmins();
@@ -219,7 +209,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
               transactionLogIndex));
 
       // Update tenant cache
-      ozoneManager.getMultiTenantManager().assignTenantAdminInDBCache(
+      ozoneManager.getMultiTenantManager().assignTenantAdminInCache(
           request.getAccessId(), delegated);
 
       omResponse.setTenantAssignAdminResponse(
@@ -229,8 +219,6 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
           accessId, newOmDBAccessIdInfo);
 
     } catch (IOException ex) {
-      // Error handling
-      handleRequestFailure(ozoneManager);
       exception = ex;
       // Prepare omClientResponse
       omClientResponse = new OMTenantAssignAdminResponse(
@@ -242,7 +230,8 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
-      // TODO: Release some lock
+      // Release write lock to authorizer (Ranger)
+      multiTenantManager.releaseAuthorizerAccessWriteLock();
     }
 
     // Audit

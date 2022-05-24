@@ -91,11 +91,12 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
 
     try {
       // Remove policies and roles from authorizer (Ranger)
-      // TODO: Better deactivate policies instead of delete later?
+      // Later deactivate (disable) policies instead of delete?
       multiTenantManager.removeTenantFromAuthorizer(tenantObj);
-    } finally {
+    } catch (Exception e) {
       // Release write lock to authorizer (Ranger)
       multiTenantManager.releaseAuthorizerAccessWriteLock();
+      throw e;
     }
 
     return omRequest;
@@ -106,6 +107,9 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
   public OMClientResponse validateAndUpdateCache(
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
 
     final OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumTenantDeletes();
@@ -185,8 +189,8 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
         // TODO: Set response dbVolumeKey?
       }
 
-      // Remove tenant from tenant cache
-      ozoneManager.getMultiTenantManager().removeTenantFromDBCache(tenantId);
+      // Update tenant cache
+      multiTenantManager.removeTenantFromDBCache(tenantId);
 
       // Compose response
 
@@ -214,7 +218,8 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       if (acquiredVolumeLock) {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
-      // TODO: Release some lock
+      // Release write lock to authorizer (Ranger)
+      multiTenantManager.releaseAuthorizerAccessWriteLock();
     }
 
     // Perform audit logging

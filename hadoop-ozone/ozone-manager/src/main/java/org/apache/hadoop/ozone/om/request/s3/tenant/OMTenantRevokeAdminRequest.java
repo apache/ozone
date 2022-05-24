@@ -121,10 +121,11 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
 
     try {
       // Remove user (inferred from access ID) from tenant admin role in Ranger
-      ozoneManager.getMultiTenantManager().revokeTenantAdmin(accessId);
-    } finally {
+      multiTenantManager.revokeTenantAdminInAuthorizer(accessId);
+    } catch (Exception e) {
       // Release write lock to authorizer (Ranger)
       multiTenantManager.releaseAuthorizerAccessWriteLock();
+      throw e;
     }
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
@@ -143,6 +144,9 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
   public OMClientResponse validateAndUpdateCache(
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
 
     final OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumTenantRevokeAdmins();
@@ -195,6 +199,9 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
           new CacheValue<>(Optional.of(newOmDBAccessIdInfo),
               transactionLogIndex));
 
+      // Update tenant cache
+      multiTenantManager.revokeTenantAdminInCache(accessId);
+
       omResponse.setTenantRevokeAdminResponse(
           TenantRevokeAdminResponse.newBuilder()
               .build());
@@ -213,7 +220,8 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
-      // TODO: Release some lock
+      // Release write lock to authorizer (Ranger)
+      multiTenantManager.releaseAuthorizerAccessWriteLock();
     }
 
     // Audit

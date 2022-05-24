@@ -106,7 +106,7 @@ public class TestOMMultiTenantManagerImpl {
 
   @Test
   public void testListUsersInTenant() throws Exception {
-    tenantManager.assignUserToTenant(
+    tenantManager.assignUserToTenantInAuthorizer(
         new BasicUserPrincipal("user1"), TENANT_ID, "accessId1");
 
     TenantUserList tenantUserList =
@@ -138,10 +138,10 @@ public class TestOMMultiTenantManagerImpl {
   public void testRevokeUserAccessId() throws Exception {
 
     LambdaTestUtils.intercept(OMException.class, () ->
-        tenantManager.revokeUserAccessId("accessId1"));
+        tenantManager.revokeUserAccessIdInAuthorizer("accessId1"));
     assertEquals(1, tenantManager.getTenantCache().size());
 
-    tenantManager.revokeUserAccessId("seed-accessId1");
+    tenantManager.revokeUserAccessIdInAuthorizer("seed-accessId1");
     assertTrue(tenantManager.getTenantCache().get(TENANT_ID)
         .getAccessIdInfoMap().isEmpty());
     assertTrue(tenantManager.listUsersInTenant(TENANT_ID, null)

@@ -277,7 +277,7 @@ public class OMRangerBGSyncService extends BackgroundService {
     boolean lockAcquired = false;
     try {
       // Acquire write lock to authorizer (Ranger)
-      lockAcquired = multiTenantManager.tryAcquireAuthorizerAccessWriteLock(
+      lockAcquired = multiTenantManager.tryAcquireAuthorizerAccessReadLock(
           OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
       if (!lockAcquired) {
 
@@ -313,7 +313,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       while (dbOzoneServiceVersion != rangerOzoneServiceVersion) {
         // Release write lock to authorizer temporarily to allow other ops to
         // interleave
-        multiTenantManager.releaseAuthorizerAccessWriteLock();
+        multiTenantManager.releaseAuthorizerAccessReadLock();
         lockAcquired = false;
         if (++attempt > MAX_ATTEMPT) {
           if (LOG.isDebugEnabled()) {
@@ -338,7 +338,7 @@ public class OMRangerBGSyncService extends BackgroundService {
         setOMDBRangerServiceVersion(rangerOzoneServiceVersion);
 
         // Acquire lock before reading the latest Ranger service version
-        lockAcquired = multiTenantManager.tryAcquireAuthorizerAccessWriteLock(
+        lockAcquired = multiTenantManager.tryAcquireAuthorizerAccessReadLock(
             OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
         if (!lockAcquired) {
           // TODO: Should be okay to fail here? Double check
@@ -360,7 +360,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       //  RangerRestMultiTenantAccessController
     } finally {
       if (lockAcquired) {
-        multiTenantManager.releaseAuthorizerAccessWriteLock();
+        multiTenantManager.releaseAuthorizerAccessReadLock();
       }
     }
 
@@ -433,7 +433,6 @@ public class OMRangerBGSyncService extends BackgroundService {
       // Release read lock to authorizer (Ranger)
       multiTenantManager.releaseAuthorizerAccessReadLock();
     }
-
 
     // This should isolate policies into two groups
     // 1. mtRangerPoliciesTobeDeleted and
@@ -594,7 +593,12 @@ public class OMRangerBGSyncService extends BackgroundService {
       final String policyName = entry.getKey();
       LOG.info("Deleting policy from Ranger: {}", policyName);
       checkLeader();
-      authorizer.deletePolicyByName(policyName);
+      multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
+      try {
+        authorizer.deletePolicyByName(policyName);
+      } finally {
+        multiTenantManager.releaseAuthorizerAccessWriteLock();
+      }
     }
 
   }
@@ -638,7 +642,13 @@ public class OMRangerBGSyncService extends BackgroundService {
           ResultCodes.INTERNAL_ERROR);
     }
 
-    String id = authorizer.createAccessPolicy(accessPolicy);
+    final String id;
+    multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
+    try {
+      id = authorizer.createAccessPolicy(accessPolicy);
+    } finally {
+      multiTenantManager.releaseAuthorizerAccessWriteLock();
+    }
     LOG.info("Created policy, ID: {}", id);
   }
 
@@ -750,11 +760,14 @@ public class OMRangerBGSyncService extends BackgroundService {
         // mtRangerRoles to be populated incorrectly. In this case the roles
         // are there just fine. If not, will be corrected in the next run anyway
         checkLeader();
+        multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
         try {
           authorizer.createRole(roleName, null);
         } catch (IOException e) {
           // Tolerate create role failure, possibly due to role already exists
           LOG.error(e.getMessage());
+        } finally {
+          multiTenantManager.releaseAuthorizerAccessWriteLock();
         }
         pushRoleToRanger = true;
       }
@@ -776,6 +789,7 @@ public class OMRangerBGSyncService extends BackgroundService {
     for (String roleName : rolesToDelete) {
       LOG.warn("Deleting role from Ranger: {}", roleName);
       checkLeader();
+      multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
       try {
         final String roleObj = authorizer.getRole(roleName);
         authorizer.deleteRoleById(new JsonParser().parse(roleObj)
@@ -785,6 +799,8 @@ public class OMRangerBGSyncService extends BackgroundService {
         // Or the role could be referenced in other roles or policies.
         LOG.error("Failed to delete role: {}", roleName);
         throw e;
+      } finally {
+        multiTenantManager.releaseAuthorizerAccessWriteLock();
       }
       // TODO: Server returned HTTP response code: 400
       //  if already deleted or is depended on
