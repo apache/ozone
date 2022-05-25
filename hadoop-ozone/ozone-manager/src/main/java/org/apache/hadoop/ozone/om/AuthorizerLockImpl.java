@@ -35,7 +35,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTE
  */
 public class AuthorizerLockImpl implements AuthorizerLock {
 
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(AuthorizerLockImpl.class);
 
   private final StampedLock authorizerStampedLock = new StampedLock();
@@ -135,11 +135,14 @@ public class AuthorizerLockImpl implements AuthorizerLock {
 
     long stamp = tryWriteLockThrowOnTimeout();
     omRequestWriteLockStamp = stamp;
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Set omRequestWriteLockStamp to {}", stamp);
+    }
     return stamp;
   }
 
   @Override
-  public void unlockWriteInOMRequest(long stamp) throws IOException {
+  public void unlockWriteInOMRequest(long stamp) {
 
     if (omRequestWriteLockStamp == 0L) {
       LOG.debug("Authorizer write lock is not held in this "
@@ -150,15 +153,22 @@ public class AuthorizerLockImpl implements AuthorizerLock {
 
     // Sanity check. Should never happen
     if (stamp != omRequestWriteLockStamp) {
-      throw new OMException("Invalid operation. Current OMMultiTenantManager "
-          + "instance does not hold the expected write lock stamp. "
-          + "Stamp provided: " + stamp
-          + ". Stamp expected: " + omRequestWriteLockStamp,
-          INTERNAL_ERROR);
+      // Won't throw OMException here as this method is supposed to be called
+      // in the finally block in OMRequest, and validateAndUpdateCache isn't
+      // supposed to throw.
+      // Also, OM probably should just crash if this sanity check fails.
+      throw new RuntimeException("Invalid operation. "
+          + "Current OMMultiTenantManager instance does not hold the "
+          + "expected write lock stamp. " + "Stamp provided: " + stamp
+          + ". Stamp expected: " + omRequestWriteLockStamp);
     }
 
     // Reset the internal lock stamp record back to zero.
     omRequestWriteLockStamp = 0L;
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Restored omRequestWriteLockStamp to {}",
+          omRequestWriteLockStamp);
+    }
     unlockWrite(stamp);
   }
 }

@@ -307,11 +307,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       multiTenantManager.createTenantInCache(
           tenantId, userRoleName, adminRoleName);
 
-      // Release authorizer write lock
-      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
-      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
-          lockStamp);
-
       omResponse.setCreateTenantResponse(
           CreateTenantResponse.newBuilder()
               .build());
@@ -331,6 +326,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       if (acquiredVolumeLock) {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
+      // Release authorizer write lock
+      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
+      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
+          lockStamp);
     }
 
     // Perform audit logging

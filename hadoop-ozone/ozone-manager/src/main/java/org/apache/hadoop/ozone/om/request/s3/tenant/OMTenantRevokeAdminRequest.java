@@ -203,11 +203,6 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
       // Update tenant cache
       multiTenantManager.revokeTenantAdminInCache(accessId);
 
-      // Release authorizer write lock
-      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
-      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
-          lockStamp);
-
       omResponse.setTenantRevokeAdminResponse(
           TenantRevokeAdminResponse.newBuilder()
               .build());
@@ -226,6 +221,10 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
+      // Release authorizer write lock
+      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
+      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
+          lockStamp);
     }
 
     // Audit

@@ -223,11 +223,6 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       // Update tenant cache
       multiTenantManager.revokeUserAccessIdInCache(accessId, tenantId);
 
-      // Release authorizer write lock
-      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
-      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
-          lockStamp);
-
       // Generate response
       omResponse.setTenantRevokeUserAccessIdResponse(
           TenantRevokeUserAccessIdResponse.newBuilder()
@@ -250,6 +245,10 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
+      // Release authorizer write lock
+      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
+      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
+          lockStamp);
     }
 
     // Audit

@@ -27,6 +27,7 @@ import org.apache.hadoop.io.retry.RetryInvocationHandler;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.AuthorizerLockImpl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -197,6 +198,7 @@ public class TestOzoneTenantShell {
         OMTenantAssignUserAccessIdRequest.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(
         MultiTenantAccessAuthorizerRangerPlugin.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(AuthorizerLockImpl.LOG, Level.DEBUG);
   }
 
   @After

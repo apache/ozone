@@ -330,11 +330,6 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       multiTenantManager.assignUserToTenantInCache(
           new BasicUserPrincipal(userPrincipal), tenantId, accessId);
 
-      // Release authorizer write lock
-      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
-      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
-          lockStamp);
-
       // Generate response
       omResponse.setTenantAssignUserAccessIdResponse(
           TenantAssignUserAccessIdResponse.newBuilder()
@@ -360,6 +355,10 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
+      // Release authorizer write lock
+      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
+      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
+          lockStamp);
     }
 
     // Audit

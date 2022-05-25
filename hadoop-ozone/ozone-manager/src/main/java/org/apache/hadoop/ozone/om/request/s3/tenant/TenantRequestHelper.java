@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.om.request.s3.tenant;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.slf4j.Logger;
 
-import java.io.IOException;
-
 /**
  * Common helper methods for Tenant Requests.
  */
@@ -34,8 +32,7 @@ public final class TenantRequestHelper {
    * Wrapper method that attempts to release the lock when actually held.
    */
   static void unlockWriteAfterRequest(
-      OMMultiTenantManager multiTenantManager, Logger logger, long lockStamp)
-      throws IOException {
+      OMMultiTenantManager multiTenantManager, Logger logger, long lockStamp) {
 
     if (lockStamp != 0L) {
       // Release write lock to authorizer (Ranger)

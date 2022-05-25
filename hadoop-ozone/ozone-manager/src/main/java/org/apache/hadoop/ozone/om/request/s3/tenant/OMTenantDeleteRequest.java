@@ -194,11 +194,6 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       // Update tenant cache
       multiTenantManager.removeTenantFromDBCache(tenantId);
 
-      // Release authorizer write lock
-      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
-      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
-          lockStamp);
-
       // Compose response
       //
       // If decVolumeRefCount is false, return -1 to the client, otherwise
@@ -225,6 +220,10 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       if (acquiredVolumeLock) {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
+      // Release authorizer write lock
+      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
+      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
+          lockStamp);
     }
 
     // Perform audit logging

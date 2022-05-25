@@ -68,5 +68,5 @@ public interface AuthorizerLock {
   /**
    * A wrapper around unlockWrite() that is used exclusively in OMRequests.
    */
-  void unlockWriteInOMRequest(long stamp) throws IOException;
+  void unlockWriteInOMRequest(long stamp);
 }
