@@ -524,7 +524,7 @@ public class TestOzoneTenantShell {
 
     // Assign admin
     executeHA(tenantShell, new String[] {
-        "user", "assign-admin", "dev$bob", "--tenant=dev"});
+        "user", "assign-admin", "dev$bob", "--tenant=dev", "--delegated"});
     checkOutput(out, "", true);
     checkOutput(err, "", true);
 
@@ -822,13 +822,10 @@ public class TestOzoneTenantShell {
           "--secret=somesecret2"});
       Assert.assertTrue("Should return non-zero exit code!", exitC != 0);
       checkOutput(out, "", true);
-      checkOutput(err, "Permission denied. Requested accessId "
-          + "'tenant-test-set-secret$alice' and user doesn't satisfy any of:\n"
-          + "1) accessId match current username: 'bob';\n"
-          + "2) is an OM admin;\n"
-          + "3) user is assigned to a tenant under this accessId;\n"
-          + "4) user is an admin of the tenant where the accessId is "
-          + "assigned\n", true);
+      checkOutput(err, "Requested accessId 'tenant-test-set-secret$alice' "
+          + "is assigned under tenant 'tenant-test-set-secret', "
+          + "but the current user 'bob' doesn't own the accessId or is "
+          + "an Ozone/tenant admin\n", true);
       return null;
     });
 

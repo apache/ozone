@@ -80,7 +80,7 @@ public final class S3SecretRequestHelper {
             !multiTenantManager.isTenantAdmin(ugi, tenantId, false)) {
           throw new OMException("Requested accessId '" + accessId + "' is"
               + " assigned under tenant '" + tenantId + "',"
-              + " but the current user '" + username + "' doesn't own the "
+              + " but the current user '" + username + "' doesn't own the"
               + " accessId or is an Ozone/tenant admin",
               ResultCodes.USER_MISMATCH);
           // Note: A more fitting result code could be PERMISSION_DENIED,

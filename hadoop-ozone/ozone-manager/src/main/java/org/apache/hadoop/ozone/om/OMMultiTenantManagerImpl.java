@@ -704,8 +704,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       final String tenantId = getTenantForAccessIDThrowIfNotFound(accessId);
 
       final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
-      final String tenantAdminRoleName =
-          cachedTenantState.getTenantAdminRoleName();
 
       // Update cache
       cachedTenantState.getAccessIdInfoMap().get(accessId).setIsAdmin(false);
