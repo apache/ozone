@@ -202,10 +202,12 @@ public final class OMPBHelper {
 
     final HddsProtos.DefaultReplicationConfig.Builder builder =
         HddsProtos.DefaultReplicationConfig.newBuilder();
-    builder.setType(ReplicationType.toProto(defaultReplicationConfig.getType()));
+    builder.setType(ReplicationType.toProto(
+        defaultReplicationConfig.getType()));
 
     if (defaultReplicationConfig.getFactor() != null) {
-      builder.setFactor(ReplicationFactor.toProto(defaultReplicationConfig.getFactor()));
+      builder.setFactor(ReplicationFactor.toProto(
+          defaultReplicationConfig.getFactor()));
     }
 
     if (defaultReplicationConfig.getEcReplicationConfig() != null) {
