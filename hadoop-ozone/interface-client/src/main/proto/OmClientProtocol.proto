@@ -223,7 +223,7 @@ message OMRequest {
 
   optional SetRangerServiceVersionRequest   SetRangerServiceVersionRequest = 107;
 
-  optional int64 TenantRequestLockStamp = 108;  // Stores lock stamp
+  optional int64 TenantAuthorizerLockStamp = 108;  // Stores AuthorizerLock stamp
 }
 
 message OMResponse {

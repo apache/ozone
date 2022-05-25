@@ -142,7 +142,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     }
 
     final Builder omRequestBuilder = omRequest.toBuilder()
-        .setTenantRequestLockStamp(lockStamp)
+        .setTenantAuthorizerLockStamp(lockStamp)
         .setTenantRevokeUserAccessIdRequest(
             TenantRevokeUserAccessIdRequest.newBuilder()
                 .setAccessId(accessId)
@@ -247,7 +247,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
       // Release authorizer write lock
-      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
+      final long lockStamp = getOmRequest().getTenantAuthorizerLockStamp();
       TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
           lockStamp);
     }

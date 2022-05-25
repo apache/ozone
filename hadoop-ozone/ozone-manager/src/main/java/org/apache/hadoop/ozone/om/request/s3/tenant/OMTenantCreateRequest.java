@@ -186,7 +186,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     }
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
-        .setTenantRequestLockStamp(lockStamp)
+        .setTenantAuthorizerLockStamp(lockStamp)
         .setCreateTenantRequest(
             CreateTenantRequest.newBuilder()
                 .setTenantId(tenantId)
@@ -327,7 +327,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
       // Release authorizer write lock
-      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
+      final long lockStamp = getOmRequest().getTenantAuthorizerLockStamp();
       TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
           lockStamp);
     }

@@ -100,7 +100,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
     }
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
-        .setTenantRequestLockStamp(lockStamp);
+        .setTenantAuthorizerLockStamp(lockStamp);
 
     return omRequestBuilder.build();
   }
@@ -222,7 +222,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
       // Release authorizer write lock
-      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
+      final long lockStamp = getOmRequest().getTenantAuthorizerLockStamp();
       TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
           lockStamp);
     }

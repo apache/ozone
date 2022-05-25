@@ -138,7 +138,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     }
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
-        .setTenantRequestLockStamp(lockStamp)
+        .setTenantAuthorizerLockStamp(lockStamp)
         .setTenantAssignAdminRequest(
             TenantAssignAdminRequest.newBuilder()
                 .setAccessId(accessId)
@@ -232,7 +232,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
       // Release authorizer write lock
-      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
+      final long lockStamp = getOmRequest().getTenantAuthorizerLockStamp();
       TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
           lockStamp);
     }

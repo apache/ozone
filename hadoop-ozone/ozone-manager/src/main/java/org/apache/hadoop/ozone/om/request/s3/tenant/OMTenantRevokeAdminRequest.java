@@ -129,7 +129,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     }
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
-        .setTenantRequestLockStamp(lockStamp)
+        .setTenantAuthorizerLockStamp(lockStamp)
         .setTenantRevokeAdminRequest(
             // Regen request just in case tenantId is not provided by the client
             TenantRevokeAdminRequest.newBuilder()
@@ -222,7 +222,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
       // Release authorizer write lock
-      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
+      final long lockStamp = getOmRequest().getTenantAuthorizerLockStamp();
       TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
           lockStamp);
     }
