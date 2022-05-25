@@ -1183,11 +1183,18 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    * This is used by both BG sync and tenant requests.
    */
   @Override
-  public void releaseAuthorizerAccessWriteLock(/*long stamp*/) {
+  public void releaseAuthorizerAccessWriteLock() {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Releasing authorizer write lock from thread {}",
           Thread.currentThread().getId());
     }
-    authorizerAccessLock.writeLock().unlock();
+    try {
+      authorizerAccessLock.writeLock().unlock();
+    } catch (IllegalMonitorStateException e) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Unable to release the write lock. "
+            + "This OM might be follower, or leader change happened", e);
+      }
+    }
   }
 }
