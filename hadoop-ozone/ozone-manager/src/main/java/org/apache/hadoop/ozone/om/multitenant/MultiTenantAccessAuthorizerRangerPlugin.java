@@ -47,6 +47,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.ConnectException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -93,7 +94,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   // Stores Ranger cm_ozone service ID. This value should not change (unless
   // somehow Ranger cm_ozone service is deleted and re-created while OM is
   // still running and not reloaded / restarted).
-  private int rangerOzoneServiceId;
+  private int rangerOzoneServiceId = -1;
 
   @Override
   public void init(Configuration configuration) throws IOException {
@@ -108,11 +109,33 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     initializeRangerConnection();
 
     // Get Ranger Ozone service ID
-    rangerOzoneServiceId = retrieveRangerOzoneServiceId();
+    try {
+      rangerOzoneServiceId = retrieveRangerOzoneServiceId();
+    } catch (ConnectException e) {
+      // Exceptions (e.g. ConnectException: Connection refused)
+      // thrown here can crash OM during startup.
+      // Tolerate possible connection failure to Ranger during initialization
+      // due to cluster services starting up at the same time or not ready yet.
+      // Later when the Ranger Ozone service ID would be used it should try
+      // and retrieve the ID again if it failed earlier.
+      LOG.error("Failed to get Ozone service ID to Ranger. "
+              + "Will retry later", e);
+      rangerOzoneServiceId = -1;
+    }
   }
 
   int getRangerOzoneServiceId() {
     return rangerOzoneServiceId;
+  }
+
+  /**
+   * Helper method that checks if the RangerOzoneServiceId is properly retrieved
+   * during init. If not, try to get it from Ranger.
+   */
+  private void checkRangerOzoneServiceId() throws IOException {
+    if (rangerOzoneServiceId < 0) {
+      rangerOzoneServiceId = retrieveRangerOzoneServiceId();
+    }
   }
 
   private void initializeRangerConnection() {
@@ -648,6 +671,9 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   public long getLatestOzoneServiceVersion() throws IOException {
+
+    checkRangerOzoneServiceId();
+
     String rangerAdminUrl = rangerHttpsAddress
         + OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT + getRangerOzoneServiceId();
 
@@ -668,6 +694,8 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   public String getAllMultiTenantPolicies() throws IOException {
+
+    checkRangerOzoneServiceId();
 
     // Note: Ranger incremental policies API is broken. So we use policy label
     // filter to get all Multi-Tenant policies.
