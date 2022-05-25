@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.shell;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -513,6 +514,13 @@ public class TestOzoneTenantShell {
     checkOutput(out, "export AWS_ACCESS_KEY_ID='dev$bob'\n"
         + "export AWS_SECRET_ACCESS_KEY='", false);
     checkOutput(err, "", true);
+
+    // accessId length exceeding limit, should fail
+    executeHA(tenantShell, new String[] {
+        "user", "assign", StringUtils.repeat('a', 100), "--tenant=dev"});
+    checkOutput(out, "", true);
+    checkOutput(err, "accessId length (104) exceeds the maximum length "
+        + "allowed (100)\n", true);
 
     // Get user info
     // Equivalent to `ozone tenant user info bob`
