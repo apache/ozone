@@ -1057,4 +1057,22 @@ public class TestOzoneTenantShell {
     checkOutput(err, "Deleted tenant '" + tenantName + "'.\n", false);
     deleteVolume(tenantName);
   }
+
+  @Test
+  public void testCreateTenantOnExistingVolumeShouldFail() throws IOException {
+    final String testVolume = "existing-volume-1";
+    int exitC = execute(ozoneSh, new String[] {"volume", "create", testVolume});
+    // Volume create should succeed
+    Assert.assertEquals(0, exitC);
+    checkOutput(out, "", true);
+    checkOutput(err, "", true);
+
+    // Try to create tenant on the same volume, should fail
+    executeHA(tenantShell, new String[] {"create", testVolume});
+    checkOutput(out, "", true);
+    checkOutput(err, "Volume already exists\n", true);
+
+    // Clean up
+    deleteVolume(testVolume);
+  }
 }
