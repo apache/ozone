@@ -1415,7 +1415,7 @@ public class KeyManagerImpl implements KeyManager {
     refreshPipeline(Arrays.asList(key));
   }
 
-  private boolean isKeyDeleted(String key, Table keyTable) {
+  public static boolean isKeyDeleted(String key, Table keyTable) {
     CacheValue<OmKeyInfo> omKeyInfoCacheValue
         = keyTable.getCacheValue(new CacheKey(key));
     return omKeyInfoCacheValue != null
@@ -1501,6 +1501,7 @@ public class KeyManagerImpl implements KeyManager {
       return fileStatusList;
     }
 
+    Preconditions.checkArgument(!recursive);
     boolean useNewIterator = true;
     if (isBucketFSOptimized(volName, buckName)) {
       if (useNewIterator) {
@@ -1508,10 +1509,9 @@ public class KeyManagerImpl implements KeyManager {
             new OzoneListStatusHelper(metadataManager, scmBlockSize,
                 this::getOzoneFileStatusFSO);
         Collection<OzoneFileStatus> statuses =
-            statusHelper.listStatusFSO(args, recursive, startKey, numEntries,
+            statusHelper.listStatusFSO(args, startKey, numEntries,
             clientAddress);
-        return buildFinalStatusList(statuses,
-            args, clientAddress);
+        return buildFinalStatusList(statuses, args, clientAddress);
       } else {
         return listStatusFSO(args, recursive, startKey, numEntries,
             clientAddress);

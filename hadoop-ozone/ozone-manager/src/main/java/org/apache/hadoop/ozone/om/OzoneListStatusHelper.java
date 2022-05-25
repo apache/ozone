@@ -41,23 +41,21 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.TreeMap;
 import java.util.Map;
-import java.util.TreeSet;
 import java.util.PriorityQueue;
-import java.util.Set;
 import java.util.NoSuchElementException;
 import java.util.Collection;
 import java.util.Collections;
 
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.
+    OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
  * Helper class for fetching List Status for a path.
  */
 public class OzoneListStatusHelper {
-
   /**
-   * Interface to get the File Status.
+   * Interface to get the File Status for a path.
    */
   @FunctionalInterface
   public interface GetFileStatusHelper {
@@ -65,12 +63,15 @@ public class OzoneListStatusHelper {
                           boolean skipFileNotFoundError) throws IOException;
   }
 
+  public interface ClosableIterator extends Iterator<HeapEntry>, Closeable {
+
+  }
+
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneListStatusHelper.class);
 
   private final OMMetadataManager metadataManager;
   private final long scmBlockSize;
-
   private final GetFileStatusHelper getStatusHelper;
 
   OzoneListStatusHelper(OMMetadataManager metadataManager, long scmBlockSize,
@@ -81,15 +82,9 @@ public class OzoneListStatusHelper {
   }
 
   public Collection<OzoneFileStatus> listStatusFSO(OmKeyArgs args,
-      boolean recursive, String startKey, long numEntries,
-      String clientAddress)
+      String startKey, long numEntries, String clientAddress)
       throws IOException {
-    Preconditions.checkArgument(!recursive);
     Preconditions.checkNotNull(args, "Key args can not be null");
-
-    if (numEntries <= 0) {
-      return new ArrayList<>();
-    }
 
     boolean listKeysMode = false;
     final String volumeName = args.getVolumeName();
@@ -97,40 +92,23 @@ public class OzoneListStatusHelper {
     String keyName = args.getKeyName();
     String prefixKey = keyName;
 
-    /**
-     * a) If the keyname is a file just return one entry
-     * b) if the keyname is root, then return the value of the bucket
-     * c) if the keyname is a different bucket than root,
-     * fetch the direcoty parent id
-     *
-     * if the startkey exists
-     * a) check the start key is a child ot key, else return emptry list
-     * b) chekc if the start key is a child chil of keynae,
-     * then reset the key to parent of start key
-     * c) if start key is non existent then seek to the neatest key
-     * d) if the keyname is not a dir or a file, it can either be
-     * invalid name or a prefix path
-     *     in case, this is called as part of listStatus fail as the
-     *     real dir/file should exist
-     *     else, try to find the parent of keyname and use that as the prefix,
-     *     use the rest of the path to construct prefix path
-     */
-
     String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
         metadataManager.getBucketTable().get(bucketKey);
     if (omBucketInfo == null) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("StartKey {} is not an immediate child of keyName {}. " +
-            "Returns empty list", startKey, keyName);
+        LOG.debug("Volume:{} Bucket:{} does not exist",
+            volumeName, bucketName);
       }
       return new ArrayList<>();
     }
 
-    boolean pathNameChanged = false;
+    // Determine if the prefixKey is determined from the startKey
+    // if the keyName is null
     if (StringUtils.isNotBlank(startKey)) {
       if (StringUtils.isNotBlank(keyName)) {
-        if (!listKeysMode && !OzoneFSUtils.isImmediateChild(keyName, startKey)) {
+        if (!listKeysMode &&
+            !OzoneFSUtils.isImmediateChild(keyName, startKey)) {
           if (LOG.isDebugEnabled()) {
             LOG.debug("StartKey {} is not an immediate child of keyName {}. " +
                 "Returns empty list", startKey, keyName);
@@ -140,36 +118,35 @@ public class OzoneListStatusHelper {
       } else {
         keyName = OzoneFSUtils.getParentDir(startKey);
         prefixKey = keyName;
-        pathNameChanged = true;
+        args = args.toBuilder()
+            .setKeyName(keyName)
+            .setSortDatanodesInPipeline(false)
+            .build();
       }
     }
 
-    OzoneFileStatus fileStatus = null;
-    if (pathNameChanged) {
-      OmKeyArgs startKeyArgs = args.toBuilder()
-          .setKeyName(keyName)
-          .setSortDatanodesInPipeline(false)
-          .build();
-       fileStatus = getStatusHelper.apply(startKeyArgs,
-           null, true);
-    } else {
-      fileStatus =
-          getStatusHelper.apply(args, clientAddress, listKeysMode);
-    }
+    OzoneFileStatus fileStatus =
+        getStatusHelper.apply(args, clientAddress, listKeysMode);
 
     String dbPrefixKey;
     if (fileStatus == null) {
+      // if the file status is null, prefix is a not a valid filesystem path
+      // this should only work in list keys mode.
+      // fetch the db key based on the prefix path.
       dbPrefixKey = getDbKey(keyName, args, omBucketInfo);
       prefixKey = OzoneFSUtils.getParentDir(keyName);
     } else {
+      // If the keyname is a file just return one entry
       if (fileStatus.isFile()) {
         return Collections.singletonList(fileStatus);
       }
 
+      // fetch the db key based on parent prefix id.
       long id = getId(fileStatus, omBucketInfo);
       dbPrefixKey = metadataManager.getOzonePathKey(id, "");
     }
 
+    // Determine startKeyPrefix for DB iteration
     String startKeyPrefix =
         Strings.isNullOrEmpty(startKey) ? "" :
             getDbKey(startKey, args, omBucketInfo);
@@ -177,16 +154,16 @@ public class OzoneListStatusHelper {
     TreeMap<String, OzoneFileStatus> map = new TreeMap<>();
 
     BucketLayout bucketLayout = omBucketInfo.getBucketLayout();
-    try (MinHeapIterator heapIterator =
-             new MinHeapIterator(metadataManager, dbPrefixKey, bucketLayout,
-                 startKeyPrefix, volumeName, bucketName)) {
+
+    // fetch the sorted output using a min heap iterator where
+    // every remove from the heap will give the smallest entry.
+    try(MinHeapIterator heapIterator = new MinHeapIterator(metadataManager,
+        dbPrefixKey, bucketLayout, startKeyPrefix, volumeName, bucketName)) {
 
       while (map.size() < numEntries && heapIterator.hasNext()) {
         HeapEntry entry = heapIterator.next();
         OzoneFileStatus status = entry.getStatus(prefixKey,
-            scmBlockSize, volumeName, bucketName, args);
-        LOG.info("returning status:{} keyname:{} startkey:{} numEntries:{}",
-            status, prefixKey, startKey, numEntries);
+            scmBlockSize, volumeName, bucketName);
         map.put(entry.key, status);
       }
     }
@@ -194,12 +171,13 @@ public class OzoneListStatusHelper {
     return map.values();
   }
 
-
   private String getDbKey(String key, OmKeyArgs args,
                           OmBucketInfo omBucketInfo) throws IOException {
     long startKeyParentId;
     String parent = OzoneFSUtils.getParentDir(key);
 
+    // the keyname is not a valid filesystem path.
+    // determine the parent prefix by fetching the
     OmKeyArgs startKeyArgs = args.toBuilder()
         .setKeyName(parent)
         .setSortDatanodesInPipeline(false)
@@ -216,14 +194,13 @@ public class OzoneListStatusHelper {
     if (fileStatus.getKeyInfo() != null) {
       return fileStatus.getKeyInfo().getObjectID();
     } else {
-      // assert root is null
       // list root directory.
       return omBucketInfo.getObjectID();
     }
   }
 
   /**
-   * Enum of types of entries.
+   * Enum of types of entries in the heap
    */
   public enum EntryType {
     DIR_CACHE,
@@ -246,16 +223,17 @@ public class OzoneListStatusHelper {
   }
 
   /**
-   * Entry which is added to heap.
-   * @param <T>
+   * Entry to be added to the heap
    */
-  private static class HeapEntry<T extends WithParentObjectId>
-      implements Comparable<HeapEntry> {
+  private static class HeapEntry implements Comparable<HeapEntry> {
     private final EntryType entryType;
     private final String key;
-    private final T value;
+    private final Object value;
 
-    HeapEntry(EntryType entryType, String key, T value) {
+    HeapEntry(EntryType entryType, String key, Object value) {
+      Preconditions.checkArgument(
+          value instanceof OmDirectoryInfo ||
+              value instanceof OmKeyInfo);
       this.entryType = entryType;
       this.key = key;
       this.value = value;
@@ -283,21 +261,18 @@ public class OzoneListStatusHelper {
       return key.hashCode();
     }
 
-    public String getKey() {
-      return key;
-    }
-
     public OzoneFileStatus getStatus(String prefixPath, long scmBlockSize,
-                                     String volumeName, String bucketName,
-                                     OmKeyArgs args) {
+                                     String volumeName, String bucketName) {
       OmKeyInfo keyInfo;
       if (entryType.isDir()) {
+        Preconditions.checkArgument(value instanceof OmDirectoryInfo);
         OmDirectoryInfo dirInfo = (OmDirectoryInfo) value;
         String dirName = OMFileRequest.getAbsolutePath(prefixPath,
             dirInfo.getName());
         keyInfo = OMFileRequest.getOmKeyInfo(volumeName,
             bucketName, dirInfo, dirName);
       } else {
+        Preconditions.checkArgument(value instanceof OmKeyInfo);
         keyInfo = (OmKeyInfo) value;
         keyInfo.setFileName(keyInfo.getKeyName());
         String fullKeyPath = OMFileRequest.getAbsolutePath(prefixPath,
@@ -309,36 +284,25 @@ public class OzoneListStatusHelper {
   }
 
   /**
-   * Iterator class for Ozone keys.
+   * Iterator for DB entries in a Dir and File Table.
    */
-  public interface OzoneKeyIterator extends
-      Iterator<HeapEntry<? extends WithParentObjectId>>, Closeable {
-  }
-
-  /**
-   * Raw iterator over db tables.
-   * @param <T>
-   */
-  private static class RawIter<T extends WithParentObjectId>
-      implements OzoneKeyIterator {
-
+  private static class RawIter<Value> implements ClosableIterator {
     private final EntryType iterType;
     private final String prefixKey;
-
     private final TableIterator<String,
-        ? extends Table.KeyValue<String, T>> tableIterator;
-    private final Set<String> cacheDeletedKeySet;
+        ? extends Table.KeyValue<String, Value>> tableIterator;
+
+    private final Table<String, Value> table;
     private HeapEntry currentKey;
 
-    RawIter(EntryType iterType, TableIterator<String,
-        ? extends Table.KeyValue<String, T>> tableIterator,
-            String prefixKey, String startKey,
-            Set<String> cacheDeletedKeySet) throws IOException {
+    RawIter(EntryType iterType, Table<String, Value> table,
+            String prefixKey, String startKey) throws IOException {
       this.iterType = iterType;
-      this.tableIterator = tableIterator;
+      this.table = table;
+      this.tableIterator = table.iterator();
       this.prefixKey = prefixKey;
-      this.cacheDeletedKeySet = cacheDeletedKeySet;
       this.currentKey = null;
+
       if (!StringUtils.isBlank(prefixKey)) {
         tableIterator.seek(prefixKey);
       }
@@ -352,13 +316,15 @@ public class OzoneListStatusHelper {
 
     private void getNextKey() throws IOException {
       while (tableIterator.hasNext() && currentKey == null) {
-        Table.KeyValue<String, T> entry = tableIterator.next();
+        Table.KeyValue<String, Value> entry = tableIterator.next();
         String entryKey = entry.getKey();
         if (entryKey.startsWith(prefixKey)) {
-          if (!cacheDeletedKeySet.contains(entryKey)) {
+          if (!KeyManagerImpl.isKeyDeleted(entryKey, table)) {
             currentKey = new HeapEntry(iterType, entryKey, entry.getValue());
           }
         } else {
+          // if the prefix key does not match, then break
+          // as the iterator is beyond the prefix.
           break;
         }
       }
@@ -385,35 +351,27 @@ public class OzoneListStatusHelper {
       return ret;
     }
 
-    public void close() {
-
+    public void close() throws IOException {
+      tableIterator.close();
     }
   }
 
   /**
-   * Iterator for Cache for the database.
-   * @param <T>
+   * Iterator for Cache entries in a Dir and File Table.
    */
-  private static class CacheIter< T extends WithParentObjectId>
-      implements OzoneKeyIterator {
-    private final Set<String> cacheDeletedKeySet;
-    private final Map<String, T> cacheKeyMap;
-
-    private final Iterator<Map.Entry<String, T>>
+  private static class CacheIter<Value extends WithParentObjectId>
+      implements ClosableIterator {
+    private final Map<String, Value> cacheKeyMap;
+    private final Iterator<Map.Entry<String, Value>>
         cacheCreatedKeyIter;
-
-    private final Iterator<Map.Entry<CacheKey<String>, CacheValue<T>>>
+    private final Iterator<Map.Entry<CacheKey<String>, CacheValue<Value>>>
         cacheIter;
-
     private final String prefixKey;
     private final String startKey;
-
-
     private final EntryType entryType;
 
     CacheIter(EntryType entryType, Iterator<Map.Entry<CacheKey<String>,
-        CacheValue<T>>> cacheIter, String startKey, String prefixKey) {
-      this.cacheDeletedKeySet = new TreeSet<>();
+        CacheValue<Value>>> cacheIter, String startKey, String prefixKey) {
       this.cacheKeyMap = new TreeMap<>();
 
       this.cacheIter = cacheIter;
@@ -428,13 +386,12 @@ public class OzoneListStatusHelper {
 
     private void getCacheValues() {
       while (cacheIter.hasNext()) {
-        Map.Entry<CacheKey<String>, CacheValue<T>> entry =
+        Map.Entry<CacheKey<String>, CacheValue<Value>> entry =
             cacheIter.next();
         String cacheKey = entry.getKey().getCacheKey();
-        T cacheOmInfo = entry.getValue().getCacheValue();
+        Value cacheOmInfo = entry.getValue().getCacheValue();
         // cacheOmKeyInfo is null if an entry is deleted in cache
         if (cacheOmInfo == null) {
-          cacheDeletedKeySet.add(cacheKey);
           continue;
         }
 
@@ -462,36 +419,38 @@ public class OzoneListStatusHelper {
     }
 
     public HeapEntry next() {
-      Map.Entry<String, T> entry = cacheCreatedKeyIter.next();
+      Map.Entry<String, Value> entry = cacheCreatedKeyIter.next();
       return new HeapEntry(entryType, entry.getKey(), entry.getValue());
     }
 
     public void close() {
-
-    }
-
-    public Set<String> getDeletedKeySet() {
-      return cacheDeletedKeySet;
+      // Nothing to close here
     }
   }
 
   /**
-   * Implement a min heap iterator to find the smaller
-   * lexicographically sorted string.
+   * Implement lexicographical sorting of the file status by sorting file status
+   * across multiple lists. Each of these lists are sorted internally.
+   *
+   * This class implements sorted output by implementing a min heap based
+   * iterator where the initial element from each of sorted list is inserted.
+   *
+   * The least entry is removed and the next entry from the same list from
+   * which the entry is removed is added into the list.
+   *
+   * For example
+   * RawDir   - a1, a3, a5, a7
+   * RawFile  - a2, a4, a6, a8
+   *
+   * Min Heap is initially composed of {(a1, RawDir), (a2, RawFile)}
+   * THe least element is removed i.e a1 and then next entry from RawDir
+   * is inserted into minheap resulting in {(a2, RawFile), (a3, RawDir)}
+   *
+   * This process is repeated till both the lists are exhausted.
    */
-  private static class MinHeapIterator implements
-      Iterator<HeapEntry<? extends WithParentObjectId>>, Closeable {
-
-    private final PriorityQueue<HeapEntry
-        <? extends WithParentObjectId>> minHeap = new PriorityQueue<>();
-    private final ArrayList<Iterator<HeapEntry
-        <? extends WithParentObjectId>>> iterators = new ArrayList<>();
-
-    private final RawIter<OmDirectoryInfo> rawDirIter;
-    private final RawIter<OmKeyInfo> rawFileIter;
-
-    private final CacheIter<OmKeyInfo> cacheFileIter;
-    private final CacheIter<OmDirectoryInfo> cacheDirIter;
+  private static class MinHeapIterator implements ClosableIterator {
+    private final PriorityQueue<HeapEntry> minHeap = new PriorityQueue<>();
+    private final ArrayList<ClosableIterator> iterators = new ArrayList<>();
 
     MinHeapIterator(OMMetadataManager omMetadataManager, String prefixKey,
                     BucketLayout bucketLayout, String startKey,
@@ -499,54 +458,49 @@ public class OzoneListStatusHelper {
 
       omMetadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
           bucketName);
-      cacheDirIter =
+
+      // Initialize all the iterators
+      iterators.add(EntryType.DIR_CACHE.ordinal(),
           new CacheIter<>(EntryType.DIR_CACHE,
               omMetadataManager.getDirectoryTable().cacheIterator(),
-              startKey, prefixKey);
+              startKey, prefixKey));
 
-      cacheFileIter =
+      iterators.add(EntryType.FILE_CACHE.ordinal(),
           new CacheIter<>(EntryType.FILE_CACHE,
               omMetadataManager.getKeyTable(bucketLayout).cacheIterator(),
-              startKey, prefixKey);
+              startKey, prefixKey));
 
-      rawDirIter =
+      iterators.add(EntryType.RAW_DIR_DB.ordinal(),
           new RawIter<>(EntryType.RAW_DIR_DB,
-              omMetadataManager.getDirectoryTable().iterator(),
-              prefixKey, startKey, cacheDirIter.getDeletedKeySet());
+              omMetadataManager.getDirectoryTable(),
+              prefixKey, startKey));
 
-      rawFileIter =
+      iterators.add(EntryType.RAW_FILE_DB.ordinal(),
           new RawIter<>(EntryType.RAW_FILE_DB,
-              omMetadataManager.getKeyTable(bucketLayout).iterator(),
-              prefixKey, startKey, cacheFileIter.getDeletedKeySet());
+              omMetadataManager.getKeyTable(bucketLayout),
+              prefixKey, startKey));
 
       omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
 
-      iterators.add(EntryType.DIR_CACHE.ordinal(), cacheDirIter);
-      iterators.add(EntryType.FILE_CACHE.ordinal(), cacheFileIter);
-      iterators.add(EntryType.RAW_FILE_DB.ordinal(), rawFileIter);
-      iterators.add(EntryType.RAW_DIR_DB.ordinal(), rawDirIter);
-      insertFirstElement();
-
-    }
-
-    public void insertFirstElement() {
-      for (Iterator<HeapEntry<? extends WithParentObjectId>> iter :
-          iterators) {
+      // Insert the element from each of the iterator
+      for (Iterator<HeapEntry> iter : iterators) {
         if (iter.hasNext()) {
           minHeap.add(iter.next());
         }
       }
     }
 
+
     public boolean hasNext() {
       return !minHeap.isEmpty();
     }
 
-    public HeapEntry<? extends WithParentObjectId> next() {
-      HeapEntry<? extends WithParentObjectId> heapEntry = minHeap.remove();
-      Iterator<HeapEntry<? extends WithParentObjectId>> iter =
-          iterators.get(heapEntry.entryType.ordinal());
+    public HeapEntry next() {
+      HeapEntry heapEntry = minHeap.remove();
+      // remove the least element and
+      // reinsert the next element from the same iterator
+      Iterator<HeapEntry> iter = iterators.get(heapEntry.entryType.ordinal());
       if (iter.hasNext()) {
         minHeap.add(iter.next());
       }
@@ -555,6 +509,9 @@ public class OzoneListStatusHelper {
     }
 
     public void close() throws IOException {
+      for (ClosableIterator iterator : iterators) {
+        iterator.close();
+      }
     }
   }
 }
