@@ -124,19 +124,19 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     }
 
     // Acquire write lock to authorizer (Ranger)
-    multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
-
+    long lockStamp = multiTenantManager.tryWriteLockAuthorizerInOMRequest();
     try {
-      // Call OMMTM to add user to tenant admin role
-      ozoneManager.getMultiTenantManager().assignTenantAdminInAuthorizer(
-          request.getAccessId(), delegated);
+      // Add user to tenant admin role in Ranger.
+      // User principal is inferred from the accessId given.
+      // Throws if the user doesn't exist in Ranger.
+      multiTenantManager.assignTenantAdminInAuthorizer(accessId, delegated);
     } catch (Exception e) {
-      // Release write lock to authorizer (Ranger)
-      multiTenantManager.releaseAuthorizerAccessWriteLock();
+      multiTenantManager.unlockWriteAuthorizerInOMRequest(lockStamp);
       throw e;
     }
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
+        .setTenantRequestLockStamp(lockStamp)
         .setTenantAssignAdminRequest(
             TenantAssignAdminRequest.newBuilder()
                 .setAccessId(accessId)
@@ -209,8 +209,12 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
               transactionLogIndex));
 
       // Update tenant cache
-      ozoneManager.getMultiTenantManager().assignTenantAdminInCache(
-          request.getAccessId(), delegated);
+      multiTenantManager.assignTenantAdminInCache(accessId, delegated);
+
+      // Release authorizer write lock
+      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
+      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
+          lockStamp);
 
       omResponse.setTenantAssignAdminResponse(
           TenantAssignAdminResponse.newBuilder()
@@ -230,8 +234,6 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
-      // Release write lock to authorizer (Ranger)
-      multiTenantManager.releaseAuthorizerAccessWriteLock();
     }
 
     // Audit

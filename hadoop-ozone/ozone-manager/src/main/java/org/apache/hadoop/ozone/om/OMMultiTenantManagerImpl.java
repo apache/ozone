@@ -49,7 +49,6 @@ import com.google.common.base.Optional;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.StampedLock;
 
@@ -854,7 +853,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     if (!ozoneManager.isAdmin(ugi)) {
       throw new OMException("User '" + ugi.getUserName() + "' or '" +
-          ugi.getShortUserName() + "' is not an Ozone admin.",
+          ugi.getShortUserName() + "' is not an Ozone admin",
           OMException.ResultCodes.PERMISSION_DENIED);
     }
   }
@@ -1100,33 +1099,38 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     }
   }
 
-  private final ReadWriteLock authorizerAccessLock =
-      new StampedLock().asReadWriteLock();
+  private final StampedLock authorizerStampedLock = new StampedLock();
+  // No need to use AtomicLong here as this value can only be updated after
+  // authorizer write lock is acquired.
+  private volatile long omRequestWriteLockStamp = 0L;
 
   @Override
-  public boolean tryAcquireAuthorizerAccessReadLock(long timeout)
-      throws InterruptedException {
-
-    return authorizerAccessLock.readLock().tryLock(
-        timeout, TimeUnit.MILLISECONDS);
+  public long tryReadLockAuthorizer(long timeout) throws InterruptedException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Trying to acquire authorizer read lock from thread {}",
+          Thread.currentThread().getId());
+    }
+    return authorizerStampedLock.tryReadLock(timeout, TimeUnit.MILLISECONDS);
   }
 
   @Override
-  public void tryAcquireAuthorizerAccessReadLockInRequest() throws IOException {
+  public long tryReadLockAuthorizerThrowOnTimeout() throws IOException {
 
-    boolean lockAcquired;
+    long stamp;
     try {
-      lockAcquired = tryAcquireAuthorizerAccessReadLock(
-          OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
+      stamp = tryReadLockAuthorizer(OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
     } catch (InterruptedException e) {
-      throw new OMException("Failed to acquire read lock: " + e.getMessage(),
-          INTERNAL_ERROR);
+      throw new OMException(e, INTERNAL_ERROR);
     }
-    if (!lockAcquired) {
+    if (stamp == 0L) {
       throw new OMException("Timed out acquiring authorizer read lock. "
           + "Another multi-tenancy request is in-progress. Try again later",
           ResultCodes.TIMEOUT);
+    } else if (LOG.isDebugEnabled()) {
+      LOG.debug("Acquired authorizer read lock from thread {} with stamp {}",
+          Thread.currentThread().getId(), stamp);
     }
+    return stamp;
   }
 
   /**
@@ -1134,46 +1138,52 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    * This is only used by BG sync at the moment.
    */
   @Override
-  public void releaseAuthorizerAccessReadLock() {
-    authorizerAccessLock.readLock().unlock();
-  }
-
-  @Override
-  public boolean tryAcquireAuthorizerAccessWriteLock(long timeout)
-      throws InterruptedException {
-    return authorizerAccessLock.writeLock().tryLock(
-        timeout, TimeUnit.MILLISECONDS);
-  }
-
-  @Override
-  public void tryAcquireAuthorizerAccessWriteLockInRequest()
-      throws IOException {
-
-    boolean lockAcquired;
-    try {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Trying to acquire authorizer write lock from thread {}",
-            Thread.currentThread().getId());
-      }
-      lockAcquired = tryAcquireAuthorizerAccessWriteLock(
-          OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
-    } catch (InterruptedException e) {
-      throw new OMException("Failed to acquire write lock: " + e.getMessage(),
-          INTERNAL_ERROR);
+  public void unlockReadAuthorizer(long stamp) {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Releasing authorizer read lock from thread {} with stamp {}",
+          Thread.currentThread().getId(), stamp);
     }
-    if (!lockAcquired) {
+    authorizerStampedLock.unlockRead(stamp);
+  }
+
+  @Override
+  public long tryWriteLockAuthorizer(long timeout) throws InterruptedException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Trying to acquire authorizer write lock from thread {}",
+          Thread.currentThread().getId());
+    }
+    return authorizerStampedLock.tryWriteLock(timeout, TimeUnit.MILLISECONDS);
+  }
+
+  @Override
+  public long tryWriteLockAuthorizerThrowOnTimeout() throws IOException {
+
+    long stamp;
+    try {
+      stamp = tryWriteLockAuthorizer(OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
+    } catch (InterruptedException e) {
+      throw new OMException(e, INTERNAL_ERROR);
+    }
+    if (stamp == 0L) {
       throw new OMException("Timed out acquiring authorizer write lock. "
           + "Another multi-tenancy request is in-progress. Try again later",
           ResultCodes.TIMEOUT);
     } else if (LOG.isDebugEnabled()) {
-      LOG.debug("Acquired authorizer write lock from thread {}",
-          Thread.currentThread().getId());
+      LOG.debug("Acquired authorizer write lock from thread {} with stamp {}",
+          Thread.currentThread().getId(), stamp);
     }
+    return stamp;
   }
 
   @Override
-  public void acquireAuthorizerAccessWriteLock() {
-    authorizerAccessLock.writeLock().lock();
+  public long tryWriteLockAuthorizerInOMRequest() throws IOException {
+
+    // Sanity check. Must not have held a write lock in a tenant OMRequest.
+    Preconditions.checkArgument(omRequestWriteLockStamp == 0L);
+
+    long stamp = tryWriteLockAuthorizerThrowOnTimeout();
+    omRequestWriteLockStamp = stamp;
+    return stamp;
   }
 
   /**
@@ -1181,18 +1191,35 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    * This is used by both BG sync and tenant requests.
    */
   @Override
-  public void releaseAuthorizerAccessWriteLock() {
+  public void unlockWriteAuthorizer(long stamp) {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Releasing authorizer write lock from thread {}",
-          Thread.currentThread().getId());
+      LOG.debug("Releasing authorizer write lock from thread {} with stamp {}",
+          Thread.currentThread().getId(), stamp);
     }
-    try {
-      authorizerAccessLock.writeLock().unlock();
-    } catch (IllegalMonitorStateException e) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Unable to release the write lock. "
-            + "This OM might be follower, or leader change happened", e);
-      }
+    authorizerStampedLock.unlockWrite(stamp);
+  }
+
+  @Override
+  public void unlockWriteAuthorizerInOMRequest(long stamp) throws IOException {
+
+    if (omRequestWriteLockStamp == 0L) {
+      LOG.debug("Authorizer write lock is not held in this "
+          + "OMMultiTenantManager instance. "
+          + "This OM might be follower, or leader change happened. Ignored");
+      return;
     }
+
+    // Sanity check. Should never happen
+    if (stamp != omRequestWriteLockStamp) {
+      throw new OMException("Invalid operation. Current OMMultiTenantManager "
+          + "instance does not hold the expected write lock stamp. "
+          + "Stamp provided: " + stamp
+          + ". Stamp expected: " + omRequestWriteLockStamp,
+          INTERNAL_ERROR);
+    }
+
+    unlockWriteAuthorizer(stamp);
+    // Reset the internal lock stamp record back to zero.
+    omRequestWriteLockStamp = 0L;
   }
 }

@@ -117,18 +117,18 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     }
 
     // Acquire write lock to authorizer (Ranger)
-    multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
-
+    long lockStamp = multiTenantManager.tryWriteLockAuthorizerInOMRequest();
     try {
-      // Remove user (inferred from access ID) from tenant admin role in Ranger
+      // Add user to tenant admin role in Ranger.
+      // User principal is inferred from the accessId given.
       multiTenantManager.revokeTenantAdminInAuthorizer(accessId);
     } catch (Exception e) {
-      // Release write lock to authorizer (Ranger)
-      multiTenantManager.releaseAuthorizerAccessWriteLock();
+      multiTenantManager.unlockWriteAuthorizerInOMRequest(lockStamp);
       throw e;
     }
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
+        .setTenantRequestLockStamp(lockStamp)
         .setTenantRevokeAdminRequest(
             // Regen request just in case tenantId is not provided by the client
             TenantRevokeAdminRequest.newBuilder()
@@ -202,6 +202,11 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
       // Update tenant cache
       multiTenantManager.revokeTenantAdminInCache(accessId);
 
+      // Release authorizer write lock
+      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
+      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
+          lockStamp);
+
       omResponse.setTenantRevokeAdminResponse(
           TenantRevokeAdminResponse.newBuilder()
               .build());
@@ -220,8 +225,6 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
-      // Release write lock to authorizer (Ranger)
-      multiTenantManager.releaseAuthorizerAccessWriteLock();
     }
 
     // Audit

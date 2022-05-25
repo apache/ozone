@@ -164,16 +164,15 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     // If the user doesn't exist, Ranger return 400 and the call should throw.
 
     // Acquire write lock to authorizer (Ranger)
-    multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
-
     final String roleId;
+    long lockStamp = multiTenantManager.tryWriteLockAuthorizerInOMRequest();
     try {
-      // Update roles with the user in authorizer (Ranger)
+      // Add user to tenant user role in Ranger.
+      // Throws if the user doesn't exist in Ranger.
       roleId = multiTenantManager.assignUserToTenantInAuthorizer(
           new BasicUserPrincipal(userPrincipal), tenantId, accessId);
     } catch (Exception e) {
-      // Release write lock to authorizer (Ranger)
-      multiTenantManager.releaseAuthorizerAccessWriteLock();
+      multiTenantManager.unlockWriteAuthorizerInOMRequest(lockStamp);
       throw e;
     }
 
@@ -192,6 +191,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
             .build();
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
+        .setTenantRequestLockStamp(lockStamp)
         .setUpdateGetS3SecretRequest(updateGetS3SecretRequest);
 
     return omRequestBuilder.build();
@@ -325,9 +325,14 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, accessId);
       acquiredS3SecretLock = false;
 
-      // Update cache
+      // Update tenant cache
       multiTenantManager.assignUserToTenantInCache(
           new BasicUserPrincipal(userPrincipal), tenantId, accessId);
+
+      // Release authorizer write lock
+      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
+      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
+          lockStamp);
 
       // Generate response
       omResponse.setTenantAssignUserAccessIdResponse(
@@ -354,8 +359,6 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
-      // Release write lock to authorizer (Ranger)
-      multiTenantManager.releaseAuthorizerAccessWriteLock();
     }
 
     // Audit

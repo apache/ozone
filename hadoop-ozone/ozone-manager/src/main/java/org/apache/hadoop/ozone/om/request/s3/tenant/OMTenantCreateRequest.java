@@ -172,20 +172,20 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         OMMultiTenantManager.getDefaultAdminRoleName(tenantId);
 
     // Acquire write lock to authorizer (Ranger)
-    multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
-
+    long lockStamp = multiTenantManager.tryWriteLockAuthorizerInOMRequest();
     try {
-      // If we fail after pre-execute. Ranger background sync thread
+      // Create tenant roles and policies in Ranger.
+      // If the request fails for some reason, Ranger background sync thread
       // should clean up any leftover policies and roles.
       multiTenantManager.createTenantInAuthorizer(
           tenantId, userRoleName, adminRoleName);
     } catch (Exception e) {
-      // Release write lock to authorizer (Ranger)
-      multiTenantManager.releaseAuthorizerAccessWriteLock();
+      multiTenantManager.unlockWriteAuthorizerInOMRequest(lockStamp);
       throw e;
     }
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
+        .setTenantRequestLockStamp(lockStamp)
         .setCreateTenantRequest(
             CreateTenantRequest.newBuilder()
                 .setTenantId(tenantId)
@@ -306,6 +306,11 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       multiTenantManager.createTenantInCache(
           tenantId, userRoleName, adminRoleName);
 
+      // Release authorizer write lock
+      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
+      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
+          lockStamp);
+
       omResponse.setCreateTenantResponse(
           CreateTenantResponse.newBuilder()
               .build());
@@ -325,8 +330,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       if (acquiredVolumeLock) {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
-      // Release write lock to authorizer (Ranger)
-      multiTenantManager.releaseAuthorizerAccessWriteLock();
     }
 
     // Perform audit logging

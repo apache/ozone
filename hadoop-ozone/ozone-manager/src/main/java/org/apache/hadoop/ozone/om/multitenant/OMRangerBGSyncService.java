@@ -277,16 +277,16 @@ public class OMRangerBGSyncService extends BackgroundService {
   }
 
   private void triggerRangerSyncOnce() {
-    boolean lockAcquired = false;
+    long lockStamp = 0L;
     try {
       // Acquire authorizer (Ranger) write lock
-      lockAcquired = multiTenantManager.tryAcquireAuthorizerAccessReadLock(
+      lockStamp = multiTenantManager.tryReadLockAuthorizer(
           OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
-      if (!lockAcquired) {
+      if (lockStamp == 0L) {
         LOG.warn("Timed out acquiring write lock."
             + "Another authorizer operation is in-progress."
             + "Skipping this sync run.");
-        // TODO: Maybe schedule the next run sooner?
+        // TODO: Schedule the next run sooner?
         return;
       }
       long dbOzoneServiceVersion = getOMDBRangerServiceVersion();
@@ -315,8 +315,8 @@ public class OMRangerBGSyncService extends BackgroundService {
       while (dbOzoneServiceVersion != rangerOzoneServiceVersion) {
         // Release authorizer write lock to temporarily allow other ops to
         // interleave
-        multiTenantManager.releaseAuthorizerAccessReadLock();
-        lockAcquired = false;
+        multiTenantManager.unlockReadAuthorizer(lockStamp);
+        lockStamp = 0L;
 
         if (++attempt > MAX_ATTEMPT) {
           if (LOG.isDebugEnabled()) {
@@ -341,13 +341,13 @@ public class OMRangerBGSyncService extends BackgroundService {
         setOMDBRangerServiceVersion(rangerOzoneServiceVersion);
 
         // Acquire lock again before getting the latest Ranger service version
-        lockAcquired = multiTenantManager.tryAcquireAuthorizerAccessReadLock(
+        lockStamp = multiTenantManager.tryReadLockAuthorizer(
             OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
-        if (!lockAcquired) {
+        if (lockStamp == 0L) {
           LOG.warn("Timed out acquiring write lock."
               + "Another authorizer operation is in-progress."
               + "Skipping next version check.");
-          // TODO: Maybe schedule the next run sooner?
+          // TODO: Schedule the next run sooner?
           return;
         }
 
@@ -360,8 +360,8 @@ public class OMRangerBGSyncService extends BackgroundService {
       // TODO: Check for specific exception once switched to
       //  RangerRestMultiTenantAccessController
     } finally {
-      if (lockAcquired) {
-        multiTenantManager.releaseAuthorizerAccessReadLock();
+      if (lockStamp != 0L) {
+        multiTenantManager.unlockReadAuthorizer(lockStamp);
       }
     }
 
@@ -564,12 +564,12 @@ public class OMRangerBGSyncService extends BackgroundService {
    */
   private void withReadLock(Runnable block) throws IOException {
     // Acquire authorizer (Ranger) read lock
-    multiTenantManager.tryAcquireAuthorizerAccessReadLockInRequest();
+    long stamp = multiTenantManager.tryReadLockAuthorizerThrowOnTimeout();
     try {
       block.run();
     } finally {
       // Release authorizer (Ranger) read lock
-      multiTenantManager.releaseAuthorizerAccessReadLock();
+      multiTenantManager.unlockReadAuthorizer(stamp);
     }
   }
 
@@ -578,12 +578,12 @@ public class OMRangerBGSyncService extends BackgroundService {
    */
   private void withWriteLock(Runnable block) throws IOException {
     // Acquire authorizer (Ranger) write lock
-    multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
+    long stamp = multiTenantManager.tryWriteLockAuthorizerThrowOnTimeout();
     try {
       block.run();
     } finally {
       // Release authorizer (Ranger) write lock
-      multiTenantManager.releaseAuthorizerAccessWriteLock();
+      multiTenantManager.unlockWriteAuthorizer(stamp);
     }
   }
 

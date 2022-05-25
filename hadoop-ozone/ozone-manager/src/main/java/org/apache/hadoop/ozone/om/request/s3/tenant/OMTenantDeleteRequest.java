@@ -87,19 +87,20 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
     final Tenant tenantObj = multiTenantManager.getTenantFromDBById(tenantId);
 
     // Acquire write lock to authorizer (Ranger)
-    multiTenantManager.tryAcquireAuthorizerAccessWriteLockInRequest();
-
+    long lockStamp = multiTenantManager.tryWriteLockAuthorizerInOMRequest();
     try {
-      // Remove policies and roles from authorizer (Ranger)
-      // Later deactivate (disable) policies instead of delete?
+      // Remove policies and roles from Ranger
+      // TODO: Deactivate (disable) policies instead of delete?
       multiTenantManager.removeTenantFromAuthorizer(tenantObj);
     } catch (Exception e) {
-      // Release write lock to authorizer (Ranger)
-      multiTenantManager.releaseAuthorizerAccessWriteLock();
+      multiTenantManager.unlockWriteAuthorizerInOMRequest(lockStamp);
       throw e;
     }
 
-    return omRequest;
+    final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
+        .setTenantRequestLockStamp(lockStamp);
+
+    return omRequestBuilder.build();
   }
 
   @Override
@@ -192,8 +193,13 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       // Update tenant cache
       multiTenantManager.removeTenantFromDBCache(tenantId);
 
-      // Compose response
+      // Release authorizer write lock
+      final long lockStamp = getOmRequest().getTenantRequestLockStamp();
+      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
+          lockStamp);
 
+      // Compose response
+      //
       // If decVolumeRefCount is false, return -1 to the client, otherwise
       // return the actual volume refCount. Note if the actual volume refCount
       // becomes negative somehow, omVolumeArgs.decRefCount() would have thrown
@@ -218,8 +224,6 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       if (acquiredVolumeLock) {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
-      // Release write lock to authorizer (Ranger)
-      multiTenantManager.releaseAuthorizerAccessWriteLock();
     }
 
     // Perform audit logging

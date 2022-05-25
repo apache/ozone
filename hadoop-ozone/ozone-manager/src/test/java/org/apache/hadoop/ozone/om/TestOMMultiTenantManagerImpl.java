@@ -106,7 +106,7 @@ public class TestOMMultiTenantManagerImpl {
 
   @Test
   public void testListUsersInTenant() throws Exception {
-    tenantManager.assignUserToTenantInAuthorizer(
+    tenantManager.assignUserToTenantInCache(
         new BasicUserPrincipal("user1"), TENANT_ID, "accessId1");
 
     TenantUserList tenantUserList =
