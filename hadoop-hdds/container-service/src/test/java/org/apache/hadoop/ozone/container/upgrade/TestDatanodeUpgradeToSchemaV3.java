@@ -155,7 +155,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     // RocksDB loaded when SchemaV3 is enabled
     if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
-      Assert.assertNotNull(dataVolume.getDbParentDir().getAbsolutePath()
+      Assert.assertTrue(dataVolume.getDbParentDir().getAbsolutePath()
           .startsWith(dataVolume.getStorageDir().toString()));
     } else {
       // RocksDB is not loaded when SchemaV3 is disabled.

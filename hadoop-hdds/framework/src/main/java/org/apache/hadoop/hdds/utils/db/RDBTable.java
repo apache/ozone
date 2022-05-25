@@ -286,8 +286,9 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public void loadFromFile(File externalFile) throws IOException {
-    DumpFileLoader fileLoader = new RDBSstFileLoader(db, handle);
-    fileLoader.load(externalFile);
+    try (DumpFileLoader fileLoader = new RDBSstFileLoader(db, handle)) {
+      fileLoader.load(externalFile);
+    }
   }
 
   private List<ByteArrayKeyValue> getRangeKVs(byte[] startKey,

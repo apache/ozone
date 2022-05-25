@@ -17,16 +17,22 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 
 /**
  * Interface for loading data from a dump file.
  */
-public interface DumpFileLoader {
+public interface DumpFileLoader extends Closeable {
 
   /**
    * Load key value pairs from an external dump file.
    */
   void load(File externalFile) throws IOException;
+
+  /**
+   * Close this file loader.
+   */
+  void close();
 }
