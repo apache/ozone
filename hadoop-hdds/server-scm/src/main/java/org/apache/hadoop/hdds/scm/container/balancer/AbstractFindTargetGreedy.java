@@ -46,6 +46,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
   private Logger logger;
   private ContainerManager containerManager;
   private PlacementPolicy placementPolicy;
+  private PlacementPolicy ecPlacementPolicy;
   private Map<DatanodeDetails, Long> sizeEnteringNode;
   private NodeManager nodeManager;
   private ContainerBalancerConfiguration config;
@@ -55,10 +56,12 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
   protected AbstractFindTargetGreedy(
       ContainerManager containerManager,
       PlacementPolicy placementPolicy,
+      PlacementPolicy ecPlacementPolicy,
       NodeManager nodeManager) {
     sizeEnteringNode = new HashMap<>();
     this.containerManager = containerManager;
     this.placementPolicy = placementPolicy;
+    this.ecPlacementPolicy = ecPlacementPolicy;
     this.nodeManager = nodeManager;
   }
 
@@ -162,9 +165,16 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
             .filter(datanodeDetails -> !datanodeDetails.equals(source))
             .collect(Collectors.toList());
     replicaList.add(target);
-    ContainerPlacementStatus placementStatus =
-        placementPolicy.validateContainerPlacement(replicaList,
-        containerInfo.getReplicationConfig().getRequiredNodes());
+    ContainerPlacementStatus placementStatus;
+    switch (containerInfo.getReplicationType()) {
+    case EC:
+      placementStatus = ecPlacementPolicy.validateContainerPlacement(
+          replicaList, containerInfo.getReplicationConfig().getRequiredNodes());
+      break;
+    default:
+      placementStatus = placementPolicy.validateContainerPlacement(replicaList,
+          containerInfo.getReplicationConfig().getRequiredNodes());
+    }
 
     return placementStatus.isPolicySatisfied();
   }

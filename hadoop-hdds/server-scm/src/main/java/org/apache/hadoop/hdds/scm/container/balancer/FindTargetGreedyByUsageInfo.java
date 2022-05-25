@@ -35,8 +35,9 @@ public class FindTargetGreedyByUsageInfo extends AbstractFindTargetGreedy {
   public FindTargetGreedyByUsageInfo(
       ContainerManager containerManager,
       PlacementPolicy placementPolicy,
+      PlacementPolicy ecPlacementPolicy,
       NodeManager nodeManager) {
-    super(containerManager, placementPolicy, nodeManager);
+    super(containerManager, placementPolicy, ecPlacementPolicy, nodeManager);
     setLogger(LoggerFactory.getLogger(FindTargetGreedyByUsageInfo.class));
     setPotentialTargets(new TreeSet<>((a, b) -> compareByUsage(a, b)));
   }

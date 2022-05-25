@@ -95,6 +95,7 @@ public class ContainerBalancer implements SCMService {
   private long clusterRemaining;
   private double clusterAvgUtilisation;
   private PlacementPolicy placementPolicy;
+  private PlacementPolicy ecPlacementPolicy;
   private NetworkTopology networkTopology;
   private double upperLimit;
   private double lowerLimit;
@@ -133,6 +134,7 @@ public class ContainerBalancer implements SCMService {
     this.withinThresholdUtilizedNodes = new ArrayList<>();
     this.unBalancedNodes = new ArrayList<>();
     this.placementPolicy = scm.getContainerPlacementPolicy();
+    this.ecPlacementPolicy = scm.getEcContainerPlacementPolicy();
     this.networkTopology = scm.getClusterMap();
 
     this.lock = new ReentrantLock();
@@ -250,10 +252,11 @@ public class ContainerBalancer implements SCMService {
     this.maxSizeToMovePerIteration = config.getMaxSizeToMovePerIteration();
     if (config.getNetworkTopologyEnable()) {
       findTargetStrategy = new FindTargetGreedyByNetworkTopology(
-          containerManager, placementPolicy, nodeManager, networkTopology);
+          containerManager, placementPolicy, ecPlacementPolicy,
+          nodeManager, networkTopology);
     } else {
       findTargetStrategy = new FindTargetGreedyByUsageInfo(containerManager,
-          placementPolicy, nodeManager);
+          placementPolicy, ecPlacementPolicy, nodeManager);
     }
     this.excludeNodes = config.getExcludeNodes();
     this.includeNodes = config.getIncludeNodes();

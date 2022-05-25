@@ -262,6 +262,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
+  private PlacementPolicy ecContainerPlacementPolicy;
   private MetricsSystem ms;
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
@@ -558,9 +559,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    *                    used if needed.
    * @throws IOException - on Failure.
    */
-  private void initializeSystemManagers(OzoneConfiguration conf,
-                                        SCMConfigurator configurator)
-      throws IOException {
+  private void initializeSystemManagers(
+      OzoneConfiguration conf,
+      SCMConfigurator configurator) throws IOException {
     Clock clock = new MonotonicClock(ZoneOffset.UTC);
     if (configurator.getNetworkTopology() != null) {
       clusterMap = configurator.getNetworkTopology();
@@ -589,8 +590,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       long term = SCMHAUtils.isSCMHAEnabled(conf) ? 0 : SCMContext.INVALID_TERM;
       // non-leader of term 0, in safe mode, preCheck not completed.
       scmContext = new SCMContext.Builder()
-          .setLeader(false)
-          .setTerm(term)
+          .setLeader(false).setTerm(term)
           .setIsInSafeMode(true)
           .setIsPreCheckComplete(false)
           .setSCM(this)
@@ -608,6 +608,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     containerPlacementPolicy =
         ContainerPlacementPolicyFactory.getPolicy(conf, scmNodeManager,
             clusterMap, true, placementMetrics);
+
+    ecContainerPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(
+        conf, scmNodeManager, clusterMap, true, placementMetrics);
 
     if (configurator.getPipelineManager() != null) {
       pipelineManager = configurator.getPipelineManager();
@@ -1701,6 +1704,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public PlacementPolicy getContainerPlacementPolicy() {
     return containerPlacementPolicy;
+  }
+
+  public PlacementPolicy getEcContainerPlacementPolicy() {
+    return ecContainerPlacementPolicy;
   }
 
   @VisibleForTesting

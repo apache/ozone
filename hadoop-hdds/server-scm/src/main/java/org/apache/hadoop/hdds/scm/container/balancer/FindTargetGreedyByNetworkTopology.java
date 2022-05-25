@@ -46,9 +46,10 @@ public class FindTargetGreedyByNetworkTopology
   public FindTargetGreedyByNetworkTopology(
       ContainerManager containerManager,
       PlacementPolicy placementPolicy,
+      PlacementPolicy ecPlacementPolicy,
       NodeManager nodeManager,
       NetworkTopology networkTopology) {
-    super(containerManager, placementPolicy, nodeManager);
+    super(containerManager, placementPolicy, ecPlacementPolicy, nodeManager);
     setLogger(LoggerFactory.getLogger(FindTargetGreedyByNetworkTopology.class));
     potentialTargets = new LinkedList<>();
     setPotentialTargets(potentialTargets);
