@@ -197,12 +197,8 @@ public class ContainerBalancer extends StatefulService {
           return;
         }
         // otherwise, try to stop balancer
-        try {
-          stopBalancer();
-        } catch (IOException | IllegalContainerBalancerStateException e) {
-          LOG.warn("Tried and failed to stop Container Balancer when it " +
-              "could not initialize an iteration", e);
-        }
+        tryStopBalancer("Could not initialize ContainerBalancer's " +
+            "iteration number " + i);
         return;
       }
 
@@ -223,12 +219,7 @@ public class ContainerBalancer extends StatefulService {
       // if no new move option is generated, it means the cluster cannot be
       // balanced anymore; so just stop balancer
       if (iR == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
-        try {
-          stopBalancer();
-        } catch (IOException | IllegalContainerBalancerStateException e) {
-          LOG.warn("Tried and failed to stop Container Balancer when result " +
-              "of the latest iteration was " + iR, e);
-        }
+        tryStopBalancer(iR.toString());
         return;
       }
 
@@ -254,13 +245,8 @@ public class ContainerBalancer extends StatefulService {
     }
 
     // finally, stop balancer if it hasn't been stopped already
-    try {
-      if (isBalancerRunning()) {
-        stopBalancer();
-      }
-    } catch (IOException | IllegalContainerBalancerStateException e) {
-      LOG.warn("Failed to stop Container Balancer after it completed all " +
-          "iterations", e);
+    if (isBalancerRunning()) {
+      tryStopBalancer("Completed all iterations.");
     }
   }
 
@@ -1067,6 +1053,26 @@ public class ContainerBalancer extends StatefulService {
       validateState(true);
       saveConfiguration(config, false, 0);
       stop();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /**
+   * Tries to stop ContainerBalancer. Logs the reason for stopping. Calls
+   * {@link ContainerBalancer#stopBalancer()}.
+   * @param stopReason a string specifying the reason for stopping
+   *                   ContainerBalancer.
+   */
+  private void tryStopBalancer(String stopReason) {
+    lock.lock();
+    try {
+      LOG.info("Stopping ContainerBalancer. Reason for stopping: {}",
+          stopReason);
+      stopBalancer();
+    } catch (IllegalContainerBalancerStateException | IOException e) {
+      LOG.warn("Tried to stop ContainerBalancer but failed. Reason for " +
+          "stopping: {}", stopReason, e);
     } finally {
       lock.unlock();
     }
