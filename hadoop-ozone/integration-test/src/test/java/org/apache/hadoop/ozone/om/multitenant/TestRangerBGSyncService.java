@@ -301,7 +301,8 @@ public class TestRangerBGSyncService {
   }
 
   long initBGSync() throws IOException {
-    bgSync = new OMRangerBGSyncService(ozoneManager, auth,
+    bgSync = new OMRangerBGSyncService(ozoneManager,
+        ozoneManager.getMultiTenantManager(), auth,
         TEST_SYNC_INTERVAL_SEC, TimeUnit.SECONDS, TEST_SYNC_TIMEOUT_SEC);
     return bgSync.getLatestRangerServiceVersion();
   }

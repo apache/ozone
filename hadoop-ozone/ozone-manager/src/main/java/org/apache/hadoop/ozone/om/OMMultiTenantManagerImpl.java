@@ -49,7 +49,9 @@ import com.google.common.base.Optional;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.StampedLock;
 
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.StringUtils;
@@ -155,8 +157,9 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         OZONE_OM_MULTITENANCY_RANGER_SYNC_TIMEOUT_DEFAULT.getUnit(),
         internalTimeUnit);
     // Initialize the Ranger Sync Thread
-    omRangerBGSyncService = new OMRangerBGSyncService(ozoneManager, authorizer,
-        rangerSyncInterval, internalTimeUnit, rangerSyncTimeout);
+    omRangerBGSyncService = new OMRangerBGSyncService(ozoneManager, this,
+        authorizer, rangerSyncInterval, internalTimeUnit, rangerSyncTimeout);
+
     // Start the Ranger Sync Thread
     this.start();
   }
@@ -628,11 +631,10 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   private void checkAcquiredAuthorizerWriteLock() throws OMException {
 
     // Check that lock is acquired
-    if (!authorizerAccessLock.writeLock().isHeldByCurrentThread()) {
-      throw new OMException("Authorizer write lock must have been held before "
-          + "calling this method", INTERNAL_ERROR);
-    }
-
+//    if (!authorizerAccessLock.writeLock().isHeldByCurrentThread()) {
+//      throw new OMException("Authorizer write lock must have been held "
+//          + "before calling this method", INTERNAL_ERROR);
+//    }
   }
 
   /**
@@ -1100,12 +1102,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     }
   }
 
-  private final ReentrantReadWriteLock authorizerAccessLock =
-      new ReentrantReadWriteLock();
+  private final ReadWriteLock authorizerAccessLock =
+      new StampedLock().asReadWriteLock();
 
   @Override
   public boolean tryAcquireAuthorizerAccessReadLock(long timeout)
       throws InterruptedException {
+
     return authorizerAccessLock.readLock().tryLock(
         timeout, TimeUnit.MILLISECONDS);
   }
@@ -1122,7 +1125,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
           INTERNAL_ERROR);
     }
     if (!lockAcquired) {
-      throw new OMException("Timed out acquiring authorizer read lock",
+      throw new OMException("Timed out acquiring authorizer read lock. "
+          + "Another multi-tenancy request is in-progress. Try again later",
           ResultCodes.TIMEOUT);
     }
   }
@@ -1149,6 +1153,10 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
     boolean lockAcquired;
     try {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Trying to acquire authorizer write lock from thread {}",
+            Thread.currentThread().getId());
+      }
       lockAcquired = tryAcquireAuthorizerAccessWriteLock(
           OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
     } catch (InterruptedException e) {
@@ -1156,8 +1164,12 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
           INTERNAL_ERROR);
     }
     if (!lockAcquired) {
-      throw new OMException("Timed out acquiring authorizer write lock",
+      throw new OMException("Timed out acquiring authorizer write lock. "
+          + "Another multi-tenancy request is in-progress. Try again later",
           ResultCodes.TIMEOUT);
+    } else if (LOG.isDebugEnabled()) {
+      LOG.debug("Acquired authorizer write lock from thread {}",
+          Thread.currentThread().getId());
     }
   }
 
@@ -1171,12 +1183,11 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    * This is used by both BG sync and tenant requests.
    */
   @Override
-  public void releaseAuthorizerAccessWriteLock() {
-    if (authorizerAccessLock.writeLock().isHeldByCurrentThread()) {
-      authorizerAccessLock.writeLock().unlock();
-    } else if (LOG.isDebugEnabled()) {
-      LOG.debug("Current thread does not hold the authorizer write lock. "
-          + "Ignoring release write lock operation");
+  public void releaseAuthorizerAccessWriteLock(/*long stamp*/) {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Releasing authorizer write lock from thread {}",
+          Thread.currentThread().getId());
     }
+    authorizerAccessLock.writeLock().unlock();
   }
 }

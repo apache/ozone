@@ -199,14 +199,17 @@ public class OMRangerBGSyncService extends BackgroundService {
   private final HashMap<String, HashSet<String>> mtOMDBRoles = new HashMap<>();
 
   public OMRangerBGSyncService(OzoneManager ozoneManager,
-      MultiTenantAccessAuthorizer authorizer, long interval,
-      TimeUnit unit, long serviceTimeout) {
+      OMMultiTenantManager omMultiTenantManager,
+      MultiTenantAccessAuthorizer authorizer,
+      long interval, TimeUnit unit, long serviceTimeout) {
 
     super("OMRangerBGSyncService", interval, unit, 1, serviceTimeout);
 
     this.ozoneManager = ozoneManager;
     this.metadataManager = ozoneManager.getMetadataManager();
-    this.multiTenantManager = ozoneManager.getMultiTenantManager();
+    // Note: ozoneManager.getMultiTenantManager() may return null because
+    // it might haven't finished initialization.
+    this.multiTenantManager = omMultiTenantManager;
 
     if (authorizer != null) {
       this.authorizer = authorizer;
