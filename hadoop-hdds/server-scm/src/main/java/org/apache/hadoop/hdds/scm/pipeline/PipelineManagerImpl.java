@@ -214,6 +214,18 @@ public class PipelineManagerImpl implements PipelineManager {
     try {
       Pipeline pipeline = pipelineFactory.create(replicationConfig,
           excludedNodes, favoredNodes);
+      // In case in case if provided pipeline provider returns null.
+      if (pipeline == null) {
+        throw new IOException("Pipeline cannot be null");
+      }
+      // In case if provided pipeline returns less number of nodes than
+      // required.
+      if (pipeline.getNodes().size() != pipeline.getReplicationConfig()
+          .getRequiredNodes()) {
+        throw new IOException("Nodes size= " + pipeline.getNodes()
+            .size() + ", replication factor=" + pipeline.getReplicationConfig()
+            .getRequiredNodes() + " do not match");
+      }
       stateManager.addPipeline(pipeline.getProtobufMessage(
           ClientVersion.CURRENT_VERSION));
       recordMetricsForPipeline(pipeline);
