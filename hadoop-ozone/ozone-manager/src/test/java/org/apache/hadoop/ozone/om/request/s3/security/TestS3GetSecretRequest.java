@@ -23,6 +23,7 @@ import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ipc.Server.Call;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.om.AuthorizerLockImpl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -136,10 +137,8 @@ public class TestS3GetSecretRequest {
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
 
     when(tenant.getTenantAccessPolicies()).thenReturn(new ArrayList<>());
-    when(omMultiTenantManager.createTenantInAuthorizer(TENANT_ID,
-            OMMultiTenantManager.getDefaultUserRoleName(TENANT_ID),
-            OMMultiTenantManager.getDefaultAdminRoleName(TENANT_ID)))
-        .thenReturn(tenant);
+    when(omMultiTenantManager.getAuthorizerLock())
+        .thenReturn(new AuthorizerLockImpl());
   }
 
   @After
