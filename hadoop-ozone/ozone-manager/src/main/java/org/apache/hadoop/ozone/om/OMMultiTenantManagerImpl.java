@@ -107,7 +107,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   private final OMRangerBGSyncService omRangerBGSyncService;
   private MultiTenantAccessAuthorizer authorizer;
   private final AuthorizerLock authorizerLock;
+  /**
+   * Authorizer operations. Meant to be called in tenant preExecute.
+   */
   private final TenantOp authorizerOp;
+  /**
+   * Authorizer operations. Meant to be called in tenant validateAndUpdateCache.
+   */
   private final TenantOp cacheOp;
 
   public OMMultiTenantManagerImpl(OzoneManager ozoneManager,
@@ -220,7 +226,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
     private void checkAcquiredAuthorizerWriteLock() throws OMException {
 
-      // Check that lock is acquired
+      // Check if lock is acquired by the current thread
       if (!authorizerLock.isHeldByCurrentThread()) {
         throw new OMException("Authorizer write lock must have been held "
             + "before calling this method", INTERNAL_ERROR);
@@ -307,7 +313,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         // Does NOT update tenant cache here
       } catch (IOException e) {
         // Expect the sync thread to restore the admin role later if op succeeds
-        throw new OMException(e.getMessage(), TENANT_AUTHORIZER_ERROR);
+        throw new OMException(e, TENANT_AUTHORIZER_ERROR);
       }
     }
 
@@ -328,7 +334,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         }
       } catch (IOException e) {
         // Expect the sync thread to restore the admin role later if op succeeds
-        throw new OMException(e.getMessage(), TENANT_AUTHORIZER_ERROR);
+        throw new OMException(e, TENANT_AUTHORIZER_ERROR);
       }
     }
 
@@ -379,7 +385,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
       } catch (IOException e) {
         // Expect the sync thread to restore the user role later if op succeeds
-        throw new OMException(e.getMessage(), TENANT_AUTHORIZER_ERROR);
+        throw new OMException(e, TENANT_AUTHORIZER_ERROR);
       } finally {
         tenantCacheLock.readLock().unlock();
       }
@@ -416,7 +422,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         // Does NOT update tenant cache here
       } catch (IOException e) {
         // Expect the sync thread to restore the user role later if op succeeds
-        throw new OMException(e.getMessage(), TENANT_AUTHORIZER_ERROR);
+        throw new OMException(e, TENANT_AUTHORIZER_ERROR);
       } finally {
         tenantCacheLock.readLock().unlock();
       }
@@ -450,7 +456,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         // Does NOT update tenant cache here
       } catch (IOException e) {
         // Expect the sync thread to restore the admin role later if op succeeds
-        throw new OMException(e.getMessage(), TENANT_AUTHORIZER_ERROR);
+        throw new OMException(e, TENANT_AUTHORIZER_ERROR);
       } finally {
         tenantCacheLock.readLock().unlock();
       }
@@ -483,7 +489,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         // Does NOT update tenant cache here
       } catch (IOException e) {
         // Expect the sync thread to restore the admin role later if op succeeds
-        throw new OMException(e.getMessage(), TENANT_AUTHORIZER_ERROR);
+        throw new OMException(e, TENANT_AUTHORIZER_ERROR);
       } finally {
         tenantCacheLock.readLock().unlock();
       }

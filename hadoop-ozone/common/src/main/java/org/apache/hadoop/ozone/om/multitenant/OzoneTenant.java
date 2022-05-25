@@ -86,7 +86,8 @@ public class OzoneTenant implements Tenant {
     return tenantRoleNames;
   }
 
-  @Override public String toString() {
+  @Override
+  public String toString() {
     return "OzoneTenant{" + "tenantId='" + tenantId + '\''
         + ", tenantRoleNames=" + tenantRoleNames + ", accessPolicies="
         + accessPolicies + ", accountNameSpace=" + accountNameSpace

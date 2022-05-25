@@ -304,7 +304,8 @@ public class RangerAccessPolicy implements AccessPolicy {
             + "\"denyExceptions\":[]," + "\"service\":\"cm_ozone\"" + "}";
   }
 
-  @Override public String toString() {
+  @Override
+  public String toString() {
     return "RangerAccessPolicy{" + "accessObject=" + accessObject
         + ", policyMap=" + policyMap + ", roleList=" + roleList + ", policyID='"
         + policyID + '\'' + ", policyJsonString='" + policyJsonString + '\''
