@@ -464,7 +464,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
               + "/" + req.getLookupKeyRequest().getKeyArgs().getBucketName()
               + "/" + req.getLookupKeyRequest().getKeyArgs().getKeyName()
               + ".")
-          .clearLookupFileResponse()
           .build();
     }
     return resp;
@@ -565,7 +564,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
                 " with bucket layout features, hence the client is not able " +
                 "to understand all the keys returned. Please upgrade the"
                 + " client to get the list of keys.")
-            .clearListKeysResponse()
             .build();
         break;
       }
@@ -1021,7 +1019,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
                 + " layout features, hence the client is not able to"
                 + " represent all the keys returned."
                 + " Please upgrade the client to get the list of keys.")
-            .clearListStatusResponse()
             .build();
         break;
       }
