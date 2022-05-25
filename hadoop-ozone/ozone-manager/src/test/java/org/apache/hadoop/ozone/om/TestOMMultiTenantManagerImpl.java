@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
-import org.apache.http.auth.BasicUserPrincipal;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
@@ -106,8 +105,8 @@ public class TestOMMultiTenantManagerImpl {
 
   @Test
   public void testListUsersInTenant() throws Exception {
-    tenantManager.getCacheOp().assignUserToTenant(
-        new BasicUserPrincipal("user1"), TENANT_ID, "accessId1");
+    tenantManager.getCacheOp()
+        .assignUserToTenant("user1", TENANT_ID, "accessId1");
 
     TenantUserList tenantUserList =
         tenantManager.listUsersInTenant(TENANT_ID, "");

@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Secre
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignUserAccessIdRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignUserAccessIdResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateGetS3SecretRequest;
-import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -169,8 +168,8 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     try {
       // Add user to tenant user role in Ranger.
       // Throws if the user doesn't exist in Ranger.
-      multiTenantManager.getAuthorizerOp().assignUserToTenant(
-          new BasicUserPrincipal(userPrincipal), tenantId, accessId);
+      multiTenantManager.getAuthorizerOp()
+          .assignUserToTenant(userPrincipal, tenantId, accessId);
     } catch (Exception e) {
       multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest(lockStamp);
       throw e;
@@ -322,8 +321,8 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       acquiredS3SecretLock = false;
 
       // Update tenant cache
-      multiTenantManager.getCacheOp().assignUserToTenant(
-          new BasicUserPrincipal(userPrincipal), tenantId, accessId);
+      multiTenantManager.getCacheOp()
+          .assignUserToTenant(userPrincipal, tenantId, accessId);
 
       // Generate response
       omResponse.setTenantAssignUserAccessIdResponse(

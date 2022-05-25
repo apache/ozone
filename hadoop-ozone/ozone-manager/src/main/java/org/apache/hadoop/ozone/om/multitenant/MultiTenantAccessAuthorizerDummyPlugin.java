@@ -46,14 +46,13 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public String assignUserToRole(BasicUserPrincipal principal,
+  public String assignUserToRole(String userPrincipal,
       String existingRole, boolean isAdmin) {
     return "roleId";
   }
 
   @Override
-  public String revokeUserFromRole(BasicUserPrincipal principal,
-      String existingRole) {
+  public String revokeUserFromRole(String userPrincipal, String existingRole) {
     return "roleId";
   }
 
@@ -64,7 +63,7 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public String getUserId(BasicUserPrincipal principal) throws IOException {
+  public String getUserId(String userPrincipal) throws IOException {
     return null;
   }
 

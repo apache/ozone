@@ -54,42 +54,43 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
 
   /**
    * Assign user to an existing role in the Authorizer.
-   * @param principal User principal
-   * @param existingRole A JSON String representation of the existing role
-   *                     returned from the Authorizer (Ranger).
+   *
+   * @param userPrincipal User principal
+   * @param existingRole  A JSON String representation of the existing role
+   *                      returned from the Authorizer (Ranger).
    * @param isAdmin
    * @return unique and opaque userID that can be used to refer to the user in
    * MultiTenantGateKeeperplugin Implementation. E.g. a Ranger
    * based Implementation can return some ID thats relevant for it.
    */
-  String assignUserToRole(BasicUserPrincipal principal, String existingRole,
+  String assignUserToRole(String userPrincipal, String existingRole,
       boolean isAdmin) throws IOException;
 
   /**
    * Update the exising role details and push the changes to Ranger.
    *
-   * @param principal contains user name, must be an existing user in Ranger.
-   * @param existingRole An existing role's JSON response String from Ranger.
+   * @param userPrincipal user name that exists in Ranger (internal / external).
+   * @param existingRole  An existing role's JSON response String from Ranger.
    * @return roleId (not useful for now)
    * @throws IOException
    */
-  String revokeUserFromRole(BasicUserPrincipal principal,
-                                   String existingRole) throws IOException;
+  String revokeUserFromRole(String userPrincipal, String existingRole)
+      throws IOException;
 
   /**
    * Assign all the users to an existing role.
    * @param users list of user principals
    * @param existingRole roleName
    */
-  String assignAllUsers(HashSet<String> users,
-                               String existingRole) throws IOException;
+  String assignAllUsers(HashSet<String> users, String existingRole)
+      throws IOException;
 
   /**
-   * @param principal
+   * @param userPrincipal
    * @return Unique userID maintained by the authorizer plugin.
    * @throws IOException
    */
-  String getUserId(BasicUserPrincipal principal) throws IOException;
+  String getUserId(String userPrincipal) throws IOException;
 
   /**
    * @param principal

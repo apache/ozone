@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.http.auth.BasicUserPrincipal;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -138,7 +137,7 @@ public interface MultiTenantAccessController {
    */
   class Role {
     private final String name;
-    private final Set<BasicUserPrincipal> users;
+    private final Set<String> users;
     private final String description;
     private final Long roleID;
 
@@ -153,7 +152,7 @@ public interface MultiTenantAccessController {
       return name;
     }
 
-    public Set<BasicUserPrincipal> getUsers() {
+    public Set<String> getUsers() {
       return users;
     }
 
@@ -197,7 +196,7 @@ public interface MultiTenantAccessController {
      */
     public static final class Builder {
       private String name;
-      private final Set<BasicUserPrincipal> users;
+      private final Set<String> users;
       private String description;
       private Long roleID;
 
@@ -217,12 +216,12 @@ public interface MultiTenantAccessController {
         return this;
       }
 
-      public Builder addUser(BasicUserPrincipal user) {
+      public Builder addUser(String user) {
         this.users.add(user);
         return this;
       }
 
-      public Builder addUsers(Collection<BasicUserPrincipal> roleUsers) {
+      public Builder addUsers(Collection<String> roleUsers) {
         this.users.addAll(roleUsers);
         return this;
       }

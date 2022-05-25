@@ -93,7 +93,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
     try {
       // Remove policies and roles from Ranger
       // TODO: Deactivate (disable) policies instead of delete?
-      multiTenantManager.getAuthorizerOp().removeTenant(tenantObj);
+      multiTenantManager.getAuthorizerOp().deleteTenant(tenantObj);
     } catch (Exception e) {
       multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest(lockStamp);
       throw e;
@@ -193,7 +193,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       }
 
       // Update tenant cache
-      multiTenantManager.getCacheOp().removeTenant(new OzoneTenant(tenantId));
+      multiTenantManager.getCacheOp().deleteTenant(new OzoneTenant(tenantId));
 
       // Compose response
       //

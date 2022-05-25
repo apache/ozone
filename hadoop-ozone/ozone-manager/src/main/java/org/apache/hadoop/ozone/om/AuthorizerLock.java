@@ -69,4 +69,10 @@ public interface AuthorizerLock {
    * A wrapper around unlockWrite() that is used exclusively in OMRequests.
    */
   void unlockWriteInOMRequest(long stamp);
+
+  /**
+   * Returns true if the authorizer write lock is held by the current thread.
+   * Used in {@link OMMultiTenantManagerImpl.AuthorizerOp}.
+   */
+  boolean isHeldByCurrentThread();
 }

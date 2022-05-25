@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
-import org.apache.http.auth.BasicUserPrincipal;
 
 import java.io.IOException;
 
@@ -42,15 +41,15 @@ public interface TenantOp {
    * Note this differs from deactivateTenant() above.
    * @param tenant
    */
-  void removeTenant(Tenant tenant) throws IOException;
+  void deleteTenant(Tenant tenant) throws IOException;
 
   /**
    * Creates a new user that exists for S3 API access to Ozone.
-   * @param principal
+   * @param userPrincipal
    * @param tenantId
    * @param accessId
    */
-  void assignUserToTenant(BasicUserPrincipal principal,
+  void assignUserToTenant(String userPrincipal,
       String tenantId, String accessId) throws IOException;
 
   /**

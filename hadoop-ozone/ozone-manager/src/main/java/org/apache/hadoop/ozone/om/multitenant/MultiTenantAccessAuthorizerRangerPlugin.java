@@ -49,6 +49,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.ConnectException;
 import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
@@ -111,10 +112,10 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     // Get Ranger Ozone service ID
     try {
       rangerOzoneServiceId = retrieveRangerOzoneServiceId();
-    } catch (ConnectException e) {
+    } catch (SocketTimeoutException | ConnectException e) {
       // Exceptions (e.g. ConnectException: Connection refused)
       // thrown here can crash OM during startup.
-      // Tolerate possible connection failure to Ranger during initialization
+      // Tolerate potential connection failure to Ranger during initialization
       // due to cluster services starting up at the same time or not ready yet.
       // Later when the Ranger Ozone service ID would be used it should try
       // and retrieve the ID again if it failed earlier.
@@ -280,10 +281,10 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   @Override
-  public String getUserId(BasicUserPrincipal principal) throws IOException {
+  public String getUserId(String userPrincipal) throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_USER_HTTP_ENDPOINT +
-        principal.getName();
+        userPrincipal;
 
     HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl,
         "GET", false);
@@ -295,7 +296,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
       int numIndex = userinfo.size();
       for (int i = 0; i < numIndex; ++i) {
         if (userinfo.get(i).getAsJsonObject().get("name").getAsString()
-            .equals(principal.getName())) {
+            .equals(userPrincipal)) {
           userIDCreated =
               userinfo.get(i).getAsJsonObject().get("id").getAsString();
           break;
@@ -312,13 +313,13 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   /**
    * Update the exising role details and push the changes to Ranger.
    *
-   * @param principal contains user name, must be an existing user in Ranger.
-   * @param existingRole An existing role's JSON response String from Ranger.
+   * @param userPrincipal user name that exists in Ranger.
+   * @param existingRole  An existing role's JSON response String from Ranger.
    * @return roleId (not useful for now)
    * @throws IOException
    */
   @Override
-  public String revokeUserFromRole(BasicUserPrincipal principal,
+  public String revokeUserFromRole(String userPrincipal,
       String existingRole) throws IOException {
     JsonObject roleObj = new JsonParser().parse(existingRole).getAsJsonObject();
     // Parse Json
@@ -330,7 +331,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
     for (int i = 0; i < oldUsersArray.size(); ++i) {
       JsonObject newUserEntry = oldUsersArray.get(i).getAsJsonObject();
-      if (!newUserEntry.get("name").getAsString().equals(principal.getName())) {
+      if (!newUserEntry.get("name").getAsString().equals(userPrincipal)) {
         newUsersArray.add(newUserEntry);
       }
       // Update Json array
@@ -366,13 +367,13 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   /**
    * Update the exising role details and push the changes to Ranger.
    *
-   * @param principal contains user name, must be an existing user in Ranger.
-   * @param existingRole An existing role's JSON response String from Ranger.
-   * @param isAdmin Make it delegated admin of the role.
+   * @param userPrincipal user name that exists in Ranger.
+   * @param existingRole  An existing role's JSON response String from Ranger.
+   * @param isAdmin       Make it delegated admin of the role.
    * @return roleId (not useful for now)
    * @throws IOException
    */
-  public String assignUserToRole(BasicUserPrincipal principal,
+  public String assignUserToRole(String userPrincipal,
       String existingRole, boolean isAdmin) throws IOException {
 
     JsonObject roleObj = new JsonParser().parse(existingRole).getAsJsonObject();
@@ -382,7 +383,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
     JsonArray usersArray = roleObj.getAsJsonArray("users");
     JsonObject newUserEntry = new JsonObject();
-    newUserEntry.addProperty("name", principal.getName());
+    newUserEntry.addProperty("name", userPrincipal);
     newUserEntry.addProperty("isAdmin", isAdmin);
     usersArray.add(newUserEntry);
     // Update Json array

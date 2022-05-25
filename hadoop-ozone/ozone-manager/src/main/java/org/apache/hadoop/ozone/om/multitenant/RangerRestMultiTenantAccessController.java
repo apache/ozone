@@ -535,7 +535,7 @@ public class RangerRestMultiTenantAccessController
           for (JsonElement jsonUser : roleJson.get("users").getAsJsonArray()) {
             String userName =
                 jsonUser.getAsJsonObject().get("name").getAsString();
-            role.addUser(new BasicUserPrincipal(userName));
+            role.addUser(userName);
           }
 
           return role.build();
@@ -636,7 +636,7 @@ public class RangerRestMultiTenantAccessController
           jsonRole.addProperty("name", javaRole.getName());
 
           JsonArray jsonUserArray = new JsonArray();
-          for (BasicUserPrincipal javaUser : javaRole.getUsers()) {
+          for (String javaUser : javaRole.getUsers()) {
             jsonUserArray.add(jsonConverter.toJsonTree(javaUser));
           }
 

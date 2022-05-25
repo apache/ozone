@@ -39,9 +39,11 @@ public class AuthorizerLockImpl implements AuthorizerLock {
       LoggerFactory.getLogger(AuthorizerLockImpl.class);
 
   private final StampedLock authorizerStampedLock = new StampedLock();
-  // No need to use AtomicLong here as this value can only be updated after
+
+  // No need to use atomic here as both fields can only be updated after
   // authorizer write lock is acquired.
   private volatile long omRequestWriteLockStamp = 0L;
+  private volatile long omRequestWriteLockHolderTid = 0L;
 
   @Override
   public long tryReadLock(long timeout) throws InterruptedException {
@@ -132,11 +134,15 @@ public class AuthorizerLockImpl implements AuthorizerLock {
 
     // Sanity check. Must not have held a write lock in a tenant OMRequest.
     Preconditions.checkArgument(omRequestWriteLockStamp == 0L);
+    Preconditions.checkArgument(omRequestWriteLockHolderTid == 0L);
 
     long stamp = tryWriteLockThrowOnTimeout();
     omRequestWriteLockStamp = stamp;
+    omRequestWriteLockHolderTid = Thread.currentThread().getId();
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Set omRequestWriteLockStamp to {}", stamp);
+      LOG.debug("Set omRequestWriteLockStamp to {}, "
+          + "omRequestWriteLockHolderTid to {}",
+          omRequestWriteLockStamp, omRequestWriteLockHolderTid);
     }
     return stamp;
   }
@@ -166,10 +172,28 @@ public class AuthorizerLockImpl implements AuthorizerLock {
 
     // Reset the internal lock stamp record back to zero.
     omRequestWriteLockStamp = 0L;
+    omRequestWriteLockHolderTid = 0L;
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Restored omRequestWriteLockStamp to {}",
-          omRequestWriteLockStamp);
+      LOG.debug("Restored omRequestWriteLockStamp to {}, "
+              + "omRequestWriteLockHolderTid to {}",
+          omRequestWriteLockStamp, omRequestWriteLockHolderTid);
     }
     unlockWrite(stamp);
+  }
+
+  @Override
+  public boolean isHeldByCurrentThread() {
+
+    if (omRequestWriteLockHolderTid == 0L) {
+      LOG.debug("Write lock is not held by any OMRequest thread");
+      return false;
+    }
+
+    if (omRequestWriteLockHolderTid != Thread.currentThread().getId()) {
+      LOG.debug("Write lock is not held by current thread");
+      return false;
+    }
+
+    return true;
   }
 }

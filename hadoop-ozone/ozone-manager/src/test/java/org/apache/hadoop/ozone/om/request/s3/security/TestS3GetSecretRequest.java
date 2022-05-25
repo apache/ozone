@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.TenantOp;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
@@ -139,6 +140,10 @@ public class TestS3GetSecretRequest {
     when(tenant.getTenantAccessPolicies()).thenReturn(new ArrayList<>());
     when(omMultiTenantManager.getAuthorizerLock())
         .thenReturn(new AuthorizerLockImpl());
+    TenantOp authorizerOp = mock(TenantOp.class);
+    TenantOp cacheOp = mock(TenantOp.class);
+    when(omMultiTenantManager.getAuthorizerOp()).thenReturn(authorizerOp);
+    when(omMultiTenantManager.getCacheOp()).thenReturn(cacheOp);
   }
 
   @After

@@ -69,7 +69,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
-import org.apache.http.auth.BasicUserPrincipal;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeerId;
@@ -123,7 +122,7 @@ public class TestRangerBGSyncService {
   // List of role ID created in Ranger
   private final List<String> rolesCreated = new ArrayList<>();
   // List of users created in Ranger
-  private final List<BasicUserPrincipal> usersCreated = new ArrayList<>();
+  private final List<String> usersCreated = new ArrayList<>();
 
   private static OzoneConfiguration conf;
   private OzoneManager ozoneManager;
@@ -312,8 +311,6 @@ public class TestRangerBGSyncService {
     policiesCreated.clear();
     rolesCreated.clear();
 
-    BasicUserPrincipal userAlice = new BasicUserPrincipal(USER_ALICE_SHORT);
-    BasicUserPrincipal userBob = new BasicUserPrincipal(USER_BOB_SHORT);
     // Tenant name to be used for this test
     final String tenantId = TENANT_ID;
     // volume name = bucket namespace name
@@ -339,21 +336,21 @@ public class TestRangerBGSyncService {
                 bucketNamespacePolicyName, bucketPolicyName));
         // Access ID entry for alice
         final String aliceAccessId = OMMultiTenantManager.getDefaultAccessId(
-            tenantId, userAlice.getName());
+            tenantId, USER_ALICE_SHORT);
         omMetadataManager.getTenantAccessIdTable().put(aliceAccessId,
             new OmDBAccessIdInfo.Builder()
                 .setTenantId(tenantId)
-                .setUserPrincipal(userAlice.getName())
+                .setUserPrincipal(USER_ALICE_SHORT)
                 .setIsAdmin(false)
                 .setIsDelegatedAdmin(false)
                 .build());
         // Access ID entry for bob
         final String bobAccessId = OMMultiTenantManager.getDefaultAccessId(
-            tenantId, userBob.getName());
+            tenantId, USER_BOB_SHORT);
         omMetadataManager.getTenantAccessIdTable().put(bobAccessId,
             new OmDBAccessIdInfo.Builder()
                 .setTenantId(tenantId)
-                .setUserPrincipal(userBob.getName())
+                .setUserPrincipal(USER_BOB_SHORT)
                 .setIsAdmin(false)
                 .setIsDelegatedAdmin(false)
                 .build());
@@ -384,8 +381,8 @@ public class TestRangerBGSyncService {
     try {
       LOG.info("Creating user in Ranger: {}", USER_ALICE_SHORT);
       auth.createUser(USER_ALICE_SHORT, "password1");
-      usersCreated.add(userAlice);
-      auth.assignUserToRole(userAlice, auth.getRole(userRole), false);
+      usersCreated.add(USER_ALICE_SHORT);
+      auth.assignUserToRole(USER_ALICE_SHORT, auth.getRole(userRole), false);
     } catch (Exception e) {
       Assert.fail(e.getMessage());
     }
@@ -393,8 +390,8 @@ public class TestRangerBGSyncService {
     try {
       LOG.info("Creating user in Ranger: {}", USER_BOB_SHORT);
       auth.createUser(USER_BOB_SHORT, "password2");
-      usersCreated.add(userBob);
-      auth.assignUserToRole(userBob, auth.getRole(userRole), false);
+      usersCreated.add(USER_BOB_SHORT);
+      auth.assignUserToRole(USER_BOB_SHORT, auth.getRole(userRole), false);
     } catch (Exception e) {
       Assert.fail(e.getMessage());
     }
@@ -448,7 +445,7 @@ public class TestRangerBGSyncService {
   }
 
   public void cleanupUsers() {
-    for (BasicUserPrincipal user : usersCreated) {
+    for (String user : usersCreated) {
       try {
         LOG.info("Deleting user: {}", user);
         String userId = auth.getUserId(user);
@@ -605,8 +602,7 @@ public class TestRangerBGSyncService {
     Assert.assertEquals(
         OMMultiTenantManager.getDefaultUserRoleName(TENANT_ID), userRoleName);
 
-    auth.revokeUserFromRole(
-        new BasicUserPrincipal(USER_BOB_SHORT), auth.getRole(userRoleName));
+    auth.revokeUserFromRole(USER_BOB_SHORT, auth.getRole(userRoleName));
 
     HashSet<String> userSet = new HashSet<>();
     userSet.add(USER_ALICE_SHORT);
