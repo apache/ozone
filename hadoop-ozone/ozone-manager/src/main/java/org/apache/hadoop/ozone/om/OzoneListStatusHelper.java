@@ -63,6 +63,9 @@ public class OzoneListStatusHelper {
                           boolean skipFileNotFoundError) throws IOException;
   }
 
+  /**
+   * Interface for iteration of Heap Entries.
+   */
   public interface ClosableIterator extends Iterator<HeapEntry>, Closeable {
 
   }
@@ -157,7 +160,7 @@ public class OzoneListStatusHelper {
 
     // fetch the sorted output using a min heap iterator where
     // every remove from the heap will give the smallest entry.
-    try(MinHeapIterator heapIterator = new MinHeapIterator(metadataManager,
+    try (MinHeapIterator heapIterator = new MinHeapIterator(metadataManager,
         dbPrefixKey, bucketLayout, startKeyPrefix, volumeName, bucketName)) {
 
       while (map.size() < numEntries && heapIterator.hasNext()) {
@@ -200,7 +203,7 @@ public class OzoneListStatusHelper {
   }
 
   /**
-   * Enum of types of entries in the heap
+   * Enum of types of entries in the heap.
    */
   public enum EntryType {
     DIR_CACHE,
@@ -223,7 +226,7 @@ public class OzoneListStatusHelper {
   }
 
   /**
-   * Entry to be added to the heap
+   * Entry to be added to the heap.
    */
   private static class HeapEntry implements Comparable<HeapEntry> {
     private final EntryType entryType;
