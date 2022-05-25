@@ -46,39 +46,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     this.finalizationSteps = new ArrayList<>();
   }
 
-  public FinalizationCheckpoint getFinalizationCheckpoint() {
-    // Get a point-in-time snapshot of the finalization state, then use this to
-    // determine which checkpoint we were on at that time.
-    boolean mlvBehindSlvSnapshot;
-    boolean hasFinalizingMarkSnapshot;
-    checkpointLock.readLock().lock();
-    try {
-      mlvBehindSlvSnapshot = versionManager.needsFinalization();
-      hasFinalizingMarkSnapshot = hasFinalizingMark;
-    } finally {
-      checkpointLock.readLock().unlock();
-    }
-
-    FinalizationCheckpoint currentCheckpoint = null;
-    // Enum constants must be iterated in order to resume from the correct
-    // checkpoint.
-    for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
-      if (checkpoint.isCurrent(hasFinalizingMarkSnapshot,
-          mlvBehindSlvSnapshot)) {
-        currentCheckpoint = checkpoint;
-        break;
-      }
-    }
-
-    String errorMessage = String.format("SCM upgrade finalization " +
-        "is in an unknown state.\nFinalizing mark present? %b\n" +
-        "Metadata layout version behind software layout version? %b",
-        hasFinalizingMarkSnapshot, mlvBehindSlvSnapshot);
-    Preconditions.checkNotNull(currentCheckpoint, errorMessage);
-    return currentCheckpoint;
-  }
-
-
   @Override
   public void addFinalizingMark() throws IOException {
     checkpointLock.writeLock().lock();
@@ -134,6 +101,43 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   @Override
   public void addReplicatedFinalizationStep(ReplicatedFinalizationStep step) {
     this.finalizationSteps.add(step);
+  }
+
+  @Override
+  public boolean passedCheckpoint(FinalizationCheckpoint checkpoint) {
+    return getFinalizationCheckpoint().compareTo(checkpoint) >= 0;
+  }
+
+  private FinalizationCheckpoint getFinalizationCheckpoint() {
+    // Get a point-in-time snapshot of the finalization state, then use this to
+    // determine which checkpoint we were on at that time.
+    boolean mlvBehindSlvSnapshot;
+    boolean hasFinalizingMarkSnapshot;
+    checkpointLock.readLock().lock();
+    try {
+      mlvBehindSlvSnapshot = versionManager.needsFinalization();
+      hasFinalizingMarkSnapshot = hasFinalizingMark;
+    } finally {
+      checkpointLock.readLock().unlock();
+    }
+
+    FinalizationCheckpoint currentCheckpoint = null;
+    // Enum constants must be iterated in order to resume from the correct
+    // checkpoint.
+    for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
+      if (checkpoint.isCurrent(hasFinalizingMarkSnapshot,
+          mlvBehindSlvSnapshot)) {
+        currentCheckpoint = checkpoint;
+        break;
+      }
+    }
+
+    String errorMessage = String.format("SCM upgrade finalization " +
+            "is in an unknown state.\nFinalizing mark present? %b\n" +
+            "Metadata layout version behind software layout version? %b",
+        hasFinalizingMarkSnapshot, mlvBehindSlvSnapshot);
+    Preconditions.checkNotNull(currentCheckpoint, errorMessage);
+    return currentCheckpoint;
   }
 
   public static final class Builder {

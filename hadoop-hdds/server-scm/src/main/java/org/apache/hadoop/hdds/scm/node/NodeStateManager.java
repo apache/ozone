@@ -28,6 +28,9 @@ import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Predicate;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -45,6 +48,9 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.node.states.NodeStateMap;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -160,8 +166,8 @@ public class NodeStateManager implements Runnable, Closeable {
    * Conditions to check whether a node's metadata layout version matches
    * that of SCM.
    */
-  private Predicate<LayoutVersionProto> layoutMatchCondition;
-  private Predicate<LayoutVersionProto> layoutMisMatchCondition;
+  private final Predicate<LayoutVersionProto> layoutMatchCondition;
+  private final Predicate<LayoutVersionProto> layoutMisMatchCondition;
 
   /**
    * Constructs a NodeStateManager instance with the given configuration.
@@ -172,7 +178,9 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public NodeStateManager(ConfigurationSource conf,
                           EventPublisher eventPublisher,
-                          LayoutVersionManager layoutManager) {
+                          LayoutVersionManager layoutManager,
+                          Predicate<FinalizationCheckpoint>
+                              finalizationCheckpointIsPassed) {
     this.layoutVersionManager = layoutManager;
     this.nodeStateMap = new NodeStateMap();
     this.node2PipelineMap = new Node2PipelineMap();
@@ -199,13 +207,23 @@ public class NodeStateManager implements Runnable, Closeable {
     skippedHealthChecks = 0;
     checkPaused = false; // accessed only from test functions
 
-    layoutMatchCondition =
-        (layout) -> (layout.getMetadataLayoutVersion() ==
+    // This will move a datanode out of healthy readonly state if passed.
+    layoutMatchCondition = (layout) ->
+        (layout.getMetadataLayoutVersion() ==
              layoutVersionManager.getMetadataLayoutVersion()) &&
             (layout.getSoftwareLayoutVersion() ==
             layoutVersionManager.getSoftwareLayoutVersion());
 
-    layoutMisMatchCondition = (layout) -> !layoutMatchCondition.test(layout);
+    // This will move a datanode in to healthy readonly state if passed.
+    // When SCM finishes finalizing, it will automatically move all datanodes
+    // to healthy readonly as well.
+    // If nodes heartbeat while SCM is finalizing, they should not be moved
+    // to healthy readonly until SCM finishes updating its MLV, hence the
+    // checkpoint check here.
+    layoutMisMatchCondition = (layout) ->
+            finalizationCheckpointIsPassed
+                .test(FinalizationCheckpoint.MLV_EQUALS_SLV) &&
+            !layoutMatchCondition.test(layout);
 
     scheduleNextHealthCheck();
   }
@@ -682,7 +700,17 @@ public class NodeStateManager implements Runnable, Closeable {
     scheduleNextHealthCheck();
   }
 
-  public void forceNodesToHealthyReadOnly() {
+  /**
+   * Upgrade finalization needs to move all nodes to a healthy readonly state
+   * when finalization finishes to make sure no nodes with metadata layout
+   * version older than SCM's are used in pipelines. Pipeline creation is
+   * still frozen at this point in the finalization flow.
+   *
+   * This method is synchronized to coordinate node state updates between
+   * the upgrade finalization thread which calls this method, and the
+   * node health processing thread that calls {@link this#checkNodesHealth}.
+   */
+  public synchronized void forceNodesToHealthyReadOnly() {
     try {
       List<UUID> nodes = nodeStateMap.getNodes(null, HEALTHY);
       for (UUID id : nodes) {
@@ -700,8 +728,14 @@ public class NodeStateManager implements Runnable, Closeable {
     }
   }
 
+  /**
+   * This method is synchronized to coordinate node state updates between
+   * the upgrade finalization thread which calls
+   * {@link this#forceNodesToHealthyReadOnly}, and the node health processing
+   * thread that calls this method.
+   */
   @VisibleForTesting
-  public void checkNodesHealth() {
+  public synchronized void checkNodesHealth() {
 
     /*
      *

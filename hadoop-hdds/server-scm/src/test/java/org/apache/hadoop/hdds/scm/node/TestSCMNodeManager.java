@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -87,6 +88,7 @@ import org.junit.rules.ExpectedException;
 import java.util.Map;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -453,9 +455,16 @@ public class TestSCMNodeManager {
 
     // Wait for the expected number of pipelines using allowed DNs.
     GenericTestUtils.waitFor(() -> {
+      // Closed pipelines are no longer in operation so we should not count
+      // them. We cannot check for open pipelines only because this is a mock
+      // test so the pipelines may remain in ALLOCATED state.
       List<Pipeline> pipelines = scm.getPipelineManager()
-          .getPipelines(replConfig);
-      LOG.info("Found {} pipelines of type {} and factor {}.", pipelines.size(),
+          .getPipelines(replConfig)
+          .stream()
+          .filter(p -> p.getPipelineState() != Pipeline.PipelineState.CLOSED)
+          .collect(Collectors.toList());
+      LOG.info("Found {} non-closed pipelines of type {} and factor {}.",
+          pipelines.size(),
           replConfig.getReplicationType(), replConfig.getReplicationFactor());
       boolean success = countCheck.test(pipelines.size());
 
@@ -470,7 +479,7 @@ public class TestSCMNodeManager {
               String message = String.format("Pipeline %s used datanode %s " +
                       "which is not in the set of allowed datanodes: %s",
                   pipeline.getId().toString(), pipelineDN.getUuidString(),
-                  allowedDnIds.toString());
+                  allowedDnIds);
               Assert.fail(message);
             }
           }
@@ -850,8 +859,22 @@ public class TestSCMNodeManager {
   }
 
   @Test
-  public void testProcessLayoutVersionReportHigherMlv() throws IOException,
-      AuthenticationException {
+  public void testProcessLayoutVersion() throws IOException {
+    // TODO: Refactor this class to use org.junit.jupiter so test
+    //  parameterization can be used.
+    for(FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
+      Predicate<FinalizationCheckpoint> passedCheckpoint = c ->
+          checkpoint.compareTo(c) >= 0;
+      LOG.info("Testing with SCM finalization checkpoint {}", checkpoint);
+      testProcessLayoutVersionLowerMlv(passedCheckpoint);
+      testProcessLayoutVersionReportHigherMlv(passedCheckpoint);
+    }
+  }
+
+  // Currently invoked by testProcessLayoutVersion.
+  public void testProcessLayoutVersionReportHigherMlv(
+      Predicate<FinalizationCheckpoint> passedCheckpoint)
+      throws IOException {
     final int healthCheckInterval = 200; // milliseconds
     final int heartbeatInterval = 1; // seconds
 
@@ -861,25 +884,38 @@ public class TestSCMNodeManager {
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL,
         heartbeatInterval, SECONDS);
 
-    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
-      DatanodeDetails node1 =
-          HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
-      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-          .captureLogs(SCMNodeManager.LOG);
-      int scmMlv =
-          nodeManager.getLayoutVersionManager().getMetadataLayoutVersion();
-      nodeManager.processLayoutVersionReport(node1,
-          LayoutVersionProto.newBuilder()
-              .setMetadataLayoutVersion(scmMlv + 1)
-              .setSoftwareLayoutVersion(scmMlv + 2)
-              .build());
-      Assert.assertTrue(logCapturer.getOutput()
-          .contains("Invalid data node in the cluster"));
-    }
+    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
+    when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
+    EventPublisher eventPublisher = mock(EventPublisher.class);
+    HDDSLayoutVersionManager lvm  =
+        new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+    SCMNodeManager nodeManager  = new SCMNodeManager(conf,
+        scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
+        SCMContext.emptyContext(), lvm, passedCheckpoint);
+
+    // Regardless of SCM's finalization checkpoint, datanodes with higher MLV
+    // than SCM should not be found in the cluster.
+    DatanodeDetails node1 =
+        HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+        .captureLogs(SCMNodeManager.LOG);
+    int scmMlv =
+        nodeManager.getLayoutVersionManager().getMetadataLayoutVersion();
+    int scmSlv =
+        nodeManager.getLayoutVersionManager().getSoftwareLayoutVersion();
+    nodeManager.processLayoutVersionReport(node1,
+        LayoutVersionProto.newBuilder()
+            .setMetadataLayoutVersion(scmMlv + 1)
+            .setSoftwareLayoutVersion(scmSlv + 1)
+            .build());
+    Assert.assertTrue(logCapturer.getOutput()
+        .contains("Invalid data node in the cluster"));
+    nodeManager.close();
   }
 
-  @Test
-  public void testProcessLayoutVersionLowerMlv() throws IOException {
+  // Currently invoked by testProcessLayoutVersion.
+  public void testProcessLayoutVersionLowerMlv(Predicate<FinalizationCheckpoint>
+      passedCheckpoint) throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
@@ -888,7 +924,7 @@ public class TestSCMNodeManager {
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
-        SCMContext.emptyContext(), lvm);
+        SCMContext.emptyContext(), lvm, passedCheckpoint);
     DatanodeDetails node1 =
         HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
     verify(eventPublisher,
@@ -902,12 +938,22 @@ public class TestSCMNodeManager {
             .build());
     ArgumentCaptor<CommandForDatanode> captor =
         ArgumentCaptor.forClass(CommandForDatanode.class);
-    verify(eventPublisher, times(1))
-        .fireEvent(Mockito.eq(DATANODE_COMMAND), captor.capture());
-    assertTrue(captor.getValue().getDatanodeId()
-        .equals(node1.getUuid()));
-    assertTrue(captor.getValue().getCommand().getType()
-        .equals(finalizeNewLayoutVersionCommand));
+
+
+    if (passedCheckpoint.test(FinalizationCheckpoint.MLV_EQUALS_SLV)) {
+      // If the mlv equals slv checkpoint passed, datanodes with older mlvs
+      // should be instructed to finalize.
+      verify(eventPublisher, times(1))
+          .fireEvent(Mockito.eq(DATANODE_COMMAND), captor.capture());
+      assertEquals(captor.getValue().getDatanodeId(), node1.getUuid());
+      assertEquals(captor.getValue().getCommand().getType(),
+          finalizeNewLayoutVersionCommand);
+    } else {
+      // SCM has not finished finalizing its mlv, so datanodes with older
+      // mlvs should not be instructed to finalize yet.
+      verify(eventPublisher, times(0))
+          .fireEvent(Mockito.eq(DATANODE_COMMAND), captor.capture());
+    }
   }
 
   @Test

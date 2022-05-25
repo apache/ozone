@@ -6,13 +6,16 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizer.SCMUpgradeFinalizationContext;
+import org.rocksdb.Checkpoint;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -22,12 +25,13 @@ public class FinalizationManagerImpl implements FinalizationManager {
   private final SCMUpgradeFinalizer upgradeFinalizer;
   private final SCMUpgradeFinalizer.SCMUpgradeFinalizationContext context;
   private final SCMStorageConfig storage;
+  private final FinalizationStateManager finalizationStateManager;
 
   private FinalizationManagerImpl(Builder builder) throws IOException {
     this.storage = builder.storage;
     this.upgradeFinalizer = new SCMUpgradeFinalizer(builder.versionManager,
         builder.executor);
-    FinalizationStateManager finalizationStateManager =
+    finalizationStateManager =
         new FinalizationStateManagerImpl.Builder()
             .setVersionManager(builder.versionManager)
             .setFinalizationStore(builder.finalizationStore)
@@ -72,6 +76,11 @@ public class FinalizationManagerImpl implements FinalizationManager {
   @Override
   public void runPrefinalizeStateActions() throws IOException  {
     upgradeFinalizer.runPrefinalizeStateActions(storage, context);
+  }
+
+  @Override
+  public boolean passedCheckpoint(FinalizationStateManager.FinalizationCheckpoint checkpoint) {
+    return finalizationStateManager.passedCheckpoint(checkpoint);
   }
 
   public static final class Builder {

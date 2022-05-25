@@ -50,6 +50,9 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ipc.Server;
@@ -86,6 +89,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
@@ -126,8 +130,28 @@ public class SCMNodeManager implements NodeManager {
   private final int numPipelinesPerMetadataVolume;
   private final int heavyNodeCriteria;
   private final HDDSLayoutVersionManager scmLayoutVersionManager;
+  private final Predicate<FinalizationCheckpoint> finalizationCheckpointIsPassed;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
+
+  /**
+   * Constructs an SCMNodeManager that does not check SCM's finalization
+   * checkpoint when handling datanode information. This is suitable for node
+   * manager unit tests not related to finalization.
+   */
+  // TODO: Refactor all tests constructing an SCMNodeManager to explicitly
+  //  pass a finalization checkpoint predicate based on their requirements,
+  //  then remove this constructor.
+  @VisibleForTesting
+  public SCMNodeManager(OzoneConfiguration conf,
+                        SCMStorageConfig scmStorageConfig,
+                        EventPublisher eventPublisher,
+                        NetworkTopology networkTopology,
+                        SCMContext scmContext,
+                        HDDSLayoutVersionManager layoutVersionManager) {
+    this(conf, scmStorageConfig, eventPublisher, networkTopology, scmContext,
+        layoutVersionManager, c -> true);
+  }
 
   /**
    * Constructs SCM machine Manager.
@@ -137,14 +161,16 @@ public class SCMNodeManager implements NodeManager {
                         EventPublisher eventPublisher,
                         NetworkTopology networkTopology,
                         SCMContext scmContext,
-                        HDDSLayoutVersionManager layoutVersionManager) {
+                        HDDSLayoutVersionManager layoutVersionManager,
+                        Predicate<FinalizationCheckpoint> finalizationCheckpointIsPassed) {
     this.scmNodeEventPublisher = eventPublisher;
     this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
-        layoutVersionManager);
+        layoutVersionManager, finalizationCheckpointIsPassed);
     this.version = VersionInfo.getLatestVersion();
     this.commandQueue = new CommandQueue();
     this.scmStorageConfig = scmStorageConfig;
     this.scmLayoutVersionManager = layoutVersionManager;
+    this.finalizationCheckpointIsPassed = finalizationCheckpointIsPassed;
     LOG.info("Entering startup safe mode.");
     registerMXBean();
     this.metrics = SCMNodeMetrics.create(this);
@@ -583,12 +609,13 @@ public class SCMNodeManager implements NodeManager {
           layoutVersionReport.toString().replaceAll("\n", "\\\\n"));
     }
 
+    // Software layout version is hardcoded to the SCM.
     int scmSlv = scmLayoutVersionManager.getSoftwareLayoutVersion();
-    int scmMlv = scmLayoutVersionManager.getMetadataLayoutVersion();
     int dnSlv = layoutVersionReport.getSoftwareLayoutVersion();
     int dnMlv = layoutVersionReport.getMetadataLayoutVersion();
 
-    // If the data node slv is > scm slv => log error condition
+    // A datanode with a larger software layout version is from a future
+    // version of ozone. It should not have been added to the cluster.
     if (dnSlv > scmSlv) {
       LOG.error("Invalid data node in the cluster : {}. " +
               "DataNode SoftwareLayoutVersion = {}, SCM " +
@@ -596,29 +623,36 @@ public class SCMNodeManager implements NodeManager {
           datanodeDetails.getHostName(), dnSlv, scmSlv);
     }
 
-    // If the datanode slv < scm slv, it can not be allowed to be part of
-    // any pipeline. However it can be allowed to join the cluster
-    if (dnMlv < scmMlv) {
-      LOG.warn("Data node {} can not be used in any pipeline in the " +
-              "cluster. " + "DataNode MetadataLayoutVersion = {}, SCM " +
-              "MetadataLayoutVersion = {}",
-          datanodeDetails.getHostName(), dnMlv, scmMlv);
+    if (finalizationCheckpointIsPassed.test(FinalizationCheckpoint.MLV_EQUALS_SLV)) {
+      // Because we have crossed the MLV_EQUALS_SLV checkpoint, SCM metadata
+      // layout version will not change. We can now compare it to the
+      // datanodes' metadata layout versions to tell them to finalize.
+      int scmMlv = scmLayoutVersionManager.getMetadataLayoutVersion();
 
-      FinalizeNewLayoutVersionCommand finalizeCmd =
-          new FinalizeNewLayoutVersionCommand(true,
-          LayoutVersionProto.newBuilder()
-              .setSoftwareLayoutVersion(dnSlv)
-              .setMetadataLayoutVersion(dnSlv).build());
-      try {
-        finalizeCmd.setTerm(scmContext.getTermOfLeader());
+      // If the datanode slv < scm slv, it can not be allowed to be part of
+      // any pipeline. However it can be allowed to join the cluster
+      if (dnMlv < scmMlv) {
+        LOG.warn("Data node {} can not be used in any pipeline in the " +
+                "cluster. " + "DataNode MetadataLayoutVersion = {}, SCM " +
+                "MetadataLayoutVersion = {}",
+            datanodeDetails.getHostName(), dnMlv, scmMlv);
 
-        // Send Finalize command to the data node. Its OK to
-        // send Finalize command multiple times.
-        scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-            new CommandForDatanode<>(datanodeDetails.getUuid(), finalizeCmd));
-      } catch (NotLeaderException ex) {
-        LOG.warn("Skip sending finalize upgrade command since current SCM is" +
-            "not leader.", ex);
+        FinalizeNewLayoutVersionCommand finalizeCmd =
+            new FinalizeNewLayoutVersionCommand(true,
+                LayoutVersionProto.newBuilder()
+                    .setSoftwareLayoutVersion(dnSlv)
+                    .setMetadataLayoutVersion(dnSlv).build());
+        try {
+          finalizeCmd.setTerm(scmContext.getTermOfLeader());
+
+          // Send Finalize command to the data node. Its OK to
+          // send Finalize command multiple times.
+          scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
+              new CommandForDatanode<>(datanodeDetails.getUuid(), finalizeCmd));
+        } catch (NotLeaderException ex) {
+          LOG.warn("Skip sending finalize upgrade command since current SCM is" +
+              "not leader.", ex);
+        }
       }
     }
   }

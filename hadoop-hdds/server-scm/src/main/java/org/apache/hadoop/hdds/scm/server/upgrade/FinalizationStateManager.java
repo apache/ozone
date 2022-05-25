@@ -57,9 +57,9 @@ public interface FinalizationStateManager {
   @Replicate
   void finalizeLayoutFeature(Integer layoutVersion) throws IOException;
 
-  FinalizationCheckpoint getFinalizationCheckpoint();
-
   void addReplicatedFinalizationStep(ReplicatedFinalizationStep step);
+
+  boolean passedCheckpoint(FinalizationCheckpoint checkpoint);
 
   @FunctionalInterface
   interface ReplicatedFinalizationStep {

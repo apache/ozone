@@ -62,10 +62,10 @@ public class SCMUpgradeFinalizer extends
 
     FinalizationStateManager stateManager =
         context.getFinalizationStateManager();
-    if (stateManager.getFinalizationCheckpoint() == FinalizationCheckpoint.FINALIZATION_REQUIRED) {
+    if (!stateManager.passedCheckpoint(FinalizationCheckpoint.FINALIZATION_STARTED)) {
       context.getFinalizationStateManager().addFinalizingMark();
     }
-    if (stateManager.getFinalizationCheckpoint() == FinalizationCheckpoint.FINALIZATION_STARTED) {
+    if (!stateManager.passedCheckpoint(FinalizationCheckpoint.MLV_EQUALS_SLV)) {
       closePipelinesBeforeFinalization(context.getPipelineManager());
     }
   }
@@ -100,10 +100,10 @@ public class SCMUpgradeFinalizer extends
       throws IOException {
     FinalizationStateManager stateManager =
         context.getFinalizationStateManager();
-    if (stateManager.getFinalizationCheckpoint() == FinalizationCheckpoint.MLV_EQUALS_SLV) {
-        createPipelinesAfterFinalization(context.getPipelineManager());
+    if (!stateManager.passedCheckpoint(FinalizationCheckpoint.FINALIZATION_COMPLETE)) {
+      createPipelinesAfterFinalization(context.getPipelineManager());
+      stateManager.removeFinalizingMark();
     }
-    stateManager.removeFinalizingMark();
   }
 
   @Override

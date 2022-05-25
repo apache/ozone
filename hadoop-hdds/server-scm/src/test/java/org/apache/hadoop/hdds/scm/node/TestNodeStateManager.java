@@ -23,6 +23,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -44,6 +46,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -60,6 +63,10 @@ public class TestNodeStateManager {
   private NodeStateManager nsm;
   private ConfigurationSource conf;
   private MockEventPublisher eventPublisher;
+  private FinalizationCheckpoint currentCheckpoint;
+  private Predicate<FinalizationCheckpoint> passedCheckpoint;
+  private int scmSlv;
+  private int scmMlv;
 
   @BeforeEach
   public void setUp() {
@@ -79,14 +86,21 @@ public class TestNodeStateManager {
         return new char[0];
       }
     };
+    // Make NodeStateManager behave as if SCM has completed finalization,
+    // unless a test changes the value of this variable.
+    currentCheckpoint = FinalizationCheckpoint.FINALIZATION_COMPLETE;
+    passedCheckpoint = c -> currentCheckpoint.compareTo(c) >= 0;
     eventPublisher = new MockEventPublisher();
+    scmSlv = maxLayoutVersion();
+    scmMlv = maxLayoutVersion();
     LayoutVersionManager mockVersionManager =
         Mockito.mock(HDDSLayoutVersionManager.class);
     Mockito.when(mockVersionManager.getMetadataLayoutVersion())
-        .thenReturn(maxLayoutVersion());
+        .thenReturn(scmMlv);
     Mockito.when(mockVersionManager.getSoftwareLayoutVersion())
-        .thenReturn(maxLayoutVersion());
-    nsm = new NodeStateManager(conf, eventPublisher, mockVersionManager);
+        .thenReturn(scmSlv);
+    nsm = new NodeStateManager(conf, eventPublisher, mockVersionManager,
+        passedCheckpoint);
   }
 
   @Test
@@ -196,7 +210,7 @@ public class TestNodeStateManager {
     assertEquals(NodeState.DEAD, nsm.getNodeStatus(dn).getHealth());
     assertEquals(SCMEvents.DEAD_NODE, eventPublisher.getLastEvent());
 
-    // Transition back to healthy from dead
+    // Transition to healthy readonly from dead
     dni.updateLastHeartbeatTime();
     nsm.checkNodesHealth();
     assertEquals(NodeState.HEALTHY_READONLY, nsm.getNodeStatus(dn).getHealth());
@@ -213,6 +227,34 @@ public class TestNodeStateManager {
     assertEquals(NodeState.HEALTHY_READONLY, nsm.getNodeStatus(dn).getHealth());
     assertEquals(SCMEvents.HEALTHY_READONLY_NODE,
         eventPublisher.getLastEvent());
+
+    // Another health check run should move the node to healthy since its
+    // metadata layout version matches SCM's.
+    nsm.checkNodesHealth();
+    assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
+    assertEquals(SCMEvents.HEALTHY_READONLY_TO_HEALTHY_NODE,
+        eventPublisher.getLastEvent());
+    eventPublisher.clearEvents();
+
+    // Test how node state manager handles datanodes with lower metadata
+    // layout version based on SCM's finalization checkpoint.
+    dni.updateLastKnownLayoutVersion(UpgradeUtils.toLayoutVersionProto(scmMlv - 1, scmSlv));
+    for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
+      currentCheckpoint = checkpoint;
+      nsm.checkNodesHealth();
+
+      // Datanodes should not be moved to healthy readonly until the SCM has
+      // finished updating its metadata layout version as part of finalization.
+      if (passedCheckpoint.test(FinalizationCheckpoint.MLV_EQUALS_SLV)) {
+        assertEquals(NodeState.HEALTHY_READONLY,
+            nsm.getNodeStatus(dn).getHealth());
+        assertEquals(SCMEvents.HEALTHY_READONLY_NODE,
+            eventPublisher.getLastEvent());
+      } else {
+        assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
+        assertNull(eventPublisher.getLastEvent());
+      }
+    }
   }
 
   @Test

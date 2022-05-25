@@ -20,6 +20,7 @@ import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 
 import java.io.IOException;
@@ -40,4 +41,6 @@ public interface FinalizationManager {
   BasicUpgradeFinalizer<SCMUpgradeFinalizer.SCMUpgradeFinalizationContext, HDDSLayoutVersionManager> getUpgradeFinalizer();
 
   void runPrefinalizeStateActions() throws IOException;
+
+  boolean passedCheckpoint(FinalizationStateManager.FinalizationCheckpoint checkpoint);
 }

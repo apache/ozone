@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -42,14 +43,11 @@ public class HealthyReadOnlyNodeHandler
       LoggerFactory.getLogger(HealthyReadOnlyNodeHandler.class);
   private final PipelineManager pipelineManager;
   private final NodeManager nodeManager;
-  private final ConfigurationSource conf;
 
   public HealthyReadOnlyNodeHandler(
-      NodeManager nodeManager, PipelineManager pipelineManager,
-      OzoneConfiguration conf) {
+      NodeManager nodeManager, PipelineManager pipelineManager) {
     this.pipelineManager = pipelineManager;
     this.nodeManager = nodeManager;
-    this.conf = conf;
   }
 
   @Override
@@ -57,12 +55,24 @@ public class HealthyReadOnlyNodeHandler
       EventPublisher publisher) {
     LOG.info("Datanode {} moved to HEALTHY READONLY state.", datanodeDetails);
 
+    // Order of finalization operations should be:
+    // 1. SCM closes all pipelines.
+    // 2. SCM finalizes.
+    // 3. SCM moves all datanodes healthy readonly state.
+    //    - Before this, no datanode should have been moved to healthy
+    //    readonly, even if it heartbeated while SCM was finalizing.
+    // So a datanode should not enter the healthy readonly state and be
+    // involved in a pipeline. To be defensive in this case, close the
+    // pipeline and log a warning.
     Set<PipelineID> pipelineIDs = nodeManager.getPipelines(datanodeDetails);
     for (PipelineID id: pipelineIDs) {
-      LOG.info("Closing pipeline {} which uses HEALTHY READONLY datanode {} ",
-              id,  datanodeDetails);
       try {
-        pipelineManager.closePipeline(pipelineManager.getPipeline(id), false);
+        Pipeline pipeline = pipelineManager.getPipeline(id);
+        if (pipeline.getPipelineState() != Pipeline.PipelineState.CLOSED) {
+          LOG.warn("Closing pipeline {} which uses HEALTHY READONLY datanode " +
+                  "{}.", id,  datanodeDetails.getUuidString());
+          pipelineManager.closePipeline(pipeline,true);
+        }
       } catch (IOException ex) {
         LOG.error("Failed to close pipeline {} which uses HEALTHY READONLY " +
             "datanode {}: ", id, datanodeDetails, ex);

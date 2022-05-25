@@ -427,7 +427,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     HealthyReadOnlyNodeHandler
         healthyReadOnlyNodeHandler =
         new HealthyReadOnlyNodeHandler(scmNodeManager,
-            pipelineManager, configuration);
+            pipelineManager);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
 
     ContainerReportHandler containerReportHandler =
@@ -598,7 +598,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmNodeManager = configurator.getScmNodeManager();
     } else {
       scmNodeManager = new SCMNodeManager(conf, scmStorageConfig, eventQueue,
-          clusterMap, scmContext, scmLayoutVersionManager);
+          clusterMap, scmContext, scmLayoutVersionManager,
+          c -> finalizationManager.passedCheckpoint(c));
     }
 
     placementMetrics = SCMContainerPlacementMetrics.create();

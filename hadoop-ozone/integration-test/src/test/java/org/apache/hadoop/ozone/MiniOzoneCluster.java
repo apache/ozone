@@ -346,6 +346,8 @@ public interface MiniOzoneCluster {
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
       setClusterId(UUID.randomUUID().toString());
+      // Use default SCM configurations if no override is provided.
+      setSCMConfigurator(new SCMConfigurator());
       ExitUtils.disableSystemExit();
     }
 
