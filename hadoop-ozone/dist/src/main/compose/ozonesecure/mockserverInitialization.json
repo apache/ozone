@@ -25,7 +25,15 @@
   },
   {
     "httpRequest": {
-      "path": "/service/roles/roles/name/*"
+      "path": "/service/roles/roles/name/tenantone-UserRole"
+    },
+    "httpResponse": {
+      "body": "{id: 222, users: []}"
+    }
+  },
+  {
+    "httpRequest": {
+      "path": "/service/roles/roles/name/tenantone-AdminRole"
     },
     "httpResponse": {
       "body": "{id: 222, users: []}"

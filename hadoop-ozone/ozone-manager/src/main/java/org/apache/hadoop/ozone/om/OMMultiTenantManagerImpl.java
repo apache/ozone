@@ -306,12 +306,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
         // Does NOT update tenant cache here
       } catch (IOException e) {
-        try {
-          deleteTenant(tenant);
-        } catch (IOException ignored) {
-          // Should be cleaned up by the background sync later anyway
-        }
-        throw e;
+        // Expect the sync thread to restore the admin role later if op succeeds
+        throw new OMException(e.getMessage(), TENANT_AUTHORIZER_ERROR);
       }
     }
 
@@ -322,12 +318,17 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
       LOG.info("Deleting tenant policies and roles from Ranger: {}", tenant);
 
-      for (AccessPolicy policy : tenant.getTenantAccessPolicies()) {
-        authorizer.deletePolicyByName(policy.getPolicyName());
-      }
+      try {
+        for (AccessPolicy policy : tenant.getTenantAccessPolicies()) {
+          authorizer.deletePolicyByName(policy.getPolicyName());
+        }
 
-      for (String roleName : tenant.getTenantRoles()) {
-        authorizer.deleteRoleByName(roleName);
+        for (String roleName : tenant.getTenantRoles()) {
+          authorizer.deleteRoleByName(roleName);
+        }
+      } catch (IOException e) {
+        // Expect the sync thread to restore the admin role later if op succeeds
+        throw new OMException(e.getMessage(), TENANT_AUTHORIZER_ERROR);
       }
     }
 
@@ -377,8 +378,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         }
 
       } catch (IOException e) {
-        // Error handling
-        revokeUserAccessId(accessId, tenantId);
+        // Expect the sync thread to restore the user role later if op succeeds
         throw new OMException(e.getMessage(), TENANT_AUTHORIZER_ERROR);
       } finally {
         tenantCacheLock.readLock().unlock();
@@ -414,6 +414,9 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         Preconditions.checkNotNull(roleId);
 
         // Does NOT update tenant cache here
+      } catch (IOException e) {
+        // Expect the sync thread to restore the user role later if op succeeds
+        throw new OMException(e.getMessage(), TENANT_AUTHORIZER_ERROR);
       } finally {
         tenantCacheLock.readLock().unlock();
       }
@@ -446,8 +449,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
         // Does NOT update tenant cache here
       } catch (IOException e) {
-        revokeTenantAdmin(accessId);
-        throw e;
+        // Expect the sync thread to restore the admin role later if op succeeds
+        throw new OMException(e.getMessage(), TENANT_AUTHORIZER_ERROR);
       } finally {
         tenantCacheLock.readLock().unlock();
       }
@@ -478,6 +481,9 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         assert (roleId != null);
 
         // Does NOT update tenant cache here
+      } catch (IOException e) {
+        // Expect the sync thread to restore the admin role later if op succeeds
+        throw new OMException(e.getMessage(), TENANT_AUTHORIZER_ERROR);
       } finally {
         tenantCacheLock.readLock().unlock();
       }

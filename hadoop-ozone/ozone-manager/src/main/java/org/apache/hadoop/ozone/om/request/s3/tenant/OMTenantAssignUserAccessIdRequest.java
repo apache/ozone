@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -130,21 +131,21 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     if (accessId.length() >= OZONE_MAXIMUM_ACCESS_ID_LENGTH) {
       throw new OMException(
           "accessId length exceeds the maximum length allowed",
-          OMException.ResultCodes.INVALID_ACCESS_ID);
+          ResultCodes.INVALID_ACCESS_ID);
     }
 
     // Check userPrincipal (username) validity.
     if (userPrincipal.contains(OzoneConsts.TENANT_ID_USERNAME_DELIMITER)) {
       throw new OMException("Invalid tenant username '" + userPrincipal +
           "'. Tenant username shouldn't contain delimiter.",
-          OMException.ResultCodes.INVALID_TENANT_USERNAME);
+          ResultCodes.INVALID_TENANT_USERNAME);
     }
 
     // Check tenant name validity.
     if (tenantId.contains(OzoneConsts.TENANT_ID_USERNAME_DELIMITER)) {
       throw new OMException("Invalid tenant name '" + tenantId +
           "'. Tenant name shouldn't contain delimiter.",
-          OMException.ResultCodes.INVALID_TENANT_ID);
+          ResultCodes.INVALID_TENANT_ID);
     }
 
     // HDDS-6366: Disallow specifying custom accessId.
@@ -154,7 +155,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       throw new OMException("Invalid accessId '" + accessId + "'. "
           + "Specifying a custom access ID disallowed. "
           + "Expected accessId to be assigned is '" + expectedAccessId + "'",
-          OMException.ResultCodes.INVALID_ACCESS_ID);
+          ResultCodes.INVALID_ACCESS_ID);
     }
 
     multiTenantManager.checkTenantExistence(tenantId);
@@ -240,14 +241,14 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       if (!omMetadataManager.getTenantStateTable().isExist(tenantId)) {
         LOG.error("tenant {} doesn't exist", tenantId);
         throw new OMException("tenant '" + tenantId + "' doesn't exist",
-            OMException.ResultCodes.TENANT_NOT_FOUND);
+            ResultCodes.TENANT_NOT_FOUND);
       }
 
       // Expect accessId absence from tenantAccessIdTable
       if (omMetadataManager.getTenantAccessIdTable().isExist(accessId)) {
         LOG.error("accessId {} already exists", accessId);
         throw new OMException("accessId '" + accessId + "' already exists!",
-            OMException.ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
+            ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
       }
 
       OmDBUserPrincipalInfo principalInfo = omMetadataManager
@@ -269,7 +270,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
                 + "to the same tenant more than once. User '" + userPrincipal
                 + "' is already assigned to tenant '" + tenantId + "' with "
                 + "accessId '" + existingAccId + "'.",
-                OMException.ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
+                ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
           }
         }
       }
@@ -310,7 +311,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
         LOG.error("accessId '{}' already exists in S3SecretTable", accessId);
         throw new OMException("accessId '" + accessId +
             "' already exists in S3SecretTable",
-            OMException.ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
+            ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
       }
 
       omMetadataManager.getS3SecretTable().addCacheEntry(
