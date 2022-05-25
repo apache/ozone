@@ -1641,8 +1641,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         new ArrayList<>(trashResponse.getDeletedKeysCount());
 
     List<RepeatedOmKeyInfo> list = new ArrayList<>();
-    for (OzoneManagerProtocolProtos.RepeatedKeyInfo repeatedKeyInfo : trashResponse
-        .getDeletedKeysList()) {
+    for (OzoneManagerProtocolProtos.RepeatedKeyInfo
+        repeatedKeyInfo : trashResponse.getDeletedKeysList()) {
       RepeatedOmKeyInfo fromProto =
           RepeatedOmKeyInfo.getFromProto(repeatedKeyInfo);
       list.add(fromProto);
