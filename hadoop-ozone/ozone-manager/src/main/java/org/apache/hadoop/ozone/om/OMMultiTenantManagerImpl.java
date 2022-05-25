@@ -44,13 +44,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.StringUtils;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -287,7 +287,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       // Does NOT update tenant cache here
     } catch (IOException e) {
       try {
-        removeTenantFromAuthorizer(tenant);
+        removeTenantInAuthorizer(tenant);
       } catch (IOException ignored) {
         // Should be cleaned up by the background sync later anyway
       }
@@ -298,19 +298,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public void deactivateTenant(Tenant tenant) throws IOException {
-    for (AccessPolicy policy : tenant.getTenantAccessPolicies()) {
-      authorizer.disableAccessPolicy(policy);
-    }
-  }
-
-  @Override
-  public void activateTenant(Tenant tenant) throws IOException {
-    throw new NotImplementedException("activateTenant is not implemented yet");
-  }
-
-  @Override
-  public void removeTenantFromAuthorizer(Tenant tenant) throws IOException {
+  public void removeTenantInAuthorizer(Tenant tenant) throws IOException {
 
     LOG.info("Removing tenant policies and roles from Ranger: {}", tenant);
 
@@ -324,7 +312,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public void removeTenantFromDBCache(String tenantId) throws IOException {
+  public void removeTenantInCache(String tenantId) throws IOException {
 
     try {
       tenantCacheLock.writeLock().lock();
@@ -1036,6 +1024,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     return tenantCache.get(tenantId).isTenantEmpty();
   }
 
+  @VisibleForTesting
   public Map<String, CachedTenantState> getTenantCache() {
     return tenantCache;
   }

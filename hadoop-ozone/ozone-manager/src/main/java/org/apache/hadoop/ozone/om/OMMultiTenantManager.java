@@ -102,16 +102,6 @@ public interface OMMultiTenantManager {
       String adminRoleName) throws IOException;
 
   /**
-   * Given a Tenant object, disable (but not delete) the policies added during
-   * tenant creation.
-   * @param tenant
-   * @throws IOException
-   */
-  void deactivateTenant(Tenant tenant) throws IOException;
-
-  void activateTenant(Tenant tenant) throws IOException;
-
-  /**
    * Given a Tenant object, remove all policies and roles from Ranger that are
    * added during tenant creation.
    * Note this differs from deactivateTenant() above.
@@ -119,9 +109,9 @@ public interface OMMultiTenantManager {
    * @return
    * @throws IOException
    */
-  void removeTenantFromAuthorizer(Tenant tenant) throws IOException;
+  void removeTenantInAuthorizer(Tenant tenant) throws IOException;
 
-  void removeTenantFromDBCache(String tenantId) throws IOException;
+  void removeTenantInCache(String tenantId) throws IOException;
 
   void assignUserToTenantInCache(BasicUserPrincipal principal, String tenantId,
       String accessId) throws IOException;

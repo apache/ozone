@@ -156,7 +156,8 @@ public class AuthorizerLockImpl implements AuthorizerLock {
       // Won't throw OMException here as this method is supposed to be called
       // in the finally block in OMRequest, and validateAndUpdateCache isn't
       // supposed to throw.
-      // Also, OM probably should just crash if this sanity check fails.
+      // Also, OM probably should just crash if this check fails. e.g. too many
+      // bit flips caused by cosmic rays that even ECC memory didn't help.
       throw new RuntimeException("Invalid operation. "
           + "Current OMMultiTenantManager instance does not hold the "
           + "expected write lock stamp. " + "Stamp provided: " + stamp
