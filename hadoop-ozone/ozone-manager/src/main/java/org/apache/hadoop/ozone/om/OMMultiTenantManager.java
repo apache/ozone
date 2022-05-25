@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
-import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
@@ -87,55 +86,9 @@ public interface OMMultiTenantManager {
    */
   OMMetadataManager getOmMetadataManager();
 
-  void createTenantInCache(String tenantId, String userRoleName,
-      String adminRoleName) throws IOException;
+  TenantOp getAuthorizerOp();
 
-  /**
-   * Given a tenant name, create tenant roles and policies in the authorizer
-   * (Ranger). Then return a Tenant object.
-   * @param tenantID
-   * @param userRoleName
-   * @param adminRoleName
-   * @return Tenant interface.
-   */
-  Tenant createTenantInAuthorizer(String tenantID, String userRoleName,
-      String adminRoleName) throws IOException;
-
-  /**
-   * Given a Tenant object, remove all policies and roles from Ranger that are
-   * added during tenant creation.
-   * Note this differs from deactivateTenant() above.
-   * @param tenant
-   * @return
-   * @throws IOException
-   */
-  void removeTenantInAuthorizer(Tenant tenant) throws IOException;
-
-  void removeTenantInCache(String tenantId) throws IOException;
-
-  void assignUserToTenantInCache(BasicUserPrincipal principal, String tenantId,
-      String accessId) throws IOException;
-
-  /**
-   * Creates a new user that exists for S3 API access to Ozone.
-   * @param principal
-   * @param tenantId
-   * @param accessId
-   * @return Unique UserID.
-   * @throws IOException if there is any error condition detected.
-   */
-  String assignUserToTenantInAuthorizer(BasicUserPrincipal principal,
-      String tenantId, String accessId) throws IOException;
-
-  /**
-   * Revoke user accessId.
-   * @param accessId
-   * @throws IOException
-   */
-  void revokeUserAccessIdInAuthorizer(String accessId) throws IOException;
-
-  void revokeUserAccessIdInCache(String accessId, String tenantId)
-      throws IOException;
+  TenantOp getCacheOp();
 
   /**
    * Given an accessId, return kerberos user name for the tenant user.
@@ -213,25 +166,6 @@ public interface OMMultiTenantManager {
   static String getDefaultBucketPolicyName(String tenantId) {
     return tenantId + OzoneConsts.DEFAULT_TENANT_BUCKET_POLICY_SUFFIX;
   }
-
-  void assignTenantAdminInCache(String accessId, boolean delegated)
-      throws IOException;
-
-  /**
-   * Given a user, make him an admin of the corresponding Tenant.
-   * This makes a request to Ranger.
-   * @param accessId
-   * @param delegated
-   */
-  void assignTenantAdminInAuthorizer(String accessId, boolean delegated)
-      throws IOException;
-
-  void revokeTenantAdminInCache(String accessId) throws IOException;
-
-  /**
-   * Given a user, remove him as admin of the corresponding Tenant.
-   */
-  void revokeTenantAdminInAuthorizer(String accessID) throws IOException;
 
   /**
    * Passes check only when caller is an Ozone (cluster) admin, throws

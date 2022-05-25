@@ -99,7 +99,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   public static final String OZONE_OM_TENANT_DEV_SKIP_RANGER =
       "ozone.om.tenant.dev.skip.ranger";
 
-  private MultiTenantAccessAuthorizer authorizer;
   private final OzoneManager ozoneManager;
   private final OMMetadataManager omMetadataManager;
   private final OzoneConfiguration conf;
@@ -107,7 +106,10 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   private final Map<String, CachedTenantState> tenantCache;
   private final ReentrantReadWriteLock tenantCacheLock;
   private final OMRangerBGSyncService omRangerBGSyncService;
+  private MultiTenantAccessAuthorizer authorizer;
   private final AuthorizerLock authorizerLock;
+  private final TenantOp authorizerOp;
+  private final TenantOp cacheOp;
 
   public OMMultiTenantManagerImpl(OzoneManager ozoneManager,
                                   OzoneConfiguration conf)
@@ -139,6 +141,9 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         throw ex;
       }
     }
+
+    cacheOp = new CacheOp(tenantCache, tenantCacheLock);
+    authorizerOp = new AuthorizerOp(authorizer, tenantCache, tenantCacheLock);
 
     // Define the internal time unit for the config
     final TimeUnit internalTimeUnit = TimeUnit.SECONDS;
@@ -188,290 +193,435 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public void createTenantInCache(String tenantId,
-      String userRoleName, String adminRoleName) {
-
-    tenantCacheLock.writeLock().lock();
-
-    try {
-      if (tenantCache.containsKey(tenantId)) {
-        LOG.warn("Cache entry for tenant '{}' already exists, "
-            + "will be overwritten", tenantId);
-      }
-
-      // New entry in tenant cache
-      tenantCache.put(tenantId, new CachedTenantState(
-          tenantId, userRoleName, adminRoleName));
-    } finally {
-      tenantCacheLock.writeLock().unlock();
-    }
+  public TenantOp getAuthorizerOp() {
+    return authorizerOp;
   }
 
-  /**
-   *  Algorithm
-   *  OM State :
-   *    - Validation (Part of Ratis Request)
-   *    - create volume {Part of RATIS request}
-   *    - Persistence to OM DB {Part of RATIS request}
-   *  Authorizer-plugin(Ranger) State :
-   *    - For every tenant create two user groups
-   *        # GroupTenantAllUsers
-   *        # GroupTenantAllAdmins
-   *
-   *    - For every tenant create two default policies
-   *    - Note: plugin states are made idempotent. Onus of returning EEXIST is
-   *      part of validation in Ratis-Request. if the groups/policies exist
-   *      with the same name (Due to an earlier failed/success request), in
-   *      plugin, we just update in-memory-map here and return success.
-   *    - The job of cleanup of any half-done authorizer-plugin state is done
-   *      by a background thread.
-   *  Finally :
-   *    - Update all Maps maintained by Multi-Tenant-Manager
-   *  In case of failure :
-   *    - Undo all Ranger State
-   *    - remove updates to the Map
-   *  Locking :
-   *    - Create/Manage Tenant/User operations are control path operations.
-   *      We can do all of this as part of holding a coarse lock and synchronize
-   *      these control path operations.
-   *
-   * @param tenantId tenant name
-   * @param userRoleName user role name
-   * @param adminRoleName admin role name
-   * @return Tenant
-   * @throws IOException
-   */
   @Override
-  public Tenant createTenantInAuthorizer(String tenantId,
-      String userRoleName, String adminRoleName)
-      throws IOException {
+  public TenantOp getCacheOp() {
+    return cacheOp;
+  }
 
-    checkAcquiredAuthorizerWriteLock();
+  class AuthorizerOp implements TenantOp {
 
-    Tenant tenant = new OzoneTenant(tenantId);
+    private final MultiTenantAccessAuthorizer authorizer;
+    private final Map<String, CachedTenantState> tenantCache;
+    private final ReentrantReadWriteLock tenantCacheLock;
 
-    try {
-      // Create admin role first
-      String adminRoleId = authorizer.createRole(adminRoleName, null);
-      tenant.addTenantAccessRole(adminRoleId);
+    AuthorizerOp(MultiTenantAccessAuthorizer authorizer,
+        Map<String, CachedTenantState> tenantCache,
+        ReentrantReadWriteLock tenantCacheLock) {
+      this.authorizer = authorizer;
+      this.tenantCache = tenantCache;
+      this.tenantCacheLock = tenantCacheLock;
+    }
 
-      // Then create user role, and add admin role as its delegated admin
-      String userRoleId = authorizer.createRole(userRoleName, adminRoleName);
-      tenant.addTenantAccessRole(userRoleId);
+    /**
+     *  Algorithm
+     *  OM State :
+     *    - Validation (Part of Ratis Request)
+     *    - create volume {Part of RATIS request}
+     *    - Persistence to OM DB {Part of RATIS request}
+     *  Authorizer-plugin(Ranger) State :
+     *    - For every tenant create two user groups
+     *        # GroupTenantAllUsers
+     *        # GroupTenantAllAdmins
+     *
+     *    - For every tenant create two default policies
+     *    - Note: plugin states are made idempotent. Onus of returning EEXIST is
+     *      part of validation in Ratis-Request. if the groups/policies exist
+     *      with the same name (Due to an earlier failed/success request), in
+     *      plugin, we just update in-memory-map here and return success.
+     *    - The job of cleanup of any half-done authorizer-plugin state is done
+     *      by a background thread.
+     *  Finally :
+     *    - Update all Maps maintained by Multi-Tenant-Manager
+     *  In case of failure :
+     *    - Undo all Ranger State
+     *    - remove updates to the Map
+     *  Locking :
+     *    - Create/Manage Tenant/User operations are control path operations.
+     *      We can do all of this as part of holding a coarse lock and
+     *      synchronize these control path operations.
+     *
+     * @param tenantId tenant name
+     * @param userRoleName user role name
+     * @param adminRoleName admin role name
+     * @return Tenant
+     * @throws IOException
+     */
+    @Override
+    public void createTenant(
+        String tenantId, String userRoleName, String adminRoleName)
+        throws IOException {
 
-      BucketNameSpace bucketNameSpace = tenant.getTenantBucketNameSpace();
-      // Bucket namespace is volume
-      for (OzoneObj volume : bucketNameSpace.getBucketNameSpaceObjects()) {
-        String volumeName = volume.getVolumeName();
+      checkAcquiredAuthorizerWriteLock();
 
-        final OzoneTenantRolePrincipal userRole =
-            new OzoneTenantRolePrincipal(userRoleName);
-        final OzoneTenantRolePrincipal adminRole =
-            new OzoneTenantRolePrincipal(adminRoleName);
+      Tenant tenant = new OzoneTenant(tenantId);
 
-        // Allow Volume List access
-        AccessPolicy tenantVolumeAccessPolicy = newDefaultVolumeAccessPolicy(
-            volumeName, userRole, adminRole);
-        tenantVolumeAccessPolicy.setPolicyID(
-            authorizer.createAccessPolicy(tenantVolumeAccessPolicy));
-        tenant.addTenantAccessPolicy(tenantVolumeAccessPolicy);
-
-        // Allow Bucket Create within Volume
-        AccessPolicy tenantBucketCreatePolicy =
-            newDefaultBucketAccessPolicy(volumeName, userRole);
-        tenantBucketCreatePolicy.setPolicyID(
-            authorizer.createAccessPolicy(tenantBucketCreatePolicy));
-        tenant.addTenantAccessPolicy(tenantBucketCreatePolicy);
-      }
-
-      // Does NOT update tenant cache here
-    } catch (IOException e) {
       try {
-        removeTenantInAuthorizer(tenant);
-      } catch (IOException ignored) {
-        // Should be cleaned up by the background sync later anyway
+        // Create admin role first
+        String adminRoleId = authorizer.createRole(adminRoleName, null);
+        tenant.addTenantAccessRole(adminRoleId);
+
+        // Then create user role, and add admin role as its delegated admin
+        String userRoleId = authorizer.createRole(userRoleName, adminRoleName);
+        tenant.addTenantAccessRole(userRoleId);
+
+        BucketNameSpace bucketNameSpace = tenant.getTenantBucketNameSpace();
+        // Bucket namespace is volume
+        for (OzoneObj volume : bucketNameSpace.getBucketNameSpaceObjects()) {
+          String volumeName = volume.getVolumeName();
+
+          final OzoneTenantRolePrincipal userRole =
+              new OzoneTenantRolePrincipal(userRoleName);
+          final OzoneTenantRolePrincipal adminRole =
+              new OzoneTenantRolePrincipal(adminRoleName);
+
+          // Allow Volume List access
+          AccessPolicy tenantVolumeAccessPolicy = newDefaultVolumeAccessPolicy(
+              volumeName, userRole, adminRole);
+          tenantVolumeAccessPolicy.setPolicyID(
+              authorizer.createAccessPolicy(tenantVolumeAccessPolicy));
+          tenant.addTenantAccessPolicy(tenantVolumeAccessPolicy);
+
+          // Allow Bucket Create within Volume
+          AccessPolicy tenantBucketCreatePolicy =
+              newDefaultBucketAccessPolicy(volumeName, userRole);
+          tenantBucketCreatePolicy.setPolicyID(
+              authorizer.createAccessPolicy(tenantBucketCreatePolicy));
+          tenant.addTenantAccessPolicy(tenantBucketCreatePolicy);
+        }
+
+        // Does NOT update tenant cache here
+      } catch (IOException e) {
+        try {
+          removeTenant(tenant);
+        } catch (IOException ignored) {
+          // Should be cleaned up by the background sync later anyway
+        }
+        throw e;
       }
-      throw e;
     }
 
-    return tenant;
+    @Override
+    public void removeTenant(Tenant tenant) throws IOException {
+
+      LOG.info("Removing tenant policies and roles from Ranger: {}", tenant);
+
+      for (AccessPolicy policy : tenant.getTenantAccessPolicies()) {
+        authorizer.deletePolicyByName(policy.getPolicyName());
+      }
+
+      for (String roleName : tenant.getTenantRoles()) {
+        authorizer.deleteRoleByName(roleName);
+      }
+    }
+
+    /**
+     *  Algorithm
+     *  Authorizer-plugin(Ranger) State :
+     *    - create User in Ranger DB
+     *    - For every user created
+     *        Add them to # GroupTenantAllUsers
+     *  In case of failure :
+     *    - Undo all Ranger State
+     *    - remove updates to the Map
+     *  Locking :
+     *    - Create/Manage Tenant/User operations are control path operations.
+     *      We can do all of this as part of holding a coarse lock and
+     *      synchronize these control path operations.
+     *
+     * @param principal
+     * @param tenantId
+     * @param accessId
+     * @throws IOException
+     */
+    @Override
+    public void assignUserToTenant(BasicUserPrincipal principal,
+        String tenantId, String accessId) throws IOException {
+
+      checkAcquiredAuthorizerWriteLock();
+
+      tenantCacheLock.readLock().lock();
+
+      try {
+        final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
+        Preconditions.checkNotNull(cachedTenantState,
+            "Cache entry for tenant '" + tenantId + "' does not exist");
+
+        // Does NOT update tenant cache here
+
+        final String tenantUserRoleName =
+            tenantCache.get(tenantId).getTenantUserRoleName();
+        final OzoneTenantRolePrincipal tenantUserRolePrincipal =
+            new OzoneTenantRolePrincipal(tenantUserRoleName);
+        String roleJsonStr = authorizer.getRole(tenantUserRolePrincipal);
+        final String roleId =
+            authorizer.assignUserToRole(principal, roleJsonStr, false);
+
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("roleId that the user is assigned to: {}", roleId);
+        }
+
+      } catch (IOException e) {
+        // Error handling
+        revokeUserAccessId(accessId, tenantId);
+        throw new OMException(e.getMessage(), TENANT_AUTHORIZER_ERROR);
+      } finally {
+        tenantCacheLock.readLock().unlock();
+      }
+    }
+
+    @Override
+    public void revokeUserAccessId(String accessId, String tenantId)
+        throws IOException {
+
+      checkAcquiredAuthorizerWriteLock();
+
+      tenantCacheLock.readLock().lock();
+      try {
+        final OmDBAccessIdInfo omDBAccessIdInfo =
+            omMetadataManager.getTenantAccessIdTable().get(accessId);
+        if (omDBAccessIdInfo == null) {
+          throw new OMException(INVALID_ACCESS_ID);
+        }
+        final String tenantIdGot = omDBAccessIdInfo.getTenantId();
+        Preconditions.checkArgument(tenantIdGot.equals(tenantId));
+
+        final BasicUserPrincipal principal =
+            new BasicUserPrincipal(omDBAccessIdInfo.getUserPrincipal());
+
+        LOG.info("Removing user '{}' access ID '{}' from tenant '{}' in-memory "
+                + "cache",
+            principal.getName(), accessId, tenantId);
+        tenantCache.get(tenantId).getAccessIdInfoMap().remove(accessId);
+
+        // Delete user from role in Ranger
+        final String tenantUserRoleName =
+            tenantCache.get(tenantId).getTenantUserRoleName();
+        final OzoneTenantRolePrincipal tenantUserRolePrincipal =
+            new OzoneTenantRolePrincipal(tenantUserRoleName);
+        String roleJsonStr = authorizer.getRole(tenantUserRolePrincipal);
+        final String roleId =
+            authorizer.revokeUserFromRole(principal, roleJsonStr);
+        Preconditions.checkNotNull(roleId);
+
+        // Does NOT update tenant cache here
+      } finally {
+        tenantCacheLock.readLock().unlock();
+      }
+    }
+
+    @Override
+    public void assignTenantAdmin(String accessId, boolean delegated)
+        throws IOException {
+
+      checkAcquiredAuthorizerWriteLock();
+
+      tenantCacheLock.readLock().lock();
+
+      try {
+        // tenant name is needed to retrieve role name
+        final String tenantId = getTenantForAccessIDThrowIfNotFound(accessId);
+
+        final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
+
+        final String tenantAdminRoleName =
+            cachedTenantState.getTenantAdminRoleName();
+        final OzoneTenantRolePrincipal existingAdminRole =
+            new OzoneTenantRolePrincipal(tenantAdminRoleName);
+
+        final String roleJsonStr = authorizer.getRole(existingAdminRole);
+        final String userPrincipal = getUserNameGivenAccessId(accessId);
+        // Update Ranger. Add user principal (not accessId!) to the role
+        final String roleId = authorizer.assignUserToRole(
+            new BasicUserPrincipal(userPrincipal), roleJsonStr, delegated);
+        assert (roleId != null);
+
+        // Does NOT update tenant cache here
+      } catch (IOException e) {
+        revokeTenantAdmin(accessId);
+        throw e;
+      } finally {
+        tenantCacheLock.readLock().unlock();
+      }
+    }
+
+    @Override
+    public void revokeTenantAdmin(String accessId)
+        throws IOException {
+
+      checkAcquiredAuthorizerWriteLock();
+
+      tenantCacheLock.readLock().lock();
+
+      try {
+        // tenant name is needed to retrieve role name
+        final String tenantId = getTenantForAccessIDThrowIfNotFound(accessId);
+
+        final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
+        final String tenantAdminRoleName =
+            cachedTenantState.getTenantAdminRoleName();
+        final OzoneTenantRolePrincipal existingAdminRole =
+            new OzoneTenantRolePrincipal(tenantAdminRoleName);
+
+        final String roleJsonStr = authorizer.getRole(existingAdminRole);
+        final String userPrincipal = getUserNameGivenAccessId(accessId);
+        // Update Ranger. Add user principal (not accessId!) to the role
+        final String roleId = authorizer.revokeUserFromRole(
+            new BasicUserPrincipal(userPrincipal), roleJsonStr);
+        assert (roleId != null);
+
+        // Does NOT update tenant cache here
+      } finally {
+        tenantCacheLock.readLock().unlock();
+      }
+    }
+
   }
 
-  @Override
-  public void removeTenantInAuthorizer(Tenant tenant) throws IOException {
+  class CacheOp implements TenantOp {
 
-    LOG.info("Removing tenant policies and roles from Ranger: {}", tenant);
+    private final Map<String, CachedTenantState> tenantCache;
+    private final ReentrantReadWriteLock tenantCacheLock;
 
-    for (AccessPolicy policy : tenant.getTenantAccessPolicies()) {
-      authorizer.deletePolicyByName(policy.getPolicyName());
+    CacheOp(Map<String, CachedTenantState> tenantCache,
+        ReentrantReadWriteLock tenantCacheLock) {
+      this.tenantCache = tenantCache;
+      this.tenantCacheLock = tenantCacheLock;
     }
 
-    for (String roleName : tenant.getTenantRoles()) {
-      authorizer.deleteRoleByName(roleName);
-    }
-  }
+    @Override
+    public void createTenant(
+        String tenantId, String userRoleName, String adminRoleName) {
 
-  @Override
-  public void removeTenantInCache(String tenantId) throws IOException {
-
-    try {
       tenantCacheLock.writeLock().lock();
+      try {
+        if (tenantCache.containsKey(tenantId)) {
+          LOG.warn("Cache entry for tenant '{}' already exists, "
+              + "will be overwritten", tenantId);
+        }
 
-      if (tenantCache.containsKey(tenantId)) {
-        LOG.info("Removing tenant from in-memory cache: {}", tenantId);
-        tenantCache.remove(tenantId);
-      } else {
-        throw new OMException("Tenant does not exist in cache: " + tenantId,
-            INTERNAL_ERROR);
+        // New entry in tenant cache
+        tenantCache.put(tenantId, new CachedTenantState(
+            tenantId, userRoleName, adminRoleName));
+      } finally {
+        tenantCacheLock.writeLock().unlock();
       }
-    } finally {
-      tenantCacheLock.writeLock().unlock();
     }
-  }
 
-  @Override
-  public void assignUserToTenantInCache(BasicUserPrincipal principal,
-      String tenantId, String accessId) throws IOException {
+    @Override
+    public void removeTenant(Tenant tenant) throws IOException {
 
-    final CachedAccessIdInfo cacheEntry =
-        new CachedAccessIdInfo(principal.getName(), false);
+      final String tenantId = tenant.getTenantId();
 
-    tenantCacheLock.writeLock().lock();
-
-    try {
-      final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
-      Preconditions.checkNotNull(cachedTenantState,
-          "Cache entry for tenant '" + tenantId + "' does not exist");
-
-      LOG.info("Adding user '{}' access ID '{}' to tenant '{}' in-memory cache",
-          principal.getName(), accessId, tenantId);
-      cachedTenantState.getAccessIdInfoMap().put(accessId, cacheEntry);
-    } catch (Exception e) {
-      // Attempt to clean up tenant cache entry on exception
-      tenantCache.get(tenantId).getAccessIdInfoMap().remove(accessId);
-    } finally {
-      tenantCacheLock.writeLock().unlock();
-    }
-  }
-
-  /**
-   *  Algorithm
-   *  Authorizer-plugin(Ranger) State :
-   *    - create User in Ranger DB
-   *    - For every user created
-   *        Add them to # GroupTenantAllUsers
-   *  In case of failure :
-   *    - Undo all Ranger State
-   *    - remove updates to the Map
-   *  Locking :
-   *    - Create/Manage Tenant/User operations are control path operations.
-   *      We can do all of this as part of holding a coarse lock and synchronize
-   *      these control path operations.
-   *
-   * @param principal
-   * @param tenantId
-   * @param accessId
-   * @return Tenant, or null on error
-   * @throws IOException
-   */
-  @Override
-  public String assignUserToTenantInAuthorizer(BasicUserPrincipal principal,
-      String tenantId, String accessId) throws IOException {
-
-    checkAcquiredAuthorizerWriteLock();
-
-    tenantCacheLock.readLock().lock();
-
-    try {
-      final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
-      Preconditions.checkNotNull(cachedTenantState,
-          "Cache entry for tenant '" + tenantId + "' does not exist");
-
-      // Does NOT update tenant cache here
-
-      final String tenantUserRoleName =
-          tenantCache.get(tenantId).getTenantUserRoleName();
-      final OzoneTenantRolePrincipal tenantUserRolePrincipal =
-          new OzoneTenantRolePrincipal(tenantUserRoleName);
-      String roleJsonStr = authorizer.getRole(tenantUserRolePrincipal);
-      final String roleId =
-          authorizer.assignUserToRole(principal, roleJsonStr, false);
-
-      return roleId;
-    } catch (IOException e) {
-      // Error handling
-      revokeUserAccessIdInAuthorizer(accessId);
-      throw new OMException(e.getMessage(), TENANT_AUTHORIZER_ERROR);
-    } finally {
-      tenantCacheLock.readLock().unlock();
-    }
-  }
-
-  @Override
-  public void revokeUserAccessIdInAuthorizer(String accessId)
-      throws IOException {
-
-    checkAcquiredAuthorizerWriteLock();
-
-    tenantCacheLock.readLock().lock();
-    try {
-      final OmDBAccessIdInfo omDBAccessIdInfo =
-          omMetadataManager.getTenantAccessIdTable().get(accessId);
-      if (omDBAccessIdInfo == null) {
-        throw new OMException(INVALID_ACCESS_ID);
+      tenantCacheLock.writeLock().lock();
+      try {
+        if (tenantCache.containsKey(tenantId)) {
+          LOG.info("Removing tenant from in-memory cache: {}", tenantId);
+          tenantCache.remove(tenantId);
+        } else {
+          throw new OMException("Tenant does not exist in cache: " + tenantId,
+              INTERNAL_ERROR);
+        }
+      } finally {
+        tenantCacheLock.writeLock().unlock();
       }
-      final String tenantId = omDBAccessIdInfo.getTenantId();
-      if (tenantId == null) {
-        LOG.error("Tenant doesn't exist");
-        return;
+    }
+
+    @Override
+    public void assignUserToTenant(BasicUserPrincipal principal,
+        String tenantId, String accessId) {
+
+      final CachedAccessIdInfo cacheEntry =
+          new CachedAccessIdInfo(principal.getName(), false);
+
+      tenantCacheLock.writeLock().lock();
+      try {
+        final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
+        Preconditions.checkNotNull(cachedTenantState,
+            "Cache entry for tenant '" + tenantId + "' does not exist");
+
+        LOG.info("Adding to cache: user '{}' accessId '{}' in tenant '{}'",
+            principal.getName(), accessId, tenantId);
+        cachedTenantState.getAccessIdInfoMap().put(accessId, cacheEntry);
+      } catch (Exception e) {
+        // Attempt to clean up tenant cache entry on exception
+        tenantCache.get(tenantId).getAccessIdInfoMap().remove(accessId);
+      } finally {
+        tenantCacheLock.writeLock().unlock();
       }
-
-      final BasicUserPrincipal principal =
-          new BasicUserPrincipal(omDBAccessIdInfo.getUserPrincipal());
-
-      LOG.info("Removing user '{}' access ID '{}' from tenant '{}' in-memory "
-              + "cache",
-          principal.getName(), accessId, tenantId);
-      tenantCache.get(tenantId).getAccessIdInfoMap().remove(accessId);
-
-      // Delete user from role in Ranger
-      final String tenantUserRoleName =
-          tenantCache.get(tenantId).getTenantUserRoleName();
-      final OzoneTenantRolePrincipal tenantUserRolePrincipal =
-          new OzoneTenantRolePrincipal(tenantUserRoleName);
-      String roleJsonStr = authorizer.getRole(tenantUserRolePrincipal);
-      final String roleId =
-          authorizer.revokeUserFromRole(principal, roleJsonStr);
-      Preconditions.checkNotNull(roleId);
-
-      // Does NOT update tenant cache here
-    } finally {
-      tenantCacheLock.readLock().unlock();
     }
-  }
 
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public void revokeUserAccessIdInCache(String accessId, String tenantId) {
+    @Override
+    public void revokeUserAccessId(String accessId, String tenantId) {
 
-    tenantCacheLock.writeLock().lock();
-    try {
-      tenantCache.get(tenantId).getAccessIdInfoMap().remove(accessId);
-    } catch (NullPointerException e) {
-      // tenantCache is somehow empty. Ignore for now.
-      LOG.warn("NPE when removing accessId from cache", e);
-    } finally {
-      tenantCacheLock.writeLock().unlock();
+      tenantCacheLock.writeLock().lock();
+      try {
+        LOG.info("Removing from cache: accessId '{}' in tenant '{}'",
+            accessId, tenantId);
+        tenantCache.get(tenantId).getAccessIdInfoMap().remove(accessId);
+      } catch (NullPointerException e) {
+        // tenantCache is somehow empty. Ignore for now.
+        LOG.warn("NPE when removing accessId from cache", e);
+      } finally {
+        tenantCacheLock.writeLock().unlock();
+      }
     }
+
+    /**
+     * This should be called in validateAndUpdateCache after
+     * the InAuthorizer variant (called in preExecute).
+     */
+    @Override
+    public void assignTenantAdmin(String accessId, boolean delegated)
+        throws IOException {
+
+      tenantCacheLock.writeLock().lock();
+      try {
+        // tenant name is needed to retrieve role name
+        final String tenantId = getTenantForAccessIDThrowIfNotFound(accessId);
+        final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
+
+        LOG.info("Updating cache: accessId '{}' isAdmin '{}' isDelegated '{}'",
+            accessId, true, delegated);
+        // Update cache. Note: tenant cache does not store delegated flag yet.
+        cachedTenantState.getAccessIdInfoMap().get(accessId).setIsAdmin(true);
+      } finally {
+        tenantCacheLock.writeLock().unlock();
+      }
+    }
+
+    @Override
+    public void revokeTenantAdmin(String accessId) throws IOException {
+
+      tenantCacheLock.writeLock().lock();
+      try {
+        // tenant name is needed to retrieve role name
+        final String tenantId = getTenantForAccessIDThrowIfNotFound(accessId);
+
+        final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
+
+        LOG.info("Updating cache: accessId '{}' isAdmin '{}' isDelegated '{}'",
+            accessId, false, false);
+        // Update cache
+        cachedTenantState.getAccessIdInfoMap().get(accessId).setIsAdmin(false);
+
+      } finally {
+        tenantCacheLock.writeLock().unlock();
+      }
+    }
+
   }
 
   @Override
   public String getUserNameGivenAccessId(String accessId) {
+
     Preconditions.checkNotNull(accessId);
+
+    tenantCacheLock.readLock().lock();
     try {
-      tenantCacheLock.readLock().lock();
       OmDBAccessIdInfo omDBAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessId);
       if (omDBAccessIdInfo != null) {
@@ -621,113 +771,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 //      throw new OMException("Authorizer write lock must have been held "
 //          + "before calling this method", INTERNAL_ERROR);
 //    }
-  }
-
-  /**
-   * This should be called in validateAndUpdateCache after
-   * the InAuthorizer variant (called in preExecute).
-   */
-  @Override
-  public void assignTenantAdminInCache(String accessId, boolean delegated)
-      throws IOException {
-
-    tenantCacheLock.writeLock().lock();
-
-    try {
-      // tenant name is needed to retrieve role name
-      final String tenantId = getTenantForAccessIDThrowIfNotFound(accessId);
-      final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
-
-      // Update cache. Note: tenant cache does not store delegated flag yet.
-      cachedTenantState.getAccessIdInfoMap().get(accessId).setIsAdmin(true);
-    } finally {
-      tenantCacheLock.writeLock().unlock();
-    }
-  }
-
-  @Override
-  public void assignTenantAdminInAuthorizer(String accessId, boolean delegated)
-      throws IOException {
-
-    checkAcquiredAuthorizerWriteLock();
-
-    tenantCacheLock.readLock().lock();
-
-    try {
-      // tenant name is needed to retrieve role name
-      final String tenantId = getTenantForAccessIDThrowIfNotFound(accessId);
-
-      final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
-
-      final String tenantAdminRoleName =
-          cachedTenantState.getTenantAdminRoleName();
-      final OzoneTenantRolePrincipal existingAdminRole =
-          new OzoneTenantRolePrincipal(tenantAdminRoleName);
-
-      final String roleJsonStr = authorizer.getRole(existingAdminRole);
-      final String userPrincipal = getUserNameGivenAccessId(accessId);
-      // Update Ranger. Add user principal (not accessId!) to the role
-      final String roleId = authorizer.assignUserToRole(
-          new BasicUserPrincipal(userPrincipal), roleJsonStr, delegated);
-      assert (roleId != null);
-
-      // Does NOT update tenant cache here
-    } catch (IOException e) {
-      revokeTenantAdminInAuthorizer(accessId);
-      throw e;
-    } finally {
-      tenantCacheLock.readLock().unlock();
-    }
-  }
-
-  @Override
-  public void revokeTenantAdminInCache(String accessId) throws IOException {
-
-    tenantCacheLock.writeLock().lock();
-
-    try {
-      // tenant name is needed to retrieve role name
-      final String tenantId = getTenantForAccessIDThrowIfNotFound(accessId);
-
-      final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
-
-      // Update cache
-      cachedTenantState.getAccessIdInfoMap().get(accessId).setIsAdmin(false);
-
-    } finally {
-      tenantCacheLock.writeLock().unlock();
-    }
-  }
-
-  @Override
-  public void revokeTenantAdminInAuthorizer(String accessId)
-      throws IOException {
-
-    checkAcquiredAuthorizerWriteLock();
-
-    tenantCacheLock.readLock().lock();
-
-    try {
-      // tenant name is needed to retrieve role name
-      final String tenantId = getTenantForAccessIDThrowIfNotFound(accessId);
-
-      final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
-      final String tenantAdminRoleName =
-          cachedTenantState.getTenantAdminRoleName();
-      final OzoneTenantRolePrincipal existingAdminRole =
-          new OzoneTenantRolePrincipal(tenantAdminRoleName);
-
-      final String roleJsonStr = authorizer.getRole(existingAdminRole);
-      final String userPrincipal = getUserNameGivenAccessId(accessId);
-      // Update Ranger. Add user principal (not accessId!) to the role
-      final String roleId = authorizer.revokeUserFromRole(
-          new BasicUserPrincipal(userPrincipal), roleJsonStr);
-      assert (roleId != null);
-
-      // Does NOT update tenant cache here
-    } finally {
-      tenantCacheLock.readLock().unlock();
-    }
   }
 
   public AccessPolicy newDefaultVolumeAccessPolicy(String tenantId,

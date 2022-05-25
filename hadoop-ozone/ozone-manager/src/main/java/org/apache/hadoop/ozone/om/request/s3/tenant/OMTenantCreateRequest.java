@@ -178,7 +178,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       // Create tenant roles and policies in Ranger.
       // If the request fails for some reason, Ranger background sync thread
       // should clean up any leftover policies and roles.
-      multiTenantManager.createTenantInAuthorizer(
+      multiTenantManager.getAuthorizerOp().createTenant(
           tenantId, userRoleName, adminRoleName);
     } catch (Exception e) {
       multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest(lockStamp);
@@ -304,7 +304,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           new CacheValue<>(Optional.of(omDBTenantState), transactionLogIndex));
 
       // Update tenant cache
-      multiTenantManager.createTenantInCache(
+      multiTenantManager.getCacheOp().createTenant(
           tenantId, userRoleName, adminRoleName);
 
       omResponse.setCreateTenantResponse(

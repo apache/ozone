@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.multitenant.OzoneTenant;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -92,7 +93,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
     try {
       // Remove policies and roles from Ranger
       // TODO: Deactivate (disable) policies instead of delete?
-      multiTenantManager.removeTenantInAuthorizer(tenantObj);
+      multiTenantManager.getAuthorizerOp().removeTenant(tenantObj);
     } catch (Exception e) {
       multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest(lockStamp);
       throw e;
@@ -192,7 +193,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       }
 
       // Update tenant cache
-      multiTenantManager.removeTenantInCache(tenantId);
+      multiTenantManager.getCacheOp().removeTenant(new OzoneTenant(tenantId));
 
       // Compose response
       //

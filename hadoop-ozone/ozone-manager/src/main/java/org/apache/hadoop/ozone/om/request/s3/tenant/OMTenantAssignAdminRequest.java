@@ -130,7 +130,8 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
       // Add user to tenant admin role in Ranger.
       // User principal is inferred from the accessId given.
       // Throws if the user doesn't exist in Ranger.
-      multiTenantManager.assignTenantAdminInAuthorizer(accessId, delegated);
+      multiTenantManager.getAuthorizerOp()
+          .assignTenantAdmin(accessId, delegated);
     } catch (Exception e) {
       multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest(lockStamp);
       throw e;
@@ -210,7 +211,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
               transactionLogIndex));
 
       // Update tenant cache
-      multiTenantManager.assignTenantAdminInCache(accessId, delegated);
+      multiTenantManager.getCacheOp().assignTenantAdmin(accessId, delegated);
 
       omResponse.setTenantAssignAdminResponse(
           TenantAssignAdminResponse.newBuilder()

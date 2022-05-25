@@ -28,8 +28,8 @@ import org.apache.hadoop.ozone.om.multitenant.impl.SingleVolumeTenantNamespace;
  */
 public class OzoneTenant implements Tenant {
   private final String tenantId;
-  private List<String> tenantRoleNames;
-  private List<AccessPolicy> accessPolicies;
+  private final List<String> tenantRoleNames;
+  private final List<AccessPolicy> accessPolicies;
   private final AccountNameSpace accountNameSpace;
   private final BucketNameSpace bucketNameSpace;
 

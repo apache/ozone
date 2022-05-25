@@ -122,7 +122,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     try {
       // Add user to tenant admin role in Ranger.
       // User principal is inferred from the accessId given.
-      multiTenantManager.revokeTenantAdminInAuthorizer(accessId);
+      multiTenantManager.getAuthorizerOp().revokeTenantAdmin(accessId);
     } catch (Exception e) {
       multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest(lockStamp);
       throw e;
@@ -201,7 +201,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
               transactionLogIndex));
 
       // Update tenant cache
-      multiTenantManager.revokeTenantAdminInCache(accessId);
+      multiTenantManager.getCacheOp().revokeTenantAdmin(accessId);
 
       omResponse.setTenantRevokeAdminResponse(
           TenantRevokeAdminResponse.newBuilder()

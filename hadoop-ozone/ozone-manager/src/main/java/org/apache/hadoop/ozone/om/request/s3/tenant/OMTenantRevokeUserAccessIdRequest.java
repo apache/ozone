@@ -134,7 +134,8 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     try {
       // Remove user from tenant user role in Ranger.
       // User principal is inferred from the accessId given.
-      multiTenantManager.revokeUserAccessIdInAuthorizer(accessId);
+      multiTenantManager.getAuthorizerOp()
+          .revokeUserAccessId(accessId, tenantId);
     } catch (Exception e) {
       multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest(lockStamp);
       throw e;
@@ -221,7 +222,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           new CacheValue<>(Optional.absent(), transactionLogIndex));
 
       // Update tenant cache
-      multiTenantManager.revokeUserAccessIdInCache(accessId, tenantId);
+      multiTenantManager.getCacheOp().revokeUserAccessId(accessId, tenantId);
 
       // Generate response
       omResponse.setTenantRevokeUserAccessIdResponse(

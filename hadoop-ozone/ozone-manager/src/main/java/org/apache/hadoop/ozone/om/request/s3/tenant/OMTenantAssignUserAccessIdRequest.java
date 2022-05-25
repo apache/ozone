@@ -164,21 +164,16 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     // If the user doesn't exist, Ranger return 400 and the call should throw.
 
     // Acquire write lock to authorizer (Ranger)
-    final String roleId;
     long lockStamp = multiTenantManager.getAuthorizerLock()
         .tryWriteLockInOMRequest();
     try {
       // Add user to tenant user role in Ranger.
       // Throws if the user doesn't exist in Ranger.
-      roleId = multiTenantManager.assignUserToTenantInAuthorizer(
+      multiTenantManager.getAuthorizerOp().assignUserToTenant(
           new BasicUserPrincipal(userPrincipal), tenantId, accessId);
     } catch (Exception e) {
       multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest(lockStamp);
       throw e;
-    }
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("roleId that the user is assigned to: {}", roleId);
     }
 
     // Generate secret. However, this is used only when the accessId entry
@@ -327,7 +322,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       acquiredS3SecretLock = false;
 
       // Update tenant cache
-      multiTenantManager.assignUserToTenantInCache(
+      multiTenantManager.getCacheOp().assignUserToTenant(
           new BasicUserPrincipal(userPrincipal), tenantId, accessId);
 
       // Generate response
