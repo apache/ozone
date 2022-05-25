@@ -56,6 +56,7 @@ import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.om.AuthorizerLockImpl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -229,6 +230,8 @@ public class TestRangerBGSyncService {
     when(omMultiTenantManager.newDefaultBucketAccessPolicy(eq(TENANT_ID),
         Mockito.any(OzoneTenantRolePrincipal.class)))
         .thenReturn(newBucketAccessPolicy(TENANT_ID, TENANT_ID));
+    when(omMultiTenantManager.getAuthorizerLock())
+        .thenReturn(new AuthorizerLockImpl());
 
     // Raft client request handling
     OzoneManagerRatisServer omRatisServer = mock(OzoneManagerRatisServer.class);
