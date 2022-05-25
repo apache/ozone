@@ -91,26 +91,23 @@ public class TestListStatus {
 
   @Test
   public void testSortedListStatus() throws Exception {
-//    // a) test if output is sorted
-//    checkKeyList("", "", 1000, 10);
-//
-//    // b) number of keys returns is expected
-//    checkKeyList("", "", 2, 2);
-//
-//    // c) check if full prefix works
-//    checkKeyList("a1", "", 100, 3);
-//
-//    //  d) check if full prefix with numEntries work
-//    checkKeyList("a1", "", 2, 2);
-//
-//    // e) check if existing start key >>>
-//    checkKeyList("a1", "a1/a12", 100, 2);
-//
-//    // f) check with non existing start key>>>
-//    checkKeyList("", "a7", 100, 6);
+    // a) test if output is sorted
+    checkKeyList("", "", 1000, 10);
 
-    // g) check if full prefix with numEntries work
-    checkKeyList("a1/", "a1/", 100, 2);
+    // b) number of keys returns is expected
+    checkKeyList("", "", 2, 2);
+
+    // c) check if full prefix works
+    checkKeyList("a1", "", 100, 3);
+
+    //  d) check if full prefix with numEntries work
+    checkKeyList("a1", "", 2, 2);
+
+    // e) check if existing start key >>>
+    checkKeyList("a1", "a1/a12", 100, 2);
+
+    // f) check with non existing start key>>>
+    checkKeyList("", "a7", 100, 6);
 
     // TODO: Enable the following test after listKeys changes
 //    // g) check if half prefix works <<<<
