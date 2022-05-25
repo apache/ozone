@@ -109,6 +109,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     testFileOperationsWithRecursive();
     testFileOperationsWithNonRecursive();
     testKeysDelete();
+    Thread.sleep(1000);
   }
 
   private void testFileOperationsWithRecursive() throws Exception {
