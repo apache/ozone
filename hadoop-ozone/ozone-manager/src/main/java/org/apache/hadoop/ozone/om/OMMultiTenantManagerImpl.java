@@ -562,12 +562,18 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     }
 
     @Override
-    public void revokeUserAccessId(String accessId, String tenantId) {
+    public void revokeUserAccessId(String accessId, String tenantId)
+        throws IOException {
 
       tenantCacheLock.writeLock().lock();
       try {
         LOG.info("Removing from cache: accessId '{}' in tenant '{}'",
             accessId, tenantId);
+        if (!tenantCache.get(tenantId).getAccessIdInfoMap()
+            .containsKey(accessId)) {
+          throw new OMException("accessId '" + accessId + "' doesn't exist "
+              + "in tenant cache!", INTERNAL_ERROR);
+        }
         tenantCache.get(tenantId).getAccessIdInfoMap().remove(accessId);
       } catch (NullPointerException e) {
         // tenantCache is somehow empty. Ignore for now.

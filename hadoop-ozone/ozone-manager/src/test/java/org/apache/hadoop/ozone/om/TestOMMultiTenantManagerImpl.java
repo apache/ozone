@@ -137,12 +137,12 @@ public class TestOMMultiTenantManagerImpl {
   public void testRevokeUserAccessId() throws Exception {
 
     LambdaTestUtils.intercept(OMException.class, () ->
-        tenantManager.getAuthorizerOp()
-            .revokeUserAccessId("accessId1", "tenant1"));
+        tenantManager.getCacheOp()
+            .revokeUserAccessId("unknown-AccessId1", TENANT_ID));
     assertEquals(1, tenantManager.getTenantCache().size());
 
-    tenantManager.getAuthorizerOp()
-        .revokeUserAccessId("seed-accessId1", "tenant1");
+    tenantManager.getCacheOp()
+        .revokeUserAccessId("seed-accessId1", TENANT_ID);
     assertTrue(tenantManager.getTenantCache().get(TENANT_ID)
         .getAccessIdInfoMap().isEmpty());
     assertTrue(tenantManager.listUsersInTenant(TENANT_ID, null)
@@ -150,7 +150,7 @@ public class TestOMMultiTenantManagerImpl {
   }
 
   @Test
-  public void testGetTenantForAccessID() throws Exception {
+  public void testGetTenantForAccessId() throws Exception {
     Optional<String> optionalTenant = tenantManager.getTenantForAccessID(
         "seed-accessId1");
     assertTrue(optionalTenant.isPresent());
