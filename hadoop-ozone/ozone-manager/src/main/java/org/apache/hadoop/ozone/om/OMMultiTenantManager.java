@@ -392,43 +392,5 @@ public interface OMMultiTenantManager {
   AccessPolicy newDefaultBucketAccessPolicy(String tenantId,
       OzoneTenantRolePrincipal userRole) throws IOException;
 
-  long tryReadLockAuthorizer(long timeout) throws InterruptedException;
-
-  /**
-   * A wrapper around tryReadLockAuthorizer() that throws when timed out.
-   * @return A stamp returned from StampedLock lock operation
-   *         to be used when releasing the lock.
-   */
-  long tryReadLockAuthorizerThrowOnTimeout() throws IOException;
-
-  void unlockReadAuthorizer(long stamp);
-
-  /**
-   * Attempt to acquire the write lock to authorizer (Ranger) with a timeout.
-   *
-   * @param timeout
-   * @return
-   * @throws InterruptedException
-   */
-  long tryWriteLockAuthorizer(long timeout)
-      throws InterruptedException;
-
-  /**
-   * Helper wrapper for tryAcquireAuthorizerAccessWriteLock() that should be
-   * used in tenant write requests' preExecute() before making requests to the
-   * authorizer.
-   *
-   * @return
-   * @throws IOException
-   */
-  long tryWriteLockAuthorizerThrowOnTimeout() throws IOException;
-
-  long tryWriteLockAuthorizerInOMRequest() throws IOException;
-
-  /**
-   * Release the write lock to authorizer.
-   */
-  void unlockWriteAuthorizer(long stamp);
-
-  void unlockWriteAuthorizerInOMRequest(long stamp) throws IOException;
+  AuthorizerLock getAuthorizerLock();
 }

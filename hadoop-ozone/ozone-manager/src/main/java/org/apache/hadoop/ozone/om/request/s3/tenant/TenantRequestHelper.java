@@ -39,7 +39,7 @@ public final class TenantRequestHelper {
 
     if (lockStamp != 0L) {
       // Release write lock to authorizer (Ranger)
-      multiTenantManager.unlockWriteAuthorizerInOMRequest(lockStamp);
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest(lockStamp);
     } else {
       // Should never reach this statement. Even when OM crashes the lock stamp
       // passed from preExecute is still recoverable from Raft log.

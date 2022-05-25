@@ -129,13 +129,14 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     }
 
     // Acquire write lock to authorizer (Ranger)
-    long lockStamp = multiTenantManager.tryWriteLockAuthorizerInOMRequest();
+    long lockStamp = multiTenantManager.getAuthorizerLock()
+        .tryWriteLockInOMRequest();
     try {
       // Remove user from tenant user role in Ranger.
       // User principal is inferred from the accessId given.
       multiTenantManager.revokeUserAccessIdInAuthorizer(accessId);
     } catch (Exception e) {
-      multiTenantManager.unlockWriteAuthorizerInOMRequest(lockStamp);
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest(lockStamp);
       throw e;
     }
 

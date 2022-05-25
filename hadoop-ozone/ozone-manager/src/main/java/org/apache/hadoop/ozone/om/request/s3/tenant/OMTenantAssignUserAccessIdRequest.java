@@ -165,14 +165,15 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
 
     // Acquire write lock to authorizer (Ranger)
     final String roleId;
-    long lockStamp = multiTenantManager.tryWriteLockAuthorizerInOMRequest();
+    long lockStamp = multiTenantManager.getAuthorizerLock()
+        .tryWriteLockInOMRequest();
     try {
       // Add user to tenant user role in Ranger.
       // Throws if the user doesn't exist in Ranger.
       roleId = multiTenantManager.assignUserToTenantInAuthorizer(
           new BasicUserPrincipal(userPrincipal), tenantId, accessId);
     } catch (Exception e) {
-      multiTenantManager.unlockWriteAuthorizerInOMRequest(lockStamp);
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest(lockStamp);
       throw e;
     }
 

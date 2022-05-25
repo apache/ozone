@@ -81,6 +81,14 @@
   },
   {
     "httpRequest": {
+      "path": "/service/plugins/policies/service/7"
+    },
+    "httpResponse": {
+      "body": "{}"
+    }
+  },
+  {
+    "httpRequest": {
       "path": "/service/plugins/policies/444"
     },
     "httpResponse": {

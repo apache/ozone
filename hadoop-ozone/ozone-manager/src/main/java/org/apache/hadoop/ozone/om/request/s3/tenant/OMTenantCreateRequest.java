@@ -172,7 +172,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         OMMultiTenantManager.getDefaultAdminRoleName(tenantId);
 
     // Acquire write lock to authorizer (Ranger)
-    long lockStamp = multiTenantManager.tryWriteLockAuthorizerInOMRequest();
+    long lockStamp = multiTenantManager.getAuthorizerLock()
+        .tryWriteLockInOMRequest();
     try {
       // Create tenant roles and policies in Ranger.
       // If the request fails for some reason, Ranger background sync thread
@@ -180,7 +181,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       multiTenantManager.createTenantInAuthorizer(
           tenantId, userRoleName, adminRoleName);
     } catch (Exception e) {
-      multiTenantManager.unlockWriteAuthorizerInOMRequest(lockStamp);
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest(lockStamp);
       throw e;
     }
 

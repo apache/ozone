@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.AuthorizerLock;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
@@ -91,6 +92,7 @@ public class OMRangerBGSyncService extends BackgroundService {
   private final OMMetadataManager metadataManager;
   private final OMMultiTenantManager multiTenantManager;
   private final MultiTenantAccessAuthorizer authorizer;
+  private final AuthorizerLock authorizerLock;
 
   // Maximum number of attempts for each sync run
   private static final int MAX_ATTEMPT = 2;
@@ -210,6 +212,7 @@ public class OMRangerBGSyncService extends BackgroundService {
     // Note: ozoneManager.getMultiTenantManager() may return null because
     // it might haven't finished initialization.
     this.multiTenantManager = omMultiTenantManager;
+    this.authorizerLock = omMultiTenantManager.getAuthorizerLock();
 
     if (authorizer != null) {
       this.authorizer = authorizer;
@@ -280,7 +283,7 @@ public class OMRangerBGSyncService extends BackgroundService {
     long lockStamp = 0L;
     try {
       // Acquire authorizer (Ranger) write lock
-      lockStamp = multiTenantManager.tryReadLockAuthorizer(
+      lockStamp = authorizerLock.tryReadLock(
           OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
       if (lockStamp == 0L) {
         LOG.warn("Timed out acquiring write lock."
@@ -315,7 +318,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       while (dbOzoneServiceVersion != rangerOzoneServiceVersion) {
         // Release authorizer write lock to temporarily allow other ops to
         // interleave
-        multiTenantManager.unlockReadAuthorizer(lockStamp);
+        authorizerLock.unlockRead(lockStamp);
         lockStamp = 0L;
 
         if (++attempt > MAX_ATTEMPT) {
@@ -341,7 +344,7 @@ public class OMRangerBGSyncService extends BackgroundService {
         setOMDBRangerServiceVersion(rangerOzoneServiceVersion);
 
         // Acquire lock again before getting the latest Ranger service version
-        lockStamp = multiTenantManager.tryReadLockAuthorizer(
+        lockStamp = authorizerLock.tryReadLock(
             OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
         if (lockStamp == 0L) {
           LOG.warn("Timed out acquiring write lock."
@@ -361,7 +364,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       //  RangerRestMultiTenantAccessController
     } finally {
       if (lockStamp != 0L) {
-        multiTenantManager.unlockReadAuthorizer(lockStamp);
+        authorizerLock.unlockRead(lockStamp);
       }
     }
 
@@ -564,12 +567,12 @@ public class OMRangerBGSyncService extends BackgroundService {
    */
   private void withReadLock(Runnable block) throws IOException {
     // Acquire authorizer (Ranger) read lock
-    long stamp = multiTenantManager.tryReadLockAuthorizerThrowOnTimeout();
+    long stamp = authorizerLock.tryReadLockThrowOnTimeout();
     try {
       block.run();
     } finally {
       // Release authorizer (Ranger) read lock
-      multiTenantManager.unlockReadAuthorizer(stamp);
+      authorizerLock.unlockRead(stamp);
     }
   }
 
@@ -578,12 +581,12 @@ public class OMRangerBGSyncService extends BackgroundService {
    */
   private void withWriteLock(Runnable block) throws IOException {
     // Acquire authorizer (Ranger) write lock
-    long stamp = multiTenantManager.tryWriteLockAuthorizerThrowOnTimeout();
+    long stamp = authorizerLock.tryWriteLockThrowOnTimeout();
     try {
       block.run();
     } finally {
       // Release authorizer (Ranger) write lock
-      multiTenantManager.unlockWriteAuthorizer(stamp);
+      authorizerLock.unlockWrite(stamp);
     }
   }
 
