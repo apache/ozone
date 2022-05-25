@@ -91,6 +91,7 @@ public class OzoneListStatusHelper {
       return new ArrayList<>();
     }
 
+    boolean listKeysMode = false;
     final String volumeName = args.getVolumeName();
     final String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
@@ -115,7 +116,6 @@ public class OzoneListStatusHelper {
      *     use the rest of the path to construct prefix path
      */
 
-
     String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
         metadataManager.getBucketTable().get(bucketKey);
@@ -130,7 +130,7 @@ public class OzoneListStatusHelper {
     boolean pathNameChanged = false;
     if (StringUtils.isNotBlank(startKey)) {
       if (StringUtils.isNotBlank(keyName)) {
-        if ( !OzoneFSUtils.isImmediateChild(keyName, startKey)) {
+        if (!listKeysMode && !OzoneFSUtils.isImmediateChild(keyName, startKey)) {
           if (LOG.isDebugEnabled()) {
             LOG.debug("StartKey {} is not an immediate child of keyName {}. " +
                 "Returns empty list", startKey, keyName);
@@ -151,10 +151,10 @@ public class OzoneListStatusHelper {
           .setSortDatanodesInPipeline(false)
           .build();
        fileStatus = getStatusHelper.apply(startKeyArgs,
-          null, true);
+           null, true);
     } else {
       fileStatus =
-          getStatusHelper.apply(args, clientAddress, true);
+          getStatusHelper.apply(args, clientAddress, listKeysMode);
     }
 
     String dbPrefixKey;

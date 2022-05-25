@@ -38,7 +38,6 @@ import org.junit.AfterClass;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.UUID;
 import java.util.List;
 
@@ -153,11 +152,12 @@ public class TestListStatus {
     // f) check with non existing start key>>>
     checkKeyList("", "a7", 100, 6);
 
-    // g) check if half prefix works <<<<
-    // checkKeyList("b", "", 100, 4);
-
-    // h) check half prefix with non-existing start key
-    // checkKeyList("b", "b5", 100, 2);
+    // TODO: Enable the following test after listKeys changes
+//    // g) check if half prefix works <<<<
+//     checkKeyList("b", "", 100, 4);
+//
+//    // h) check half prefix with non-existing start key
+//     checkKeyList("b", "b5", 100, 2);
   }
 
   private static void createFile(OzoneBucket bucket, String keyName)
@@ -209,8 +209,10 @@ public class TestListStatus {
       Assert.assertTrue(stCurr.getPath().compareTo(stNext.getPath()) < 0);
     }
 
-    OzoneFileStatus stNext = statuses.get(statuses.size() - 1);
-    System.out.println("status:"  + stNext);
+    if (!statuses.isEmpty()) {
+      OzoneFileStatus stNext = statuses.get(statuses.size() - 1);
+      System.out.println("status:" + stNext);
+    }
 
     System.out.println("END:::keyPrefix---> " + keyPrefix + ":::---> " +
         startKey);
