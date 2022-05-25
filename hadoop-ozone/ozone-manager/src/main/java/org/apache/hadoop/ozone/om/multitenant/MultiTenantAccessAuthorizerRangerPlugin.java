@@ -566,46 +566,6 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return policyID;
   }
 
-  // TODO: Not tested.
-  public static final String OZONE_OM_RANGER_ADMIN_ENABLE_POLICY_HTTP_ENDPOINT
-      = "/service/public/v2/api/policy";
-  public static final String OZONE_OM_RANGER_ADMIN_DISABLE_POLICY_HTTP_ENDPOINT
-      = "/service/public/v2/api/policy";
-
-  @Override
-  public void enableAccessPolicy(AccessPolicy policy) throws IOException {
-    String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_ENABLE_POLICY_HTTP_ENDPOINT;
-
-    HttpURLConnection conn = makeHttpCall(rangerAdminUrl,
-        policy.serializePolicyToJsonString(),
-        "POST", false);
-    String policyInfo = getResponseData(conn);
-
-    String policyID;
-    JsonObject jObject = new JsonParser().parse(policyInfo).getAsJsonObject();
-    // TODO: Use policy name instead of id
-    policyID = jObject.get("id").getAsString();
-    LOG.debug("policyID is: {}", policyID);
-  }
-
-  @Override
-  public void disableAccessPolicy(AccessPolicy policy) throws IOException {
-    String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DISABLE_POLICY_HTTP_ENDPOINT;
-
-    HttpURLConnection conn = makeHttpCall(rangerAdminUrl,
-        policy.serializePolicyToJsonString(),
-        "POST", false);
-    String policyInfo = getResponseData(conn);
-
-    String policyID;
-    JsonObject jObject = new JsonParser().parse(policyInfo).getAsJsonObject();
-    // TODO: Use policy name instead of id
-    policyID = jObject.get("id").getAsString();
-    LOG.debug("policyID is: {}", policyID);
-  }
-
   public AccessPolicy getAccessPolicyByName(String policyName)
       throws IOException {
     String rangerAdminUrl =

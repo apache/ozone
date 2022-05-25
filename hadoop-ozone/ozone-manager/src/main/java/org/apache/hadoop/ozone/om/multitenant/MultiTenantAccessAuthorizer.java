@@ -155,10 +155,6 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    */
   String createAccessPolicy(AccessPolicy policy) throws IOException;
 
-  void enableAccessPolicy(AccessPolicy policy) throws IOException;
-
-  void disableAccessPolicy(AccessPolicy policy) throws IOException;
-
   /**
    *
    * @param policyName

@@ -81,7 +81,7 @@ public final class S3SecretRequestHelper {
           throw new OMException("Requested accessId '" + accessId + "' is"
               + " assigned under tenant '" + tenantId + "',"
               + " but the current user '" + username + "' doesn't own the"
-              + " accessId or is an Ozone/tenant admin",
+              + " accessId or have Ozone/tenant admin privilege",
               ResultCodes.USER_MISMATCH);
           // Note: A more fitting result code could be PERMISSION_DENIED,
           //  but existing code already uses USER_MISMATCH. Maybe change this

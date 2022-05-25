@@ -826,8 +826,8 @@ public class TestOzoneTenantShell {
       checkOutput(out, "", true);
       checkOutput(err, "Requested accessId 'tenant-test-set-secret$alice' "
           + "is assigned under tenant 'tenant-test-set-secret', "
-          + "but the current user 'bob' doesn't own the accessId or is "
-          + "an Ozone/tenant admin\n", true);
+          + "but the current user 'bob' doesn't own the accessId or "
+          + "have Ozone/tenant admin privilege\n", true);
       return null;
     });
 
