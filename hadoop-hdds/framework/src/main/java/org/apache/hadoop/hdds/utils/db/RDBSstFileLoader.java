@@ -22,6 +22,7 @@ import org.rocksdb.IngestExternalFileOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
@@ -31,11 +32,11 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.toIOException;
 /**
  * DumpFileLoader using rocksdb sst files.
  */
-public class RDBSstFileLoader implements DumpFileLoader {
+public class RDBSstFileLoader implements DumpFileLoader, Closeable {
 
   private final RocksDB db;
   private final ColumnFamilyHandle handle;
-  private final IngestExternalFileOptions ingestOptions;
+  private IngestExternalFileOptions ingestOptions;
 
 
   public RDBSstFileLoader(RocksDB db, ColumnFamilyHandle handle) {
@@ -60,6 +61,16 @@ public class RDBSstFileLoader implements DumpFileLoader {
       throw toIOException("Failed to ingest external file "
           + externalFile.getAbsolutePath() + ", ingestBehind:"
           + ingestOptions.ingestBehind(), e);
+    } finally {
+      close();
+    }
+  }
+
+  @Override
+  public void close() {
+    if (ingestOptions != null) {
+      ingestOptions.close();
+      ingestOptions = null;
     }
   }
 }
