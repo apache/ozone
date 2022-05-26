@@ -255,6 +255,11 @@ public class OMRangerBGSyncService extends BackgroundService {
       // OzoneManager can be null for testing
       return true;
     }
+    if (ozoneManager.isRatisEnabled() &&
+        (ozoneManager.getOmRatisServer() == null)) {
+      LOG.warn("OzoneManagerRatisServer is not initialized yet");
+      return false;
+    }
     // The service only runs if current OM node is leader and is ready
     //  and the service is marked as started
     return isServiceStarted && ozoneManager.isLeaderReady();
@@ -471,6 +476,10 @@ public class OMRangerBGSyncService extends BackgroundService {
     String allPolicies = authorizer.getAllMultiTenantPolicies();
     JsonObject jObject = new JsonParser().parse(allPolicies).getAsJsonObject();
     JsonArray policies = jObject.getAsJsonArray("policies");
+    if (policies == null) {
+      LOG.warn("No Ranger policy received!");
+      return;
+    }
     for (int i = 0; i < policies.size(); ++i) {
       JsonObject policy = policies.get(i).getAsJsonObject();
       JsonArray policyLabels = policy.getAsJsonArray("policyLabels");
@@ -515,6 +524,7 @@ public class OMRangerBGSyncService extends BackgroundService {
         }
       }
     }
+
   }
 
   /**

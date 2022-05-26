@@ -108,7 +108,8 @@ public class TestAuthorizerLockImpl {
     try {
       authorizerLock.tryWriteLockInOMRequest();
 
-      // Spawn a thread to release the lock. Should work
+      // Spawn another thread to release the lock.
+      // Works as long as they share the same AuthorizerLockImpl instance.
       final Thread thread1 = new Thread(authorizerLock::unlockWriteInOMRequest);
       thread1.start();
     } catch (IOException e) {
