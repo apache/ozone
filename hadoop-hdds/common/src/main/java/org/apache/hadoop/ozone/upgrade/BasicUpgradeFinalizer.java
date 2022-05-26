@@ -216,6 +216,7 @@ public abstract class BasicUpgradeFinalizer
     if (!action.isPresent()) {
       emitNOOPMsg(feature.name());
     } else {
+      LOG.info("Running finalization actions for layout feature: {}", feature);
       try {
         action.get().execute(component);
       } catch (Exception e) {

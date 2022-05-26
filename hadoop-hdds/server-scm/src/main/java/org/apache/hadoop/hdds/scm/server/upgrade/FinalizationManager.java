@@ -17,18 +17,16 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.scm.metadata.Replicate;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizer.SCMUpgradeFinalizationContext;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager.FinalizationCheckpoint;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 
 import java.io.IOException;
-import java.util.function.Predicate;
 
 /**
- * Manages the state of finalization in SCM.
+ * Class to initiate SCM finalization and query its progress.
  */
 public interface FinalizationManager {
 
@@ -40,9 +38,10 @@ public interface FinalizationManager {
   ) throws IOException;
 
   @VisibleForTesting
-  BasicUpgradeFinalizer<SCMUpgradeFinalizer.SCMUpgradeFinalizationContext, HDDSLayoutVersionManager> getUpgradeFinalizer();
+  BasicUpgradeFinalizer<SCMUpgradeFinalizationContext, HDDSLayoutVersionManager>
+  getUpgradeFinalizer();
 
   void runPrefinalizeStateActions() throws IOException;
 
-  boolean passedCheckpoint(FinalizationStateManager.FinalizationCheckpoint checkpoint);
+  boolean crossedCheckpoint(FinalizationCheckpoint checkpoint);
 }

@@ -120,6 +120,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     try {
       if (layoutFeature.layoutVersion() == metadataLayoutVersion + 1) {
         metadataLayoutVersion = layoutFeature.layoutVersion();
+        LOG.info("Layout feature {} has been finalized.", layoutFeature);
         if (!needsFinalization()) {
           completeFinalization();
         }
@@ -148,6 +149,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     lock.writeLock().lock();
     try {
       currentUpgradeState = FINALIZATION_DONE;
+      LOG.info("Finalization is complete.");
     } finally {
       lock.writeLock().unlock();
     }

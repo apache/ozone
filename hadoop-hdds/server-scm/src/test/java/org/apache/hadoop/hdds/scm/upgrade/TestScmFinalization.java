@@ -116,12 +116,12 @@ public class TestScmFinalization {
         // If the expected current checkpoint is >= this checkpoint,
         // then this checkpoint should be crossed according to the state
         // manager.
-        Assert.assertTrue(stateManager.passedCheckpoint(checkpoint));
+        Assert.assertTrue(stateManager.crossedCheckpoint(checkpoint));
       } else {
         // Else if the expected current checkpoint is < this
         // checkpoint, then this checkpoint should not be crossed according to
         // the state manager.
-        Assert.assertFalse(stateManager.passedCheckpoint(checkpoint));
+        Assert.assertFalse(stateManager.crossedCheckpoint(checkpoint));
       }
     }
   }

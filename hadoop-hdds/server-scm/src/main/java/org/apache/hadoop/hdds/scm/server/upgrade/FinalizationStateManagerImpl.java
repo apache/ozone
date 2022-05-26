@@ -20,6 +20,9 @@ import java.util.List;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+/**
+ * Manages the state of finalization in SCM.
+ */
 public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
   private static final Logger LOG =
@@ -104,7 +107,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   }
 
   @Override
-  public boolean passedCheckpoint(FinalizationCheckpoint checkpoint) {
+  public boolean crossedCheckpoint(FinalizationCheckpoint checkpoint) {
     return getFinalizationCheckpoint().compareTo(checkpoint) >= 0;
   }
 

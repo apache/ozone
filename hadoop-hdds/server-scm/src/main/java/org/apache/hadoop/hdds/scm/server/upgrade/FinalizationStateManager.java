@@ -17,7 +17,6 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 
@@ -27,6 +26,15 @@ import java.io.IOException;
  * Manages the state of finalization in SCM.
  */
 public interface FinalizationStateManager {
+  /**
+   * A finalization checkpoint is an abstraction over SCM's disk state,
+   * indicating where finalization left off so it can be resumed on leader
+   * change or restart. Currently the checkpoint is derived from two properties:
+   * 1. The presence of a finalizing key in the database to indicate that
+   * finalization is in progress.
+   * 2. Whether SCM's metadata layout version is less than its software
+   * layout version.
+   */
   enum FinalizationCheckpoint {
     FINALIZATION_REQUIRED(false, true),
     FINALIZATION_STARTED(true, true),
@@ -42,6 +50,17 @@ public interface FinalizationStateManager {
       this.needsMlvBehindSlv = needsMlvBehindSlv;
     }
 
+    /**
+     * Given external state, determines whether that corresponds to this
+     * checkpoint.
+     *
+     * @param hasFinalizationMark true if finalization mark is present in the
+     *    DB.
+     * @param hasMlvBehindSlv true if the metadata layout version is less
+     *    than the software layout version
+     * @return true if the provided state corresponds to this checkpoint.
+     * False otherwise.
+     */
     public boolean isCurrent(boolean hasFinalizationMark,
                              boolean hasMlvBehindSlv) {
       return hasFinalizationMark == needsFinalizingMark &&
@@ -51,6 +70,7 @@ public interface FinalizationStateManager {
     public boolean needsFinalizingMark() {
       return needsFinalizingMark;
     }
+
     public boolean needsMlvBehindSlv() {
       return needsMlvBehindSlv;
     }
@@ -67,8 +87,19 @@ public interface FinalizationStateManager {
 
   void addReplicatedFinalizationStep(ReplicatedFinalizationStep step);
 
-  boolean passedCheckpoint(FinalizationCheckpoint checkpoint);
+  /**
+   * @param checkpoint The checkpoint to check for being crossed.
+   * @return true if SCM's disk state indicates this checkpoint has been
+   * crossed. False otherwise.
+   */
+  boolean crossedCheckpoint(FinalizationCheckpoint checkpoint);
 
+  /**
+   * Additional steps that must be run on all SCMs when a layout feature is
+   * finalized. This can be used to bring required finalization steps from
+   * the upgrade framework in {@link SCMUpgradeFinalizer} into replicated
+   * methods in the {@link FinalizationStateManager}.
+   */
   @FunctionalInterface
   interface ReplicatedFinalizationStep {
     void run(LayoutFeature feature) throws UpgradeException;

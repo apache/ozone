@@ -18,6 +18,9 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Optional;
 
+/**
+ * Class to initiate SCM finalization and query its progress.
+ */
 public class FinalizationManagerImpl implements FinalizationManager {
   private final SCMUpgradeFinalizer upgradeFinalizer;
   private final SCMUpgradeFinalizer.SCMUpgradeFinalizationContext context;
@@ -55,7 +58,8 @@ public class FinalizationManagerImpl implements FinalizationManager {
   }
 
   @Override
-  public UpgradeFinalizer.StatusAndMessages finalizeUpgrade(String upgradeClientID)
+  public UpgradeFinalizer.StatusAndMessages finalizeUpgrade(
+      String upgradeClientID)
       throws IOException {
     return upgradeFinalizer.finalize(upgradeClientID, context);
   }
@@ -65,14 +69,15 @@ public class FinalizationManagerImpl implements FinalizationManager {
       String upgradeClientID, boolean takeover, boolean readonly
   ) throws IOException {
     if (readonly) {
-      return new UpgradeFinalizer.StatusAndMessages(upgradeFinalizer.getStatus(),
-          Collections.emptyList());
+      return new UpgradeFinalizer.StatusAndMessages(
+          upgradeFinalizer.getStatus(), Collections.emptyList());
     }
     return upgradeFinalizer.reportStatus(upgradeClientID, takeover);
   }
 
   @Override
-  public BasicUpgradeFinalizer<SCMUpgradeFinalizer.SCMUpgradeFinalizationContext, HDDSLayoutVersionManager> getUpgradeFinalizer() {
+  public BasicUpgradeFinalizer<SCMUpgradeFinalizationContext,
+      HDDSLayoutVersionManager> getUpgradeFinalizer() {
     return upgradeFinalizer;
   }
 
@@ -82,8 +87,8 @@ public class FinalizationManagerImpl implements FinalizationManager {
   }
 
   @Override
-  public boolean passedCheckpoint(FinalizationStateManager.FinalizationCheckpoint checkpoint) {
-    return finalizationStateManager.passedCheckpoint(checkpoint);
+  public boolean crossedCheckpoint(FinalizationStateManager.FinalizationCheckpoint checkpoint) {
+    return finalizationStateManager.crossedCheckpoint(checkpoint);
   }
 
   public static class Builder {

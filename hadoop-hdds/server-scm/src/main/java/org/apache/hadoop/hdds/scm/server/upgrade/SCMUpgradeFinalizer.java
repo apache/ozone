@@ -40,9 +40,14 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 
 /**
  * UpgradeFinalizer for the Storage Container Manager service.
+ *
+ * This class contains the actions to drive finalization on the leader SCM,
+ * while followers are updated through replicated methods in
+ * {@link FinalizationStateManager}.
  */
 public class SCMUpgradeFinalizer extends
-    BasicUpgradeFinalizer<SCMUpgradeFinalizer.SCMUpgradeFinalizationContext, HDDSLayoutVersionManager> {
+    BasicUpgradeFinalizer<SCMUpgradeFinalizer.SCMUpgradeFinalizationContext,
+        HDDSLayoutVersionManager> {
 
   public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
     super(versionManager);
@@ -53,21 +58,25 @@ public class SCMUpgradeFinalizer extends
     super(versionManager, executor);
   }
 
-  // This should be called in the context of a separate finalize upgrade thread.
-  // This function can block indefinitely till the conditions are met to safely
-  // finalize Upgrade.
+  private void logCheckpointCrossed(FinalizationCheckpoint checkpoint){
+    LOG.info("SCM Finalization has crossed checkpoint {}", checkpoint);
+  }
+
   @Override
   public void preFinalizeUpgrade(SCMUpgradeFinalizationContext context)
       throws IOException {
-
     FinalizationStateManager stateManager =
         context.getFinalizationStateManager();
-    if (!stateManager.passedCheckpoint(FinalizationCheckpoint.FINALIZATION_STARTED)) {
+    if (!stateManager.crossedCheckpoint(
+        FinalizationCheckpoint.FINALIZATION_STARTED)) {
       context.getFinalizationStateManager().addFinalizingMark();
     }
-    if (!stateManager.passedCheckpoint(FinalizationCheckpoint.MLV_EQUALS_SLV)) {
+    logCheckpointCrossed(FinalizationCheckpoint.FINALIZATION_STARTED);
+
+    if (!stateManager.crossedCheckpoint(FinalizationCheckpoint.MLV_EQUALS_SLV)) {
       closePipelinesBeforeFinalization(context.getPipelineManager());
     }
+    logCheckpointCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV);
   }
 
   @Override
@@ -84,6 +93,15 @@ public class SCMUpgradeFinalizer extends
     }
   }
 
+  /**
+   * Run on each SCM (leader and follower) when a layout feature is being
+   * finalized to run its finalization actions, update the VERSION file, and
+   * move the state of its in memory datanodes to healthy readonly.
+   *
+   * @param lf The layout feature that is being finalized.
+   * @param context Supplier of objects needed to run the steps.
+   * @throws UpgradeException
+   */
   void replicatedFinalizationSteps(LayoutFeature lf,
       SCMUpgradeFinalizationContext context) throws UpgradeException {
     // Run upgrade actions and update VERSION file.
@@ -100,10 +118,12 @@ public class SCMUpgradeFinalizer extends
       throws IOException {
     FinalizationStateManager stateManager =
         context.getFinalizationStateManager();
-    if (!stateManager.passedCheckpoint(FinalizationCheckpoint.FINALIZATION_COMPLETE)) {
+    if (!stateManager.crossedCheckpoint(
+        FinalizationCheckpoint.FINALIZATION_COMPLETE)) {
       createPipelinesAfterFinalization(context.getPipelineManager());
       stateManager.removeFinalizingMark();
     }
+    logCheckpointCrossed(FinalizationCheckpoint.FINALIZATION_COMPLETE);
   }
 
   @Override
@@ -178,6 +198,10 @@ public class SCMUpgradeFinalizer extends
     emitFinishedMsg();
   }
 
+  /**
+   * Provided to methods in the {@link SCMUpgradeFinalizer} to supply objects
+   * needed to operate.
+   */
   public static class SCMUpgradeFinalizationContext {
     private final PipelineManager pipelineManager;
     private final NodeManager nodeManager;
