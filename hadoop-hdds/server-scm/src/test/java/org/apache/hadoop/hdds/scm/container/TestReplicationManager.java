@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager
@@ -119,6 +120,7 @@ public class TestReplicationManager {
   private DBStore dbStore;
   private PipelineManager pipelineManager;
   private SCMHAManager scmhaManager;
+  private ContainerReplicaPendingOps containerReplicaPendingOps;
 
   @BeforeEach
   public void setup()
@@ -195,6 +197,7 @@ public class TestReplicationManager {
         )).thenAnswer(invocation ->
         new ContainerPlacementStatusDefault(2, 2, 3));
     clock = new TestClock(Instant.now(), ZoneId.of("UTC"));
+    containerReplicaPendingOps = new ContainerReplicaPendingOps(conf, clock);
     createReplicationManager(new ReplicationManagerConfiguration());
   }
 
@@ -225,7 +228,8 @@ public class TestReplicationManager {
         nodeManager,
         clock,
         scmHAManager,
-        SCMDBDefinition.MOVE.getTable(dbStore));
+        SCMDBDefinition.MOVE.getTable(dbStore),
+        containerReplicaPendingOps);
 
     serviceManager.notifyStatusChanged();
     scmLogs.clearOutput();
