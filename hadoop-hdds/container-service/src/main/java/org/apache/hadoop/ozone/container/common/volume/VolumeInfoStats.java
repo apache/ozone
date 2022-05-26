@@ -101,7 +101,7 @@ public class VolumeInfoStats {
    */
 
   /**
-   * Return the Storage type for the Volume
+   * Return the Storage type for the Volume.
    */
   @Metric("Returns the Used space")
   public long getUsed() {
