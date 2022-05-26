@@ -27,11 +27,12 @@ import org.apache.hadoop.ozone.OzoneConsts;
 /**
  * This class is used to track Volume Info stats for each HDDS Volume.
  */
-@Metrics(about = "Ozone Volume Information Metrics", context = OzoneConsts.OZONE)
+@Metrics(about = "Ozone Volume Information Metrics",
+    context = OzoneConsts.OZONE)
 public class VolumeInfoStats {
 
   private String metricsSourceName = VolumeInfoStats.class.getSimpleName();
-  private String VolumeRootStr;
+  private String volumeRootStr;
   private HddsVolume volume;
 
   private long spaceUsed;
@@ -45,7 +46,7 @@ public class VolumeInfoStats {
   public VolumeInfoStats(String identifier, HddsVolume ref) {
     this.metricsSourceName +=
         '-' + identifier + StorageVolume.VolumeType.DATA_VOLUME.toString();
-    this.VolumeRootStr = identifier;
+    this.volumeRootStr = identifier;
     this.volume = ref;
     init();
   }
