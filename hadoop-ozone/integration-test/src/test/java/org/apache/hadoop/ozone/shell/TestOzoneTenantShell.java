@@ -28,7 +28,7 @@ import org.apache.hadoop.io.retry.RetryInvocationHandler;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.apache.hadoop.ozone.om.AuthorizerLockImpl;
+import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;

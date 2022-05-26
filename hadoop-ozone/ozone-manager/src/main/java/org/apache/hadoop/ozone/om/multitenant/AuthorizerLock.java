@@ -15,10 +15,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om;
+package org.apache.hadoop.ozone.om.multitenant;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.AuthorizerOp;
 
 import java.io.IOException;
 
@@ -82,7 +83,7 @@ public interface AuthorizerLock {
 
   /**
    * Returns true if the authorizer write lock is held by the current thread.
-   * Used in {@link OMMultiTenantManagerImpl.AuthorizerOp}.
+   * Used in {@link AuthorizerOp}.
    */
   boolean isWriteLockHeldByCurrentThread();
 }

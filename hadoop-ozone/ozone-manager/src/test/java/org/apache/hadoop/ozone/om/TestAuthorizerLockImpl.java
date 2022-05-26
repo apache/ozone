@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.om;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.hadoop.ozone.om.multitenant.AuthorizerLock;
+import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.BeforeClass;
