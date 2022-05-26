@@ -208,8 +208,8 @@ public class OzoneListStatusHelper {
   public enum EntryType {
     DIR_CACHE,
     FILE_CACHE,
-    RAW_FILE_DB,
-    RAW_DIR_DB;
+    RAW_DIR_DB,
+    RAW_FILE_DB;
 
     public boolean isDir() {
       switch (this) {

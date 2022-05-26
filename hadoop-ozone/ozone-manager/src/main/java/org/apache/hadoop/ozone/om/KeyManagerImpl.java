@@ -1501,9 +1501,9 @@ public class KeyManagerImpl implements KeyManager {
       return fileStatusList;
     }
 
-    Preconditions.checkArgument(!recursive);
     boolean useNewIterator = true;
     if (isBucketFSOptimized(volName, buckName)) {
+      Preconditions.checkArgument(!recursive);
       if (useNewIterator) {
         OzoneListStatusHelper statusHelper =
             new OzoneListStatusHelper(metadataManager, scmBlockSize,
