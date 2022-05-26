@@ -12,8 +12,6 @@ import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
-import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizer.SCMUpgradeFinalizationContext;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager.FinalizationCheckpoint;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -24,7 +22,7 @@ import java.util.Optional;
  */
 public class FinalizationManagerImpl implements FinalizationManager {
   private final SCMUpgradeFinalizer upgradeFinalizer;
-  private final SCMUpgradeFinalizer.SCMUpgradeFinalizationContext context;
+  private final SCMUpgradeFinalizationContext context;
   private final SCMStorageConfig storage;
   private final FinalizationStateManager finalizationStateManager;
 
@@ -37,7 +35,7 @@ public class FinalizationManagerImpl implements FinalizationManager {
     this.upgradeFinalizer = new SCMUpgradeFinalizer(builder.versionManager);
     finalizationStateManager = stateManager;
     this.context =
-        new SCMUpgradeFinalizer.SCMUpgradeFinalizationContext.Builder()
+        new SCMUpgradeFinalizationContext.Builder()
             .setStorage(this.storage)
             .setFinalizationStateManager(finalizationStateManager)
             .setConfiguration(builder.conf)
