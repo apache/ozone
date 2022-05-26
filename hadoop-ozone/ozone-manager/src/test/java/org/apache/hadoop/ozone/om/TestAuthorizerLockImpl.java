@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -40,6 +41,7 @@ public class TestAuthorizerLockImpl {
    * Tests StampedLock behavior.
    */
   @Test
+  @SuppressFBWarnings("IMSE_DONT_CATCH_IMSE")
   public void testStampedLockBehavior() throws InterruptedException {
 
     final AuthorizerLock authorizerLock = new AuthorizerLockImpl();
@@ -56,7 +58,6 @@ public class TestAuthorizerLockImpl {
       authorizerLock.unlockRead(readLockStamp - 1L);
       Assert.fail("Should have thrown IllegalMonitorStateException");
     } catch (IllegalMonitorStateException ignored) {
-      // Expects IMSE
     }
     authorizerLock.unlockRead(readLockStamp);
     writeLockStamp = authorizerLock.tryWriteLock(100);
@@ -64,7 +65,6 @@ public class TestAuthorizerLockImpl {
       authorizerLock.unlockWrite(writeLockStamp - 1L);
       Assert.fail("Should have thrown IllegalMonitorStateException");
     } catch (IllegalMonitorStateException ignored) {
-      // Expects IMSE
     }
     authorizerLock.unlockWrite(writeLockStamp);
 
