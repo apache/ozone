@@ -92,29 +92,28 @@ public class TestListStatus {
   @Test
   public void testSortedListStatus() throws Exception {
     // a) test if output is sorted
-    checkKeyList("", "", 1000, 10);
+    checkKeyList("", "", 1000, 10, false);
 
     // b) number of keys returns is expected
-    checkKeyList("", "", 2, 2);
+    checkKeyList("", "", 2, 2, false);
 
     // c) check if full prefix works
-    checkKeyList("a1", "", 100, 3);
+    checkKeyList("a1", "", 100, 3, false);
 
     //  d) check if full prefix with numEntries work
-    checkKeyList("a1", "", 2, 2);
+    checkKeyList("a1", "", 2, 2, false);
 
     // e) check if existing start key >>>
-    checkKeyList("a1", "a1/a12", 100, 2);
+    checkKeyList("a1", "a1/a12", 100, 2, false);
 
     // f) check with non existing start key>>>
-    checkKeyList("", "a7", 100, 6);
+    checkKeyList("", "a7", 100, 6, false);
 
-    // TODO: Enable the following test after listKeys changes
-//    // g) check if half prefix works <<<<
-//     checkKeyList("b", "", 100, 4);
-//
-//    // h) check half prefix with non-existing start key
-//     checkKeyList("b", "b5", 100, 2);
+    // g) check if half prefix works <<<<
+    checkKeyList("b", "", 100, 4, true);
+
+    // h) check half prefix with non-existing start key
+    checkKeyList("b", "b5", 100, 2, true);
   }
 
   private static void createFile(OzoneBucket bucket, String keyName)
@@ -167,11 +166,13 @@ public class TestListStatus {
   }
 
   private void checkKeyList(String keyPrefix, String startKey,
-                            long numEntries, int expectedNumKeys)
+                            long numEntries, int expectedNumKeys,
+                            boolean isPartialPrefix)
       throws Exception {
 
     List<OzoneFileStatus> statuses =
-        fsoOzoneBucket.listStatus(keyPrefix, false, startKey, numEntries);
+        fsoOzoneBucket.listStatus(keyPrefix, false, startKey,
+            numEntries, isPartialPrefix);
     Assert.assertEquals(expectedNumKeys, statuses.size());
 
     System.out.println("BEGIN:::keyPrefix---> " + keyPrefix + ":::---> " +
