@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.net;
 
+import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -87,4 +88,16 @@ public class TestYamlSchemaLoader {
     }
   }
 
+  @Test
+  public void testDefaultYaml() {
+    try {
+      String filePath = classLoader.getResource(
+          "network-topology-default.yaml").getPath();
+      NodeSchemaLoader.NodeSchemaLoadResult result =
+          NodeSchemaLoader.getInstance().loadSchemaFromFile(filePath);
+      Assert.assertEquals(3, result.getSchemaList().size());
+    } catch (Throwable e) {
+      fail("should succeed");
+    }
+  }
 }
