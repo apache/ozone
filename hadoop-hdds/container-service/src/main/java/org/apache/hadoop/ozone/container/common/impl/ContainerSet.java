@@ -246,6 +246,11 @@ public class ContainerSet {
     // consumers such as SCM.
     synchronized (this) {
       for (Container<?> container : containers) {
+        if (container.getContainerState()
+            == ContainerProtos.ContainerDataProto.State.RECOVERING) {
+          // Skip the recovering containers in ICR and FCR for now.
+          continue;
+        }
         crBuilder.addReports(container.getContainerReport());
       }
     }

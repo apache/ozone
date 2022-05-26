@@ -276,6 +276,10 @@ public class KeyValueHandler extends Handler {
     KeyValueContainerData newContainerData = new KeyValueContainerData(
         containerID, layoutVersion, maxContainerSize, request.getPipelineID(),
         getDatanodeId());
+    State state = request.getCreateContainer().getState();
+    if (state != null) {
+      newContainerData.setState(state);
+    }
     newContainerData.setReplicaIndex(request.getCreateContainer()
         .getReplicaIndex());
     // TODO: Add support to add metadataList to ContainerData. Add metadata
@@ -911,7 +915,8 @@ public class KeyValueHandler extends Handler {
      * in the leader goes to closing state, will arrive here even the container
      * might already be in closing state here.
      */
-    if (containerState == State.OPEN || containerState == State.CLOSING) {
+    if (containerState == State.OPEN || containerState == State.CLOSING
+        || containerState == State.RECOVERING) {
       return;
     }
 
@@ -973,7 +978,8 @@ public class KeyValueHandler extends Handler {
     container.writeLock();
     try {
       // Move the container to CLOSING state only if it's OPEN
-      if (container.getContainerState() == State.OPEN) {
+      if (container.getContainerState() == State.OPEN || container
+          .getContainerState() == State.RECOVERING) {
         container.markContainerForClose();
         sendICR(container);
       }

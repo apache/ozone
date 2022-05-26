@@ -304,7 +304,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   public void markContainerForClose() throws StorageContainerException {
     writeLock();
     try {
-      if (getContainerState() != ContainerDataProto.State.OPEN) {
+      if (getContainerState() != ContainerDataProto.State.OPEN
+          && getContainerState() != ContainerDataProto.State.RECOVERING) {
         throw new StorageContainerException(
             "Attempting to close a " + getContainerState() + " container.",
             CONTAINER_NOT_OPEN);
