@@ -1415,7 +1415,7 @@ public class KeyManagerImpl implements KeyManager {
     refreshPipeline(Arrays.asList(key));
   }
 
-  private boolean isKeyDeleted(String key, Table keyTable) {
+  public static boolean isKeyDeleted(String key, Table keyTable) {
     CacheValue<OmKeyInfo> omKeyInfoCacheValue
         = keyTable.getCacheValue(new CacheKey(key));
     return omKeyInfoCacheValue != null
@@ -1500,9 +1500,22 @@ public class KeyManagerImpl implements KeyManager {
     if (numEntries <= 0) {
       return fileStatusList;
     }
+
+    boolean useNewIterator = true;
     if (isBucketFSOptimized(volName, buckName)) {
-      return listStatusFSO(args, recursive, startKey, numEntries,
-          clientAddress);
+      Preconditions.checkArgument(!recursive);
+      if (useNewIterator) {
+        OzoneListStatusHelper statusHelper =
+            new OzoneListStatusHelper(metadataManager, scmBlockSize,
+                this::getOzoneFileStatusFSO);
+        Collection<OzoneFileStatus> statuses =
+            statusHelper.listStatusFSO(args, startKey, numEntries,
+            clientAddress);
+        return buildFinalStatusList(statuses, args, clientAddress);
+      } else {
+        return listStatusFSO(args, recursive, startKey, numEntries,
+            clientAddress);
+      }
     }
 
     String volumeName = args.getVolumeName();
@@ -1889,6 +1902,34 @@ public class KeyManagerImpl implements KeyManager {
       fileStatusFinalList.add(fileStatus);
     }
 
+    return sortPipelineInfo(fileStatusFinalList, keyInfoList,
+        omKeyArgs, clientAddress);
+  }
+
+  private List<OzoneFileStatus> buildFinalStatusList(
+      Collection<OzoneFileStatus> statusesCollection, OmKeyArgs omKeyArgs,
+      String clientAddress)
+      throws IOException {
+    List<OzoneFileStatus> fileStatusFinalList = new ArrayList<>();
+    List<OmKeyInfo> keyInfoList = new ArrayList<>();
+
+    for (OzoneFileStatus fileStatus : statusesCollection) {
+      if (fileStatus.isFile()) {
+        keyInfoList.add(fileStatus.getKeyInfo());
+      }
+      fileStatusFinalList.add(fileStatus);
+    }
+
+    return sortPipelineInfo(fileStatusFinalList, keyInfoList,
+        omKeyArgs, clientAddress);
+  }
+
+
+  private List<OzoneFileStatus> sortPipelineInfo(
+      List<OzoneFileStatus> fileStatusFinalList, List<OmKeyInfo> keyInfoList,
+      OmKeyArgs omKeyArgs, String clientAddress) throws IOException {
+
+
     if (omKeyArgs.getLatestVersionLocation()) {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
     }
@@ -1903,6 +1944,7 @@ public class KeyManagerImpl implements KeyManager {
 
     return fileStatusFinalList;
   }
+
 
   /***
    * Build files, directories and marked for deleted entries from dir/file
