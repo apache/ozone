@@ -832,10 +832,9 @@ public class TestOzoneTenantShell {
           "--secret=somesecret2"});
       Assert.assertTrue("Should return non-zero exit code!", exitC != 0);
       checkOutput(out, "", true);
-      checkOutput(err, "Requested accessId 'tenant-test-set-secret$alice' "
-          + "is assigned under tenant 'tenant-test-set-secret', "
-          + "but the current user 'bob' doesn't own the accessId or "
-          + "have Ozone/tenant admin privilege\n", true);
+      checkOutput(err, "Requested accessId 'tenant-test-set-secret$alice'"
+          + " doesn't belong to current user 'bob', nor does current user"
+          + " have Ozone or tenant administrator privilege\n", true);
       return null;
     });
 

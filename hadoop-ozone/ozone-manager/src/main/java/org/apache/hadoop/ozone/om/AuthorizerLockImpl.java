@@ -77,8 +77,8 @@ public class AuthorizerLockImpl implements AuthorizerLock {
       throw new OMException(e, INTERNAL_ERROR);
     }
     if (stamp == 0L) {
-      throw new OMException("Timed out acquiring authorizer read lock. "
-          + "Another multi-tenancy request is in-progress. Try again later",
+      throw new OMException("Timed out acquiring authorizer read lock."
+          + " Another multi-tenancy request is in-progress. Try again later",
           ResultCodes.TIMEOUT);
     } else if (LOG.isDebugEnabled()) {
       LOG.debug("Acquired authorizer read lock from thread {} with stamp {}",
@@ -103,8 +103,8 @@ public class AuthorizerLockImpl implements AuthorizerLock {
   @Override
   public void unlockWrite(long stamp) {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Releasing authorizer write lock from thread {} "
-          + "with stamp {}", Thread.currentThread().getId(), stamp);
+      LOG.debug("Releasing authorizer write lock from thread {} with stamp {}",
+          Thread.currentThread().getId(), stamp);
     }
     authorizerStampedLock.unlockWrite(stamp);
   }
@@ -170,7 +170,7 @@ public class AuthorizerLockImpl implements AuthorizerLock {
   }
 
   @Override
-  public boolean isHeldByCurrentThread() {
+  public boolean isWriteLockHeldByCurrentThread() {
 
     if (omRequestWriteLockHolderTid == 0L) {
       LOG.debug("Write lock is not held by any OMRequest thread");

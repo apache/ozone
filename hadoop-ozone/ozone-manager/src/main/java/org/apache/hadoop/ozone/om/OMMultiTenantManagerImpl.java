@@ -224,12 +224,15 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       this.tenantCacheLock = tenantCacheLock;
     }
 
+    /**
+     * Throws if authorizer write lock hasn't been acquired.
+     */
     private void checkAcquiredAuthorizerWriteLock() throws OMException {
 
       // Check if lock is acquired by the current thread
-      if (!authorizerLock.isHeldByCurrentThread()) {
+      if (!authorizerLock.isWriteLockHeldByCurrentThread()) {
         throw new OMException("Authorizer write lock must have been held "
-            + "before calling this method", INTERNAL_ERROR);
+            + "before calling this", INTERNAL_ERROR);
       }
     }
 

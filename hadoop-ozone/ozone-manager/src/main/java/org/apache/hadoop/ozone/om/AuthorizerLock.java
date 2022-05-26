@@ -65,7 +65,12 @@ public interface AuthorizerLock {
   long tryWriteLockThrowOnTimeout() throws IOException;
 
   /**
-   * A wrapper around tryWriteLock() that is used exclusively in OMRequests.
+   * A wrapper around tryWriteLockThrowOnTimeout() that is used exclusively
+   * in OMRequests.
+   *
+   * MUST use paired with unlockWriteInOMRequest() for unlocking to ensure
+   * correctness.
+   *
    * @return stamp
    */
   long tryWriteLockInOMRequest() throws IOException;
@@ -79,5 +84,5 @@ public interface AuthorizerLock {
    * Returns true if the authorizer write lock is held by the current thread.
    * Used in {@link OMMultiTenantManagerImpl.AuthorizerOp}.
    */
-  boolean isHeldByCurrentThread();
+  boolean isWriteLockHeldByCurrentThread();
 }

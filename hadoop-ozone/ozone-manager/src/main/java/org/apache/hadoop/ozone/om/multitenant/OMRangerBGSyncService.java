@@ -271,7 +271,11 @@ public class OMRangerBGSyncService extends BackgroundService {
     public BackgroundTaskResult call() {
       // Check OM leader and readiness
       if (shouldRun()) {
-        runCount.incrementAndGet();
+        final long count = runCount.incrementAndGet();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Initiating Ranger Multi-Tenancy Ranger Sync: run # {}",
+              count);
+        }
         triggerRangerSyncOnce();
       }
 
@@ -286,9 +290,8 @@ public class OMRangerBGSyncService extends BackgroundService {
       lockStamp = authorizerLock.tryReadLock(
           OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
       if (lockStamp == 0L) {
-        LOG.warn("Timed out acquiring write lock."
-            + "Another authorizer operation is in-progress."
-            + "Skipping this sync run.");
+        LOG.warn("Timed out acquiring read lock. Another authorizer"
+            + " operation is in-progress. Skipped run # {}.", runCount.get());
         // TODO: Schedule the next run sooner?
         return;
       }
@@ -329,15 +332,15 @@ public class OMRangerBGSyncService extends BackgroundService {
           break;
         }
 
-        LOG.info("Executing Multi-Tenancy Ranger Sync: run #{}, attempt #{}. "
-                + "Ranger service version: {}, DB version :{}",
+        LOG.info("Executing Multi-Tenancy Ranger Sync: run # {}, attempt # {}. "
+                + "Ranger service version: {}, DB service version: {}",
             runCount.get(), attempt,
             rangerOzoneServiceVersion, dbOzoneServiceVersion);
 
         executeOMDBToRangerSync(dbOzoneServiceVersion);
 
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Setting OM DB Ranger Service Version to {} (was {})",
+          LOG.debug("Setting DB Ranger service version to {} (was {})",
               rangerOzoneServiceVersion, dbOzoneServiceVersion);
         }
         // Submit Ratis Request to sync the new service version in OM DB
@@ -347,9 +350,8 @@ public class OMRangerBGSyncService extends BackgroundService {
         lockStamp = authorizerLock.tryReadLock(
             OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
         if (lockStamp == 0L) {
-          LOG.warn("Timed out acquiring write lock."
-              + "Another authorizer operation is in-progress."
-              + "Skipping next version check.");
+          LOG.warn("Timed out acquiring read lock. Another authorizer"
+              + " operation is in-progress. Skipping next attempt.");
           // TODO: Schedule the next run sooner?
           return;
         }
