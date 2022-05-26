@@ -78,10 +78,9 @@ public final class S3SecretRequestHelper {
         // admin to pass the check.
         if (!username.equals(accessIdOwnerUsername) &&
             !multiTenantManager.isTenantAdmin(ugi, tenantId, false)) {
-          throw new OMException("Requested accessId '" + accessId + "' is"
-              + " assigned under tenant '" + tenantId + "',"
-              + " but the current user '" + username + "' doesn't own the"
-              + " accessId or have Ozone/tenant admin privilege",
+          throw new OMException("Requested accessId '" + accessId + "' doesn't"
+              + " belong to current user '" + username + "', nor does"
+              + " current user have Ozone or tenant administrator privilege",
               ResultCodes.USER_MISMATCH);
           // Note: A more fitting result code could be PERMISSION_DENIED,
           //  but existing code already uses USER_MISMATCH. Maybe change this

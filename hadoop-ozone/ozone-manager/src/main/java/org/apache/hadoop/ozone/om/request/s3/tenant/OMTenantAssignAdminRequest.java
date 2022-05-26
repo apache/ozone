@@ -124,8 +124,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     }
 
     // Acquire write lock to authorizer (Ranger)
-    long lockStamp = multiTenantManager.getAuthorizerLock()
-        .tryWriteLockInOMRequest();
+    multiTenantManager.getAuthorizerLock().tryWriteLockInOMRequest();
     try {
       // Add user to tenant admin role in Ranger.
       // User principal is inferred from the accessId given.
@@ -133,12 +132,11 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
       multiTenantManager.getAuthorizerOp()
           .assignTenantAdmin(accessId, delegated);
     } catch (Exception e) {
-      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest(lockStamp);
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
       throw e;
     }
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
-        .setTenantAuthorizerLockStamp(lockStamp)
         .setTenantAssignAdminRequest(
             TenantAssignAdminRequest.newBuilder()
                 .setAccessId(accessId)
@@ -232,9 +230,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
       // Release authorizer write lock
-      final long lockStamp = getOmRequest().getTenantAuthorizerLockStamp();
-      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
-          lockStamp);
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
     }
 
     // Audit

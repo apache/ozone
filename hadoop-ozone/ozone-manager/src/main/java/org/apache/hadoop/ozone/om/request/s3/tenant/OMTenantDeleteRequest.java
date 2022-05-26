@@ -88,21 +88,17 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
     final Tenant tenantObj = multiTenantManager.getTenantFromDBById(tenantId);
 
     // Acquire write lock to authorizer (Ranger)
-    long lockStamp = multiTenantManager.getAuthorizerLock()
-        .tryWriteLockInOMRequest();
+    multiTenantManager.getAuthorizerLock().tryWriteLockInOMRequest();
     try {
       // Remove policies and roles from Ranger
       // TODO: Deactivate (disable) policies instead of delete?
       multiTenantManager.getAuthorizerOp().deleteTenant(tenantObj);
     } catch (Exception e) {
-      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest(lockStamp);
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
       throw e;
     }
 
-    final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
-        .setTenantAuthorizerLockStamp(lockStamp);
-
-    return omRequestBuilder.build();
+    return omRequest;
   }
 
   @Override
@@ -222,9 +218,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
       // Release authorizer write lock
-      final long lockStamp = getOmRequest().getTenantAuthorizerLockStamp();
-      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
-          lockStamp);
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
     }
 
     // Perform audit logging

@@ -164,15 +164,14 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     // If the user doesn't exist, Ranger return 400 and the call should throw.
 
     // Acquire write lock to authorizer (Ranger)
-    long lockStamp = multiTenantManager.getAuthorizerLock()
-        .tryWriteLockInOMRequest();
+    multiTenantManager.getAuthorizerLock().tryWriteLockInOMRequest();
     try {
       // Add user to tenant user role in Ranger.
       // Throws if the user doesn't exist in Ranger.
       multiTenantManager.getAuthorizerOp()
           .assignUserToTenant(userPrincipal, tenantId, accessId);
     } catch (Exception e) {
-      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest(lockStamp);
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
       throw e;
     }
 
@@ -187,7 +186,6 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
             .build();
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
-        .setTenantAuthorizerLockStamp(lockStamp)
         .setUpdateGetS3SecretRequest(updateGetS3SecretRequest);
 
     return omRequestBuilder.build();
@@ -351,9 +349,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
       // Release authorizer write lock
-      final long lockStamp = getOmRequest().getTenantAuthorizerLockStamp();
-      TenantRequestHelper.unlockWriteAfterRequest(multiTenantManager, LOG,
-          lockStamp);
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
     }
 
     // Audit

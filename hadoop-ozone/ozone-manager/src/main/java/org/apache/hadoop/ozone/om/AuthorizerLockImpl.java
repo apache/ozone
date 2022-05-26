@@ -42,8 +42,8 @@ public class AuthorizerLockImpl implements AuthorizerLock {
 
   // No need to use atomic here as both fields can only be updated after
   // authorizer write lock is acquired.
-  private volatile long omRequestWriteLockStamp = 0L;
-  private volatile long omRequestWriteLockHolderTid = 0L;
+  private long omRequestWriteLockStamp = 0L;
+  private long omRequestWriteLockHolderTid = 0L;
 
   @Override
   public long tryReadLock(long timeout) throws InterruptedException {
@@ -148,27 +148,15 @@ public class AuthorizerLockImpl implements AuthorizerLock {
   }
 
   @Override
-  public void unlockWriteInOMRequest(long stamp) {
+  public void unlockWriteInOMRequest() {
 
     if (omRequestWriteLockStamp == 0L) {
-      LOG.debug("Authorizer write lock is not held in this "
-          + "OMMultiTenantManager instance. "
-          + "This OM might be follower, or leader change happened. Ignored");
+      LOG.debug("Authorizer write lock is not held in this lock instance. "
+          + "This OM might be follower, or leader changed. Ignored");
       return;
     }
 
-    // Sanity check. Should never happen
-    if (stamp != omRequestWriteLockStamp) {
-      // Won't throw OMException here as this method is supposed to be called
-      // in the finally block in OMRequest, and validateAndUpdateCache isn't
-      // supposed to throw.
-      // Also, OM probably should just crash if this check fails. e.g. too many
-      // bit flips caused by cosmic rays that even ECC memory didn't help.
-      throw new RuntimeException("Invalid operation. "
-          + "Current OMMultiTenantManager instance does not hold the "
-          + "expected write lock stamp. " + "Stamp provided: " + stamp
-          + ". Stamp expected: " + omRequestWriteLockStamp);
-    }
+    final long stamp = omRequestWriteLockStamp;
 
     // Reset the internal lock stamp record back to zero.
     omRequestWriteLockStamp = 0L;

@@ -222,8 +222,6 @@ message OMRequest {
   optional SetS3SecretRequest               SetS3SecretRequest             = 106;
 
   optional SetRangerServiceVersionRequest   SetRangerServiceVersionRequest = 107;
-
-  optional int64 TenantAuthorizerLockStamp = 108;  // Stores AuthorizerLock stamp
 }
 
 message OMResponse {

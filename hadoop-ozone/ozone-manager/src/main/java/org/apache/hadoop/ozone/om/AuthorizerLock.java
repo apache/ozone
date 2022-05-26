@@ -17,11 +17,16 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+
 import java.io.IOException;
 
 /**
  * Authorizer access lock interface. Used by OMMultiTenantManager.
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public interface AuthorizerLock {
   /**
    * Attempt to acquire the read lock to the authorizer with a timeout.
@@ -68,7 +73,7 @@ public interface AuthorizerLock {
   /**
    * A wrapper around unlockWrite() that is used exclusively in OMRequests.
    */
-  void unlockWriteInOMRequest(long stamp);
+  void unlockWriteInOMRequest();
 
   /**
    * Returns true if the authorizer write lock is held by the current thread.

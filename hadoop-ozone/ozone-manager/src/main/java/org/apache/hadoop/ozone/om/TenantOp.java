@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 
 import java.io.IOException;
@@ -24,6 +26,8 @@ import java.io.IOException;
 /**
  * Interface for tenant operations.
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public interface TenantOp {
   /**
    * Given a tenant name, create tenant roles and policies in the authorizer
