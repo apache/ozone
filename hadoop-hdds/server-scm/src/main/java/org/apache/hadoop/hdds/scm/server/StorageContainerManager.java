@@ -1440,7 +1440,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     try {
       if (containerBalancer.isBalancerRunning()) {
         LOG.info("Stopping Container Balancer service.");
-        containerBalancer.stopBalancer();
+        // stop ContainerBalancer thread in this scm
+        containerBalancer.stop();
       } else {
         LOG.info("Container Balancer is not running.");
       }

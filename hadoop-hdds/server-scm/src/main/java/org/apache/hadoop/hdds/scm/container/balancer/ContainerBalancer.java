@@ -841,11 +841,13 @@ public class ContainerBalancer extends StatefulService {
     try {
       if (!scmContext.isLeader() || scmContext.isInSafeMode()) {
         if (isBalancerRunning()) {
+          LOG.info("Stopping ContainerBalancer in this scm on status change");
           stop();
         }
       } else {
         if (shouldRun()) {
           try {
+            LOG.info("Starting ContainerBalancer in this scm on status change");
             start();
           } catch (IllegalContainerBalancerStateException |
               InvalidContainerBalancerConfigurationException e) {
