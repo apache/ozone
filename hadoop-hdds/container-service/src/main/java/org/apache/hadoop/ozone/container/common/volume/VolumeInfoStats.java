@@ -30,115 +30,116 @@ import org.apache.hadoop.ozone.OzoneConsts;
 @Metrics(about = "Ozone Volume Information Metrics", context = OzoneConsts.OZONE)
 public class VolumeInfoStats {
 
-    private String metricsSourceName = VolumeInfoStats.class.getSimpleName();
-    private String VolumeRootStr;
-    private HddsVolume volume;
+  private String metricsSourceName = VolumeInfoStats.class.getSimpleName();
+  private String VolumeRootStr;
+  private HddsVolume volume;
 
-    private long spaceUsed;
-    private long spaceAvailable;
-    private long spaceReserved;
+  private long spaceUsed;
+  private long spaceAvailable;
+  private long spaceReserved;
 
 
-    /**
-     * @param identifier Typically, path to volume root. e.g. /data/hdds
-     */
-    public VolumeInfoStats(String identifier, HddsVolume ref) {
-        this.metricsSourceName += '-' + identifier+ StorageVolume.VolumeType.DATA_VOLUME.toString();
-        this.VolumeRootStr = identifier;
-        this.volume = ref;
-        init();
-    }
+  /**
+   * @param identifier Typically, path to volume root. e.g. /data/hdds
+   */
+  public VolumeInfoStats(String identifier, HddsVolume ref) {
+    this.metricsSourceName +=
+        '-' + identifier + StorageVolume.VolumeType.DATA_VOLUME.toString();
+    this.VolumeRootStr = identifier;
+    this.volume = ref;
+    init();
+  }
 
-    public void init() {
-        MetricsSystem ms = DefaultMetricsSystem.instance();
-        ms.register(metricsSourceName, "Volume Info Statistics", this);
-    }
+  public void init() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.register(metricsSourceName, "Volume Info Statistics", this);
+  }
 
-    public void unregister() {
-        MetricsSystem ms = DefaultMetricsSystem.instance();
-        ms.unregisterSource(metricsSourceName);
-    }
+  public void unregister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(metricsSourceName);
+  }
 
-    @Metric("Metric to return the Storage Type")
-    public String getStorageType() {
-        return volume.getStorageType().toString();
-    }
+  @Metric("Metric to return the Storage Type")
+  public String getStorageType() {
+    return volume.getStorageType().toString();
+  }
 
-    @Metric("Returns the Directory name for the volume")
-    public String getStorageDirectory() {
-        return volume.getStorageDir().toString();
-    }
+  @Metric("Returns the Directory name for the volume")
+  public String getStorageDirectory() {
+    return volume.getStorageDir().toString();
+  }
 
-    @Metric("Return the DataNode UID for the respective volume")
-    public String getDatanodeUuid() {
-        return volume.getDatanodeUuid();
-    }
+  @Metric("Return the DataNode UID for the respective volume")
+  public String getDatanodeUuid() {
+    return volume.getDatanodeUuid();
+  }
 
-    @Metric("Return the Layout Version for the volume")
-    public int getLayoutVersion() {
-        return volume.getLayoutVersion();
-    }
+  @Metric("Return the Layout Version for the volume")
+  public int getLayoutVersion() {
+    return volume.getLayoutVersion();
+  }
 
-    @Metric("Returns the Volume Type")
-    public String getVolumeType() {
-        return volume.getType().name();
-    }
+  @Metric("Returns the Volume Type")
+  public String getVolumeType() {
+    return volume.getType().name();
+  }
 
-    public String getMetricsSourceName() {
-        return metricsSourceName;
-    }
+  public String getMetricsSourceName() {
+    return metricsSourceName;
+  }
 
-    /**
-     * Test conservative avail space.
-     * |----used----|   (avail)   |++++++++reserved++++++++|
-     * |<------- capacity ------->|
-     * |<------------------- Total capacity -------------->|
-     * A) avail = capacity - used
-     * B) capacity = used + avail
-     * C) Total capacity = used + avail + reserved
-     */
+  /**
+   * Test conservative avail space.
+   * |----used----|   (avail)   |++++++++reserved++++++++|
+   * |<------- capacity ------->|
+   * |<------------------- Total capacity -------------->|
+   * A) avail = capacity - used
+   * B) capacity = used + avail
+   * C) Total capacity = used + avail + reserved
+   */
 
-    /**
-     * Return the Storage type for the Volume
-     */
-    @Metric("Returns the Used space")
-    public long getUsed() {
-        spaceUsed = volume.getVolumeInfo().getScmUsed();
-        return spaceUsed;
-    }
+  /**
+   * Return the Storage type for the Volume
+   */
+  @Metric("Returns the Used space")
+  public long getUsed() {
+    spaceUsed = volume.getVolumeInfo().getScmUsed();
+    return spaceUsed;
+  }
 
-    /**
-     * Return the Total Available capacity of the Volume.
-     */
-    @Metric("Returns the Available space")
-    public long getAvailable() {
-        spaceAvailable = volume.getVolumeInfo().getAvailable();
-        return spaceAvailable;
-    }
+  /**
+   * Return the Total Available capacity of the Volume.
+   */
+  @Metric("Returns the Available space")
+  public long getAvailable() {
+    spaceAvailable = volume.getVolumeInfo().getAvailable();
+    return spaceAvailable;
+  }
 
-    /**
-     * Return the Total Reserved of the Volume.
-     */
-    @Metric("Fetches the Reserved Space")
-    public long getReserved() {
-        spaceReserved = volume.getVolumeInfo().getReservedInBytes();
-        return spaceReserved;
-    }
+  /**
+   * Return the Total Reserved of the Volume.
+   */
+  @Metric("Fetches the Reserved Space")
+  public long getReserved() {
+    spaceReserved = volume.getVolumeInfo().getReservedInBytes();
+    return spaceReserved;
+  }
 
-    /**
-     * Return the Total capacity of the Volume.
-     */
-    @Metric("Returns the Capacity of the Volume")
-    public long getCapacity() {
-        return spaceUsed+spaceAvailable;
-    }
+  /**
+   * Return the Total capacity of the Volume.
+   */
+  @Metric("Returns the Capacity of the Volume")
+  public long getCapacity() {
+    return spaceUsed + spaceAvailable;
+  }
 
-    /**
-     * Return the Total capacity of the Volume.
-     */
-    @Metric("Returns the Total Capacity of the Volume")
-    public long getTotalCapacity() {
-        return (spaceUsed+spaceAvailable+spaceReserved);
-    }
+  /**
+   * Return the Total capacity of the Volume.
+   */
+  @Metric("Returns the Total Capacity of the Volume")
+  public long getTotalCapacity() {
+    return (spaceUsed + spaceAvailable + spaceReserved);
+  }
 
 }
