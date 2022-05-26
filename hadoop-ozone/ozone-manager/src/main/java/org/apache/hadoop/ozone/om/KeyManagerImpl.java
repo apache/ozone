@@ -1476,6 +1476,14 @@ public class KeyManagerImpl implements KeyManager {
     return listStatus(args, recursive, startKey, numEntries, null);
   }
 
+  public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
+                                          String startKey, long numEntries,
+                                          String clientAddress)
+      throws IOException {
+    return listStatus(args, recursive, startKey, numEntries,
+        clientAddress, false);
+  }
+
   /**
    * List the status for a file or a directory and its contents.
    *
@@ -1492,8 +1500,8 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   @SuppressWarnings("methodlength")
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
-      String startKey, long numEntries, String clientAddress)
-          throws IOException {
+      String startKey, long numEntries, String clientAddress,
+      boolean allowPartialPrefixes) throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
     String volName = args.getVolumeName();
     String buckName = args.getBucketName();
@@ -1511,7 +1519,7 @@ public class KeyManagerImpl implements KeyManager {
                 this::getOzoneFileStatusFSO);
         Collection<OzoneFileStatus> statuses =
             statusHelper.listStatusFSO(args, startKey, numEntries,
-            clientAddress);
+            clientAddress, allowPartialPrefixes);
         return buildFinalStatusList(statuses, args, clientAddress);
       } else {
         return listStatusFSO(args, recursive, startKey, numEntries,

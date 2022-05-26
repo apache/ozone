@@ -86,11 +86,10 @@ public class OzoneListStatusHelper {
   }
 
   public Collection<OzoneFileStatus> listStatusFSO(OmKeyArgs args,
-      String startKey, long numEntries, String clientAddress)
-      throws IOException {
+      String startKey, long numEntries, String clientAddress,
+      boolean allowPartialPrefixes) throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
 
-    boolean listKeysMode = false;
     final String volumeName = args.getVolumeName();
     final String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
@@ -118,7 +117,7 @@ public class OzoneListStatusHelper {
     // if the keyName is null
     if (StringUtils.isNotBlank(startKey)) {
       if (StringUtils.isNotBlank(keyName)) {
-        if (!listKeysMode &&
+        if (!allowPartialPrefixes &&
             !OzoneFSUtils.isImmediateChild(keyName, startKey)) {
           if (LOG.isDebugEnabled()) {
             LOG.debug("StartKey {} is not an immediate child of keyName {}. " +
@@ -137,7 +136,7 @@ public class OzoneListStatusHelper {
     }
 
     OzoneFileStatus fileStatus =
-        getStatusHelper.apply(args, clientAddress, listKeysMode);
+        getStatusHelper.apply(args, clientAddress, allowPartialPrefixes);
 
     String dbPrefixKey;
     if (fileStatus == null) {

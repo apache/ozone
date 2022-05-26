@@ -1223,7 +1223,7 @@ public class OzoneBucket extends WithMetadata {
 
       // 2. Get immediate children of keyPrefix, starting with startKey
       List<OzoneFileStatus> statuses = proxy.listStatus(volumeName, name,
-              keyPrefix, false, startKey, listCacheSize);
+              keyPrefix, false, startKey, listCacheSize, true);
 
       // 3. Special case: ListKey expects keyPrefix element should present in
       // the resultList, only if startKey is blank. If startKey is not blank
