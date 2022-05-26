@@ -28,9 +28,6 @@ import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Predicate;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -48,8 +45,6 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.node.states.NodeStateMap;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;

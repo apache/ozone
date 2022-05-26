@@ -112,6 +112,7 @@ public class TestHDDSUpgrade {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestHDDSUpgrade.class);
   private static final int NUM_DATA_NODES = 3;
+  private static final int NUM_DATA_SCMS = 3;
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -121,7 +122,8 @@ public class TestHDDSUpgrade {
   private final int numContainersCreated = 1;
   private HDDSLayoutVersionManager scmVersionManager;
   private AtomicBoolean testPassed = new AtomicBoolean(true);
-  private static InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
+  private static
+      InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
       scmFinalizationExecutor;
 
   private static final ReplicationConfig RATIS_THREE =
@@ -158,7 +160,7 @@ public class TestHDDSUpgrade {
 
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(NUM_DATA_NODES)
-        .setNumOfStorageContainerManagers(3)
+        .setNumOfStorageContainerManagers(NUM_DATA_SCMS)
         .setSCMConfigurator(scmConfigurator)
         // allow only one FACTOR THREE pipeline.
         .setTotalPipelineNumLimit(NUM_DATA_NODES + 1)
@@ -455,7 +457,8 @@ public class TestHDDSUpgrade {
 
     // Wait for the Finalization to complete on the SCM.
     while (status.status() != FINALIZATION_DONE) {
-      status = scm.getFinalizationManager().queryUpgradeFinalizationProgress("xyz",
+      status = scm.getFinalizationManager()
+          .queryUpgradeFinalizationProgress("xyz",
           false, false);
     }
 
@@ -924,15 +927,15 @@ public class TestHDDSUpgrade {
       testPassed.set(true);
       Thread helpingFailureInjectionThread =
           injectSCMAndDataNodeFailureTogetherAtTheSameTime();
-      InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
+      InjectedUpgradeFinalizationExecutor finalizationExecutor =
           new InjectedUpgradeFinalizationExecutor();
-      scmFinalizationExecutor.configureTestInjectionFunction(
+      finalizationExecutor.configureTestInjectionFunction(
           injectionPoint, () -> {
             helpingFailureInjectionThread.start();
             return true;
           });
       scm.getFinalizationManager().getUpgradeFinalizer()
-          .setFinalizationExecutor(scmFinalizationExecutor);
+          .setFinalizationExecutor(finalizationExecutor);
       testFinalizationWithFailureInjectionHelper(helpingFailureInjectionThread);
       Assert.assertTrue(testPassed.get());
       synchronized (cluster) {
@@ -996,7 +999,8 @@ public class TestHDDSUpgrade {
     testPreUpgradeConditionsDataNodes();
 
     // Trigger Finalization on the SCM
-    StatusAndMessages status = scm.getFinalizationManager().finalizeUpgrade("xyz");
+    StatusAndMessages status =
+        scm.getFinalizationManager().finalizeUpgrade("xyz");
     Assert.assertEquals(STARTING_FINALIZATION, status.status());
 
     // Make sure that any outstanding thread created by failure injection

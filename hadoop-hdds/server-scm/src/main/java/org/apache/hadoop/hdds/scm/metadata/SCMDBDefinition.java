@@ -161,11 +161,11 @@ public class SCMDBDefinition implements DBDefinition {
    */
   public static final DBColumnFamilyDefinition<String, String>
       META = new DBColumnFamilyDefinition<>(
-      "meta",
-      String.class,
-      new StringCodec(),
-      String.class,
-      new StringCodec());
+          "meta",
+          String.class,
+          new StringCodec(),
+          String.class,
+          new StringCodec());
 
   public static final DBColumnFamilyDefinition<String, ByteString>
       STATEFUL_SERVICE_CONFIG =

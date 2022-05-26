@@ -30,7 +30,6 @@ import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 
@@ -62,10 +61,12 @@ public class TestBasicUpgradeFinalizer {
 
     inOrder.verify(finalizer).preFinalizeUpgrade(ArgumentMatchers.eq(mockObj));
     inOrder.verify(finalizer).finalizeLayoutFeature(
-        ArgumentMatchers.eq(TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_2),
+        ArgumentMatchers.eq(
+            TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_2),
         ArgumentMatchers.eq(mockObj));
     inOrder.verify(finalizer).finalizeLayoutFeature(
-        ArgumentMatchers.eq(TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_3),
+        ArgumentMatchers.eq(
+            TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_3),
         ArgumentMatchers.eq(mockObj));
     inOrder.verify(finalizer).postFinalizeUpgrade(ArgumentMatchers.eq(mockObj));
 

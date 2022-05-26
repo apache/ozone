@@ -50,8 +50,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -130,7 +128,8 @@ public class SCMNodeManager implements NodeManager {
   private final int numPipelinesPerMetadataVolume;
   private final int heavyNodeCriteria;
   private final HDDSLayoutVersionManager scmLayoutVersionManager;
-  private final Predicate<FinalizationCheckpoint> finalizationCheckpointIsPassed;
+  private final Predicate<FinalizationCheckpoint>
+      finalizationCheckpointIsPassed;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
 
@@ -162,7 +161,8 @@ public class SCMNodeManager implements NodeManager {
                         NetworkTopology networkTopology,
                         SCMContext scmContext,
                         HDDSLayoutVersionManager layoutVersionManager,
-                        Predicate<FinalizationCheckpoint> finalizationCheckpointIsPassed) {
+                        Predicate<FinalizationCheckpoint>
+                            finalizationCheckpointIsPassed) {
     this.scmNodeEventPublisher = eventPublisher;
     this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
         layoutVersionManager, finalizationCheckpointIsPassed);
@@ -623,7 +623,8 @@ public class SCMNodeManager implements NodeManager {
           datanodeDetails.getHostName(), dnSlv, scmSlv);
     }
 
-    if (finalizationCheckpointIsPassed.test(FinalizationCheckpoint.MLV_EQUALS_SLV)) {
+    if (finalizationCheckpointIsPassed.test(
+        FinalizationCheckpoint.MLV_EQUALS_SLV)) {
       // Because we have crossed the MLV_EQUALS_SLV checkpoint, SCM metadata
       // layout version will not change. We can now compare it to the
       // datanodes' metadata layout versions to tell them to finalize.
@@ -650,8 +651,8 @@ public class SCMNodeManager implements NodeManager {
           scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
               new CommandForDatanode<>(datanodeDetails.getUuid(), finalizeCmd));
         } catch (NotLeaderException ex) {
-          LOG.warn("Skip sending finalize upgrade command since current SCM is" +
-              "not leader.", ex);
+          LOG.warn("Skip sending finalize upgrade command since current SCM" +
+              "is not leader.", ex);
         }
       }
     }

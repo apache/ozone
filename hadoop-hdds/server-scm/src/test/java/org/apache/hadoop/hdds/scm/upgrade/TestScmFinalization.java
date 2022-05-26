@@ -196,7 +196,8 @@ public class TestScmFinalization {
     }
 
     // First, SCM should mark that it is beginning finalization.
-    inOrder.verify(buffer, count).addToBuffer(ArgumentMatchers.eq(finalizationStore),
+    inOrder.verify(buffer, count).addToBuffer(
+        ArgumentMatchers.eq(finalizationStore),
         ArgumentMatchers.matches(OzoneConsts.FINALIZING_KEY),
         ArgumentMatchers.matches(""));
 

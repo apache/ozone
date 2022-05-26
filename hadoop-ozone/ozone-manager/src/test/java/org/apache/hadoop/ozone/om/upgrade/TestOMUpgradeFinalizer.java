@@ -24,7 +24,6 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
-import org.apache.log4j.Layout;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;

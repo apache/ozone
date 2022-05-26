@@ -20,8 +20,6 @@ package org.apache.hadoop.hdds.scm.node;
 import java.io.IOException;
 import java.util.Set;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -71,7 +69,7 @@ public class HealthyReadOnlyNodeHandler
         if (pipeline.getPipelineState() != Pipeline.PipelineState.CLOSED) {
           LOG.warn("Closing pipeline {} which uses HEALTHY READONLY datanode " +
                   "{}.", id,  datanodeDetails.getUuidString());
-          pipelineManager.closePipeline(pipeline,true);
+          pipelineManager.closePipeline(pipeline, true);
         }
       } catch (IOException ex) {
         LOG.error("Failed to close pipeline {} which uses HEALTHY READONLY " +

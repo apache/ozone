@@ -39,7 +39,7 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
 
   @Override
   public void finalizeLayoutFeature(LayoutFeature layoutFeature,
-    OzoneManager om) throws UpgradeException {
+      OzoneManager om) throws UpgradeException {
     super.finalizeLayoutFeature(layoutFeature, om.getOmStorage());
   }
 

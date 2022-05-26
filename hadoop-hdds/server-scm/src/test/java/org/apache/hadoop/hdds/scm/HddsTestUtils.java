@@ -589,8 +589,8 @@ public final class HddsTestUtils {
    * @throws AuthenticationException
    */
   public static StorageContainerManager getScmSimple(OzoneConfiguration conf,
-    SCMConfigurator configurator)
-      throws IOException, AuthenticationException {
+      SCMConfigurator configurator) throws IOException,
+      AuthenticationException {
     return StorageContainerManager.createSCM(conf, configurator);
   }
 

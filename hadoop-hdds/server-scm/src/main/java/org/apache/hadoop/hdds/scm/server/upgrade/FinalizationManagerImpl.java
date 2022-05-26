@@ -13,6 +13,7 @@ import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizer.SCMUpgradeFinalizationContext;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager.FinalizationCheckpoint;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -49,12 +50,12 @@ public class FinalizationManagerImpl implements FinalizationManager {
   }
 
   private FinalizationManagerImpl(Builder builder) throws IOException {
-      this(builder, new FinalizationStateManagerImpl.Builder()
-            .setVersionManager(builder.versionManager)
-            .setFinalizationStore(builder.finalizationStore)
-            .setTransactionBuffer(builder.scmHAManager.getDBTransactionBuffer())
-            .setRatisServer(builder.scmHAManager.getRatisServer())
-            .build());
+    this(builder, new FinalizationStateManagerImpl.Builder()
+        .setVersionManager(builder.versionManager)
+        .setFinalizationStore(builder.finalizationStore)
+        .setTransactionBuffer(builder.scmHAManager.getDBTransactionBuffer())
+        .setRatisServer(builder.scmHAManager.getRatisServer())
+        .build());
   }
 
   @Override
@@ -87,10 +88,14 @@ public class FinalizationManagerImpl implements FinalizationManager {
   }
 
   @Override
-  public boolean crossedCheckpoint(FinalizationStateManager.FinalizationCheckpoint checkpoint) {
+  public boolean crossedCheckpoint(FinalizationCheckpoint checkpoint) {
     return finalizationStateManager.crossedCheckpoint(checkpoint);
   }
 
+  /**
+   * Builds a {@link FinalizationManagerImpl}.
+   */
+  @SuppressWarnings("checkstyle:hiddenfield")
   public static class Builder {
     private OzoneConfiguration conf;
     private HDDSLayoutVersionManager versionManager;
@@ -109,7 +114,8 @@ public class FinalizationManagerImpl implements FinalizationManager {
       return this;
     }
 
-    public Builder setLayoutVersionManager(HDDSLayoutVersionManager versionManager) {
+    public Builder setLayoutVersionManager(
+        HDDSLayoutVersionManager versionManager) {
       this.versionManager = versionManager;
       return this;
     }
@@ -134,7 +140,8 @@ public class FinalizationManagerImpl implements FinalizationManager {
       return this;
     }
 
-    public Builder setFinalizationStore(Table<String, String> finalizationStore) {
+    public Builder setFinalizationStore(
+        Table<String, String> finalizationStore) {
       this.finalizationStore = finalizationStore;
       return this;
     }

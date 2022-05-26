@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizer.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
@@ -45,7 +44,8 @@ public class ScmHAUnfinalizedStateValidationAction
     implements HDDSUpgradeAction<SCMUpgradeFinalizationContext> {
 
   @Override
-  public void execute(SCMUpgradeFinalizationContext context) throws IOException {
+  public void execute(SCMUpgradeFinalizationContext context)
+      throws IOException {
     checkScmHA(context.getConfiguration(), context.getStorage(),
         context.getLayoutVersionManager());
   }

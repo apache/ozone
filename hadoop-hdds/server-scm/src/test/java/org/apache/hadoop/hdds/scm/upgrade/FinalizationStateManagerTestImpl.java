@@ -9,11 +9,15 @@ import java.io.IOException;
  * An implementation of {@link FinalizationStateManager} built without an
  * invocation handler for testing.
  */
-public class FinalizationStateManagerTestImpl extends FinalizationStateManagerImpl {
+public class FinalizationStateManagerTestImpl extends
+    FinalizationStateManagerImpl {
   public FinalizationStateManagerTestImpl(Builder builder) throws IOException {
     super(builder);
   }
 
+  /**
+   * Builds a {@link FinalizationStateManagerTestImpl}.
+   */
   public static class Builder extends FinalizationStateManagerImpl.Builder {
     @Override
     public FinalizationStateManagerTestImpl build() throws IOException {

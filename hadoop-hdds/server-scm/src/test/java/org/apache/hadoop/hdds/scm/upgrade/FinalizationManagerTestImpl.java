@@ -16,6 +16,9 @@ public class FinalizationManagerTestImpl extends FinalizationManagerImpl {
     super(builder, builder.finalizationStateManager);
   }
 
+  /**
+   * Builds a {@link FinalizationManagerTestImpl}.
+   */
   public static class Builder extends FinalizationManagerImpl.Builder {
     private FinalizationStateManager finalizationStateManager;
 

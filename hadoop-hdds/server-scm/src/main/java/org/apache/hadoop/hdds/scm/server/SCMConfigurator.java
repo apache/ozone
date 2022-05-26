@@ -22,7 +22,6 @@ package org.apache.hadoop.hdds.scm.server;
 
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.ha.ExecutionUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -78,7 +77,8 @@ public final class SCMConfigurator {
   private SCMHAManager scmHAManager;
   private SCMContext scmContext;
   private WritableContainerFactory writableContainerFactory;
-  private UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> finalizationExecutor;
+  private UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
+      finalizationExecutor;
 
   /**
    * Allows user to specify a version of Node manager to use with this SCM.

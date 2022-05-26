@@ -66,7 +66,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     checkpointLock.writeLock().lock();
     try {
       LayoutFeature feature = versionManager.getFeature(layoutVersion);
-      for(ReplicatedFinalizationStep step: finalizationSteps) {
+      for (ReplicatedFinalizationStep step: finalizationSteps) {
         step.run(feature);
       }
     } finally {
@@ -141,6 +141,9 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     return currentCheckpoint;
   }
 
+  /**
+   * Builds a {@link FinalizationManagerImpl}.
+   */
   public static class Builder {
     private Table<String, String> finalizationStore;
     private DBTransactionBuffer transactionBuffer;
@@ -155,7 +158,8 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       return this;
     }
 
-    public Builder setFinalizationStore(Table<String, String> finalizationStore) {
+    public Builder setFinalizationStore(
+        Table<String, String> finalizationStore) {
       this.finalizationStore = finalizationStore;
       return this;
     }

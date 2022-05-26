@@ -88,7 +88,6 @@ import org.junit.rules.ExpectedException;
 import java.util.Map;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -862,7 +861,7 @@ public class TestSCMNodeManager {
   public void testProcessLayoutVersion() throws IOException {
     // TODO: Refactor this class to use org.junit.jupiter so test
     //  parameterization can be used.
-    for(FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
+    for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
       Predicate<FinalizationCheckpoint> passedCheckpoint = c ->
           checkpoint.compareTo(c) >= 0;
       LOG.info("Testing with SCM finalization checkpoint {}", checkpoint);

@@ -5,6 +5,9 @@ import com.google.common.primitives.Longs;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 
+/**
+ * Encodes/decodes an integer to a byte string.
+ */
 public class IntegerCodec implements Codec {
   @Override
   public ByteString serialize(Object object)

@@ -200,7 +200,7 @@ public abstract class BasicUpgradeFinalizer
         || status.equals(FINALIZATION_DONE);
   }
 
-  public abstract void finalizeLayoutFeature(LayoutFeature lf, T component)
+  public abstract void finalizeLayoutFeature(LayoutFeature lf, T context)
       throws UpgradeException;
 
   protected void finalizeLayoutFeature(LayoutFeature lf, Storage storage)

@@ -58,7 +58,7 @@ public class SCMUpgradeFinalizer extends
     super(versionManager, executor);
   }
 
-  private void logCheckpointCrossed(FinalizationCheckpoint checkpoint){
+  private void logCheckpointCrossed(FinalizationCheckpoint checkpoint) {
     LOG.info("SCM Finalization has crossed checkpoint {}", checkpoint);
   }
 
@@ -73,7 +73,8 @@ public class SCMUpgradeFinalizer extends
     }
     logCheckpointCrossed(FinalizationCheckpoint.FINALIZATION_STARTED);
 
-    if (!stateManager.crossedCheckpoint(FinalizationCheckpoint.MLV_EQUALS_SLV)) {
+    if (!stateManager.crossedCheckpoint(
+        FinalizationCheckpoint.MLV_EQUALS_SLV)) {
       closePipelinesBeforeFinalization(context.getPipelineManager());
     }
     logCheckpointCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV);
@@ -128,7 +129,7 @@ public class SCMUpgradeFinalizer extends
 
   @Override
   public void runPrefinalizeStateActions(Storage storage,
-    SCMUpgradeFinalizationContext context) throws IOException {
+      SCMUpgradeFinalizationContext context) throws IOException {
     super.runPrefinalizeStateActions(
         lf -> ((HDDSLayoutFeature) lf)::scmAction, storage, context);
   }
@@ -166,7 +167,8 @@ public class SCMUpgradeFinalizer extends
     logAndEmit(msg);
   }
 
-  private void createPipelinesAfterFinalization(PipelineManager pipelineManager) {
+  private void createPipelinesAfterFinalization(
+      PipelineManager pipelineManager) {
     pipelineManager.resumePipelineCreation();
 
     // Wait for at least one pipeline to be created before finishing
@@ -202,7 +204,7 @@ public class SCMUpgradeFinalizer extends
    * Provided to methods in the {@link SCMUpgradeFinalizer} to supply objects
    * needed to operate.
    */
-  public static class SCMUpgradeFinalizationContext {
+  public static final class SCMUpgradeFinalizationContext {
     private final PipelineManager pipelineManager;
     private final NodeManager nodeManager;
     private final FinalizationStateManager finalizationStateManager;
@@ -243,6 +245,10 @@ public class SCMUpgradeFinalizer extends
       return storage;
     }
 
+    /**
+     * Builds an {@link SCMUpgradeFinalizationContext}.
+     */
+    @SuppressWarnings("checkstyle:hiddenfield")
     public static final class Builder {
       private PipelineManager pipelineManager;
       private NodeManager nodeManager;
@@ -264,7 +270,8 @@ public class SCMUpgradeFinalizer extends
         return this;
       }
 
-      public Builder setFinalizationStateManager(FinalizationStateManager finalizationStateManager) {
+      public Builder setFinalizationStateManager(
+          FinalizationStateManager finalizationStateManager) {
         this.finalizationStateManager = finalizationStateManager;
         return this;
       }
@@ -274,7 +281,8 @@ public class SCMUpgradeFinalizer extends
         return this;
       }
 
-      public Builder setLayoutVersionManager(HDDSLayoutVersionManager versionManager) {
+      public Builder setLayoutVersionManager(
+          HDDSLayoutVersionManager versionManager) {
         this.versionManager = versionManager;
         return this;
       }

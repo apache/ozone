@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -238,7 +237,8 @@ public class TestNodeStateManager {
 
     // Test how node state manager handles datanodes with lower metadata
     // layout version based on SCM's finalization checkpoint.
-    dni.updateLastKnownLayoutVersion(UpgradeUtils.toLayoutVersionProto(scmMlv - 1, scmSlv));
+    dni.updateLastKnownLayoutVersion(
+        UpgradeUtils.toLayoutVersionProto(scmMlv - 1, scmSlv));
     for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
       currentCheckpoint = checkpoint;
       nsm.checkNodesHealth();

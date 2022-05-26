@@ -39,7 +39,7 @@ public interface FinalizationManager {
 
   @VisibleForTesting
   BasicUpgradeFinalizer<SCMUpgradeFinalizationContext, HDDSLayoutVersionManager>
-  getUpgradeFinalizer();
+      getUpgradeFinalizer();
 
   void runPrefinalizeStateActions() throws IOException;
 
