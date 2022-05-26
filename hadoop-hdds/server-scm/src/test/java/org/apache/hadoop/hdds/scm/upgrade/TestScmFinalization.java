@@ -10,10 +10,8 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManagerImpl;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager.FinalizationCheckpoint;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManagerImpl;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -23,15 +21,19 @@ import org.junit.Test;
 import org.mockito.ArgumentMatchers;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
+import org.mockito.verification.VerificationMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.UUID;
 
-public class TestScmHAFinalization {
+/**
+ * Tests SCM finalization operations on mocked upgrade state.
+ */
+public class TestScmFinalization {
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestScmHAFinalization.class);
+      LoggerFactory.getLogger(TestScmFinalization.class);
 
   /**
    * Order of finalization checkpoints within the enum is used to determine
@@ -59,17 +61,18 @@ public class TestScmHAFinalization {
   @Test
   public void testUpgradeStateToCheckpointMapping() throws Exception {
     HDDSLayoutVersionManager versionManager =
-        new HDDSLayoutVersionManager(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+        new HDDSLayoutVersionManager(
+            HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
     // State manager keeps upgrade information in memory as well as writing
     // it to disk, so we can mock the classes that handle disk ops for this
     // test.
     FinalizationStateManager stateManager =
-        new FinalizationStateManagerImpl.Builder()
+        new FinalizationStateManagerTestImpl.Builder()
             .setVersionManager(versionManager)
             .setFinalizationStore(Mockito.mock(Table.class))
             .setRatisServer(Mockito.mock(SCMRatisServer.class))
             .setTransactionBuffer(Mockito.mock(DBTransactionBuffer.class))
-            .buildForTesting();
+            .build();
     // This is normally handled by the FinalizationManager, which we do not
     // have in this test.
     stateManager.addReplicatedFinalizationStep(lf ->
@@ -110,44 +113,64 @@ public class TestScmHAFinalization {
       LOG.info("Comparing expected checkpoint {} to {}", expectedCheckpoint,
           checkpoint);
       if (expectedCheckpoint.compareTo(checkpoint) >= 0) {
-        // If the expected current checkpoint is larger than this checkpoint,
-        // then this checkpoint should be passed according to the state manager.
+        // If the expected current checkpoint is >= this checkpoint,
+        // then this checkpoint should be crossed according to the state
+        // manager.
         Assert.assertTrue(stateManager.passedCheckpoint(checkpoint));
       } else {
-        // Else if the expected current checkpoint is smaller than this
-        // checkpoint, then this checkpoint should not be passed according to
+        // Else if the expected current checkpoint is < this
+        // checkpoint, then this checkpoint should not be crossed according to
         // the state manager.
         Assert.assertFalse(stateManager.passedCheckpoint(checkpoint));
       }
     }
   }
 
+  /**
+   * Tests resuming finalization after a failure or leader change, where the
+   * disk state will indicate which finalization checkpoint (and therefore
+   * set of steps) the SCM must resume from.
+   */
   @Test
   public void testResumeFinalizationFromCheckpoint() throws Exception {
+    for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
+      testResumeFinalizationFromCheckpoint(checkpoint);
+    }
+  }
+
+  public void testResumeFinalizationFromCheckpoint(
+      FinalizationCheckpoint initialCheckpoint) throws Exception {
+    LOG.info("Testing finalization beginning at checkpoint {}",
+        initialCheckpoint);
+
     PipelineManager pipelineManager = Mockito.mock(PipelineManager.class);
     // After finalization, SCM will wait for at least one pipeline to be
     // created. It does not care about the contents of the pipeline list, so
     // just return something with length >= 1.
     Mockito.when(pipelineManager.getPipelines(Mockito.any(),
         Mockito.any())).thenReturn(Arrays.asList(null, null, null));
-    DBTransactionBuffer buffer = Mockito.mock(DBTransactionBuffer.class);
+    // Create the table and version manager to appear as if we left off from in
+    // progress finalization.
+    Table<String, String> finalizationStore =
+        getMockTableFromCheckpoint(initialCheckpoint);
+    HDDSLayoutVersionManager versionManager =
+        getMockVersionManagerFromCheckpoint(initialCheckpoint);
     SCMHAManager haManager = Mockito.mock(SCMHAManager.class);
+    DBTransactionBuffer buffer = Mockito.mock(DBTransactionBuffer.class);
     Mockito.when(haManager.getDBTransactionBuffer()).thenReturn(buffer);
     NodeManager nodeManager = Mockito.mock(NodeManager.class);
-    Table<String, String> finalizationStore = Mockito.mock(Table.class);
     SCMStorageConfig storage = Mockito.mock(SCMStorageConfig.class);
-    HDDSLayoutVersionManager versionManager = new HDDSLayoutVersionManager(
-        HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
 
     FinalizationStateManager stateManager =
-        new FinalizationStateManagerImpl.Builder()
+        new FinalizationStateManagerTestImpl.Builder()
             .setVersionManager(versionManager)
             .setFinalizationStore(finalizationStore)
             .setRatisServer(Mockito.mock(SCMRatisServer.class))
             .setTransactionBuffer(buffer)
-            .buildForTesting();
+            .build();
 
-    FinalizationManager manager = new FinalizationManagerImpl.Builder()
+    FinalizationManager manager = new FinalizationManagerTestImpl.Builder()
+        .setFinalizationStateManager(stateManager)
         .setConfiguration(new OzoneConfiguration())
         .setLayoutVersionManager(versionManager)
         .setPipelineManager(pipelineManager)
@@ -155,7 +178,6 @@ public class TestScmHAFinalization {
         .setStorage(storage)
         .setHAManager(SCMHAManagerStub.getInstance(true))
         .setFinalizationStore(finalizationStore)
-        .setFinalizationStateManagerForTesting(stateManager)
         .build();
 
     // Execute upgrade finalization, then check that events happened in the
@@ -164,39 +186,93 @@ public class TestScmHAFinalization {
 
     InOrder inOrder = Mockito.inOrder(buffer, pipelineManager, nodeManager,
         storage);
+
+    // Once the initial checkpoint's operations are crossed, this count will
+    // be increased to 1 to indicate where finalization should have resumed
+    // from.
+    VerificationMode count = Mockito.never();
+    if (initialCheckpoint == FinalizationCheckpoint.FINALIZATION_REQUIRED) {
+      count = Mockito.times(1);
+    }
+
     // First, SCM should mark that it is beginning finalization.
-    inOrder.verify(buffer).addToBuffer(ArgumentMatchers.eq(finalizationStore),
+    inOrder.verify(buffer, count).addToBuffer(ArgumentMatchers.eq(finalizationStore),
         ArgumentMatchers.matches(OzoneConsts.FINALIZING_KEY),
         ArgumentMatchers.matches(""));
+
+    if (initialCheckpoint == FinalizationCheckpoint.FINALIZATION_STARTED) {
+      count = Mockito.times(1);
+    }
+
     // Next, all pipeline creation should be stopped.
-    inOrder.verify(pipelineManager).freezePipelineCreation();
+    inOrder.verify(pipelineManager, count).freezePipelineCreation();
 
     // Next, each layout feature should be finalized.
     for (HDDSLayoutFeature feature: HDDSLayoutFeature.values()) {
       // Cannot finalize initial version since we are already there.
       if (!feature.equals(HDDSLayoutFeature.INITIAL_VERSION)) {
-        inOrder.verify(storage).setLayoutVersion(feature.layoutVersion());
-        inOrder.verify(storage).persistCurrentState();
+        inOrder.verify(storage, count)
+            .setLayoutVersion(feature.layoutVersion());
+        inOrder.verify(storage, count).persistCurrentState();
         // After MLV == SLV, all datanodes should be moved to healthy readonly.
         if (feature.layoutVersion() ==
             HDDSLayoutVersionManager.maxLayoutVersion()) {
-          inOrder.verify(nodeManager).forceNodesToHealthyReadOnly();
+          inOrder.verify(nodeManager, count).forceNodesToHealthyReadOnly();
         }
-        // VERSION file is the source of truth, DB is only used for snapshot
-        // finalization. Therefore DB update should be last.
-        inOrder.verify(buffer).addToBuffer(ArgumentMatchers.eq(finalizationStore),
+        inOrder.verify(buffer, count).addToBuffer(
+            ArgumentMatchers.eq(finalizationStore),
             ArgumentMatchers.matches(OzoneConsts.LAYOUT_VERSION_KEY),
             ArgumentMatchers.eq(String.valueOf(feature.layoutVersion())));
       }
     }
-    Mockito.verify(nodeManager, Mockito.times(1)).forceNodesToHealthyReadOnly();
+    // If this was not called in the loop, there was an error. To detect this
+    // mistake, verify again here.
+    Mockito.verify(nodeManager, count).forceNodesToHealthyReadOnly();
 
-    // Finally, the finalizing mark is removed to indicate finalization is
+    if (initialCheckpoint == FinalizationCheckpoint.MLV_EQUALS_SLV) {
+      count = Mockito.times(1);
+    }
+
+    // Last, the finalizing mark is removed to indicate finalization is
     // complete.
-    inOrder.verify(buffer).removeFromBuffer(
+    inOrder.verify(buffer, count).removeFromBuffer(
         ArgumentMatchers.eq(finalizationStore),
         ArgumentMatchers.matches(OzoneConsts.FINALIZING_KEY));
 
-    inOrder.verifyNoMoreInteractions();
+    // If the initial checkpoint was FINALIZATION_COMPLETE, no mocks should
+    // have been invoked.
+  }
+
+  /**
+   * On startup, the finalization table will be read to determine the
+   * checkpoint we are resuming from. After this, the results will be stored
+   * in memory and flushed to the table asynchronously by the buffer, so the
+   * mock table can continue to return the initial values since the in memory
+   * values will be used after the initial table read on start.
+   *
+   * Layout version stored in the table is only used for ratis snapshot
+   * finalization, which is not covered in this test.
+   */
+  private Table<String, String> getMockTableFromCheckpoint(
+      FinalizationCheckpoint initialCheckpoint) throws Exception {
+    Table<String, String> finalizationStore = Mockito.mock(Table.class);
+    Mockito.when(finalizationStore
+            .isExist(ArgumentMatchers.eq(OzoneConsts.FINALIZING_KEY)))
+        .thenReturn(initialCheckpoint.needsFinalizingMark());
+    return finalizationStore;
+  }
+
+  /**
+   * On startup, components will read their version file to get their current
+   * layout version and initialize the version manager with that. Simulate
+   * that here.
+   */
+  private HDDSLayoutVersionManager getMockVersionManagerFromCheckpoint(
+      FinalizationCheckpoint initialCheckpoint) throws Exception {
+    int layoutVersion = HDDSLayoutVersionManager.maxLayoutVersion();
+    if (initialCheckpoint.needsMlvBehindSlv()) {
+      layoutVersion = HDDSLayoutFeature.INITIAL_VERSION.layoutVersion();
+    }
+    return new HDDSLayoutVersionManager(layoutVersion);
   }
 }

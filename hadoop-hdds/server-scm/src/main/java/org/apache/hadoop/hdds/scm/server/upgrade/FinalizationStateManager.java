@@ -47,6 +47,13 @@ public interface FinalizationStateManager {
       return hasFinalizationMark == needsFinalizingMark &&
           hasMlvBehindSlv == needsMlvBehindSlv;
     }
+
+    public boolean needsFinalizingMark() {
+      return needsFinalizingMark;
+    }
+    public boolean needsMlvBehindSlv() {
+      return needsMlvBehindSlv;
+    }
   }
 
   @Replicate

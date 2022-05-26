@@ -36,7 +36,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   // up-to-date DB information in memory as well for reads.
   private volatile boolean hasFinalizingMark;
 
-  private FinalizationStateManagerImpl(Builder builder) throws IOException {
+  protected FinalizationStateManagerImpl(Builder builder) throws IOException {
     this.finalizationStore = builder.finalizationStore;
     this.transactionBuffer = builder.transactionBuffer;
     this.versionManager = builder.versionManager;
@@ -108,7 +108,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     return getFinalizationCheckpoint().compareTo(checkpoint) >= 0;
   }
 
-  private FinalizationCheckpoint getFinalizationCheckpoint() {
+  protected FinalizationCheckpoint getFinalizationCheckpoint() {
     // Get a point-in-time snapshot of the finalization state under the lock,
     // then use this to determine which checkpoint we were on at that time.
     boolean mlvBehindSlvSnapshot;
@@ -138,7 +138,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     return currentCheckpoint;
   }
 
-  public static final class Builder {
+  public static class Builder {
     private Table<String, String> finalizationStore;
     private DBTransactionBuffer transactionBuffer;
     private HDDSLayoutVersionManager versionManager;
@@ -167,26 +167,18 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       return this;
     }
 
-    public FinalizationStateManager buildForTesting() throws IOException {
-      return getInstance();
-    }
-
     public FinalizationStateManager build() throws IOException {
+      Preconditions.checkNotNull(finalizationStore);
+      Preconditions.checkNotNull(transactionBuffer);
+      Preconditions.checkNotNull(versionManager);
       final SCMHAInvocationHandler invocationHandler =
           new SCMHAInvocationHandler(SCMRatisProtocol.RequestType.FINALIZE,
-              getInstance(),
+              new FinalizationStateManagerImpl(this),
               scmRatisServer);
 
       return (FinalizationStateManager) Proxy.newProxyInstance(
           SCMHAInvocationHandler.class.getClassLoader(),
           new Class<?>[]{FinalizationStateManager.class}, invocationHandler);
-    }
-
-    private FinalizationStateManager getInstance() throws IOException {
-      Preconditions.checkNotNull(finalizationStore);
-      Preconditions.checkNotNull(transactionBuffer);
-      Preconditions.checkNotNull(versionManager);
-      return new FinalizationStateManagerImpl(this);
     }
   }
 }

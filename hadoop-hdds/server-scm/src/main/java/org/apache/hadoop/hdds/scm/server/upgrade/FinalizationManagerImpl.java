@@ -24,21 +24,14 @@ public class FinalizationManagerImpl implements FinalizationManager {
   private final SCMStorageConfig storage;
   private final FinalizationStateManager finalizationStateManager;
 
-  private FinalizationManagerImpl(Builder builder) throws IOException {
+  /**
+   * Used for testing so subclasses can inject their own state manager.
+   */
+  protected FinalizationManagerImpl(Builder builder,
+      FinalizationStateManager stateManager) throws IOException {
     this.storage = builder.storage;
-    this.upgradeFinalizer = new SCMUpgradeFinalizer(builder.versionManager,
-        builder.executor);
-    if (builder.finalizationStateManagerForTesting != null) {
-      finalizationStateManager = builder.finalizationStateManagerForTesting;
-    } else {
-      finalizationStateManager =
-          new FinalizationStateManagerImpl.Builder()
-              .setVersionManager(builder.versionManager)
-              .setFinalizationStore(builder.finalizationStore)
-              .setTransactionBuffer(builder.scmHAManager.getDBTransactionBuffer())
-              .setRatisServer(builder.scmHAManager.getRatisServer())
-              .build();
-    }
+    this.upgradeFinalizer = new SCMUpgradeFinalizer(builder.versionManager);
+    finalizationStateManager = stateManager;
     this.context =
         new SCMUpgradeFinalizer.SCMUpgradeFinalizationContext.Builder()
             .setStorage(this.storage)
@@ -50,6 +43,15 @@ public class FinalizationManagerImpl implements FinalizationManager {
             .build();
     finalizationStateManager.addReplicatedFinalizationStep(
         lf -> this.upgradeFinalizer.replicatedFinalizationSteps(lf, context));
+  }
+
+  private FinalizationManagerImpl(Builder builder) throws IOException {
+      this(builder, new FinalizationStateManagerImpl.Builder()
+            .setVersionManager(builder.versionManager)
+            .setFinalizationStore(builder.finalizationStore)
+            .setTransactionBuffer(builder.scmHAManager.getDBTransactionBuffer())
+            .setRatisServer(builder.scmHAManager.getRatisServer())
+            .build());
   }
 
   @Override
@@ -84,7 +86,7 @@ public class FinalizationManagerImpl implements FinalizationManager {
     return finalizationStateManager.passedCheckpoint(checkpoint);
   }
 
-  public static final class Builder {
+  public static class Builder {
     private OzoneConfiguration conf;
     private HDDSLayoutVersionManager versionManager;
     private PipelineManager pipelineManager;
@@ -93,7 +95,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
     private SCMHAManager scmHAManager;
     private Table<String, String> finalizationStore;
     private UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor;
-    private FinalizationStateManager finalizationStateManagerForTesting;
 
     public Builder() {
     }
@@ -136,12 +137,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
     public Builder setFinalizationExecutor(
         UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor) {
       this.executor = executor;
-      return this;
-    }
-
-    public Builder setFinalizationStateManagerForTesting(
-        FinalizationStateManager stateManager) {
-      this.finalizationStateManagerForTesting = stateManager;
       return this;
     }
 

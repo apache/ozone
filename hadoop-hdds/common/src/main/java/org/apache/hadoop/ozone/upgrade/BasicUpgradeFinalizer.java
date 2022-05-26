@@ -73,6 +73,9 @@ public abstract class BasicUpgradeFinalizer
   public StatusAndMessages finalize(String upgradeClientID, T service)
       throws IOException {
     StatusAndMessages response = initFinalize(upgradeClientID, service);
+    // TODO: This will cause problems if we need to restart SCM finalization
+    //  from the MLV_EQUALS_SLV checkpoint, since the finalization will not
+    //  be run to remove the finalizing key.
     if (response.status() != FINALIZATION_REQUIRED) {
       return response;
     }
