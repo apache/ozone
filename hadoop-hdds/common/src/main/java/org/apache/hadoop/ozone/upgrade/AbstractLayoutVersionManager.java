@@ -125,7 +125,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
         }
       } else {
         String msgStart = "";
-        if (layoutFeature.layoutVersion() < metadataLayoutVersion) {
+        if (layoutFeature.layoutVersion() <= metadataLayoutVersion) {
           msgStart = "Finalize attempt on a layoutFeature which has already "
               + "been finalized.";
         } else {
@@ -135,7 +135,8 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
         }
 
         throw new IllegalArgumentException(
-            msgStart + "Software Layout version: " + softwareLayoutVersion
+            msgStart + " Software layout version: " + softwareLayoutVersion
+                + " Metadata layout version: " + metadataLayoutVersion
                 + " Feature Layout version: " + layoutFeature.layoutVersion());
       }
     } finally {

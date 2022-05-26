@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -38,6 +39,7 @@ public interface FinalizationManager {
       String upgradeClientID, boolean takeover, boolean readonly
   ) throws IOException;
 
+  @VisibleForTesting
   BasicUpgradeFinalizer<SCMUpgradeFinalizer.SCMUpgradeFinalizationContext, HDDSLayoutVersionManager> getUpgradeFinalizer();
 
   void runPrefinalizeStateActions() throws IOException;

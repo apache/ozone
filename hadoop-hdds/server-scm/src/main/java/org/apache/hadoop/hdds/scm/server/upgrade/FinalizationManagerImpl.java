@@ -6,16 +6,13 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizer.SCMUpgradeFinalizationContext;
-import org.rocksdb.Checkpoint;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -31,13 +28,17 @@ public class FinalizationManagerImpl implements FinalizationManager {
     this.storage = builder.storage;
     this.upgradeFinalizer = new SCMUpgradeFinalizer(builder.versionManager,
         builder.executor);
-    finalizationStateManager =
-        new FinalizationStateManagerImpl.Builder()
-            .setVersionManager(builder.versionManager)
-            .setFinalizationStore(builder.finalizationStore)
-            .setTransactionBuffer(builder.scmHAManager.getDBTransactionBuffer())
-            .setRatisServer(builder.scmHAManager.getRatisServer())
-            .build();
+    if (builder.finalizationStateManagerForTesting != null) {
+      finalizationStateManager = builder.finalizationStateManagerForTesting;
+    } else {
+      finalizationStateManager =
+          new FinalizationStateManagerImpl.Builder()
+              .setVersionManager(builder.versionManager)
+              .setFinalizationStore(builder.finalizationStore)
+              .setTransactionBuffer(builder.scmHAManager.getDBTransactionBuffer())
+              .setRatisServer(builder.scmHAManager.getRatisServer())
+              .build();
+    }
     this.context =
         new SCMUpgradeFinalizer.SCMUpgradeFinalizationContext.Builder()
             .setStorage(this.storage)
@@ -92,6 +93,7 @@ public class FinalizationManagerImpl implements FinalizationManager {
     private SCMHAManager scmHAManager;
     private Table<String, String> finalizationStore;
     private UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor;
+    private FinalizationStateManager finalizationStateManagerForTesting;
 
     public Builder() {
     }
@@ -134,6 +136,12 @@ public class FinalizationManagerImpl implements FinalizationManager {
     public Builder setFinalizationExecutor(
         UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor) {
       this.executor = executor;
+      return this;
+    }
+
+    public Builder setFinalizationStateManagerForTesting(
+        FinalizationStateManager stateManager) {
+      this.finalizationStateManagerForTesting = stateManager;
       return this;
     }
 

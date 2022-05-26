@@ -109,8 +109,8 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   }
 
   private FinalizationCheckpoint getFinalizationCheckpoint() {
-    // Get a point-in-time snapshot of the finalization state, then use this to
-    // determine which checkpoint we were on at that time.
+    // Get a point-in-time snapshot of the finalization state under the lock,
+    // then use this to determine which checkpoint we were on at that time.
     boolean mlvBehindSlvSnapshot;
     boolean hasFinalizingMarkSnapshot;
     checkpointLock.readLock().lock();
@@ -122,8 +122,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     }
 
     FinalizationCheckpoint currentCheckpoint = null;
-    // Enum constants must be iterated in order to resume from the correct
-    // checkpoint.
     for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
       if (checkpoint.isCurrent(hasFinalizingMarkSnapshot,
           mlvBehindSlvSnapshot)) {
@@ -169,19 +167,26 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       return this;
     }
 
-    public FinalizationStateManager build() throws IOException {
-      Preconditions.checkNotNull(finalizationStore);
-      Preconditions.checkNotNull(transactionBuffer);
-      Preconditions.checkNotNull(versionManager);
+    public FinalizationStateManager buildForTesting() throws IOException {
+      return getInstance();
+    }
 
+    public FinalizationStateManager build() throws IOException {
       final SCMHAInvocationHandler invocationHandler =
           new SCMHAInvocationHandler(SCMRatisProtocol.RequestType.FINALIZE,
-              new FinalizationStateManagerImpl(this),
+              getInstance(),
               scmRatisServer);
 
       return (FinalizationStateManager) Proxy.newProxyInstance(
           SCMHAInvocationHandler.class.getClassLoader(),
           new Class<?>[]{FinalizationStateManager.class}, invocationHandler);
+    }
+
+    private FinalizationStateManager getInstance() throws IOException {
+      Preconditions.checkNotNull(finalizationStore);
+      Preconditions.checkNotNull(transactionBuffer);
+      Preconditions.checkNotNull(versionManager);
+      return new FinalizationStateManagerImpl(this);
     }
   }
 }
