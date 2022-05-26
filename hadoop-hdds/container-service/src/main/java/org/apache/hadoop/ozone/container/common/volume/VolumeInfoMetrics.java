@@ -29,23 +29,17 @@ import org.apache.hadoop.ozone.OzoneConsts;
  */
 @Metrics(about = "Ozone Volume Information Metrics",
     context = OzoneConsts.OZONE)
-public class VolumeInfoStats {
+public class VolumeInfoMetrics {
 
-  private String metricsSourceName = VolumeInfoStats.class.getSimpleName();
+  private String metricsSourceName = VolumeInfoMetrics.class.getSimpleName();
   private String volumeRootStr;
   private HddsVolume volume;
-
-  private long spaceUsed;
-  private long spaceAvailable;
-  private long spaceReserved;
-
 
   /**
    * @param identifier Typically, path to volume root. e.g. /data/hdds
    */
-  public VolumeInfoStats(String identifier, HddsVolume ref) {
-    this.metricsSourceName +=
-        '-' + identifier + StorageVolume.VolumeType.DATA_VOLUME.toString();
+  public VolumeInfoMetrics(String identifier, HddsVolume ref) {
+    this.metricsSourceName += '-' + identifier;
     this.volumeRootStr = identifier;
     this.volume = ref;
     init();
@@ -105,8 +99,7 @@ public class VolumeInfoStats {
    */
   @Metric("Returns the Used space")
   public long getUsed() {
-    spaceUsed = volume.getVolumeInfo().getScmUsed();
-    return spaceUsed;
+    return volume.getVolumeInfo().getScmUsed();
   }
 
   /**
@@ -114,8 +107,7 @@ public class VolumeInfoStats {
    */
   @Metric("Returns the Available space")
   public long getAvailable() {
-    spaceAvailable = volume.getVolumeInfo().getAvailable();
-    return spaceAvailable;
+    return volume.getVolumeInfo().getAvailable();
   }
 
   /**
@@ -123,8 +115,7 @@ public class VolumeInfoStats {
    */
   @Metric("Fetches the Reserved Space")
   public long getReserved() {
-    spaceReserved = volume.getVolumeInfo().getReservedInBytes();
-    return spaceReserved;
+    return volume.getVolumeInfo().getReservedInBytes();
   }
 
   /**
@@ -132,7 +123,7 @@ public class VolumeInfoStats {
    */
   @Metric("Returns the Capacity of the Volume")
   public long getCapacity() {
-    return spaceUsed + spaceAvailable;
+    return getUsed() + getAvailable();
   }
 
   /**
@@ -140,7 +131,7 @@ public class VolumeInfoStats {
    */
   @Metric("Returns the Total Capacity of the Volume")
   public long getTotalCapacity() {
-    return (spaceUsed + spaceAvailable + spaceReserved);
+    return (getUsed() + getAvailable() + getReserved());
   }
 
 }

@@ -67,7 +67,7 @@ public class HddsVolume extends StorageVolume {
 
   private VolumeState state;
   private final VolumeIOStats volumeIOStats;
-  private final VolumeInfoStats volumeInfoStats;
+  private final VolumeInfoMetrics volumeInfoMetrics;
 
   // VERSION file properties
   private String storageID;       // id of the file system
@@ -118,7 +118,7 @@ public class HddsVolume extends StorageVolume {
       this.clusterID = b.clusterID;
       this.datanodeUuid = b.datanodeUuid;
       this.volumeIOStats = new VolumeIOStats(b.getVolumeRootStr());
-      this.volumeInfoStats = new VolumeInfoStats(b.getVolumeRootStr(), this);
+      this.volumeInfoMetrics = new VolumeInfoMetrics(b.getVolumeRootStr(), this);
       this.committedBytes = new AtomicLong(0);
 
       LOG.info("Creating HddsVolume: {} of storage type : {} capacity : {}",
@@ -129,7 +129,7 @@ public class HddsVolume extends StorageVolume {
       // Builder is called with failedVolume set, so create a failed volume
       // HddsVolume Object.
       volumeIOStats = null;
-      volumeInfoStats = null;
+      volumeInfoMetrics = null;
       storageID = UUID.randomUUID().toString();
       state = VolumeState.FAILED;
       committedBytes = null;
@@ -325,8 +325,8 @@ public class HddsVolume extends StorageVolume {
     return volumeIOStats;
   }
 
-  public VolumeInfoStats getVolumeInfoStats() {
-    return volumeInfoStats;
+  public VolumeInfoMetrics getVolumeInfoStats() {
+    return volumeInfoMetrics;
   }
 
   @Override
@@ -336,8 +336,8 @@ public class HddsVolume extends StorageVolume {
     if (volumeIOStats != null) {
       volumeIOStats.unregister();
     }
-    if (volumeInfoStats != null) {
-      volumeInfoStats.unregister();
+    if (volumeInfoMetrics != null) {
+      volumeInfoMetrics.unregister();
     }
   }
 
@@ -348,8 +348,8 @@ public class HddsVolume extends StorageVolume {
     if (volumeIOStats != null) {
       volumeIOStats.unregister();
     }
-    if (volumeInfoStats != null) {
-      volumeInfoStats.unregister();
+    if (volumeInfoMetrics != null) {
+      volumeInfoMetrics.unregister();
     }
   }
 
