@@ -23,7 +23,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
@@ -43,10 +43,12 @@ public class OMOpenKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
   private Map<String, OmKeyInfo> keysToDelete;
 
   public OMOpenKeysDeleteResponse(
-      @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse,
-      @Nonnull Map<String, OmKeyInfo> keysToDelete, boolean isRatisEnabled) {
+      @Nonnull OMResponse omResponse,
+      @Nonnull Map<String, OmKeyInfo> keysToDelete,
+      boolean isRatisEnabled,
+      @Nonnull BucketLayout bucketLayout) {
 
-    super(omResponse, isRatisEnabled);
+    super(omResponse, isRatisEnabled, bucketLayout);
     this.keysToDelete = keysToDelete;
   }
 
@@ -55,8 +57,8 @@ public class OMOpenKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
    * For a successful request, the other constructor should be used.
    */
   public OMOpenKeysDeleteResponse(
-      @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse, @Nonnull
-      BucketLayout bucketLayout) {
+      @Nonnull OMResponse omResponse,
+      @Nonnull BucketLayout bucketLayout) {
 
     super(omResponse, bucketLayout);
   }

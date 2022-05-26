@@ -27,6 +27,7 @@ import java.net.URI;
 import java.security.InvalidKeyException;
 import java.security.PrivilegedExceptionAction;
 import java.security.SecureRandom;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -253,6 +254,14 @@ public class RpcClient implements ClientProtocol {
       caCertPem = serviceInfoEx.getCaCertificate();
       caCertPems = serviceInfoEx.getCaCertPemList();
       if (caCertPems == null || caCertPems.isEmpty()) {
+        if (caCertPem == null) {
+          LOG.error("RpcClient received empty caCertPems from serviceInfo");
+          CertificateException ex = new CertificateException(
+              "No caCerts found; caCertPem can" +
+                  " not be null when caCertPems is empty or null"
+          );
+          throw new IOException(ex);
+        }
         caCertPems = Collections.singletonList(caCertPem);
       }
       x509Certificates = OzoneSecurityUtil.convertToX509(caCertPems);

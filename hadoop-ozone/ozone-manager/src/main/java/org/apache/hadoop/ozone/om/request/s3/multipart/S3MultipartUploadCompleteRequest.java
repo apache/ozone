@@ -223,21 +223,26 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         OmKeyInfo keyToDelete =
             omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
         long usedBytesDiff = 0;
+        boolean isNamespaceUpdate = false;
         if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
           oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
               keyToDelete, omMetadataManager,
               trxnLogIndex, ozoneManager.isRatisEnabled());
           long numCopy = keyToDelete.getReplicationConfig().getRequiredNodes();
           usedBytesDiff -= keyToDelete.getDataSize() * numCopy;
+        } else {
+          checkBucketQuotaInNamespace(omBucketInfo, 1L);
+          omBucketInfo.incrUsedNamespace(1L);
+          isNamespaceUpdate = true;
         }
 
-        String dbBucketKey = null;
+        String dbBucketKey = omMetadataManager.getBucketKey(
+            omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
         if (usedBytesDiff != 0) {
           omBucketInfo.incrUsedBytes(usedBytesDiff);
-          dbBucketKey = omMetadataManager.getBucketKey(
-              omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
-        } else {
-          // If no bucket size changed, prevent from updating bucket object
+        } else if (!isNamespaceUpdate) {
+          // If no bucket size and Namespace changed, prevent from updating
+          // bucket object.
           omBucketInfo = null;
         }
 
