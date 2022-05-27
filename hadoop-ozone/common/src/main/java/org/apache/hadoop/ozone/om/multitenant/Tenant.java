@@ -29,8 +29,8 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 public interface Tenant {
 
   /**
-   * A tenant is represnted by a globally unique TenantID.
-   * @return Tenant-ID.
+   * A tenant is represented by a globally unique tenant name.
+   * @return tenant name.
    */
   String getTenantId();
 

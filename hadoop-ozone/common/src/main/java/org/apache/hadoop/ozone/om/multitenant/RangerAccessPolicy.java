@@ -303,4 +303,14 @@ public class RangerAccessPolicy implements AccessPolicy {
             + "\"allowExceptions\":[]," + "\"denyPolicyItems\":[],"
             + "\"denyExceptions\":[]," + "\"service\":\"cm_ozone\"" + "}";
   }
+
+  @Override
+  public String toString() {
+    return "RangerAccessPolicy{" + "accessObject=" + accessObject
+        + ", policyMap=" + policyMap + ", roleList=" + roleList + ", policyID='"
+        + policyID + '\'' + ", policyJsonString='" + policyJsonString + '\''
+        + ", policyName='" + policyName + '\''
+        + ", lastPolicyUpdateTimeEpochMillis=" + lastPolicyUpdateTimeEpochMillis
+        + '}';
+  }
 }

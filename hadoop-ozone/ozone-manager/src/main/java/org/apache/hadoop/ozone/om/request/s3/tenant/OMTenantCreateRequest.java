@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
@@ -105,8 +104,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
   public static final Logger LOG =
       LoggerFactory.getLogger(OMTenantCreateRequest.class);
 
-  private transient Tenant tenantInContext;
-
   public OMTenantCreateRequest(OMRequest omRequest) {
     super(omRequest);
   }
@@ -115,8 +112,11 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
   @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
+
     // Check Ozone cluster admin privilege
-    ozoneManager.getMultiTenantManager().checkAdmin();
+    multiTenantManager.checkAdmin();
 
     final OMRequest omRequest = super.preExecute(ozoneManager);
     final CreateTenantRequest request = omRequest.getCreateTenantRequest();
@@ -171,12 +171,18 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final String adminRoleName =
         OMMultiTenantManager.getDefaultAdminRoleName(tenantId);
 
-    // TODO: Acquire some lock
-
-    // If we fail after pre-execute. handleRequestFailure() callback
-    // would clean up any state maintained by the getMultiTenantManager.
-    tenantInContext = ozoneManager.getMultiTenantManager()
-        .createTenantAccessInAuthorizer(tenantId, userRoleName, adminRoleName);
+    // Acquire write lock to authorizer (Ranger)
+    multiTenantManager.getAuthorizerLock().tryWriteLockInOMRequest();
+    try {
+      // Create tenant roles and policies in Ranger.
+      // If the request fails for some reason, Ranger background sync thread
+      // should clean up any leftover policies and roles.
+      multiTenantManager.getAuthorizerOp().createTenant(
+          tenantId, userRoleName, adminRoleName);
+    } catch (Exception e) {
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
+      throw e;
+    }
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
         .setCreateTenantRequest(
@@ -193,25 +199,13 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
   }
 
   @Override
-  public void handleRequestFailure(OzoneManager ozoneManager) {
-    try {
-      // Cleanup any state maintained by OMMultiTenantManager
-      if (tenantInContext != null) {
-        ozoneManager.getMultiTenantManager()
-            .removeTenantAccessFromAuthorizer(tenantInContext);
-      }
-    } catch (Exception e) {
-      // TODO: Ignore for now. Multi-Tenant Manager is responsible for
-      //  cleaning up stale state eventually. The Caller is already calling
-      //  this in a failure context and would throw exception anyway.
-    }
-  }
-
-  @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
 
     final OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumTenantCreates();
@@ -254,7 +248,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           VOLUME_LOCK, volumeName);
 
       // Check volume existence
-      if (omMetadataManager.getVolumeTable().isExist(volumeName)) {
+      if (omMetadataManager.getVolumeTable().isExist(dbVolumeKey)) {
         LOG.debug("volume: '{}' already exists", volumeName);
         throw new OMException("Volume already exists", VOLUME_ALREADY_EXISTS);
       }
@@ -307,6 +301,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           new CacheKey<>(tenantId),
           new CacheValue<>(Optional.of(omDBTenantState), transactionLogIndex));
 
+      // Update tenant cache
+      multiTenantManager.getCacheOp().createTenant(
+          tenantId, userRoleName, adminRoleName);
+
       omResponse.setCreateTenantResponse(
           CreateTenantResponse.newBuilder()
               .build());
@@ -314,22 +312,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           omVolumeArgs, volumeList, omDBTenantState);
 
     } catch (IOException ex) {
-      // Error handling. Clean up Ranger policies when necessary.
-      if (ex instanceof OMException) {
-        final OMException omEx = (OMException) ex;
-        if (!omEx.getResult().equals(VOLUME_ALREADY_EXISTS) &&
-            !omEx.getResult().equals(TENANT_ALREADY_EXISTS)) {
-          handleRequestFailure(ozoneManager);
-        }
-        // Do NOT perform any clean-up if the exception is a result of
-        //  volume name or tenant name already existing.
-        //  Otherwise in a race condition a late-comer could wipe the
-        //  policies of an existing tenant from Ranger.
-      } else {
-        // ALL OMs should proactively call the clean-up handler in other cases
-        handleRequestFailure(ozoneManager);
-      }
-      // Prepare omClientResponse
       omClientResponse = new OMTenantCreateResponse(
           createErrorOMResponse(omResponse, ex));
       exception = ex;
@@ -342,7 +324,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       if (acquiredVolumeLock) {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
-      // TODO: Release some lock
+      // Release authorizer write lock
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
     }
 
     // Perform audit logging

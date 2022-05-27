@@ -97,11 +97,11 @@ Delete Tenant Failure Tenant Not Empty
 Create Tenant Failure with Regular User
     Run Keyword         Kinit test user     testuser2    testuser2.keytab
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant create tenanttwo
-                        Should contain   ${output}         PERMISSION_DENIED User 'testuser2/scm@EXAMPLE.COM' is not an Ozone admin.
+                        Should contain   ${output}         PERMISSION_DENIED User 'testuser2/scm@EXAMPLE.COM' or 'testuser2' is not an Ozone admin
 
 SetSecret Failure with Regular User
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user set-secret 'tenantone$testuser' --secret=somesecret2
-                        Should contain   ${output}         Permission denied. Requested accessId
+                        Should contain   ${output}         USER_MISMATCH Requested accessId 'tenantone$testuser' doesn't belong to current user 'testuser2/scm@EXAMPLE.COM', nor does current user have Ozone or tenant administrator privilege
 
 Create Bucket 2 Success with somesecret1 via S3 API
     ${output} =         Execute          aws s3api --endpoint-url ${S3G_ENDPOINT_URL} create-bucket --bucket bucket-test2

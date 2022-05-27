@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -46,7 +47,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Secre
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignUserAccessIdRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignUserAccessIdResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateGetS3SecretRequest;
-import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,6 +56,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeSet;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
@@ -98,6 +99,7 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SC
  * Handles OMAssignUserToTenantRequest.
  */
 public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
+
   public static final Logger LOG =
       LoggerFactory.getLogger(OMTenantAssignUserAccessIdRequest.class);
 
@@ -110,29 +112,40 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
     final OMRequest omRequest = super.preExecute(ozoneManager);
+
     final TenantAssignUserAccessIdRequest request =
         omRequest.getTenantAssignUserAccessIdRequest();
 
     final String tenantId = request.getTenantId();
 
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
+
     // Caller should be an Ozone admin, or at least a tenant non-delegated admin
-    ozoneManager.getMultiTenantManager().checkTenantAdmin(tenantId, false);
+    multiTenantManager.checkTenantAdmin(tenantId, false);
 
     final String userPrincipal = request.getUserPrincipal();
     final String accessId = request.getAccessId();
+
+    // Check accessId length.
+    if (accessId.length() >= OZONE_MAXIMUM_ACCESS_ID_LENGTH) {
+      throw new OMException(
+          "accessId length exceeds the maximum length allowed",
+          ResultCodes.INVALID_ACCESS_ID);
+    }
 
     // Check userPrincipal (username) validity.
     if (userPrincipal.contains(OzoneConsts.TENANT_ID_USERNAME_DELIMITER)) {
       throw new OMException("Invalid tenant username '" + userPrincipal +
           "'. Tenant username shouldn't contain delimiter.",
-          OMException.ResultCodes.INVALID_TENANT_USERNAME);
+          ResultCodes.INVALID_TENANT_USERNAME);
     }
 
     // Check tenant name validity.
     if (tenantId.contains(OzoneConsts.TENANT_ID_USERNAME_DELIMITER)) {
       throw new OMException("Invalid tenant name '" + tenantId +
           "'. Tenant name shouldn't contain delimiter.",
-          OMException.ResultCodes.INVALID_TENANT_ID);
+          ResultCodes.INVALID_TENANT_ID);
     }
 
     // HDDS-6366: Disallow specifying custom accessId.
@@ -142,33 +155,35 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       throw new OMException("Invalid accessId '" + accessId + "'. "
           + "Specifying a custom access ID disallowed. "
           + "Expected accessId to be assigned is '" + expectedAccessId + "'",
-          OMException.ResultCodes.INVALID_ACCESS_ID);
+          ResultCodes.INVALID_ACCESS_ID);
     }
 
-    ozoneManager.getMultiTenantManager().checkTenantExistence(tenantId);
+    multiTenantManager.checkTenantExistence(tenantId);
 
     // Below call implies user existence check in authorizer.
     // If the user doesn't exist, Ranger return 400 and the call should throw.
 
-    // TODO: Acquire some lock
-    // Call OMMTM
-    // Inform MultiTenantManager of user assignment so it could
-    //  initialize some policies in Ranger.
-    final String roleId = ozoneManager.getMultiTenantManager()
-        .assignUserToTenant(new BasicUserPrincipal(userPrincipal), tenantId,
-            accessId);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("roleId that the user is assigned to: {}", roleId);
+    // Acquire write lock to authorizer (Ranger)
+    multiTenantManager.getAuthorizerLock().tryWriteLockInOMRequest();
+    try {
+      // Add user to tenant user role in Ranger.
+      // Throws if the user doesn't exist in Ranger.
+      multiTenantManager.getAuthorizerOp()
+          .assignUserToTenant(userPrincipal, tenantId, accessId);
+    } catch (Exception e) {
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
+      throw e;
     }
 
-    // Generate secret. Used only when doesn't the kerberosID entry doesn't
-    //  exist in DB, discarded otherwise.
+    // Generate secret. However, this is used only when the accessId entry
+    // doesn't exist in DB and need to be created, discarded otherwise.
     final String s3Secret = DigestUtils.sha256Hex(OmUtils.getSHADigest());
 
     final UpdateGetS3SecretRequest updateGetS3SecretRequest =
         UpdateGetS3SecretRequest.newBuilder()
+            .setKerberosID(accessId)
             .setAwsSecret(s3Secret)
-            .setKerberosID(accessId).build();
+            .build();
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
         .setUpdateGetS3SecretRequest(updateGetS3SecretRequest);
@@ -177,32 +192,13 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
   }
 
   @Override
-  public void handleRequestFailure(OzoneManager ozoneManager) {
-    final TenantAssignUserAccessIdRequest request =
-        getOmRequest().getTenantAssignUserAccessIdRequest();
-
-    try {
-      // Undo Authorizer states established in preExecute
-      ozoneManager.getMultiTenantManager().revokeUserAccessId(
-          request.getAccessId());
-    } catch (IOException ioEx) {
-      final String userPrincipal = request.getUserPrincipal();
-      final String tenantId = request.getTenantId();
-      final String accessId = request.getAccessId();
-      ozoneManager.getMultiTenantManager().removeUserAccessIdFromCache(
-          accessId, userPrincipal, tenantId);
-    } catch (Exception e) {
-      // TODO: Ignore for now. See OMTenantCreateRequest#handleRequestFailure
-      // TODO: Temporary solution for remnant tenantCache entry. Might becomes
-      //  useless with Ranger thread impl. Can remove.
-    }
-  }
-
-  @Override
   @SuppressWarnings("checkstyle:methodlength")
   public OMClientResponse validateAndUpdateCache(
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
 
     final OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumTenantAssignUsers();
@@ -243,14 +239,14 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       if (!omMetadataManager.getTenantStateTable().isExist(tenantId)) {
         LOG.error("tenant {} doesn't exist", tenantId);
         throw new OMException("tenant '" + tenantId + "' doesn't exist",
-            OMException.ResultCodes.TENANT_NOT_FOUND);
+            ResultCodes.TENANT_NOT_FOUND);
       }
 
       // Expect accessId absence from tenantAccessIdTable
       if (omMetadataManager.getTenantAccessIdTable().isExist(accessId)) {
         LOG.error("accessId {} already exists", accessId);
         throw new OMException("accessId '" + accessId + "' already exists!",
-            OMException.ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
+            ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
       }
 
       OmDBUserPrincipalInfo principalInfo = omMetadataManager
@@ -272,7 +268,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
                 + "to the same tenant more than once. User '" + userPrincipal
                 + "' is already assigned to tenant '" + tenantId + "' with "
                 + "accessId '" + existingAccId + "'.",
-                OMException.ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
+                ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
           }
         }
       }
@@ -313,7 +309,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
         LOG.error("accessId '{}' already exists in S3SecretTable", accessId);
         throw new OMException("accessId '" + accessId +
             "' already exists in S3SecretTable",
-            OMException.ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
+            ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
       }
 
       omMetadataManager.getS3SecretTable().addCacheEntry(
@@ -322,6 +318,10 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
 
       omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, accessId);
       acquiredS3SecretLock = false;
+
+      // Update tenant cache
+      multiTenantManager.getCacheOp()
+          .assignUserToTenant(userPrincipal, tenantId, accessId);
 
       // Generate response
       omResponse.setTenantAssignUserAccessIdResponse(
@@ -333,7 +333,6 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
           omResponse.build(), s3SecretValue, userPrincipal,
           accessId, omDBAccessIdInfo, principalInfo);
     } catch (IOException ex) {
-      handleRequestFailure(ozoneManager);
       exception = ex;
       omResponse.setTenantAssignUserAccessIdResponse(
           TenantAssignUserAccessIdResponse.newBuilder().build());
@@ -349,7 +348,8 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
-      // TODO: Release some lock
+      // Release authorizer write lock
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
     }
 
     // Audit

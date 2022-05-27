@@ -26,10 +26,13 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.multitenant.OzoneTenant;
+import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
@@ -69,13 +72,33 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
   @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
+    final OMRequest omRequest = super.preExecute(ozoneManager);
+
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
+
     // Check Ozone cluster admin privilege
-    ozoneManager.getMultiTenantManager().checkAdmin();
+    multiTenantManager.checkAdmin();
 
-    // TODO: Acquire some lock
-    // TODO: TBD: Call ozoneManager.getMultiTenantManager().deleteTenant() ?
+    // First get tenant name
+    final String tenantId = omRequest.getDeleteTenantRequest().getTenantId();
+    Preconditions.checkNotNull(tenantId);
 
-    return super.preExecute(ozoneManager);
+    // Get tenant object by tenant name
+    final Tenant tenantObj = multiTenantManager.getTenantFromDBById(tenantId);
+
+    // Acquire write lock to authorizer (Ranger)
+    multiTenantManager.getAuthorizerLock().tryWriteLockInOMRequest();
+    try {
+      // Remove policies and roles from Ranger
+      // TODO: Deactivate (disable) policies instead of delete?
+      multiTenantManager.getAuthorizerOp().deleteTenant(tenantObj);
+    } catch (Exception e) {
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
+      throw e;
+    }
+
+    return omRequest;
   }
 
   @Override
@@ -83,6 +106,9 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
   public OMClientResponse validateAndUpdateCache(
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
 
     final OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumTenantDeletes();
@@ -162,8 +188,11 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
         // TODO: Set response dbVolumeKey?
       }
 
-      // Compose response
+      // Update tenant cache
+      multiTenantManager.getCacheOp().deleteTenant(new OzoneTenant(tenantId));
 
+      // Compose response
+      //
       // If decVolumeRefCount is false, return -1 to the client, otherwise
       // return the actual volume refCount. Note if the actual volume refCount
       // becomes negative somehow, omVolumeArgs.decRefCount() would have thrown
@@ -188,7 +217,8 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       if (acquiredVolumeLock) {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
-      // TODO: Release some lock
+      // Release authorizer write lock
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
     }
 
     // Perform audit logging

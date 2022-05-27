@@ -22,7 +22,6 @@ import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Acl;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Policy;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Role;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.http.auth.BasicUserPrincipal;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -41,14 +40,14 @@ import java.util.stream.Collectors;
  */
 public class TestMultiTenantAccessController {
   private MultiTenantAccessController controller;
-  private List<BasicUserPrincipal> users;
+  private List<String> users;
 
   @Before
   public void setupUsers() {
     // If testing against a real cluster, users must already be added to Ranger.
     users = new ArrayList<>();
-    users.add(new BasicUserPrincipal("om"));
-    users.add(new BasicUserPrincipal("hdfs"));
+    users.add("om");
+    users.add("hdfs");
   }
 
   /**

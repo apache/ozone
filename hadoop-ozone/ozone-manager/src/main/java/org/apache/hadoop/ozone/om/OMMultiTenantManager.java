@@ -21,18 +21,20 @@ import java.io.IOException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
+import org.apache.hadoop.ozone.om.multitenant.AuthorizerLock;
 import org.apache.hadoop.ozone.om.multitenant.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.multitenant.OzoneTenantRolePrincipal;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
-import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
@@ -45,6 +47,8 @@ import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENAN
 /**
  * OM MultiTenant manager interface.
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public interface OMMultiTenantManager {
   /* TODO: Outdated
    * Init multi-tenant manager. Performs initialization e.g.
@@ -83,55 +87,9 @@ public interface OMMultiTenantManager {
    */
   OMMetadataManager getOmMetadataManager();
 
-  /**
-   * Given a TenantID String, Create and return Tenant Interface.
-   *
-   * @param tenantID
-   * @param userRoleName
-   * @param adminRoleName
-   * @return Tenant interface.
-   */
-  Tenant createTenantAccessInAuthorizer(String tenantID, String userRoleName,
-      String adminRoleName) throws IOException;
+  TenantOp getAuthorizerOp();
 
-  /**
-   * Given a TenantID, destroys all state associated with that tenant.
-   * This is different from deactivateTenant() above.
-   * @param tenant
-   * @return
-   * @throws IOException
-   */
-  void removeTenantAccessFromAuthorizer(Tenant tenant) throws Exception;
-
-
-  /**
-   * Creates a new user that exists for S3 API access to Ozone.
-   * @param principal
-   * @param tenantId
-   * @param accessId
-   * @return Unique UserID.
-   * @throws IOException if there is any error condition detected.
-   */
-  String assignUserToTenant(BasicUserPrincipal principal, String tenantId,
-                            String accessId) throws IOException;
-
-  /**
-   * Revoke user accessId.
-   * @param accessId
-   * @throws IOException
-   */
-  void revokeUserAccessId(String accessId) throws IOException;
-
-  /**
-   * A placeholder method to remove a failed-to-assign accessId from
-   * tenantCache.
-   * Triggered in OMAssignUserToTenantRequest#handleRequestFailure.
-   * Most likely becomes unnecessary if we move OMMTM call to the end of the
-   * request (current it runs in preExecute).
-   * TODO: Remove this if unneeded when Ranger thread patch lands.
-   */
-  void removeUserAccessIdFromCache(String accessId, String userPrincipal,
-                                   String tenantId);
+  TenantOp getCacheOp();
 
   /**
    * Given an accessId, return kerberos user name for the tenant user.
@@ -211,18 +169,6 @@ public interface OMMultiTenantManager {
   }
 
   /**
-   * Given a user, make him an admin of the corresponding Tenant.
-   * @param accessID
-   * @param delegated
-   */
-  void assignTenantAdmin(String accessID, boolean delegated) throws IOException;
-
-  /**
-   * Given a user, remove him as admin of the corresponding Tenant.
-   */
-  void revokeTenantAdmin(String accessID) throws IOException;
-
-  /**
    * Passes check only when caller is an Ozone (cluster) admin, throws
    * OMException otherwise.
    * @throws OMException PERMISSION_DENIED
@@ -266,6 +212,14 @@ public interface OMMultiTenantManager {
    * @return tenant user role name
    */
   String getTenantAdminRoleName(String tenantId) throws IOException;
+
+  /**
+   * Get Tenant object of given tenant name from OM DB.
+   * @param tenantId tenant name
+   * @return Tenant
+   * @throws IOException
+   */
+  Tenant getTenantFromDBById(String tenantId) throws IOException;
 
   boolean isUserAccessIdPrincipalOrTenantAdmin(String accessId,
       UserGroupInformation ugi) throws IOException;
@@ -362,4 +316,6 @@ public interface OMMultiTenantManager {
    */
   AccessPolicy newDefaultBucketAccessPolicy(String tenantId,
       OzoneTenantRolePrincipal userRole) throws IOException;
+
+  AuthorizerLock getAuthorizerLock();
 }

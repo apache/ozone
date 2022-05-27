@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.shell;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -27,6 +28,7 @@ import org.apache.hadoop.io.retry.RetryInvocationHandler;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -197,6 +199,7 @@ public class TestOzoneTenantShell {
         OMTenantAssignUserAccessIdRequest.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(
         MultiTenantAccessAuthorizerRangerPlugin.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(AuthorizerLockImpl.LOG, Level.DEBUG);
   }
 
   @After
@@ -512,6 +515,13 @@ public class TestOzoneTenantShell {
         + "export AWS_SECRET_ACCESS_KEY='", false);
     checkOutput(err, "", true);
 
+    // accessId length exceeding limit, should fail
+    executeHA(tenantShell, new String[] {
+        "user", "assign", StringUtils.repeat('a', 100), "--tenant=dev"});
+    checkOutput(out, "", true);
+    checkOutput(err, "accessId length (104) exceeds the maximum length "
+        + "allowed (100)\n", true);
+
     // Get user info
     // Equivalent to `ozone tenant user info bob`
     executeHA(tenantShell, new String[] {
@@ -524,7 +534,7 @@ public class TestOzoneTenantShell {
 
     // Assign admin
     executeHA(tenantShell, new String[] {
-        "user", "assign-admin", "dev$bob", "--tenant=dev"});
+        "user", "assign-admin", "dev$bob", "--tenant=dev", "--delegated"});
     checkOutput(out, "", true);
     checkOutput(err, "", true);
 
@@ -822,13 +832,9 @@ public class TestOzoneTenantShell {
           "--secret=somesecret2"});
       Assert.assertTrue("Should return non-zero exit code!", exitC != 0);
       checkOutput(out, "", true);
-      checkOutput(err, "Permission denied. Requested accessId "
-          + "'tenant-test-set-secret$alice' and user doesn't satisfy any of:\n"
-          + "1) accessId match current username: 'bob';\n"
-          + "2) is an OM admin;\n"
-          + "3) user is assigned to a tenant under this accessId;\n"
-          + "4) user is an admin of the tenant where the accessId is "
-          + "assigned\n", true);
+      checkOutput(err, "Requested accessId 'tenant-test-set-secret$alice'"
+          + " doesn't belong to current user 'bob', nor does current user"
+          + " have Ozone or tenant administrator privilege\n", true);
       return null;
     });
 
@@ -1057,5 +1063,23 @@ public class TestOzoneTenantShell {
     checkOutput(out, "", true);
     checkOutput(err, "Deleted tenant '" + tenantName + "'.\n", false);
     deleteVolume(tenantName);
+  }
+
+  @Test
+  public void testCreateTenantOnExistingVolumeShouldFail() throws IOException {
+    final String testVolume = "existing-volume-1";
+    int exitC = execute(ozoneSh, new String[] {"volume", "create", testVolume});
+    // Volume create should succeed
+    Assert.assertEquals(0, exitC);
+    checkOutput(out, "", true);
+    checkOutput(err, "", true);
+
+    // Try to create tenant on the same volume, should fail
+    executeHA(tenantShell, new String[] {"create", testVolume});
+    checkOutput(out, "", true);
+    checkOutput(err, "Volume already exists\n", true);
+
+    // Clean up
+    deleteVolume(testVolume);
   }
 }

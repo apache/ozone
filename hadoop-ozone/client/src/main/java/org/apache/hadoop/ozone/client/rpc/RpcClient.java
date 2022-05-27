@@ -158,6 +158,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH;
 
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ratis.protocol.ClientId;
@@ -881,6 +882,10 @@ public class RpcClient implements ClientProtocol {
         "tenantId can't be null or empty.");
     Preconditions.checkArgument(Strings.isNotBlank(accessId),
         "accessId can't be null or empty.");
+    Preconditions.checkArgument(
+        accessId.length() <= OZONE_MAXIMUM_ACCESS_ID_LENGTH, "accessId length ("
+            + accessId.length() + ") exceeds the maximum length allowed ("
+            + OZONE_MAXIMUM_ACCESS_ID_LENGTH + ")");
     return ozoneManagerClient.tenantAssignUserAccessId(
         username, tenantId, accessId);
   }

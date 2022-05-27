@@ -132,7 +132,15 @@ OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,recon,s3g,kdc,localhost,127.0.0.1
 
-OZONE-SITE.XML_ozone.om.ranger.https-address=http://ranger:6080
 OZONE-SITE.XML_ozone.om.multitenancy.enabled=true
+OZONE-SITE.XML_ozone.om.ranger.https-address=http://ranger:6080
+
 OZONE-SITE.XML_ozone.om.ranger.https.admin.api.user=admin
 OZONE-SITE.XML_ozone.om.ranger.https.admin.api.passwd=passwd
+
+# Note: ozone.om.kerberos.principal and ozone.om.kerberos.keytab.file
+# (which are required for the Multi-Tenancy Ranger Java client) are already
+# properly defined above.
+
+OZONE-SITE.XML_ozone.om.multitenancy.ranger.sync.interval=30s
+OZONE-SITE.XML_ozone.om.multitenancy.ranger.sync.timeout=10s
