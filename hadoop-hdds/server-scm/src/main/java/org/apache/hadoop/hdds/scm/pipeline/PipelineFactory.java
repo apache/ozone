@@ -85,9 +85,25 @@ public class PipelineFactory {
       ReplicationConfig replicationConfig, List<DatanodeDetails> excludedNodes,
       List<DatanodeDetails> favoredNodes)
       throws IOException {
-    return providers
-        .get(replicationConfig.getReplicationType())
+    Pipeline pipeline = providers.get(replicationConfig.getReplicationType())
         .create(replicationConfig, excludedNodes, favoredNodes);
+    checkPipeline(pipeline);
+    return pipeline;
+  }
+
+  private void checkPipeline(Pipeline pipeline) throws IOException {
+    // In case in case if provided pipeline provider returns null.
+    if (pipeline == null) {
+      throw new IOException("Pipeline cannot be null");
+    }
+    // In case if provided pipeline returns less number of nodes than
+    // required.
+    if (pipeline.getNodes().size() != pipeline.getReplicationConfig()
+        .getRequiredNodes()) {
+      throw new IOException("Nodes size= " + pipeline.getNodes()
+          .size() + ", replication factor=" + pipeline.getReplicationConfig()
+          .getRequiredNodes() + " do not match");
+    }
   }
 
   public Pipeline create(ReplicationConfig replicationConfig,

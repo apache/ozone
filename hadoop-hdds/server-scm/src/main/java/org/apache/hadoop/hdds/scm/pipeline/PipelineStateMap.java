@@ -70,6 +70,14 @@ class PipelineStateMap {
    * @throws IOException if pipeline with provided pipelineID already exists
    */
   void addPipeline(Pipeline pipeline) throws IOException {
+    Preconditions.checkNotNull(pipeline, "Pipeline cannot be null");
+    Preconditions.checkArgument(
+        pipeline.getNodes().size() == pipeline.getReplicationConfig()
+            .getRequiredNodes(),
+        "Nodes size=%s, replication factor=%s do not match ",
+        pipeline.getNodes().size(), pipeline.getReplicationConfig()
+            .getRequiredNodes());
+
     if (pipelineMap.putIfAbsent(pipeline.getId(), pipeline) != null) {
       LOG.warn("Duplicate pipeline ID detected. {}", pipeline.getId());
       throw new IOException(String
