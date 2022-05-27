@@ -75,8 +75,8 @@ class PipelineStateMap {
         pipeline.getNodes().size() == pipeline.getReplicationConfig()
             .getRequiredNodes(),
         "Nodes size=%s, replication factor=%s do not match ",
-        pipeline.getNodes().size(), pipeline.getReplicationConfig()
-            .getRequiredNodes());
+            pipeline.getNodes().size(), pipeline.getReplicationConfig()
+                .getRequiredNodes());
 
     if (pipelineMap.putIfAbsent(pipeline.getId(), pipeline) != null) {
       LOG.warn("Duplicate pipeline ID detected. {}", pipeline.getId());
