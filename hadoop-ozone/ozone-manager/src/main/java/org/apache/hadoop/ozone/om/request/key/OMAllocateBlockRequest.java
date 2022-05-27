@@ -284,4 +284,33 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     }
     return req;
   }
+
+  /**
+   * Validates block allocation requests.
+   * We do not want to allow older clients to create block allocation requests
+   * for keys that are present in buckets which use non LEGACY layouts.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.AllocateBlock
+  )
+  public static OMRequest blockAllocateBlockWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    if (req.getAllocateBlockRequest().hasKeyArgs()) {
+      KeyArgs keyArgs = req.getAllocateBlockRequest().getKeyArgs();
+
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
+      }
+    }
+    return req;
+  }
 }

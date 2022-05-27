@@ -97,7 +97,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
       }
 
       omClientResponse = new OMOpenKeysDeleteResponse(omResponse.build(),
-          deletedOpenKeys, ozoneManager.isRatisEnabled());
+          deletedOpenKeys, ozoneManager.isRatisEnabled(), getBucketLayout());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -151,8 +151,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
               volumeName, bucketName);
 
       for (OpenKey key: keysPerBucket.getKeysList()) {
-        String fullKeyName = omMetadataManager.getOpenKey(volumeName,
-                bucketName, key.getName(), key.getClientID());
+        String fullKeyName = key.getName();
 
         // If an open key is no longer present in the table, it was committed
         // and should not be deleted.
