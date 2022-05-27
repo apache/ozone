@@ -1747,7 +1747,8 @@ public class RpcClient implements ClientProtocol {
       long numEntries, boolean allowPartialPrefixes) throws IOException {
     OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName);
     return ozoneManagerClient
-        .listStatus(keyArgs, recursive, startKey, numEntries, allowPartialPrefixes);
+        .listStatus(keyArgs, recursive, startKey, numEntries,
+            allowPartialPrefixes);
   }
 
   /**
