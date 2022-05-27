@@ -191,12 +191,12 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       // Remove accessId from principalToAccessIdsTable
       OmDBAccessIdInfo omDBAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessId);
-      assert (omDBAccessIdInfo != null);
+      Preconditions.checkNotNull(omDBAccessIdInfo);
       userPrincipal = omDBAccessIdInfo.getUserPrincipal();
-      assert (userPrincipal != null);
+      Preconditions.checkNotNull(userPrincipal);
       OmDBUserPrincipalInfo principalInfo = omMetadataManager
           .getPrincipalToAccessIdsTable().getIfExist(userPrincipal);
-      assert (principalInfo != null);
+      Preconditions.checkNotNull(principalInfo);
       principalInfo.removeAccessId(accessId);
       omMetadataManager.getPrincipalToAccessIdsTable().addCacheEntry(
           new CacheKey<>(userPrincipal),

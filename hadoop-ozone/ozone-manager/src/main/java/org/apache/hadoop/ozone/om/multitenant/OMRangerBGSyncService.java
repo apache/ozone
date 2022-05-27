@@ -62,7 +62,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL;
 
 /**
@@ -288,17 +287,7 @@ public class OMRangerBGSyncService extends BackgroundService {
   }
 
   private void triggerRangerSyncOnce() {
-    long lockStamp = 0L;
     try {
-      // Acquire authorizer (Ranger) write lock
-      lockStamp = authorizerLock.tryReadLock(
-          OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
-      if (lockStamp == 0L) {
-        LOG.warn("Timed out acquiring read lock. Another authorizer"
-            + " operation is in-progress. Skipped run # {}.", runCount.get());
-        // TODO: Schedule the next run sooner?
-        return;
-      }
       long dbOzoneServiceVersion = getOMDBRangerServiceVersion();
       long rangerOzoneServiceVersion = getLatestRangerServiceVersion();
 
@@ -323,10 +312,6 @@ public class OMRangerBGSyncService extends BackgroundService {
       // has the up-to-date Ranger service version most of the times.
       int attempt = 0;
       while (dbOzoneServiceVersion != rangerOzoneServiceVersion) {
-        // Release authorizer write lock to temporarily allow other ops to
-        // interleave
-        authorizerLock.unlockRead(lockStamp);
-        lockStamp = 0L;
 
         if (++attempt > MAX_ATTEMPT) {
           if (LOG.isDebugEnabled()) {
@@ -350,28 +335,14 @@ public class OMRangerBGSyncService extends BackgroundService {
         // Submit Ratis Request to sync the new service version in OM DB
         setOMDBRangerServiceVersion(rangerOzoneServiceVersion);
 
-        // Acquire lock again before getting the latest Ranger service version
-        lockStamp = authorizerLock.tryReadLock(
-            OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS);
-        if (lockStamp == 0L) {
-          LOG.warn("Timed out acquiring read lock. Another authorizer"
-              + " operation is in-progress. Skipping next attempt.");
-          // TODO: Schedule the next run sooner?
-          return;
-        }
-
         // Check Ranger Ozone service version again
         dbOzoneServiceVersion = rangerOzoneServiceVersion;
         rangerOzoneServiceVersion = getLatestRangerServiceVersion();
       }
-    } catch (IOException | ServiceException | InterruptedException e) {
+    } catch (IOException | ServiceException e) {
       LOG.warn("Exception during Ranger Sync", e);
       // TODO: Check for specific exception once switched to
       //  RangerRestMultiTenantAccessController
-    } finally {
-      if (lockStamp != 0L) {
-        authorizerLock.unlockRead(lockStamp);
-      }
     }
 
   }
@@ -437,13 +408,12 @@ public class OMRangerBGSyncService extends BackgroundService {
       try {
         loadAllPoliciesAndRoleNamesFromRanger(baseVersion);
         loadAllRolesFromRanger();
+        loadAllRolesFromOM();
       } catch (IOException e) {
-        LOG.error("Failed to load policies or roles from Ranger", e);
+        LOG.error("Failed to load policies or roles from Ranger or DB", e);
         throw new RuntimeException(e);
       }
     });
-
-    loadAllRolesFromOM();
 
     // This should isolate policies into two groups
     // 1. mtRangerPoliciesTobeDeleted and

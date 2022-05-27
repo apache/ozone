@@ -114,7 +114,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    */
   private final TenantOp authorizerOp;
   /**
-   * Authorizer operations. Meant to be called in tenant validateAndUpdateCache.
+   * Cache operations. Meant to be called in tenant validateAndUpdateCache.
    */
   private final TenantOp cacheOp;
 
@@ -570,9 +570,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         LOG.info("Adding to cache: user '{}' accessId '{}' in tenant '{}'",
             userPrincipal, accessId, tenantId);
         cachedTenantState.getAccessIdInfoMap().put(accessId, cacheEntry);
-      } catch (Exception e) {
-        // Attempt to clean up tenant cache entry on exception
-        tenantCache.get(tenantId).getAccessIdInfoMap().remove(accessId);
       } finally {
         tenantCacheLock.writeLock().unlock();
       }
@@ -592,9 +589,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
               + "in tenant cache!", INTERNAL_ERROR);
         }
         tenantCache.get(tenantId).getAccessIdInfoMap().remove(accessId);
-      } catch (NullPointerException e) {
-        // tenantCache is somehow empty. Ignore for now.
-        LOG.warn("NPE when removing accessId from cache", e);
       } finally {
         tenantCacheLock.writeLock().unlock();
       }
@@ -952,17 +946,15 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         omMetadataManager.getTenantStateTable().get(tenantId);
 
     if (tenantState == null) {
-      throw new OMException("Potential DB error or race condition. "
-          + "OmDBTenantState entry is missing for tenant '" + tenantId + "'.",
+      throw new OMException("Tenant '" + tenantId + "' does not exist",
           OMException.ResultCodes.TENANT_NOT_FOUND);
     }
 
     final String volumeName = tenantState.getBucketNamespaceName();
 
     if (volumeName == null) {
-      throw new OMException("Potential DB error. volumeName "
-          + "field is null for tenantId '" + tenantId + "'.",
-          OMException.ResultCodes.VOLUME_NOT_FOUND);
+      throw new OMException("Volume for tenant '" + tenantId +
+          "' is not set!", OMException.ResultCodes.VOLUME_NOT_FOUND);
     }
 
     return volumeName;
@@ -1016,8 +1008,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         omMetadataManager.getTenantStateTable().get(tenantId);
 
     if (tenantState == null) {
-      throw new OMException("Potential DB error or race condition. "
-          + "OmDBTenantState entry is missing for tenant '" + tenantId + "'.",
+      throw new OMException("Tenant '" + tenantId + "' does not exist",
           OMException.ResultCodes.TENANT_NOT_FOUND);
     }
 
