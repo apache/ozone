@@ -528,4 +528,16 @@ public final class OzoneConsts {
       "/service/plugins/policies/service/";
 
   public static final String OZONE_TENANT_RANGER_POLICY_LABEL = "OzoneTenant";
+
+  /**
+   * The time (in ms) that AuthorizerLock try-lock operations would wait (by
+   * default, some can be overridden) before declaring timeout.
+   */
+  public static final long OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS = 1000L;
+
+  /**
+   * The maximum length of accessId allowed when assigning new users to a
+   * tenant.
+   */
+  public static final int OZONE_MAXIMUM_ACCESS_ID_LENGTH = 100;
 }

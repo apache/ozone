@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
-import org.apache.http.auth.BasicUserPrincipal;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
@@ -106,8 +105,8 @@ public class TestOMMultiTenantManagerImpl {
 
   @Test
   public void testListUsersInTenant() throws Exception {
-    tenantManager.assignUserToTenant(
-        new BasicUserPrincipal("user1"), TENANT_ID, "accessId1");
+    tenantManager.getCacheOp()
+        .assignUserToTenant("user1", TENANT_ID, "accessId1");
 
     TenantUserList tenantUserList =
         tenantManager.listUsersInTenant(TENANT_ID, "");
@@ -138,10 +137,12 @@ public class TestOMMultiTenantManagerImpl {
   public void testRevokeUserAccessId() throws Exception {
 
     LambdaTestUtils.intercept(OMException.class, () ->
-        tenantManager.revokeUserAccessId("accessId1"));
+        tenantManager.getCacheOp()
+            .revokeUserAccessId("unknown-AccessId1", TENANT_ID));
     assertEquals(1, tenantManager.getTenantCache().size());
 
-    tenantManager.revokeUserAccessId("seed-accessId1");
+    tenantManager.getCacheOp()
+        .revokeUserAccessId("seed-accessId1", TENANT_ID);
     assertTrue(tenantManager.getTenantCache().get(TENANT_ID)
         .getAccessIdInfoMap().isEmpty());
     assertTrue(tenantManager.listUsersInTenant(TENANT_ID, null)
@@ -149,7 +150,7 @@ public class TestOMMultiTenantManagerImpl {
   }
 
   @Test
-  public void testGetTenantForAccessID() throws Exception {
+  public void testGetTenantForAccessId() throws Exception {
     Optional<String> optionalTenant = tenantManager.getTenantForAccessID(
         "seed-accessId1");
     assertTrue(optionalTenant.isPresent());

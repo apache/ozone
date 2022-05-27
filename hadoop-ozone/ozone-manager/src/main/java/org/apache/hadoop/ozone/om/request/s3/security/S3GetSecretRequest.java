@@ -66,24 +66,21 @@ public class S3GetSecretRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    GetS3SecretRequest s3GetSecretRequest =
+
+    final GetS3SecretRequest s3GetSecretRequest =
         getOmRequest().getGetS3SecretRequest();
 
-    // Generate S3 Secret to be used by OM quorum.
-    // Note 1: The proto field kerberosID is effectively accessId already.
-    // It is still named kerberosID because kerberosID == accessId before
-    // multi-tenancy. TODO: Rename the kerberosID field later in master branch.
-    String accessId = s3GetSecretRequest.getKerberosID();
+    // The proto field kerberosID is effectively accessId w/ Multi-Tenancy
+    //
+    // But it is still named kerberosID because kerberosID == accessId before
+    // multi-tenancy feature is implemented. And renaming proto field fails the
+    // protolock check.
+    final String accessId = s3GetSecretRequest.getKerberosID();
 
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
-    final String username = ugi.getUserName();
-    // Permission check. Users need to be themselves or have admin privilege
-    if (!username.equals(accessId) && !ozoneManager.isAdmin(ugi)) {
-      throw new OMException("Requested accessId '" + accessId +
-          "' doesn't match current user '" + username +
-          "', nor does current user has administrator privilege.",
-          OMException.ResultCodes.USER_MISMATCH);
-    }
+    // Permission check
+    S3SecretRequestHelper.checkAccessIdSecretOpPermission(
+        ozoneManager, ugi, accessId);
 
     // Client issues GetS3Secret request, when received by OM leader
     // it will generate s3Secret. Original GetS3Secret request is

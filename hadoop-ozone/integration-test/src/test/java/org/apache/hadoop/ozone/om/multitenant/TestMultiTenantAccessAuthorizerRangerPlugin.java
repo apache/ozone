@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.http.auth.BasicUserPrincipal;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -105,7 +104,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
       OzoneTenantRolePrincipal userRole =
           new OzoneTenantRolePrincipal("tenant1-UserRole");
 
-      BasicUserPrincipal userPrincipal = new BasicUserPrincipal("user1Test");
+      String userPrincipal = "user1Test";
       usersIdsCreated.add(
           omm.assignUserToRole(userPrincipal, userRole.getName(), false));
       usersIdsCreated.add(
@@ -137,7 +136,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
         omm.deleteUser(id);
       }
       for (String id : groupIdsCreated) {
-        omm.deleteRole(id);
+        omm.deleteRoleById(id);
       }
     }
   }
@@ -146,7 +145,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
   @Ignore("TODO:Requires (mocked) Ranger endpoint")
   public void testMultiTenantAccessAuthorizerRangerPluginWithoutIds()
       throws Exception {
-    BasicUserPrincipal userPrincipal = null;
+    String userPrincipal = null;
     simulateOzoneSiteXmlConfig();
     final MultiTenantAccessAuthorizer omm =
         new MultiTenantAccessAuthorizerRangerPlugin();
@@ -163,7 +162,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
       omm.createRole(group2Principal.getName(), group1Principal.getName());
       groupIdsCreated.add(omm.getRole(group2Principal));
 
-      userPrincipal = new BasicUserPrincipal("user1Test");
+      userPrincipal = "user1Test";
       omm.assignUserToRole(userPrincipal, group2Principal.getName(), false);
 
       AccessPolicy tenant1VolumeAccessPolicy = createVolumeAccessPolicy(
@@ -195,7 +194,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
       String userId = omm.getUserId(userPrincipal);
       omm.deleteUser(userId);
       for (String id : groupIdsCreated) {
-        omm.deleteRole(id);
+        omm.deleteRoleById(id);
       }
     }
   }

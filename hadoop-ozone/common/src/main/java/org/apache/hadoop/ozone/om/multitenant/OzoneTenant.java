@@ -28,8 +28,8 @@ import org.apache.hadoop.ozone.om.multitenant.impl.SingleVolumeTenantNamespace;
  */
 public class OzoneTenant implements Tenant {
   private final String tenantId;
-  private List<String> tenantRoleNames;
-  private List<AccessPolicy> accessPolicies;
+  private final List<String> tenantRoleNames;
+  private final List<AccessPolicy> accessPolicies;
   private final AccountNameSpace accountNameSpace;
   private final BucketNameSpace bucketNameSpace;
 
@@ -84,5 +84,13 @@ public class OzoneTenant implements Tenant {
   @Override
   public List<String> getTenantRoles() {
     return tenantRoleNames;
+  }
+
+  @Override
+  public String toString() {
+    return "OzoneTenant{" + "tenantId='" + tenantId + '\''
+        + ", tenantRoleNames=" + tenantRoleNames + ", accessPolicies="
+        + accessPolicies + ", accountNameSpace=" + accountNameSpace
+        + ", bucketNameSpace=" + bucketNameSpace + '}';
   }
 }

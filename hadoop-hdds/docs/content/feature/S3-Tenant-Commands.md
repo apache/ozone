@@ -150,12 +150,13 @@ Both delegated and non-delegated tenant admin can assign and revoke **regular** 
 The only difference between delegated tenant admin and non-delegated tenant admin is that delegated tenant admin can assign and revoke tenant **admins** in the tenant,
 while non-delegated tenant admin can't.
 
-Unless `--delegated=false` is specified, `ozone tenant assignadmin` assigns **delegated** tenant admins by default.
+By default, `ozone tenant assignadmin` assigns a **non-delegated** tenant admin.
+To assign a **delegated** tenant admin, specify `--delegated` or `-d`.
 
-It is possible to assign a user to be tenant admins in multiple tenants.
+It is possible to assign a user to be tenant admins in multiple tenants. Just a reminder, the user would have a different access ID under each tenant.
 
 ```shell
-ozone tenant user assignadmin <ACCESS_ID> --delegated=true --tenant=<TENANT_NAME>
+ozone tenant user assignadmin <ACCESS_ID> [-d|--delegated] --tenant=<TENANT_NAME>
 ```
 
 Example:

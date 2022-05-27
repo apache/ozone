@@ -107,8 +107,8 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       Optional<String> optionalTenantId =
           multiTenantManager.getTenantForAccessID(accessId);
       if (!optionalTenantId.isPresent()) {
-        throw new OMException("OmDBAccessIdInfo is missing for accessId '" +
-            accessId + "' in DB.", OMException.ResultCodes.METADATA_ERROR);
+        throw new OMException("accessId '" + accessId + "' is not assigned to "
+            + "any tenant", ResultCodes.TENANT_NOT_FOUND);
       }
       tenantId = optionalTenantId.get();
       assert (!StringUtils.isEmpty(tenantId));
@@ -120,6 +120,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     // Caller should be an Ozone admin, or at least a tenant non-delegated admin
     multiTenantManager.checkTenantAdmin(tenantId, false);
 
+    // Prevent a tenant admin from being revoked user access
     if (accessIdInfo.getIsAdmin()) {
       throw new OMException("accessId '" + accessId + "' is a tenant admin of "
           + "tenant'" + tenantId + "'. Please revoke its tenant admin "
@@ -127,9 +128,17 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           ResultCodes.PERMISSION_DENIED);
     }
 
-    // TODO: Acquire some lock
-    // Call OMMTM to revoke user access to tenant
-    ozoneManager.getMultiTenantManager().revokeUserAccessId(accessId);
+    // Acquire write lock to authorizer (Ranger)
+    multiTenantManager.getAuthorizerLock().tryWriteLockInOMRequest();
+    try {
+      // Remove user from tenant user role in Ranger.
+      // User principal is inferred from the accessId given.
+      multiTenantManager.getAuthorizerOp()
+          .revokeUserAccessId(accessId, tenantId);
+    } catch (Exception e) {
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
+      throw e;
+    }
 
     final Builder omRequestBuilder = omRequest.toBuilder()
         .setTenantRevokeUserAccessIdRequest(
@@ -145,6 +154,9 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
   public OMClientResponse validateAndUpdateCache(
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
 
     final OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumTenantRevokeUsers();
@@ -179,12 +191,12 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       // Remove accessId from principalToAccessIdsTable
       OmDBAccessIdInfo omDBAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessId);
-      assert (omDBAccessIdInfo != null);
+      Preconditions.checkNotNull(omDBAccessIdInfo);
       userPrincipal = omDBAccessIdInfo.getUserPrincipal();
-      assert (userPrincipal != null);
+      Preconditions.checkNotNull(userPrincipal);
       OmDBUserPrincipalInfo principalInfo = omMetadataManager
           .getPrincipalToAccessIdsTable().getIfExist(userPrincipal);
-      assert (principalInfo != null);
+      Preconditions.checkNotNull(principalInfo);
       principalInfo.removeAccessId(accessId);
       omMetadataManager.getPrincipalToAccessIdsTable().addCacheEntry(
           new CacheKey<>(userPrincipal),
@@ -207,12 +219,16 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           new CacheKey<>(accessId),
           new CacheValue<>(Optional.absent(), transactionLogIndex));
 
+      // Update tenant cache
+      multiTenantManager.getCacheOp().revokeUserAccessId(accessId, tenantId);
+
       // Generate response
       omResponse.setTenantRevokeUserAccessIdResponse(
           TenantRevokeUserAccessIdResponse.newBuilder()
               .build());
       omClientResponse = new OMTenantRevokeUserAccessIdResponse(
           omResponse.build(), accessId, userPrincipal, principalInfo);
+
     } catch (IOException ex) {
       exception = ex;
       // Prepare omClientResponse
@@ -228,7 +244,8 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
-      // TODO: Release some lock
+      // Release authorizer write lock
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
     }
 
     // Audit

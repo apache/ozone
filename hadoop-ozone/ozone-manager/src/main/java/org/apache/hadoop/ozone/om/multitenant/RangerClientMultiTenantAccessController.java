@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.security.SecurityUtil;
-import org.apache.http.auth.BasicUserPrincipal;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.model.RangerRole;
@@ -186,16 +185,16 @@ public class RangerClientMultiTenantAccessController implements
   }
 
   private static List<RangerRole.RoleMember> toRangerRoleMembers(
-      Collection<BasicUserPrincipal> members) {
+      Collection<String> members) {
     return members.stream()
-            .map(princ -> new RangerRole.RoleMember(princ.getName(), false))
+            .map(princ -> new RangerRole.RoleMember(princ, false))
             .collect(Collectors.toList());
   }
 
-  private static List<BasicUserPrincipal> fromRangerRoleMembers(
+  private static List<String> fromRangerRoleMembers(
       Collection<RangerRole.RoleMember> members) {
     return members.stream()
-        .map(rangerUser -> new BasicUserPrincipal(rangerUser.getName()))
+        .map(rangerUser -> rangerUser.getName())
         .collect(Collectors.toList());
   }
 

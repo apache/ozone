@@ -90,6 +90,7 @@ public class OMRangerBGSyncService extends BackgroundService {
   private final OMMetadataManager metadataManager;
   private final OMMultiTenantManager multiTenantManager;
   private final MultiTenantAccessAuthorizer authorizer;
+  private final AuthorizerLock authorizerLock;
 
   // Maximum number of attempts for each sync run
   private static final int MAX_ATTEMPT = 2;
@@ -198,14 +199,18 @@ public class OMRangerBGSyncService extends BackgroundService {
   private final HashMap<String, HashSet<String>> mtOMDBRoles = new HashMap<>();
 
   public OMRangerBGSyncService(OzoneManager ozoneManager,
-      MultiTenantAccessAuthorizer authorizer, long interval,
-      TimeUnit unit, long serviceTimeout) {
+      OMMultiTenantManager omMultiTenantManager,
+      MultiTenantAccessAuthorizer authorizer,
+      long interval, TimeUnit unit, long serviceTimeout) {
 
     super("OMRangerBGSyncService", interval, unit, 1, serviceTimeout);
 
     this.ozoneManager = ozoneManager;
     this.metadataManager = ozoneManager.getMetadataManager();
-    this.multiTenantManager = ozoneManager.getMultiTenantManager();
+    // Note: ozoneManager.getMultiTenantManager() may return null because
+    // it might haven't finished initialization.
+    this.multiTenantManager = omMultiTenantManager;
+    this.authorizerLock = omMultiTenantManager.getAuthorizerLock();
 
     if (authorizer != null) {
       this.authorizer = authorizer;
@@ -248,6 +253,11 @@ public class OMRangerBGSyncService extends BackgroundService {
       // OzoneManager can be null for testing
       return true;
     }
+    if (ozoneManager.isRatisEnabled() &&
+        (ozoneManager.getOmRatisServer() == null)) {
+      LOG.warn("OzoneManagerRatisServer is not initialized yet");
+      return false;
+    }
     // The service only runs if current OM node is leader and is ready
     //  and the service is marked as started
     return isServiceStarted && ozoneManager.isLeaderReady();
@@ -264,7 +274,11 @@ public class OMRangerBGSyncService extends BackgroundService {
     public BackgroundTaskResult call() {
       // Check OM leader and readiness
       if (shouldRun()) {
-        runCount.incrementAndGet();
+        final long count = runCount.incrementAndGet();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Initiating Ranger Multi-Tenancy Ranger Sync: run # {}",
+              count);
+        }
         triggerRangerSyncOnce();
       }
 
@@ -273,9 +287,7 @@ public class OMRangerBGSyncService extends BackgroundService {
   }
 
   private void triggerRangerSyncOnce() {
-    int attempt = 0;
     try {
-      // TODO: Acquire lock
       long dbOzoneServiceVersion = getOMDBRangerServiceVersion();
       long rangerOzoneServiceVersion = getLatestRangerServiceVersion();
 
@@ -298,8 +310,9 @@ public class OMRangerBGSyncService extends BackgroundService {
       // A maximum of MAX_ATTEMPT times will be attempted each time the sync
       // service is run. MAX_ATTEMPT should at least be 2 to make sure OM DB
       // has the up-to-date Ranger service version most of the times.
+      int attempt = 0;
       while (dbOzoneServiceVersion != rangerOzoneServiceVersion) {
-        // TODO: Release lock
+
         if (++attempt > MAX_ATTEMPT) {
           if (LOG.isDebugEnabled()) {
             LOG.warn("Reached maximum number of attempts ({}). Abort",
@@ -308,32 +321,28 @@ public class OMRangerBGSyncService extends BackgroundService {
           break;
         }
 
-        LOG.info("Executing Multi-Tenancy Ranger Sync: run #{}, attempt #{}. "
-                + "Ranger service version: {}, DB version :{}",
+        LOG.info("Executing Multi-Tenancy Ranger Sync: run # {}, attempt # {}. "
+                + "Ranger service version: {}, DB service version: {}",
             runCount.get(), attempt,
             rangerOzoneServiceVersion, dbOzoneServiceVersion);
 
         executeOMDBToRangerSync(dbOzoneServiceVersion);
 
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Setting OM DB Ranger Service Version to {} (was {})",
+          LOG.debug("Setting DB Ranger service version to {} (was {})",
               rangerOzoneServiceVersion, dbOzoneServiceVersion);
         }
         // Submit Ratis Request to sync the new service version in OM DB
         setOMDBRangerServiceVersion(rangerOzoneServiceVersion);
 
-        // TODO: Acquire lock
-
-        // Check Ranger ozone service version again
+        // Check Ranger Ozone service version again
         dbOzoneServiceVersion = rangerOzoneServiceVersion;
         rangerOzoneServiceVersion = getLatestRangerServiceVersion();
       }
     } catch (IOException | ServiceException e) {
       LOG.warn("Exception during Ranger Sync", e);
-      // TODO: Check specific exception once switched to
+      // TODO: Check for specific exception once switched to
       //  RangerRestMultiTenantAccessController
-//    } finally {
-//      // TODO: Release lock
     }
 
   }
@@ -394,11 +403,17 @@ public class OMRangerBGSyncService extends BackgroundService {
   private void executeOMDBToRangerSync(long baseVersion) throws IOException {
     clearPolicyAndRoleMaps();
 
-    // TODO: Acquire global lock
-    loadAllPoliciesAndRoleNamesFromRanger(baseVersion);
-    loadAllRolesFromRanger();
-    loadAllRolesFromOM();
-    // TODO: Release global lock
+
+    withReadLock(() -> {
+      try {
+        loadAllPoliciesAndRoleNamesFromRanger(baseVersion);
+        loadAllRolesFromRanger();
+        loadAllRolesFromOM();
+      } catch (IOException e) {
+        LOG.error("Failed to load policies or roles from Ranger or DB", e);
+        throw new RuntimeException(e);
+      }
+    });
 
     // This should isolate policies into two groups
     // 1. mtRangerPoliciesTobeDeleted and
@@ -430,6 +445,10 @@ public class OMRangerBGSyncService extends BackgroundService {
     String allPolicies = authorizer.getAllMultiTenantPolicies();
     JsonObject jObject = new JsonParser().parse(allPolicies).getAsJsonObject();
     JsonArray policies = jObject.getAsJsonArray("policies");
+    if (policies == null) {
+      LOG.warn("No Ranger policy received!");
+      return;
+    }
     for (int i = 0; i < policies.size(); ++i) {
       JsonObject policy = policies.get(i).getAsJsonObject();
       JsonArray policyLabels = policy.getAsJsonArray("policyLabels");
@@ -474,6 +493,7 @@ public class OMRangerBGSyncService extends BackgroundService {
         }
       }
     }
+
   }
 
   /**
@@ -523,6 +543,34 @@ public class OMRangerBGSyncService extends BackgroundService {
     }
   }
 
+  /**
+   * Helper function to run the block with read lock held.
+   */
+  private void withReadLock(Runnable block) throws IOException {
+    // Acquire authorizer (Ranger) read lock
+    long stamp = authorizerLock.tryReadLockThrowOnTimeout();
+    try {
+      block.run();
+    } finally {
+      // Release authorizer (Ranger) read lock
+      authorizerLock.unlockRead(stamp);
+    }
+  }
+
+  /**
+   * Helper function to run the block with write lock held.
+   */
+  private void withWriteLock(Runnable block) throws IOException {
+    // Acquire authorizer (Ranger) write lock
+    long stamp = authorizerLock.tryWriteLockThrowOnTimeout();
+    try {
+      block.run();
+    } finally {
+      // Release authorizer (Ranger) write lock
+      authorizerLock.unlockWrite(stamp);
+    }
+  }
+
   private void processAllPoliciesFromOMDB() throws IOException {
 
     // Iterate all DB tenant states. For each tenant,
@@ -559,7 +607,14 @@ public class OMRangerBGSyncService extends BackgroundService {
       final String policyName = entry.getKey();
       LOG.info("Deleting policy from Ranger: {}", policyName);
       checkLeader();
-      authorizer.deletePolicyByName(policyName);
+      withWriteLock(() -> {
+        try {
+          authorizer.deletePolicyByName(policyName);
+        } catch (IOException e) {
+          LOG.error("Failed to delete policy: {}", policyName, e);
+          // Proceed to delete other policies
+        }
+      });
     }
 
   }
@@ -603,8 +658,14 @@ public class OMRangerBGSyncService extends BackgroundService {
           ResultCodes.INTERNAL_ERROR);
     }
 
-    String id = authorizer.createAccessPolicy(accessPolicy);
-    LOG.info("Created policy, ID: {}", id);
+    withWriteLock(() -> {
+      try {
+        final String id = authorizer.createAccessPolicy(accessPolicy);
+        LOG.info("Created policy. Policy ID: {}", id);
+      } catch (IOException e) {
+        LOG.error("Failed to create policy: {}", accessPolicy, e);
+      }
+    });
   }
 
   private void loadAllRolesFromOM() throws IOException {
@@ -715,12 +776,14 @@ public class OMRangerBGSyncService extends BackgroundService {
         // mtRangerRoles to be populated incorrectly. In this case the roles
         // are there just fine. If not, will be corrected in the next run anyway
         checkLeader();
-        try {
-          authorizer.createRole(roleName, null);
-        } catch (IOException e) {
-          // Tolerate create role failure, possibly due to role already exists
-          LOG.error(e.getMessage());
-        }
+        withWriteLock(() -> {
+          try {
+            authorizer.createRole(roleName, null);
+          } catch (IOException e) {
+            // Tolerate create role failure, possibly due to role already exists
+            LOG.error("Failed to create role: {}", roleName, e);
+          }
+        });
         pushRoleToRanger = true;
       }
       if (pushRoleToRanger) {
@@ -741,25 +804,33 @@ public class OMRangerBGSyncService extends BackgroundService {
     for (String roleName : rolesToDelete) {
       LOG.warn("Deleting role from Ranger: {}", roleName);
       checkLeader();
-      try {
-        final String roleObj = authorizer.getRole(roleName);
-        authorizer.deleteRole(new JsonParser().parse(roleObj)
-            .getAsJsonObject().get("id").getAsString());
-      } catch (IOException e) {
-        // The role might have been deleted already.
-        // Or the role could be referenced in other roles or policies.
-        LOG.error("Failed to delete role: {}", roleName);
-        throw e;
-      }
+      withWriteLock(() -> {
+        try {
+          final String roleObj = authorizer.getRole(roleName);
+          authorizer.deleteRoleById(new JsonParser().parse(roleObj)
+              .getAsJsonObject().get("id").getAsString());
+        } catch (IOException e) {
+          // The role might have been deleted already.
+          // Or the role could be referenced in other roles or policies.
+          LOG.error("Failed to delete role: {}", roleName);
+        }
+      });
       // TODO: Server returned HTTP response code: 400
       //  if already deleted or is depended on
     }
   }
 
   private void pushOMDBRoleToRanger(String roleName) throws IOException {
-    HashSet<String> omdbUserList = mtOMDBRoles.get(roleName);
-    String roleJsonStr = authorizer.getRole(roleName);
-    authorizer.assignAllUsers(omdbUserList, roleJsonStr);
+    final HashSet<String> omDBUserList = mtOMDBRoles.get(roleName);
+    withWriteLock(() -> {
+      try {
+        String roleJsonStr = authorizer.getRole(roleName);
+        authorizer.assignAllUsers(omDBUserList, roleJsonStr);
+      } catch (IOException e) {
+        LOG.error("Failed to update role: {}, target user list: {}",
+            roleName, omDBUserList, e);
+      }
+    });
   }
 
   /**

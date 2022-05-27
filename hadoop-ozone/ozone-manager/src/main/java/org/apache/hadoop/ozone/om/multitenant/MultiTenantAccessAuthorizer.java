@@ -54,42 +54,43 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
 
   /**
    * Assign user to an existing role in the Authorizer.
-   * @param principal User principal
-   * @param existingRole A JSON String representation of the existing role
-   *                     returned from the Authorizer (Ranger).
-   * @param isAdmin
+   *
+   * @param userPrincipal user principal
+   * @param existingRole  A JSON String representation of the existing role
+   *                      returned from the Authorizer (Ranger).
+   * @param isAdmin true if tenant admin
    * @return unique and opaque userID that can be used to refer to the user in
    * MultiTenantGateKeeperplugin Implementation. E.g. a Ranger
    * based Implementation can return some ID thats relevant for it.
    */
-  String assignUserToRole(BasicUserPrincipal principal, String existingRole,
+  String assignUserToRole(String userPrincipal, String existingRole,
       boolean isAdmin) throws IOException;
 
   /**
    * Update the exising role details and push the changes to Ranger.
    *
-   * @param principal contains user name, must be an existing user in Ranger.
-   * @param existingRole An existing role's JSON response String from Ranger.
+   * @param userPrincipal user name that exists in Ranger (internal / external).
+   * @param existingRole  An existing role's JSON response String from Ranger.
    * @return roleId (not useful for now)
    * @throws IOException
    */
-  String revokeUserFromRole(BasicUserPrincipal principal,
-                                   String existingRole) throws IOException;
+  String revokeUserFromRole(String userPrincipal, String existingRole)
+      throws IOException;
 
   /**
    * Assign all the users to an existing role.
    * @param users list of user principals
    * @param existingRole roleName
    */
-  String assignAllUsers(HashSet<String> users,
-                               String existingRole) throws IOException;
+  String assignAllUsers(HashSet<String> users, String existingRole)
+      throws IOException;
 
   /**
-   * @param principal
+   * @param userPrincipal
    * @return Unique userID maintained by the authorizer plugin.
    * @throws IOException
    */
-  String getUserId(BasicUserPrincipal principal) throws IOException;
+  String getUserId(String userPrincipal) throws IOException;
 
   /**
    * @param principal
@@ -143,26 +144,30 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @param groupID : unique opaque ID that was returned by
    *                MultiTenantGatekeeper in createGroup().
    */
-  void deleteRole(String groupID) throws IOException;
+  void deleteRoleById(String groupID) throws IOException;
 
   /**
+   * Create access policy with the given parameters in the authorizer
+   * (e.g. Ranger).
    *
-   * @param policy
+   * @param policy AccessPolicy
    * @return unique and opaque policy ID that is maintained by the plugin.
    * @throws IOException
    */
   String createAccessPolicy(AccessPolicy policy) throws IOException;
 
   /**
+   * Get AccessPolicy by policy name.
    *
-   * @param policyName
-   * @return unique and opaque policy ID that is maintained by the plugin.
+   * @param policyName policy name
+   * @return AccessPolicy
    * @throws IOException
    */
   AccessPolicy getAccessPolicyByName(String policyName) throws IOException;
 
   /**
-   * given a policy Id, returs the policy.
+   * Given a policy Id, returns the policy.
+   *
    * @param policyId
    * @return
    * @throws IOException
@@ -170,18 +175,29 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
   AccessPolicy getAccessPolicyById(String policyId) throws IOException;
 
   /**
+   * Delete policy by policy ID.
    *
-   * @param policyId that was returned earlier by the createAccessPolicy().
+   * @param policyId ID that was returned earlier by createAccessPolicy().
    * @throws IOException
    */
   void deletePolicyById(String policyId) throws IOException;
 
   /**
+   * Delete policy by policy name.
    *
-   * @param policyName unique policyName.
+   * @param policyName policy name
    * @throws IOException
    */
   void deletePolicyByName(String policyName) throws IOException;
+
+  /**
+   * Delete role by role name.
+   *
+   * @param roleName role name
+   * @throws IOException
+   */
+  void deleteRoleByName(String roleName) throws IOException;
+
   /**
    * Grant user aclType access to bucketNameSpace.
    * @param bucketNameSpace

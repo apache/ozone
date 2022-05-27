@@ -23,12 +23,14 @@ import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ipc.Server.Call;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.TenantOp;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
@@ -136,10 +138,12 @@ public class TestS3GetSecretRequest {
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
 
     when(tenant.getTenantAccessPolicies()).thenReturn(new ArrayList<>());
-    when(omMultiTenantManager.createTenantAccessInAuthorizer(TENANT_ID,
-            OMMultiTenantManager.getDefaultUserRoleName(TENANT_ID),
-            OMMultiTenantManager.getDefaultAdminRoleName(TENANT_ID)))
-        .thenReturn(tenant);
+    when(omMultiTenantManager.getAuthorizerLock())
+        .thenReturn(new AuthorizerLockImpl());
+    TenantOp authorizerOp = mock(TenantOp.class);
+    TenantOp cacheOp = mock(TenantOp.class);
+    when(omMultiTenantManager.getAuthorizerOp()).thenReturn(authorizerOp);
+    when(omMultiTenantManager.getCacheOp()).thenReturn(cacheOp);
   }
 
   @After

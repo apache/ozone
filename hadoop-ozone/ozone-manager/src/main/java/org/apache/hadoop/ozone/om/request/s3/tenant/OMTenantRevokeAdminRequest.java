@@ -89,8 +89,8 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
       Optional<String> optionalTenantId =
           multiTenantManager.getTenantForAccessID(accessId);
       if (!optionalTenantId.isPresent()) {
-        throw new OMException("OmDBAccessIdInfo is missing for accessId '" +
-            accessId + "' in DB.", OMException.ResultCodes.METADATA_ERROR);
+        throw new OMException("accessId '" + accessId + "' is not assigned to "
+            + "any tenant", OMException.ResultCodes.TENANT_NOT_FOUND);
       }
       tenantId = optionalTenantId.get();
       assert (!StringUtils.isEmpty(tenantId));
@@ -101,7 +101,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     // Caller should be an Ozone admin, or a tenant delegated admin
     multiTenantManager.checkTenantAdmin(tenantId, true);
 
-    OmDBAccessIdInfo accessIdInfo = ozoneManager.getMetadataManager()
+    final OmDBAccessIdInfo accessIdInfo = ozoneManager.getMetadataManager()
         .getTenantAccessIdTable().get(accessId);
 
     if (accessIdInfo == null) {
@@ -116,9 +116,16 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
           OMException.ResultCodes.INVALID_TENANT_ID);
     }
 
-    // TODO: Acquire some lock
-    // Remove user (inferred from access ID) from tenant admin role in Ranger
-    ozoneManager.getMultiTenantManager().revokeTenantAdmin(accessId);
+    // Acquire write lock to authorizer (Ranger)
+    multiTenantManager.getAuthorizerLock().tryWriteLockInOMRequest();
+    try {
+      // Add user to tenant admin role in Ranger.
+      // User principal is inferred from the accessId given.
+      multiTenantManager.getAuthorizerOp().revokeTenantAdmin(accessId);
+    } catch (Exception e) {
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
+      throw e;
+    }
 
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
         .setTenantRevokeAdminRequest(
@@ -136,6 +143,9 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
   public OMClientResponse validateAndUpdateCache(
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
 
     final OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumTenantRevokeAdmins();
@@ -188,6 +198,9 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
           new CacheValue<>(Optional.of(newOmDBAccessIdInfo),
               transactionLogIndex));
 
+      // Update tenant cache
+      multiTenantManager.getCacheOp().revokeTenantAdmin(accessId);
+
       omResponse.setTenantRevokeAdminResponse(
           TenantRevokeAdminResponse.newBuilder()
               .build());
@@ -206,7 +219,8 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
-      // TODO: Release some lock
+      // Release authorizer write lock
+      multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
     }
 
     // Audit

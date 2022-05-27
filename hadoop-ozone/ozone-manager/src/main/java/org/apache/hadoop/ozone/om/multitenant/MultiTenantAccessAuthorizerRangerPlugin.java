@@ -47,7 +47,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.ConnectException;
 import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
@@ -93,7 +95,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   // Stores Ranger cm_ozone service ID. This value should not change (unless
   // somehow Ranger cm_ozone service is deleted and re-created while OM is
   // still running and not reloaded / restarted).
-  private int rangerOzoneServiceId;
+  private int rangerOzoneServiceId = -1;
 
   @Override
   public void init(Configuration configuration) throws IOException {
@@ -108,11 +110,33 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     initializeRangerConnection();
 
     // Get Ranger Ozone service ID
-    rangerOzoneServiceId = retrieveRangerOzoneServiceId();
+    try {
+      rangerOzoneServiceId = retrieveRangerOzoneServiceId();
+    } catch (SocketTimeoutException | ConnectException e) {
+      // Exceptions (e.g. ConnectException: Connection refused)
+      // thrown here can crash OM during startup.
+      // Tolerate potential connection failure to Ranger during initialization
+      // due to cluster services starting up at the same time or not ready yet.
+      // Later when the Ranger Ozone service ID would be used it should try
+      // and retrieve the ID again if it failed earlier.
+      LOG.error("Failed to get Ozone service ID to Ranger. "
+              + "Will retry later", e);
+      rangerOzoneServiceId = -1;
+    }
   }
 
   int getRangerOzoneServiceId() {
     return rangerOzoneServiceId;
+  }
+
+  /**
+   * Helper method that checks if the RangerOzoneServiceId is properly retrieved
+   * during init. If not, try to get it from Ranger.
+   */
+  private void checkRangerOzoneServiceId() throws IOException {
+    if (rangerOzoneServiceId < 0) {
+      rangerOzoneServiceId = retrieveRangerOzoneServiceId();
+    }
   }
 
   private void initializeRangerConnection() {
@@ -257,10 +281,10 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   @Override
-  public String getUserId(BasicUserPrincipal principal) throws IOException {
+  public String getUserId(String userPrincipal) throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_USER_HTTP_ENDPOINT +
-        principal.getName();
+        userPrincipal;
 
     HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl,
         "GET", false);
@@ -272,7 +296,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
       int numIndex = userinfo.size();
       for (int i = 0; i < numIndex; ++i) {
         if (userinfo.get(i).getAsJsonObject().get("name").getAsString()
-            .equals(principal.getName())) {
+            .equals(userPrincipal)) {
           userIDCreated =
               userinfo.get(i).getAsJsonObject().get("id").getAsString();
           break;
@@ -289,13 +313,13 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   /**
    * Update the exising role details and push the changes to Ranger.
    *
-   * @param principal contains user name, must be an existing user in Ranger.
-   * @param existingRole An existing role's JSON response String from Ranger.
+   * @param userPrincipal user name that exists in Ranger.
+   * @param existingRole  An existing role's JSON response String from Ranger.
    * @return roleId (not useful for now)
    * @throws IOException
    */
   @Override
-  public String revokeUserFromRole(BasicUserPrincipal principal,
+  public String revokeUserFromRole(String userPrincipal,
       String existingRole) throws IOException {
     JsonObject roleObj = new JsonParser().parse(existingRole).getAsJsonObject();
     // Parse Json
@@ -307,7 +331,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
     for (int i = 0; i < oldUsersArray.size(); ++i) {
       JsonObject newUserEntry = oldUsersArray.get(i).getAsJsonObject();
-      if (!newUserEntry.get("name").getAsString().equals(principal.getName())) {
+      if (!newUserEntry.get("name").getAsString().equals(userPrincipal)) {
         newUsersArray.add(newUserEntry);
       }
       // Update Json array
@@ -343,13 +367,13 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   /**
    * Update the exising role details and push the changes to Ranger.
    *
-   * @param principal contains user name, must be an existing user in Ranger.
-   * @param existingRole An existing role's JSON response String from Ranger.
-   * @param isAdmin Make it delegated admin of the role.
+   * @param userPrincipal user name that exists in Ranger.
+   * @param existingRole  An existing role's JSON response String from Ranger.
+   * @param isAdmin       Make it delegated admin of the role.
    * @return roleId (not useful for now)
    * @throws IOException
    */
-  public String assignUserToRole(BasicUserPrincipal principal,
+  public String assignUserToRole(String userPrincipal,
       String existingRole, boolean isAdmin) throws IOException {
 
     JsonObject roleObj = new JsonParser().parse(existingRole).getAsJsonObject();
@@ -359,7 +383,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
     JsonArray usersArray = roleObj.getAsJsonArray("users");
     JsonObject newUserEntry = new JsonObject();
-    newUserEntry.addProperty("name", principal.getName());
+    newUserEntry.addProperty("name", userPrincipal);
     newUserEntry.addProperty("isAdmin", isAdmin);
     usersArray.add(newUserEntry);
     // Update Json array
@@ -608,6 +632,9 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   public long getLatestOzoneServiceVersion() throws IOException {
+
+    checkRangerOzoneServiceId();
+
     String rangerAdminUrl = rangerHttpsAddress
         + OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT + getRangerOzoneServiceId();
 
@@ -628,6 +655,8 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   public String getAllMultiTenantPolicies() throws IOException {
+
+    checkRangerOzoneServiceId();
 
     // Note: Ranger incremental policies API is broken. So we use policy label
     // filter to get all Multi-Tenant policies.
@@ -670,10 +699,26 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     }
   }
 
-  public void deleteRole(String roleName) throws IOException {
+  @Override
+  public void deleteRoleById(String roleId) throws IOException {
 
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_ROLE_HTTP_ENDPOINT
+            + roleId + "?forceDelete=true";
+
+    HttpURLConnection conn = makeHttpCall(rangerAdminUrl, null,
+        "DELETE", false);
+    int respnseCode = conn.getResponseCode();
+    if (respnseCode != 200 && respnseCode != 204) {
+      throw new IOException("Couldn't delete role " + roleId);
+    }
+  }
+
+  @Override
+  public void deleteRoleByName(String roleName) throws IOException {
+
+    String rangerAdminUrl =
+        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_ROLE_HTTP_ENDPOINT
             + roleName + "?forceDelete=true";
 
     HttpURLConnection conn = makeHttpCall(rangerAdminUrl, null,
@@ -682,12 +727,13 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     if (respnseCode != 200 && respnseCode != 204) {
       throw new IOException("Couldn't delete role " + roleName);
     }
+
   }
 
   @Override
   public void deletePolicyByName(String policyName) throws IOException {
     AccessPolicy policy = getAccessPolicyByName(policyName);
-    String  policyID = policy.getPolicyID();
+    String policyID = policy.getPolicyID();
     LOG.debug("policyID is: {}", policyID);
     deletePolicyById(policyID);
   }
@@ -720,6 +766,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         response.append(responseLine.trim());
       }
       LOG.debug("Got response: {}", response);
+      // TODO: throw if urlConnection code is 400?
     } catch (IOException e) {
       // Common exceptions:
       // 1. Server returned HTTP response code: 401
