@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.crl.CRLStatusReportHandler;
+import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -625,6 +626,36 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     containerReplicaPendingOps = new ContainerReplicaPendingOps(conf, clock);
+
+    long containerReplicaOpScrubberIntervalMs = conf.getTimeDuration(
+        ScmConfigKeys
+            .OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL,
+        ScmConfigKeys
+            .OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+
+    long containerReplicaOpExpiryMs = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+
+    long backgroundServiceSafemodeWaitMs = conf.getTimeDuration(
+        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
+        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+
+    final String backgroundServiceName = "ExpiredContainerReplicaOpScrubber";
+    BackgroundSCMService expiredContainerReplicaOpScrubber =
+        new BackgroundSCMService.Builder().setClock(clock)
+            .setScmContext(scmContext)
+            .setServiceName(backgroundServiceName)
+            .setIntervalInMillis(containerReplicaOpScrubberIntervalMs)
+            .setWaitTimeInMillis(backgroundServiceSafemodeWaitMs)
+            .setPeriodicalTask(() -> containerReplicaPendingOps
+                .removeExpiredEntries(containerReplicaOpExpiryMs)).build();
+
+    serviceManager.register(expiredContainerReplicaOpScrubber);
+
     if (configurator.getContainerManager() != null) {
       containerManager = configurator.getContainerManager();
     } else {

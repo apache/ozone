@@ -19,10 +19,13 @@ package org.apache.hadoop.ozone.protocolPB;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import com.google.protobuf.ServiceException;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
@@ -32,6 +35,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -511,6 +515,39 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.LookupKey
+  )
+  public static OMResponse disallowLookupKeyWithBucketLayout(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException, IOException {
+    if (!resp.hasLookupKeyResponse()) {
+      return resp;
+    }
+    KeyInfo keyInfo = resp.getLookupKeyResponse().getKeyInfo();
+    // If the key is present inside a bucket using a non LEGACY bucket layout,
+    // then the client needs to be upgraded before proceeding.
+    if (keyInfo.hasVolumeName() && keyInfo.hasBucketName() &&
+        !ctx.getBucketLayout(keyInfo.getVolumeName(), keyInfo.getBucketName())
+            .equals(BucketLayout.LEGACY)) {
+      resp = resp.toBuilder()
+          .setStatus(Status.NOT_SUPPORTED_OPERATION)
+          .setMessage("Key is present inside a bucket with bucket layout " +
+              "features, which the client can not understand. Please upgrade" +
+              " the client to a compatible version before trying to read the" +
+              " key info for "
+              + req.getLookupKeyRequest().getKeyArgs().getVolumeName()
+              + "/" + req.getLookupKeyRequest().getKeyArgs().getBucketName()
+              + "/" + req.getLookupKeyRequest().getKeyArgs().getKeyName()
+              + ".")
+          .clearLookupKeyResponse()
+          .build();
+    }
+    return resp;
+  }
+
   private ListBucketsResponse listBuckets(ListBucketsRequest request)
       throws IOException {
     ListBucketsResponse.Builder resp =
@@ -573,6 +610,47 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.ListKeys
+  )
+  public static OMResponse disallowListKeysWithBucketLayout(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException, IOException {
+    if (!resp.hasListKeysResponse()) {
+      return resp;
+    }
+
+    // Put volume and bucket pairs into a set to avoid duplicates.
+    HashSet<Pair<String, String>> volumeBucketSet = new HashSet<>();
+    List<KeyInfo> keys = resp.getListKeysResponse().getKeyInfoList();
+    for (KeyInfo key : keys) {
+      if (key.hasVolumeName() && key.hasBucketName()) {
+        volumeBucketSet.add(
+            new ImmutablePair<>(key.getVolumeName(), key.getBucketName()));
+      }
+    }
+
+    for (Pair<String, String> volumeBucket : volumeBucketSet) {
+      // If any of the buckets have a non legacy layout, then the client is
+      // not compatible with the response.
+      if (!ctx.getBucketLayout(volumeBucket.getLeft(), volumeBucket.getRight())
+          .isLegacy()) {
+        resp = resp.toBuilder()
+            .setStatus(Status.NOT_SUPPORTED_OPERATION)
+            .setMessage("The list of keys contains keys present inside bucket" +
+                " with bucket layout features, hence the client is not able " +
+                "to understand all the keys returned. Please upgrade the"
+                + " client to get the list of keys.")
+            .clearListKeysResponse()
+            .build();
+        break;
+      }
+    }
+    return resp;
+  }
+
   private ListTrashResponse listTrash(ListTrashRequest request,
       int clientVersion) throws IOException {
 
@@ -618,6 +696,51 @@ public class OzoneManagerRequestHandler implements RequestHandler {
               .clearListTrashResponse()
               .build();
         }
+      }
+    }
+    return resp;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.ListTrash
+  )
+  public static OMResponse disallowListTrashWithBucketLayout(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException, IOException {
+    if (!resp.hasListTrashResponse()) {
+      return resp;
+    }
+
+    // Add the volume and bucket pairs to a set to avoid duplicates.
+    List<RepeatedKeyInfo> repeatedKeys =
+        resp.getListTrashResponse().getDeletedKeysList();
+    HashSet<Pair<String, String>> volumeBucketSet = new HashSet<>();
+
+    for (RepeatedKeyInfo repeatedKey : repeatedKeys) {
+      for (KeyInfo key : repeatedKey.getKeyInfoList()) {
+        if (key.hasVolumeName() && key.hasBucketName()) {
+          volumeBucketSet.add(
+              new ImmutablePair<>(key.getVolumeName(), key.getBucketName()));
+        }
+      }
+    }
+
+    // If any of the keys is present inside a bucket using a non LEGACY bucket
+    // layout, then the client needs to be upgraded before proceeding.
+    for (Pair<String, String> volumeBucket : volumeBucketSet) {
+      if (!ctx.getBucketLayout(volumeBucket.getLeft(), volumeBucket.getRight())
+          .isLegacy()) {
+        resp = resp.toBuilder()
+            .setStatus(Status.NOT_SUPPORTED_OPERATION)
+            .setMessage("The list of keys contains keys present in buckets " +
+                " using bucket layout features, hence the client is not able to"
+                + " understand all the keys returned. Please upgrade the"
+                + " client to get the list of keys.")
+            .clearListTrashResponse()
+            .build();
+        break;
       }
     }
     return resp;
@@ -779,6 +902,40 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.GetFileStatus
+  )
+  public static OMResponse disallowGetFileStatusWithBucketLayout(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException, IOException {
+    if (!resp.hasGetFileStatusResponse()) {
+      return resp;
+    }
+
+    // If the File is present inside a bucket with non LEGACY layout,
+    // then the client should be upgraded before proceeding.
+    KeyInfo keyInfo = resp.getGetFileStatusResponse().getStatus().getKeyInfo();
+    if (keyInfo.hasVolumeName() && keyInfo.hasBucketName() &&
+        !ctx.getBucketLayout(keyInfo.getVolumeName(), keyInfo.getBucketName())
+            .isLegacy()) {
+      resp = resp.toBuilder()
+          .setStatus(Status.NOT_SUPPORTED_OPERATION)
+          .setMessage("Key is present in a bucket using bucket layout features"
+              + " which the client can not understand."
+              + " Please upgrade the client before trying to read the key info"
+              + " for "
+              + req.getGetFileStatusRequest().getKeyArgs().getVolumeName()
+              + "/" + req.getGetFileStatusRequest().getKeyArgs().getBucketName()
+              + "/" + req.getGetFileStatusRequest().getKeyArgs().getKeyName()
+              + ".")
+          .clearGetFileStatusResponse()
+          .build();
+    }
+    return resp;
+  }
+
   private LookupFileResponse lookupFile(LookupFileRequest request,
       int clientVersion) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
@@ -813,6 +970,37 @@ public class OzoneManagerRequestHandler implements RequestHandler {
               + " client can not understand."
               + " Please upgrade the client before trying to read the key info"
               + " for "
+              + req.getLookupFileRequest().getKeyArgs().getVolumeName()
+              + "/" + req.getLookupFileRequest().getKeyArgs().getBucketName()
+              + "/" + req.getLookupFileRequest().getKeyArgs().getKeyName()
+              + ".")
+          .clearLookupFileResponse()
+          .build();
+    }
+    return resp;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.LookupFile
+  )
+  public static OMResponse disallowLookupFileWithBucketLayout(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException, IOException {
+    if (!resp.hasLookupFileResponse()) {
+      return resp;
+    }
+    KeyInfo keyInfo = resp.getLookupFileResponse().getKeyInfo();
+    if (keyInfo.hasVolumeName() && keyInfo.hasBucketName() &&
+        !ctx.getBucketLayout(keyInfo.getVolumeName(), keyInfo.getBucketName())
+            .equals(BucketLayout.LEGACY)) {
+      resp = resp.toBuilder()
+          .setStatus(Status.NOT_SUPPORTED_OPERATION)
+          .setMessage("File is present inside a bucket with bucket layout " +
+              "features, which the client can not understand. Please upgrade" +
+              " the client to a compatible version before trying to read the" +
+              " key info for "
               + req.getLookupFileRequest().getKeyArgs().getVolumeName()
               + "/" + req.getLookupFileRequest().getKeyArgs().getBucketName()
               + "/" + req.getLookupFileRequest().getKeyArgs().getKeyName()
@@ -871,6 +1059,52 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             .build();
       }
     }
+    return resp;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.ListStatus
+  )
+  public static OMResponse disallowListStatusResponseWithBucketLayout(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException, IOException {
+    if (!resp.hasListStatusResponse()) {
+      return resp;
+    }
+
+    // Add the volume and bucket pairs to a set to avoid duplicate entries.
+    List<OzoneFileStatusProto> statuses =
+        resp.getListStatusResponse().getStatusesList();
+    HashSet<Pair<String, String>> volumeBucketSet = new HashSet<>();
+
+    for (OzoneFileStatusProto status : statuses) {
+      KeyInfo keyInfo = status.getKeyInfo();
+      if (keyInfo.hasVolumeName() && keyInfo.hasBucketName()) {
+        volumeBucketSet.add(
+            new ImmutablePair<>(keyInfo.getVolumeName(),
+                keyInfo.getBucketName()));
+      }
+    }
+
+    // If any of the keys are present in a bucket with a non LEGACY bucket
+    // layout, then the client needs to be upgraded before proceeding.
+    for (Pair<String, String> volumeBucket : volumeBucketSet) {
+      if (!ctx.getBucketLayout(volumeBucket.getLeft(),
+          volumeBucket.getRight()).isLegacy()) {
+        resp = resp.toBuilder()
+            .setStatus(Status.NOT_SUPPORTED_OPERATION)
+            .setMessage("The list of keys is present in a bucket using bucket"
+                + " layout features, hence the client is not able to"
+                + " represent all the keys returned."
+                + " Please upgrade the client to get the list of keys.")
+            .clearListStatusResponse()
+            .build();
+        break;
+      }
+    }
+
     return resp;
   }
 
