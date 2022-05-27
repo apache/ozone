@@ -130,7 +130,7 @@ public class AuthorizerLockImpl implements AuthorizerLock {
   }
 
   @Override
-  public long tryWriteLockInOMRequest() throws IOException {
+  public void tryWriteLockInOMRequest() throws IOException {
 
     // Sanity check. Must not have held a write lock in a tenant OMRequest.
     Preconditions.checkArgument(omRequestWriteLockStamp == 0L);
@@ -144,7 +144,6 @@ public class AuthorizerLockImpl implements AuthorizerLock {
           + "omRequestWriteLockHolderTid to {}",
           omRequestWriteLockStamp, omRequestWriteLockHolderTid);
     }
-    return stamp;
   }
 
   @Override

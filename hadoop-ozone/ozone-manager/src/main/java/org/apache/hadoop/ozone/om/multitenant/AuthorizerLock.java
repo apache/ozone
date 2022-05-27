@@ -71,10 +71,8 @@ public interface AuthorizerLock {
    *
    * MUST use paired with unlockWriteInOMRequest() for unlocking to ensure
    * correctness.
-   *
-   * @return stamp
    */
-  long tryWriteLockInOMRequest() throws IOException;
+  void tryWriteLockInOMRequest() throws IOException;
 
   /**
    * A wrapper around unlockWrite() that is used exclusively in OMRequests.
