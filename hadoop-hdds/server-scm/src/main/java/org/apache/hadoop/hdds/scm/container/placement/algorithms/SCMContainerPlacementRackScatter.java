@@ -98,6 +98,7 @@ public final class SCMContainerPlacementRackScatter
       throws SCMException {
     Preconditions.checkArgument(nodesRequired > 0);
     metrics.incrDatanodeRequestCount(nodesRequired);
+    final int originalNodesRequired = nodesRequired;
     int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
     List<Node> availableNodes = networkTopology.getNodes(
         networkTopology.getMaxLevel());
@@ -215,11 +216,12 @@ public final class SCMContainerPlacementRackScatter
       }
     }
     ContainerPlacementStatus placementStatus =
-        validateContainerPlacement(chosenNodes, nodesRequired);
+        validateContainerPlacement(chosenNodes, originalNodesRequired);
     if (!placementStatus.isPolicySatisfied()) {
-      LOG.warn("ContainerPlacementPolicy not met, currentRacks is {}," +
-          " desired racks is {}.", placementStatus.actualPlacementCount(),
-          placementStatus.expectedPlacementCount());
+      String errorMsg = "ContainerPlacementPolicy not met, currentRacks is" +
+          placementStatus.actualPlacementCount() + "desired racks is" +
+          placementStatus.expectedPlacementCount();
+      throw new SCMException(errorMsg, null);
     }
     return chosenNodes;
   }
