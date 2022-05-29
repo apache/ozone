@@ -102,6 +102,24 @@ enum Type {
   RevokeS3Secret = 93;
 
   PurgePaths = 94;
+
+  CreateTenant = 96;
+  DeleteTenant = 97;
+  ListTenant = 98;
+
+  TenantGetUserInfo = 99;
+  TenantAssignUserAccessId = 100;
+  TenantRevokeUserAccessId = 101;
+
+  TenantAssignAdmin = 102;
+  TenantRevokeAdmin = 103;
+
+  GetS3VolumeContext = 104;
+  TenantListUser = 105;
+
+  SetS3Secret = 106;
+
+  SetRangerServiceVersion = 107;
 }
 
 message OMRequest {
@@ -186,6 +204,24 @@ message OMRequest {
   optional PurgePathsRequest                purgePathsRequest              = 94;
 
   optional S3Authentication                 s3Authentication               = 95;
+
+  optional CreateTenantRequest              CreateTenantRequest            = 96;
+  optional DeleteTenantRequest              DeleteTenantRequest            = 97;
+  optional ListTenantRequest                ListTenantRequest              = 98;
+
+  optional TenantGetUserInfoRequest         TenantGetUserInfoRequest       = 99;
+  optional TenantAssignUserAccessIdRequest  TenantAssignUserAccessIdRequest= 100;
+  optional TenantRevokeUserAccessIdRequest  TenantRevokeUserAccessIdRequest= 101;
+
+  optional TenantAssignAdminRequest         TenantAssignAdminRequest       = 102;
+  optional TenantRevokeAdminRequest         TenantRevokeAdminRequest       = 103;
+
+  optional GetS3VolumeContextRequest        getS3VolumeContextRequest      = 104;
+  optional TenantListUserRequest            tenantListUserRequest          = 105;
+
+  optional SetS3SecretRequest               SetS3SecretRequest             = 106;
+
+  optional SetRangerServiceVersionRequest   SetRangerServiceVersionRequest = 107;
 }
 
 message OMResponse {
@@ -262,6 +298,25 @@ message OMResponse {
   optional ListTrashResponse                  listTrashResponse            = 91;
   optional RecoverTrashResponse               RecoverTrashResponse         = 92;
   optional PurgePathsResponse                 purgePathsResponse           = 93;
+
+  // Skipped 94/95 to align with OMRequest
+  optional CreateTenantResponse              CreateTenantResponse          = 96;
+  optional DeleteTenantResponse              DeleteTenantResponse          = 97;
+  optional ListTenantResponse                ListTenantResponse            = 98;
+
+  optional TenantGetUserInfoResponse         TenantGetUserInfoResponse     = 99;
+  optional TenantAssignUserAccessIdResponse  TenantAssignUserAccessIdResponse = 100;
+  optional TenantRevokeUserAccessIdResponse  TenantRevokeUserAccessIdResponse = 101;
+
+  optional TenantAssignAdminResponse         TenantAssignAdminResponse     = 102;
+  optional TenantRevokeAdminResponse         TenantRevokeAdminResponse     = 103;
+
+  optional GetS3VolumeContextResponse        getS3VolumeContextResponse    = 104;
+  optional TenantListUserResponse            tenantListUserResponse        = 105;
+
+  optional SetS3SecretResponse               SetS3SecretResponse           = 106;
+
+  optional SetRangerServiceVersionResponse   SetRangerServiceVersionResponse = 107;
 }
 
 enum Status {
@@ -357,6 +412,21 @@ enum Status {
     PREPARE_FAILED = 73;
     NOT_SUPPORTED_OPERATION_WHEN_PREPARED = 74;
     NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION = 75;
+
+    TENANT_NOT_FOUND = 76;
+    TENANT_ALREADY_EXISTS = 77;
+    INVALID_TENANT_ID = 78;
+
+    ACCESS_ID_NOT_FOUND = 79;
+    TENANT_USER_ACCESS_ID_ALREADY_EXISTS = 80;
+    INVALID_TENANT_USERNAME = 81;
+    INVALID_ACCESS_ID = 82;
+    TENANT_AUTHORIZER_ERROR = 83;
+
+    VOLUME_IS_REFERENCED = 84;
+    TENANT_NOT_EMPTY = 85;
+
+    FEATURE_NOT_ENABLED = 86;
 }
 
 /**
@@ -404,6 +474,7 @@ message VolumeInfo {
     optional uint64 modificationTime = 10;
     optional int64 quotaInNamespace = 11 [default = -2];
     optional uint64 usedNamespace = 12;
+    optional int64 refCount = 13;
 }
 
 /**
@@ -1327,16 +1398,93 @@ message CancelDelegationTokenResponseProto {
 }
 
 message S3Secret {
-    required string kerberosID = 1;
+    required string kerberosID = 1;  // HDDS-6339: This really means accessId
     required string awsSecret = 2;
 }
 
 message GetS3SecretRequest {
-    required string kerberosID = 1;
+    required string kerberosID = 1;  // HDDS-6339: This really means accessId
+    optional bool createIfNotExist = 2;
 }
 
 message GetS3SecretResponse {
     required S3Secret s3Secret = 2;
+}
+
+message SetS3SecretRequest {
+    optional string accessId = 1;
+    optional string secretKey = 2;
+}
+
+message SetS3SecretResponse {
+    optional string accessId = 1;
+    optional string secretKey = 2;
+}
+
+message TenantState {
+    optional string tenantId = 1;
+    optional string bucketNamespaceName = 2;        // Volume name
+    optional string userRoleName = 3;
+    optional string adminRoleName = 4;
+    optional string bucketNamespacePolicyName = 5;  // VolumeAccessPolicy name
+    optional string bucketPolicyName = 6;           // BucketAccessPolicy name
+}
+
+message TenantUserPrincipalInfo {
+    repeated string accessIds = 1;
+}
+
+// Stores a basic user-accessId pair, used in TenantListUserResponse
+message UserAccessIdInfo {
+    optional string userPrincipal = 1;
+    optional string accessId = 2;
+}
+
+// Multi-purpose message for storing or transferring extra access ID information
+//
+// This is an extension to the S3Secret protobuf message, carrying supplementary
+//   information to the existing accessId (kerberosID) field.
+// For now, all fields are related to multi-tenancy. New fields can be added
+//   when necessary in the future. e.g. when implementing new features.
+//
+// Usage 1: Stored as value (OmDBAccessIdInfo) in TenantAccessIdTable.
+//   In this case, accessId field is not set to avoid duplication,
+//   because the key of TenantAccessIdTable is already accessId.
+//
+// Usage 2: Used when transferring the result of `ozone tenant user info`
+//   See TenantUserInfoValue.
+//
+message ExtendedUserAccessIdInfo {
+    optional string userPrincipal = 1;
+    optional string accessId = 2;  // OmDBAccessIdInfo doesn't use this field
+    optional string tenantId = 3;
+    optional bool isAdmin = 4;
+    optional bool isDelegatedAdmin = 5;
+}
+
+message ListTenantRequest {
+
+}
+
+message ListTenantResponse {
+    repeated TenantState tenantState = 1;
+}
+
+message TenantListUserRequest {
+    optional string tenantId = 1;
+    optional string prefix = 2;
+}
+
+message TenantListUserResponse {
+    repeated UserAccessIdInfo userAccessIdInfo = 1;
+}
+
+message TenantGetUserInfoRequest {
+    optional string userPrincipal = 1;
+}
+
+message TenantGetUserInfoResponse {
+    repeated ExtendedUserAccessIdInfo accessIdInfo = 1;
 }
 
 message LayoutVersion {
@@ -1344,7 +1492,82 @@ message LayoutVersion {
 }
 
 message RevokeS3SecretRequest {
-    required string kerberosID = 1;
+    required string kerberosID = 1;  // HDDS-6339: This really means accessId
+}
+
+message CreateTenantRequest {
+    optional string tenantId = 1;  // Tenant name
+    optional string volumeName = 2;
+    optional string userRoleName = 3;
+    optional string adminRoleName = 4;
+}
+
+message SetRangerServiceVersionRequest {
+    required uint64 rangerServiceVersion = 1;
+}
+
+message DeleteTenantRequest {
+    optional string tenantId = 1;
+}
+
+message TenantAssignUserAccessIdRequest {
+    optional string userPrincipal = 1;
+    optional string tenantId = 2;
+    optional string accessId = 3;
+}
+
+message TenantRevokeUserAccessIdRequest {
+    optional string accessId = 1;
+    optional string tenantId = 2;
+}
+
+message TenantAssignAdminRequest {
+    optional string accessId = 1;
+    optional string tenantId = 2;
+    optional bool delegated = 3;
+}
+
+message TenantRevokeAdminRequest {
+    optional string accessId = 1;
+    optional string tenantId = 2;
+}
+
+message GetS3VolumeContextRequest {
+
+}
+
+message CreateTenantResponse {
+
+}
+
+message SetRangerServiceVersionResponse {
+}
+
+message DeleteTenantResponse {
+    optional string volumeName = 1;
+    optional int64 volRefCount = 2;
+}
+
+message TenantAssignUserAccessIdResponse {
+    optional S3Secret s3Secret = 1;
+}
+
+message TenantRevokeUserAccessIdResponse {
+
+}
+
+message TenantAssignAdminResponse {
+
+}
+
+message TenantRevokeAdminResponse {
+
+}
+
+message GetS3VolumeContextResponse {
+  optional VolumeInfo volumeInfo = 1;
+  // Piggybacked username (principal) response to be used for KMS client operations
+  optional string userPrincipal = 2;
 }
 
 /**
@@ -1352,9 +1575,11 @@ message RevokeS3SecretRequest {
   OM's.
 */
 message UpdateGetS3SecretRequest {
-    required string kerberosID = 1;
+    required string kerberosID = 1;  // HDDS-6339: This really means accessId
     required string awsSecret = 2;
 }
+
+// MARK
 
 /**
   This will be used by OM to authenticate S3 gateway requests on a per request basis.

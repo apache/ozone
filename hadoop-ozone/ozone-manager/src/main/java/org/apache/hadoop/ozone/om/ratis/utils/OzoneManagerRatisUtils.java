@@ -57,8 +57,16 @@ import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
+import org.apache.hadoop.ozone.om.request.s3.security.OMSetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3RevokeSecretRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignUserAccessIdRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMSetRangerServiceVersionRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignAdminRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantDeleteRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRevokeAdminRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRevokeUserAccessIdRequest;
 import org.apache.hadoop.ozone.om.request.security.OMCancelDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.security.OMGetDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.security.OMRenewDelegationTokenRequest;
@@ -174,12 +182,34 @@ public final class OzoneManagerRatisUtils {
       return new OMPrepareRequest(omRequest);
     case CancelPrepare:
       return new OMCancelPrepareRequest(omRequest);
+    case SetS3Secret:
+      return new OMSetSecretRequest(omRequest);
     case RevokeS3Secret:
       return new S3RevokeSecretRequest(omRequest);
     case PurgeKeys:
       return new OMKeyPurgeRequest(omRequest);
     case PurgePaths:
       return new OMPathsPurgeRequestWithFSO(omRequest);
+    case CreateTenant:
+      ozoneManager.checkS3MultiTenancyEnabled();
+      return new OMTenantCreateRequest(omRequest);
+    case DeleteTenant:
+      ozoneManager.checkS3MultiTenancyEnabled();
+      return new OMTenantDeleteRequest(omRequest);
+    case TenantAssignUserAccessId:
+      ozoneManager.checkS3MultiTenancyEnabled();
+      return new OMTenantAssignUserAccessIdRequest(omRequest);
+    case TenantRevokeUserAccessId:
+      ozoneManager.checkS3MultiTenancyEnabled();
+      return new OMTenantRevokeUserAccessIdRequest(omRequest);
+    case TenantAssignAdmin:
+      ozoneManager.checkS3MultiTenancyEnabled();
+      return new OMTenantAssignAdminRequest(omRequest);
+    case TenantRevokeAdmin:
+      ozoneManager.checkS3MultiTenancyEnabled();
+      return new OMTenantRevokeAdminRequest(omRequest);
+    case SetRangerServiceVersion:
+      return new OMSetRangerServiceVersionRequest(omRequest);
 
     /*
      * Key requests that can have multiple variants based on the bucket layout

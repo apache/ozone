@@ -48,10 +48,13 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmBucketInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmDBAccessIdInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmDBUserPrincipalInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmDirectoryInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmMultipartKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmPrefixInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmDBTenantStateCodec;
 import org.apache.hadoop.ozone.om.codec.OmVolumeArgsCodec;
 import org.apache.hadoop.ozone.om.codec.RepeatedOmKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.S3SecretValueCodec;
@@ -60,12 +63,15 @@ import org.apache.hadoop.ozone.om.codec.UserVolumeInfoCodec;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -128,6 +134,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * | transactionInfoTable| #TRANSACTIONINFO -> OMTransactionInfo          |
    * |----------------------------------------------------------------------|
    *
+   * Multi-Tenant Tables:
+   * |----------------------------------------------------------------------|
+   * | tenantStateTable          | tenantId -> OmDBTenantState              |
+   * |----------------------------------------------------------------------|
+   * | tenantAccessIdTable       | accessId -> OmDBAccessIdInfo             |
+   * |----------------------------------------------------------------------|
+   * | principalToAccessIdsTable | userPrincipal -> OmDBUserPrincipalInfo   |
+   * |----------------------------------------------------------------------|
+   *
+   *
    * Simple Tables:
    * |----------------------------------------------------------------------|
    * |  Column Family     |        VALUE                                    |
@@ -151,7 +167,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * |  deletedDirTable   | parentId/directoryName -> KeyInfo               |
    * |----------------------------------------------------------------------|
-   *
    */
 
   public static final String USER_TABLE = "userTable";
@@ -172,6 +187,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       "transactionInfoTable";
   public static final String META_TABLE = "metaTable";
 
+  // Tables for multi-tenancy
+  public static final String TENANT_ACCESS_ID_TABLE = "tenantAccessIdTable";
+  public static final String PRINCIPAL_TO_ACCESS_IDS_TABLE =
+      "principalToAccessIdsTable";
+  public static final String TENANT_STATE_TABLE = "tenantStateTable";
+
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,
       VOLUME_TABLE,
@@ -188,7 +209,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       FILE_TABLE,
       DELETED_DIR_TABLE,
       OPEN_FILE_TABLE,
-      META_TABLE
+      META_TABLE,
+      TENANT_ACCESS_ID_TABLE,
+      PRINCIPAL_TO_ACCESS_IDS_TABLE,
+      TENANT_STATE_TABLE
   };
 
   private DBStore store;
@@ -210,6 +234,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table openFileTable;
   private Table transactionInfoTable;
   private Table metaTable;
+
+  // Tables required for multi-tenancy
+  private Table tenantAccessIdTable;
+  private Table principalToAccessIdsTable;
+  private Table tenantStateTable;
+
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
   private Table deletedDirTable;
@@ -408,6 +438,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(DELETED_DIR_TABLE)
         .addTable(TRANSACTION_INFO_TABLE)
         .addTable(META_TABLE)
+        .addTable(TENANT_ACCESS_ID_TABLE)
+        .addTable(PRINCIPAL_TO_ACCESS_IDS_TABLE)
+        .addTable(TENANT_STATE_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
         .addCodec(RepeatedOmKeyInfo.class,
@@ -419,7 +452,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addCodec(S3SecretValue.class, new S3SecretValueCodec())
         .addCodec(OmPrefixInfo.class, new OmPrefixInfoCodec())
         .addCodec(TransactionInfo.class, new TransactionInfoCodec())
-        .addCodec(OmDirectoryInfo.class, new OmDirectoryInfoCodec());
+        .addCodec(OmDirectoryInfo.class, new OmDirectoryInfoCodec())
+        .addCodec(OmDBTenantState.class, new OmDBTenantStateCodec())
+        .addCodec(OmDBAccessIdInfo.class, new OmDBAccessIdInfoCodec())
+        .addCodec(OmDBUserPrincipalInfo.class,
+            new OmDBUserPrincipalInfoCodec());
   }
 
   /**
@@ -495,6 +532,22 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
     metaTable = this.store.getTable(META_TABLE, String.class, String.class);
     checkTableStatus(metaTable, META_TABLE);
+
+    // accessId -> OmDBAccessIdInfo (tenantId, secret, Kerberos principal)
+    tenantAccessIdTable = this.store.getTable(TENANT_ACCESS_ID_TABLE,
+        String.class, OmDBAccessIdInfo.class);
+    checkTableStatus(tenantAccessIdTable, TENANT_ACCESS_ID_TABLE);
+
+    // User principal -> OmDBUserPrincipalInfo (a list of accessIds)
+    principalToAccessIdsTable = this.store.getTable(
+        PRINCIPAL_TO_ACCESS_IDS_TABLE,
+        String.class, OmDBUserPrincipalInfo.class);
+    checkTableStatus(principalToAccessIdsTable, PRINCIPAL_TO_ACCESS_IDS_TABLE);
+
+    // tenant name -> tenant (tenant states)
+    tenantStateTable = this.store.getTable(TENANT_STATE_TABLE,
+        String.class, OmDBTenantState.class);
+    checkTableStatus(tenantStateTable, TENANT_STATE_TABLE);
   }
 
   /**
@@ -1323,6 +1376,21 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Table<String, String> getMetaTable() {
     return metaTable;
+  }
+
+  @Override
+  public Table<String, OmDBAccessIdInfo> getTenantAccessIdTable() {
+    return tenantAccessIdTable;
+  }
+
+  @Override
+  public Table<String, OmDBUserPrincipalInfo> getPrincipalToAccessIdsTable() {
+    return principalToAccessIdsTable;
+  }
+
+  @Override
+  public Table<String, OmDBTenantState> getTenantStateTable() {
+    return tenantStateTable;
   }
 
   /**
