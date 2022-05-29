@@ -71,7 +71,7 @@ with_old_version_downgraded() {
 
 with_new_version_finalized() {
   _check_hdds_mlvs 3
-  _check_om_mlvs 2
+  _check_om_mlvs 3
 
   validate old1
   validate new1

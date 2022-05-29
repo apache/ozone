@@ -152,6 +152,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
 
   private OMResponse processRequest(OMRequest request) throws
       ServiceException {
+    OMClientRequest omClientRequest = null;
     if (isRatisEnabled) {
       boolean s3Auth = false;
       try {
@@ -183,14 +184,25 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
           checkLeaderStatus();
         }
         try {
-          OMClientRequest omClientRequest =
+          omClientRequest =
               createClientRequest(request, ozoneManager);
+          // TODO: Note: Due to HDDS-6055, createClientRequest() could now
+          //  return null, which triggered the findbugs warning.
+          //  Added the assertion.
+          assert (omClientRequest != null);
           request = omClientRequest.preExecute(ozoneManager);
         } catch (IOException ex) {
           // As some of the preExecute returns error. So handle here.
+          if (omClientRequest != null) {
+            omClientRequest.handleRequestFailure(ozoneManager);
+          }
           return createErrorResponse(request, ex);
         }
-        return submitRequestToRatis(request);
+        OMResponse response = submitRequestToRatis(request);
+        if (!response.getSuccess()) {
+          omClientRequest.handleRequestFailure(ozoneManager);
+        }
+        return response;
       }
     } else {
       return submitRequestDirectlyToOM(request);

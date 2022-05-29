@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -47,7 +48,9 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
+import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
+import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -57,6 +60,7 @@ import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessResponse;
@@ -74,6 +78,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBuc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeRequest;
@@ -89,12 +95,18 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Prepare
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RepeatedKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.collect.Lists;
 
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
@@ -231,6 +243,29 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         PrepareStatusResponse prepareStatusResponse = getPrepareStatus();
         responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
         break;
+      case GetS3VolumeContext:
+        GetS3VolumeContextResponse s3VolumeContextResponse =
+            getS3VolumeContext();
+        responseBuilder.setGetS3VolumeContextResponse(s3VolumeContextResponse);
+        break;
+      case TenantGetUserInfo:
+        impl.checkS3MultiTenancyEnabled();
+        TenantGetUserInfoResponse getUserInfoResponse = tenantGetUserInfo(
+            request.getTenantGetUserInfoRequest());
+        responseBuilder.setTenantGetUserInfoResponse(getUserInfoResponse);
+        break;
+      case ListTenant:
+        impl.checkS3MultiTenancyEnabled();
+        ListTenantResponse listTenantResponse = listTenant(
+            request.getListTenantRequest());
+        responseBuilder.setListTenantResponse(listTenantResponse);
+        break;
+      case TenantListUser:
+        impl.checkS3MultiTenancyEnabled();
+        TenantListUserResponse listUserResponse = tenantListUsers(
+            request.getTenantListUserRequest());
+        responseBuilder.setTenantListUserResponse(listUserResponse);
+        break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
@@ -354,6 +389,49 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     OmVolumeArgs ret = impl.getVolumeInfo(volume);
     resp.setVolumeInfo(ret.getProtobuf());
+
+    return resp.build();
+  }
+
+  @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
+  private TenantGetUserInfoResponse tenantGetUserInfo(
+      TenantGetUserInfoRequest request) throws IOException {
+
+    final TenantGetUserInfoResponse.Builder resp =
+        TenantGetUserInfoResponse.newBuilder();
+    final String userPrincipal = request.getUserPrincipal();
+
+    TenantUserInfoValue ret = impl.tenantGetUserInfo(userPrincipal);
+    // Note impl.tenantGetUserInfo() throws if errs
+    if (ret != null) {
+      resp.addAllAccessIdInfo(ret.getAccessIdInfoList());
+    }
+
+    return resp.build();
+  }
+
+  @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
+  private TenantListUserResponse tenantListUsers(
+      TenantListUserRequest request) throws IOException {
+    TenantListUserResponse.Builder builder =
+        TenantListUserResponse.newBuilder();
+    TenantUserList usersInTenant =
+        impl.listUsersInTenant(request.getTenantId(), request.getPrefix());
+    // Note impl.listUsersInTenant() throws if errs
+    if (usersInTenant != null) {
+      builder.addAllUserAccessIdInfo(usersInTenant.getUserAccessIds());
+    }
+    return builder.build();
+  }
+
+  @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
+  private ListTenantResponse listTenant(
+      ListTenantRequest request) throws IOException {
+
+    final ListTenantResponse.Builder resp = ListTenantResponse.newBuilder();
+
+    TenantStateList ret = impl.listTenant();
+    resp.addAllTenantState(ret.getTenantStateList());
 
     return resp.build();
   }
@@ -1060,6 +1138,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return PrepareStatusResponse.newBuilder()
         .setStatus(prepareState.getStatus())
         .setCurrentTxnIndex(prepareState.getIndex()).build();
+  }
+
+  private GetS3VolumeContextResponse getS3VolumeContext()
+      throws IOException {
+    return impl.getS3VolumeContext().getProtobuf();
   }
 
   public OzoneManager getOzoneManager() {
