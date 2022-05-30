@@ -114,6 +114,30 @@ test_ec_cross_compatibility() {
   done
 }
 
+test_bucket_layout_cross_compatibility() {
+  echo "Running Bucket Layout backward compatibility tests."
+    local cluster_versions_with_bucket_layout="1.3.0"
+    local non_bucket_layout_client_versions="1.0.0 1.1.0 1.2.1"
+
+    for cluster_version in ${cluster_versions_with_bucket_layout}; do
+        export COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${cluster_version}
+        OZONE_KEEP_RESULTS=true start_docker_env 5
+
+        local prefix=$(LC_CTYPE=C tr -dc '[:alnum:]' < /dev/urandom | head -c 5 | tr '[:upper:]' '[:lower:]')
+        OZONE_DIR=/opt/hadoop
+        execute_robot_test new_client --include setup-bucket-layout-data -N "xcompat-cluster-${cluster_version}-setup-data" -v prefix:"${prefix}" bucketlayout/backward-compat.robot
+         OZONE_DIR=/opt/ozone
+
+        for client_version in ${non_bucket_layout_client_versions}; do
+          client="old_client_${client_version//./_}"
+          unset OUTPUT_PATH
+          execute_robot_test "${client}" --include test-bucket-layout-compat -N "xcompat-cluster-${cluster_version}-client-${client_version}-read-${cluster_version}" -v prefix:"${prefix}" bucketlayout/backward-compat.robot
+        done
+
+        KEEP_RUNNING=false stop_docker_env
+      done
+}
+
 create_results_dir
 
 # current cluster with various clients
@@ -125,6 +149,8 @@ for cluster_version in ${old_versions}; do
   COMPOSE_FILE=old-cluster.yaml:clients.yaml test_cross_compatibility ${cluster_version}
 done
 
-test_ec_cross_compatibility
+#test_ec_cross_compatibility
+
+test_bucket_layout_cross_compatibility
 
 generate_report
