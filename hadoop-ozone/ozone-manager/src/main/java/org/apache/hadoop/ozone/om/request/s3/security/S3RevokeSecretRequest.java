@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -62,21 +61,15 @@ public class S3RevokeSecretRequest extends OMClientRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     final RevokeS3SecretRequest s3RevokeSecretRequest =
         getOmRequest().getRevokeS3SecretRequest();
-    final String kerberosID = s3RevokeSecretRequest.getKerberosID();
+    final String accessId = s3RevokeSecretRequest.getKerberosID();
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
-    final String username = ugi.getUserName();
-    // Permission check. Users need to be themselves or have admin privilege
-    if (!username.equals(kerberosID) &&
-        !ozoneManager.isAdmin(ugi)) {
-      throw new OMException("Requested user name '" + kerberosID +
-          "' doesn't match current user '" + username +
-          "', nor does current user has administrator privilege.",
-          OMException.ResultCodes.USER_MISMATCH);
-    }
+    // Permission check
+    S3SecretRequestHelper.checkAccessIdSecretOpPermission(
+        ozoneManager, ugi, accessId);
 
     final RevokeS3SecretRequest revokeS3SecretRequest =
             RevokeS3SecretRequest.newBuilder()
-                    .setKerberosID(kerberosID).build();
+                    .setKerberosID(accessId).build();
 
     OMRequest.Builder omRequest = OMRequest.newBuilder()
         .setRevokeS3SecretRequest(revokeS3SecretRequest)

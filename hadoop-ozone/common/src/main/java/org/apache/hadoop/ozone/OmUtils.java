@@ -263,6 +263,10 @@ public final class OmUtils {
     case ListMultipartUploads:
     case FinalizeUpgradeProgress:
     case PrepareStatus:
+    case GetS3VolumeContext:
+    case ListTenant:
+    case TenantGetUserInfo:
+    case TenantListUser:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -296,8 +300,16 @@ public final class OmUtils {
     case Prepare:
     case CancelPrepare:
     case DeleteOpenKeys:
+    case SetS3Secret:
     case RevokeS3Secret:
     case PurgePaths:
+    case CreateTenant:
+    case DeleteTenant:
+    case TenantAssignUserAccessId:
+    case TenantRevokeUserAccessId:
+    case TenantAssignAdmin:
+    case TenantRevokeAdmin:
+    case SetRangerServiceVersion:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);

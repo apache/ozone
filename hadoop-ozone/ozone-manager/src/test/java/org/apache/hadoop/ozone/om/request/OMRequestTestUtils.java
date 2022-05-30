@@ -47,6 +47,10 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .MultipartUploadAbortRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -67,6 +71,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .RemoveAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .SetAclRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignAdminRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignUserAccessIdRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantRevokeAdminRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantRevokeUserAccessIdRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
@@ -881,6 +892,149 @@ public final class OMRequestTestUtils {
             .setBucketName(bucketName).setVolumeName(volumeName))
         .setCmdType(OzoneManagerProtocolProtos.Type.DeleteBucket)
         .setClientId(UUID.randomUUID().toString()).build();
+  }
+
+  public static OMRequest createTenantRequest(String tenantId) {
+
+    final CreateTenantRequest.Builder requestBuilder =
+        CreateTenantRequest.newBuilder()
+            .setTenantId(tenantId)
+            .setVolumeName(tenantId);
+
+    return OMRequest.newBuilder()
+        .setCreateTenantRequest(requestBuilder)
+        .setCmdType(Type.CreateTenant)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
+  public static OMRequest deleteTenantRequest(String tenantId) {
+
+    final DeleteTenantRequest.Builder requestBuilder =
+        DeleteTenantRequest.newBuilder()
+            .setTenantId(tenantId);
+
+    return OMRequest.newBuilder()
+        .setDeleteTenantRequest(requestBuilder)
+        .setCmdType(Type.DeleteTenant)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
+  public static OMRequest tenantAssignUserAccessIdRequest(
+      String username, String tenantId, String accessId) {
+
+    final TenantAssignUserAccessIdRequest.Builder requestBuilder =
+        TenantAssignUserAccessIdRequest.newBuilder()
+            .setUserPrincipal(username)
+            .setTenantId(tenantId)
+            .setAccessId(accessId);
+
+    return OMRequest.newBuilder()
+        .setTenantAssignUserAccessIdRequest(requestBuilder)
+        .setCmdType(Type.TenantAssignUserAccessId)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
+  public static OMRequest tenantRevokeUserAccessIdRequest(String accessId) {
+
+    final TenantRevokeUserAccessIdRequest.Builder requestBuilder =
+        TenantRevokeUserAccessIdRequest.newBuilder()
+            .setAccessId(accessId);
+
+    return OMRequest.newBuilder()
+        .setTenantRevokeUserAccessIdRequest(requestBuilder)
+        .setCmdType(Type.TenantRevokeUserAccessId)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
+  public static OMRequest tenantAssignAdminRequest(
+      String accessId, String tenantId, boolean delegated) {
+
+    final TenantAssignAdminRequest.Builder requestBuilder =
+        TenantAssignAdminRequest.newBuilder()
+            .setAccessId(accessId)
+            .setDelegated(delegated);
+
+    if (tenantId != null) {
+      requestBuilder.setTenantId(tenantId);
+    }
+
+    return OMRequest.newBuilder()
+        .setTenantAssignAdminRequest(requestBuilder)
+        .setCmdType(Type.TenantAssignAdmin)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
+  public static OMRequest tenantRevokeAdminRequest(
+      String accessId, String tenantId) {
+
+    final TenantRevokeAdminRequest.Builder requestBuilder =
+        TenantRevokeAdminRequest.newBuilder()
+            .setAccessId(accessId);
+
+    if (tenantId != null) {
+      requestBuilder.setTenantId(tenantId);
+    }
+
+    return OMRequest.newBuilder()
+        .setTenantRevokeAdminRequest(requestBuilder)
+        .setCmdType(Type.TenantRevokeAdmin)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
+  public static OMRequest tenantGetUserInfoRequest(String userPrincipal) {
+
+    final TenantGetUserInfoRequest.Builder requestBuilder =
+        TenantGetUserInfoRequest.newBuilder()
+            .setUserPrincipal(userPrincipal);
+
+    return OMRequest.newBuilder()
+        .setTenantGetUserInfoRequest(requestBuilder)
+        .setCmdType(Type.TenantGetUserInfo)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
+  public static OMRequest listUsersInTenantRequest(String tenantId) {
+
+    final TenantListUserRequest.Builder requestBuilder =
+        TenantListUserRequest.newBuilder()
+            .setTenantId(tenantId);
+
+    return OMRequest.newBuilder()
+        .setTenantListUserRequest(requestBuilder)
+        .setCmdType(Type.TenantListUser)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
+  public static OMRequest listTenantRequest() {
+
+    final ListTenantRequest.Builder requestBuilder =
+        ListTenantRequest.newBuilder();
+
+    return OMRequest.newBuilder()
+        .setListTenantRequest(requestBuilder)
+        .setCmdType(Type.ListTenant)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
+  public static OMRequest getS3VolumeContextRequest() {
+
+    final GetS3VolumeContextRequest.Builder requestBuilder =
+        GetS3VolumeContextRequest.newBuilder();
+
+    return OMRequest.newBuilder()
+        .setGetS3VolumeContextRequest(requestBuilder)
+        .setCmdType(Type.GetS3VolumeContext)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
   }
 
   /**

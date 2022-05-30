@@ -115,7 +115,7 @@ public class DBCheckpointServlet extends HttpServlet {
       return;
     }
 
-    // Check ACL for dbCheckpoint only when global Ozone ACL is enable
+    // Check ACL for dbCheckpoint only when global Ozone ACL is enabled
     if (aclEnabled) {
       final java.security.Principal userPrincipal = request.getUserPrincipal();
       if (userPrincipal == null) {
