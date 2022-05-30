@@ -85,10 +85,8 @@ public class TestOzoneECClient {
   private final XceiverClientFactory factoryStub =
       new MockXceiverClientFactory();
   private OzoneConfiguration conf = new OzoneConfiguration();
-  private final int requiredNodes = dataBlocks + parityBlocks;
-  private final int totalNodes = 15;
   private MultiNodePipelineBlockAllocator allocator =
-      new MultiNodePipelineBlockAllocator(conf, requiredNodes, totalNodes);
+      new MultiNodePipelineBlockAllocator(conf, dataBlocks + parityBlocks, 15);
   private final MockOmTransport transportStub = new MockOmTransport(allocator);
   private final RawErasureEncoder encoder =
       new RSRawErasureCoderFactory().createEncoder(
