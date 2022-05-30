@@ -149,7 +149,7 @@ for cluster_version in ${old_versions}; do
   COMPOSE_FILE=old-cluster.yaml:clients.yaml test_cross_compatibility ${cluster_version}
 done
 
-#test_ec_cross_compatibility
+test_ec_cross_compatibility
 
 test_bucket_layout_cross_compatibility
 
