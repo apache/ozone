@@ -27,6 +27,7 @@ spec:
       component: datanode
   serviceName: datanode
   replicas: 3
+  podManagementPolicy: Parallel
   template:
     metadata:
       labels:
@@ -52,6 +53,7 @@ spec:
       containers:
       - name: datanode
         image: '@docker.image@'
+        imagePullPolicy: Always
         args:
         - ozone
         - datanode
