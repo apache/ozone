@@ -817,13 +817,18 @@ public class TestOzoneECClient {
   }
 
   @Test
-  public void testExcludeFailedDN() throws IOException {
-    testExcludeFailedDN(IntStream.range(0, 3), IntStream.range(3, 5));
+  public void testExcludeOnDNFailure() throws IOException {
+    testExcludeFailedDN(IntStream.range(0, 5), IntStream.empty());
   }
 
   @Test
-  public void testNotExcludeClosedDN() throws IOException {
+  public void testExcludeOnDNClosed() throws IOException {
     testExcludeFailedDN(IntStream.empty(), IntStream.range(0, 5));
+  }
+
+  @Test
+  public void testExcludeOnDNMixed() throws IOException {
+    testExcludeFailedDN(IntStream.range(0, 3), IntStream.range(3, 5));
   }
 
   private void testExcludeFailedDN(IntStream failedDNIndex,
