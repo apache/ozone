@@ -276,7 +276,7 @@ public class TestContainerBalancer {
     // balancer should have identified unbalanced nodes
     Assert.assertFalse(containerBalancer.getUnBalancedNodes().isEmpty());
     // no container should have been selected
-    Assert.assertTrue(containerBalancer.getSourceToTargetMap().isEmpty());
+    Assert.assertTrue(containerBalancer.getContainerFromSourceMap().isEmpty());
     /*
     Iteration result should be CAN_NOT_BALANCE_ANY_MORE because no container
     move is generated
@@ -294,11 +294,10 @@ public class TestContainerBalancer {
     containerBalancer.stopBalancer();
 
     // check whether all selected containers are closed
-    for (ContainerMoveSelection moveSelection:
-         containerBalancer.getSourceToTargetMap().values()) {
+    for (ContainerID cid:
+         containerBalancer.getContainerFromSourceMap().keySet()) {
       Assert.assertSame(
-          cidToInfoMap.get(moveSelection.getContainerID()).getState(),
-          HddsProtos.LifeCycleState.CLOSED);
+          cidToInfoMap.get(cid).getState(), HddsProtos.LifeCycleState.CLOSED);
     }
   }
 
@@ -329,19 +328,14 @@ public class TestContainerBalancer {
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     startBalancer(balancerConfiguration);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) { }
+    sleepWhileBalancing(1000);
 
     containerBalancer.stopBalancer();
-    Map<DatanodeDetails, ContainerMoveSelection> sourceToTargetMap =
-        containerBalancer.getSourceToTargetMap();
-    for (ContainerMoveSelection moveSelection : sourceToTargetMap.values()) {
-      ContainerID container = moveSelection.getContainerID();
-      DatanodeDetails target = moveSelection.getTargetNode();
+    Map<ContainerID, DatanodeDetails> map =
+        containerBalancer.getContainerToTargetMap();
+    for (Map.Entry<ContainerID, DatanodeDetails> entry : map.entrySet()) {
+      ContainerID container = entry.getKey();
+      DatanodeDetails target = entry.getValue();
       Assert.assertTrue(cidToReplicasMap.get(container)
           .stream()
           .map(ContainerReplica::getDatanodeDetails)
@@ -354,33 +348,31 @@ public class TestContainerBalancer {
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    balancerConfiguration.setIterations(1);
     startBalancer(balancerConfiguration);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) { }
+    sleepWhileBalancing(500);
 
     containerBalancer.stopBalancer();
-    Map<DatanodeDetails, ContainerMoveSelection> sourceToTargetMap =
-        containerBalancer.getSourceToTargetMap();
+    Map<ContainerID, DatanodeDetails> containerFromSourceMap =
+        containerBalancer.getContainerFromSourceMap();
+    Map<ContainerID, DatanodeDetails> containerToTargetMap =
+        containerBalancer.getContainerToTargetMap();
 
     // for each move selection, check if {replicas - source + target}
     // satisfies placement policy
-    for (Map.Entry<DatanodeDetails, ContainerMoveSelection> entry :
-        sourceToTargetMap.entrySet()) {
-      ContainerMoveSelection moveSelection = entry.getValue();
-      ContainerID container = moveSelection.getContainerID();
-      DatanodeDetails target = moveSelection.getTargetNode();
+    for (Map.Entry<ContainerID, DatanodeDetails> entry :
+        containerFromSourceMap.entrySet()) {
+      ContainerID container = entry.getKey();
+      DatanodeDetails source = entry.getValue();
 
       List<DatanodeDetails> replicas = cidToReplicasMap.get(container)
           .stream()
           .map(ContainerReplica::getDatanodeDetails)
           .collect(Collectors.toList());
-      replicas.remove(entry.getKey());
-      replicas.add(target);
+      // remove source and add target
+      replicas.remove(source);
+      replicas.add(containerToTargetMap.get(container));
 
       ContainerInfo containerInfo = cidToInfoMap.get(container);
       ContainerPlacementStatus placementStatus =
@@ -397,20 +389,13 @@ public class TestContainerBalancer {
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
     balancerConfiguration.setMaxSizeEnteringTarget(50 * OzoneConsts.GB);
+    balancerConfiguration.setIterations(1);
     startBalancer(balancerConfiguration);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) {
-    }
+    sleepWhileBalancing(500);
 
     containerBalancer.stopBalancer();
-    for (ContainerMoveSelection moveSelection :
-        containerBalancer.getSourceToTargetMap().values()) {
-      DatanodeDetails target = moveSelection.getTargetNode();
+    for (DatanodeDetails target : containerBalancer.getSelectedTargets()) {
       NodeStatus status = mockNodeManager.getNodeStatus(target);
       Assert.assertSame(HddsProtos.NodeOperationalState.IN_SERVICE,
           status.getOperationalState());
@@ -424,24 +409,15 @@ public class TestContainerBalancer {
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
     balancerConfiguration.setMaxSizeEnteringTarget(50 * OzoneConsts.GB);
-
+    balancerConfiguration.setIterations(1);
     startBalancer(balancerConfiguration);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) { }
+    sleepWhileBalancing(500);
 
     containerBalancer.stopBalancer();
-    Set<ContainerID> containers = new HashSet<>();
-    for (ContainerMoveSelection moveSelection :
-        containerBalancer.getSourceToTargetMap().values()) {
-      ContainerID container = moveSelection.getContainerID();
-      Assert.assertFalse(containers.contains(container));
-      containers.add(container);
-    }
+    // all containers should be unique, so the list size should equal map size
+    Assert.assertEquals(containerBalancer.getContainerFromSourceMap().size(),
+        containerBalancer.getSelectedContainersList().size());
   }
 
   @Test
@@ -454,19 +430,13 @@ public class TestContainerBalancer {
 
     startBalancer(balancerConfiguration);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) { }
+    sleepWhileBalancing(500);
 
     containerBalancer.stopBalancer();
     Set<ContainerID> excludeContainers =
         balancerConfiguration.getExcludeContainers();
-    for (ContainerMoveSelection moveSelection :
-        containerBalancer.getSourceToTargetMap().values()) {
-      ContainerID container = moveSelection.getContainerID();
+    for (ContainerID container :
+        containerBalancer.getContainerFromSourceMap().keySet()) {
       Assert.assertFalse(excludeContainers.contains(container));
     }
   }
@@ -486,7 +456,7 @@ public class TestContainerBalancer {
     sleepWhileBalancing(500);
 
     Assert.assertFalse(containerBalancer.getUnBalancedNodes().isEmpty());
-    Assert.assertTrue(containerBalancer.getSourceToTargetMap().isEmpty());
+    Assert.assertTrue(containerBalancer.getContainerFromSourceMap().isEmpty());
     containerBalancer.stopBalancer();
 
     // some containers should be selected when using default values
@@ -500,7 +470,7 @@ public class TestContainerBalancer {
     containerBalancer.stopBalancer();
     // balancer should have identified unbalanced nodes
     Assert.assertFalse(containerBalancer.getUnBalancedNodes().isEmpty());
-    Assert.assertFalse(containerBalancer.getSourceToTargetMap().isEmpty());
+    Assert.assertFalse(containerBalancer.getContainerFromSourceMap().isEmpty());
   }
 
   @Test
@@ -577,10 +547,14 @@ public class TestContainerBalancer {
         nodesInCluster.get(secondIncludeIndex).getDatanodeDetails();
     DatanodeDetails dn2 =
         nodesInCluster.get(thirdIncludeIndex).getDatanodeDetails();
-    for (Map.Entry<DatanodeDetails, ContainerMoveSelection> entry :
-        containerBalancer.getSourceToTargetMap().entrySet()) {
-      DatanodeDetails source = entry.getKey();
-      DatanodeDetails target = entry.getValue().getTargetNode();
+    Map<ContainerID, DatanodeDetails> containerFromSourceMap =
+        containerBalancer.getContainerFromSourceMap();
+    Map<ContainerID, DatanodeDetails> containerToTargetMap =
+        containerBalancer.getContainerToTargetMap();
+    for (Map.Entry<ContainerID, DatanodeDetails> entry :
+        containerFromSourceMap.entrySet()) {
+      DatanodeDetails source = entry.getValue();
+      DatanodeDetails target = containerToTargetMap.get(entry.getKey());
       Assert.assertTrue(source.equals(dn1) || source.equals(dn2));
       Assert.assertTrue(target.equals(dn1) || target.equals(dn2));
     }

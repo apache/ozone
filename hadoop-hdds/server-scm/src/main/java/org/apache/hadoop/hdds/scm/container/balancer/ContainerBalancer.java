@@ -103,7 +103,18 @@ public class ContainerBalancer implements SCMService {
   private Lock lock;
   private ContainerBalancerSelectionCriteria selectionCriteria;
   private Map<DatanodeDetails, ContainerMoveSelection> sourceToTargetMap;
-  private Set<ContainerID> selectedContainers;
+
+  /*
+  Since a container can be selected only once during an iteration, these maps
+   use it as a primary key to track source to target pairings.
+  */
+  private Map<ContainerID, DatanodeDetails> containerFromSourceMap;
+  private Map<ContainerID, DatanodeDetails> containerToTargetMap;
+
+  private Set<DatanodeDetails> selectedTargets;
+  private Set<DatanodeDetails> selectedSources;
+  // maintaining a list of containers for testing
+  private List<ContainerID> selectedContainersList;
   private FindTargetStrategy findTargetStrategy;
   private FindSourceStrategy findSourceStrategy;
   private Map<ContainerMoveSelection,
@@ -127,13 +138,15 @@ public class ContainerBalancer implements SCMService {
         ContainerBalancerConfiguration.class);
     this.metrics = ContainerBalancerMetrics.create();
     this.scmContext = scm.getScmContext();
-    this.selectedContainers = new HashSet<>();
     this.overUtilizedNodes = new ArrayList<>();
     this.underUtilizedNodes = new ArrayList<>();
     this.withinThresholdUtilizedNodes = new ArrayList<>();
     this.unBalancedNodes = new ArrayList<>();
     this.placementPolicy = scm.getContainerPlacementPolicy();
     this.networkTopology = scm.getClusterMap();
+    this.containerFromSourceMap = new HashMap<>();
+    this.containerToTargetMap = new HashMap<>();
+    this.selectedContainersList = new ArrayList<>();
 
     this.lock = new ReentrantLock();
     findSourceStrategy = new FindSourceGreedy(nodeManager);
@@ -143,6 +156,7 @@ public class ContainerBalancer implements SCMService {
    * Balances the cluster.
    */
   private void balance() {
+    resetState();
     this.iterations = config.getIterations();
     if (this.iterations == -1) {
       //run balancer infinitely
@@ -375,8 +389,8 @@ public class ContainerBalancer implements SCMService {
     List<DatanodeUsageInfo> potentialTargets = getPotentialTargets();
     findTargetStrategy.reInitialize(potentialTargets, config, upperLimit);
 
-    Set<DatanodeDetails> selectedTargets =
-        new HashSet<>(potentialTargets.size());
+    selectedTargets = new HashSet<>(potentialTargets.size());
+    selectedSources = new HashSet<>(getPotentialSources().size());
     moveSelectionToFutureMap = new HashMap<>(unBalancedNodes.size());
     boolean isMoveGenerated = false;
     iterationResult = IterationResult.ITERATION_COMPLETED;
@@ -405,20 +419,19 @@ public class ContainerBalancer implements SCMService {
       ContainerMoveSelection moveSelection = matchSourceWithTarget(source);
       if (moveSelection != null) {
         isMoveGenerated = true;
-        processMoveSelection(source, moveSelection, selectedTargets);
+        processMoveSelection(source, moveSelection);
       } else {
         // can not find any target for this source
         findSourceStrategy.removeCandidateSourceDataNode(source);
       }
     }
 
-    checkIterationResults(isMoveGenerated, selectedTargets);
+    checkIterationResults(isMoveGenerated);
     return iterationResult;
   }
 
   private void processMoveSelection(DatanodeDetails source,
-                                    ContainerMoveSelection moveSelection,
-                                    Set<DatanodeDetails> selectedTargets) {
+                                    ContainerMoveSelection moveSelection) {
     LOG.info("ContainerBalancer is trying to move container {} from " +
             "source datanode {} to target datanode {}",
         moveSelection.getContainerID().toString(),
@@ -427,8 +440,7 @@ public class ContainerBalancer implements SCMService {
 
     if (moveContainer(source, moveSelection)) {
       // consider move successful for now, and update selection criteria
-      updateTargetsAndSelectionCriteria(
-          selectedTargets, moveSelection, source);
+      updateTargetsAndSelectionCriteria(moveSelection, source);
     }
   }
 
@@ -439,10 +451,8 @@ public class ContainerBalancer implements SCMService {
    * </p>
    * <p>ITERATION_COMPLETED</p>
    * @param isMoveGenerated whether a move was generated during the iteration
-   * @param selectedTargets selected target datanodes
    */
-  private void checkIterationResults(boolean isMoveGenerated,
-                                     Set<DatanodeDetails> selectedTargets) {
+  private void checkIterationResults(boolean isMoveGenerated) {
     if (!isMoveGenerated) {
       /*
        If no move was generated during this iteration then we don't need to
@@ -450,17 +460,14 @@ public class ContainerBalancer implements SCMService {
        */
       iterationResult = IterationResult.CAN_NOT_BALANCE_ANY_MORE;
     } else {
-      checkIterationMoveResults(selectedTargets);
+      checkIterationMoveResults();
     }
   }
 
   /**
    * Checks the results of all move operations when exiting an iteration.
-   *
-   * @param selectedTargets Set of target datanodes that were selected in
-   *                        current iteration
    */
-  private void checkIterationMoveResults(Set<DatanodeDetails> selectedTargets) {
+  private void checkIterationMoveResults() {
     this.countDatanodesInvolvedPerIteration = 0;
     CompletableFuture<Void> allFuturesResult = CompletableFuture.allOf(
         moveSelectionToFutureMap.values()
@@ -486,7 +493,7 @@ public class ContainerBalancer implements SCMService {
     }
 
     countDatanodesInvolvedPerIteration =
-        sourceToTargetMap.size() + selectedTargets.size();
+        selectedSources.size() + selectedTargets.size();
     metrics.incrementNumDatanodesInvolvedInLatestIteration(
         countDatanodesInvolvedPerIteration);
     metrics.incrementNumContainerMovesCompleted(
@@ -641,20 +648,16 @@ public class ContainerBalancer implements SCMService {
   }
 
   /**
-   * Update targets and selection criteria after a move.
+   * Update targets, sources, and selection criteria after a move.
    *
-   * @param selectedTargets  selected target datanodes
-   * @param moveSelection    the target datanode and container that has been
-   *                         just selected
-   * @param source           the source datanode
-   * @return List of updated potential targets
+   * @param moveSelection the target datanode and container that has been
+   *                      just selected
+   * @param source        the source datanode
    */
   private void updateTargetsAndSelectionCriteria(
-      Set<DatanodeDetails> selectedTargets,
       ContainerMoveSelection moveSelection, DatanodeDetails source) {
     // count source if it has not been involved in move earlier
-    if (!sourceToTargetMap.containsKey(source) &&
-        !selectedTargets.contains(source)) {
+    if (!selectedSources.contains(source)) {
       countDatanodesInvolvedPerIteration += 1;
     }
     // count target if it has not been involved in move earlier
@@ -663,9 +666,14 @@ public class ContainerBalancer implements SCMService {
     }
     incSizeSelectedForMoving(source, moveSelection);
     sourceToTargetMap.put(source, moveSelection);
+    selectedContainersList.add(moveSelection.getContainerID());
+    containerFromSourceMap.put(moveSelection.getContainerID(), source);
+    containerToTargetMap.put(moveSelection.getContainerID(),
+        moveSelection.getTargetNode());
     selectedTargets.add(moveSelection.getTargetNode());
-    selectedContainers.add(moveSelection.getContainerID());
-    selectionCriteria.setSelectedContainers(selectedContainers);
+    selectedSources.add(source);
+    selectionCriteria.setSelectedContainers(
+        new HashSet<>(containerFromSourceMap.keySet()));
   }
 
   /**
@@ -784,10 +792,12 @@ public class ContainerBalancer implements SCMService {
     this.clusterCapacity = 0L;
     this.clusterUsed = 0L;
     this.clusterRemaining = 0L;
-    this.selectedContainers.clear();
     this.overUtilizedNodes.clear();
     this.underUtilizedNodes.clear();
     this.unBalancedNodes.clear();
+    this.containerFromSourceMap.clear();
+    this.containerToTargetMap.clear();
+    this.selectedContainersList.clear();
     this.countDatanodesInvolvedPerIteration = 0;
     this.sizeMovedPerIteration = 0;
     metrics.resetDataSizeMovedGBInLatestIteration();
@@ -1058,6 +1068,26 @@ public class ContainerBalancer implements SCMService {
   @VisibleForTesting
   public Map<DatanodeDetails, ContainerMoveSelection> getSourceToTargetMap() {
     return sourceToTargetMap;
+  }
+
+  @VisibleForTesting
+  public Map<ContainerID, DatanodeDetails> getContainerFromSourceMap() {
+    return containerFromSourceMap;
+  }
+
+  @VisibleForTesting
+  public Map<ContainerID, DatanodeDetails> getContainerToTargetMap() {
+    return containerToTargetMap;
+  }
+
+  @VisibleForTesting
+  Set<DatanodeDetails> getSelectedTargets() {
+    return selectedTargets;
+  }
+
+  @VisibleForTesting
+  List<ContainerID> getSelectedContainersList() {
+    return selectedContainersList;
   }
 
   /**
