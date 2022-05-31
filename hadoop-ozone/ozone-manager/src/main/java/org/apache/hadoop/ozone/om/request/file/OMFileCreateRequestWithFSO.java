@@ -130,6 +130,10 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
+      final long volumeId = omMetadataManager.getVolumeId(volumeName);
+      final long bucketId = omMetadataManager
+              .getBucketId(volumeName, bucketName);
+
       OmKeyInfo dbFileInfo = null;
 
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO =
@@ -138,7 +142,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
 
       if (pathInfoFSO.getDirectoryResult()
               == OMFileRequest.OMDirectoryResult.FILE_EXISTS) {
-        String dbFileKey = omMetadataManager.getOzonePathKey(
+        String dbFileKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
                 pathInfoFSO.getLastKnownParentId(),
                 pathInfoFSO.getLeafNodeName());
         dbFileInfo = OMFileRequest.getOmKeyInfoFromFileTable(false,
@@ -180,8 +184,9 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       long openVersion = omFileInfo.getLatestVersionLocations().getVersion();
       long clientID = createFileRequest.getClientID();
       String dbOpenFileName = omMetadataManager
-          .getOpenFileName(pathInfoFSO.getLastKnownParentId(),
-              pathInfoFSO.getLeafNodeName(), clientID);
+          .getOpenFileName(volumeId, bucketId,
+                  pathInfoFSO.getLastKnownParentId(),
+                  pathInfoFSO.getLeafNodeName(), clientID);
 
       // Append new blocks
       List<OmKeyLocationInfo> newLocationList = keyArgs.getKeyLocationsList()
@@ -206,9 +211,9 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
 
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
-      OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
-              Optional.absent(), Optional.of(missingParentInfos),
-              trxnLogIndex);
+      OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager, volumeId,
+              bucketId, trxnLogIndex, Optional.of(missingParentInfos),
+              Optional.absent());
 
       // Prepare response. Sets user given full key name in the 'keyName'
       // attribute in response object.

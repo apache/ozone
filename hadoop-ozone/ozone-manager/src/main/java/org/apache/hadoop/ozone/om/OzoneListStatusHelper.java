@@ -146,7 +146,12 @@ public class OzoneListStatusHelper {
 
       // fetch the db key based on parent prefix id.
       long id = getId(fileStatus, omBucketInfo);
-      dbPrefixKey = metadataManager.getOzonePathKey(id, "");
+      final long volumeId = metadataManager.getVolumeId(
+              omBucketInfo.getVolumeName());
+      final long bucketId = metadataManager.getBucketId(
+              omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
+      dbPrefixKey = metadataManager.getOzonePathKey(volumeId, bucketId,
+              id, "");
     }
 
     // Determine startKeyPrefix for DB iteration
@@ -189,8 +194,13 @@ public class OzoneListStatusHelper {
         null, true);
     Preconditions.checkNotNull(fileStatusInfo);
     startKeyParentId = getId(fileStatusInfo, omBucketInfo);
+    final long volumeId = metadataManager.getVolumeId(
+            omBucketInfo.getVolumeName());
+    final long bucketId = metadataManager.getBucketId(
+            omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
     return metadataManager.
-        getOzonePathKey(startKeyParentId, OzoneFSUtils.getFileName(key));
+        getOzonePathKey(volumeId, bucketId, startKeyParentId,
+                OzoneFSUtils.getFileName(key));
   }
 
   private long getId(OzoneFileStatus fileStatus, OmBucketInfo omBucketInfo) {

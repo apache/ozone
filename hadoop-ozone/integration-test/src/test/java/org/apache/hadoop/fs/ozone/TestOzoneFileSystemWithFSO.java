@@ -380,14 +380,21 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
         .get(omMgr.getBucketKey(getVolumeName(), getBucketName()));
     Assert.assertNotNull("Failed to find bucketInfo", omBucketInfo);
 
+    final long volumeId = omMgr.getVolumeId(getVolumeName());
+    final long bucketId = omMgr.getBucketId(getVolumeName(), getBucketName());
+
     ArrayList<String> dirKeys = new ArrayList<>();
     long d1ObjectID =
-        verifyDirKey(omBucketInfo.getObjectID(), "d1", "/d1", dirKeys, omMgr);
-    long d2ObjectID = verifyDirKey(d1ObjectID, "d2", "/d1/d2", dirKeys, omMgr);
+        verifyDirKey(volumeId, bucketId, omBucketInfo.getObjectID(),
+                "d1", "/d1", dirKeys, omMgr);
+    long d2ObjectID = verifyDirKey(volumeId, bucketId, d1ObjectID,
+            "d2", "/d1/d2", dirKeys, omMgr);
     long d3ObjectID =
-        verifyDirKey(d2ObjectID, "d3", "/d1/d2/d3", dirKeys, omMgr);
+        verifyDirKey(volumeId, bucketId, d2ObjectID,
+                "d3", "/d1/d2/d3", dirKeys, omMgr);
     long d4ObjectID =
-        verifyDirKey(d3ObjectID, "d4", "/d1/d2/d3/d4", dirKeys, omMgr);
+        verifyDirKey(volumeId, bucketId, d3ObjectID,
+                "d4", "/d1/d2/d3/d4", dirKeys, omMgr);
 
     Assert.assertEquals("Wrong OM numKeys metrics", 4,
         getCluster().getOzoneManager().getMetrics().getNumKeys());
@@ -398,9 +405,11 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     Path subDir6 = new Path("/d1/d2/d3/d4/d6");
     getFs().mkdirs(subDir6);
     long d5ObjectID =
-        verifyDirKey(d4ObjectID, "d5", "/d1/d2/d3/d4/d5", dirKeys, omMgr);
+        verifyDirKey(volumeId, bucketId, d4ObjectID,
+                "d5", "/d1/d2/d3/d4/d5", dirKeys, omMgr);
     long d6ObjectID =
-        verifyDirKey(d4ObjectID, "d6", "/d1/d2/d3/d4/d6", dirKeys, omMgr);
+        verifyDirKey(volumeId, bucketId, d4ObjectID,
+                "d6", "/d1/d2/d3/d4/d6", dirKeys, omMgr);
     Assert.assertTrue(
         "Wrong objectIds for sub-dirs[" + d5ObjectID + "/d5, " + d6ObjectID
             + "/d6] of same parent!", d5ObjectID != d6ObjectID);
@@ -424,10 +433,18 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     Assert.assertNotNull("Failed to find bucketInfo", omBucketInfo);
 
     ArrayList<String> dirKeys = new ArrayList<>();
+
+    final long volumeId = omMgr.getVolumeId(getVolumeName());
+    final long bucketId = omMgr.getBucketId(getVolumeName(), getBucketName());
     long d1ObjectID =
-        verifyDirKey(omBucketInfo.getObjectID(), "d1", "/d1", dirKeys, omMgr);
-    long d2ObjectID = verifyDirKey(d1ObjectID, "d2", "/d1/d2", dirKeys, omMgr);
-    openFileKey = d2ObjectID + OzoneConsts.OM_KEY_PREFIX + file.getName();
+        verifyDirKey(volumeId, bucketId, omBucketInfo.getObjectID(),
+                "d1", "/d1", dirKeys, omMgr);
+    long d2ObjectID = verifyDirKey(volumeId, bucketId, d1ObjectID,
+            "d2", "/d1/d2", dirKeys, omMgr);
+    openFileKey = OzoneConsts.OM_KEY_PREFIX + volumeId +
+            OzoneConsts.OM_KEY_PREFIX + bucketId +
+            OzoneConsts.OM_KEY_PREFIX + d2ObjectID +
+            OzoneConsts.OM_KEY_PREFIX + file.getName();
 
     // trigger CommitKeyRequest
     outputStream.close();
@@ -457,10 +474,12 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     Assert.assertEquals("Wrong path format", dbKey, omKeyInfo.getPath());
   }
 
-  long verifyDirKey(long parentId, String dirKey, String absolutePath,
-      ArrayList<String> dirKeys, OMMetadataManager omMgr)
+  long verifyDirKey(long volumeId, long bucketId, long parentId,
+                    String dirKey, String absolutePath,
+                    ArrayList<String> dirKeys, OMMetadataManager omMgr)
       throws Exception {
-    String dbKey = parentId + "/" + dirKey;
+    String dbKey = "/" + volumeId + "/" + bucketId + "/" +
+            parentId + "/" + dirKey;
     dirKeys.add(dbKey);
     OmDirectoryInfo dirInfo = omMgr.getDirectoryTable().get(dbKey);
     Assert.assertNotNull("Failed to find " + absolutePath +
@@ -473,8 +492,6 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
         dirInfo.getCreationTime() > 0);
     Assert.assertEquals("Mismatches directory modification time param",
         dirInfo.getCreationTime(), dirInfo.getModificationTime());
-    Assert.assertEquals("Wrong representation!",
-        dbKey + ":" + dirInfo.getObjectID(), dirInfo.toString());
     return dirInfo.getObjectID();
   }
 

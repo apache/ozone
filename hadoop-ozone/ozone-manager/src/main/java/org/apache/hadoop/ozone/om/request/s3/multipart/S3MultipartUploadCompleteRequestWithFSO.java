@@ -119,7 +119,11 @@ public class S3MultipartUploadCompleteRequestWithFSO
       fileName = filePath.toString();
     }
 
-    return omMetadataManager.getOzonePathKey(parentId, fileName);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getOzonePathKey(volumeId, bucketId,
+            parentId, fileName);
   }
 
   @Override
@@ -136,7 +140,12 @@ public class S3MultipartUploadCompleteRequestWithFSO
       fileName = filePath.toString();
     }
 
-    return omMetadataManager.getMultipartKey(parentId, fileName, uploadID);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+
+    return omMetadataManager.getMultipartKey(volumeId, bucketId,
+            parentId, fileName, uploadID);
   }
 
   @Override

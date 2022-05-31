@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
@@ -70,7 +69,6 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
@@ -785,17 +783,16 @@ public class TestObjectStoreWithFSO {
   private OmDirectoryInfo getDirInfo(String parentKey) throws Exception {
     OMMetadataManager omMetadataManager =
             cluster.getOzoneManager().getMetadataManager();
-    long bucketId = OMRequestTestUtils.getBucketId(volumeName, bucketName,
-            omMetadataManager);
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
+    long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
     String[] pathComponents = StringUtils.split(parentKey, '/');
     long parentId = bucketId;
     OmDirectoryInfo dirInfo = null;
     for (int indx = 0; indx < pathComponents.length; indx++) {
       String pathElement = pathComponents[indx];
-      String dbKey = omMetadataManager.getOzonePathKey(parentId,
-              pathElement);
-      dirInfo =
-              omMetadataManager.getDirectoryTable().get(dbKey);
+      String dbKey = omMetadataManager.getOzonePathKey(volumeId,
+              bucketId, parentId, pathElement);
+      dirInfo = omMetadataManager.getDirectoryTable().get(dbKey);
       parentId = dirInfo.getObjectID();
     }
     return dirInfo;
@@ -804,7 +801,12 @@ public class TestObjectStoreWithFSO {
   private void verifyKeyInFileTable(Table<String, OmKeyInfo> fileTable,
       String fileName, long parentID, boolean isEmpty) throws IOException {
 
-    String dbFileKey = parentID + OM_KEY_PREFIX + fileName;
+    final OMMetadataManager omMetadataManager =
+            cluster.getOzoneManager().getMetadataManager();
+    final String dbFileKey = omMetadataManager.getOzonePathKey(
+            omMetadataManager.getVolumeId(volumeName),
+            omMetadataManager.getBucketId(volumeName, bucketName),
+            parentID, fileName);
     OmKeyInfo omKeyInfo = fileTable.get(dbFileKey);
     if (isEmpty) {
       Assert.assertNull("Table is not empty!", omKeyInfo);
@@ -822,8 +824,12 @@ public class TestObjectStoreWithFSO {
   private void verifyKeyInOpenFileTable(Table<String, OmKeyInfo> openFileTable,
       long clientID, String fileName, long parentID, boolean isEmpty)
           throws IOException, TimeoutException, InterruptedException {
-    String dbOpenFileKey =
-            parentID + OM_KEY_PREFIX + fileName + OM_KEY_PREFIX + clientID;
+    final OMMetadataManager omMetadataManager =
+            cluster.getOzoneManager().getMetadataManager();
+    final String dbOpenFileKey = omMetadataManager.getOpenFileName(
+            omMetadataManager.getVolumeId(volumeName),
+            omMetadataManager.getBucketId(volumeName, bucketName),
+            parentID, fileName, clientID);
 
     if (isEmpty) {
       // wait for DB updates

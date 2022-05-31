@@ -111,6 +111,12 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               volumeName, bucketName);
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
+      final long volumeId = omMetadataManager.getVolumeTable()
+              .get(omMetadataManager.getVolumeKey(volumeName)).getObjectID();
+      final long bucketId = omMetadataManager.getBucketTable()
+              .get(omMetadataManager.getBucketKey(volumeName, bucketName))
+              .getObjectID();
+
       OmKeyInfo dbFileInfo = null;
 
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO =
@@ -119,7 +125,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
 
       if (pathInfoFSO.getDirectoryResult()
               == OMFileRequest.OMDirectoryResult.FILE_EXISTS) {
-        String dbFileKey = omMetadataManager.getOzonePathKey(
+        String dbFileKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
                 pathInfoFSO.getLastKnownParentId(),
                 pathInfoFSO.getLeafNodeName());
         dbFileInfo = OMFileRequest.getOmKeyInfoFromFileTable(false,
@@ -164,8 +170,9 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       long openVersion = omFileInfo.getLatestVersionLocations().getVersion();
       long clientID = createKeyRequest.getClientID();
       String dbOpenFileName = omMetadataManager
-          .getOpenFileName(pathInfoFSO.getLastKnownParentId(),
-              pathInfoFSO.getLeafNodeName(), clientID);
+          .getOpenFileName(volumeId, bucketId,
+                  pathInfoFSO.getLastKnownParentId(),
+                  pathInfoFSO.getLeafNodeName(), clientID);
 
       // Append new blocks
       List<OmKeyLocationInfo> newLocationList = keyArgs.getKeyLocationsList()
@@ -191,8 +198,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
       OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
-              Optional.absent(), Optional.of(missingParentInfos),
-              trxnLogIndex);
+              volumeId, bucketId, trxnLogIndex,
+              Optional.of(missingParentInfos), Optional.absent());
 
       // Prepare response. Sets user given full key name in the 'keyName'
       // attribute in response object.
@@ -252,11 +259,15 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
                                          OMMetadataManager omMetadataManager)
       throws IOException {
 
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
     long parentId =
         getParentId(omMetadataManager, volumeName, bucketName, keyName);
 
     String fileName = OzoneFSUtils.getFileName(keyName);
 
-    return omMetadataManager.getMultipartKey(parentId, fileName, uploadID);
+    return omMetadataManager.getMultipartKey(volumeId, bucketId, parentId,
+            fileName, uploadID);
   }
 }

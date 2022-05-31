@@ -266,7 +266,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
   protected long markKeysAsDeletedInCache(OzoneManager ozoneManager,
       long trxnLogIndex, List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
-      OMMetadataManager omMetadataManager, long quotaReleased) {
+      OMMetadataManager omMetadataManager, long quotaReleased)
+          throws IOException {
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(omMetadataManager

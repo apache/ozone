@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketAddAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketSetAclRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
-import org.apache.hadoop.ozone.om.request.key.OMPathsPurgeRequestWithFSO;
+import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMTrashRecoverRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequestWithFSO;
@@ -188,8 +188,8 @@ public final class OzoneManagerRatisUtils {
       return new S3RevokeSecretRequest(omRequest);
     case PurgeKeys:
       return new OMKeyPurgeRequest(omRequest);
-    case PurgePaths:
-      return new OMPathsPurgeRequestWithFSO(omRequest);
+    case PurgeDirectories:
+      return new OMDirectoriesPurgeRequestWithFSO(omRequest);
     case CreateTenant:
       ozoneManager.checkS3MultiTenancyEnabled();
       return new OMTenantCreateRequest(omRequest);

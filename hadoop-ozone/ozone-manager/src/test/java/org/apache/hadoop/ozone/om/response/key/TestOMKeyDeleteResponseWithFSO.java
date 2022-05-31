@@ -56,7 +56,10 @@ public class TestOMKeyDeleteResponseWithFSO extends TestOMKeyDeleteResponse {
                     parentId, 100, Time.now());
     OMRequestTestUtils.addFileToKeyTable(false, false,
             keyName, omKeyInfo, -1, 50, omMetadataManager);
-    return omKeyInfo.getPath();
+    return omMetadataManager.getOzonePathKey(
+            omMetadataManager.getVolumeId(volumeName),
+            omMetadataManager.getBucketId(volumeName, bucketName),
+           omKeyInfo.getParentObjectID(), keyName);
   }
 
   @Override
