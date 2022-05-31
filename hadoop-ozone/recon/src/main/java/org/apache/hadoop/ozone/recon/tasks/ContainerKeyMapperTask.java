@@ -23,15 +23,19 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -70,6 +74,10 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
     long omKeyCount = 0;
+    Map<ContainerKeyPrefix, Integer> containerKeyMap = new HashMap<>();
+    Map<Long, Long> containerKeyCountMap = new HashMap<>();
+    List<ContainerKeyPrefix> deletedKeyCountList = new ArrayList<>();
+
     try {
       LOG.info("Starting a 'reprocess' run of ContainerKeyMapperTask.");
       Instant start = Instant.now();
@@ -85,7 +93,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
         while (keyIter.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
           OmKeyInfo omKeyInfo = kv.getValue();
-          writeOMKeyToContainerDB(kv.getKey(), omKeyInfo);
+          handlePutOMKeyEvent(kv.getKey(), omKeyInfo, containerKeyMap,
+              containerKeyCountMap, deletedKeyCountList);
           omKeyCount++;
         }
       }
@@ -97,6 +106,12 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     } catch (IOException ioEx) {
       LOG.error("Unable to populate Container Key Prefix data in Recon DB. ",
           ioEx);
+      return new ImmutablePair<>(getTaskName(), false);
+    }
+    try {
+      writeToTheDB(containerKeyMap, containerKeyCountMap, deletedKeyCountList);
+    } catch (IOException e) {
+      LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
       return new ImmutablePair<>(getTaskName(), false);
     }
     return new ImmutablePair<>(getTaskName(), true);
@@ -116,6 +131,9 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     int eventCount = 0;
     final Collection<String> taskTables = getTaskTables();
+    Map<ContainerKeyPrefix, Integer> containerKeyMap = new HashMap<>();
+    Map<Long, Long> containerKeyCountMap = new HashMap<>();
+    List<ContainerKeyPrefix> deletedKeyCountList = new ArrayList<>();
 
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, OmKeyInfo> omdbUpdateEvent = eventIterator.next();
@@ -128,22 +146,26 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       try {
         switch (omdbUpdateEvent.getAction()) {
         case PUT:
-          writeOMKeyToContainerDB(updatedKey, updatedKeyValue);
+          handlePutOMKeyEvent(updatedKey, updatedKeyValue, containerKeyMap,
+              containerKeyCountMap, deletedKeyCountList);
           break;
 
         case DELETE:
-          deleteOMKeyFromContainerDB(updatedKey);
+          handleDeleteOMKeyEvent(updatedKey, containerKeyMap,
+              containerKeyCountMap, deletedKeyCountList);
           break;
 
         case UPDATE:
           if (omdbUpdateEvent.getOldValue() != null) {
-            deleteOMKeyFromContainerDB(
-                omdbUpdateEvent.getOldValue().getKeyName());
+            handleDeleteOMKeyEvent(
+                omdbUpdateEvent.getOldValue().getKeyName(), containerKeyMap,
+                containerKeyCountMap, deletedKeyCountList);
           } else {
             LOG.warn("Update event does not have the old Key Info for {}.",
                 updatedKey);
           }
-          writeOMKeyToContainerDB(updatedKey, updatedKeyValue);
+          handlePutOMKeyEvent(updatedKey, updatedKeyValue, containerKeyMap,
+              containerKeyCountMap, deletedKeyCountList);
           break;
 
         default: LOG.debug("Skipping DB update event : {}",
@@ -156,9 +178,55 @@ public class ContainerKeyMapperTask implements ReconOmTask {
         return new ImmutablePair<>(getTaskName(), false);
       }
     }
+    try {
+      writeToTheDB(containerKeyMap, containerKeyCountMap, deletedKeyCountList);
+    } catch (IOException e) {
+      LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
+      return new ImmutablePair<>(getTaskName(), false);
+    }
     LOG.info("{} successfully processed {} OM DB update event(s).",
         getTaskName(), eventCount);
     return new ImmutablePair<>(getTaskName(), true);
+  }
+
+  private void writeToTheDB(Map<ContainerKeyPrefix, Integer> containerKeyMap,
+                            Map<Long, Long> containerKeyCountMap,
+                            List<ContainerKeyPrefix> deletedContainerKeyList)
+      throws IOException {
+    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    containerKeyMap.keySet().forEach((ContainerKeyPrefix key) -> {
+      try {
+        reconContainerMetadataManager
+            .batchStoreContainerKeyMapping(rdbBatchOperation, key,
+                containerKeyMap.get(key));
+      } catch (IOException e) {
+        LOG.error("Unable to write Container Key Prefix data in Recon DB.",
+            e);
+      }
+    });
+
+    containerKeyCountMap.keySet().forEach((Long key) -> {
+      try {
+        reconContainerMetadataManager
+            .batchStoreContainerKeyCounts(rdbBatchOperation, key,
+                containerKeyCountMap.get(key));
+      } catch (IOException e) {
+        LOG.error("Unable to write Container Key Prefix data in Recon DB.",
+            e);
+      }
+    });
+
+    deletedContainerKeyList.forEach((ContainerKeyPrefix key) -> {
+      try {
+        reconContainerMetadataManager
+            .batchDeleteContainerMapping(rdbBatchOperation, key);
+      } catch (IOException e) {
+        LOG.error("Unable to write Container Key Prefix data in Recon DB.",
+            e);
+      }
+    });
+
+    reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
   }
 
   /**
@@ -168,7 +236,12 @@ public class ContainerKeyMapperTask implements ReconOmTask {
    * @param key key String.
    * @throws IOException If Unable to write to container DB.
    */
-  private void  deleteOMKeyFromContainerDB(String key)
+  private void handleDeleteOMKeyEvent(String key,
+                                      Map<ContainerKeyPrefix, Integer>
+                                          containerKeyMap,
+                                      Map<Long, Long> containerKeyCountMap,
+                                      List<ContainerKeyPrefix>
+                                          deletedContainerKeyList)
       throws IOException {
 
     TableIterator<ContainerKeyPrefix, ? extends
@@ -186,16 +259,29 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       }
     }
 
+    containerKeyMap.keySet()
+        .forEach((ContainerKeyPrefix containerKeyPrefix) -> {
+          String keyPrefix = containerKeyPrefix.getKeyPrefix();
+          if (keyPrefix.equals(key)) {
+            keysToBeDeleted.add(containerKeyPrefix);
+          }
+        });
+
     for (ContainerKeyPrefix containerKeyPrefix : keysToBeDeleted) {
-      reconContainerMetadataManager.deleteContainerMapping(containerKeyPrefix);
+      deletedContainerKeyList.add(containerKeyPrefix);
+      containerKeyMap.remove(containerKeyPrefix);
 
       // decrement count and update containerKeyCount.
       Long containerID = containerKeyPrefix.getContainerId();
-      long keyCount =
-          reconContainerMetadataManager.getKeyCountForContainer(containerID);
+      long keyCount;
+      if (containerKeyCountMap.containsKey(containerID)) {
+        keyCount = containerKeyCountMap.get(containerID);
+      } else {
+        keyCount = reconContainerMetadataManager
+            .getKeyCountForContainer(containerID);
+      }
       if (keyCount > 0) {
-        reconContainerMetadataManager.storeContainerKeyCount(containerID,
-            --keyCount);
+        containerKeyCountMap.put(containerID, --keyCount);
       }
     }
   }
@@ -208,7 +294,12 @@ public class ContainerKeyMapperTask implements ReconOmTask {
    * @param omKeyInfo omKeyInfo value
    * @throws IOException if unable to write to recon DB.
    */
-  private void  writeOMKeyToContainerDB(String key, OmKeyInfo omKeyInfo)
+  private void handlePutOMKeyEvent(String key, OmKeyInfo omKeyInfo,
+                                   Map<ContainerKeyPrefix, Integer>
+                                       containerKeyMap,
+                                   Map<Long, Long> containerKeyCountMap,
+                                   List<ContainerKeyPrefix>
+                                       deletedContainerKeyList)
       throws IOException {
     long containerCountToIncrement = 0;
     for (OmKeyLocationInfoGroup omKeyLocationInfoGroup : omKeyInfo
@@ -220,27 +311,34 @@ public class ContainerKeyMapperTask implements ReconOmTask {
         ContainerKeyPrefix containerKeyPrefix = new ContainerKeyPrefix(
             containerId, key, keyVersion);
         if (reconContainerMetadataManager.getCountForContainerKeyPrefix(
-            containerKeyPrefix) == 0) {
+            containerKeyPrefix) == 0
+            && !containerKeyMap.containsKey(containerKeyPrefix)) {
           // Save on writes. No need to save same container-key prefix
           // mapping again.
-          reconContainerMetadataManager.storeContainerKeyMapping(
-              containerKeyPrefix, 1);
+          containerKeyMap.put(containerKeyPrefix, 1);
+          deletedContainerKeyList.remove(containerKeyPrefix);
+
 
           // check if container already exists and
           // increment the count of containers if it does not exist
-          if (!reconContainerMetadataManager.doesContainerExists(containerId)) {
+          if (!reconContainerMetadataManager.doesContainerExists(containerId)
+              && !containerKeyCountMap.containsKey(containerId)) {
             containerCountToIncrement++;
           }
 
           // update the count of keys for the given containerID
-          long keyCount = reconContainerMetadataManager
-                  .getKeyCountForContainer(containerId);
+          long keyCount;
+          if (containerKeyCountMap.containsKey(containerId)) {
+            keyCount = containerKeyCountMap.get(containerId);
+          } else {
+            keyCount = reconContainerMetadataManager
+                .getKeyCountForContainer(containerId);
+          }
 
           // increment the count and update containerKeyCount.
           // keyCount will be 0 if containerID is not found. So, there is no
           // need to initialize keyCount for the first time.
-          reconContainerMetadataManager.storeContainerKeyCount(containerId,
-              ++keyCount);
+          containerKeyCountMap.put(containerId, ++keyCount);
         }
       }
     }
