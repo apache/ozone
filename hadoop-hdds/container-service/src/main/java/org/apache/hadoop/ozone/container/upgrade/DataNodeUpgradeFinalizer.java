@@ -83,7 +83,18 @@ public class DataNodeUpgradeFinalizer extends
   @Override
   public void finalizeLayoutFeature(LayoutFeature layoutFeature,
       DatanodeStateMachine dsm) throws UpgradeException {
-    super.finalizeLayoutFeature(layoutFeature, dsm.getLayoutStorage());
+    if (layoutFeature instanceof HDDSLayoutFeature) {
+      HDDSLayoutFeature hddslayoutFeature =  (HDDSLayoutFeature)layoutFeature;
+      super.finalizeLayoutFeature(hddslayoutFeature,
+          hddslayoutFeature
+              .datanodeAction(LayoutFeature.UpgradeActionType.ON_FINALIZE),
+          dsm.getLayoutStorage());
+    } else {
+      String msg = String.format("Failed to finalize datanode layout feature " +
+          "%s. It is not an HDDS Layout Feature.", layoutFeature);
+      throw new UpgradeException(msg,
+          UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
+    }
   }
 
   @Override

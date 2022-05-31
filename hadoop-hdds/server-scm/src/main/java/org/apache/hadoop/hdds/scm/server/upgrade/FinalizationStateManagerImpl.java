@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -87,7 +88,8 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       // version. This is updated in the replicated finalization steps.
       // Layout version will be written to the DB as well so followers can
       // finalize from a snapshot.
-      LayoutFeature feature = versionManager.getFeature(layoutVersion);
+      HDDSLayoutFeature feature =
+          (HDDSLayoutFeature)versionManager.getFeature(layoutVersion);
       for (ReplicatedFinalizationStep step: finalizationSteps) {
         step.run(feature);
       }

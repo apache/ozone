@@ -99,12 +99,16 @@ public class SCMUpgradeFinalizer extends
    * @param context Supplier of objects needed to run the steps.
    * @throws UpgradeException
    */
-  void replicatedFinalizationSteps(LayoutFeature lf,
+  void replicatedFinalizationSteps(HDDSLayoutFeature lf,
       SCMUpgradeFinalizationContext context) throws UpgradeException {
     // Run upgrade actions and update VERSION file.
-    super.finalizeLayoutFeature(lf, context.getStorage());
+    super.finalizeLayoutFeature(lf,
+        lf.scmAction(LayoutFeature.UpgradeActionType.ON_FINALIZE),
+        context.getStorage());
+
     if (!getVersionManager().needsFinalization()) {
-      // Don 't wait for next heartbeat from datanodes in order to move them to
+      // If we just finalized the last layout feature, don 't wait for next
+      // heartbeat from datanodes in order to move them to
       // Healthy - Readonly state. Force them to Healthy ReadOnly state so that
       // we can resume pipeline creation right away.
       context.getNodeManager().forceNodesToHealthyReadOnly();

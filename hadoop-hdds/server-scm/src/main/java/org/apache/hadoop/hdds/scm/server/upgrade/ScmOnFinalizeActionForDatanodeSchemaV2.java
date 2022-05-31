@@ -34,12 +34,12 @@ import org.slf4j.LoggerFactory;
 @UpgradeActionHdds(feature = DATANODE_SCHEMA_V2, component = SCM, type =
     ON_FINALIZE)
 public class ScmOnFinalizeActionForDatanodeSchemaV2 implements
-    HDDSUpgradeAction<StorageContainerManager> {
+    HDDSUpgradeAction<SCMUpgradeFinalizationContext> {
   public static final Logger LOG =
       LoggerFactory.getLogger(ScmOnFinalizeActionForDatanodeSchemaV2.class);
 
   @Override
-  public void execute(StorageContainerManager arg) throws Exception {
+  public void execute(SCMUpgradeFinalizationContext context) throws Exception {
     LOG.info("Executing SCM On Finalize action for layout feature {}",
         DATANODE_SCHEMA_V2);
   }

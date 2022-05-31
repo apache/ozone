@@ -125,7 +125,8 @@ public class TestBasicUpgradeFinalizer {
       Storage mockStorage = mock(Storage.class);
       InOrder inOrder = inOrder(mockStorage);
 
-      super.finalizeLayoutFeature(lf, mockStorage);
+      super.finalizeLayoutFeature(lf,
+          lf.action(LayoutFeature.UpgradeActionType.ON_FINALIZE), mockStorage);
 
       inOrder.verify(mockStorage)
           .setLayoutVersion(ArgumentMatchers.eq(lf.layoutVersion()));

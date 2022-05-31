@@ -17,7 +17,7 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 
 import java.io.IOException;
@@ -53,6 +53,6 @@ public interface FinalizationStateManager {
    */
   @FunctionalInterface
   interface ReplicatedFinalizationStep {
-    void run(LayoutFeature feature) throws UpgradeException;
+    void run(HDDSLayoutFeature feature) throws UpgradeException;
   }
 }

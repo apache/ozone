@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FIRST_UPGRADE_START;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VALIDATE_IN_PREFINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.FIRST_UPGRADE_START_ACTION_FAILED;
@@ -203,9 +202,10 @@ public abstract class BasicUpgradeFinalizer
   public abstract void finalizeLayoutFeature(LayoutFeature lf, T context)
       throws UpgradeException;
 
-  protected void finalizeLayoutFeature(LayoutFeature lf, Storage storage)
+  protected void finalizeLayoutFeature(LayoutFeature lf, Optional<?
+      extends UpgradeAction> action, Storage storage)
       throws UpgradeException {
-    runFinalizationAction(lf, lf.action(ON_FINALIZE));
+    runFinalizationAction(lf, action);
     updateLayoutVersionInVersionFile(lf, storage);
     versionManager.finalized(lf);
   }
