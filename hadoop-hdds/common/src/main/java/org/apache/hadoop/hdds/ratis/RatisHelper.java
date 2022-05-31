@@ -104,13 +104,13 @@ public final class RatisHelper {
     if (datanodeUseHostName()) {
       final String address =
               id.getHostName() + ":" + id.getPort(port).getValue();
-      LOG.debug("Datanode is using hostname for raft peer address: {}",
+      LOG.info("Datanode is using hostname for raft peer address: {}",
               address);
       return address;
     } else {
       final String address =
               id.getIpAddress() + ":" + id.getPort(port).getValue();
-      LOG.debug("Datanode is using IP for raft peer address: {}", address);
+      LOG.info("Datanode is using IP for raft peer address: {}", address);
       return address;
     }
   }
