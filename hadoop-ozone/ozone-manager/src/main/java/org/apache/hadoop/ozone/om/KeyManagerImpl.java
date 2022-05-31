@@ -1733,14 +1733,15 @@ public class KeyManagerImpl implements KeyManager {
         countEntries = getFilesAndDirsFromCacheWithBucket(volumeName,
             bucketName, cacheFileMap, tempCacheDirMap, deletedKeySet,
             prefixKeyInDB, seekFileInDB, seekDirInDB, prefixPath, startKey,
-            countEntries);
+            countEntries, numEntries);
 
       } finally {
         metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
             bucketName);
       }
       countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
-          prefixPath, prefixKeyInDB, numEntries, deletedKeySet, iterator);
+          prefixPath, prefixKeyInDB, countEntries, numEntries, deletedKeySet,
+          iterator);
 
     } else {
       /*
@@ -1796,9 +1797,9 @@ public class KeyManagerImpl implements KeyManager {
                 bucketName);
           try {
             listStatusFindDirsInTableCache(tempCacheDirMap,
-                metadataManager.getDirectoryTable(), prefixKeyInDB,
-                seekDirInDB, prefixPath, startKey, volumeName,
-                bucketName, countEntries, deletedKeySet);
+                metadataManager.getDirectoryTable(),
+                prefixKeyInDB, seekDirInDB, prefixPath, startKey, volumeName,
+                bucketName, countEntries, numEntries, deletedKeySet);
           } finally {
             metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
                 bucketName);
@@ -1822,7 +1823,7 @@ public class KeyManagerImpl implements KeyManager {
             countEntries = getFilesAndDirsFromCacheWithBucket(volumeName,
                 bucketName, cacheFileMap, tempCacheDirMap, deletedKeySet,
                 prefixKeyInDB, seekFileInDB, seekDirInDB, prefixPath, startKey,
-                countEntries);
+                countEntries, numEntries);
           } finally {
             metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
                 bucketName);
@@ -1830,7 +1831,8 @@ public class KeyManagerImpl implements KeyManager {
 
           // 1. Seek the given key in key table.
           countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
-              prefixPath, prefixKeyInDB, numEntries, deletedKeySet, iterator);
+              prefixPath, prefixKeyInDB, countEntries, numEntries,
+              deletedKeySet, iterator);
         }
       } else {
         // TODO: HDDS-4364: startKey can be a non-existed key
@@ -1853,13 +1855,14 @@ public class KeyManagerImpl implements KeyManager {
     }
 
     // 2. Seek the given key in dir table.
-    getDirectories(cacheDirMap, seekDirInDB, prefixPath,
-        prefixKeyInDB, numEntries, recursive,
-        volumeName, bucketName, deletedKeySet);
+    if (countEntries < numEntries) {
+      getDirectories(cacheDirMap, seekDirInDB, prefixPath,
+          prefixKeyInDB, countEntries, numEntries, recursive,
+          volumeName, bucketName, deletedKeySet);
+    }
 
 
-    return buildFinalStatusList(cacheFileMap, cacheDirMap, args,
-        clientAddress, numEntries);
+    return buildFinalStatusList(cacheFileMap, cacheDirMap, args, clientAddress);
 
   }
 
@@ -1870,27 +1873,18 @@ public class KeyManagerImpl implements KeyManager {
   private List<OzoneFileStatus> buildFinalStatusList(
       Map<String, OzoneFileStatus> cacheFileMap,
       Map<String, OzoneFileStatus> cacheDirMap, OmKeyArgs omKeyArgs,
-      String clientAddress, long numEntries)
+      String clientAddress)
       throws IOException {
     List<OmKeyInfo> keyInfoList = new ArrayList<>();
     List<OzoneFileStatus> fileStatusFinalList = new ArrayList<>();
 
-    long countEntries = 0;
     for (OzoneFileStatus fileStatus : cacheFileMap.values()) {
       fileStatusFinalList.add(fileStatus);
       keyInfoList.add(fileStatus.getKeyInfo());
-      countEntries++;
-      if (countEntries >= numEntries) {
-        break;
-      }
     }
 
     for (OzoneFileStatus fileStatus : cacheDirMap.values()) {
-      if (countEntries >= numEntries) {
-        break;
-      }
       fileStatusFinalList.add(fileStatus);
-      countEntries++;
     }
 
     if (omKeyArgs.getLatestVersionLocation()) {
@@ -1914,11 +1908,11 @@ public class KeyManagerImpl implements KeyManager {
    */
   @SuppressWarnings("parameternumber")
   private int getFilesAndDirsFromCacheWithBucket(String volumeName,
-       String bucketName, Map<String, OzoneFileStatus> cacheFileMap,
-       Map<String, OzoneFileStatus> tempCacheDirMap,
-       Set<String> deletedKeySet, long prefixKeyInDB,
-       String seekFileInDB, String seekDirInDB, String prefixPath,
-       String startKey, int countEntries) throws IOException {
+      String bucketName, Map<String, OzoneFileStatus> cacheFileMap,
+      Map<String, OzoneFileStatus> tempCacheDirMap,
+      Set<String> deletedKeySet, long prefixKeyInDB,
+      String seekFileInDB,  String seekDirInDB, String prefixPath,
+      String startKey, int countEntries, long numEntries) throws IOException {
 
 
     // First under lock obtain both entries from dir/file cache and generate
@@ -1926,15 +1920,16 @@ public class KeyManagerImpl implements KeyManager {
     BucketLayout bucketLayout = getBucketLayout(metadataManager, volumeName,
         bucketName);
     countEntries = listStatusFindFilesInTableCache(cacheFileMap, metadataManager
-            .getKeyTable(bucketLayout), prefixKeyInDB, seekFileInDB, prefixPath,
-        startKey, countEntries, deletedKeySet);
+            .getKeyTable(bucketLayout),
+        prefixKeyInDB, seekFileInDB, prefixPath, startKey, countEntries,
+        numEntries, deletedKeySet);
 
     // Don't count entries from dir cache, as first we need to return all
     // files and then directories.
     listStatusFindDirsInTableCache(tempCacheDirMap,
         metadataManager.getDirectoryTable(),
         prefixKeyInDB, seekDirInDB, prefixPath, startKey, volumeName,
-        bucketName, countEntries, deletedKeySet);
+        bucketName, countEntries, numEntries, deletedKeySet);
 
     return countEntries;
   }
@@ -1943,15 +1938,16 @@ public class KeyManagerImpl implements KeyManager {
   protected int getDirectories(
       TreeMap<String, OzoneFileStatus> cacheKeyMap,
       String seekDirInDB, String prefixPath, long prefixKeyInDB,
-      long numEntries, boolean recursive, String volumeName,
-      String bucketName, Set<String> deletedKeySet) throws IOException {
+      int countEntries, long numEntries, boolean recursive,
+      String volumeName, String bucketName, Set<String> deletedKeySet)
+      throws IOException {
 
     Table dirTable = metadataManager.getDirectoryTable();
     TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
             iterator = dirTable.iterator();
 
     iterator.seek(seekDirInDB);
-    int countEntries = 0;
+
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
       OmDirectoryInfo dirInfo = entry.getValue();
@@ -1984,11 +1980,11 @@ public class KeyManagerImpl implements KeyManager {
   private int getFilesFromDirectory(
       TreeMap<String, OzoneFileStatus> cacheKeyMap,
       String seekKeyInDB, String prefixKeyPath, long prefixKeyInDB,
-      long numEntries, Set<String> deletedKeySet,
+      int countEntries, long numEntries, Set<String> deletedKeySet,
       TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-          iterator) throws IOException {
+          iterator)
+      throws IOException {
     iterator.seek(seekKeyInDB);
-    int countEntries = 0;
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
       OmKeyInfo keyInfo = entry.getValue();
@@ -2018,16 +2014,16 @@ public class KeyManagerImpl implements KeyManager {
    */
   @SuppressWarnings("parameternumber")
   private int listStatusFindFilesInTableCache(
-      Map<String, OzoneFileStatus> cacheKeyMap, Table<String,
-      OmKeyInfo> keyTable, long prefixKeyInDB, String seekKeyInDB,
-      String prefixKeyPath, String startKey, int countEntries,
-      Set<String> deletedKeySet) {
+          Map<String, OzoneFileStatus> cacheKeyMap, Table<String,
+          OmKeyInfo> keyTable, long prefixKeyInDB, String seekKeyInDB,
+          String prefixKeyPath, String startKey, int countEntries,
+          long numEntries, Set<String> deletedKeySet) {
 
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
             cacheIter = keyTable.cacheIterator();
 
     // TODO: recursive list will be handled in HDDS-4360 jira.
-    while (cacheIter.hasNext()) {
+    while (cacheIter.hasNext() && numEntries - countEntries > 0) {
       Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
               cacheIter.next();
       String cacheKey = entry.getKey().getCacheKey();
@@ -2060,10 +2056,11 @@ public class KeyManagerImpl implements KeyManager {
    */
   @SuppressWarnings("parameternumber")
   private int listStatusFindDirsInTableCache(
-      Map<String, OzoneFileStatus> cacheKeyMap, Table<String,
-      OmDirectoryInfo> dirTable, long prefixKeyInDB, String seekKeyInDB,
-      String prefixKeyPath, String startKey, String volumeName,
-      String bucketName, int countEntries, Set<String> deletedKeySet) {
+          Map<String, OzoneFileStatus> cacheKeyMap, Table<String,
+          OmDirectoryInfo> dirTable, long prefixKeyInDB, String seekKeyInDB,
+          String prefixKeyPath, String startKey, String volumeName,
+          String bucketName, int countEntries, long numEntries,
+          Set<String> deletedKeySet) {
 
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>>>
             cacheIter = dirTable.cacheIterator();
@@ -2071,7 +2068,7 @@ public class KeyManagerImpl implements KeyManager {
     // 1. "1024/"   -> startKey is null or empty
     // 2. "1024/b"  -> startKey exists
     // TODO: recursive list will be handled in HDDS-4360 jira.
-    while (cacheIter.hasNext()) {
+    while (cacheIter.hasNext() && numEntries - countEntries > 0) {
       Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>> entry =
               cacheIter.next();
       String cacheKey = entry.getKey().getCacheKey();
