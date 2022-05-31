@@ -938,7 +938,6 @@ public class TestSCMNodeManager {
     ArgumentCaptor<CommandForDatanode> captor =
         ArgumentCaptor.forClass(CommandForDatanode.class);
 
-
     if (passedCheckpoint.test(FinalizationCheckpoint.MLV_EQUALS_SLV)) {
       // If the mlv equals slv checkpoint passed, datanodes with older mlvs
       // should be instructed to finalize.

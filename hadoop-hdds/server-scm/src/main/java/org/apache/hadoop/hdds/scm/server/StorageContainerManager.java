@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManagerImpl;
 import org.apache.hadoop.hdds.scm.node.CommandQueueReportHandler;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
+import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmHAUnfinalizedStateValidationAction;
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
@@ -138,6 +139,8 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.lease.LeaseManager;
+import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -666,6 +669,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           containerManager.getContainers(), containerManager,
           pipelineManager, eventQueue, serviceManager, scmContext);
     }
+
+    UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
+        finalizationExecutor = new DefaultUpgradeFinalizationExecutor<>();
+    if (configurator.getUpgradeFinalizationExecutor() != null) {
+      finalizationExecutor = configurator.getUpgradeFinalizationExecutor();
+    }
     finalizationManager = new FinalizationManagerImpl.Builder()
         .setConfiguration(conf)
         .setLayoutVersionManager(scmLayoutVersionManager)
@@ -674,7 +683,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         .setStorage(scmStorageConfig)
         .setHAManager(scmHAManager)
         .setFinalizationStore(scmMetadataStore.getMetaTable())
-        .setFinalizationExecutor(configurator.getUpgradeFinalizationExecutor())
+        .setFinalizationExecutor(finalizationExecutor)
         .build();
 
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,

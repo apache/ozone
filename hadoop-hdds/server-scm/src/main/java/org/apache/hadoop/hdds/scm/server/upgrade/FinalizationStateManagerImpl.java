@@ -83,6 +83,10 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   public void finalizeLayoutFeature(Integer layoutVersion) throws IOException {
     checkpointLock.writeLock().lock();
     try {
+      // The VERSION file is the source of truth for the current layout
+      // version. This is updated in the replicated finalization steps.
+      // Layout version will be written to the DB as well so followers can
+      // finalize from a snapshot.
       LayoutFeature feature = versionManager.getFeature(layoutVersion);
       for (ReplicatedFinalizationStep step: finalizationSteps) {
         step.run(feature);

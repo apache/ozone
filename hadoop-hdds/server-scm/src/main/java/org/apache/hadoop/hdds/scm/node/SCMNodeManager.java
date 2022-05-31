@@ -630,7 +630,7 @@ public class SCMNodeManager implements NodeManager {
       // datanodes' metadata layout versions to tell them to finalize.
       int scmMlv = scmLayoutVersionManager.getMetadataLayoutVersion();
 
-      // If the datanode slv < scm slv, it can not be allowed to be part of
+      // If the datanode mlv < scm mlv, it can not be allowed to be part of
       // any pipeline. However it can be allowed to join the cluster
       if (dnMlv < scmMlv) {
         LOG.warn("Data node {} can not be used in any pipeline in the " +

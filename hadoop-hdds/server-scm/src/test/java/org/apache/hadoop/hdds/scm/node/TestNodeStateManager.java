@@ -38,6 +38,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -59,11 +61,14 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutV
 
 public class TestNodeStateManager {
 
+  public static final Logger LOG =
+      LoggerFactory.getLogger(TestNodeStateManager.class);
+
   private NodeStateManager nsm;
   private ConfigurationSource conf;
   private MockEventPublisher eventPublisher;
   private FinalizationCheckpoint currentCheckpoint;
-  private Predicate<FinalizationCheckpoint> passedCheckpoint;
+  private Predicate<FinalizationCheckpoint> hasCrossedCheckpoint;
   private int scmSlv;
   private int scmMlv;
 
@@ -88,7 +93,7 @@ public class TestNodeStateManager {
     // Make NodeStateManager behave as if SCM has completed finalization,
     // unless a test changes the value of this variable.
     currentCheckpoint = FinalizationCheckpoint.FINALIZATION_COMPLETE;
-    passedCheckpoint = c -> currentCheckpoint.compareTo(c) >= 0;
+    hasCrossedCheckpoint = c -> currentCheckpoint.compareTo(c) >= 0;
     eventPublisher = new MockEventPublisher();
     scmSlv = maxLayoutVersion();
     scmMlv = maxLayoutVersion();
@@ -99,7 +104,7 @@ public class TestNodeStateManager {
     Mockito.when(mockVersionManager.getSoftwareLayoutVersion())
         .thenReturn(scmSlv);
     nsm = new NodeStateManager(conf, eventPublisher, mockVersionManager,
-        passedCheckpoint);
+        hasCrossedCheckpoint);
   }
 
   @Test
@@ -241,11 +246,13 @@ public class TestNodeStateManager {
         UpgradeUtils.toLayoutVersionProto(scmMlv - 1, scmSlv));
     for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
       currentCheckpoint = checkpoint;
+      LOG.info("Testing datanode state from current SCM finalization " +
+          "checkpoint: {}", currentCheckpoint);
       nsm.checkNodesHealth();
 
       // Datanodes should not be moved to healthy readonly until the SCM has
       // finished updating its metadata layout version as part of finalization.
-      if (passedCheckpoint.test(FinalizationCheckpoint.MLV_EQUALS_SLV)) {
+      if (hasCrossedCheckpoint.test(FinalizationCheckpoint.MLV_EQUALS_SLV)) {
         assertEquals(NodeState.HEALTHY_READONLY,
             nsm.getNodeStatus(dn).getHealth());
         assertEquals(SCMEvents.HEALTHY_READONLY_NODE,
