@@ -77,9 +77,9 @@ public class TestECContainerReplicaCount {
     ECContainerReplicaCount rcnt = new ECContainerReplicaCount(container,
         replica, new ArrayList<>(), new ArrayList<>(), 1);
     Assertions.assertFalse(rcnt.isSufficientlyReplicated());
-    Assertions.assertEquals(1, rcnt.missingNonMaintenanceIndexes().size());
+    Assertions.assertEquals(1, rcnt.unavailableIndexes().size());
     Assertions.assertEquals(5,
-        rcnt.missingNonMaintenanceIndexes().get(0).intValue());
+        rcnt.unavailableIndexes().get(0).intValue());
   }
 
   @Test
@@ -93,9 +93,9 @@ public class TestECContainerReplicaCount {
     ECContainerReplicaCount rcnt = new ECContainerReplicaCount(container,
         replica, new ArrayList<>(), delete, 1);
     Assertions.assertFalse(rcnt.isSufficientlyReplicated());
-    Assertions.assertEquals(1, rcnt.missingNonMaintenanceIndexes().size());
+    Assertions.assertEquals(1, rcnt.unavailableIndexes().size());
     Assertions.assertEquals(1,
-        rcnt.missingNonMaintenanceIndexes().get(0).intValue());
+        rcnt.unavailableIndexes().get(0).intValue());
   }
 
   @Test
@@ -128,9 +128,9 @@ public class TestECContainerReplicaCount {
     ECContainerReplicaCount rcnt = new ECContainerReplicaCount(container,
         replica, new ArrayList<>(), delete, 1);
     Assertions.assertFalse(rcnt.isSufficientlyReplicated());
-    Assertions.assertEquals(1, rcnt.missingNonMaintenanceIndexes().size());
+    Assertions.assertEquals(1, rcnt.unavailableIndexes().size());
     Assertions.assertEquals(2,
-        rcnt.missingNonMaintenanceIndexes().get(0).intValue());
+        rcnt.unavailableIndexes().get(0).intValue());
   }
 
   @Test
@@ -317,9 +317,9 @@ public class TestECContainerReplicaCount {
     // any indexes only have a maintenance copy.
     Assertions.assertEquals(0, rcnt.maintenanceOnlyIndexes().size());
 
-    Assertions.assertEquals(2, rcnt.missingNonMaintenanceIndexes().size());
-    Assertions.assertTrue(rcnt.missingNonMaintenanceIndexes().contains(4));
-    Assertions.assertTrue(rcnt.missingNonMaintenanceIndexes().contains(5));
+    Assertions.assertEquals(2, rcnt.unavailableIndexes().size());
+    Assertions.assertTrue(rcnt.unavailableIndexes().contains(4));
+    Assertions.assertTrue(rcnt.unavailableIndexes().contains(5));
   }
 
   @Test
@@ -336,9 +336,9 @@ public class TestECContainerReplicaCount {
     Assertions.assertFalse(rcnt.isSufficientlyReplicated());
     Assertions.assertFalse(rcnt.isOverReplicated());
 
-    Assertions.assertEquals(2, rcnt.missingNonMaintenanceIndexes().size());
-    Assertions.assertTrue(rcnt.missingNonMaintenanceIndexes().contains(1));
-    Assertions.assertTrue(rcnt.missingNonMaintenanceIndexes().contains(5));
+    Assertions.assertEquals(2, rcnt.unavailableIndexes().size());
+    Assertions.assertTrue(rcnt.unavailableIndexes().contains(1));
+    Assertions.assertTrue(rcnt.unavailableIndexes().contains(5));
   }
 
   @Test
@@ -356,7 +356,7 @@ public class TestECContainerReplicaCount {
     Assertions.assertFalse(rcnt.isSufficientlyReplicated());
     Assertions.assertFalse(rcnt.isOverReplicated());
 
-    Assertions.assertEquals(0, rcnt.missingNonMaintenanceIndexes().size());
+    Assertions.assertEquals(0, rcnt.unavailableIndexes().size());
   }
 
   @Test
@@ -374,7 +374,7 @@ public class TestECContainerReplicaCount {
     Assertions.assertFalse(rcnt.isSufficientlyReplicated());
     Assertions.assertFalse(rcnt.isOverReplicated());
 
-    Assertions.assertEquals(0, rcnt.missingNonMaintenanceIndexes().size());
+    Assertions.assertEquals(0, rcnt.unavailableIndexes().size());
   }
 
   @Test
@@ -382,14 +382,14 @@ public class TestECContainerReplicaCount {
     ECContainerReplicaCount rcnt = new ECContainerReplicaCount(container,
         new HashSet<>(), new ArrayList<>(), new ArrayList<>(), 1);
     Assertions.assertTrue(rcnt.unRecoverable());
-    Assertions.assertEquals(5, rcnt.missingNonMaintenanceIndexes().size());
+    Assertions.assertEquals(5, rcnt.unavailableIndexes().size());
 
     Set<ContainerReplica> replica =
         registerNodes(Pair.of(IN_SERVICE, 1), Pair.of(IN_MAINTENANCE, 2));
     rcnt = new ECContainerReplicaCount(container, replica, new ArrayList<>(),
         new ArrayList<>(), 1);
     Assertions.assertTrue(rcnt.unRecoverable());
-    Assertions.assertEquals(3, rcnt.missingNonMaintenanceIndexes().size());
+    Assertions.assertEquals(3, rcnt.unavailableIndexes().size());
     Assertions.assertEquals(0, rcnt.additionalMaintenanceCopiesNeeded());
 
     replica =
@@ -400,7 +400,7 @@ public class TestECContainerReplicaCount {
         new ArrayList<>(), 1);
     // Not missing as the decommission replicas are still online
     Assertions.assertFalse(rcnt.unRecoverable());
-    Assertions.assertEquals(5, rcnt.missingNonMaintenanceIndexes().size());
+    Assertions.assertEquals(0, rcnt.unavailableIndexes().size());
   }
 
   private Set<ContainerReplica> registerNodes(

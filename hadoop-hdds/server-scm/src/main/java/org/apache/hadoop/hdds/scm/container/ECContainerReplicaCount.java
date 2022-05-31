@@ -152,14 +152,15 @@ public class ECContainerReplicaCount {
   /**
    * Returns an unsorted list of indexes which need additional copies to
    * ensure the container is sufficiently replicated. These missing indexes will
-   * not be on maintenance nodes, although they may be on decommissioning nodes.
+   * not be on maintenance nodes, or decommission nodes.
    * Replicas pending delete are assumed to be removed and any pending add
    * are assume to be created and omitted them from the returned list. This list
-   * can be used to determine which replicas must be recovered in a group,
-   * assuming the inflight replicas pending add complete successfully.
-   * @return List of missing indexes
+   * can be used to determine which replicas must be recovered via an EC
+   * reconstuction, rathern than making copies of maintenance / decommission
+   * replicas
+   * @return List of missing indexes which have no online copy.
    */
-  public List<Integer> missingNonMaintenanceIndexes() {
+  public List<Integer> unavailableIndexes() {
     if (isSufficientlyReplicated()) {
       return Collections.emptyList();
     }
@@ -177,6 +178,10 @@ public class ECContainerReplicaCount {
     // Remove any maintenance copies, as they are still available. What remains
     // is the set of indexes we have no copy of, and hence must get re-created
     for (Integer i : maintenanceIndexes.keySet()) {
+      missing.remove(i);
+    }
+    // Remove any decommission copies, as they are still available
+    for (Integer i : decommissionIndexes.keySet()) {
       missing.remove(i);
     }
     return missing.stream().collect(Collectors.toList());
