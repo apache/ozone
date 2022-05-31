@@ -17,14 +17,26 @@
  */
 package org.apache.hadoop.ozone.container.ec.reconstruction;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex;
+
+import java.util.SortedMap;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
 /**
  * This is the actual EC reconstruction coordination task.
  */
 public class ECReconstructionCoordinatorTask implements Runnable {
+
+  private ECReconstructionCoordinator reconstructionCoordinator;
   private ECReconstructionCommandInfo reconstructionCommandInfo;
 
   public ECReconstructionCoordinatorTask(
+      ECReconstructionCoordinator reconstructionCoordinator,
       ECReconstructionCommandInfo reconstructionCommandInfo) {
+    this.reconstructionCoordinator = reconstructionCoordinator;
     this.reconstructionCommandInfo = reconstructionCommandInfo;
   }
 
@@ -42,6 +54,26 @@ public class ECReconstructionCoordinatorTask implements Runnable {
     // 4. Write the recovered chunks to given targets/write locally to
     // respective container. HDDS-6582
     // 5. Close/finalize the recovered containers.
+
+    SortedMap<Integer, DatanodeDetails> sourceNodeMap =
+        reconstructionCommandInfo.getSources().stream()
+            .collect(Collectors.toMap(
+                DatanodeDetailsAndReplicaIndex::getReplicaIndex,
+                DatanodeDetailsAndReplicaIndex::getDnDetails,
+                (v1, v2) -> v1, TreeMap::new));
+    SortedMap<Integer, DatanodeDetails> targetNodeMap = IntStream.range(0,
+            reconstructionCommandInfo.getTargetDatanodes().size())
+        .boxed().collect(Collectors.toMap(
+            i -> (int) reconstructionCommandInfo
+                .getMissingContainerIndexes()[i],
+            i -> reconstructionCommandInfo
+                .getTargetDatanodes().get(i),
+            (v1, v2) -> v1, TreeMap::new));
+
+    reconstructionCoordinator.reconstructECContainerGroup(
+        reconstructionCommandInfo.getContainerID(),
+        reconstructionCommandInfo.getEcReplicationConfig(),
+        sourceNodeMap, targetNodeMap);
   }
 
   @Override
