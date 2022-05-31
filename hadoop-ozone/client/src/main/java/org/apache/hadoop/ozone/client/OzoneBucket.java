@@ -1071,8 +1071,8 @@ public class OzoneBucket extends WithMetadata {
 
     /**
      * keyPrefix="a1" and startKey="a1/b2/d2/f3/f31.tx".
-     * Now, this will prepare a list and return list :
-     * <"a1/b2", "a1/b2/d2/f3">
+     * Now, this function will prepare and return a list :
+     * <"a1/b2/d2", "a1/b2/d2/f3">
      * <"a1/b2", "a1/b2/d2">
      * <"a1", "a1/b2">
      *
@@ -1111,7 +1111,7 @@ public class OzoneBucket extends WithMetadata {
         setKeyPrefix(keyPrefixName);
 
         if (StringUtils.isNotBlank(prevKey) &&
-            (StringUtils.startsWith(prevKey, getKeyPrefix()))) {
+            StringUtils.startsWith(prevKey, getKeyPrefix())) {
           // 1. Prepare all the seekKeys after the prefixKey.
           // Example case: prefixKey="a1", startKey="a1/b2/d2/f3/f31.tx"
           // Now, stack should be build with all the levels after prefixKey
@@ -1127,23 +1127,26 @@ public class OzoneBucket extends WithMetadata {
           //      bottom | < a1, a1/b2 >                       |
           //             --------------------------------------|
           List<Pair<String, String>> seekPaths = new ArrayList<>();
-          String parentStartKeyPath = OzoneFSUtils.getParentDir(prevKey);
-          if (StringUtils.compare(parentStartKeyPath, getKeyPrefix()) >= 0) {
-            // Add the leaf node to the seek path. The idea is to search for
-            // sub-paths if the given start key is a directory.
-            seekPaths.add(new ImmutablePair<>(prevKey, ""));
-            removeStartKey = prevKey;
-            getSeekPathsBetweenKeyPrefixAndStartKey(getKeyPrefix(), prevKey,
-                seekPaths);
-          } else if (StringUtils.compare(prevKey, getKeyPrefix()) >= 0) {
-            // Add the leaf node to the seek path. The idea is to search for
-            // sub-paths if the given start key is a directory.
-            seekPaths.add(new ImmutablePair<>(prevKey, ""));
-            removeStartKey = prevKey;
+
+          if (StringUtils.isNotBlank(getKeyPrefix())) {
+            String parentStartKeyPath = OzoneFSUtils.getParentDir(prevKey);
+            if (StringUtils.compare(parentStartKeyPath, getKeyPrefix()) >= 0) {
+              // Add the leaf node to the seek path. The idea is to search for
+              // sub-paths if the given start key is a directory.
+              seekPaths.add(new ImmutablePair<>(prevKey, ""));
+              removeStartKey = prevKey;
+              getSeekPathsBetweenKeyPrefixAndStartKey(getKeyPrefix(), prevKey,
+                  seekPaths);
+            } else if (StringUtils.compare(prevKey, getKeyPrefix()) >= 0) {
+              // Add the leaf node to the seek path. The idea is to search for
+              // sub-paths if the given start key is a directory.
+              seekPaths.add(new ImmutablePair<>(prevKey, ""));
+              removeStartKey = prevKey;
+            }
           }
 
-          // 2. Push elements in reverse order so that the FS tree traversal will
-          // occur in left-to-right fashion[Depth-First Search]
+          // 2. Push elements in reverse order so that the FS tree traversal
+          // will occur in left-to-right fashion[Depth-First Search]
           for (int index = seekPaths.size() - 1; index >= 0; index--) {
             Pair<String, String> seekDirPath = seekPaths.get(index);
             stack.push(seekDirPath);
