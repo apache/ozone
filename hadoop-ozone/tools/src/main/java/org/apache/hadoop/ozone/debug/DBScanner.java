@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -216,7 +217,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);
     this.constructColumnFamilyMap(DBDefinitionFactory.
-            getDefinition(Paths.get(dbPath)));
+            getDefinition(Paths.get(dbPath), new OzoneConfiguration()));
     if (this.columnFamilyMap != null) {
       if (!this.columnFamilyMap.containsKey(tableName)) {
         System.out.print("Table with name:" + tableName + " does not exist");
