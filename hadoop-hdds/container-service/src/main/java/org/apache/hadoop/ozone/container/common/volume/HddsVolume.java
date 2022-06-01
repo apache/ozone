@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
  * Each hdds volume has its own VERSION file. The hdds volume will have one
  * clusterUuid directory for each SCM it is a part of (currently only one SCM is
  * supported).
- *
+ * <p>
  * During DN startup, if the VERSION file exists, we verify that the
  * clusterID in the version file matches the clusterID from SCM.
  */
@@ -67,6 +67,7 @@ public class HddsVolume extends StorageVolume {
 
   private VolumeState state;
   private final VolumeIOStats volumeIOStats;
+  private final VolumeInfoMetrics volumeInfoMetrics;
 
   // VERSION file properties
   private String storageID;       // id of the file system
@@ -75,6 +76,9 @@ public class HddsVolume extends StorageVolume {
   private long cTime;             // creation time of the file system state
   private int layoutVersion;      // layout version of the storage data
   private final AtomicLong committedBytes; // till Open containers become full
+
+  // Mentions the type of volume
+  private final VolumeType type = VolumeType.DATA_VOLUME;
 
   /**
    * Builder for HddsVolume.
@@ -115,6 +119,8 @@ public class HddsVolume extends StorageVolume {
       this.clusterID = b.clusterID;
       this.datanodeUuid = b.datanodeUuid;
       this.volumeIOStats = new VolumeIOStats(b.getVolumeRootStr());
+      this.volumeInfoMetrics =
+          new VolumeInfoMetrics(b.getVolumeRootStr(), this);
       this.committedBytes = new AtomicLong(0);
 
       LOG.info("Creating HddsVolume: {} of storage type : {} capacity : {}",
@@ -125,6 +131,7 @@ public class HddsVolume extends StorageVolume {
       // Builder is called with failedVolume set, so create a failed volume
       // HddsVolume Object.
       volumeIOStats = null;
+      volumeInfoMetrics = null;
       storageID = UUID.randomUUID().toString();
       state = VolumeState.FAILED;
       committedBytes = null;
@@ -136,6 +143,7 @@ public class HddsVolume extends StorageVolume {
    * Initializes the volume.
    * Creates the Version file if not present,
    * otherwise returns with IOException.
+   *
    * @throws IOException
    */
   private void initialize() throws IOException {
@@ -176,7 +184,7 @@ public class HddsVolume extends StorageVolume {
     if (!getStorageDir().isDirectory()) {
       // Volume Root exists but is not a directory.
       LOG.warn("Volume {} exists but is not a directory,"
-          + " current volume state: {}.",
+              + " current volume state: {}.",
           getStorageDir().getPath(), VolumeState.INCONSISTENT);
       return VolumeState.INCONSISTENT;
     }
@@ -188,7 +196,7 @@ public class HddsVolume extends StorageVolume {
     if (!getVersionFile().exists()) {
       // Volume Root is non empty but VERSION file does not exist.
       LOG.warn("VERSION file does not exist in volume {},"
-          + " current volume state: {}.",
+              + " current volume state: {}.",
           getStorageDir().getPath(), VolumeState.INCONSISTENT);
       return VolumeState.INCONSISTENT;
     }
@@ -205,6 +213,7 @@ public class HddsVolume extends StorageVolume {
 
   /**
    * Create Version File and write property fields into it.
+   *
    * @throws IOException
    */
   private void createVersionFile() throws IOException {
@@ -300,6 +309,10 @@ public class HddsVolume extends StorageVolume {
     return layoutVersion;
   }
 
+  public VolumeType getType() {
+    return type;
+  }
+
   public VolumeState getStorageState() {
     return state;
   }
@@ -316,12 +329,19 @@ public class HddsVolume extends StorageVolume {
     return volumeIOStats;
   }
 
+  public VolumeInfoMetrics getVolumeInfoStats() {
+    return volumeInfoMetrics;
+  }
+
   @Override
   public void failVolume() {
     setState(VolumeState.FAILED);
     super.failVolume();
     if (volumeIOStats != null) {
       volumeIOStats.unregister();
+    }
+    if (volumeInfoMetrics != null) {
+      volumeInfoMetrics.unregister();
     }
   }
 
@@ -332,19 +352,22 @@ public class HddsVolume extends StorageVolume {
     if (volumeIOStats != null) {
       volumeIOStats.unregister();
     }
+    if (volumeInfoMetrics != null) {
+      volumeInfoMetrics.unregister();
+    }
   }
 
   /**
    * VolumeState represents the different states a HddsVolume can be in.
    * NORMAL          =&gt; Volume can be used for storage
    * FAILED          =&gt; Volume has failed due and can no longer be used for
-   *                    storing containers.
+   * storing containers.
    * NON_EXISTENT    =&gt; Volume Root dir does not exist
    * INCONSISTENT    =&gt; Volume Root dir is not empty but VERSION file is
-   *                    missing or Volume Root dir is not a directory
+   * missing or Volume Root dir is not a directory
    * NOT_FORMATTED   =&gt; Volume Root exists but not formatted(no VERSION file)
    * NOT_INITIALIZED =&gt; VERSION file exists but has not been verified for
-   *                    correctness.
+   * correctness.
    */
   public enum VolumeState {
     NORMAL,
@@ -357,6 +380,7 @@ public class HddsVolume extends StorageVolume {
 
   /**
    * add "delta" bytes to committed space in the volume.
+   *
    * @param delta bytes to add to committed space counter
    * @return bytes of committed space
    */
@@ -366,6 +390,7 @@ public class HddsVolume extends StorageVolume {
 
   /**
    * return the committed space in the volume.
+   *
    * @return bytes of committed space
    */
   public long getCommittedBytes() {
