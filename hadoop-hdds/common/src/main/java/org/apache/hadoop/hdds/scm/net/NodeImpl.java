@@ -196,10 +196,37 @@ public class NodeImpl implements Node {
    */
   @Override
   public boolean isAncestor(Node node) {
+    if (node == null) {
+      return false;
+    }
+    return isAncestor(node.getNetworkFullPath());
+  }
+
+  @Override
+  public boolean isAncestor(String nodePath) {
+    if (nodePath == null) {
+      return false;
+    }
     return this.getNetworkFullPath().equals(PATH_SEPARATOR_STR) ||
-        node.getNetworkLocation().startsWith(this.getNetworkFullPath()) ||
-            node.getNetworkFullPath().equalsIgnoreCase(
-                this.getNetworkFullPath());
+        nodePath.equalsIgnoreCase(this.getNetworkFullPath()) ||
+        NetUtils.addSuffix(nodePath).startsWith(
+            NetUtils.addSuffix(this.getNetworkFullPath()));
+  }
+  @Override
+  public boolean isDescendant(Node node) {
+    if (node == null) {
+      return false;
+    }
+    return isDescendant(node.getNetworkFullPath());
+  }
+
+  @Override
+  public boolean isDescendant(String nodePath) {
+    if (nodePath == null) {
+      return false;
+    }
+    return NetUtils.addSuffix(this.getNetworkFullPath()).startsWith(
+        NetUtils.addSuffix(nodePath));
   }
 
   @Override

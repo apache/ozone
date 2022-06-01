@@ -365,4 +365,84 @@ public final class S3GatewayMetrics implements MetricsSource {
   public long getListMultipartUploadsFailure() {
     return listMultipartUploadsFailure.value();
   }
+
+  public long getCreateMultipartKeySuccess() {
+    return createMultipartKeySuccess.value();
+  }
+
+  public long getCreateMultipartKeyFailure() {
+    return createMultipartKeyFailure.value();
+  }
+
+  public long getCompleteMultiPartUploadSuccess() {
+    return completeMultiPartUploadSuccess.value();
+  }
+
+  public long getCompleteMultiPartUploadFailure() {
+    return completeMultiPartUploadFailure.value();
+  }
+
+  public long getListPartsSuccess() {
+    return listPartsSuccess.value();
+  }
+
+  public long getListPartsFailure() {
+    return listPartsFailure.value();
+  }
+
+  public long getCopyObjectSuccess() {
+    return copyObjectSuccess.value();
+  }
+
+  public long getCopyObjectFailure() {
+    return copyObjectFailure.value();
+  }
+
+  public long getCreateKeyFailure() {
+    return createKeyFailure.value();
+  }
+
+  public long getCreateKeySuccess() {
+    return createKeySuccess.value();
+  }
+
+  public long getInitMultiPartUploadSuccess() {
+    return initMultiPartUploadSuccess.value();
+  }
+
+  public long getInitMultiPartUploadFailure() {
+    return initMultiPartUploadFailure.value();
+  }
+
+  public long getDeleteKeySuccess() {
+    return deleteKeySuccess.value();
+  }
+
+  public long getDeleteKeyFailure() {
+    return deleteKeyFailure.value();
+  }
+
+  public long getGetKeyFailure() {
+    return getKeyFailure.value();
+  }
+
+  public long getGetKeySuccess() {
+    return getKeySuccess.value();
+  }
+
+  public long getAbortMultiPartUploadSuccess() {
+    return abortMultiPartUploadSuccess.value();
+  }
+
+  public long getAbortMultiPartUploadFailure() {
+    return abortMultiPartUploadFailure.value();
+  }
+
+  public long getHeadKeyFailure() {
+    return headKeyFailure.value();
+  }
+
+  public long getListS3BucketsFailure() {
+    return listS3BucketsFailure.value();
+  }
 }

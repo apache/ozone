@@ -25,11 +25,16 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -142,8 +147,9 @@ public class TestS3MultipartResponse {
     omMultipartKeyInfo.addPartKeyInfo(partNumber, partKeyInfo);
   }
 
-  public PartKeyInfo createPartKeyInfo(
-      String volumeName, String bucketName, String keyName, int partNumber) {
+  public PartKeyInfo createPartKeyInfo(String volumeName, String bucketName,
+                                       String keyName, int partNumber)
+          throws IOException {
     return PartKeyInfo.newBuilder()
         .setPartNumber(partNumber)
         .setPartName(omMetadataManager.getMultipartKey(volumeName,
@@ -161,10 +167,14 @@ public class TestS3MultipartResponse {
 
   public PartKeyInfo createPartKeyInfoFSO(
       String volumeName, String bucketName, long parentID, String fileName,
-      int partNumber) {
+      int partNumber) throws IOException {
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
     return PartKeyInfo.newBuilder()
         .setPartNumber(partNumber)
-        .setPartName(omMetadataManager.getOzonePathKey(parentID, fileName +
+        .setPartName(omMetadataManager.getOzonePathKey(volumeId, bucketId,
+                parentID, fileName +
                 UUID.randomUUID().toString()))
         .setPartKeyInfo(KeyInfo.newBuilder()
             .setVolumeName(volumeName)
@@ -284,14 +294,18 @@ public class TestS3MultipartResponse {
           OzoneManagerProtocolProtos.Status status,
           List<OmKeyInfo> unUsedParts,
           OmBucketInfo omBucketInfo,
-          RepeatedOmKeyInfo keysToDelete) {
+          RepeatedOmKeyInfo keysToDelete) throws IOException {
 
 
     String multipartKey = omMetadataManager
         .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
 
-    String multipartOpenKey = getMultipartKey(parentID, keyName,
-        multipartUploadID);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    String fileName = OzoneFSUtils.getFileName(keyName);
+    String multipartOpenKey = omMetadataManager.getMultipartKey(
+            volumeId, bucketId, parentID, fileName, multipartUploadID);
 
     OMResponse omResponse = OMResponse.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.CompleteMultiPartUpload)
@@ -304,13 +318,6 @@ public class TestS3MultipartResponse {
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse,
         multipartKey, multipartOpenKey, omKeyInfo, unUsedParts,
         getBucketLayout(), omBucketInfo, keysToDelete);
-  }
-
-  private String getMultipartKey(long parentID, String keyName,
-                                 String multipartUploadID) {
-    String fileName = OzoneFSUtils.getFileName(keyName);
-    return omMetadataManager.getMultipartKey(parentID, fileName,
-            multipartUploadID);
   }
 
   protected S3InitiateMultipartUploadResponse getS3InitiateMultipartUploadResp(
@@ -331,5 +338,34 @@ public class TestS3MultipartResponse {
 
   public BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
+  }
+
+  public void addVolumeToDB(String volumeName) throws IOException {
+    final OmVolumeArgs volumeArgs = OmVolumeArgs.newBuilder()
+            .setVolume(volumeName)
+            .setAdminName("admin")
+            .setOwnerName("owner")
+            .setObjectID(System.currentTimeMillis())
+            .build();
+
+    omMetadataManager.getVolumeTable().addCacheEntry(
+            new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
+            new CacheValue<>(Optional.of(volumeArgs), 1));
+  }
+
+  public void addBucketToDB(String volumeName, String bucketName)
+          throws IOException {
+    final OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setObjectID(System.currentTimeMillis())
+            .setStorageType(StorageType.DISK)
+            .setIsVersionEnabled(false)
+            .build();
+
+    omMetadataManager.getBucketTable().addCacheEntry(
+            new CacheKey<>(omMetadataManager.getBucketKey(
+                    volumeName, bucketName)),
+            new CacheValue<>(Optional.of(omBucketInfo), 1));
   }
 }

@@ -26,10 +26,13 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
 import org.apache.hadoop.ozone.client.io.BlockStreamAccessor;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
@@ -58,6 +61,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -345,6 +350,50 @@ public class TestOzoneECClient {
       Assert.assertEquals(expected, parityBlockData);
       Assert.assertEquals(expected.length(), parityBlockData.length());
 
+    }
+  }
+
+  @Test
+  public void testPutBlockHasBlockGroupLen() throws IOException {
+    OzoneBucket bucket = writeIntoECKey(inputChunks, keyName, null);
+    OzoneKey key = bucket.getKey(keyName);
+    Assert.assertEquals(keyName, key.getName());
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      byte[] fileContent = new byte[chunkSize];
+      for (int i = 0; i < dataBlocks; i++) {
+        Assert.assertEquals(inputChunks[i].length, is.read(fileContent));
+        Assert.assertTrue(Arrays.equals(inputChunks[i], fileContent));
+      }
+
+      Map<DatanodeDetails, MockDatanodeStorage> storages =
+          ((MockXceiverClientFactory) factoryStub).getStorages();
+      OzoneManagerProtocolProtos.KeyLocationList blockList =
+          transportStub.getKeys().get(volumeName).get(bucketName).get(keyName).
+              getKeyLocationListList().get(0);
+
+      // Check all node putBlock requests has block group length included.
+      for (int i = 0; i < dataBlocks + parityBlocks; i++) {
+        MockDatanodeStorage mockDatanodeStorage = storages.get(
+            getMatchingStorage(storages,
+                blockList.getKeyLocations(0).getPipeline().getMembers(i)
+                    .getUuid()));
+        final OzoneKeyDetails keyDetails = bucket.getKey(keyName);
+
+        ContainerProtos.BlockData block = mockDatanodeStorage.getBlock(
+            ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(
+                keyDetails.getOzoneKeyLocations().get(0).getContainerID())
+                .setLocalID(
+                    keyDetails.getOzoneKeyLocations().get(0).getLocalID())
+                .setBlockCommitSequenceId(1).build());
+
+        List<ContainerProtos.KeyValue> metadataList =
+            block.getMetadataList().stream().filter(kv -> kv.getKey()
+                .equals(OzoneConsts.BLOCK_GROUP_LEN_KEY_IN_PUT_BLOCK))
+                .collect(Collectors.toList());
+
+        Assert.assertEquals(3L * chunkSize,
+            Long.parseLong(metadataList.get(0).getValue()));
+      }
     }
   }
 
@@ -764,6 +813,69 @@ public class TestOzoneECClient {
                 UTF_8) + " \n " + "Actual: " + new String(fileContent, UTF_8),
             Arrays.equals(inputChunks[i % dataBlocks], fileContent));
       }
+    }
+  }
+
+  @Test
+  public void testExcludeOnDNFailure() throws IOException {
+    testExcludeFailedDN(IntStream.range(0, 5), IntStream.empty());
+  }
+
+  @Test
+  public void testExcludeOnDNClosed() throws IOException {
+    testExcludeFailedDN(IntStream.empty(), IntStream.range(0, 5));
+  }
+
+  @Test
+  public void testExcludeOnDNMixed() throws IOException {
+    testExcludeFailedDN(IntStream.range(0, 3), IntStream.range(3, 5));
+  }
+
+  private void testExcludeFailedDN(IntStream failedDNIndex,
+      IntStream closedDNIndex) throws IOException {
+    close();
+    OzoneConfiguration con = new OzoneConfiguration();
+    MultiNodePipelineBlockAllocator blkAllocator =
+        new MultiNodePipelineBlockAllocator(con, dataBlocks + parityBlocks, 10);
+    createNewClient(con, blkAllocator);
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    ECReplicationConfig repConfig = new ECReplicationConfig(
+        dataBlocks, parityBlocks, ECReplicationConfig.EcCodec.RS, chunkSize);
+
+    try (OzoneOutputStream out = bucket.createKey(keyName,
+        (long) dataBlocks * chunkSize, repConfig, new HashMap<>())) {
+
+      Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+      ECKeyOutputStream ecKeyOut = (ECKeyOutputStream) out.getOutputStream();
+
+      List<HddsProtos.DatanodeDetailsProto> dns = blkAllocator.getClusterDns();
+
+      // Then let's mark datanodes with closed container
+      List<DatanodeDetails> closedDNs = closedDNIndex
+          .mapToObj(i -> DatanodeDetails.getFromProtoBuf(dns.get(i)))
+          .collect(Collectors.toList());
+      ((MockXceiverClientFactory) factoryStub).mockStorageFailure(closedDNs,
+          new ContainerNotOpenException("Mocked"));
+
+      // Then let's mark failed datanodes
+      List<DatanodeDetails> failedDNs = failedDNIndex
+          .mapToObj(i -> DatanodeDetails.getFromProtoBuf(dns.get(i)))
+          .collect(Collectors.toList());
+      ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
+
+      for (int i = 0; i < dataBlocks; i++) {
+        out.write(inputChunks[i % dataBlocks]);
+      }
+
+      // Assert excludeList only includes failedDNs
+      Assert.assertArrayEquals(failedDNs.toArray(new DatanodeDetails[0]),
+          ecKeyOut.getExcludeList().getDatanodes()
+              .toArray(new DatanodeDetails[0]));
     }
   }
 

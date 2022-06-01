@@ -313,10 +313,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           new CacheKey<>(dbOpenKeyName),
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
-      omBucketInfo.incrUsedBytes(preAllocatedSpace);
-      // Update namespace quota
-      omBucketInfo.incrUsedNamespace(1L);
-
       // Prepare response
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
           .setKeyInfo(omKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(),
@@ -395,6 +391,35 @@ public class OMKeyCreateRequest extends OMKeyRequest {
             + " an Erasure Coded replication type. Rejecting the request,"
             + " please finalize the cluster upgrade and then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  /**
+   * Validates key create requests.
+   * We do not want to allow older clients to create keys in buckets which use
+   * non LEGACY layouts.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CreateKey
+  )
+  public static OMRequest blockCreateKeyWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    if (req.getCreateKeyRequest().hasKeyArgs()) {
+      KeyArgs keyArgs = req.getCreateKeyRequest().getKeyArgs();
+
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
       }
     }
     return req;

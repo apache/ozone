@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#suite:compat
+
 # Version that will be run using the local build.
 : "${OZONE_CURRENT_VERSION:=1.3.0}"
 export OZONE_CURRENT_VERSION

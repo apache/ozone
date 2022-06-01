@@ -57,9 +57,12 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     String fileName = OzoneFSUtils.getFileName(keyName);
     String multipartKey = omMetadataManager
         .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
     long clientId = Time.now();
-    String openKey = omMetadataManager.getOpenFileName(parentID, fileName,
-            clientId);
+    String openKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
+            parentID, fileName, clientId);
 
     S3MultipartUploadCommitPartResponse s3MultipartUploadCommitPartResponse =
         createS3CommitMPUResponseFSO(volumeName, bucketName, parentID, keyName,
@@ -117,8 +120,11 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     addPart(1, part1, omMultipartKeyInfo);
 
     long clientId = Time.now();
-    String openKey = omMetadataManager.getOpenFileName(parentID, fileName,
-            clientId);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    String openKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
+            parentID, fileName, clientId);
 
     S3MultipartUploadCommitPartResponse s3MultipartUploadCommitPartResponse =
             createS3CommitMPUResponseFSO(volumeName, bucketName, parentID,
@@ -166,9 +172,13 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
 
     String multipartUploadID = UUID.randomUUID().toString();
 
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+
     String fileName = OzoneFSUtils.getFileName(keyName);
-    String multipartKey = omMetadataManager.getMultipartKey(parentID, fileName,
-            multipartUploadID);
+    String multipartKey = omMetadataManager.getMultipartKey(volumeId, bucketId,
+            parentID, fileName, multipartUploadID);
 
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponseFSO =
             createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
@@ -189,8 +199,8 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     addPart(1, part1, omMultipartKeyInfo);
 
     long clientId = Time.now();
-    String openKey = omMetadataManager.getOpenFileName(parentID, fileName,
-            clientId);
+    String openKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
+            parentID, fileName, clientId);
 
     S3MultipartUploadCommitPartResponse s3MultipartUploadCommitPartResponse =
             createS3CommitMPUResponseFSO(volumeName, bucketName, parentID,

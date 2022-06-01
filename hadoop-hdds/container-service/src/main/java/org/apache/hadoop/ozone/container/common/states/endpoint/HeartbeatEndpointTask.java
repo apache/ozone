@@ -284,7 +284,7 @@ public class HeartbeatEndpointTask
       reportProto.addCommand(entry.getKey())
           .addCount(entry.getValue());
     }
-    requestBuilder.setQueuedCommandReport(reportProto.build());
+    requestBuilder.setCommandQueueReport(reportProto.build());
   }
 
   /**

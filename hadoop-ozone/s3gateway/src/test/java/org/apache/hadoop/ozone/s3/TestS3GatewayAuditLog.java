@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.s3;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -42,6 +43,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertEquals;
@@ -66,21 +68,33 @@ public class TestS3GatewayAuditLog {
   private RootEndpoint rootEndpoint;
   private ObjectEndpoint keyEndpoint;
   private OzoneBucket bucket;
+  private Map<String, String> parametersMap = new HashMap<>();
 
   @Before
   public void setup() throws Exception {
 
+    parametersMap.clear();
     clientStub = new OzoneClientStub();
     clientStub.getObjectStore().createS3Bucket(bucketName);
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
 
-    bucketEndpoint = new BucketEndpoint();
+    bucketEndpoint = new BucketEndpoint() {
+      @Override
+      protected Map<String, String> getAuditParameters() {
+        return parametersMap;
+      }
+    };
     bucketEndpoint.setClient(clientStub);
 
     rootEndpoint = new RootEndpoint();
     rootEndpoint.setClient(clientStub);
 
-    keyEndpoint = new ObjectEndpoint();
+    keyEndpoint = new ObjectEndpoint() {
+      @Override
+      protected Map<String, String> getAuditParameters() {
+        return parametersMap;
+      }
+    };
     keyEndpoint.setClient(clientStub);
     keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
 
@@ -99,9 +113,11 @@ public class TestS3GatewayAuditLog {
 
   @Test
   public void testHeadBucket() throws Exception {
+    parametersMap.put("bucket", "[bucket]");
+
     bucketEndpoint.head(bucketName);
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=HEAD_BUCKET {bucket=bucket} | ret=SUCCESS";
+        "op=HEAD_BUCKET {bucket=[bucket]} | ret=SUCCESS";
     verifyLog(expected);
   }
 
@@ -118,15 +134,18 @@ public class TestS3GatewayAuditLog {
   public void testHeadObject() throws Exception {
     String value = RandomStringUtils.randomAlphanumeric(32);
     OzoneOutputStream out = bucket.createKey("key1",
-        value.getBytes(UTF_8).length, ReplicationType.RATIS,
-        ReplicationFactor.ONE, new HashMap<>());
+        value.getBytes(UTF_8).length,
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+        ReplicationFactor.ONE), new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();
 
+    parametersMap.put("bucket", "[bucket]");
+    parametersMap.put("path", "[key1]");
 
     keyEndpoint.head(bucketName, "key1");
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=HEAD_KEY {bucket=bucket, keyPath=key1} | ret=SUCCESS";
+        "op=HEAD_KEY {bucket=[bucket], path=[key1]} | ret=SUCCESS";
     verifyLog(expected);
 
   }

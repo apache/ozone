@@ -84,17 +84,17 @@ public class TestObjectStore {
     store.createVolume(sampleVolumeName);
     OzoneVolume volume = store.getVolume(sampleVolumeName);
 
-    // Case 1: Bucket layout: Empty and OM default bucket layout: OBJECT_STORE
+    // Case 1: Bucket layout: Empty and OM default bucket layout: LEGACY
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     volume.createBucket(sampleBucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(sampleBucketName);
     Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertEquals(BucketLayout.OBJECT_STORE,
+    Assert.assertEquals(BucketLayout.LEGACY,
         bucket.getBucketLayout());
 
-    // Case 2: Bucket layout: DEFAULT
+    // Case 2: Bucket layout: OBJECT_STORE
     sampleBucketName = UUID.randomUUID().toString();
-    builder.setBucketLayout(BucketLayout.DEFAULT);
+    builder.setBucketLayout(BucketLayout.OBJECT_STORE);
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
     Assert.assertEquals(sampleBucketName, bucket.getName());
@@ -107,7 +107,16 @@ public class TestObjectStore {
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
     Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertNotEquals(BucketLayout.LEGACY, bucket.getBucketLayout());
+    Assert.assertEquals(BucketLayout.LEGACY, bucket.getBucketLayout());
+
+    // Case 3: Bucket layout: FILE_SYSTEM_OPTIMIZED
+    sampleBucketName = UUID.randomUUID().toString();
+    builder.setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    volume.createBucket(sampleBucketName, builder.build());
+    bucket = volume.getBucket(sampleBucketName);
+    Assert.assertEquals(sampleBucketName, bucket.getName());
+    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        bucket.getBucketLayout());
   }
 
   /**

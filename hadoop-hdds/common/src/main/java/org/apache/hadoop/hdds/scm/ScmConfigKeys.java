@@ -359,6 +359,17 @@ public final class ScmConfigKeys {
   public static final boolean OZONE_SCM_DATANODE_DISALLOW_SAME_PEERS_DEFAULT =
       false;
 
+  public static final String
+      OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL =
+      "ozone.scm.expired.container.replica.op.scrub.interval";
+  public static final String
+      OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL_DEFAULT =
+      "5m";
+  public static final String OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT =
+      "ozone.scm.expired.container.replica.op.time.out";
+  public static final String
+      OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT_DEFAULT = "30m";
+
   // Upper limit for how many pipelines can be created
   // across the cluster nodes managed by SCM.
   // Only for test purpose now.
@@ -403,6 +414,12 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT =
       "120s";
 
+  public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL =
+      "ozone.scm.pipeline.scrub.interval";
+  public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT =
+      "5m";
+
+
   // Allow SCM to auto create factor ONE ratis pipeline.
   public static final String OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE =
       "ozone.scm.pipeline.creation.auto.factor.one";
@@ -437,7 +454,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HA_ENABLE_KEY
       = "ozone.scm.ratis.enable";
   public static final boolean OZONE_SCM_HA_ENABLE_DEFAULT
-      = true;
+      = false;
   public static final String OZONE_SCM_RATIS_PORT_KEY
       = "ozone.scm.ratis.port";
   public static final int OZONE_SCM_RATIS_PORT_DEFAULT

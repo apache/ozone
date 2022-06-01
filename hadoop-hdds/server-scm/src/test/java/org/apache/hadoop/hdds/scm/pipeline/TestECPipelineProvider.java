@@ -29,9 +29,9 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -57,7 +57,7 @@ public class TestECPipelineProvider {
       Mockito.mock(PipelineStateManager.class);
   private PlacementPolicy placementPolicy = Mockito.mock(PlacementPolicy.class);
   private long containerSizeBytes;
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     conf = new OzoneConfiguration();
     provider = new ECPipelineProvider(
@@ -85,14 +85,14 @@ public class TestECPipelineProvider {
   public void testSimplePipelineCanBeCreatedWithIndexes() throws IOException {
     ECReplicationConfig ecConf = new ECReplicationConfig(3, 2);
     Pipeline pipeline = provider.create(ecConf);
-    Assert.assertEquals(EC, pipeline.getType());
-    Assert.assertEquals(ecConf.getData() + ecConf.getParity(),
+    Assertions.assertEquals(EC, pipeline.getType());
+    Assertions.assertEquals(ecConf.getData() + ecConf.getParity(),
         pipeline.getNodes().size());
-    Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
+    Assertions.assertEquals(ALLOCATED, pipeline.getPipelineState());
     List<DatanodeDetails> dns = pipeline.getNodes();
     for (int i = 0; i < ecConf.getRequiredNodes(); i++) {
       // EC DN indexes are numbered starting from 1 to N.
-      Assert.assertEquals(i + 1, pipeline.getReplicaIndex(dns.get(i)));
+      Assertions.assertEquals(i + 1, pipeline.getReplicaIndex(dns.get(i)));
     }
   }
 
@@ -103,11 +103,11 @@ public class TestECPipelineProvider {
     Set<ContainerReplica> replicas = createContainerReplicas(4);
     Pipeline pipeline = provider.createForRead(ecConf, replicas);
 
-    Assert.assertEquals(EC, pipeline.getType());
-    Assert.assertEquals(4, pipeline.getNodes().size());
-    Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
+    Assertions.assertEquals(EC, pipeline.getType());
+    Assertions.assertEquals(4, pipeline.getNodes().size());
+    Assertions.assertEquals(ALLOCATED, pipeline.getPipelineState());
     for (ContainerReplica r : replicas) {
-      Assert.assertEquals(r.getReplicaIndex(),
+      Assertions.assertEquals(r.getReplicaIndex(),
           pipeline.getReplicaIndex(r.getDatanodeDetails()));
     }
   }
@@ -124,8 +124,8 @@ public class TestECPipelineProvider {
     favoredNodes.add(MockDatanodeDetails.randomDatanodeDetails());
 
     Pipeline pipeline = provider.create(ecConf, excludedNodes, favoredNodes);
-    Assert.assertEquals(EC, pipeline.getType());
-    Assert.assertEquals(ecConf.getData() + ecConf.getParity(),
+    Assertions.assertEquals(EC, pipeline.getType());
+    Assertions.assertEquals(ecConf.getData() + ecConf.getParity(),
         pipeline.getNodes().size());
 
     verify(placementPolicy).chooseDatanodes(excludedNodes, favoredNodes,

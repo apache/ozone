@@ -44,10 +44,10 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static org.mockito.Mockito.when;
@@ -64,7 +64,7 @@ public class TestContainerStateManager {
   private DBStore dbStore;
   private Pipeline pipeline;
 
-  @Before
+  @BeforeEach
   public void init() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     scmhaManager = SCMHAManagerStub.getInstance(true);
@@ -95,7 +95,7 @@ public class TestContainerStateManager {
 
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     containerStateManager.close();
     if (dbStore != null) {
@@ -123,7 +123,7 @@ public class TestContainerStateManager {
         .getContainerReplicas(c1.containerID());
 
     //THEN
-    Assert.assertEquals(3, replicas.size());
+    Assertions.assertEquals(3, replicas.size());
   }
 
   @Test
@@ -142,8 +142,8 @@ public class TestContainerStateManager {
     Set<ContainerReplica> replicas = containerStateManager
         .getContainerReplicas(c1.containerID());
 
-    Assert.assertEquals(2, replicas.size());
-    Assert.assertEquals(3, c1.getReplicationConfig().getRequiredNodes());
+    Assertions.assertEquals(2, replicas.size());
+    Assertions.assertEquals(3, c1.getReplicationConfig().getRequiredNodes());
   }
 
   private void addReplica(ContainerInfo cont, DatanodeDetails node) {

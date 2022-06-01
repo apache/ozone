@@ -24,92 +24,72 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.TemporaryFolder;
-import org.rocksdb.ColumnFamilyHandle;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.ColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.List;
+import java.util.Collection;
+import java.nio.file.Path;
+
 
 /**
  * Tests RDBStore creation.
  */
 public class TestDBStoreBuilder {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
-
-  @Before
-  public void setUp() throws Exception {
-    System.setProperty(DBConfigFromFile.CONFIG_DIR,
-        folder.newFolder().toString());
+  @BeforeEach
+  public void setUp(@TempDir Path tempDir) throws Exception {
+    System.setProperty(DBConfigFromFile.CONFIG_DIR, tempDir.toString());
   }
 
   @Test
-  public void builderWithoutAnyParams() throws IOException {
+  public void builderWithoutAnyParams() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    thrown.expect(IOException.class);
-    DBStoreBuilder.newBuilder(conf).build();
+    Assertions.assertThrows(IOException.class,
+        () -> DBStoreBuilder.newBuilder(conf).build());
   }
 
   @Test
-  public void builderWithOneParamV1() throws IOException {
+  public void builderWithOneParamV1() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    thrown.expect(IOException.class);
-    DBStoreBuilder.newBuilder(conf)
-        .setName("Test.db")
-        .build();
+    Assertions.assertThrows(IOException.class,
+        () -> DBStoreBuilder.newBuilder(conf).setName("Test.db").build());
   }
 
   @Test
-  public void builderWithOneParamV2() throws IOException {
+  public void builderWithOneParamV2(@TempDir Path tempDir) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    File newFolder = folder.newFolder();
-    if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
-    }
-    thrown.expect(IOException.class);
-    DBStoreBuilder.newBuilder(conf)
-        .setPath(newFolder.toPath())
-        .build();
+    Assertions.assertThrows(IOException.class,
+        () -> DBStoreBuilder.newBuilder(conf).setPath(tempDir).build());
   }
 
   @Test
-  public void builderWithOpenClose() throws Exception {
+  public void builderWithOpenClose(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    File newFolder = folder.newFolder();
-    if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
-    }
     DBStore dbStore = DBStoreBuilder.newBuilder(conf)
         .setName("Test.db")
-        .setPath(newFolder.toPath())
+        .setPath(tempDir)
         .build();
     // Nothing to do just open and Close.
     dbStore.close();
   }
 
   @Test
-  public void builderWithDoubleTableName() throws Exception {
+  public void builderWithDoubleTableName(@TempDir Path tempDir)
+      throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    File newFolder = folder.newFolder();
-    if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
-    }
     // Registering a new table with the same name should replace the previous
     // one.
     DBStore dbStore = DBStoreBuilder.newBuilder(conf)
         .setName("Test.db")
-        .setPath(newFolder.toPath())
+        .setPath(tempDir)
         .addTable("FIRST")
         .addTable("FIRST", new ColumnFamilyOptions())
         .build();
@@ -122,22 +102,18 @@ public class TestDBStoreBuilder {
           RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
       firstTable.put(key, value);
       byte[] temp = firstTable.get(key);
-      Assert.assertArrayEquals(value, temp);
+      Assertions.assertArrayEquals(value, temp);
     }
 
     dbStore.close();
   }
 
   @Test
-  public void builderWithDataWrites() throws Exception {
+  public void builderWithDataWrites(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    File newFolder = folder.newFolder();
-    if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
-    }
     try (DBStore dbStore = DBStoreBuilder.newBuilder(conf)
         .setName("Test.db")
-        .setPath(newFolder.toPath())
+        .setPath(tempDir)
         .addTable("First")
         .addTable("Second")
         .build()) {
@@ -148,25 +124,22 @@ public class TestDBStoreBuilder {
             RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
         firstTable.put(key, value);
         byte[] temp = firstTable.get(key);
-        Assert.assertArrayEquals(value, temp);
+        Assertions.assertArrayEquals(value, temp);
       }
 
       try (Table secondTable = dbStore.getTable("Second")) {
-        Assert.assertTrue(secondTable.isEmpty());
+        Assertions.assertTrue(secondTable.isEmpty());
       }
     }
   }
 
   @Test
-  public void builderWithDiskProfileWrites() throws Exception {
+  public void builderWithDiskProfileWrites(@TempDir Path tempDir)
+      throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    File newFolder = folder.newFolder();
-    if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
-    }
     try (DBStore dbStore = DBStoreBuilder.newBuilder(conf)
         .setName("Test.db")
-        .setPath(newFolder.toPath())
+        .setPath(tempDir)
         .addTable("First")
         .addTable("Second")
         .setProfile(DBProfile.DISK)
@@ -178,21 +151,21 @@ public class TestDBStoreBuilder {
             RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
         firstTable.put(key, value);
         byte[] temp = firstTable.get(key);
-        Assert.assertArrayEquals(value, temp);
+        Assertions.assertArrayEquals(value, temp);
       }
 
       try (Table secondTable = dbStore.getTable("Second")) {
-        Assert.assertTrue(secondTable.isEmpty());
+        Assertions.assertTrue(secondTable.isEmpty());
       }
     }
   }
 
   @Test
-  public void builderWithColumnFamilyOptions() throws Exception {
+  public void builderWithColumnFamilyOptions(@TempDir Path tempDir)
+      throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        folder.newFolder().getAbsolutePath());
-    File newFolder = folder.newFolder();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.toString());
+    File newFolder = new File(tempDir.toString() + "/newFolder");
 
     if (!newFolder.exists()) {
       Assert.assertTrue(newFolder.mkdirs());
@@ -238,21 +211,21 @@ public class TestDBStoreBuilder {
       Assert.assertTrue(dbStore instanceof RDBStore);
 
       RDBStore rdbStore = (RDBStore) dbStore;
-      List<ColumnFamilyHandle> cfHandles = rdbStore.getColumnFamilyHandles();
+      Collection<ColumnFamily> cfs = rdbStore.getColumnFamilies();
 
       // we also have the default column family, so there are 2
-      Assert.assertEquals(2, cfHandles.size());
+      Assert.assertEquals(2, cfs.size());
 
       boolean checked = false;
-      for (ColumnFamilyHandle cfHandle : cfHandles) {
-        if (Arrays.equals(cfHandle.getName(),
+      for (ColumnFamily cf : cfs) {
+        if (Arrays.equals(cf.getHandle().getName(),
             sampleTableName.getBytes(StandardCharsets.UTF_8))) {
           // get the default value
           boolean defaultValue = new ColumnFamilyOptions()
               .forceConsistencyChecks();
 
           // the value should be different from the default value
-          Assert.assertNotEquals(cfHandle.getDescriptor()
+          Assert.assertNotEquals(cf.getHandle().getDescriptor()
               .getOptions().forceConsistencyChecks(), defaultValue);
           checked = true;
         }

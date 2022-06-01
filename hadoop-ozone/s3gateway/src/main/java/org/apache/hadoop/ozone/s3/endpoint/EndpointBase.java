@@ -23,11 +23,12 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Context;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
-import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -77,6 +78,12 @@ public abstract class EndpointBase implements Auditor {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
+      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3Auth.getAccessID(), ex);
+      } else if (ex.getResult() == ResultCodes.TIMEOUT ||
+          ex.getResult() == ResultCodes.INTERNAL_ERROR) {
+        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
       } else {
         throw ex;
       }
@@ -108,8 +115,14 @@ public abstract class EndpointBase implements Auditor {
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND
           || ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
+      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3Auth.getAccessID(), ex);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
+      } else if (ex.getResult() == ResultCodes.TIMEOUT ||
+          ex.getResult() == ResultCodes.INTERNAL_ERROR) {
+        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
       } else {
         throw ex;
       }
@@ -118,9 +131,7 @@ public abstract class EndpointBase implements Auditor {
   }
 
   protected OzoneVolume getVolume() throws IOException {
-    String s3VolumeName = HddsClientUtils.getS3VolumeName(
-        client.getConfiguration());
-    return client.getObjectStore().getVolume(s3VolumeName);
+    return client.getObjectStore().getS3Volume();
   }
 
   /**
@@ -138,6 +149,12 @@ public abstract class EndpointBase implements Auditor {
       getMetrics().incCreateBucketFailure();
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
+      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3Auth.getAccessID(), ex);
+      } else if (ex.getResult() == ResultCodes.TIMEOUT ||
+          ex.getResult() == ResultCodes.INTERNAL_ERROR) {
+        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
       } else if (ex.getResult() != ResultCodes.BUCKET_ALREADY_EXISTS) {
         // S3 does not return error for bucket already exists, it just
         // returns the location.
@@ -152,15 +169,23 @@ public abstract class EndpointBase implements Auditor {
    * @param s3BucketName - S3 Bucket Name.
    * @throws  IOException in case the bucket cannot be deleted.
    */
-  public void deleteS3Bucket(String s3BucketName)
+  protected void deleteS3Bucket(String s3BucketName)
       throws IOException, OS3Exception {
     try {
       client.getObjectStore().deleteS3Bucket(s3BucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, s3BucketName, ex);
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3BucketName, ex);
+      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3Auth.getAccessID(), ex);
+      } else if (ex.getResult() == ResultCodes.TIMEOUT ||
+          ex.getResult() == ResultCodes.INTERNAL_ERROR) {
+        throw newError(S3ErrorTable.INTERNAL_ERROR, s3BucketName, ex);
+      } else {
+        throw ex;
       }
-      throw ex;
     }
   }
 
@@ -172,7 +197,7 @@ public abstract class EndpointBase implements Auditor {
    * @param prefix Bucket prefix to match
    * @return {@code Iterator<OzoneBucket>}
    */
-  public Iterator<? extends OzoneBucket> listS3Buckets(String prefix)
+  protected Iterator<? extends OzoneBucket> listS3Buckets(String prefix)
       throws IOException, OS3Exception {
     return iterateBuckets(volume -> volume.listBuckets(prefix));
   }
@@ -187,7 +212,7 @@ public abstract class EndpointBase implements Auditor {
    * @param previousBucket Buckets are listed after this bucket
    * @return {@code Iterator<OzoneBucket>}
    */
-  public Iterator<? extends OzoneBucket> listS3Buckets(String prefix,
+  protected Iterator<? extends OzoneBucket> listS3Buckets(String prefix,
       String previousBucket) throws IOException, OS3Exception {
     return iterateBuckets(volume -> volume.listBuckets(prefix, previousBucket));
   }
@@ -201,7 +226,15 @@ public abstract class EndpointBase implements Auditor {
       if (e.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
         return Collections.emptyIterator();
       } else  if (e.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, "listBuckets", e);
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            "listBuckets", e);
+      } else if (e.getResult() == ResultCodes.INVALID_TOKEN) {
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3Auth.getAccessID(), e);
+      } else if (e.getResult() == ResultCodes.TIMEOUT ||
+          e.getResult() == ResultCodes.INTERNAL_ERROR) {
+        throw newError(S3ErrorTable.INTERNAL_ERROR,
+            "listBuckets", e);
       } else {
         throw e;
       }
@@ -258,5 +291,21 @@ public abstract class EndpointBase implements Auditor {
 
   public String getClientIpAddress() {
     return context.getHeaderString(CLIENT_IP_HEADER);
+  }
+
+  protected Map<String, String> getAuditParameters() {
+    Map<String, String> res = new HashMap<>();
+    if (context != null) {
+      for (Map.Entry<String, List<String>> entry :
+          context.getUriInfo().getPathParameters().entrySet()) {
+        res.put(entry.getKey(), entry.getValue().toString());
+
+      }
+      for (Map.Entry<String, List<String>> entry :
+          context.getUriInfo().getQueryParameters().entrySet()) {
+        res.put(entry.getKey(), entry.getValue().toString());
+      }
+    }
+    return res;
   }
 }

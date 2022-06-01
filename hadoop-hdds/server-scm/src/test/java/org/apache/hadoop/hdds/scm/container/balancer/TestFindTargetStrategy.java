@@ -26,8 +26,8 @@ import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
-import org.junit.Test;
-import org.junit.Assert;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assertions;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -37,7 +37,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.NODEGROUP_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests for all the implementations of FindTargetStrategy.
@@ -77,15 +77,15 @@ public class TestFindTargetStrategy {
 
     Object[] sortedPotentialTargetArray = potentialTargets.toArray();
 
-    Assert.assertEquals(sortedPotentialTargetArray.length, 3);
+    Assertions.assertEquals(sortedPotentialTargetArray.length, 3);
 
     //make sure after sorting target for source, the potentialTargets is
     //sorted in descending order of usage
-    Assert.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[0])
+    Assertions.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[0])
         .getDatanodeDetails(), dui3.getDatanodeDetails());
-    Assert.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[1])
+    Assertions.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[1])
         .getDatanodeDetails(), dui2.getDatanodeDetails());
-    Assert.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[2])
+    Assertions.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[2])
         .getDatanodeDetails(), dui1.getDatanodeDetails());
 
   }
@@ -171,26 +171,26 @@ public class TestFindTargetStrategy {
         findTargetGreedyByNetworkTopology.getPotentialTargets();
 
     Object[] sortedPotentialTargetArray = potentialTargets.toArray();
-    Assert.assertEquals(sortedPotentialTargetArray.length, 5);
+    Assertions.assertEquals(sortedPotentialTargetArray.length, 5);
 
     // although target1 has the highest usage, it has the nearest network
     // topology distance to source, so it should be at the head of the
     // sorted PotentialTargetArray
-    Assert.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[0])
+    Assertions.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[0])
         .getDatanodeDetails(), target1);
 
     // these targets have same network topology distance to source,
     // so they should be sorted by usage
-    Assert.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[1])
+    Assertions.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[1])
         .getDatanodeDetails(), target4);
-    Assert.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[2])
+    Assertions.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[2])
         .getDatanodeDetails(), target3);
-    Assert.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[3])
+    Assertions.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[3])
         .getDatanodeDetails(), target2);
 
     //target5 has the lowest usage , but it has the farthest distance to source
     //so it should be at the tail of the sorted PotentialTargetArray
-    Assert.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[4])
+    Assertions.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[4])
         .getDatanodeDetails(), target5);
   }
 }

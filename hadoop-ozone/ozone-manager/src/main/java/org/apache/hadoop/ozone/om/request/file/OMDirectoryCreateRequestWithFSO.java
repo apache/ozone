@@ -156,6 +156,10 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
                 OMDirectoryCreateRequestWithFSO.getAllMissingParentDirInfo(
                         ozoneManager, keyArgs, omPathInfo, trxnLogIndex);
 
+        final long volumeId = omMetadataManager.getVolumeId(volumeName);
+        final long bucketId = omMetadataManager
+                .getBucketId(volumeName, bucketName);
+
         // prepare leafNode dir
         OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(
                 omPathInfo.getLeafNodeName(),
@@ -163,15 +167,16 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
                 omPathInfo.getLastKnownParentId(), trxnLogIndex,
                 OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
         OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
-                Optional.of(dirInfo), Optional.of(missingParentInfos),
-                trxnLogIndex);
+                volumeId, bucketId, trxnLogIndex,
+                Optional.of(missingParentInfos), Optional.of(dirInfo));
 
         // total number of keys created.
         numKeysCreated = missingParentInfos.size() + 1;
 
         result = OMDirectoryCreateRequest.Result.SUCCESS;
         omClientResponse =
-            new OMDirectoryCreateResponseWithFSO(omResponse.build(), dirInfo,
+            new OMDirectoryCreateResponseWithFSO(omResponse.build(),
+                    volumeName, bucketName, dirInfo,
                 missingParentInfos, result, getBucketLayout());
       } else {
         result = Result.DIRECTORY_ALREADY_EXISTS;
