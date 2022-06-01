@@ -86,7 +86,6 @@ public class SCMUpgradeFinalizer extends
         FinalizationCheckpoint.MLV_EQUALS_SLV)) {
       closePipelinesBeforeFinalization(context.getPipelineManager());
     }
-    logCheckpointCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV);
   }
 
   @Override
@@ -130,6 +129,9 @@ public class SCMUpgradeFinalizer extends
 
   public void postFinalizeUpgrade(SCMUpgradeFinalizationContext context)
       throws IOException {
+    // If we reached this phase of finalization, all layout features should
+    // be finalized.
+    logCheckpointCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV);
     FinalizationStateManager stateManager =
         context.getFinalizationStateManager();
     if (!stateManager.crossedCheckpoint(
@@ -198,7 +200,7 @@ public class SCMUpgradeFinalizer extends
 
       hasPipeline = (pipelineCount >= 1);
       if (!hasPipeline) {
-        LOG.info("Waiting for at least one open pipeline after SCM " +
+        LOG.info("Waiting for at least one open Ratis 3 pipeline after SCM " +
             "finalization.");
         try {
           Thread.sleep(5000);
@@ -210,6 +212,5 @@ public class SCMUpgradeFinalizer extends
         LOG.info("Open pipeline found after SCM finalization");
       }
     }
-    emitFinishedMsg();
   }
 }

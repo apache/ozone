@@ -35,8 +35,12 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
-import org.junit.Assert;
 import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentMatchers;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
@@ -62,14 +66,14 @@ public class TestScmFinalization {
   @Test
   public void testCheckpointOrder() {
     FinalizationCheckpoint[] checkpoints = FinalizationCheckpoint.values();
-    Assert.assertEquals(4, checkpoints.length);
-    Assert.assertEquals(checkpoints[0],
+    assertEquals(4, checkpoints.length);
+    assertEquals(checkpoints[0],
         FinalizationCheckpoint.FINALIZATION_REQUIRED);
-    Assert.assertEquals(checkpoints[1],
+    assertEquals(checkpoints[1],
         FinalizationCheckpoint.FINALIZATION_STARTED);
-    Assert.assertEquals(checkpoints[2],
+    assertEquals(checkpoints[2],
         FinalizationCheckpoint.MLV_EQUALS_SLV);
-    Assert.assertEquals(checkpoints[3],
+    assertEquals(checkpoints[3],
         FinalizationCheckpoint.FINALIZATION_COMPLETE);
   }
 
@@ -94,8 +98,7 @@ public class TestScmFinalization {
             .build();
     // This is normally handled by the FinalizationManager, which we do not
     // have in this test.
-    stateManager.addReplicatedFinalizationStep(lf ->
-        versionManager.finalized((HDDSLayoutFeature) lf));
+    stateManager.addReplicatedFinalizationStep(versionManager::finalized);
 
     assertCurrentCheckpoint(stateManager,
         FinalizationCheckpoint.FINALIZATION_REQUIRED);
@@ -135,12 +138,12 @@ public class TestScmFinalization {
         // If the expected current checkpoint is >= this checkpoint,
         // then this checkpoint should be crossed according to the state
         // manager.
-        Assert.assertTrue(stateManager.crossedCheckpoint(checkpoint));
+        assertTrue(stateManager.crossedCheckpoint(checkpoint));
       } else {
         // Else if the expected current checkpoint is < this
         // checkpoint, then this checkpoint should not be crossed according to
         // the state manager.
-        Assert.assertFalse(stateManager.crossedCheckpoint(checkpoint));
+        assertFalse(stateManager.crossedCheckpoint(checkpoint));
       }
     }
   }
@@ -150,13 +153,8 @@ public class TestScmFinalization {
    * disk state will indicate which finalization checkpoint (and therefore
    * set of steps) the SCM must resume from.
    */
-  @Test
-  public void testResumeFinalizationFromCheckpoint() throws Exception {
-    for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
-      testResumeFinalizationFromCheckpoint(checkpoint);
-    }
-  }
-
+  @ParameterizedTest
+  @EnumSource(FinalizationCheckpoint.class)
   public void testResumeFinalizationFromCheckpoint(
       FinalizationCheckpoint initialCheckpoint) throws Exception {
     LOG.info("Testing finalization beginning at checkpoint {}",
@@ -203,7 +201,7 @@ public class TestScmFinalization {
     // correct order.
     StatusAndMessages status =
         manager.finalizeUpgrade(UUID.randomUUID().toString());
-    Assert.assertEquals(getStatusFromCheckpoint(initialCheckpoint).status(),
+    assertEquals(getStatusFromCheckpoint(initialCheckpoint).status(),
         status.status());
 
     InOrder inOrder = Mockito.inOrder(buffer, pipelineManager, nodeManager,

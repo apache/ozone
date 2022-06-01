@@ -713,6 +713,10 @@ public class NodeStateManager implements Runnable, Closeable {
         nodeStateMap.updateNodeHealthState(node.getUuid(),
             HEALTHY_READONLY);
         if (state2EventMap.containsKey(HEALTHY_READONLY)) {
+          // At this point pipeline creation is already frozen and the node's
+          // state has been updated in nodeStateMap. This event should be a
+          // no-op aside from logging a message, so it is ok to complete
+          // asynchronously.
           eventPublisher.fireEvent(state2EventMap.get(HEALTHY_READONLY),
               node);
         }
