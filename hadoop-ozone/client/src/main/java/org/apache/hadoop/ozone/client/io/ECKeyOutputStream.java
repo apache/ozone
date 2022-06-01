@@ -249,7 +249,8 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     // If the failure is NOT caused by other reasons (e.g. container full),
     // we assume it is caused by DN failure and exclude the failed DN.
     failedStreams.stream()
-        .filter(s -> !checkIfContainerToExclude(s.getIoException()))
+        .filter(s -> !checkIfContainerToExclude(
+            HddsClientUtils.checkForException(s.getIoException())))
         .forEach(s -> blockOutputStreamEntryPool.getExcludeList()
             .addDatanode(s.getDatanodeDetails()));
   }
