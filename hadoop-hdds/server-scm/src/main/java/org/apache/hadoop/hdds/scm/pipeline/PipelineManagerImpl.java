@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -429,18 +430,19 @@ public class PipelineManagerImpl implements PipelineManager {
     List<Pipeline> pipelinesWithStaleIpOrHostname =
             getStalePipelines(datanodeDetails);
     if (pipelinesWithStaleIpOrHostname.isEmpty()) {
-      LOG.info("No stale pipelines");
+      LOG.debug("No stale pipelines for datanode {}",
+              datanodeDetails.getUuidString());
       return;
     }
-    LOG.info("Pipelines with stale IP or Host name: {}",
-            pipelinesWithStaleIpOrHostname);
+    LOG.info("Found {} stale pipelines",
+            pipelinesWithStaleIpOrHostname.size());
     pipelinesWithStaleIpOrHostname.forEach(p -> {
       try {
-        LOG.info("Closing pipeline: {}", p.getId());
+        LOG.info("Closing the stale pipeline: {}", p.getId());
         closePipeline(p, false);
-        LOG.info("Closed pipeline: {}", p.getId());
+        LOG.info("Closed the stale pipeline: {}", p.getId());
       } catch (IOException e) {
-        LOG.error("Close pipeline failed: {}", p, e);
+        LOG.error("Closing the stale pipeline failed: {}", p, e);
       }
     });
   }
@@ -570,34 +572,57 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public void waitPipelineReady(PipelineID pipelineID, long timeout)
       throws IOException {
+    waitOnePipelineReady(Lists.newArrayList(pipelineID), timeout);
+  }
+
+  @Override
+  public Pipeline waitOnePipelineReady(Collection<PipelineID> pipelineIDs,
+                                   long timeout)
+          throws IOException {
     long st = clock.millis();
     if (timeout == 0) {
       timeout = pipelineWaitDefaultTimeout;
     }
-
-    boolean ready;
-    Pipeline pipeline;
+    List<String> pipelineIDStrs =
+            pipelineIDs.stream()
+                    .map(id -> id.getId().toString())
+                            .collect(Collectors.toList());
+    String piplineIdsStr = String.join(",", pipelineIDStrs);
+    Pipeline pipeline = null;
     do {
-      try {
-        pipeline = stateManager.getPipeline(pipelineID);
-      } catch (PipelineNotFoundException e) {
-        throw new PipelineNotFoundException(String.format(
-            "Pipeline %s cannot be found", pipelineID));
+      boolean found = false;
+      for (PipelineID pipelineID : pipelineIDs) {
+        try {
+          Pipeline tempPipeline = stateManager.getPipeline(pipelineID);
+          found = true;
+          if (tempPipeline.isOpen()) {
+            pipeline = tempPipeline;
+            break;
+          }
+        } catch (PipelineNotFoundException e) {
+          LOG.warn("Pipeline {} cannot be found", pipelineID);
+        }
       }
-      ready = pipeline.isOpen();
-      if (!ready) {
+
+      if (!found) {
+        throw new PipelineNotFoundException("The input pipeline IDs " +
+                piplineIdsStr + " cannot be found");
+      }
+
+      if (pipeline == null) {
         try {
           Thread.sleep((long)100);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
         }
       }
-    } while (!ready && clock.millis() - st < timeout);
+    } while (pipeline == null && clock.millis() - st < timeout);
 
-    if (!ready) {
+    if (pipeline == null) {
       throw new IOException(String.format("Pipeline %s is not ready in %d ms",
-          pipelineID, timeout));
+              piplineIdsStr, timeout));
     }
+    return pipeline;
   }
 
   @Override

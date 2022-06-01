@@ -33,8 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Class to obtain a writable container for Ratis and Standalone pipelines.
@@ -119,26 +119,23 @@ public class WritableRatisContainerProvider
 
         } catch (SCMException se) {
           LOG.warn("Pipeline creation failed for repConfig {} " +
-              "Datanodes may be used up.", repConfig, se);
-          LOG.info("Try to see if any pipeline is in ALLOCATED state, " +
-                  "and then will wait for it to be OPEN");
+              "Datanodes may be used up. Try to see if any pipeline is in " +
+                  "ALLOCATED state, and then will wait for it to be OPEN",
+                  repConfig, se);
           List<Pipeline> allocatedPipelines = findPipelinesByState(repConfig,
                   excludeList,
                   Pipeline.PipelineState.ALLOCATED);
           if (!allocatedPipelines.isEmpty()) {
-            // wait until the oldest allocated pipeline is ready
-            Pipeline oldestAllocatedPipeline =
-                    allocatedPipelines
-                            .stream()
-                            .min(Comparator
-                                    .comparing(p -> p.getCreationTimestamp()))
-                            .get();
+            List<PipelineID> allocatedPipelineIDs =
+                    allocatedPipelines.stream()
+                            .map(p -> p.getId())
+                            .collect(Collectors.toList());
             try {
               pipelineManager
-                      .waitPipelineReady(oldestAllocatedPipeline.getId(), 0);
+                      .waitOnePipelineReady(allocatedPipelineIDs, 0);
             } catch (IOException e) {
-              LOG.warn("Waiting for pipeline {} to be OPEN failed. ",
-                      oldestAllocatedPipeline, e);
+              LOG.warn("Waiting for one of pipelines {} to be OPEN failed. ",
+                      allocatedPipelineIDs, e);
             }
           }
         } catch (IOException e) {
