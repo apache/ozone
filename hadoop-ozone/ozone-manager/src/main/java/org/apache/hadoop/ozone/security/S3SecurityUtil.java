@@ -47,8 +47,9 @@ public final class S3SecurityUtil {
   /**
    * Validate S3 Credentials which are part of {@link OMRequest}.
    *
-   * If validation is successful returns, else throw {@link OMException}
-   * @throws OMException
+   * If validation is successful returns, else throw exception.
+   * @throws OMException         validation failure
+   *         ServiceException    Server is not leader or not ready
    */
   public static void validateS3Credential(OMRequest omRequest,
       OzoneManager ozoneManager) throws ServiceException, OMException {
@@ -65,7 +66,7 @@ public final class S3SecurityUtil {
           throw new ServiceException(e.getCause());
         }
 
-        // TODO: Just check are we okay to log enitre token in failure case.
+        // TODO: Just check are we okay to log entire token in failure case.
         OzoneManagerProtocolServerSideTranslatorPB.getLog().error(
             "signatures do NOT match for S3 identifier:{}", s3Token, e);
         throw new OMException("User " + s3Token.getAwsAccessId()
