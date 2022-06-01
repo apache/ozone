@@ -57,13 +57,19 @@ public final class StatefulServiceStateManagerImpl
   public void saveConfiguration(String serviceName, ByteString bytes)
       throws IOException {
     transactionBuffer.addToBuffer(statefulServiceConfig, serviceName, bytes);
-    LOG.debug("Added specified bytes to the transaction buffer for key {} to " +
-        "table {}", serviceName, statefulServiceConfig.getName());
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Added specified bytes to the transaction buffer for key " +
+          "{} to table {}", serviceName, statefulServiceConfig.getName());
+    }
+
     if (transactionBuffer instanceof SCMHADBTransactionBuffer) {
       SCMHADBTransactionBuffer buffer =
               (SCMHADBTransactionBuffer) transactionBuffer;
       buffer.flush();
-      LOG.debug("Transaction buffer flushed");
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Transaction buffer flushed");
+      }
     }
   }
 
