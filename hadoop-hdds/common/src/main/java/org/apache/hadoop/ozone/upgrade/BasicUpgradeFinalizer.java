@@ -57,7 +57,7 @@ public abstract class BasicUpgradeFinalizer
   private String clientID;
   private T component;
   private UpgradeFinalizationExecutor<T> finalizationExecutor;
-  // Ensures that there is only one SCM finalization thread running at a time.
+  // Ensures that there is only one finalization thread running at a time.
   private final Lock finalizationLock;
 
   private final Queue<String> msgs = new ConcurrentLinkedQueue<>();
