@@ -134,6 +134,10 @@ public class GrpcOMFailoverProxyProvider<T> extends
       if (status.getCode() == Status.Code.RESOURCE_EXHAUSTED) {
         LOG.debug("Grpc response has invalid length, {}", srexp.getMessage());
         return false;
+      } else if (status.getCode() == Status.Code.DATA_LOSS) {
+        LOG.debug("Grpc unrecoverable data loss or corruption, {}",
+                srexp.getMessage());
+        return false;
       }
     }
     return super.shouldFailover(ex);

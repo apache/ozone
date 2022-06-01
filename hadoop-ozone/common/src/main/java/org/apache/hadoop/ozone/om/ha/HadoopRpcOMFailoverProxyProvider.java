@@ -53,11 +53,11 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
  * multiple OMs to connect to. In case of OM failover, client can try
  * connecting to another OM node from the list of proxies.
  */
-public class OMFailoverProxyProvider<T> extends
+public class HadoopRpcOMFailoverProxyProvider<T> extends
       OMFailoverProxyProviderBase<T> {
 
   public static final Logger LOG =
-      LoggerFactory.getLogger(OMFailoverProxyProvider.class);
+      LoggerFactory.getLogger(HadoopRpcOMFailoverProxyProvider.class);
 
   private final long omVersion;
   private final Text delegationTokenService;
@@ -65,13 +65,13 @@ public class OMFailoverProxyProvider<T> extends
   private Map<String, OMProxyInfo> omProxyInfos;
   private List<String> retryExceptions = new ArrayList<>();
 
-  // OMFailoverProxyProvider, on encountering certain exception, tries each OM
-  // once in a round robin fashion. After that it waits for configured time
-  // before attempting to contact all the OMs again. For other exceptions
-  // such as LeaderNotReadyException, the same OM is contacted again with a
-  // linearly increasing wait time.
+  // HadoopRpcOMFailoverProxyProvider, on encountering certain exception,
+  // tries each OM once in a round robin fashion. After that it waits
+  // for configured time before attempting to contact all the OMs again.
+  // For other exceptions such as LeaderNotReadyException, the same OM
+  // is contacted again with a linearly increasing wait time.
 
-  public OMFailoverProxyProvider(ConfigurationSource configuration,
+  public HadoopRpcOMFailoverProxyProvider(ConfigurationSource configuration,
                                  UserGroupInformation ugi,
                                  String omServiceId,
                                  Class<T> protocol) throws IOException {
