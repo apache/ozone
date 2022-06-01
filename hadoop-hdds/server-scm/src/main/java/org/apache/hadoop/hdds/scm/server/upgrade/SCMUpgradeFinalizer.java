@@ -59,6 +59,18 @@ public class SCMUpgradeFinalizer extends
   }
 
   @Override
+  protected boolean componentFinishedFinalizationSteps(SCMUpgradeFinalizationContext context) {
+    // By default, the parent class will mark finalization as complete when
+    // MLV == SLV. However, for SCM, there are a few extra steps that need to
+    // be done after this point (see postFinalizeUpgrade). If there is a
+    // leader change or restart after MLV == SLV but before running these
+    // post finalize steps, we must tell the parent to run finalization
+    // even though MLV == SLV.
+    return context.getFinalizationStateManager()
+        .crossedCheckpoint(FinalizationCheckpoint.FINALIZATION_COMPLETE);
+  }
+
+  @Override
   public void preFinalizeUpgrade(SCMUpgradeFinalizationContext context)
       throws IOException {
     FinalizationStateManager stateManager =

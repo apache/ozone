@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOU
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PREFINALIZE_ACTION_VALIDATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
 
@@ -35,6 +36,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.concurrent.TimeUnit;
 
@@ -55,6 +59,8 @@ public abstract class BasicUpgradeFinalizer
   private String clientID;
   private T component;
   private UpgradeFinalizationExecutor<T> finalizationExecutor;
+  // Ensures that there is only one SCM finalization thread running at a time.
+  private Lock finalizationLock;
 
   private final Queue<String> msgs = new ConcurrentLinkedQueue<>();
   private boolean isDone = false;
@@ -67,19 +73,35 @@ public abstract class BasicUpgradeFinalizer
                                UpgradeFinalizationExecutor<T> executor) {
     this.versionManager = versionManager;
     this.finalizationExecutor = executor;
+    this.finalizationLock = new ReentrantLock();
   }
 
   public StatusAndMessages finalize(String upgradeClientID, T service)
       throws IOException {
+    // SCM finalization is driven asynchronously by a thread, not a single
+    // serialized Ratis request.
+    // A second request could closely follow the first before it
+    // sets the finalization status to FINALIZATION_IN_PROGRESS.
+    // Therefore, a lock is used to make sure only one finalization thread is
+    // running at a time.
     StatusAndMessages response = initFinalize(upgradeClientID, service);
-    // TODO: This will cause problems if we need to restart SCM finalization
-    //  from the MLV_EQUALS_SLV checkpoint, since the finalization will not
-    //  be run to remove the finalizing key.
-    if (response.status() != FINALIZATION_REQUIRED) {
-      return response;
+    if(finalizationLock.tryLock()) {
+      try {
+        if (response.status() == FINALIZATION_REQUIRED ||
+            !componentFinishedFinalizationSteps(service)) {
+          // If SCM finalization was interrupted and is resuming here, the
+          // FinalizationCheckpoint system will make it resumes from the
+          // correct place.
+          finalizationExecutor.execute(service, this);
+          response = STARTING_MSG;
+        }
+      } finally {
+        finalizationLock.unlock();
+      }
+    } else {
+      response = FINALIZATION_IN_PROGRESS_MSG;
     }
-    finalizationExecutor.execute(service, this);
-    return STARTING_MSG;
+    return response;
   }
 
   public synchronized StatusAndMessages reportStatus(
@@ -144,10 +166,12 @@ public abstract class BasicUpgradeFinalizer
     }
   }
 
+  @VisibleForTesting
   public boolean isFinalizationDone() {
     return isDone;
   }
 
+  @VisibleForTesting
   public void markFinalizationDone() {
     isDone = true;
   }
@@ -197,6 +221,15 @@ public abstract class BasicUpgradeFinalizer
   private static boolean isFinalized(Status status) {
     return status.equals(Status.ALREADY_FINALIZED)
         || status.equals(FINALIZATION_DONE);
+  }
+
+  /**
+   * Child classes that have additional finalization steps can override this
+   * method to check component specific state to determine whether
+   * finalization still needs to be run.
+   */
+  protected boolean componentFinishedFinalizationSteps(T component) {
+    return true;
   }
 
   public abstract void finalizeLayoutFeature(LayoutFeature lf, T context)
