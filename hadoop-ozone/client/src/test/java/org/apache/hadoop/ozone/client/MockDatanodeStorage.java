@@ -40,10 +40,10 @@ public class MockDatanodeStorage {
 
   private final Map<String, ByteString> data = new HashMap<>();
 
-  private boolean failed = false;
+  private IOException exception = null;
 
-  public void setStorageFailed() {
-    this.failed = true;
+  public void setStorageFailed(IOException reason) {
+    this.exception = reason;
   }
 
   public void putBlock(DatanodeBlockID blockID, BlockData blockData) {
@@ -57,8 +57,8 @@ public class MockDatanodeStorage {
   public void writeChunk(
       DatanodeBlockID blockID,
       ChunkInfo chunkInfo, ByteString bytes) throws IOException {
-    if (failed) {
-      throw new IOException("This storage was marked as failed.");
+    if (exception != null) {
+      throw exception;
     }
     data.put(createKey(blockID, chunkInfo),
         ByteString.copyFrom(bytes.toByteArray()));
