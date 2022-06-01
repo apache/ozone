@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -95,13 +96,20 @@ public class OzoneListStatusHelper {
     String keyName = args.getKeyName();
     String prefixKey = keyName;
 
-    String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-        metadataManager.getBucketTable().get(bucketKey);
-    if (omBucketInfo == null) {
+    final String volumeKey = metadataManager.getVolumeKey(volumeName);
+    final String bucketKey = metadataManager.getBucketKey(volumeName,
+            bucketName);
+
+    final OmVolumeArgs volumeInfo = metadataManager.getVolumeTable()
+            .get(volumeKey);
+    final OmBucketInfo omBucketInfo = metadataManager.getBucketTable()
+            .get(bucketKey);
+
+    if (volumeInfo == null || omBucketInfo == null) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Volume:{} Bucket:{} does not exist",
-            volumeName, bucketName);
+        LOG.debug(String.format("%s does not exist.", (volumeInfo == null) ?
+                "Volume : " + volumeName :
+                "Bucket: " + volumeName + "/" + bucketName));
       }
       return new ArrayList<>();
     }
@@ -136,7 +144,7 @@ public class OzoneListStatusHelper {
       // if the file status is null, prefix is a not a valid filesystem path
       // this should only work in list keys mode.
       // fetch the db key based on the prefix path.
-      dbPrefixKey = getDbKey(keyName, args, omBucketInfo);
+      dbPrefixKey = getDbKey(keyName, args, volumeInfo, omBucketInfo);
       prefixKey = OzoneFSUtils.getParentDir(keyName);
     } else {
       // If the keyname is a file just return one entry
@@ -146,13 +154,16 @@ public class OzoneListStatusHelper {
 
       // fetch the db key based on parent prefix id.
       long id = getId(fileStatus, omBucketInfo);
-      dbPrefixKey = metadataManager.getOzonePathKey(id, "");
+      final long volumeId = volumeInfo.getObjectID();
+      final long bucketId = omBucketInfo.getObjectID();
+      dbPrefixKey = metadataManager.getOzonePathKey(volumeId, bucketId,
+              id, "");
     }
 
     // Determine startKeyPrefix for DB iteration
     String startKeyPrefix =
         Strings.isNullOrEmpty(startKey) ? "" :
-            getDbKey(startKey, args, omBucketInfo);
+            getDbKey(startKey, args, volumeInfo, omBucketInfo);
 
     TreeMap<String, OzoneFileStatus> map = new TreeMap<>();
 
@@ -175,6 +186,7 @@ public class OzoneListStatusHelper {
   }
 
   private String getDbKey(String key, OmKeyArgs args,
+                          OmVolumeArgs volumeInfo,
                           OmBucketInfo omBucketInfo) throws IOException {
     long startKeyParentId;
     String parent = OzoneFSUtils.getParentDir(key);
@@ -189,8 +201,11 @@ public class OzoneListStatusHelper {
         null, true);
     Preconditions.checkNotNull(fileStatusInfo);
     startKeyParentId = getId(fileStatusInfo, omBucketInfo);
+    final long volumeId = volumeInfo.getObjectID();
+    final long bucketId = omBucketInfo.getObjectID();
     return metadataManager.
-        getOzonePathKey(startKeyParentId, OzoneFSUtils.getFileName(key));
+        getOzonePathKey(volumeId, bucketId, startKeyParentId,
+                OzoneFSUtils.getFileName(key));
   }
 
   private long getId(OzoneFileStatus fileStatus, OmBucketInfo omBucketInfo) {

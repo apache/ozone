@@ -439,32 +439,42 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * Given parent object id and path component name, return the corresponding
    * DB 'prefixKey' key.
    *
+   * @param volumeId - ID of the volume
+   * @param bucketId - ID of the bucket
    * @param parentObjectId - parent object Id
    * @param pathComponentName   - path component name
    * @return DB directory key as String.
    */
-  String getOzonePathKey(long parentObjectId, String pathComponentName);
+  String getOzonePathKey(long volumeId, long bucketId,
+                         long parentObjectId, String pathComponentName);
 
   /**
    * Returns DB key name of an open file in OM metadata store. Should be
    * #open# prefix followed by actual leaf node name.
    *
+   * @param volumeId       - ID of the volume
+   * @param bucketId       - ID of the bucket
    * @param parentObjectId - parent object Id
    * @param fileName       - file name
    * @param id             - client id for this open request
    * @return DB directory key as String.
    */
-  String getOpenFileName(long parentObjectId, String fileName, long id);
+  String getOpenFileName(long volumeId, long bucketId,
+                         long parentObjectId, String fileName, long id);
 
   /**
    * Returns the DB key name of a multipart upload key in OM metadata store.
    *
+   * @param volumeId       - ID of the volume
+   * @param bucketId       - ID of the bucket
    * @param parentObjectId - parent object Id
    * @param fileName       - file name
    * @param uploadId       - the upload id for this key
    * @return bytes of DB key.
    */
-  String getMultipartKey(long parentObjectId, String fileName, String uploadId);
+  String getMultipartKey(long volumeId, long bucketId,
+                         long parentObjectId, String fileName,
+                         String uploadId);
 
   /**
    * Get Deleted Directory Table.
@@ -472,5 +482,24 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @return Deleted Directory Table.
    */
   Table<String, OmKeyInfo> getDeletedDirTable();
+
+  /**
+   * Get the ID of given volume.
+   *
+   * @param volume volume name
+   * @return ID of the volume
+   * @throws IOException
+   */
+  long getVolumeId(String volume) throws IOException;
+
+  /**
+   * Get the ID of given bucket.
+   *
+   * @param volume volume name
+   * @param bucket bucket name
+   * @return ID of the bucket
+   * @throws IOException
+   */
+  long getBucketId(String volume, String bucket) throws IOException;
 
 }
