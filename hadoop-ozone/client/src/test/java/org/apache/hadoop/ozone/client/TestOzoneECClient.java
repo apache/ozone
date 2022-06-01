@@ -833,6 +833,11 @@ public class TestOzoneECClient {
 
   private void testExcludeFailedDN(IntStream failedDNIndex,
       IntStream closedDNIndex) throws IOException {
+    close();
+    OzoneConfiguration con = new OzoneConfiguration();
+    MultiNodePipelineBlockAllocator blkAllocator =
+        new MultiNodePipelineBlockAllocator(con, dataBlocks + parityBlocks, 10);
+    createNewClient(con, blkAllocator);
 
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
@@ -848,7 +853,7 @@ public class TestOzoneECClient {
       Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
       ECKeyOutputStream ecKeyOut = (ECKeyOutputStream) out.getOutputStream();
 
-      List<HddsProtos.DatanodeDetailsProto> dns = allocator.getClusterDns();
+      List<HddsProtos.DatanodeDetailsProto> dns = blkAllocator.getClusterDns();
 
       // Then let's mark datanodes with closed container
       List<DatanodeDetails> closedDNs = closedDNIndex
@@ -863,7 +868,7 @@ public class TestOzoneECClient {
           .collect(Collectors.toList());
       ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
 
-      for (int i = 0; i < dns.size() * 10; i++) {
+      for (int i = 0; i < dataBlocks; i++) {
         out.write(inputChunks[i % dataBlocks]);
       }
 
