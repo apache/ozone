@@ -62,7 +62,7 @@ public class CreateBucketHandler extends BucketHandler {
   enum AllowedBucketLayouts {
     FILE_SYSTEM_OPTIMIZED("FILE_SYSTEM_OPTIMIZED"),
     OBJECT_STORE("OBJECT_STORE"),
-    DEFAULT("");
+    LEGACY("LEGACY");
 
     // Assigning a value to each enum
     private final String layout;
@@ -79,8 +79,7 @@ public class CreateBucketHandler extends BucketHandler {
   }
 
   @Option(names = { "--layout", "-l" },
-      description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}",
-      defaultValue = "")
+      description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}")
   private AllowedBucketLayouts allowedBucketLayout;
 
   @CommandLine.Mixin
@@ -100,12 +99,14 @@ public class CreateBucketHandler extends BucketHandler {
       ownerName = UserGroupInformation.getCurrentUser().getShortUserName();
     }
 
-    BucketArgs.Builder bb;
-    BucketLayout bucketLayout =
-        BucketLayout.fromString(allowedBucketLayout.toString());
-    bb = new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
-        .setVersioning(false).setBucketLayout(bucketLayout)
-        .setOwner(ownerName);
+    BucketArgs.Builder bb =
+        new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
+            .setVersioning(false).setOwner(ownerName);
+    if (allowedBucketLayout != null) {
+      BucketLayout bucketLayout =
+          BucketLayout.fromString(allowedBucketLayout.toString());
+      bb.setBucketLayout(bucketLayout);
+    }
     // TODO: New Client talking to old server, will it create a LEGACY bucket?
 
     if (isGdprEnforced != null) {
