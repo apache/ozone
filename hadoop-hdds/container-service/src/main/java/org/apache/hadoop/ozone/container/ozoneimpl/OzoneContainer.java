@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.HAUtils;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
@@ -54,6 +55,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGr
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
+import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -62,6 +64,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -91,6 +94,7 @@ public class OzoneContainer {
   private final ConfigurationSource config;
   private final MutableVolumeSet volumeSet;
   private final MutableVolumeSet metaVolumeSet;
+  private final MutableVolumeSet dbVolumeSet;
   private final StorageVolumeChecker volumeChecker;
   private final ContainerSet containerSet;
   private final XceiverServerSpi writeChannel;
@@ -119,10 +123,8 @@ public class OzoneContainer {
    * @throws IOException
    */
   public OzoneContainer(
-      DatanodeDetails datanodeDetails, ConfigurationSource
-      conf, StateContext context, CertificateClient certClient
-  )
-      throws IOException {
+      DatanodeDetails datanodeDetails, ConfigurationSource conf,
+      StateContext context, CertificateClient certClient) throws IOException {
     config = conf;
     this.datanodeDetails = datanodeDetails;
     this.context = context;
@@ -133,6 +135,13 @@ public class OzoneContainer {
     volumeSet.setFailedVolumeListener(this::handleVolumeFailures);
     metaVolumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
         context, VolumeType.META_VOLUME, volumeChecker);
+
+    dbVolumeSet = HddsServerUtil.getDatanodeDbDirs(conf).isEmpty() ? null :
+        new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
+            context, VolumeType.DB_VOLUME, volumeChecker);
+    if (SchemaV3.isFinalizedAndEnabled(config)) {
+      HddsVolumeUtil.loadAllHddsVolumeDbStore(volumeSet, dbVolumeSet, LOG);
+    }
 
     containerSet = new ContainerSet();
     metadataScanner = null;
@@ -363,6 +372,9 @@ public class OzoneContainer {
     volumeChecker.shutdownAndWait(0, TimeUnit.SECONDS);
     volumeSet.shutdown();
     metaVolumeSet.shutdown();
+    if (dbVolumeSet != null) {
+      dbVolumeSet.shutdown();
+    }
     blockDeletingService.shutdown();
     ContainerMetrics.remove();
   }
@@ -421,6 +433,14 @@ public class OzoneContainer {
       nrb.addMetadataStorageReport(
           metaReports[i].getMetadataProtoBufMessage());
     }
+
+    if (dbVolumeSet != null) {
+      StorageLocationReport[] dbReports = dbVolumeSet.getStorageReport();
+      for (int i = 0; i < dbReports.length; i++) {
+        nrb.addDbStorageReport(dbReports[i].getProtoBufMessage());
+      }
+    }
+
     return nrb.build();
   }
 
@@ -437,9 +457,12 @@ public class OzoneContainer {
     return metaVolumeSet;
   }
 
+  public MutableVolumeSet getDbVolumeSet() {
+    return dbVolumeSet;
+  }
+
   @VisibleForTesting
   StorageVolumeChecker getVolumeChecker(ConfigurationSource conf) {
     return new StorageVolumeChecker(conf, new Timer());
   }
-
 }

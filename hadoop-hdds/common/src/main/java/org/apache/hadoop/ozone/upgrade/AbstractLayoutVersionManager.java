@@ -37,6 +37,8 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.management.ObjectName;
+
 /**
  * Layout Version Manager containing generic method implementations.
  */
@@ -58,6 +60,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   // Note that MLV may have been incremented during the upgrade
   // by the time the value is read/used.
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+  private ObjectName mBean;
 
   protected void init(int version, T[] lfs) throws IOException {
     lock.writeLock().lock();
@@ -81,7 +84,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
           mlvFeature, mlvFeature.layoutVersion(),
           slvFeature, slvFeature.layoutVersion());
 
-      MBeans.register("LayoutVersionManager",
+      mBean = MBeans.register("LayoutVersionManager",
           getClass().getSimpleName(), this);
     } finally {
       lock.writeLock().unlock();
@@ -213,6 +216,13 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
           .values());
     } finally {
       lock.readLock().unlock();
+    }
+  }
+
+  public void close() {
+    if (mBean != null) {
+      MBeans.unregister(mBean);
+      mBean = null;
     }
   }
 }

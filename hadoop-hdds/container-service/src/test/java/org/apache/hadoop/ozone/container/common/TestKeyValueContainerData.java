@@ -19,9 +19,10 @@
 package org.apache.hadoop.ozone.container.common;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.junit.Test;
@@ -42,14 +43,19 @@ public class TestKeyValueContainerData {
   private static final long MAXSIZE = (long) StorageUnit.GB.toBytes(5);
 
   private final ContainerLayoutVersion layout;
+  private final String schemaVersion;
+  private final OzoneConfiguration conf;
 
-  public TestKeyValueContainerData(ContainerLayoutVersion layout) {
-    this.layout = layout;
+  public TestKeyValueContainerData(ContainerTestVersionInfo versionInfo) {
+    this.layout = versionInfo.getLayout();
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    this.conf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
+    return ContainerTestVersionInfo.versionParameters();
   }
 
   @Test
@@ -94,7 +100,7 @@ public class TestKeyValueContainerData {
     kvData.incrBlockCount();
     kvData.incrPendingDeletionBlocks(1);
     kvData.setSchemaVersion(
-        VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion());
+        VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion(conf));
 
     assertEquals(state, kvData.getState());
     assertEquals(containerDBType, kvData.getContainerDBType());
@@ -109,7 +115,7 @@ public class TestKeyValueContainerData {
     assertEquals(1, kvData.getNumPendingDeletionBlocks());
     assertEquals(pipelineId.toString(), kvData.getOriginPipelineId());
     assertEquals(datanodeId.toString(), kvData.getOriginNodeId());
-    assertEquals(VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(),
+    assertEquals(VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion(conf),
         kvData.getSchemaVersion());
   }
 
