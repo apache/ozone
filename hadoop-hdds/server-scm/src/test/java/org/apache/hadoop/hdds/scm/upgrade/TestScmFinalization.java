@@ -33,6 +33,8 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.ArgumentMatchers;
@@ -199,7 +201,10 @@ public class TestScmFinalization {
 
     // Execute upgrade finalization, then check that events happened in the
     // correct order.
-    manager.finalizeUpgrade(UUID.randomUUID().toString());
+    StatusAndMessages status =
+        manager.finalizeUpgrade(UUID.randomUUID().toString());
+    Assert.assertEquals(getStatusFromCheckpoint(initialCheckpoint).status(),
+        status.status());
 
     InOrder inOrder = Mockito.inOrder(buffer, pipelineManager, nodeManager,
         storage);
@@ -292,5 +297,18 @@ public class TestScmFinalization {
       layoutVersion = HDDSLayoutFeature.INITIAL_VERSION.layoutVersion();
     }
     return new HDDSLayoutVersionManager(layoutVersion);
+  }
+
+  /**
+   * Returns the expected status when finalization is invoked from the
+   * provided checkpoint.
+   */
+  private StatusAndMessages getStatusFromCheckpoint(
+      FinalizationCheckpoint initialCheckpoint) {
+    if (initialCheckpoint == FinalizationCheckpoint.FINALIZATION_COMPLETE) {
+      return UpgradeFinalizer.FINALIZED_MSG;
+    } else {
+      return UpgradeFinalizer.STARTING_MSG;
+    }
   }
 }

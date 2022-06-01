@@ -26,7 +26,6 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOU
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PREFINALIZE_ACTION_VALIDATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
 
@@ -37,7 +36,6 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.concurrent.TimeUnit;
@@ -60,7 +58,7 @@ public abstract class BasicUpgradeFinalizer
   private T component;
   private UpgradeFinalizationExecutor<T> finalizationExecutor;
   // Ensures that there is only one SCM finalization thread running at a time.
-  private Lock finalizationLock;
+  private final Lock finalizationLock;
 
   private final Queue<String> msgs = new ConcurrentLinkedQueue<>();
   private boolean isDone = false;
@@ -78,20 +76,20 @@ public abstract class BasicUpgradeFinalizer
 
   public StatusAndMessages finalize(String upgradeClientID, T service)
       throws IOException {
-    // SCM finalization is driven asynchronously by a thread, not a single
-    // serialized Ratis request.
+    // In some components, finalization can be driven asynchronously by a
+    // thread, not a single serialized Ratis request.
     // A second request could closely follow the first before it
     // sets the finalization status to FINALIZATION_IN_PROGRESS.
     // Therefore, a lock is used to make sure only one finalization thread is
     // running at a time.
     StatusAndMessages response = initFinalize(upgradeClientID, service);
-    if(finalizationLock.tryLock()) {
+    if (finalizationLock.tryLock()) {
       try {
+        // Even if the status indicates finalization completed, the component
+        // may not have finished all its specific steps if finalization was
+        // interrupted, so we should re-invoke them here.
         if (response.status() == FINALIZATION_REQUIRED ||
             !componentFinishedFinalizationSteps(service)) {
-          // If SCM finalization was interrupted and is resuming here, the
-          // FinalizationCheckpoint system will make it resumes from the
-          // correct place.
           finalizationExecutor.execute(service, this);
           response = STARTING_MSG;
         }
@@ -99,7 +97,12 @@ public abstract class BasicUpgradeFinalizer
         finalizationLock.unlock();
       }
     } else {
-      response = FINALIZATION_IN_PROGRESS_MSG;
+      // We could not acquire the lock, so either finalization is ongoing, or
+      // it already finished but we received multiple requests to
+      // run it at the same time.
+      if (!isFinalized(response.status())) {
+        response = FINALIZATION_IN_PROGRESS_MSG;
+      }
     }
     return response;
   }
@@ -228,7 +231,7 @@ public abstract class BasicUpgradeFinalizer
    * method to check component specific state to determine whether
    * finalization still needs to be run.
    */
-  protected boolean componentFinishedFinalizationSteps(T component) {
+  protected boolean componentFinishedFinalizationSteps(T service) {
     return true;
   }
 

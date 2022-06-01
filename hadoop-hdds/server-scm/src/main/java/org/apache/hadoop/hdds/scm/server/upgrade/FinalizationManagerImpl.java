@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Optional;
 
 /**
  * Class to initiate SCM finalization and query its progress.
@@ -50,7 +49,8 @@ public class FinalizationManagerImpl implements FinalizationManager {
   protected FinalizationManagerImpl(Builder builder,
       FinalizationStateManager stateManager) throws IOException {
     this.storage = builder.storage;
-    this.upgradeFinalizer = new SCMUpgradeFinalizer(builder.versionManager);
+    this.upgradeFinalizer = new SCMUpgradeFinalizer(builder.versionManager,
+        builder.executor);
     finalizationStateManager = stateManager;
     this.context =
         new SCMUpgradeFinalizationContext.Builder()
@@ -123,6 +123,7 @@ public class FinalizationManagerImpl implements FinalizationManager {
     private UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor;
 
     public Builder() {
+      executor = new DefaultUpgradeFinalizationExecutor<>();
     }
 
     public Builder setConfiguration(OzoneConfiguration conf) {
@@ -176,8 +177,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
       Preconditions.checkNotNull(storage);
       Preconditions.checkNotNull(scmHAManager);
       Preconditions.checkNotNull(finalizationStore);
-      executor = Optional.ofNullable(executor)
-          .orElse(new DefaultUpgradeFinalizationExecutor<>());
       return new FinalizationManagerImpl(this);
     }
   }

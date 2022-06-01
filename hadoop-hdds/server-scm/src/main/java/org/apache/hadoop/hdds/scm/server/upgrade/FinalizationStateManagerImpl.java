@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import com.google.common.base.Preconditions;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
