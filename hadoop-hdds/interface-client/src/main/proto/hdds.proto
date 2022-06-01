@@ -431,3 +431,22 @@ message ReplicationManagerReportProto {
     repeated KeyIntValue stat = 2;
     repeated KeyContainerIDList statSample = 3;
 }
+
+message ContainerBalancerConfigurationProto {
+    optional string utilizationThreshold = 5;
+    optional int32 datanodesInvolvedMaxPercentagePerIteration = 6;
+    optional int64 sizeMovedMaxPerIteration = 7;
+    optional int64 sizeEnteringTargetMax = 8;
+    optional int64 sizeLeavingSourceMax = 9;
+    optional int32 iterations = 10;
+    optional string excludeContainers = 11;
+    optional int64 moveTimeout = 12;
+    optional int64 balancingIterationInterval = 13;
+    optional string includeDatanodes = 14;
+    optional string excludeDatanodes = 15;
+    optional bool moveNetworkTopologyEnable = 16;
+    optional bool triggerDuBeforeMoveEnable = 17;
+
+    required bool shouldRun = 18;
+    optional int32 nextIterationIndex = 19;
+}
