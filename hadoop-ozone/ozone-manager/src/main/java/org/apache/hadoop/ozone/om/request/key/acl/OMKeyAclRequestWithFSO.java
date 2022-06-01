@@ -93,7 +93,10 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
         throw new OMException("Key not found. Key:" + key, KEY_NOT_FOUND);
       }
       omKeyInfo = keyStatus.getKeyInfo();
-      String dbKey = omKeyInfo.getPath();
+      final long volumeId = omMetadataManager.getVolumeId(volume);
+      final long bucketId = omMetadataManager.getBucketId(volume, bucket);
+      final String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+              omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
       boolean isDirectory = keyStatus.isDirectory();
       operationResult = apply(omKeyInfo, trxnLogIndex);
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());

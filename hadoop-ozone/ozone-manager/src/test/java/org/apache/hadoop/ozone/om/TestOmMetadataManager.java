@@ -562,6 +562,12 @@ public class TestOmMetadataManager {
       throws Exception {
     final String bucketName = UUID.randomUUID().toString();
     final String volumeName = UUID.randomUUID().toString();
+    // Add volume, bucket, key entries to DB.
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
     final int numExpiredOpenKeys = 4;
     final int numUnexpiredOpenKeys = 1;
     final long clientID = 1000L;
@@ -594,7 +600,7 @@ public class TestOmMetadataManager {
         keyInfo.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
         OMRequestTestUtils.addFileToKeyTable(true, false,
             keyInfo.getFileName(), keyInfo, clientID, 0L, omMetadataManager);
-        dbOpenKeyName = omMetadataManager.getOpenFileName(
+        dbOpenKeyName = omMetadataManager.getOpenFileName(volumeId, bucketId,
             keyInfo.getParentObjectID(), keyInfo.getFileName(), clientID);
       } else {
         OMRequestTestUtils.addKeyToTable(true, false,

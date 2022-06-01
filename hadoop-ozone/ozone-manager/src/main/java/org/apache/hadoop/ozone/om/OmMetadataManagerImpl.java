@@ -157,15 +157,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    *
    * Prefix Tables:
    * |----------------------------------------------------------------------|
-   * |  Column Family     |        VALUE                                    |
+   * |  Column Family   |        VALUE                                      |
    * |----------------------------------------------------------------------|
-   * |  directoryTable    | parentId/directoryName -> DirectoryInfo         |
+   * |  directoryTable  | /volumeId/bucketId/parentId/dirName -> DirInfo    |
    * |----------------------------------------------------------------------|
-   * |  fileTable         | parentId/fileName -> KeyInfo                    |
+   * |  fileTable       | /volumeId/bucketId/parentId/fileName -> KeyInfo   |
    * |----------------------------------------------------------------------|
-   * |  openFileTable     | parentId/fileName/id -> KeyInfo                 |
+   * |  openFileTable   | /volumeId/bucketId/parentId/fileName/id -> KeyInfo|
    * |----------------------------------------------------------------------|
-   * |  deletedDirTable   | parentId/directoryName -> KeyInfo               |
+   * |  deletedDirTable | /volumeId/bucketId/parentId/dirName -> KeyInfo    |
    * |----------------------------------------------------------------------|
    */
 
@@ -765,6 +765,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       throws IOException {
     String bucketKey = getBucketKey(volume, bucket);
     OmBucketInfo omBucketInfo = getBucketTable().get(bucketKey);
+    String volumeId = String.valueOf(getVolumeId(
+            omBucketInfo.getVolumeName()));
     String bucketId = String.valueOf(omBucketInfo.getObjectID());
     BucketLayout bucketLayout = omBucketInfo.getBucketLayout();
 
@@ -776,10 +778,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     //    - TOP-LEVEL DIRECTORY would be of the format <bucket ID>/dirName
     //      inside the dirTable.
     //    - TOP-LEVEL FILE (a file directly placed under the bucket without
-    //      any sub paths) would be of the format <bucket ID>/fileName inside
-    //      the fileTable.
+    //      any sub paths) would be of the format
+    //      /<volume ID>/<bucket ID>/fileName inside the fileTable.
     String keyPrefix =
-        bucketLayout.isFileSystemOptimized() ? bucketId : bucketKey;
+        bucketLayout.isFileSystemOptimized() ?
+                OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX +
+                        bucketId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX :
+                bucketKey;
 
     // Check key/file Table
     Table<String, OmKeyInfo> table = getKeyTable(bucketLayout);
@@ -1422,28 +1427,42 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public String getOzonePathKey(long parentObjectId, String pathComponentName) {
-    StringBuilder builder = new StringBuilder();
-    builder.append(parentObjectId);
-    builder.append(OM_KEY_PREFIX).append(pathComponentName);
+  public String getOzonePathKey(final long volumeId, final long bucketId,
+                                final long parentObjectId,
+                                final String pathComponentName) {
+    final StringBuilder builder = new StringBuilder();
+    builder.append(OM_KEY_PREFIX)
+            .append(volumeId)
+            .append(OM_KEY_PREFIX)
+            .append(bucketId)
+            .append(OM_KEY_PREFIX)
+            .append(parentObjectId)
+            .append(OM_KEY_PREFIX)
+            .append(pathComponentName);
     return builder.toString();
   }
 
   @Override
-  public String getOpenFileName(long parentID, String fileName,
+  public String getOpenFileName(long volumeId, long bucketId,
+                                long parentID, String fileName,
                                 long id) {
     StringBuilder openKey = new StringBuilder();
-    openKey.append(parentID);
+    openKey.append(OM_KEY_PREFIX).append(volumeId);
+    openKey.append(OM_KEY_PREFIX).append(bucketId);
+    openKey.append(OM_KEY_PREFIX).append(parentID);
     openKey.append(OM_KEY_PREFIX).append(fileName);
     openKey.append(OM_KEY_PREFIX).append(id);
     return openKey.toString();
   }
 
   @Override
-  public String getMultipartKey(long parentID, String fileName,
+  public String getMultipartKey(long volumeId, long bucketId,
+                                long parentID, String fileName,
                                 String uploadId) {
     StringBuilder openKey = new StringBuilder();
-    openKey.append(parentID);
+    openKey.append(OM_KEY_PREFIX).append(volumeId);
+    openKey.append(OM_KEY_PREFIX).append(bucketId);
+    openKey.append(OM_KEY_PREFIX).append(parentID);
     openKey.append(OM_KEY_PREFIX).append(fileName);
     openKey.append(OM_KEY_PREFIX).append(uploadId);
     return openKey.toString();
@@ -1451,5 +1470,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   public BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
+  }
+
+  @Override
+  public long getVolumeId(String volume) throws IOException {
+    return getVolumeTable().get(getVolumeKey(volume)).getObjectID();
+  }
+
+  @Override
+  public long getBucketId(String volume, String bucket) throws IOException {
+    return getBucketTable().get(getBucketKey(volume, bucket)).getObjectID();
   }
 }

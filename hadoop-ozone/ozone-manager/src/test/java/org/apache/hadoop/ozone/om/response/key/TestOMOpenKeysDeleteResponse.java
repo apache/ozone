@@ -38,6 +38,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addBucketToDB;
+
 /**
  * Tests OMOpenKeysDeleteResponse.
  */
@@ -69,6 +71,8 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    */
   @Test
   public void testAddToDBBatchWithEmptyBlocks() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager, getBucketLayout());
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
     Map<String, OmKeyInfo> keysToKeep = addOpenKeysToDB(volumeName, 3);
 
@@ -96,6 +100,8 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    */
   @Test
   public void testAddToDBBatchWithNonEmptyBlocks() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager, getBucketLayout());
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3,
         KEY_LENGTH);
     Map<String, OmKeyInfo> keysToKeep = addOpenKeysToDB(volumeName, 3,
@@ -126,6 +132,8 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    */
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager, getBucketLayout());
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
 
     createAndCommitResponse(keysToDelete, Status.INTERNAL_ERROR);
@@ -190,6 +198,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
     for (int i = 0; i < numKeys; i++) {
       String bucket = UUID.randomUUID().toString();
       String key = UUID.randomUUID().toString();
+      addBucketToDB(volume, bucket, omMetadataManager, getBucketLayout());
       long clientID = random.nextLong();
       long parentID = random.nextLong();
 
@@ -207,11 +216,14 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
       // cache by the request, and it would only remain in the DB.
       if (getBucketLayout().isFileSystemOptimized()) {
         String file = OzoneFSUtils.getFileName(key);
+        final long volumeId = omMetadataManager.getVolumeId(volume);
+        final long bucketId = omMetadataManager.getBucketId(volume, bucket);
         omKeyInfo.setFileName(file);
         omKeyInfo.setParentObjectID(parentID);
         OMRequestTestUtils.addFileToKeyTable(true, false, file, omKeyInfo,
             clientID, 0L, omMetadataManager);
-        openKey = omMetadataManager.getOpenFileName(parentID, file, clientID);
+        openKey = omMetadataManager.getOpenFileName(
+                volumeId, bucketId, parentID, file, clientID);
       } else {
         OMRequestTestUtils.addKeyToTable(true, false, omKeyInfo,
             clientID, 0L, omMetadataManager);

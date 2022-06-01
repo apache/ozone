@@ -23,7 +23,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.key.OMPathsPurgeResponseWithFSO;
+import org.apache.hadoop.ozone.om.response.key.OMDirectoriesPurgeResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -33,30 +33,27 @@ import java.util.List;
 /**
  * Handles purging of keys from OM DB.
  */
-public class OMPathsPurgeRequestWithFSO extends OMKeyRequest {
+public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
 
-  public OMPathsPurgeRequestWithFSO(OMRequest omRequest) {
+  public OMDirectoriesPurgeRequestWithFSO(OMRequest omRequest) {
     super(omRequest, BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
-    OzoneManagerProtocolProtos.PurgePathsRequest purgePathsRequest =
-        getOmRequest().getPurgePathsRequest();
+    OzoneManagerProtocolProtos.PurgeDirectoriesRequest purgeDirsRequest =
+        getOmRequest().getPurgeDirectoriesRequest();
 
-    List<String> deletedDirsList = purgePathsRequest.getDeletedDirsList();
-    List<OzoneManagerProtocolProtos.KeyInfo> deletedSubFilesList =
-        purgePathsRequest.getDeletedSubFilesList();
-    List<OzoneManagerProtocolProtos.KeyInfo> markDeletedSubDirsList =
-        purgePathsRequest.getMarkDeletedSubDirsList();
+    List<OzoneManagerProtocolProtos.PurgePathRequest> purgeRequests =
+            purgeDirsRequest.getDeletedPathList();
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
 
-    OMClientResponse omClientResponse = new OMPathsPurgeResponseWithFSO(
-        omResponse.build(), markDeletedSubDirsList, deletedSubFilesList,
-        deletedDirsList, ozoneManager.isRatisEnabled(), getBucketLayout());
+    OMClientResponse omClientResponse = new OMDirectoriesPurgeResponseWithFSO(
+        omResponse.build(), purgeRequests, ozoneManager.isRatisEnabled(),
+            getBucketLayout());
     addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
         omDoubleBufferHelper);
 

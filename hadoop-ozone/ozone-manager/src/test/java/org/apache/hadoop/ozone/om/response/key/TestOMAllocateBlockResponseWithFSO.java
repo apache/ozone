@@ -57,7 +57,10 @@ public class TestOMAllocateBlockResponseWithFSO
 
   @Override
   protected String getOpenKey() throws Exception {
-    return omMetadataManager.getOpenFileName(
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getOpenFileName(volumeId, bucketId,
             parentID, fileName, clientID);
   }
 

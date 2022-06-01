@@ -116,9 +116,15 @@ public final class OMRequestTestUtils {
       String bucketName, OMMetadataManager omMetadataManager,
       BucketLayout bucketLayout) throws Exception {
 
-    addVolumeToDB(volumeName, omMetadataManager);
+    if (!omMetadataManager.getVolumeTable().isExist(
+            omMetadataManager.getVolumeKey(volumeName))) {
+      addVolumeToDB(volumeName, omMetadataManager);
+    }
 
-    addBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
+    if (!omMetadataManager.getBucketTable().isExist(
+            omMetadataManager.getBucketKey(volumeName, bucketName))) {
+      addBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
+    }
   }
 
   @SuppressWarnings("parameterNumber")
@@ -313,10 +319,15 @@ public final class OMRequestTestUtils {
    */
   public static void addDirKeyToDirTable(boolean addToCache,
                                          OmDirectoryInfo omDirInfo,
+                                         String volume,
+                                         String bucket,
                                          long trxnLogIndex,
                                          OMMetadataManager omMetadataManager)
           throws Exception {
-    String ozoneKey = omDirInfo.getPath();
+    final long volumeId = omMetadataManager.getVolumeId(volume);
+    final long bucketId = omMetadataManager.getBucketId(volume, bucket);
+    final String ozoneKey = omMetadataManager.getOzonePathKey(volumeId,
+            bucketId, omDirInfo.getParentObjectID(), omDirInfo.getName());
     if (addToCache) {
       omMetadataManager.getDirectoryTable().addCacheEntry(
               new CacheKey<>(ozoneKey),
@@ -347,7 +358,7 @@ public final class OMRequestTestUtils {
             .setModificationTime(Time.now())
             .setObjectID(objectID)
             .setParentObjectID(parentObjID)
-            .setUpdateID(objectID)
+            .setUpdateID(50)
             .build();
   }
 
@@ -443,6 +454,7 @@ public final class OMRequestTestUtils {
     OmVolumeArgs omVolumeArgs =
         OmVolumeArgs.newBuilder().setCreationTime(Time.now())
             .setVolume(volumeName).setAdminName(ownerName)
+            .setObjectID(System.currentTimeMillis())
             .setOwnerName(ownerName).setQuotaInBytes(Long.MAX_VALUE)
             .setQuotaInNamespace(10000L).build();
     omMetadataManager.getVolumeTable().put(
@@ -474,8 +486,10 @@ public final class OMRequestTestUtils {
 
     OmBucketInfo omBucketInfo =
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
-            .setBucketName(bucketName).setCreationTime(Time.now())
-            .setBucketLayout(bucketLayout).build();
+                .setBucketName(bucketName)
+                .setObjectID(System.currentTimeMillis())
+                .setCreationTime(Time.now())
+                .setBucketLayout(bucketLayout).build();
 
     // Add to cache.
     omMetadataManager.getBucketTable().addCacheEntry(
@@ -1142,8 +1156,13 @@ public final class OMRequestTestUtils {
                                        OMMetadataManager omMetadataManager)
           throws Exception {
     if (openKeyTable) {
-      String ozoneKey = omMetadataManager.getOpenFileName(
-              omKeyInfo.getParentObjectID(), fileName, clientID);
+      final long volumeId = omMetadataManager.getVolumeId(
+              omKeyInfo.getVolumeName());
+      final long bucketId = omMetadataManager.getBucketId(
+              omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
+      final String ozoneKey = omMetadataManager.getOpenFileName(
+              volumeId, bucketId, omKeyInfo.getParentObjectID(),
+              fileName, clientID);
       if (addToCache) {
         omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
             .addCacheEntry(new CacheKey<>(ozoneKey),
@@ -1153,6 +1172,9 @@ public final class OMRequestTestUtils {
           .put(ozoneKey, omKeyInfo);
     } else {
       String ozoneKey = omMetadataManager.getOzonePathKey(
+              omMetadataManager.getVolumeId(omKeyInfo.getVolumeName()),
+              omMetadataManager.getBucketId(omKeyInfo.getVolumeName(),
+                      omKeyInfo.getBucketName()),
               omKeyInfo.getParentObjectID(), fileName);
       if (addToCache) {
         omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
@@ -1162,24 +1184,6 @@ public final class OMRequestTestUtils {
       omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
           .put(ozoneKey, omKeyInfo);
     }
-  }
-
-  /**
-   * Gets bucketId from OM metadata manager.
-   *
-   * @param volumeName        volume name
-   * @param bucketName        bucket name
-   * @param omMetadataManager metadata manager
-   * @return bucket Id
-   * @throws Exception DB failure
-   */
-  public static long getBucketId(String volumeName, String bucketName,
-                                 OMMetadataManager omMetadataManager)
-          throws Exception {
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-            omMetadataManager.getBucketTable().get(bucketKey);
-    return omBucketInfo.getObjectID();
   }
 
   /**
@@ -1196,8 +1200,7 @@ public final class OMRequestTestUtils {
   public static long addParentsToDirTable(String volumeName, String bucketName,
                                     String key, OMMetadataManager omMetaMgr)
           throws Exception {
-    long bucketId = OMRequestTestUtils.getBucketId(volumeName, bucketName,
-            omMetaMgr);
+    long bucketId = omMetaMgr.getBucketId(volumeName, bucketName);
     if (org.apache.commons.lang3.StringUtils.isBlank(key)) {
       return bucketId;
     }
@@ -1210,7 +1213,7 @@ public final class OMRequestTestUtils {
               OMRequestTestUtils.createOmDirectoryInfo(pathElement, ++objectId,
                       parentId);
       OMRequestTestUtils.addDirKeyToDirTable(true, omDirInfo,
-              txnID, omMetaMgr);
+              volumeName, bucketName, txnID, omMetaMgr);
       parentId = omDirInfo.getObjectID();
     }
     return parentId;
