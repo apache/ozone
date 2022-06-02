@@ -59,24 +59,7 @@ public class CreateBucketHandler extends BucketHandler {
               " user if not specified")
   private String ownerName;
 
-  enum AllowedBucketLayouts {
-    FILE_SYSTEM_OPTIMIZED("FILE_SYSTEM_OPTIMIZED"),
-    OBJECT_STORE("OBJECT_STORE"),
-    LEGACY("LEGACY");
-
-    // Assigning a value to each enum
-    private final String layout;
-    AllowedBucketLayouts(String layout) {
-      this.layout = layout;
-    }
-
-    // Overriding toString() method to return the value passed to the
-    // constructor.
-    @Override
-    public String toString() {
-      return this.layout;
-    }
-  }
+  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY }
 
   @Option(names = { "--layout", "-l" },
       description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}")
