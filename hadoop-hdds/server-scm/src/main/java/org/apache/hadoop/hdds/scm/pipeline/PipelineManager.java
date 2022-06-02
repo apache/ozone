@@ -153,7 +153,7 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   }
 
   /**
-   * Wait one pipeline to be OPEN among a collection pipelines
+   * Wait one pipeline to be OPEN among a collection pipelines.
    * @param pipelineIDs ID collection of the pipelines to wait for
    * @param timeout wait timeout(millisecond), if 0, use default timeout
    * @return Pipeline the pipeline which is OPEN
