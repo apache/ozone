@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.shell;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
