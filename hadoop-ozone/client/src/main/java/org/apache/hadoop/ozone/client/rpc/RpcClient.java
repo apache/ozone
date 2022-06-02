@@ -101,6 +101,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
@@ -625,6 +626,7 @@ public class RpcClient implements ClientProtocol {
         Boolean.FALSE : bucketArgs.getVersioning();
     StorageType storageType = bucketArgs.getStorageType() == null ?
         StorageType.DEFAULT : bucketArgs.getStorageType();
+    BucketLayout bucketLayout = bucketArgs.getBucketLayout();
     BucketEncryptionKeyInfo bek = null;
     if (bucketArgs.getEncryptionKey() != null) {
       bek = new BucketEncryptionKeyInfo.Builder()
@@ -648,7 +650,7 @@ public class RpcClient implements ClientProtocol {
         .setQuotaInBytes(bucketArgs.getQuotaInBytes())
         .setQuotaInNamespace(bucketArgs.getQuotaInNamespace())
         .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()))
-        .setBucketLayout(bucketArgs.getBucketLayout())
+        .setBucketLayout(bucketLayout)
         .setOwner(owner);
 
     if (bek != null) {
@@ -661,9 +663,10 @@ public class RpcClient implements ClientProtocol {
       builder.setDefaultReplicationConfig(defaultReplicationConfig);
     }
 
-    LOG.info("Creating Bucket: {}/{}, with {} as owner and Versioning {} and " +
-        "Storage Type set to {} and Encryption set to {} ",
-        volumeName, bucketName, owner, isVersionEnabled,
+    LOG.info("Creating Bucket: {}/{}, with the Bucket Layout {}, {} as " +
+            "owner, Versioning {}, Storage Type set to {} and Encryption set " +
+            "to {} ",
+        volumeName, bucketName, bucketLayout, owner, isVersionEnabled,
         storageType, bek != null);
     ozoneManagerClient.createBucket(builder.build());
   }
