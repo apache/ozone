@@ -219,7 +219,7 @@ public class TestECBlockReconstructedStripeInputStream {
 
       // Read 3 full stripes
       for (int i = 0; i < 3; i++) {
-        int read = ecb.readStripe(bufs);
+        int read = ecb.read(bufs);
         Assertions.assertEquals(stripeSize(), read);
 
         int output = 0;
@@ -238,7 +238,7 @@ public class TestECBlockReconstructedStripeInputStream {
         clearBuffers(bufs);
       }
       // The next read is a partial stripe
-      int read = ecb.readStripe(bufs);
+      int read = ecb.read(bufs);
       Assertions.assertEquals(partialStripeSize, read);
       int output = 0;
       for (int j = 0; j < 2; j++) {
@@ -253,7 +253,7 @@ public class TestECBlockReconstructedStripeInputStream {
 
       // A further read should give EOF
       clearBuffers(bufs);
-      read = ecb.readStripe(bufs);
+      read = ecb.read(bufs);
       Assertions.assertEquals(-1, read);
     }
   }
@@ -279,7 +279,7 @@ public class TestECBlockReconstructedStripeInputStream {
     dataGen = new SplittableRandom(randomSeed);
     try (ECBlockReconstructedStripeInputStream ecb =
         createInputStream(keyInfo)) {
-      int read = ecb.readStripe(bufs);
+      int read = ecb.read(bufs);
       Assertions.assertEquals(blockLength, read);
       ECStreamTestUtil.assertBufferMatches(bufs[0], dataGen);
       Assertions.assertEquals(0, bufs[1].remaining());
@@ -293,7 +293,7 @@ public class TestECBlockReconstructedStripeInputStream {
       Assertions.assertEquals(ecb.getPos(), blockLength);
       clearBuffers(bufs);
       // A further read should give EOF
-      read = ecb.readStripe(bufs);
+      read = ecb.read(bufs);
       Assertions.assertEquals(-1, read);
     }
   }
@@ -322,7 +322,7 @@ public class TestECBlockReconstructedStripeInputStream {
              createInputStream(keyInfo)) {
       ecb.setRecoveryIndexes(Arrays.asList(3, 4));
 
-      int read = ecb.readStripe(bufs);
+      int read = ecb.read(bufs);
       Assertions.assertEquals(blockLength, read);
       ECStreamTestUtil.assertBufferMatches(bufs[0], dataGen);
       ECStreamTestUtil.assertBufferMatches(bufs[1], dataGen);
@@ -333,7 +333,7 @@ public class TestECBlockReconstructedStripeInputStream {
       Assertions.assertEquals(ecb.getPos(), blockLength);
       clearBuffers(bufs);
       // A further read should give EOF
-      read = ecb.readStripe(bufs);
+      read = ecb.read(bufs);
       Assertions.assertEquals(-1, read);
     }
   }
@@ -361,7 +361,7 @@ public class TestECBlockReconstructedStripeInputStream {
     dataGen = new SplittableRandom(randomSeed);
     try (ECBlockReconstructedStripeInputStream ecb =
         createInputStream(keyInfo)) {
-      int read = ecb.readStripe(bufs);
+      int read = ecb.read(bufs);
       Assertions.assertEquals(blockLength, read);
       ECStreamTestUtil.assertBufferMatches(bufs[0], dataGen);
       ECStreamTestUtil.assertBufferMatches(bufs[1], dataGen);
@@ -374,7 +374,7 @@ public class TestECBlockReconstructedStripeInputStream {
       Assertions.assertEquals(ecb.getPos(), blockLength);
       clearBuffers(bufs);
       // A further read should give EOF
-      read = ecb.readStripe(bufs);
+      read = ecb.read(bufs);
       Assertions.assertEquals(-1, read);
     }
   }
@@ -418,7 +418,7 @@ public class TestECBlockReconstructedStripeInputStream {
       dataGen = new SplittableRandom(randomSeed);
       try (ECBlockReconstructedStripeInputStream ecb =
           createInputStream(keyInfo)) {
-        int read = ecb.readStripe(bufs);
+        int read = ecb.read(bufs);
         Assertions.assertEquals(blockLength, read);
         ECStreamTestUtil.assertBufferMatches(bufs[0], dataGen);
         ECStreamTestUtil.assertBufferMatches(bufs[1], dataGen);
@@ -430,7 +430,7 @@ public class TestECBlockReconstructedStripeInputStream {
         Assertions.assertEquals(ecb.getPos(), blockLength);
         clearBuffers(bufs);
         // A further read should give EOF
-        read = ecb.readStripe(bufs);
+        read = ecb.read(bufs);
         Assertions.assertEquals(-1, read);
       }
     }
@@ -461,7 +461,7 @@ public class TestECBlockReconstructedStripeInputStream {
     try (ECBlockReconstructedStripeInputStream ecb =
         createInputStream(keyInfo)) {
       try {
-        ecb.readStripe(bufs);
+        ecb.read(bufs);
         Assertions.fail("Read should have thrown an exception");
       } catch (InsufficientLocationsException e) {
         // expected
@@ -506,7 +506,7 @@ public class TestECBlockReconstructedStripeInputStream {
           createInputStream(keyInfo)) {
 
         // Read Stripe 1
-        int read = ecb.readStripe(bufs);
+        int read = ecb.read(bufs);
         for (int j = 0; j < bufs.length; j++) {
           validateContents(dataBufs[j], bufs[j], 0, chunkSize);
         }
@@ -516,7 +516,7 @@ public class TestECBlockReconstructedStripeInputStream {
         // Seek to 0 and read again
         clearBuffers(bufs);
         ecb.seek(0);
-        ecb.readStripe(bufs);
+        ecb.read(bufs);
         for (int j = 0; j < bufs.length; j++) {
           validateContents(dataBufs[j], bufs[j], 0, chunkSize);
         }
@@ -527,7 +527,7 @@ public class TestECBlockReconstructedStripeInputStream {
         // Seek to the last stripe
         clearBuffers(bufs);
         ecb.seek(stripeSize() * 3);
-        read = ecb.readStripe(bufs);
+        read = ecb.read(bufs);
         validateContents(dataBufs[0], bufs[0], 3 * chunkSize, chunkSize);
         validateContents(dataBufs[1], bufs[1], 3 * chunkSize, chunkSize - 1);
         Assertions.assertEquals(0, bufs[2].remaining());
@@ -537,7 +537,7 @@ public class TestECBlockReconstructedStripeInputStream {
         // seek to the start of stripe 3
         clearBuffers(bufs);
         ecb.seek(stripeSize() * (long)2);
-        read = ecb.readStripe(bufs);
+        read = ecb.read(bufs);
         for (int j = 0; j < bufs.length; j++) {
           validateContents(dataBufs[j], bufs[j], 2 * chunkSize, chunkSize);
         }
@@ -602,7 +602,7 @@ public class TestECBlockReconstructedStripeInputStream {
           createInputStream(keyInfo)) {
         // After reading the first stripe, make one of the streams error
         for (int i = 0; i < 3; i++) {
-          int read = ecb.readStripe(bufs);
+          int read = ecb.read(bufs);
           for (int j = 0; j < bufs.length; j++) {
             validateContents(dataBufs[j], bufs[j], i * chunkSize, chunkSize);
           }
@@ -618,7 +618,7 @@ public class TestECBlockReconstructedStripeInputStream {
           }
         }
         // The next read is a partial stripe
-        int read = ecb.readStripe(bufs);
+        int read = ecb.read(bufs);
         Assertions.assertEquals(partialStripeSize, read);
         validateContents(dataBufs[0], bufs[0], 3 * chunkSize, chunkSize);
         validateContents(dataBufs[1], bufs[1], 3 * chunkSize, chunkSize - 1);
@@ -628,7 +628,7 @@ public class TestECBlockReconstructedStripeInputStream {
         // seek back to zero and read a stripe to re-open the streams
         ecb.seek(0);
         clearBuffers(bufs);
-        ecb.readStripe(bufs);
+        ecb.read(bufs);
         // Now fail another random stream and the read should fail with
         // insufficient locations
         Set<Integer> currentStreams =
@@ -639,7 +639,7 @@ public class TestECBlockReconstructedStripeInputStream {
             .setShouldError(true);
         try {
           clearBuffers(bufs);
-          ecb.readStripe(bufs);
+          ecb.read(bufs);
           Assertions.fail("InsufficientLocationsException expected");
         } catch (InsufficientLocationsException e) {
           // expected
@@ -681,7 +681,7 @@ public class TestECBlockReconstructedStripeInputStream {
     try (ECBlockReconstructedStripeInputStream ecb =
              createInputStream(keyInfo)) {
       assertThrows(InsufficientLocationsException.class,
-          () -> ecb.readStripe(bufs));
+          () -> ecb.read(bufs));
     }
   }
 
@@ -718,7 +718,7 @@ public class TestECBlockReconstructedStripeInputStream {
       ecb.addFailedDatanodes(failed);
 
       // Read full stripe
-      int read = ecb.readStripe(bufs);
+      int read = ecb.read(bufs);
       for (int j = 0; j < bufs.length; j++) {
         ECStreamTestUtil.assertBufferMatches(bufs[j], dataGen);
       }
