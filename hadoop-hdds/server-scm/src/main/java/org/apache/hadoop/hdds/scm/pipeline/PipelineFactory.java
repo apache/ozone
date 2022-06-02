@@ -94,15 +94,17 @@ public class PipelineFactory {
   private void checkPipeline(Pipeline pipeline) throws IOException {
     // In case in case if provided pipeline provider returns null.
     if (pipeline == null) {
-      throw new IOException("Pipeline cannot be null");
+      throw new SCMException("Pipeline cannot be null",
+          SCMException.ResultCodes.INTERNAL_ERROR);
     }
     // In case if provided pipeline returns less number of nodes than
     // required.
     if (pipeline.getNodes().size() != pipeline.getReplicationConfig()
         .getRequiredNodes()) {
-      throw new IOException("Nodes size= " + pipeline.getNodes()
-          .size() + ", replication factor=" + pipeline.getReplicationConfig()
-          .getRequiredNodes() + " do not match");
+      throw new SCMException("Nodes size= " + pipeline.getNodes()
+          .size() + ", replication factor= " + pipeline.getReplicationConfig()
+          .getRequiredNodes() + " do not match",
+          SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
     }
   }
 
