@@ -26,9 +26,9 @@
         },
         controller: function ($http) {
             var ctrl = this;
-            $http.get("jmx?qry=Hadoop:service=HddsDatanode,name=StorageContainerMetrics")
+            $http.get("jmx?qry=Hadoop:service=HddsDatanode,name=VolumeInfoMetrics*")
                 .then(function (result) {
-                    ctrl.dnmetrics = result.data.beans[0];
+                    ctrl.dnmetrics = result.data.beans;
                 });
         }
     });
