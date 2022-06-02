@@ -39,7 +39,7 @@ public class TestOzoneShellHAWithFSO extends TestOzoneShellHA {
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
+        OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
     startCluster(conf);
   }
 
