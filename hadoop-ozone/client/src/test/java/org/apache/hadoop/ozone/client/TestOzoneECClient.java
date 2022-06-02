@@ -848,12 +848,16 @@ public class TestOzoneECClient {
         dataBlocks, parityBlocks, ECReplicationConfig.EcCodec.RS, chunkSize);
 
     try (OzoneOutputStream out = bucket.createKey(keyName,
-        (long) dataBlocks * chunkSize, repConfig, new HashMap<>())) {
+        2L * dataBlocks * chunkSize, repConfig, new HashMap<>())) {
 
       Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
       ECKeyOutputStream ecKeyOut = (ECKeyOutputStream) out.getOutputStream();
 
       List<HddsProtos.DatanodeDetailsProto> dns = blkAllocator.getClusterDns();
+
+      for (int i = 0; i < dataBlocks; i++) {
+        out.write(inputChunks[i % dataBlocks]);
+      }
 
       // Then let's mark datanodes with closed container
       List<DatanodeDetails> closedDNs = closedDNIndex
