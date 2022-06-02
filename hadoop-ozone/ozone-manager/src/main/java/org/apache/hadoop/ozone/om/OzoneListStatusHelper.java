@@ -147,7 +147,7 @@ public class OzoneListStatusHelper {
       // this should only work in list keys mode.
       // fetch the db key based on the prefix path.
       try {
-        dbPrefixKey = getDbKey(keyName, args, omBucketInfo);
+        dbPrefixKey = getDbKey(keyName, args, volumeInfo, omBucketInfo);
         prefixKey = OzoneFSUtils.getParentDir(keyName);
       } catch (OMException ome) {
         if (ome.getResult() == FILE_NOT_FOUND) {
@@ -173,7 +173,7 @@ public class OzoneListStatusHelper {
     // Determine startKeyPrefix for DB iteration
     String startKeyPrefix = "";
     try {
-      String startDbKey = getDbKey(startKey, args, omBucketInfo);
+      String startDbKey = getDbKey(startKey, args, volumeInfo, omBucketInfo);
       startKeyPrefix = Strings.isNullOrEmpty(startKey) ? "" : startDbKey;
     } catch (OMException ome) {
       if (ome.getResult() != FILE_NOT_FOUND) {
