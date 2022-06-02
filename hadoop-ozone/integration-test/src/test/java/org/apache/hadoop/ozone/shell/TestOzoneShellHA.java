@@ -107,7 +107,6 @@ public class TestOzoneShellHA {
   private static File baseDir;
   private static File testFile;
   private static String testFilePathString;
-  private static OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster = null;
   private OzoneShell ozoneShell = null;
   private OzoneAdmin ozoneAdminShell = null;
@@ -131,8 +130,11 @@ public class TestOzoneShellHA {
    */
   @BeforeClass
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    startCluster(conf);
+  }
 
+  protected static void startCluster(OzoneConfiguration conf) throws Exception {
     String path = GenericTestUtils.getTempPath(
         TestOzoneShellHA.class.getSimpleName());
     baseDir = new File(path);
@@ -261,7 +263,7 @@ public class TestOzoneShellHA {
   }
 
   private String getSetConfStringFromConf(String key) {
-    return String.format("--set=%s=%s", key, conf.get(key));
+    return String.format("--set=%s=%s", key, cluster.getConf().get(key));
   }
 
   private String generateSetConfString(String key, String value) {
@@ -287,7 +289,7 @@ public class TestOzoneShellHA {
 
     String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
-    String omNodesVal = conf.get(omNodesKey);
+    String omNodesVal = cluster.getConf().get(omNodesKey);
     res[indexOmNodes] = generateSetConfString(omNodesKey, omNodesVal);
 
     String[] omNodesArr = omNodesVal.split(",");
@@ -392,7 +394,7 @@ public class TestOzoneShellHA {
     String omLeaderNodeId = getLeaderOMNodeId();
     String omLeaderNodeAddrKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omLeaderNodeId);
-    String omLeaderNodeAddr = conf.get(omLeaderNodeAddrKey);
+    String omLeaderNodeAddr = cluster.getConf().get(omLeaderNodeAddrKey);
     String omLeaderNodeAddrWithoutPort = omLeaderNodeAddr.split(":")[0];
 
     // Test case 2: ozone sh volume create o3://om1/volume2
@@ -560,7 +562,8 @@ public class TestOzoneShellHA {
   @Test
   public void testDeleteToTrashOrSkipTrash() throws Exception {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
-    OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
+    OzoneConfiguration clientConf =
+        getClientConfForOFS(hostPrefix, cluster.getConf());
     OzoneFsShell shell = new OzoneFsShell(clientConf);
     FileSystem fs = FileSystem.get(clientConf);
     final String strDir1 = hostPrefix + "/volumed2t/bucket1/dir1";
@@ -634,7 +637,7 @@ public class TestOzoneShellHA {
     // (default is TrashPolicyDefault)
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
     OzoneConfiguration clientConf =
-            getClientConfForOzoneTrashPolicy(hostPrefix, conf);
+            getClientConfForOzoneTrashPolicy(hostPrefix, cluster.getConf());
     OzoneFsShell shell = new OzoneFsShell(clientConf);
 
     int res;
