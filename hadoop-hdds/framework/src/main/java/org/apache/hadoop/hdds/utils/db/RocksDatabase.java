@@ -24,6 +24,7 @@ import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
 import org.rocksdb.FlushOptions;
 import org.rocksdb.Holder;
+import org.rocksdb.IngestExternalFileOptions;
 import org.rocksdb.Options;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
@@ -227,7 +228,7 @@ public final class RocksDatabase {
       return codec.fromPersistedFormat(nameBytes);
     }
 
-    private ColumnFamilyHandle getHandle() {
+    protected ColumnFamilyHandle getHandle() {
       return handle;
     }
 
@@ -299,6 +300,19 @@ public final class RocksDatabase {
       return true;
     default:
       return false;
+    }
+  }
+
+  public void ingestExternalFile(ColumnFamily family, List<String> files,
+      IngestExternalFileOptions ingestOptions) throws IOException {
+    try {
+      db.ingestExternalFile(family.getHandle(), files, ingestOptions);
+    } catch (RocksDBException e) {
+      closeOnError(e);
+      String msg = "Failed to ingest external files " +
+          files.stream().collect(Collectors.joining(", ")) + " of " +
+          family.getName();
+      throw toIOException(this, msg, e);
     }
   }
 

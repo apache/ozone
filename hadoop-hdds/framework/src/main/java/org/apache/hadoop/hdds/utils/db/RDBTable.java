@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.ArrayList;
@@ -27,8 +28,6 @@ import java.util.function.Supplier;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
-
-import org.rocksdb.RocksIterator;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -163,6 +162,12 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
+  public TableIterator<byte[], ByteArrayKeyValue> iterator(byte[] prefix) {
+    return new RDBStoreIterator(db.newIterator(family, false), this,
+        prefix);
+  }
+
+  @Override
   public String getName() throws IOException {
     return family.getName();
   }
@@ -179,58 +184,87 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public List<ByteArrayKeyValue> getRangeKVs(byte[] startKey,
-      int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+      int count, byte[] prefix,
+      MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
-    return getRangeKVs(startKey, count, false, filters);
+    return getRangeKVs(startKey, count, false, prefix, filters);
   }
 
   @Override
   public List<ByteArrayKeyValue> getSequentialRangeKVs(byte[] startKey,
-      int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+      int count, byte[] prefix,
+      MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
-    return getRangeKVs(startKey, count, true, filters);
+    return getRangeKVs(startKey, count, true, prefix, filters);
+  }
+
+  @Override
+  public void deleteBatchWithPrefix(BatchOperation batch, byte[] prefix)
+      throws IOException {
+    try (TableIterator<byte[], ByteArrayKeyValue> iter = iterator(prefix)) {
+      while (iter.hasNext()) {
+        deleteWithBatch(batch, iter.next().getValue());
+      }
+    }
+  }
+
+  @Override
+  public void dumpToFileWithPrefix(File externalFile, byte[] prefix)
+      throws IOException {
+    try (TableIterator<byte[], ByteArrayKeyValue> iter = iterator(prefix);
+         DumpFileWriter fileWriter = new RDBSstFileWriter()) {
+      fileWriter.open(externalFile);
+      while (iter.hasNext()) {
+        ByteArrayKeyValue entry = iter.next();
+        fileWriter.put(entry.getKey(), entry.getValue());
+      }
+    }
+  }
+
+  @Override
+  public void loadFromFile(File externalFile) throws IOException {
+    try (DumpFileLoader fileLoader = new RDBSstFileLoader(db, family)) {
+      fileLoader.load(externalFile);
+    }
   }
 
   private List<ByteArrayKeyValue> getRangeKVs(byte[] startKey,
-      int count, boolean sequential,
+      int count, boolean sequential, byte[] prefix,
       MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
     List<ByteArrayKeyValue> result = new ArrayList<>();
     long start = System.currentTimeMillis();
+
     if (count < 0) {
       throw new IllegalArgumentException(
             "Invalid count given " + count + ", count must be greater than 0");
     }
-    try (RocksIterator it = db.newIterator(family)) {
+    try (TableIterator<byte[], ByteArrayKeyValue> it = iterator(prefix)) {
       if (startKey == null) {
         it.seekToFirst();
       } else {
-        if (get(startKey) == null) {
+        if ((prefix == null || startKey.length > prefix.length)
+            && get(startKey) == null) {
           // Key not found, return empty list
           return result;
         }
         it.seek(startKey);
       }
-      while (it.isValid() && result.size() < count) {
-        byte[] currentKey = it.key();
-        byte[] currentValue = it.value();
 
-        it.prev();
-        final byte[] prevKey = it.isValid() ? it.key() : null;
-
-        it.seek(currentKey);
-        it.next();
-        final byte[] nextKey = it.isValid() ? it.key() : null;
+      while (it.hasNext() && result.size() < count) {
+        ByteArrayKeyValue currentEntry = it.next();
+        byte[] currentKey = currentEntry.getKey();
 
         if (filters == null) {
-          result.add(ByteArrayKeyValue
-                  .create(currentKey, currentValue));
+          result.add(currentEntry);
         } else {
+          // NOTE: the preKey and nextKey are never checked
+          // in all existing underlying filters, so they could
+          // be safely as null here.
           if (Arrays.stream(filters)
-                  .allMatch(entry -> entry.filterKey(prevKey,
-                          currentKey, nextKey))) {
-            result.add(ByteArrayKeyValue
-                    .create(currentKey, currentValue));
+                  .allMatch(entry -> entry.filterKey(null,
+                          currentKey, null))) {
+            result.add(currentEntry);
           } else {
             if (result.size() > 0 && sequential) {
               // if the caller asks for a sequential range of results,

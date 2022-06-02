@@ -179,6 +179,8 @@ public class KeyValueHandler extends Handler {
 
   @Override
   public void stop() {
+    chunkManager.shutdown();
+    blockManager.shutdown();
   }
 
   @Override
@@ -317,10 +319,9 @@ public class KeyValueHandler extends Handler {
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
           container.getContainerData().getMaxSize());
-      String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
       String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
               containerVolume, clusterId);
-      container.populatePathFields(idDir, containerVolume, hddsVolumeDir);
+      container.populatePathFields(idDir, containerVolume);
     } finally {
       volumeSet.readUnlock();
     }
@@ -941,9 +942,11 @@ public class KeyValueHandler extends Handler {
       final InputStream rawContainerStream,
       final TarContainerPacker packer)
       throws IOException {
+    Preconditions.checkState(originalContainerData instanceof
+        KeyValueContainerData, "Should be KeyValueContainerData instance");
 
-    KeyValueContainerData containerData =
-        new KeyValueContainerData(originalContainerData);
+    KeyValueContainerData containerData = new KeyValueContainerData(
+        (KeyValueContainerData) originalContainerData);
 
     KeyValueContainer container = new KeyValueContainer(containerData,
         conf);
