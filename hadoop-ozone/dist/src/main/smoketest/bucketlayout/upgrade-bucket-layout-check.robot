@@ -22,9 +22,9 @@ Resource            lib.resource
 Test Bucket Layout Prior To Finalization
     [Tags]  pre-finalized-bucket-layout-tests
     Execute         ozone sh volume create /bucket-layout-test
-    ${result} =     Execute and checkrc                     ozone sh bucket create bucket-layout-test/fso-bucket --layout FILE_SYSTEM_OPTIMIZED 255
+    ${result} =     Execute                     ozone sh bucket create bucket-layout-test/fso-bucket --layout FILE_SYSTEM_OPTIMIZED
                     Should contain  ${result}   NOT_SUPPORTED_OPERATION
-    ${result} =     Execute and checkrc                     ozone sh bucket create bucket-layout-test/obs-bucket --layout OBJECT_STORE          255
+    ${result} =     Execute                     ozone sh bucket create bucket-layout-test/obs-bucket --layout OBJECT_STORE
                     Should contain  ${result}   NOT_SUPPORTED_OPERATION
     ${result} =     Execute                     ozone sh bucket create bucket-layout-test/legacy-bucket --layout LEGACY
                     Should Not contain  ${result}   NOT_SUPPORTED_OPERATION
