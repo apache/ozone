@@ -168,6 +168,12 @@ public final class OzoneFSUtils {
     java.nio.file.Path childPath = Paths.get(childKey);
 
     java.nio.file.Path childParent = childPath.getParent();
+    java.nio.file.Path parentParent = parentPath.getParent();
+
+    if (childParent == parentParent) {
+      return true;
+    }
+
     // Following are the valid parentKey formats:
     // parentKey="" or parentKey="/" or parentKey="/a" or parentKey="a"
     // Following are the valid childKey formats:

@@ -114,6 +114,13 @@ public class TestListStatus {
 
     // h) check half prefix with non-existing start key
     checkKeyList("b", "b5", 100, 2, true);
+
+    // i) check half prefix with non-existing parent in start key
+    checkKeyList("b", "b/g5", 100, 4, true);
+
+    // j) check prefix with non-existing prefix key
+    //    and non-existing parent in start key
+    checkKeyList("a1/a111", "a1/a111/a100", 100, 0, true);
   }
 
   private static void createFile(OzoneBucket bucket, String keyName)
