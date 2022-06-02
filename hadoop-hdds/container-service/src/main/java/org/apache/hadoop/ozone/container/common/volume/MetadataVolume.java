@@ -55,4 +55,9 @@ public class MetadataVolume extends StorageVolume {
       return new MetadataVolume(this);
     }
   }
+
+  @Override
+  public String getStorageID() {
+    return "";
+  }
 }

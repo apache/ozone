@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
@@ -48,14 +47,13 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
+import org.apache.hadoop.ozone.container.metadata.DeleteTransactionStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.protocol.proto
@@ -66,6 +64,7 @@ import com.google.common.collect.Lists;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.slf4j.Logger;
@@ -278,14 +277,16 @@ public class BlockDeletingService extends BackgroundService {
       File dataDir = new File(containerData.getChunksPath());
       long startTime = Time.monotonicNow();
       // Scan container's db and get list of under deletion blocks
-      try (ReferenceCountedDB meta = BlockUtils.getDB(containerData, conf)) {
+      try (DBHandle meta = BlockUtils.getDB(containerData, conf)) {
         if (containerData.getSchemaVersion().equals(SCHEMA_V1)) {
           crr = deleteViaSchema1(meta, container, dataDir, startTime);
         } else if (containerData.getSchemaVersion().equals(SCHEMA_V2)) {
           crr = deleteViaSchema2(meta, container, dataDir, startTime);
+        } else if (containerData.getSchemaVersion().equals(SCHEMA_V3)) {
+          crr = deleteViaSchema3(meta, container, dataDir, startTime);
         } else {
           throw new UnsupportedOperationException(
-              "Only schema version 1 and schema version 2 are supported.");
+              "Only schema version 1,2,3 are supported.");
         }
         return crr;
       } finally {
@@ -304,7 +305,7 @@ public class BlockDeletingService extends BackgroundService {
     }
 
     public ContainerBackgroundTaskResult deleteViaSchema1(
-        ReferenceCountedDB meta, Container container, File dataDir,
+        DBHandle meta, Container container, File dataDir,
         long startTime) throws IOException {
       ContainerBackgroundTaskResult crr = new ContainerBackgroundTaskResult();
       if (!checkDataDir(dataDir)) {
@@ -315,10 +316,12 @@ public class BlockDeletingService extends BackgroundService {
             meta.getStore().getBlockDataTable();
 
         // # of blocks to delete is throttled
-        KeyPrefixFilter filter = MetadataKeyFilters.getDeletingKeyFilter();
+        KeyPrefixFilter filter = containerData.getDeletingBlockKeyFilter();
         List<? extends Table.KeyValue<String, BlockData>> toDeleteBlocks =
             blockDataTable
-                .getSequentialRangeKVs(null, (int) blocksToDelete, filter);
+                .getSequentialRangeKVs(containerData.startKeyEmpty(),
+                    (int) blocksToDelete, containerData.containerPrefix(),
+                    filter);
         if (toDeleteBlocks.isEmpty()) {
           LOG.debug("No under deletion block found in container : {}",
               containerData.getContainerID());
@@ -394,8 +397,41 @@ public class BlockDeletingService extends BackgroundService {
     }
 
     public ContainerBackgroundTaskResult deleteViaSchema2(
-        ReferenceCountedDB meta, Container container, File dataDir,
+        DBHandle meta, Container container, File dataDir,
         long startTime) throws IOException {
+      Deleter schema2Deleter = (table, batch, tid) -> {
+        Table<Long, DeletedBlocksTransaction> delTxTable =
+            (Table<Long, DeletedBlocksTransaction>) table;
+        delTxTable.deleteWithBatch(batch, tid);
+      };
+      Table<Long, DeletedBlocksTransaction> deleteTxns =
+          ((DeleteTransactionStore<Long>) meta.getStore())
+              .getDeleteTransactionTable();
+      return deleteViaTransactionStore(
+          deleteTxns.iterator(), meta,
+          container, dataDir, startTime, schema2Deleter);
+    }
+
+    public ContainerBackgroundTaskResult deleteViaSchema3(
+        DBHandle meta, Container container, File dataDir,
+        long startTime) throws IOException {
+      Deleter schema3Deleter = (table, batch, tid) -> {
+        Table<String, DeletedBlocksTransaction> delTxTable =
+            (Table<String, DeletedBlocksTransaction>) table;
+        delTxTable.deleteWithBatch(batch, containerData.deleteTxnKey(tid));
+      };
+      Table<String, DeletedBlocksTransaction> deleteTxns =
+          ((DeleteTransactionStore<String>) meta.getStore())
+              .getDeleteTransactionTable();
+      return deleteViaTransactionStore(
+          deleteTxns.iterator(containerData.containerPrefix()), meta,
+          container, dataDir, startTime, schema3Deleter);
+    }
+
+    public ContainerBackgroundTaskResult deleteViaTransactionStore(
+        TableIterator<?, ? extends Table.KeyValue<?, DeletedBlocksTransaction>>
+            iter, DBHandle meta, Container container, File dataDir,
+        long startTime, Deleter deleter) throws IOException {
       ContainerBackgroundTaskResult crr = new ContainerBackgroundTaskResult();
       if (!checkDataDir(dataDir)) {
         return crr;
@@ -403,22 +439,18 @@ public class BlockDeletingService extends BackgroundService {
       try {
         Table<String, BlockData> blockDataTable =
             meta.getStore().getBlockDataTable();
-        DatanodeStore ds = meta.getStore();
-        DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
-            (DatanodeStoreSchemaTwoImpl) ds;
-        Table<Long, DeletedBlocksTransaction>
-            deleteTxns = dnStoreTwoImpl.getDeleteTransactionTable();
+        DeleteTransactionStore<?> txnStore =
+            (DeleteTransactionStore<?>) meta.getStore();
+        Table<?, DeletedBlocksTransaction> deleteTxns =
+            txnStore.getDeleteTransactionTable();
         List<DeletedBlocksTransaction> delBlocks = new ArrayList<>();
         int numBlocks = 0;
-        try (TableIterator<Long,
-            ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-            dnStoreTwoImpl.getDeleteTransactionTable().iterator()) {
-          while (iter.hasNext() && (numBlocks < blocksToDelete)) {
-            DeletedBlocksTransaction delTx = iter.next().getValue();
-            numBlocks += delTx.getLocalIDList().size();
-            delBlocks.add(delTx);
-          }
+        while (iter.hasNext() && (numBlocks < blocksToDelete)) {
+          DeletedBlocksTransaction delTx = iter.next().getValue();
+          numBlocks += delTx.getLocalIDList().size();
+          delBlocks.add(delTx);
         }
+        iter.close();
         if (delBlocks.isEmpty()) {
           LOG.debug("No transaction found in container : {}",
               containerData.getContainerID());
@@ -441,7 +473,7 @@ public class BlockDeletingService extends BackgroundService {
         try (BatchOperation batch = meta.getStore().getBatchHandler()
             .initBatchOperation()) {
           for (DeletedBlocksTransaction delTx : delBlocks) {
-            deleteTxns.deleteWithBatch(batch, delTx.getTxID());
+            deleter.apply(deleteTxns, batch, delTx.getTxID());
             for (Long blk : delTx.getLocalIDList()) {
               String bID = blk.toString();
               meta.getStore().getBlockDataTable().deleteWithBatch(batch, bID);
@@ -487,13 +519,13 @@ public class BlockDeletingService extends BackgroundService {
       long bytesReleased = 0;
       for (DeletedBlocksTransaction entry : delBlocks) {
         for (Long blkLong : entry.getLocalIDList()) {
-          String blk = blkLong.toString();
+          String blk = containerData.blockKey(blkLong);
           BlockData blkInfo = blockDataTable.get(blk);
-          LOG.debug("Deleting block {}", blk);
+          LOG.debug("Deleting block {}", blkLong);
           if (blkInfo == null) {
             LOG.warn("Missing delete block(Container = " +
                 container.getContainerData().getContainerID() + ", Block = " +
-                blk);
+                blkLong);
             continue;
           }
           try {
@@ -501,9 +533,9 @@ public class BlockDeletingService extends BackgroundService {
             blocksDeleted++;
             bytesReleased += KeyValueContainerUtil.getBlockLength(blkInfo);
           } catch (InvalidProtocolBufferException e) {
-            LOG.error("Failed to parse block info for block {}", blk, e);
+            LOG.error("Failed to parse block info for block {}", blkLong, e);
           } catch (IOException e) {
-            LOG.error("Failed to delete files for block {}", blk, e);
+            LOG.error("Failed to delete files for block {}", blkLong, e);
           }
         }
       }
@@ -514,5 +546,10 @@ public class BlockDeletingService extends BackgroundService {
     public int getPriority() {
       return priority;
     }
+  }
+
+  private interface Deleter {
+    void apply(Table<?, DeletedBlocksTransaction> deleteTxnsTable,
+        BatchOperation batch, long txnID) throws IOException;
   }
 }
