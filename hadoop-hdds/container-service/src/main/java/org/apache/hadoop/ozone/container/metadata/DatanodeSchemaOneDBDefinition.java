@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -68,8 +69,9 @@ public class DatanodeSchemaOneDBDefinition
             ChunkInfoList.class,
             new SchemaOneChunkInfoListCodec());
 
-  public DatanodeSchemaOneDBDefinition(String dbPath) {
-    super(dbPath);
+  public DatanodeSchemaOneDBDefinition(String dbPath,
+      ConfigurationSource config) {
+    super(dbPath, config);
   }
 
   @Override

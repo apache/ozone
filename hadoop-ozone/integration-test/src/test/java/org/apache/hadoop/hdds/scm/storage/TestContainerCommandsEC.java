@@ -20,17 +20,22 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
@@ -43,6 +48,10 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -52,6 +61,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -59,6 +69,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * This class tests container commands on EC containers.
@@ -94,15 +106,16 @@ public class TestContainerCommandsEC {
   private static Pipeline pipeline;
   private static List<DatanodeDetails> datanodeDetails;
   private List<XceiverClientSpi> clients = null;
+  private static OzoneConfiguration config;
 
   @BeforeAll
   public static void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
-    conf.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, true);
-    conf.set(OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS,
+    config = new OzoneConfiguration();
+    config.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
+    config.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, true);
+    config.set(OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
-    startCluster(conf);
+    startCluster(config);
     prepareData(KEY_SIZE_RANGES);
   }
 
@@ -184,6 +197,84 @@ public class TestContainerCommandsEC {
           response.getBlockDataList().stream()
               .mapToInt(BlockData::getChunksCount).sum(),
           "chunks count doesn't match on DN " + i);
+    }
+  }
+
+  @Test
+  public void testCreateRecoveryContainer() throws Exception {
+    XceiverClientManager xceiverClientManager =
+        new XceiverClientManager(config);
+    ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
+    Pipeline newPipeline =
+        scm.getPipelineManager().createPipeline(replicationConfig);
+    scm.getPipelineManager().activatePipeline(newPipeline.getId());
+    ContainerInfo container =
+        scm.getContainerManager().allocateContainer(replicationConfig, "test");
+    scm.getContainerManager().getContainerStateManager()
+        .addContainer(container.getProtobuf());
+
+    XceiverClientSpi dnClient = xceiverClientManager.acquireClient(
+        createSingleNodePipeline(newPipeline, newPipeline.getNodes().get(0),
+            2));
+    try {
+      // To create the actual situation, container would have been in closed
+      // state at SCM.
+      scm.getContainerManager().getContainerStateManager()
+          .updateContainerState(container.containerID().getProtobuf(),
+              HddsProtos.LifeCycleEvent.FINALIZE);
+      scm.getContainerManager().getContainerStateManager()
+          .updateContainerState(container.containerID().getProtobuf(),
+              HddsProtos.LifeCycleEvent.CLOSE);
+
+      //Create the recovering container in DN.
+      ContainerProtocolCalls.createRecoveringContainer(dnClient,
+          container.containerID().getProtobuf().getId(), null);
+
+      BlockID blockID = ContainerTestHelper
+          .getTestBlockID(container.containerID().getProtobuf().getId());
+      byte[] data = "TestData".getBytes(UTF_8);
+      ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
+          ContainerTestHelper.newWriteChunkRequestBuilder(newPipeline, blockID,
+              ChunkBuffer.wrap(ByteBuffer.wrap(data)), 0).build();
+      dnClient.sendCommand(writeChunkRequest);
+
+      // Now, explicitly make a putKey request for the block.
+      ContainerProtos.ContainerCommandRequestProto putKeyRequest =
+          ContainerTestHelper.getPutBlockRequest(newPipeline,
+              writeChunkRequest.getWriteChunk());
+      dnClient.sendCommand(putKeyRequest);
+
+      ContainerProtos.ReadContainerResponseProto readContainerResponseProto =
+          ContainerProtocolCalls.readContainer(dnClient,
+              container.containerID().getProtobuf().getId(), null);
+      Assert.assertEquals(ContainerProtos.ContainerDataProto.State.RECOVERING,
+          readContainerResponseProto.getContainerData().getState());
+      // Container at SCM should be still in closed state.
+      Assert.assertEquals(HddsProtos.LifeCycleState.CLOSED,
+          scm.getContainerManager().getContainerStateManager()
+              .getContainer(container.containerID()).getState());
+      // close container call
+      ContainerProtocolCalls.closeContainer(dnClient,
+          container.containerID().getProtobuf().getId(), null);
+      // Make sure we have the container and readable.
+      readContainerResponseProto = ContainerProtocolCalls
+          .readContainer(dnClient,
+              container.containerID().getProtobuf().getId(), null);
+      Assert.assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
+          readContainerResponseProto.getContainerData().getState());
+      ContainerProtos.ReadChunkResponseProto readChunkResponseProto =
+          ContainerProtocolCalls.readChunk(dnClient,
+              writeChunkRequest.getWriteChunk().getChunkData(), blockID, null,
+              null);
+      ByteBuffer[] readOnlyByteBuffersArray = BufferUtils
+          .getReadOnlyByteBuffersArray(
+              readChunkResponseProto.getDataBuffers().getBuffersList());
+      Assert.assertEquals(readOnlyByteBuffersArray[0].limit(), data.length);
+      byte[] readBuff = new byte[readOnlyByteBuffersArray[0].limit()];
+      readOnlyByteBuffersArray[0].get(readBuff, 0, readBuff.length);
+      Assert.assertArrayEquals(data, readBuff);
+    } finally {
+      xceiverClientManager.releaseClient(dnClient, false);
     }
   }
 

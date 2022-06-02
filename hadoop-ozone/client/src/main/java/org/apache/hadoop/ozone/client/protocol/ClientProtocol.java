@@ -38,17 +38,24 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
+import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
+import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
@@ -119,6 +126,15 @@ public interface ClientProtocol {
    * */
   OzoneVolume getVolumeDetails(String volumeName)
       throws IOException;
+
+  /**
+   * @return Raw GetS3VolumeContextResponse.
+   * S3Auth won't be updated with actual userPrincipal by this call.
+   * @throws IOException
+   */
+  S3VolumeContext getS3VolumeContext() throws IOException;
+
+  OzoneVolume buildOzoneVolume(OmVolumeArgs volume);
 
   /**
    * Checks if a Volume exists and the user with a role specified has access
@@ -540,12 +556,38 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
-   * returns S3 Secret given kerberos user.
-   * @param kerberosID
+   * Returns S3 Secret given kerberos user.
+   * Will generate a secret access key for the accessId (=kerberosID)
+   * if it doesn't exist.
+   * @param kerberosID Access ID
    * @return S3SecretValue
    * @throws IOException
    */
   S3SecretValue getS3Secret(String kerberosID) throws IOException;
+
+  /**
+   * Returns S3 Secret given kerberos user.
+   * Optionally generate a secret access key for the accessId (=kerberosID)
+   * if it doesn't exist if createIfNotExist is true.
+   * When createIfNotExist is false and accessId (=kerberosID) doesn't
+   * exist, OM throws OMException with ACCESSID_NOT_FOUND to the client.
+   * @param kerberosID
+   * @param createIfNotExist
+   * @return S3SecretValue
+   * @throws IOException
+   */
+  S3SecretValue getS3Secret(String kerberosID, boolean createIfNotExist)
+          throws IOException;
+
+  /**
+   * Set secret key of a given accessId.
+   * @param accessId
+   * @param secretKey
+   * @return S3SecretValue
+   * @throws IOException
+   */
+  S3SecretValue setS3Secret(String accessId, String secretKey)
+      throws IOException;
 
   /**
    * Revoke S3 Secret of given kerberos user.
@@ -553,6 +595,91 @@ public interface ClientProtocol {
    * @throws IOException
    */
   void revokeS3Secret(String kerberosID) throws IOException;
+
+  /**
+   * Create a tenant.
+   * @param tenantId tenant name.
+   * @throws IOException
+   */
+  void createTenant(String tenantId) throws IOException;
+
+  /**
+   * Create a tenant with args.
+   *
+   * @param tenantId
+   * @param tenantArgs extra arguments e.g. volume name
+   * @throws IOException
+   */
+  void createTenant(String tenantId, TenantArgs tenantArgs) throws IOException;
+
+  /**
+   * Delete a tenant.
+   * @param tenantId tenant name.
+   * @throws IOException
+   * @return DeleteTenantState
+   */
+  DeleteTenantState deleteTenant(String tenantId) throws IOException;
+
+  /**
+   * Assign a user to a tenant.
+   * @param username user name to be assigned.
+   * @param tenantId tenant name.
+   * @param accessId access ID.
+   * @throws IOException
+   */
+  S3SecretValue tenantAssignUserAccessId(String username, String tenantId,
+      String accessId) throws IOException;
+
+  /**
+   * Revoke a user accessId previously assign to a tenant.
+   * @param accessId accessId to be revoked.
+   * @throws IOException
+   */
+  void tenantRevokeUserAccessId(String accessId) throws IOException;
+
+  /**
+   * Assign admin role to an accessId in a tenant.
+   * @param accessId access ID.
+   * @param tenantId tenant name.
+   * @param delegated true if making delegated admin.
+   * @throws IOException
+   */
+  void tenantAssignAdmin(String accessId, String tenantId, boolean delegated)
+      throws IOException;
+
+  /**
+   * Revoke admin role of an accessId from a tenant.
+   * @param accessId access ID.
+   * @param tenantId tenant name.
+   * @throws IOException
+   */
+  void tenantRevokeAdmin(String accessId, String tenantId) throws IOException;
+
+  /**
+   * Get tenant info for a user.
+   * @param userPrincipal Kerberos principal of a user.
+   * @return TenantUserInfo
+   * @throws IOException
+   */
+  TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
+      throws IOException;
+
+  /**
+   * Get List of users in a tenant.
+   * @param tenantId tenant name
+   * @param prefix optional prefix
+   * @return List of username, accessIds in tenant.
+   * @throws IOException on server error.
+   */
+  TenantUserList listUsersInTenant(String tenantId, String prefix)
+      throws IOException;
+
+  /**
+   * List tenants.
+   * @return TenantStateList
+   * @throws IOException
+   */
+  TenantStateList listTenant() throws IOException;
 
   /**
    * Get KMS client provider.

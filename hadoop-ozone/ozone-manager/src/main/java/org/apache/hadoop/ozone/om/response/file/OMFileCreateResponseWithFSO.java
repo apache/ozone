@@ -75,8 +75,13 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
      * XXX handle stale directory entries.
      */
     if (parentDirInfos != null) {
+      final long volumeId = omMetadataMgr.getVolumeId(
+              getOmKeyInfo().getVolumeName());
+      final long bucketId = omMetadataMgr.getBucketId(
+              getOmKeyInfo().getVolumeName(), getOmKeyInfo().getBucketName());
       for (OmDirectoryInfo parentDirInfo : parentDirInfos) {
-        String parentKey = parentDirInfo.getPath();
+        String parentKey = omMetadataMgr.getOzonePathKey(volumeId, bucketId,
+                parentDirInfo.getParentObjectID(), parentDirInfo.getName());
         if (LOG.isDebugEnabled()) {
           LOG.debug("putWithBatch adding parent : key {} info : {}", parentKey,
                   parentDirInfo);

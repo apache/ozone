@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -417,6 +418,23 @@ public final class ContainerProtocolCalls  {
   }
 
   /**
+   * createRecoveringContainer call that creates a container on the datanode.
+   * Currently this is used for EC reconstruction containers. When EC
+   * reconstruction coordinator reconstructing the containers, the in progress
+   * containers would be created as "RECOVERING" state containers.
+   * @param client  - client
+   * @param containerID - ID of container
+   * @param encodedToken - encodedToken if security is enabled
+   * @throws IOException
+   */
+  @InterfaceStability.Evolving
+  public static void createRecoveringContainer(XceiverClientSpi client,
+      long containerID, String encodedToken) throws IOException {
+    createContainerInternal(client, containerID, encodedToken,
+        ContainerProtos.ContainerDataProto.State.RECOVERING);
+  }
+
+  /**
    * createContainer call that creates a container on the datanode.
    * @param client  - client
    * @param containerID - ID of container
@@ -425,11 +443,26 @@ public final class ContainerProtocolCalls  {
    */
   public static void createContainer(XceiverClientSpi client, long containerID,
       String encodedToken) throws IOException {
+    createContainerInternal(client, containerID, encodedToken, null);
+  }
+  /**
+   * createContainer call that creates a container on the datanode.
+   * @param client  - client
+   * @param containerID - ID of container
+   * @param encodedToken - encodedToken if security is enabled
+   * @param state - state of the container
+   * @throws IOException
+   */
+  private static void createContainerInternal(XceiverClientSpi client,
+      long containerID, String encodedToken,
+      ContainerProtos.ContainerDataProto.State state) throws IOException {
     ContainerProtos.CreateContainerRequestProto.Builder createRequest =
-        ContainerProtos.CreateContainerRequestProto
-            .newBuilder();
+        ContainerProtos.CreateContainerRequestProto.newBuilder();
     createRequest.setContainerType(ContainerProtos.ContainerType
         .KeyValueContainer);
+    if (state != null) {
+      createRequest.setState(state);
+    }
 
     String id = client.getPipeline().getFirstNode().getUuidString();
     ContainerCommandRequestProto.Builder request =

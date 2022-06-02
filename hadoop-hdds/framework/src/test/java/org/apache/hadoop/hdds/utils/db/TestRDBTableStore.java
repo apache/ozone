@@ -22,10 +22,13 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.StringUtils;
@@ -36,6 +39,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.junit.Assert;
+import org.junit.Rule;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
 import org.rocksdb.RocksDB;
@@ -53,6 +59,13 @@ public class TestRDBTableStore {
           "Fourth", "Fifth",
           "Sixth", "Seventh",
           "Eighth");
+  private final List<String> prefixedFamilies = Arrays.asList(
+      "PrefixFirst",
+      "PrefixTwo", "PrefixThree",
+      "PrefixFour", "PrefixFifth"
+  );
+  private static final int PREFIX_LENGTH = 9;
+  @Rule
   private RDBStore rdbStore = null;
   private DBOptions options = null;
   private static byte[][] bytesOf;
@@ -88,6 +101,13 @@ public class TestRDBTableStore {
     Set<TableConfig> configSet = new HashSet<>();
     for (String name : families) {
       TableConfig newConfig = new TableConfig(name, new ColumnFamilyOptions());
+      configSet.add(newConfig);
+    }
+    for (String name : prefixedFamilies) {
+      ColumnFamilyOptions cfOptions = new ColumnFamilyOptions();
+      cfOptions.useFixedLengthPrefixExtractor(PREFIX_LENGTH);
+
+      TableConfig newConfig = new TableConfig(name, cfOptions);
       configSet.add(newConfig);
     }
     rdbStore = new RDBStore(tempDir, options, configSet);
@@ -428,6 +448,212 @@ public class TestRDBTableStore {
       byte[] value =
           RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
       testTable.put(key, value);
+    }
+  }
+
+  @Test
+  public void testPrefixedIterator() throws Exception {
+    int containerCount = 3;
+    int blockCount = 5;
+    List<String> testPrefixes = generatePrefixes(containerCount);
+    List<Map<String, String>> testData = generateKVs(testPrefixes, blockCount);
+
+    try (Table<byte[], byte[]> testTable = rdbStore.getTable("PrefixFirst")) {
+      // write data
+      populatePrefixedTable(testTable, testData);
+
+      // iterator should seek to right pos in the middle
+      byte[] samplePrefix = testPrefixes.get(2).getBytes(
+          StandardCharsets.UTF_8);
+      try (TableIterator<byte[],
+          ? extends Table.KeyValue<byte[], byte[]>> iter = testTable.iterator(
+              samplePrefix)) {
+        int keyCount = 0;
+        while (iter.hasNext()) {
+          // iterator should only meet keys with samplePrefix
+          Assert.assertTrue(Arrays.equals(
+              Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
+              samplePrefix));
+          keyCount++;
+        }
+
+        // iterator should end at right pos
+        Assert.assertEquals(blockCount, keyCount);
+
+        // iterator should be able to seekToFirst
+        iter.seekToFirst();
+        Assert.assertTrue(iter.hasNext());
+        Assert.assertTrue(Arrays.equals(
+            Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
+            samplePrefix));
+      }
+    }
+  }
+
+  @Test
+  public void testPrefixedRangeKVs() throws Exception {
+    int containerCount = 3;
+    int blockCount = 5;
+    List<String> testPrefixes = generatePrefixes(containerCount);
+    List<Map<String, String>> testData = generateKVs(testPrefixes, blockCount);
+
+    try (Table<byte[], byte[]> testTable = rdbStore.getTable("PrefixFirst")) {
+
+      // write data
+      populatePrefixedTable(testTable, testData);
+
+      byte[] samplePrefix = testPrefixes.get(2).getBytes(
+          StandardCharsets.UTF_8);
+
+      // test start at first
+      byte[] startKey = samplePrefix;
+      List<? extends Table.KeyValue<byte[], byte[]>> rangeKVs = testTable
+          .getRangeKVs(startKey, 3, samplePrefix);
+      Assert.assertEquals(3, rangeKVs.size());
+
+      // test start with a middle key
+      startKey = StringUtils.string2Bytes(
+          StringUtils.bytes2String(samplePrefix) + "3");
+      rangeKVs = testTable.getRangeKVs(startKey, blockCount, samplePrefix);
+      Assert.assertEquals(2, rangeKVs.size());
+
+      // test with a filter
+      MetadataKeyFilters.KeyPrefixFilter filter1 = new MetadataKeyFilters
+          .KeyPrefixFilter()
+          .addFilter(StringUtils.bytes2String(samplePrefix) + "1");
+      startKey = StringUtils.string2Bytes(
+          StringUtils.bytes2String(samplePrefix));
+      rangeKVs = testTable.getRangeKVs(startKey, blockCount,
+          samplePrefix, filter1);
+      Assert.assertEquals(1, rangeKVs.size());
+
+      // test start with a non-exist key
+      startKey = StringUtils.string2Bytes(
+          StringUtils.bytes2String(samplePrefix) + 123);
+      rangeKVs = testTable.getRangeKVs(startKey, 10, samplePrefix);
+      Assert.assertEquals(0, rangeKVs.size());
+    }
+  }
+
+  @Test
+  public void testDumpAndLoadBasic(@TempDir Path tempDir) throws Exception {
+    int containerCount = 3;
+    int blockCount = 5;
+    List<String> testPrefixes = generatePrefixes(containerCount);
+    List<Map<String, String>> testData = generateKVs(testPrefixes, blockCount);
+    File dumpFile = new File(tempDir.toString() + "/PrefixTwo.dump");
+    byte[] samplePrefix = testPrefixes.get(2).getBytes(StandardCharsets.UTF_8);
+
+    try (Table<byte[], byte[]> testTable1 = rdbStore.getTable("PrefixTwo")) {
+      // write data
+      populatePrefixedTable(testTable1, testData);
+
+      // dump to external file
+      testTable1.dumpToFileWithPrefix(dumpFile, samplePrefix);
+
+      // check dump file exist
+      Assert.assertTrue(dumpFile.exists());
+      Assert.assertTrue(dumpFile.length() != 0);
+    }
+
+    // load dump file into another table
+    try (Table<byte[], byte[]> testTable2 = rdbStore.getTable("PrefixThree")) {
+      testTable2.loadFromFile(dumpFile);
+
+      // check loaded keys
+      try (TableIterator<byte[],
+          ? extends Table.KeyValue<byte[], byte[]>> iter = testTable2.iterator(
+          samplePrefix)) {
+        int keyCount = 0;
+        while (iter.hasNext()) {
+          // check prefix
+          Assert.assertTrue(Arrays.equals(
+              Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
+              samplePrefix));
+          keyCount++;
+        }
+
+        // check block count
+        Assert.assertEquals(blockCount, keyCount);
+      }
+    }
+  }
+
+  @Test
+  public void testDumpAndLoadEmpty(@TempDir Path tempDir) throws Exception {
+    int containerCount = 3;
+    List<String> testPrefixes = generatePrefixes(containerCount);
+
+    File dumpFile = new File(tempDir.toString() + "/PrefixFour.dump");
+    byte[] samplePrefix = testPrefixes.get(2).getBytes(StandardCharsets.UTF_8);
+
+    try (Table<byte[], byte[]> testTable1 = rdbStore.getTable("PrefixFour")) {
+      // no data
+
+      // dump to external file
+      testTable1.dumpToFileWithPrefix(dumpFile, samplePrefix);
+
+      // check dump file exist
+      Assert.assertTrue(dumpFile.exists());
+      // empty dump file
+      Assert.assertTrue(dumpFile.length() == 0);
+    }
+
+    // load dump file into another table
+    try (Table<byte[], byte[]> testTable2 = rdbStore.getTable("PrefixFifth")) {
+      testTable2.loadFromFile(dumpFile);
+
+      // check loaded keys
+      try (TableIterator<byte[],
+          ? extends Table.KeyValue<byte[], byte[]>> iter = testTable2.iterator(
+          samplePrefix)) {
+        int keyCount = 0;
+        while (iter.hasNext()) {
+          // check prefix
+          Assert.assertTrue(Arrays.equals(
+              Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
+              samplePrefix));
+          keyCount++;
+        }
+
+        // check block count
+        Assert.assertEquals(0, keyCount);
+      }
+    }
+  }
+
+  private List<String> generatePrefixes(int prefixCount) {
+    List<String> prefixes = new ArrayList<>();
+    for (int i = 0; i < prefixCount; i++) {
+      // use alphabetic chars so we get fixed length prefix when
+      // convert to byte[]
+      prefixes.add(RandomStringUtils.randomAlphabetic(PREFIX_LENGTH));
+    }
+    return prefixes;
+  }
+
+  private List<Map<String, String>> generateKVs(List<String> prefixes,
+      int keyCount) {
+    List<Map<String, String>> data = new ArrayList<>();
+    for (String prefix : prefixes) {
+      Map<String, String> kvs = new HashMap<>();
+      for (int i = 0; i < keyCount; i++) {
+        String key = prefix + i;
+        String val = RandomStringUtils.random(10);
+        kvs.put(key, val);
+      }
+      data.add(kvs);
+    }
+    return data;
+  }
+
+  private void populatePrefixedTable(Table<byte[], byte[]> table,
+      List<Map<String, String>> testData) throws IOException {
+    for (Map<String, String> segment : testData) {
+      for (Map.Entry<String, String> entry : segment.entrySet()) {
+        table.put(entry.getKey().getBytes(StandardCharsets.UTF_8),
+            entry.getValue().getBytes(StandardCharsets.UTF_8));
+      }
     }
   }
 }

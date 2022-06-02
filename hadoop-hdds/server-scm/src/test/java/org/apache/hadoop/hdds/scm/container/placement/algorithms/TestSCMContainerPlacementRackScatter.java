@@ -61,6 +61,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
@@ -308,11 +309,32 @@ public class TestSCMContainerPlacementRackScatter {
     excludedNodes.clear();
     excludedNodes.add(datanodes.get(0));
     excludedNodes.add(datanodes.get(5));
-    datanodeDetails = policy.chooseDatanodes(
-        excludedNodes, null, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertEquals(getRackSize(datanodeDetails, excludedNodes),
-        Math.min(totalNum, rackNum));
+    if (datanodeCount == 6) {
+      /*
+      * when datanodeCount is 6, the clusterMap will be
+      * /rack0/node0
+      * /rack0/node1
+      * /rack0/node2
+      * /rack0/node3
+      * /rack0/node4
+      * /rack1/node5
+      * if we select node0 and node5 as the excluded datanode,
+      * only datanode in rack0 will be chosen when calling
+      * `policy.chooseDatanodes` and the placement will not be
+      *  met since there are two racks exist, but only one
+      * of them is chosen
+      * */
+      SCMException e = assertThrows(SCMException.class,
+          () -> policy.chooseDatanodes(excludedNodes, null, 3, 0, 15));
+      String message = e.getMessage();
+      assumeTrue(message.contains("ContainerPlacementPolicy not met"));
+    } else {
+      datanodeDetails = policy.chooseDatanodes(
+          excludedNodes, null, nodeNum, 0, 15);
+      Assert.assertEquals(nodeNum, datanodeDetails.size());
+      Assert.assertEquals(getRackSize(datanodeDetails, excludedNodes),
+          Math.min(totalNum, rackNum));
+    }
   }
 
   @Test

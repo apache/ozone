@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.shell.s3.S3Shell;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.hadoop.util.ToolRunner;
@@ -110,6 +111,7 @@ public class TestOzoneShellHA {
   private static MiniOzoneCluster cluster = null;
   private OzoneShell ozoneShell = null;
   private OzoneAdmin ozoneAdminShell = null;
+  private S3Shell s3Shell = null;
 
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
@@ -175,6 +177,7 @@ public class TestOzoneShellHA {
   public void setup() throws UnsupportedEncodingException {
     ozoneShell = new OzoneShell();
     ozoneAdminShell = new OzoneAdmin();
+    s3Shell = new S3Shell();
     System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
   }
@@ -1084,5 +1087,39 @@ public class TestOzoneShellHA {
         "bucket", "delete", firstVolumePrefix + bucket}));
     testVolumes.forEach(vol -> execute(ozoneShell, new String[] {
         "volume", "delete", vol}));
+  }
+
+  @Test
+  public void testClientBucketLayoutValidation() {
+    String volName = "/vol-" + UUID.randomUUID();
+    String[] args =
+        new String[]{"volume", "create", "o3://" + omServiceId + volName};
+    execute(ozoneShell, args);
+
+    args = new String[]{
+        "bucket", "create", "o3://" + omServiceId + volName + "/buck-1",
+        "--layout", ""
+    };
+    try {
+      execute(ozoneShell, args);
+      Assert.fail("Should throw exception on unsupported bucket layouts!");
+    } catch (Exception e) {
+      GenericTestUtils.assertExceptionContains(
+          "expected one of [FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY] ",
+          e);
+    }
+
+    args = new String[]{
+        "bucket", "create", "o3://" + omServiceId + volName + "/buck-2",
+        "--layout", "INVALID"
+    };
+    try {
+      execute(ozoneShell, args);
+      Assert.fail("Should throw exception on unsupported bucket layouts!");
+    } catch (Exception e) {
+      GenericTestUtils.assertExceptionContains(
+          "expected one of [FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY] ",
+          e);
+    }
   }
 }

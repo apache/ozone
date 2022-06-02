@@ -81,6 +81,7 @@ public class TestNSSummaryTask {
   private static final String DIR_FOUR = "dir4";
   private static final String DIR_FIVE = "dir5";
 
+  private static final long VOL_OBJECT_ID = 0L;
   private static final long BUCKET_ONE_OBJECT_ID = 1L;
   private static final long BUCKET_TWO_OBJECT_ID = 2L;
   private static final long KEY_ONE_OBJECT_ID = 3L;
@@ -486,6 +487,8 @@ public class TestNSSummaryTask {
             FILE_ONE,
             KEY_ONE_OBJECT_ID,
             BUCKET_ONE_OBJECT_ID,
+            BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID,
             KEY_ONE_SIZE);
     writeKeyToOm(reconOMMetadataManager,
             KEY_TWO,
@@ -494,6 +497,8 @@ public class TestNSSummaryTask {
             FILE_TWO,
             KEY_TWO_OBJECT_ID,
             BUCKET_TWO_OBJECT_ID,
+            BUCKET_TWO_OBJECT_ID,
+            VOL_OBJECT_ID,
             KEY_TWO_OLD_SIZE);
     writeKeyToOm(reconOMMetadataManager,
             KEY_THREE,
@@ -502,6 +507,8 @@ public class TestNSSummaryTask {
             FILE_THREE,
             KEY_THREE_OBJECT_ID,
             DIR_TWO_OBJECT_ID,
+            BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID,
             KEY_THREE_SIZE);
     writeKeyToOm(reconOMMetadataManager,
             KEY_FOUR,
@@ -510,13 +517,18 @@ public class TestNSSummaryTask {
             FILE_FOUR,
             KEY_FOUR_OBJECT_ID,
             BUCKET_TWO_OBJECT_ID,
+            BUCKET_TWO_OBJECT_ID,
+            VOL_OBJECT_ID,
             KEY_FOUR_SIZE);
     writeDirToOm(reconOMMetadataManager, DIR_ONE_OBJECT_ID,
-            BUCKET_ONE_OBJECT_ID, DIR_ONE);
+            BUCKET_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID, DIR_ONE);
     writeDirToOm(reconOMMetadataManager, DIR_TWO_OBJECT_ID,
-            DIR_ONE_OBJECT_ID, DIR_TWO);
+            DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID, DIR_TWO);
     writeDirToOm(reconOMMetadataManager, DIR_THREE_OBJECT_ID,
-            DIR_ONE_OBJECT_ID, DIR_THREE);
+            DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID, DIR_THREE);
   }
 
   private BucketLayout getBucketLayout() {

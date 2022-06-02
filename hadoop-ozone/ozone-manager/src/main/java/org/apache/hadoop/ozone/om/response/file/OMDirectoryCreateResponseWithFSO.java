@@ -47,8 +47,12 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
   private OmDirectoryInfo dirInfo;
   private List<OmDirectoryInfo> parentDirInfos;
   private Result result;
+  private String volume;
+  private String bucket;
 
   public OMDirectoryCreateResponseWithFSO(@Nonnull OMResponse omResponse,
+                                          @Nonnull String volume,
+                                          @Nonnull String bucket,
                                           @Nonnull OmDirectoryInfo dirInfo,
                                           @Nonnull
                                               List<OmDirectoryInfo> pDirInfos,
@@ -58,6 +62,8 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
     this.dirInfo = dirInfo;
     this.parentDirInfos = pDirInfos;
     this.result = result;
+    this.volume = volume;
+    this.bucket = bucket;
   }
 
   /**
@@ -80,10 +86,13 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
                                 BatchOperation batchOperation)
           throws IOException {
     if (dirInfo != null) {
+      final long volumeId = omMetadataManager.getVolumeId(volume);
+      final long bucketId = omMetadataManager.getBucketId(volume, bucket);
       if (parentDirInfos != null) {
         for (OmDirectoryInfo parentDirInfo : parentDirInfos) {
           String parentKey = omMetadataManager
-                  .getOzonePathKey(parentDirInfo.getParentObjectID(),
+                  .getOzonePathKey(volumeId, bucketId,
+                          parentDirInfo.getParentObjectID(),
                           parentDirInfo.getName());
           LOG.debug("putWithBatch parent : dir {} info : {}", parentKey,
                   parentDirInfo);
@@ -92,7 +101,7 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
         }
       }
 
-      String dirKey = omMetadataManager.getOzonePathKey(
+      String dirKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
               dirInfo.getParentObjectID(), dirInfo.getName());
       omMetadataManager.getDirectoryTable().putWithBatch(batchOperation, dirKey,
               dirInfo);

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -90,6 +91,8 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    */
   @Test
   public void testDeleteOpenKeysNotInTable() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager, getBucketLayout());
     List<Pair<Long, OmKeyInfo>> openKeys =
         makeOpenKeys(volumeName, bucketName, 5);
     deleteOpenKeysFromCache(openKeys);
@@ -110,6 +113,13 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     final String volume2 = UUID.randomUUID().toString();
     final String bucket1 = UUID.randomUUID().toString();
     final String bucket2 = UUID.randomUUID().toString();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volume1, bucket1,
+            omMetadataManager, getBucketLayout());
+    OMRequestTestUtils.addVolumeAndBucketToDB(volume1, bucket2,
+            omMetadataManager, getBucketLayout());
+    OMRequestTestUtils.addVolumeAndBucketToDB(volume2, bucket2,
+            omMetadataManager, getBucketLayout());
 
     List<Pair<Long, OmKeyInfo>> v1b1KeysToDelete =
         makeOpenKeys(volume1, bucket1, 3);
@@ -165,6 +175,9 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     final String bucket = UUID.randomUUID().toString();
     final String key = UUID.randomUUID().toString();
 
+    OMRequestTestUtils.addVolumeAndBucketToDB(volume, bucket,
+            omMetadataManager, getBucketLayout());
+
     List<Pair<Long, OmKeyInfo>> keysToKeep =
         makeOpenKeys(volume, bucket, key, 3);
     List<Pair<Long, OmKeyInfo>> keysToDelete =
@@ -191,6 +204,9 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     final String key = UUID.randomUUID().toString();
     final int numExistentKeys = 3;
     final int numNonExistentKeys = 5;
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volume, bucket,
+            omMetadataManager, getBucketLayout());
 
     OMMetrics metrics = ozoneManager.getMetrics();
     Assert.assertEquals(metrics.getNumOpenKeyDeleteRequests(), 0);
@@ -354,22 +370,29 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     }
   }
 
-  private List<String> getDBKeyNames(List<Pair<Long, OmKeyInfo>> openKeys) {
-    return openKeys.stream()
-        .map(getBucketLayout().isFileSystemOptimized() ?
-            p -> omMetadataManager.getOpenFileName(
-                p.getRight().getParentObjectID(),
-                p.getRight().getFileName(),
-                p.getLeft()
-            ) :
-            p -> omMetadataManager.getOpenKey(
-                p.getRight().getVolumeName(),
-                p.getRight().getBucketName(),
-                p.getRight().getKeyName(),
-                p.getLeft()
-            )
-        )
-        .collect(Collectors.toList());
+  private List<String> getDBKeyNames(List<Pair<Long, OmKeyInfo>> openKeys)
+          throws IOException {
+
+    final List<String> result = new ArrayList<>();
+    for (Pair<Long, OmKeyInfo> entry : openKeys) {
+      final OmKeyInfo ki = entry.getRight();
+      if (getBucketLayout().isFileSystemOptimized()) {
+        result.add(omMetadataManager.getOpenFileName(
+                omMetadataManager.getVolumeId(ki.getVolumeName()),
+                omMetadataManager.getBucketId(ki.getVolumeName(),
+                        ki.getBucketName()),
+                ki.getParentObjectID(),
+                ki.getFileName(),
+                entry.getLeft()));
+      } else {
+        result.add(omMetadataManager.getOpenKey(
+                entry.getRight().getVolumeName(),
+                entry.getRight().getBucketName(),
+                entry.getRight().getKeyName(),
+                entry.getLeft()));
+      }
+    }
+    return result;
   }
 
   /**
@@ -398,7 +421,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    * {@code OpenKeyDeleteRequest}.
    */
   private OMRequest createDeleteOpenKeyRequest(
-      List<Pair<Long, OmKeyInfo>> keysToDelete) {
+      List<Pair<Long, OmKeyInfo>> keysToDelete) throws IOException {
 
     List<String> names = getDBKeyNames(keysToDelete);
 

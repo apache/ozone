@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -40,13 +41,18 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
+import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
+import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
+import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
@@ -537,6 +543,31 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
+  /**
+   * Gets s3Secret for given kerberos user.
+   * @param kerberosID
+   * @param createIfNotExist
+   * @return S3SecretValue
+   * @throws IOException
+   */
+  default S3SecretValue getS3Secret(String kerberosID, boolean createIfNotExist)
+      throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach");
+  };
+
+  /**
+   * Set secret key for accessId.
+   * @param accessId
+   * @param secretKey
+   * @return S3SecretValue
+   * @throws IOException
+   */
+  default S3SecretValue setS3Secret(String accessId, String secretKey)
+      throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach");
+  }
 
   /**
    * Revokes s3Secret of given kerberos user.
@@ -548,6 +579,101 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
+  /**
+   * Create a tenant.
+   * @param omTenantArgs OmTenantArgs
+   * @throws IOException
+   */
+  default void createTenant(OmTenantArgs omTenantArgs) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach");
+  }
+
+  /**
+   * Delete a tenant.
+   * @param tenantId tenant name.
+   * @return DeleteTenantResponse
+   * @throws IOException
+   */
+  default DeleteTenantState deleteTenant(String tenantId)
+      throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach");
+  }
+
+  /**
+   * Assign user to a tenant.
+   * @param username user name to be assigned.
+   * @param tenantId tenant name.
+   * @param accessId access ID.
+   * @return S3SecretValue
+   * @throws IOException
+   */
+  default S3SecretValue tenantAssignUserAccessId(String username,
+                                                 String tenantId,
+                                                 String accessId)
+      throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach");
+  }
+
+  S3VolumeContext getS3VolumeContext() throws IOException;
+
+  /**
+   * Revoke user accessId to a tenant.
+   * @param accessId accessId to be revoked.
+   * @throws IOException
+   */
+  default void tenantRevokeUserAccessId(String accessId) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach");
+  }
+
+  /**
+   * Assign admin role to a user identified by an accessId in a tenant.
+   * @param accessId access ID.
+   * @param tenantId tenant name.
+   * @param delegated true if making delegated admin.
+   * @throws IOException
+   */
+  default void tenantAssignAdmin(String accessId,
+                                 String tenantId,
+                                 boolean delegated)
+      throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach");
+  }
+
+  /**
+   * Revoke admin role of an accessId in a tenant.
+   * @param accessId access ID.
+   * @param tenantId tenant name.
+   * @throws IOException
+   */
+  default void tenantRevokeAdmin(String accessId,
+                                 String tenantId) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach");
+  }
+
+  /**
+   * Get tenant info for a user.
+   * @param userPrincipal Kerberos principal of a user.
+   * @return TenantUserInfo
+   * @throws IOException
+   */
+  TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
+      throws IOException;
+
+  TenantUserList listUsersInTenant(String tenantId, String prefix)
+      throws IOException;
+
+  /**
+   * List tenants.
+   * @return TenantStateList
+   * @throws IOException
+   */
+  TenantStateList listTenant() throws IOException;
 
   /**
    * OzoneFS api to get file status for an entry.

@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -46,9 +47,12 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
   public void testAddToDBBatch() throws Exception {
     omBucketInfo = OmBucketInfo.newBuilder()
             .setVolumeName(volumeName).setBucketName(bucketName)
+            .setObjectID(System.currentTimeMillis())
             .setCreationTime(Time.now()).build();
 
-    OmKeyInfo omKeyInfo = getOmKeyInfo();
+    String ozoneKey = addKeyToTable();
+    OmKeyInfo omKeyInfo = omMetadataManager
+            .getKeyTable(getBucketLayout()).get(ozoneKey);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder().setDeleteKeyResponse(
@@ -59,8 +63,6 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
     OMKeyDeleteResponse omKeyDeleteResponse = getOmKeyDeleteResponse(omKeyInfo,
             omResponse);
-
-    String ozoneKey = addKeyToTable();
 
     Assert.assertTrue(
         omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneKey));
@@ -85,9 +87,13 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
   public void testAddToDBBatchWithNonEmptyBlocks() throws Exception {
     omBucketInfo = OmBucketInfo.newBuilder()
             .setVolumeName(volumeName).setBucketName(bucketName)
+            .setObjectID(System.currentTimeMillis())
             .setCreationTime(Time.now()).build();
 
-    OmKeyInfo omKeyInfo = getOmKeyInfo();
+    final String ozoneKey = addKeyToTable();
+    final OmKeyInfo omKeyInfo = omMetadataManager
+            .getKeyTable(getBucketLayout())
+            .get(ozoneKey);
 
     // Add block to key.
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
@@ -109,8 +115,6 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
     omKeyLocationInfoList.add(omKeyLocationInfo);
 
     omKeyInfo.appendNewBlocks(omKeyLocationInfoList, false);
-
-    String ozoneKey = addKeyToTable();
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder().setDeleteKeyResponse(
@@ -190,5 +194,9 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
   protected OmBucketInfo getOmBucketInfo() {
     return omBucketInfo;
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.OBJECT_STORE;
   }
 }
