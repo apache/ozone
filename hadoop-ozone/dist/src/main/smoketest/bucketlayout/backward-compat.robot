@@ -25,10 +25,10 @@ Setup Cluster Data
 
 Test Info Compat
     [Tags]  test-bucket-layout-compat
-    ${result} =     Execute and checkrc                     ozone sh bucket info /${prefix}vol1/${prefix}default-fso    255
+    ${result} =     Execute                     ozone sh bucket info /${prefix}vol1/${prefix}default-fso
                     Should Contain  ${result}   NOT_SUPPORTED_OPERATION
 
-    ${result} =     Execute and checkrc                     ozone sh bucket info /${prefix}vol1/${prefix}default-obs    255
+    ${result} =     Execute                     ozone sh bucket info /${prefix}vol1/${prefix}default-obs
                     Should Contain  ${result}   NOT_SUPPORTED_OPERATION
 
     ${result} =     Execute                     ozone sh bucket info /${prefix}vol1/${prefix}default-legacy | grep name
