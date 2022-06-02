@@ -31,6 +31,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 
 import com.google.common.util.concurrent.Striped;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -977,9 +978,8 @@ public class KeyValueHandler extends Handler {
       throws IOException {
     container.writeLock();
     try {
-      // Move the container to CLOSING state only if it's OPEN
-      if (container.getContainerState() == State.OPEN || container
-          .getContainerState() == State.RECOVERING) {
+      // Move the container to CLOSING state only if it's OPEN/RECOVERING
+      if (HddsUtils.isOpenToWriteState(container.getContainerState())) {
         container.markContainerForClose();
         sendICR(container);
       }

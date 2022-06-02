@@ -441,7 +441,6 @@ public final class ContainerTestHelper {
 
     ContainerProtos.PutBlockRequestProto.Builder putRequest =
         ContainerProtos.PutBlockRequestProto.newBuilder();
-    putRequest.setEof(true);
 
     BlockData blockData = new BlockData(
         BlockID.getFromProtobuf(writeRequest.getBlockID()));
