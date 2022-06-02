@@ -106,17 +106,23 @@ public class TestListStatus {
     // e) check if existing start key >>>
     checkKeyList("a1", "a1/a12", 100, 2, false);
 
-    // f) check with non existing start key>>>
+    // f) check with non-existing start key
     checkKeyList("", "a7", 100, 6, false);
 
-    // g) check if half prefix works <<<<
+    // g) check if half prefix works
     checkKeyList("b", "", 100, 4, true);
 
     // h) check half prefix with non-existing start key
     checkKeyList("b", "b5", 100, 2, true);
 
     // i) check half prefix with non-existing parent in start key
+    checkKeyList("b", "c", 100, 0, true);
+
+    // i) check half prefix with non-existing parent in start key
     checkKeyList("b", "b/g5", 100, 4, true);
+
+    // i) check half prefix with non-existing parent in start key
+    checkKeyList("b", "c/g5", 100, 0, true);
 
     // j) check prefix with non-existing prefix key
     //    and non-existing parent in start key
@@ -149,8 +155,8 @@ public class TestListStatus {
 
     "b1"      File
     "b2"      File
-    "b3"      File
-    "b4"      File
+    "b7"      File
+    "b8"      File
      */
     ozoneBucket.createDirectory("/a1");
     createFile(ozoneBucket, "/a2");

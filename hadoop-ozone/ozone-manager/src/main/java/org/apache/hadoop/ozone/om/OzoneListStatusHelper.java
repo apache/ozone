@@ -120,10 +120,11 @@ public class OzoneListStatusHelper {
     // if the keyName is null
     if (StringUtils.isNotBlank(startKey)) {
       if (StringUtils.isNotBlank(keyName)) {
-        if (!OzoneFSUtils.isImmediateChild(keyName, startKey)) {
+        if (!OzoneFSUtils.isSibling(keyName, startKey) &&
+            !OzoneFSUtils.isImmediateChild(keyName, startKey)) {
           if (LOG.isDebugEnabled()) {
-            LOG.debug("StartKey {} is not an immediate child of keyName {}. " +
-                "Returns empty list", startKey, keyName);
+            LOG.debug("StartKey {} is not an immediate child or not a sibling"
+                + " of keyName {}. Returns empty list", startKey, keyName);
           }
           return new ArrayList<>();
         }
@@ -152,6 +153,10 @@ public class OzoneListStatusHelper {
       } catch (OMException ome) {
         if (ome.getResult() == FILE_NOT_FOUND) {
           // the parent dir cannot be found return null list
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Parent directory of keyName:{} does not exist." +
+                "Returns empty list", keyName);
+          }
           return new ArrayList<>();
         }
         throw ome;
