@@ -344,7 +344,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // only be in open or closing state.
         State containerState = container.getContainerData().getState();
         Preconditions.checkState(
-            containerState == State.OPEN || containerState == State.CLOSING);
+            containerState == State.OPEN
+                || containerState == State.CLOSING
+                || containerState == State.RECOVERING);
         // mark and persist the container state to be unhealthy
         try {
           handler.markContainerUnhealthy(container);
@@ -471,7 +473,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
 
     State containerState = container.getContainerState();
-    if (!HddsUtils.isReadOnly(msg) && containerState != State.OPEN) {
+    if (!HddsUtils.isReadOnly(msg)
+        && !HddsUtils.isOpenToWriteState(containerState)) {
       switch (cmdType) {
       case CreateContainer:
         // Create Container is idempotent. There is nothing to validate.
@@ -481,8 +484,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // while execution. Nothing to validate here.
         break;
       default:
-        // if the container is not open, no updates can happen. Just throw
-        // an exception
+        // if the container is not open/recovering, no updates can happen. Just
+        // throw an exception
         ContainerNotOpenException cex = new ContainerNotOpenException(
             "Container " + containerID + " in " + containerState + " state");
         audit(action, eventType, params, AuditEventStatus.FAILURE, cex);
