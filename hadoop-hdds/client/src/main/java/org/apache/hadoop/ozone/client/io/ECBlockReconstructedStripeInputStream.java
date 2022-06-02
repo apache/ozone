@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.client.io;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -63,6 +64,7 @@ import static java.util.stream.IntStream.range;
  * the data blocks are not available. The public API for this class is:
  *
  *     readStripe(ByteBuffer[] bufs)
+ *     recoverChunks(ByteBuffer[] bufs)
  *
  * The other inherited public APIs will throw a NotImplementedException. This is
  * because this class is intended to only read full stripes into a reusable set
@@ -96,6 +98,18 @@ import static java.util.stream.IntStream.range;
  * than a full stripe, the client can simply read upto remaining from each
  * buffer in turn. If there is a full stripe, each buffer should have ecChunk
  * size remaining.
+ *
+ * recoverChunks() handles the more generic case, where specific buffers, even
+ * parity ones, are to be recovered -- these should be passed to the method.
+ * The whole stripe is not important for the caller in this case.  The indexes
+ * of the buffers that need to be recovered should be set by calling
+ * setRecoveryIndexes() before any read operation.
+ *
+ * Example: with rs-3-2 there are 3 data and 2 parity replicas, indexes are [0,
+ * 1, 2, 3, 4].  If replicas 2 and 3 are missing and need to be recovered,
+ * caller should {@code setRecoveryIndexes([2, 3])}, and then can recover the
+ * part of each stripe for these replicas by calling
+ * {@code recoverChunks(bufs)}, passing two buffers.
  */
 public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
 
@@ -120,7 +134,8 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
 
   // The blockLocation indexes to use to read data into the output buffers
   private final SortedSet<Integer> selectedIndexes = new TreeSet<>();
-  // indexes to which internal buffers are allocated
+  // indexes of internal buffers (ones which are not requested by the caller,
+  // but needed for reconstructing missing data)
   private final SortedSet<Integer> internalBuffers = new TreeSet<>();
   // Data Indexes we have tried to read from, and failed for some reason
   private final Set<Integer> failedDataIndexes = new HashSet<>();
@@ -182,6 +197,10 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     }
   }
 
+  /**
+   * Set the EC indexes that should be recovered by
+   * {@link #recoverChunks(ByteBuffer[])}.
+   */
   public synchronized void setRecoveryIndexes(Collection<Integer> indexes) {
     if (initialized) {
       throw new IllegalStateException("Cannot set recovery indexes after the " +
@@ -291,6 +310,23 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   /**
+   * This method should be passed a list of byteBuffers which must contain the
+   * same number of entries as previously set recovery indexes. Each Bytebuffer
+   * should be at position 0 and have EC ChunkSize bytes remaining.
+   * After returning, the buffers will contain the data for the parts to be
+   * recovered in the block's next stripe. The buffers will be returned
+   * "ready to read" with their position set to zero and the limit set
+   * according to how much data they contain.
+   *
+   * @param bufs A list of byteBuffers into which recovered data is written
+   * @return The number of bytes read
+   */
+  public synchronized int recoverChunks(ByteBuffer[] bufs) throws IOException {
+    Preconditions.assertTrue(isOfflineRecovery());
+    return read(bufs);
+  }
+
+  /**
    * This method should be passed a list of byteBuffers which must contain EC
    * Data Number entries. Each Bytebuffer should be at position 0 and have EC
    * ChunkSize bytes remaining. After returning, the buffers will contain the
@@ -306,6 +342,11 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
    * @throws IOException
    */
   public synchronized int readStripe(ByteBuffer[] bufs) throws IOException {
+    return read(bufs);
+  }
+
+  @VisibleForTesting
+  synchronized int read(ByteBuffer[] bufs) throws IOException {
     int toRead = (int)Math.min(getRemaining(), getStripeSize());
     if (toRead == 0) {
       return EOF;
