@@ -31,12 +31,13 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.USER_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 
 /**
  * Response for DeleteVolume request.
  */
-@CleanupTableInfo(cleanupTables = {VOLUME_TABLE})
+@CleanupTableInfo(cleanupTables = {VOLUME_TABLE,USER_TABLE})
 public class OMVolumeDeleteResponse extends OMClientResponse {
   private String volume;
   private String owner;

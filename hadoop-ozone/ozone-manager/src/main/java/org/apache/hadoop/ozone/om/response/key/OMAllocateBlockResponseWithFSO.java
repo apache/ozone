@@ -54,7 +54,7 @@ public class OMAllocateBlockResponseWithFSO extends OMAllocateBlockResponse {
   }
 
   @Override
-  public void addToDBBatch(OMMetadataManager omMetadataManager,
+    public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
     OMFileRequest.addToOpenFileTable(omMetadataManager, batchOperation,

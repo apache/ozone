@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om.response;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.Iterators;
+import com.google.common.collect.Maps;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -28,6 +30,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Pipeline;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -36,6 +40,7 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -45,12 +50,20 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
+import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCommitPartResponse;
+import org.apache.hadoop.ozone.om.response.s3.security.S3GetSecretResponse;
+import org.apache.hadoop.ozone.om.response.security.OMGetDelegationTokenResponse;
+import org.apache.hadoop.ozone.om.response.security.OMRenewDelegationTokenResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.om.response.key.acl.OMKeyAclResponseWithFSO;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -58,22 +71,25 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.stubbing.Answer;
 import org.reflections.Reflections;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.shortThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -106,6 +122,7 @@ public class TestCleanupTableInfo {
   private OzoneManagerDoubleBufferHelper dbh;
 
   private OzoneManager om;
+  private BatchOperation batchOperation;
 
   /**
    * Creates a mock Ozone Manager object.
@@ -140,6 +157,7 @@ public class TestCleanupTableInfo {
         .getDefault(new OzoneConfiguration()));
     addVolumeToMetaTable(aVolumeArgs());
     addBucketToMetaTable(aBucketInfo());
+    batchOperation = metaMgr.getStore().initBatchOperation();
   }
 
   @Test
@@ -167,12 +185,230 @@ public class TestCleanupTableInfo {
       }
     });
   }
+  private void mockTables(OMMetadataManager omMetadataManager, Set<String> updatedTables, boolean isFSO) throws IOException, IllegalAccessException {
+    Map<String, Table> tableMap= omMetadataManager.listTables();
+    Map<Table,Table> mockedTableMap = new HashMap<>();
 
+    for(String table:tableMap.keySet()){
+      Table mockedTable = Mockito.spy(tableMap.get(table));
+      Answer answer = new Answer() {
+        @Override
+        public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+          String t = table;
+          if(isFSO){
+            if(table.equals(OmMetadataManagerImpl.OPEN_KEY_TABLE)){
+              t = OmMetadataManagerImpl.OPEN_FILE_TABLE;
+            }
+            if(table.equals(OmMetadataManagerImpl.KEY_TABLE)){
+              t = OmMetadataManagerImpl.FILE_TABLE;
+            }
+          }else{
+            if(table.equals(OmMetadataManagerImpl.OPEN_FILE_TABLE)){
+              t = OmMetadataManagerImpl.OPEN_KEY_TABLE;
+            }
+            if(table.equals(OmMetadataManagerImpl.FILE_TABLE)){
+              t = OmMetadataManagerImpl.KEY_TABLE;
+            }
+          }
+          updatedTables.add(t);
+          return null;
+        }
+      };
+      Mockito.doAnswer(answer).when(mockedTable).put(any(),any());
+      Mockito.doAnswer(answer).when(mockedTable).putWithBatch(any(),any(),any());
+      Mockito.doAnswer(answer).when(mockedTable).delete(any());
+      Mockito.doAnswer(answer).when(mockedTable).deleteWithBatch(any(),any());
+      mockedTableMap.put(tableMap.get(table),mockedTable);
+      tableMap.put(table,mockedTable);
+    }
+    for(Field f:omMetadataManager.getClass().getDeclaredFields()){
+      boolean isAccessible = f.isAccessible();
+      f.setAccessible(true);
+      try {
+        if(Table.class.isAssignableFrom(f.getType())){
+          f.set(omMetadataManager,mockedTableMap.getOrDefault(f.get(omMetadataManager),(Table)f.get(omMetadataManager)));
+        }
+      } finally {
+        f.setAccessible(isAccessible);
+      }
+    }
+  }
+  private <T> T getMockObject(Class<T> type,Map<Class,Object> instanceMap,Status status,boolean isFSO) throws IOException {
+    T instance =  Mockito.mock(type,invocationOnMock -> {
+      try {
+        return createInstance(invocationOnMock.getMethod().getReturnType(),instanceMap,status,isFSO);
+      } catch (Throwable e) {
+        throw new RuntimeException(e);
+      }
+    });
+    instanceMap.put(type,instance);
+    return instance;
+  }
+  private List<Field> getFields(Class<?> type) {
+    List<Field> fields = new ArrayList<>();
+    while (type != Object.class) {
+      fields.addAll(Arrays.asList(type.getDeclaredFields()));
+      type = type.getSuperclass();
+    }
+//    System.out.println(fields);
+    return fields;
+  }
+  private Object createInstance(Class<?> type, Map<Class,Object> instanceMap,Status status,boolean isFSO){
+    if(instanceMap.containsKey(type)){
+      return instanceMap.get(type);
+    }
+    Object instance = null;
+    try {
+      if(type.isArray()){
+        return Array.newInstance(type.getComponentType(),0);
+      } else if(type.equals(Void.TYPE)){
+        return null;
+      }else if(type.isPrimitive()){
+        if (Boolean.TYPE.equals(type)) {
+          return true;
+        } else if (Character.TYPE.equals(type)) {
+          return 'a';
+        } else if (Byte.TYPE.equals(type)) {
+          return 0xFF;
+        } else if (Short.TYPE.equals(type)) {
+          return (short) 0;
+        } else if (Integer.TYPE.equals(type)) {
+          return 0;
+        } else if (Long.TYPE.equals(type)) {
+          return (long) 0;
+        } else if (Float.TYPE.equals(type)) {
+          return (float) 0.0;
+        } else if (Double.TYPE.equals(type)) {
+          return 0.0;
+        } else if (Void.TYPE.equals(type)) {
+          return null;
+        }
+        return type.getName().toLowerCase().contains("bool")? true :0;
+      }else if(type.equals(OzoneManagerProtocolProtos.OMResponse.class)){
+        return OzoneManagerProtocolProtos.OMResponse.newBuilder().setStatus(status).buildPartial();
+      }else if(type.equals(BucketLayout.class)){
+        return isFSO?BucketLayout.FILE_SYSTEM_OPTIMIZED:BucketLayout.DEFAULT;
+      } else if(type.isEnum()){
+        return type.getDeclaredFields()[0].get(type);
+      }else if(type.equals(String.class)){
+        return "testString";
+      }else if(Map.class.isAssignableFrom(type)){
+        return type.isInterface()?Collections.EMPTY_MAP:type.newInstance();
+      }else if(List.class.isAssignableFrom(type)){
+        return type.isInterface()?Collections.EMPTY_LIST:type.newInstance();
+      }else if(Set.class.isAssignableFrom(type)){
+        return type.isInterface()?Collections.EMPTY_SET:type.newInstance();
+      }
+      if(OMClientResponse.class.isAssignableFrom(type)){
+        Constructor<?>[] constructors = type.getDeclaredConstructors();
+        for(Constructor c:constructors){
+          boolean accessible  = c.isAccessible();
+          c.setAccessible(true);
+          try {
+            Class<?>[] params = c.getParameterTypes();
+            boolean flag = false;
+            for(Class<?> p:params){
+              if(p.equals(type)){
+                flag = true;
+                break;
+              }
+            }
+            if(flag){
+              continue;
+            }
+            instance = c.newInstance(Arrays.stream(params).map(p-> {
+              return createInstance(p, instanceMap, status, isFSO);
+            }).toArray());
+            break;
+          } catch (Exception e) {
+          }finally {
+            c.setAccessible(accessible);
+          }
+        }
+        for(Field f:getFields(type)){
+          boolean isAccessible = f.isAccessible();
+          f.setAccessible(true);
+          try {
+            Object fInstance = createInstance(f.getType(),instanceMap,status,isFSO);
+            f.set(instance,fInstance);
+          } catch (Exception e) {
+          }finally {
+            f.setAccessible(isAccessible);
+          }
+        }
 
+      }else {
+        instance = getMockObject(type,instanceMap,status,isFSO);
+      }
+    } catch (Exception e) {
+      instanceMap.put(type,instance);
+    }
+    return instance;
+  }
+  private Status getExpectedStatusForResponseClass(Class<? extends OMClientResponse> responseClass){
+    Map<Class<? extends OMClientResponse>,Status> responseClassStatusMap = new HashMap<>();
+    responseClassStatusMap.put(S3GetSecretResponse.class,Status.OK);
+    return responseClassStatusMap.getOrDefault(responseClass,Status.OK);
+  }
+
+  @Test
+  public void checkCleanupTablesWithTableNames() throws IOException, InterruptedException, IllegalAccessException {
+    checkCleanupTablesWithTableNames(true);
+    checkCleanupTablesWithTableNames(false);
+  }
+  private void checkCleanupTablesWithTableNames(boolean isFSO) throws IOException, IllegalAccessException, InterruptedException {
+    OMMetadataManager omMetadataManager = om.getMetadataManager();
+    Set<Class<? extends OMClientResponse>> subTypes = responseClasses();
+    subTypes = subTypes.stream().filter(c -> c.isAnnotationPresent(CleanupTableInfo.class)).collect(Collectors.toSet());
+    Set<String> updatedTables = new HashSet<>();
+    mockTables(omMetadataManager, updatedTables, isFSO);
+
+    Map<Class,Object> instanceMap = Maps.newHashMap();
+    for (Class<? extends OMClientResponse> subType : subTypes) {
+      if (subType.isAnnotationPresent(CleanupTableInfo.class) &&
+          !Modifier.isAbstract(subType.getModifiers()) &&
+          Arrays.stream(subType.getDeclaredMethods()).anyMatch(m->m.getName().equals("addToDBBatch"))) {
+        try {
+          updatedTables.clear();
+          instanceMap.clear();
+          CleanupTableInfo cleanupTableInfo = subType.getAnnotation(CleanupTableInfo.class);
+          OMClientResponse omClientResponse = (OMClientResponse) createInstance(subType,instanceMap,getExpectedStatusForResponseClass(subType),isFSO);
+          omClientResponse.addToDBBatch(om.getMetadataManager(), batchOperation);
+          Set<String> tables = Arrays.stream(cleanupTableInfo.cleanupTables()).collect(Collectors.toSet());
+          if(isFSO){
+            if(tables.contains(OmMetadataManagerImpl.KEY_TABLE)){
+              tables.remove(OmMetadataManagerImpl.KEY_TABLE);
+              tables.add(OmMetadataManagerImpl.FILE_TABLE);
+            }
+            if(tables.contains(OmMetadataManagerImpl.OPEN_KEY_TABLE)){
+              tables.remove(OmMetadataManagerImpl.OPEN_KEY_TABLE);
+              tables.add(OmMetadataManagerImpl.OPEN_FILE_TABLE);
+            }
+          }else{
+            if(tables.contains(OmMetadataManagerImpl.FILE_TABLE)){
+              tables.remove(OmMetadataManagerImpl.FILE_TABLE);
+              tables.add(OmMetadataManagerImpl.KEY_TABLE);
+            }
+            if(tables.contains(OmMetadataManagerImpl.OPEN_FILE_TABLE)){
+              tables.remove(OmMetadataManagerImpl.OPEN_FILE_TABLE);
+              tables.add(OmMetadataManagerImpl.OPEN_KEY_TABLE);
+            }
+          }
+          for(String t:updatedTables){
+            Assert.assertTrue(tables.contains(t));
+          }
+        } catch (Exception e) {
+        }
+      }
+    }
+    instanceMap.clear();
+  }
   private Set<Class<? extends OMClientResponse>> responseClasses() {
     Reflections reflections = new Reflections(OM_RESPONSE_PACKAGE);
     return reflections.getSubTypesOf(OMClientResponse.class);
   }
+
+
 
   @Test
   public void testFileCreateRequestSetsAllTouchedTableCachesForEviction() {
@@ -229,7 +465,6 @@ public class TestCleanupTableInfo {
       }
     }
   }
-
   /**
    * Adds the volume info to the volumeTable in the MetadataManager, and also
    * add the value to the table's cache.
