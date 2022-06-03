@@ -40,7 +40,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 /**
  * Response for set owner request.
  */
-@CleanupTableInfo(cleanupTables = {VOLUME_TABLE,USER_TABLE})
+@CleanupTableInfo(cleanupTables = {VOLUME_TABLE, USER_TABLE})
 public class OMVolumeSetOwnerResponse extends OMClientResponse {
   private String oldOwner;
   private PersistedUserVolumeInfo oldOwnerVolumeList;

@@ -37,7 +37,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 /**
  * Response for DeleteVolume request.
  */
-@CleanupTableInfo(cleanupTables = {VOLUME_TABLE,USER_TABLE})
+@CleanupTableInfo(cleanupTables = {VOLUME_TABLE, USER_TABLE})
 public class OMVolumeDeleteResponse extends OMClientResponse {
   private String volume;
   private String owner;
