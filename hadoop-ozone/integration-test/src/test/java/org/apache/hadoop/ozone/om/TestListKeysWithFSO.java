@@ -228,8 +228,8 @@ public class TestListKeysWithFSO {
     expectedKeys = getExpectedKeyList("a1/b2", "a1/b20");
     checkKeyList("a1/b2", "a1/b20", expectedKeys);
 
-    // case-2: StartKey LeafNode's parent is lexographically ahead than prefixKey.
-    // So, will return EmptyList
+    // case-2: StartKey LeafNode's parent is lexographically ahead than
+    // prefixKey. So, will return EmptyList
     // a1/b1 < a1/b2
     expectedKeys = getExpectedKeyList("a1/b1", "a1/b2/d0");
     checkKeyList("a1/b1", "a1/b2/d0", expectedKeys);
@@ -308,23 +308,15 @@ public class TestListKeysWithFSO {
 
     // case-9:
     // Immediate child of prefixKey is lexographically greater than "a1/b1".
-    // So will fetch and return all the sub-paths after "b11111", which is "a1/b2"
+    // So will fetch and return all the sub-paths after "b11111",
+    // which is "a1/b2"
     expectedKeys = getExpectedKeyList("a1", "a1/b11111/d311111");
     /**
      0 = "a1/b2/"
      1 = "a1/b2/d1/"
      2 = "a1/b2/d1/d11.tx"
      3 = "a1/b2/d2/"
-     4 = "a1/b2/d2/d21.tx"
-     5 = "a1/b2/d2/d22.tx"
-     6 = "a1/b2/d3/"
-     7 = "a1/b2/d3/d31.tx"
-     8 = "a1/b3/"
-     9 = "a1/b3/e1/"
-     10 = "a1/b3/e1/e11.tx"
-     11 = "a1/b3/e2/"
-     12 = "a1/b3/e2/e21.tx"
-     13 = "a1/b3/e3/"
+     ........
      14 = "a1/b3/e3/e31.tx"
      */
     checkKeyList("a1", "a1/b11111/d311111", expectedKeys);
@@ -336,12 +328,7 @@ public class TestListKeysWithFSO {
     /**
      0 = "a1/b2/d2/d22.tx"
      1 = "a1/b2/d3/"
-     2 = "a1/b2/d3/d31.tx"
-     3 = "a1/b3/"
-     4 = "a1/b3/e1/"
-     4 = "a1/b3/e1/e11.tx"
-     5 = "a1/b3/e2/"
-     6 = "a1/b3/e2/e21.tx"
+     ......
      7 = "a1/b3/e3/"
      8 = "a1/b3/e3/e31.tx"
      */

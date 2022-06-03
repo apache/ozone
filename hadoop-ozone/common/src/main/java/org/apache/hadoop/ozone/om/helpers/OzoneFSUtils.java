@@ -169,8 +169,11 @@ public final class OzoneFSUtils {
     java.nio.file.Path childParent = childPath.getParent();
     java.nio.file.Path parentParent = parentPath.getParent();
 
-    return childParent != null ? childParent.equals(parentParent) :
-        childParent == parentParent;
+    if (childParent != null && parentParent != null) {
+      return childParent.equals(parentParent);
+    }
+
+    return childParent == parentParent;
   }
 
   /**
