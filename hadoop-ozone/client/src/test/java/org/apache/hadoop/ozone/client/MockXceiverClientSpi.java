@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -102,6 +103,9 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
     case GetBlock:
       return result(request,
           r -> r.setGetBlock(getBlock(request.getGetBlock())));
+    case ListBlock:
+      return result(request,
+          r -> r.setListBlock(listBlock(request.getContainerID())));
     default:
       throw new IllegalArgumentException(
           "Mock version of datanode call " + request.getCmdType()
@@ -123,6 +127,11 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
     return GetBlockResponseProto.newBuilder()
         .setBlockData(datanodeStorage.getBlock(getBlock.getBlockID()))
         .build();
+  }
+
+  private ContainerProtos.ListBlockResponseProto listBlock(long containerID) {
+    return ContainerProtos.ListBlockResponseProto.newBuilder()
+        .addAllBlockData(datanodeStorage.listBlock(containerID)).build();
   }
 
   private PutBlockResponseProto putBlock(PutBlockRequestProto putBlock) {
