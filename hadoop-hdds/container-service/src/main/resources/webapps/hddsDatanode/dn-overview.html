@@ -14,7 +14,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 -->
-
+<html>
+<head><title>DataNode Hai yee</title></head>
+<body>
 <table class="table table-bordered table-striped" class="col-md-6">
     <tbody>
     </tbody>
@@ -34,7 +36,6 @@
     </tr>
     </thead>
     <tbody>
-    <p>{{$info}}</p>
     <tr ng-repeat="volumeInfo in $ctrl.dnmetrics">
         <td>{{volumeInfo["tag.StorageDirectory"]}}</td>
         <td>{{volumeInfo["tag.StorageType"]}}</td>
@@ -46,3 +47,5 @@
     </tr>
     </tbody>
 </table>
+</body>
+</html>
