@@ -18,12 +18,14 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
+import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -102,6 +104,12 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       DBOptions options = dbProfile.getDBOptions();
       options.setCreateIfMissing(true);
       options.setCreateMissingColumnFamilies(true);
+
+      if (this.dbDef instanceof DatanodeSchemaOneDBDefinition ||
+          this.dbDef instanceof DatanodeSchemaTwoDBDefinition) {
+        long maxWalSize = DBProfile.toLong(StorageUnit.MB.toBytes(2));
+        options.setMaxTotalWalSize(maxWalSize);
+      }
 
       String rocksDbStat = config.getTrimmed(
               OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
