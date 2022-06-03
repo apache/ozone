@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.common.primitives.Ints;
-import com.google.common.primitives.Longs;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 
@@ -36,6 +35,6 @@ public class IntegerCodec implements Codec {
   @Override
   public Object deserialize(Class<?> type, ByteString value)
       throws InvalidProtocolBufferException {
-    return Longs.fromByteArray(value.toByteArray());
+    return Ints.fromByteArray(value.toByteArray());
   }
 }

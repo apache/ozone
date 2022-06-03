@@ -672,9 +672,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
-        finalizationExecutor = new DefaultUpgradeFinalizationExecutor<>();
+        finalizationExecutor;
     if (configurator.getUpgradeFinalizationExecutor() != null) {
       finalizationExecutor = configurator.getUpgradeFinalizationExecutor();
+    } else {
+      finalizationExecutor = new DefaultUpgradeFinalizationExecutor<>();
     }
     finalizationManager = new FinalizationManagerImpl.Builder()
         .setConfiguration(conf)
