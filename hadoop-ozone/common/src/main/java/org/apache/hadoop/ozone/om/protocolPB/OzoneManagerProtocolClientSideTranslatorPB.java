@@ -1835,7 +1835,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
-      String startKey, long numEntries) throws IOException {
+      String startKey, long numEntries, boolean allowPartialPrefixes)
+      throws IOException {
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
@@ -1843,15 +1844,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setSortDatanodes(args.getSortDatanodes())
         .setLatestVersionLocation(args.getLatestVersionLocation())
         .build();
-    ListStatusRequest listStatusRequest =
+    ListStatusRequest.Builder listStatusRequestBuilder =
         ListStatusRequest.newBuilder()
             .setKeyArgs(keyArgs)
             .setRecursive(recursive)
             .setStartKey(startKey)
-            .setNumEntries(numEntries)
-            .build();
+            .setNumEntries(numEntries);
+
+    if (allowPartialPrefixes) {
+      listStatusRequestBuilder.setAllowPartialPrefix(allowPartialPrefixes);
+    }
+
     OMRequest omRequest = createOMRequest(Type.ListStatus)
-        .setListStatusRequest(listStatusRequest)
+        .setListStatusRequest(listStatusRequestBuilder.build())
         .build();
     ListStatusResponse listStatusResponse =
         handleError(submitRequest(omRequest)).getListStatusResponse();
@@ -1862,6 +1867,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       statusList.add(OzoneFileStatus.getFromProtobuf(fileStatus));
     }
     return statusList;
+  }
+
+  @Override
+  public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
+      String startKey, long numEntries) throws IOException {
+    return listStatus(args, recursive, startKey, numEntries, false);
   }
 
   @Override

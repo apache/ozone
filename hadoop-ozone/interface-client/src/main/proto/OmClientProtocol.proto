@@ -973,6 +973,7 @@ message ListStatusRequest {
     required bool recursive = 2;
     required string startKey = 3;
     required uint64 numEntries = 4;
+    optional bool allowPartialPrefix = 5;
 }
 
 message ListStatusResponse {
