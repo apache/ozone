@@ -136,7 +136,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     doValidateAndUpdateCache(volumeName, bucketName,
         omBucketCreateRequest.getOmRequest());
 
-    Assert.assertEquals(BucketLayout.DEFAULT,
+    Assert.assertEquals(BucketLayout.LEGACY,
         omMetadataManager.getBucketTable().get(bucketKey).getBucketLayout());
   }
 

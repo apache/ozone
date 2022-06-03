@@ -152,10 +152,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
         getOmRequest());
     OmBucketInfo omBucketInfo = null;
 
-    // If the user has set a value, bucketInfo.hasBucketLayout() would be true,
-    // and we would be using this value in the else condition.
-    // If the value is not specified by the user, we would set it to the server
-    // default.
+    // bucketInfo.hasBucketLayout() would be true when user sets bucket layout.
+    // Now, OM will create bucket with the user specified bucket layout.
+    // When the value is not specified by the user, OM will use the
+    // "ozone.default.bucket.layout" configured value.
     if (!bucketInfo.hasBucketLayout()) {
       // Bucket Layout argument was not passed during bucket creation.
       String omDefaultBucketLayout = ozoneManager.getOMDefaultBucketLayout();
