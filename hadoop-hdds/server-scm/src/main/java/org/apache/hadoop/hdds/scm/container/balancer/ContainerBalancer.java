@@ -103,7 +103,6 @@ public class ContainerBalancer extends StatefulService {
   private volatile Thread currentBalancingThread;
   private Lock lock;
   private ContainerBalancerSelectionCriteria selectionCriteria;
-  private Map<DatanodeDetails, ContainerMoveSelection> sourceToTargetMap;
 
   /*
   Since a container can be selected only once during an iteration, these maps
@@ -405,8 +404,6 @@ public class ContainerBalancer extends StatefulService {
 
     selectionCriteria = new ContainerBalancerSelectionCriteria(config,
         nodeManager, replicationManager, containerManager, findSourceStrategy);
-    sourceToTargetMap = new HashMap<>(overUtilizedNodes.size() +
-        withinThresholdUtilizedNodes.size());
     return true;
   }
 
@@ -695,7 +692,6 @@ public class ContainerBalancer extends StatefulService {
       countDatanodesInvolvedPerIteration += 1;
     }
     incSizeSelectedForMoving(source, moveSelection);
-    sourceToTargetMap.put(source, moveSelection);
     selectedContainersList.add(moveSelection.getContainerID());
     containerFromSourceMap.put(moveSelection.getContainerID(), source);
     containerToTargetMap.put(moveSelection.getContainerID(),
@@ -1234,24 +1230,22 @@ public class ContainerBalancer extends StatefulService {
   }
 
   /**
-   * Gets source datanodes mapped to their selected
-   * {@link ContainerMoveSelection}, consisting of target datanode and
-   * container to move.
-   *
-   * @return Map of {@link DatanodeDetails} to {@link ContainerMoveSelection}
+   * Gets a map with selected containers and their source datanodes.
+   * @return map with mappings from {@link ContainerID} to
+   * {@link DatanodeDetails}
    */
   @VisibleForTesting
-  public Map<DatanodeDetails, ContainerMoveSelection> getSourceToTargetMap() {
-    return sourceToTargetMap;
-  }
-
-  @VisibleForTesting
-  public Map<ContainerID, DatanodeDetails> getContainerFromSourceMap() {
+  Map<ContainerID, DatanodeDetails> getContainerFromSourceMap() {
     return containerFromSourceMap;
   }
 
+  /**
+   * Gets a map with selected containers and target datanodes.
+   * @return map with mappings from {@link ContainerID} to
+   * {@link DatanodeDetails}.
+   */
   @VisibleForTesting
-  public Map<ContainerID, DatanodeDetails> getContainerToTargetMap() {
+  Map<ContainerID, DatanodeDetails> getContainerToTargetMap() {
     return containerToTargetMap;
   }
 
