@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.DUFactory;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBalancerConfigurationProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -33,7 +34,7 @@ import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMService;
+import org.apache.hadoop.hdds.scm.ha.StatefulService;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -43,6 +44,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -65,7 +67,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DE
  * Container balancer is a service in SCM to move containers between over- and
  * under-utilized datanodes.
  */
-public class ContainerBalancer implements SCMService {
+public class ContainerBalancer extends StatefulService {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancer.class);
@@ -98,7 +100,6 @@ public class ContainerBalancer implements SCMService {
   private NetworkTopology networkTopology;
   private double upperLimit;
   private double lowerLimit;
-  private volatile boolean balancerRunning;
   private volatile Thread currentBalancingThread;
   private Lock lock;
   private ContainerBalancerSelectionCriteria selectionCriteria;
@@ -110,15 +111,17 @@ public class ContainerBalancer implements SCMService {
       CompletableFuture<LegacyReplicationManager.MoveResult>>
       moveSelectionToFutureMap;
   private IterationResult iterationResult;
+  private int nextIterationIndex;
 
   /**
    * Constructs ContainerBalancer with the specified arguments. Initializes
-   * new ContainerBalancerConfiguration and ContainerBalancerMetrics.
-   * Container Balancer does not start on construction.
+   * ContainerBalancerMetrics. Container Balancer does not start on
+   * construction.
    *
    * @param scm the storage container manager
    */
   public ContainerBalancer(StorageContainerManager scm) {
+    super(scm.getStatefulServiceStateManager());
     this.nodeManager = scm.getScmNodeManager();
     this.containerManager = scm.getContainerManager();
     this.replicationManager = scm.getReplicationManager();
@@ -134,13 +137,16 @@ public class ContainerBalancer implements SCMService {
     this.unBalancedNodes = new ArrayList<>();
     this.placementPolicy = scm.getContainerPlacementPolicy();
     this.networkTopology = scm.getClusterMap();
+    this.nextIterationIndex = 0;
 
     this.lock = new ReentrantLock();
     findSourceStrategy = new FindSourceGreedy(nodeManager);
+    scm.getSCMServiceManager().register(this);
   }
 
   /**
-   * Balances the cluster.
+   * Balances the cluster in iterations. Regularly checks if balancing has
+   * been stopped.
    */
   private void balance() {
     this.iterations = config.getIterations();
@@ -149,7 +155,11 @@ public class ContainerBalancer implements SCMService {
       this.iterations = Integer.MAX_VALUE;
     }
 
-    for (int i = 0; i < iterations && balancerRunning; i++) {
+    // nextIterationIndex is the iteration that balancer should start from on
+    // leader change or restart
+    int i = nextIterationIndex;
+    resetState();
+    for (; i < iterations && isBalancerRunning(); i++) {
       if (config.getTriggerDuEnable()) {
         // before starting a new iteration, we trigger all the datanode
         // to run `du`. this is an aggressive action, with which we can
@@ -179,19 +189,37 @@ public class ContainerBalancer implements SCMService {
         }
       }
 
-      // stop balancing if iteration is not initialized
+      // initialize this iteration. stop balancing on initialization failure
       if (!initializeIteration()) {
-        stopBalancer();
+        // just return if the reason for initialization failure is that
+        // balancer has been stopped in another thread
+        if (!isBalancerRunning()) {
+          return;
+        }
+        // otherwise, try to stop balancer
+        tryStopBalancer("Could not initialize ContainerBalancer's " +
+            "iteration number " + i);
         return;
       }
 
-      //if no new move option is generated, it means the cluster can
-      //not be balanced any more , so just stop
       IterationResult iR = doIteration();
       metrics.incrementNumIterations(1);
       LOG.info("Result of this iteration of Container Balancer: {}", iR);
+
+      // persist next iteration index
+      if (iR == IterationResult.ITERATION_COMPLETED) {
+        try {
+          saveConfiguration(config, true, i + 1);
+        } catch (IOException e) {
+          LOG.warn("Could not persist next iteration index value for " +
+              "ContainerBalancer after completing an iteration", e);
+        }
+      }
+
+      // if no new move option is generated, it means the cluster cannot be
+      // balanced anymore; so just stop balancer
       if (iR == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
-        stopBalancer();
+        tryStopBalancer(iR.toString());
         return;
       }
 
@@ -215,7 +243,11 @@ public class ContainerBalancer implements SCMService {
         }
       }
     }
-    stopBalancer();
+
+    // finally, stop balancer if it hasn't been stopped already
+    if (isBalancerRunning()) {
+      tryStopBalancer("Completed all iterations.");
+    }
   }
 
   /**
@@ -238,12 +270,11 @@ public class ContainerBalancer implements SCMService {
     List<DatanodeUsageInfo> datanodeUsageInfos =
         nodeManager.getMostOrLeastUsedDatanodes(true);
     if (datanodeUsageInfos.isEmpty()) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Container Balancer could not retrieve nodes from Node " +
-            "Manager.");
-      }
+      LOG.warn("Received an empty list of datanodes from Node Manager when " +
+          "trying to identify which nodes to balance");
       return false;
     }
+
     this.threshold = config.getThresholdAsRatio();
     this.maxDatanodesRatioToInvolvePerIteration =
         config.getMaxDatanodesRatioToInvolvePerIteration();
@@ -801,24 +832,72 @@ public class ContainerBalancer implements SCMService {
   /**
    * Receives a notification for raft or safe mode related status changes.
    * Stops ContainerBalancer if it's running and the current SCM becomes a
-   * follower or enters safe mode.
+   * follower or enters safe mode. Starts ContainerBalancer if the current
+   * SCM becomes leader, is out of safe mode and balancer should run.
    */
   @Override
   public void notifyStatusChanged() {
-    if (!scmContext.isLeader() || scmContext.isInSafeMode()) {
-      if (isBalancerRunning()) {
-        stopBalancingThread();
+    lock.lock();
+    try {
+      if (!scmContext.isLeader() || scmContext.isInSafeMode()) {
+        if (isBalancerRunning()) {
+          LOG.info("Stopping ContainerBalancer in this scm on status change");
+          stop();
+        }
+      } else {
+        if (shouldRun()) {
+          try {
+            LOG.info("Starting ContainerBalancer in this scm on status change");
+            start();
+          } catch (IllegalContainerBalancerStateException |
+              InvalidContainerBalancerConfigurationException e) {
+            LOG.warn("Could not start ContainerBalancer on raft/safe-mode " +
+                "status change.", e);
+          }
+        }
       }
+    } finally {
+      lock.unlock();
     }
   }
 
   /**
-   * Checks if ContainerBalancer should run.
-   * @return false
+   * Checks if ContainerBalancer should start (after a leader change, restart
+   * etc.) by reading persisted state.
+   * @return true if the persisted state is true, otherwise false
    */
   @Override
   public boolean shouldRun() {
-    return false;
+    try {
+      ContainerBalancerConfigurationProto proto =
+          readConfiguration(ContainerBalancerConfigurationProto.class);
+      if (proto == null) {
+        LOG.warn("Could not find persisted configuration for {} when checking" +
+            " if ContainerBalancer should run. ContainerBalancer should not " +
+            "run now.", this.getServiceName());
+        return false;
+      }
+      return proto.getShouldRun();
+    } catch (IOException e) {
+      LOG.warn("Could not read persisted configuration for checking if " +
+          "ContainerBalancer should start. ContainerBalancer should not start" +
+          " now.", e);
+      return false;
+    }
+  }
+
+  /**
+   * Checks if ContainerBalancer is currently running in this SCM.
+   *
+   * @return true if the currentBalancingThread is not null, otherwise false
+   */
+  public boolean isBalancerRunning() {
+    lock.lock();
+    try {
+      return currentBalancingThread != null;
+    } finally {
+      lock.unlock();
+    }
   }
 
   /**
@@ -830,12 +909,47 @@ public class ContainerBalancer implements SCMService {
   }
 
   /**
-   * Starts ContainerBalancer as an SCMService.
+   * Starts ContainerBalancer as an SCMService. Validates state, reads and
+   * validates persisted configuration, and then starts the balancing
+   * thread.
+   * @throws IllegalContainerBalancerStateException if balancer should not
+   * run according to persisted configuration
+   * @throws InvalidContainerBalancerConfigurationException if failed to
+   * retrieve persisted configuration, or the configuration is null
    */
   @Override
-  public void start() {
-    if (shouldRun()) {
+  public void start() throws IllegalContainerBalancerStateException,
+      InvalidContainerBalancerConfigurationException {
+    lock.lock();
+    try {
+      // should be leader-ready, out of safe mode, and not running already
+      validateState(false);
+      ContainerBalancerConfigurationProto proto;
+      try {
+        proto = readConfiguration(ContainerBalancerConfigurationProto.class);
+      } catch (IOException e) {
+        throw new InvalidContainerBalancerConfigurationException("Could not " +
+            "retrieve persisted configuration while starting " +
+            "Container Balancer as an SCMService. Will not start now.", e);
+      }
+      if (proto == null) {
+        throw new InvalidContainerBalancerConfigurationException("Persisted " +
+            "configuration for ContainerBalancer is null during start. Will " +
+            "not start now.");
+      }
+      if (!proto.getShouldRun()) {
+        throw new IllegalContainerBalancerStateException("According to " +
+            "persisted configuration, ContainerBalancer should not run.");
+      }
+      ContainerBalancerConfiguration configuration =
+          ContainerBalancerConfiguration.fromProtobuf(proto,
+              ozoneConfiguration);
+      validateConfiguration(configuration);
+      this.config = configuration;
+      this.nextIterationIndex = proto.getNextIterationIndex();
       startBalancingThread();
+    } finally {
+      lock.unlock();
     }
   }
 
@@ -848,13 +962,16 @@ public class ContainerBalancer implements SCMService {
    * @throws InvalidContainerBalancerConfigurationException if
    * {@link ContainerBalancerConfiguration} config file is incorrectly
    * configured
+   * @throws IOException on failure to persist
+   * {@link ContainerBalancerConfiguration}
    */
-  public void startBalancer() throws IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException {
+  public void startBalancer(ContainerBalancerConfiguration configuration)
+      throws IllegalContainerBalancerStateException,
+      InvalidContainerBalancerConfigurationException, IOException {
     lock.lock();
     try {
-      validateState();
-      validateConfiguration(this.config);
+      // validates state, config, and then saves config
+      setBalancerConfigOnStartBalancer(configuration);
       startBalancingThread();
     } finally {
       lock.unlock();
@@ -867,7 +984,6 @@ public class ContainerBalancer implements SCMService {
   private void startBalancingThread() {
     lock.lock();
     try {
-      balancerRunning = true;
       currentBalancingThread = new Thread(this::balance);
       currentBalancingThread.setName("ContainerBalancer");
       currentBalancingThread.setDaemon(true);
@@ -879,11 +995,17 @@ public class ContainerBalancer implements SCMService {
   }
 
   /**
-   * Checks if ContainerBalancer can start.
-   * @throws IllegalContainerBalancerStateException if ContainerBalancer is
-   * already running, SCM is in safe mode, or SCM is not leader ready
+   * Validates balancer's state based on the specified expectedRunning.
+   * Confirms SCM is leader-ready and out of safe mode.
+   *
+   * @param expectedRunning true if ContainerBalancer is expected to be
+   *                        running, else false
+   * @throws IllegalContainerBalancerStateException if SCM is not
+   * leader-ready, is in safe mode, or state does not match the specified
+   * expected state
    */
-  private void validateState() throws IllegalContainerBalancerStateException {
+  private void validateState(boolean expectedRunning)
+      throws IllegalContainerBalancerStateException {
     if (!scmContext.isLeaderReady()) {
       LOG.warn("SCM is not leader ready");
       throw new IllegalContainerBalancerStateException("SCM is not leader " +
@@ -895,10 +1017,10 @@ public class ContainerBalancer implements SCMService {
     }
     lock.lock();
     try {
-      if (isBalancerRunning() || currentBalancingThread != null) {
-        LOG.warn("Cannot start ContainerBalancer because it's already running");
+      if (isBalancerRunning() != expectedRunning) {
         throw new IllegalContainerBalancerStateException(
-            "Cannot start ContainerBalancer because it's already running");
+            "Expect ContainerBalancer running state to be " + expectedRunning +
+                ", but running state is actually " + isBalancerRunning());
       }
     } finally {
       lock.unlock();
@@ -910,20 +1032,49 @@ public class ContainerBalancer implements SCMService {
    */
   @Override
   public void stop() {
-    stopBalancer();
+    lock.lock();
+    try {
+      if (!isBalancerRunning()) {
+        LOG.warn("Cannot stop Container Balancer because it's not running");
+        return;
+      }
+      stopBalancingThread();
+    } finally {
+      lock.unlock();
+    }
   }
 
   /**
    * Stops ContainerBalancer gracefully.
    */
-  public void stopBalancer() {
+  public void stopBalancer()
+      throws IOException, IllegalContainerBalancerStateException {
     lock.lock();
     try {
-      if (!isBalancerRunning()) {
-        LOG.info("Container Balancer is not running.");
-        return;
-      }
-      stopBalancingThread();
+      // should be leader, out of safe mode, and currently running
+      validateState(true);
+      saveConfiguration(config, false, 0);
+      stop();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /**
+   * Tries to stop ContainerBalancer. Logs the reason for stopping. Calls
+   * {@link ContainerBalancer#stopBalancer()}.
+   * @param stopReason a string specifying the reason for stopping
+   *                   ContainerBalancer.
+   */
+  private void tryStopBalancer(String stopReason) {
+    lock.lock();
+    try {
+      LOG.info("Stopping ContainerBalancer. Reason for stopping: {}",
+          stopReason);
+      stopBalancer();
+    } catch (IllegalContainerBalancerStateException | IOException e) {
+      LOG.warn("Tried to stop ContainerBalancer but failed. Reason for " +
+          "stopping: {}", stopReason, e);
     } finally {
       lock.unlock();
     }
@@ -933,7 +1084,6 @@ public class ContainerBalancer implements SCMService {
     Thread balancingThread;
     lock.lock();
     try {
-      balancerRunning = false;
       balancingThread = currentBalancingThread;
       currentBalancingThread = null;
     } finally {
@@ -950,6 +1100,20 @@ public class ContainerBalancer implements SCMService {
       }
     }
     LOG.info("Container Balancer stopped successfully.");
+  }
+
+  private void saveConfiguration(ContainerBalancerConfiguration configuration,
+                                 boolean shouldRun, int index)
+      throws IOException {
+    lock.lock();
+    try {
+      saveConfiguration(configuration.toProtobufBuilder()
+          .setShouldRun(shouldRun)
+          .setNextIterationIndex(index)
+          .build());
+    } finally {
+      lock.unlock();
+    }
   }
 
   private void validateConfiguration(ContainerBalancerConfiguration conf)
@@ -1007,12 +1171,24 @@ public class ContainerBalancer implements SCMService {
   }
 
   /**
-   * Sets the configuration that ContainerBalancer will use. This should be
-   * set before starting balancer.
-   * @param config ContainerBalancerConfiguration
+   * Persists the configuration that ContainerBalancer will use after
+   * validating state and the specified configuration.
+   * @param configuration ContainerBalancerConfiguration to persist
+   * @throws InvalidContainerBalancerConfigurationException on failure to
+   * validate the specified configuration
+   * @throws IllegalContainerBalancerStateException if this SCM is not leader
+   * or not out of safe mode or if ContainerBalancer is currently running in
+   * this SCM
+   * @throws IOException on failure to persist configuration
    */
-  public void setConfig(ContainerBalancerConfiguration config) {
-    this.config = config;
+  private void setBalancerConfigOnStartBalancer(
+      ContainerBalancerConfiguration configuration)
+      throws InvalidContainerBalancerConfigurationException,
+      IllegalContainerBalancerStateException, IOException {
+    validateState(false);
+    validateConfiguration(configuration);
+    saveConfiguration(configuration, true, 0);
+    this.config = configuration;
   }
 
   /**
@@ -1060,15 +1236,6 @@ public class ContainerBalancer implements SCMService {
     return sourceToTargetMap;
   }
 
-  /**
-   * Checks if ContainerBalancer is currently running.
-   *
-   * @return true if ContainerBalancer is running, false if not running.
-   */
-  public boolean isBalancerRunning() {
-    return balancerRunning;
-  }
-
   @VisibleForTesting
   int getCountDatanodesInvolvedPerIteration() {
     return countDatanodesInvolvedPerIteration;
@@ -1096,7 +1263,7 @@ public class ContainerBalancer implements SCMService {
   public String toString() {
     String status = String.format("%nContainer Balancer status:%n" +
         "%-30s %s%n" +
-        "%-30s %b%n", "Key", "Value", "Running", balancerRunning);
+        "%-30s %b%n", "Key", "Value", "Running", isBalancerRunning());
     return status + config.toString();
   }
 

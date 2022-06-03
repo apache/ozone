@@ -18,10 +18,13 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import org.apache.hadoop.hdds.scm.ha.SCMServiceException;
+
 /**
  * Signals that a state change cannot be performed on ContainerBalancer.
  */
-public class IllegalContainerBalancerStateException extends Exception {
+public class IllegalContainerBalancerStateException extends
+    SCMServiceException {
 
   /**
    * Constructs an IllegalContainerBalancerStateException with no detail

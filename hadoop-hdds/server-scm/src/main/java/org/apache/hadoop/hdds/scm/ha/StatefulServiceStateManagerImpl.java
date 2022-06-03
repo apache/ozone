@@ -23,6 +23,8 @@ import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
@@ -33,6 +35,9 @@ import java.lang.reflect.Proxy;
  */
 public final class StatefulServiceStateManagerImpl
     implements StatefulServiceStateManager {
+
+  public static final Logger LOG =
+      LoggerFactory.getLogger(StatefulServiceStateManagerImpl.class);
 
   // this table maps the service name to the configuration (ByteString)
   private Table<String, ByteString> statefulServiceConfig;
@@ -52,10 +57,19 @@ public final class StatefulServiceStateManagerImpl
   public void saveConfiguration(String serviceName, ByteString bytes)
       throws IOException {
     transactionBuffer.addToBuffer(statefulServiceConfig, serviceName, bytes);
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Added specified bytes to the transaction buffer for key " +
+          "{} to table {}", serviceName, statefulServiceConfig.getName());
+    }
+
     if (transactionBuffer instanceof SCMHADBTransactionBuffer) {
       SCMHADBTransactionBuffer buffer =
               (SCMHADBTransactionBuffer) transactionBuffer;
       buffer.flush();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Transaction buffer flushed");
+      }
     }
   }
 

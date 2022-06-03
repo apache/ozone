@@ -227,6 +227,16 @@ public final class SCMContainerPlacementRackScatter
           placementStatus.expectedPlacementCount();
       throw new SCMException(errorMsg, null);
     }
+    if (nodesRequiredToChoose != chosenNodes.size()) {
+      String reason = "Chosen nodes size: " + chosenNodes
+          .size() + ", but required nodes to choose: " + nodesRequiredToChoose
+          + " do not match.";
+      LOG.warn("Placement policy could not choose the enough nodes."
+              + " {} Available nodes count: {}, Excluded nodes count: {}",
+          reason, totalNodesCount, excludedNodesCount);
+      throw new SCMException(reason,
+          SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
+    }
     return chosenNodes;
   }
 

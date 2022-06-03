@@ -22,6 +22,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -936,6 +938,28 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * List the status for a file or a directory and its contents.
+   *
+   * @param keyName    Absolute path of the entry to be listed
+   * @param recursive  For a directory if true all the descendants of a
+   *                   particular directory are listed
+   * @param startKey   Key from which listing needs to start. If startKey exists
+   *                   its status is included in the final list.
+   * @param numEntries Number of entries to list from the start key
+   * @param allowPartialPrefix allow partial prefixes during listStatus,
+   *                           this is used in context of listKeys calling
+   *                           listStatus
+   * @return list of file status
+   */
+  public List<OzoneFileStatus> listStatus(String keyName, boolean recursive,
+      String startKey, long numEntries, boolean allowPartialPrefix)
+      throws IOException {
+    return proxy
+        .listStatus(volumeName, name, keyName, recursive, startKey,
+            numEntries, allowPartialPrefix);
+  }
+
+  /**
    * Return with the list of the in-flight multipart uploads.
    *
    * @param prefix Optional string to filter for the selected keys.
@@ -1050,9 +1074,10 @@ public class OzoneBucket extends WithMetadata {
    */
   private class KeyIteratorWithFSO extends KeyIterator {
 
-    private Stack<String> stack;
+    private Stack<Pair<String, String>> stack;
     private List<OzoneKey> pendingItemsToBeBatched;
     private boolean addedKeyPrefix;
+    private String removeStartKey = "";
 
     /**
      * Creates an Iterator to iterate over all keys after prevKey in the bucket.
@@ -1064,6 +1089,31 @@ public class OzoneBucket extends WithMetadata {
      */
     KeyIteratorWithFSO(String keyPrefix, String prevKey) throws IOException {
       super(keyPrefix, prevKey);
+    }
+
+    /**
+     * keyPrefix="a1" and startKey="a1/b2/d2/f3/f31.tx".
+     * Now, this function will prepare and return a list :
+     * <"a1/b2/d2", "a1/b2/d2/f3">
+     * <"a1/b2", "a1/b2/d2">
+     * <"a1", "a1/b2">
+     *
+     * @param keyPrefix keyPrefix
+     * @param startKey  startKey
+     * @param seekPaths list of seek paths between keyPrefix and startKey
+     */
+    private void getSeekPathsBetweenKeyPrefixAndStartKey(String keyPrefix,
+        String startKey, List<Pair<String, String>> seekPaths) {
+
+      String parentStartKeyPath = OzoneFSUtils.getParentDir(startKey);
+
+      if (StringUtils.compare(parentStartKeyPath, keyPrefix) >= 0) {
+        seekPaths.add(new ImmutablePair<>(parentStartKeyPath, startKey));
+
+        // recursively fetch all the sub-paths between keyPrefix and prevKey
+        getSeekPathsBetweenKeyPrefixAndStartKey(keyPrefix, parentStartKeyPath,
+            seekPaths);
+      }
     }
 
     @Override
@@ -1081,14 +1131,62 @@ public class OzoneBucket extends WithMetadata {
           keyPrefixName = OmUtils.normalizeKey(getKeyPrefix(), true);
         }
         setKeyPrefix(keyPrefixName);
+
+        if (StringUtils.isNotBlank(prevKey) &&
+            StringUtils.startsWith(prevKey, getKeyPrefix())) {
+          // 1. Prepare all the seekKeys after the prefixKey.
+          // Example case: prefixKey="a1", startKey="a1/b2/d2/f3/f31.tx"
+          // Now, stack should be build with all the levels after prefixKey
+          // Stack format => <keyPrefix and startKey>, startKey should be an
+          // immediate child of keyPrefix.
+          //             _______________________________________
+          // Stack=> top | < a1/b2/d2/f3, a1/b2/d2/f3/f31.tx > |
+          //             |-------------------------------------|
+          //             | < a1/b2/d2, a1/b2/d2/f3 >           |
+          //             |-------------------------------------|
+          //             | < a1/b2, a1/b2/d2 >                 |
+          //             |-------------------------------------|
+          //      bottom | < a1, a1/b2 >                       |
+          //             --------------------------------------|
+          List<Pair<String, String>> seekPaths = new ArrayList<>();
+
+          if (StringUtils.isNotBlank(getKeyPrefix())) {
+            String parentStartKeyPath = OzoneFSUtils.getParentDir(prevKey);
+            if (StringUtils.compare(parentStartKeyPath, getKeyPrefix()) >= 0) {
+              // Add the leaf node to the seek path. The idea is to search for
+              // sub-paths if the given start key is a directory.
+              seekPaths.add(new ImmutablePair<>(prevKey, ""));
+              removeStartKey = prevKey;
+              getSeekPathsBetweenKeyPrefixAndStartKey(getKeyPrefix(), prevKey,
+                  seekPaths);
+            } else if (StringUtils.compare(prevKey, getKeyPrefix()) >= 0) {
+              // Add the leaf node to the seek path. The idea is to search for
+              // sub-paths if the given start key is a directory.
+              seekPaths.add(new ImmutablePair<>(prevKey, ""));
+              removeStartKey = prevKey;
+            }
+          }
+
+          // 2. Push elements in reverse order so that the FS tree traversal
+          // will occur in left-to-right fashion[Depth-First Search]
+          for (int index = seekPaths.size() - 1; index >= 0; index--) {
+            Pair<String, String> seekDirPath = seekPaths.get(index);
+            stack.push(seekDirPath);
+          }
+        }
       }
 
-      // Get immediate children
+      // 3. Pop out top pair and get its immediate children
       List<OzoneKey> keysResultList = new ArrayList<>();
-      getChildrenKeys(getKeyPrefix(), prevKey, keysResultList);
-
-      // TODO: Back and Forth seek all the files & dirs, starting from
-      //  startKey till keyPrefix.
+      if (stack.isEmpty()) {
+        // case: startKey is empty
+        getChildrenKeys(getKeyPrefix(), prevKey, keysResultList);
+      } else {
+        // case: startKey is non-empty
+        Pair<String, String> keyPrefixPath = stack.pop();
+        getChildrenKeys(keyPrefixPath.getLeft(), keyPrefixPath.getRight(),
+            keysResultList);
+      }
 
       return keysResultList;
     }
@@ -1147,7 +1245,7 @@ public class OzoneBucket extends WithMetadata {
 
       // 2. Get immediate children of keyPrefix, starting with startKey
       List<OzoneFileStatus> statuses = proxy.listStatus(volumeName, name,
-              keyPrefix, false, startKey, listCacheSize);
+              keyPrefix, false, startKey, listCacheSize, true);
 
       // 3. Special case: ListKey expects keyPrefix element should present in
       // the resultList, only if startKey is blank. If startKey is not blank
@@ -1201,7 +1299,7 @@ public class OzoneBucket extends WithMetadata {
       // occur in left-to-right fashion.
       for (int indx = dirList.size() - 1; indx >= 0; indx--) {
         String dirPathComponent = dirList.get(indx);
-        stack.push(dirPathComponent);
+        stack.push(new ImmutablePair<>(dirPathComponent, ""));
       }
 
       if (reachedLimitCacheSize) {
@@ -1211,8 +1309,9 @@ public class OzoneBucket extends WithMetadata {
       // 7. Pop element and seek for its sub-child path(s). Basically moving
       // seek pointer to next level(depth) in FS tree.
       while (!stack.isEmpty()) {
-        keyPrefix = stack.pop();
-        if (getChildrenKeys(keyPrefix, "", keysResultList)) {
+        Pair<String, String> keyPrefixPath = stack.pop();
+        if (getChildrenKeys(keyPrefixPath.getLeft(), keyPrefixPath.getRight(),
+            keysResultList)) {
           // reached limit batch size.
           return true;
         }
@@ -1224,14 +1323,21 @@ public class OzoneBucket extends WithMetadata {
     private void removeStartKeyIfExistsInStatusList(String startKey,
         List<OzoneFileStatus> statuses) {
 
-      if (StringUtils.isNotBlank(startKey) && !statuses.isEmpty()) {
+      if (!statuses.isEmpty()) {
+        String firstElement = statuses.get(0).getKeyInfo().getKeyName();
         String startKeyPath = startKey;
-        if (startKey.endsWith(OZONE_URI_DELIMITER)) {
-          startKeyPath = OzoneFSUtils.removeTrailingSlashIfNeeded(startKey);
+        if (StringUtils.isNotBlank(startKey)) {
+          if (startKey.endsWith(OZONE_URI_DELIMITER)) {
+            startKeyPath = OzoneFSUtils.removeTrailingSlashIfNeeded(startKey);
+          }
         }
-        if (StringUtils.equals(statuses.get(0).getKeyInfo().getKeyName(),
-                startKeyPath)) {
-          // remove the duplicateKey from the list.
+
+        // case-1) remove the startKey from the list as it should be skipped.
+        // case-2) removeStartKey - as the startKey is a placeholder, which is
+        //  managed internally to traverse leaf node's sub-paths.
+        if (StringUtils.equals(firstElement, startKeyPath) ||
+            StringUtils.equals(firstElement, removeStartKey)) {
+
           statuses.remove(0);
         }
       }
@@ -1277,6 +1383,13 @@ public class OzoneBucket extends WithMetadata {
       if (status != null) {
         OmKeyInfo keyInfo = status.getKeyInfo();
         String keyName = keyInfo.getKeyName();
+
+        // removeStartKey - as the startKey is a placeholder, which is
+        // managed internally to traverse leaf node's sub-paths.
+        if (StringUtils.equals(keyName, removeStartKey)) {
+          return;
+        }
+
         if (status.isDirectory()) {
           // add trailing slash to represent directory
           keyName =
