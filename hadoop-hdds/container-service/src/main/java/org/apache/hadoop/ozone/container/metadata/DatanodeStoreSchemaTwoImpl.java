@@ -31,7 +31,8 @@ import java.io.IOException;
  * 2. A metadata table.
  * 3. A Delete Transaction Table.
  */
-public class DatanodeStoreSchemaTwoImpl extends AbstractDatanodeStore {
+public class DatanodeStoreSchemaTwoImpl extends AbstractDatanodeStore
+    implements DeleteTransactionStore<Long> {
 
   private final Table<Long, DeletedBlocksTransaction>
       deleteTransactionTable;
@@ -42,15 +43,15 @@ public class DatanodeStoreSchemaTwoImpl extends AbstractDatanodeStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  public DatanodeStoreSchemaTwoImpl(ConfigurationSource config,
-      long containerID, String dbPath, boolean openReadOnly)
-      throws IOException {
-    super(config, containerID, new DatanodeSchemaTwoDBDefinition(dbPath),
+  public DatanodeStoreSchemaTwoImpl(ConfigurationSource config, String dbPath,
+      boolean openReadOnly) throws IOException {
+    super(config, new DatanodeSchemaTwoDBDefinition(dbPath, config),
         openReadOnly);
-    this.deleteTransactionTable = new DatanodeSchemaTwoDBDefinition(dbPath)
+    this.deleteTransactionTable = ((DatanodeSchemaTwoDBDefinition) getDbDef())
         .getDeleteTransactionsColumnFamily().getTable(getStore());
   }
 
+  @Override
   public Table<Long, DeletedBlocksTransaction> getDeleteTransactionTable() {
     return deleteTransactionTable;
   }

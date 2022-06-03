@@ -56,7 +56,10 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     // Delete child key but retain path "a/b/ in the key table
     OmDirectoryInfo dirPathC = getDirInfo("a/b/c");
     Assert.assertNotNull("Failed to find dir path: a/b/c", dirPathC);
-    String dbFileD = omMetadataManager.getOzonePathKey(
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    String dbFileD = omMetadataManager.getOzonePathKey(volumeId, bucketId,
             dirPathC.getObjectID(), fileNameD);
     omMetadataManager.getKeyTable(getBucketLayout()).delete(dbFileD);
     omMetadataManager.getKeyTable(getBucketLayout()).delete(dirPathC.getPath());
@@ -126,8 +129,9 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
   protected OmKeyInfo verifyPathInOpenKeyTable(String key, long id,
                                              boolean doAssert)
           throws Exception {
-    long bucketId = OMRequestTestUtils.getBucketId(volumeName, bucketName,
-            omMetadataManager);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
     String[] pathComponents = StringUtils.split(key, '/');
     long parentId = bucketId;
     for (int indx = 0; indx < pathComponents.length; indx++) {
@@ -135,7 +139,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
       // Reached last component, which is file name
       if (indx == pathComponents.length - 1) {
         String dbOpenFileName = omMetadataManager.getOpenFileName(
-                parentId, pathElement, id);
+                volumeId, bucketId, parentId, pathElement, id);
         OmKeyInfo omKeyInfo =
             omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(dbOpenFileName);
@@ -145,8 +149,8 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
         return omKeyInfo;
       } else {
         // directory
-        String dbKey = omMetadataManager.getOzonePathKey(parentId,
-                pathElement);
+        String dbKey = omMetadataManager.getOzonePathKey(volumeId,
+                bucketId, parentId, pathElement);
         OmDirectoryInfo dirInfo =
                 omMetadataManager.getDirectoryTable().get(dbKey);
         parentId = dirInfo.getObjectID();
@@ -160,8 +164,9 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
 
   private OmDirectoryInfo getDirInfo(String key)
           throws Exception {
-    long bucketId = OMRequestTestUtils.getBucketId(volumeName, bucketName,
-            omMetadataManager);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
     String[] pathComponents = StringUtils.split(key, '/');
     long parentId = bucketId;
     OmDirectoryInfo dirInfo = null;
@@ -169,8 +174,8 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
       String pathElement = pathComponents[indx];
       // Reached last component, which is file name
       // directory
-      String dbKey = omMetadataManager.getOzonePathKey(parentId,
-              pathElement);
+      String dbKey = omMetadataManager.getOzonePathKey(volumeId,
+              bucketId, parentId, pathElement);
       dirInfo =
               omMetadataManager.getDirectoryTable().get(dbKey);
       parentId = dirInfo.getObjectID();

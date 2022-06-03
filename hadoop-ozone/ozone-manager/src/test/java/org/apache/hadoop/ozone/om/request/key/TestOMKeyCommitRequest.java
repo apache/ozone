@@ -206,7 +206,11 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OMKeyCommitRequest omKeyCommitRequest =
             getOmKeyCommitRequest(modifiedOmRequest);
 
-    String ozoneKey = getOzonePathKey();
+    final long volumeId = 100L;
+    final long bucketID = 1000L;
+    final String fileName = OzoneFSUtils.getFileName(keyName);
+    final String ozoneKey = omMetadataManager.getOzonePathKey(volumeId,
+            bucketID, bucketID, fileName);
 
     // Key should not be there in key table, as validateAndUpdateCache is
     // still not called.

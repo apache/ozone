@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunk
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import java.io.IOException;
@@ -86,6 +87,8 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
           r -> {
             try {
               return r.setWriteChunk(writeChunk(request.getWriteChunk()));
+            } catch (ContainerNotOpenException e) {
+              return r.setResult(Result.CLOSED_CONTAINER_IO);
             } catch (IOException e) {
               return r.setResult(Result.IO_EXCEPTION);
             }

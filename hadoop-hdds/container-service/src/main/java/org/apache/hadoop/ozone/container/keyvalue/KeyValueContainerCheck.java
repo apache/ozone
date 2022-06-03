@@ -32,10 +32,11 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 
 import java.io.File;
 import java.io.IOException;
@@ -64,15 +65,17 @@ public class KeyValueContainerCheck {
   private ConfigurationSource checkConfig;
 
   private String metadataPath;
+  private HddsVolume volume;
 
   public KeyValueContainerCheck(String metadataPath, ConfigurationSource conf,
-      long containerID) {
+      long containerID, HddsVolume volume) {
     Preconditions.checkArgument(metadataPath != null);
 
     this.checkConfig = conf;
     this.containerID = containerID;
     this.onDiskContainerData = null;
     this.metadataPath = metadataPath;
+    this.volume = volume;
   }
 
   /**
@@ -215,9 +218,8 @@ public class KeyValueContainerCheck {
     Preconditions.checkState(onDiskContainerData != null,
         "invoke loadContainerData prior to calling this function");
 
-    File metaDir = new File(metadataPath);
     File dbFile = KeyValueContainerLocationUtil
-        .getContainerDBFile(metaDir, containerID);
+        .getContainerDBFile(onDiskContainerData);
 
     if (!dbFile.exists() || !dbFile.canRead()) {
       String dbFileErrorMsg = "Unable to access DB File [" + dbFile.toString()
@@ -230,9 +232,10 @@ public class KeyValueContainerCheck {
 
     ContainerLayoutVersion layout = onDiskContainerData.getLayoutVersion();
 
-    try (ReferenceCountedDB db =
-            BlockUtils.getDB(onDiskContainerData, checkConfig);
-        BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator()) {
+    try (DBHandle db = BlockUtils.getDB(onDiskContainerData, checkConfig);
+        BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator(
+            onDiskContainerData.getContainerID(),
+            onDiskContainerData.getUnprefixedKeyFilter())) {
 
       while (kvIter.hasNext()) {
         BlockData block = kvIter.nextBlock();
@@ -242,11 +245,11 @@ public class KeyValueContainerCheck {
 
           if (!chunkFile.exists()) {
             // concurrent mutation in Block DB? lookup the block again.
-            String localBlockID =
-                    Long.toString(block.getBlockID().getLocalID());
+            String blockKey =
+                onDiskContainerData.blockKey(block.getBlockID().getLocalID());
             BlockData bdata = db.getStore()
                     .getBlockDataTable()
-                    .get(localBlockID);
+                    .get(blockKey);
             if (bdata != null) {
               throw new IOException("Missing chunk file "
                   + chunkFile.getAbsolutePath());
@@ -329,6 +332,7 @@ public class KeyValueContainerCheck {
 
     onDiskContainerData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
+    onDiskContainerData.setVolume(volume);
   }
 
   private void handleCorruption(IOException e) {
