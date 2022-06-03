@@ -64,6 +64,7 @@ public final class RocksDatabase {
 
   static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
 
+
   static IOException toIOException(Object name, String op, RocksDBException e) {
     return HddsServerUtil.toIOException(name + ": Failed to " + op, e);
   }
@@ -177,6 +178,10 @@ public final class RocksDatabase {
     };
   }
 
+  public boolean isClosed() {
+    return isClosed.get();
+  }
+
   /**
    * Represents a checkpoint of the db.
    *
@@ -281,7 +286,7 @@ public final class RocksDatabase {
     this.columnFamilies = columnFamilies;
   }
 
-  void close() {
+  public void close() {
     if (isClosed.compareAndSet(false, true)) {
       close(columnFamilies, db, descriptors, writeOptions, dbOptions);
     }

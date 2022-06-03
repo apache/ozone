@@ -65,7 +65,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractDatanodeStore.class);
-  private DBStore store;
+  private volatile DBStore store;
   private final AbstractDatanodeDBDefinition dbDef;
   private final ColumnFamilyOptions cfOptions;
 
@@ -143,7 +143,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public void stop() throws Exception {
+  public synchronized void stop() throws Exception {
     if (store != null) {
       store.close();
       store = null;
@@ -187,6 +187,19 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       KeyPrefixFilter filter) throws IOException {
     return new KeyValueBlockIterator(containerID,
             blockDataTableWithIterator.iterator(), filter);
+  }
+
+  @Override
+  public synchronized boolean isClosed() {
+    if (this.store == null) {
+      return true;
+    }
+    return this.store.isClosed();
+  }
+
+  @Override
+  public void close() throws IOException {
+    this.store.close();
   }
 
   @Override
