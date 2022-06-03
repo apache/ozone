@@ -92,29 +92,41 @@ public class TestListStatus {
   @Test
   public void testSortedListStatus() throws Exception {
     // a) test if output is sorted
-    checkKeyList("", "", 1000, 10);
+    checkKeyList("", "", 1000, 10, false);
 
     // b) number of keys returns is expected
-    checkKeyList("", "", 2, 2);
+    checkKeyList("", "", 2, 2, false);
 
     // c) check if full prefix works
-    checkKeyList("a1", "", 100, 3);
+    checkKeyList("a1", "", 100, 3, false);
 
     //  d) check if full prefix with numEntries work
-    checkKeyList("a1", "", 2, 2);
+    checkKeyList("a1", "", 2, 2, false);
 
     // e) check if existing start key >>>
-    checkKeyList("a1", "a1/a12", 100, 2);
+    checkKeyList("a1", "a1/a12", 100, 2, false);
 
-    // f) check with non existing start key>>>
-    checkKeyList("", "a7", 100, 6);
+    // f) check with non-existing start key
+    checkKeyList("", "a7", 100, 6, false);
 
-    // TODO: Enable the following test after listKeys changes
-//    // g) check if half prefix works <<<<
-//     checkKeyList("b", "", 100, 4);
-//
-//    // h) check half prefix with non-existing start key
-//     checkKeyList("b", "b5", 100, 2);
+    // g) check if half prefix works
+    checkKeyList("b", "", 100, 4, true);
+
+    // h) check half prefix with non-existing start key
+    checkKeyList("b", "b5", 100, 2, true);
+
+    // i) check half prefix with non-existing parent in start key
+    checkKeyList("b", "c", 100, 0, true);
+
+    // i) check half prefix with non-existing parent in start key
+    checkKeyList("b", "b/g5", 100, 4, true);
+
+    // i) check half prefix with non-existing parent in start key
+    checkKeyList("b", "c/g5", 100, 0, true);
+
+    // j) check prefix with non-existing prefix key
+    //    and non-existing parent in start key
+    checkKeyList("a1/a111", "a1/a111/a100", 100, 0, true);
   }
 
   private static void createFile(OzoneBucket bucket, String keyName)
@@ -143,8 +155,8 @@ public class TestListStatus {
 
     "b1"      File
     "b2"      File
-    "b3"      File
-    "b4"      File
+    "b7"      File
+    "b8"      File
      */
     ozoneBucket.createDirectory("/a1");
     createFile(ozoneBucket, "/a2");
@@ -167,11 +179,13 @@ public class TestListStatus {
   }
 
   private void checkKeyList(String keyPrefix, String startKey,
-                            long numEntries, int expectedNumKeys)
+                            long numEntries, int expectedNumKeys,
+                            boolean isPartialPrefix)
       throws Exception {
 
     List<OzoneFileStatus> statuses =
-        fsoOzoneBucket.listStatus(keyPrefix, false, startKey, numEntries);
+        fsoOzoneBucket.listStatus(keyPrefix, false, startKey,
+            numEntries, isPartialPrefix);
     Assert.assertEquals(expectedNumKeys, statuses.size());
 
     System.out.println("BEGIN:::keyPrefix---> " + keyPrefix + ":::---> " +

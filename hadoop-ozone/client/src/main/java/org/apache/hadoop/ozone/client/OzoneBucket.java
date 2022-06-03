@@ -938,6 +938,28 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * List the status for a file or a directory and its contents.
+   *
+   * @param keyName    Absolute path of the entry to be listed
+   * @param recursive  For a directory if true all the descendants of a
+   *                   particular directory are listed
+   * @param startKey   Key from which listing needs to start. If startKey exists
+   *                   its status is included in the final list.
+   * @param numEntries Number of entries to list from the start key
+   * @param allowPartialPrefix allow partial prefixes during listStatus,
+   *                           this is used in context of listKeys calling
+   *                           listStatus
+   * @return list of file status
+   */
+  public List<OzoneFileStatus> listStatus(String keyName, boolean recursive,
+      String startKey, long numEntries, boolean allowPartialPrefix)
+      throws IOException {
+    return proxy
+        .listStatus(volumeName, name, keyName, recursive, startKey,
+            numEntries, allowPartialPrefix);
+  }
+
+  /**
    * Return with the list of the in-flight multipart uploads.
    *
    * @param prefix Optional string to filter for the selected keys.
@@ -1223,7 +1245,7 @@ public class OzoneBucket extends WithMetadata {
 
       // 2. Get immediate children of keyPrefix, starting with startKey
       List<OzoneFileStatus> statuses = proxy.listStatus(volumeName, name,
-              keyPrefix, false, startKey, listCacheSize);
+              keyPrefix, false, startKey, listCacheSize, true);
 
       // 3. Special case: ListKey expects keyPrefix element should present in
       // the resultList, only if startKey is blank. If startKey is not blank

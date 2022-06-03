@@ -1719,11 +1719,9 @@ public class RpcClient implements ClientProtocol {
     return createOutputStream(keySession, UUID.randomUUID().toString());
   }
 
-  @Override
-  public List<OzoneFileStatus> listStatus(String volumeName, String bucketName,
-      String keyName, boolean recursive, String startKey, long numEntries)
-      throws IOException {
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+  private OmKeyArgs prepareOmKeyArgs(String volumeName, String bucketName,
+      String keyName) {
+    return new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
@@ -1731,8 +1729,26 @@ public class RpcClient implements ClientProtocol {
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .setLatestVersionLocation(getLatestVersionLocation)
         .build();
+  }
+
+
+  @Override
+  public List<OzoneFileStatus> listStatus(String volumeName, String bucketName,
+      String keyName, boolean recursive, String startKey, long numEntries)
+      throws IOException {
+    OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName);
     return ozoneManagerClient
         .listStatus(keyArgs, recursive, startKey, numEntries);
+  }
+
+  @Override
+  public List<OzoneFileStatus> listStatus(String volumeName, String bucketName,
+      String keyName, boolean recursive, String startKey,
+      long numEntries, boolean allowPartialPrefixes) throws IOException {
+    OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName);
+    return ozoneManagerClient
+        .listStatus(keyArgs, recursive, startKey, numEntries,
+            allowPartialPrefixes);
   }
 
   /**
