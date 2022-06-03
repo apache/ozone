@@ -741,9 +741,9 @@ public class TestObjectStoreWithFSO {
     Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         bucket.getBucketLayout());
 
-    // Case 4: Bucket layout: DEFAULT
+    // Case 4: Bucket layout: Empty
     sampleBucketName = UUID.randomUUID().toString();
-    builder.setBucketLayout(BucketLayout.DEFAULT);
+    builder = BucketArgs.newBuilder();
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
     Assert.assertEquals(sampleBucketName, bucket.getName());
@@ -756,7 +756,7 @@ public class TestObjectStoreWithFSO {
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
     Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertNotEquals(BucketLayout.LEGACY, bucket.getBucketLayout());
+    Assert.assertEquals(BucketLayout.LEGACY, bucket.getBucketLayout());
   }
 
   private void assertKeyRenamedEx(OzoneBucket bucket, String keyName)

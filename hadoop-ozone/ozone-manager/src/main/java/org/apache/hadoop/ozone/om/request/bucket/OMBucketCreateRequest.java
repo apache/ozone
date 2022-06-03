@@ -51,7 +51,6 @@ import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketEncryptionInfoProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketLayoutProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -152,8 +151,12 @@ public class OMBucketCreateRequest extends OMClientRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OmBucketInfo omBucketInfo = null;
-    if (bucketInfo.getBucketLayout() == null || bucketInfo.getBucketLayout()
-        .equals(BucketLayoutProto.LEGACY)) {
+
+    // bucketInfo.hasBucketLayout() would be true when user sets bucket layout.
+    // Now, OM will create bucket with the user specified bucket layout.
+    // When the value is not specified by the user, OM will use the
+    // "ozone.default.bucket.layout" configured value.
+    if (!bucketInfo.hasBucketLayout()) {
       // Bucket Layout argument was not passed during bucket creation.
       String omDefaultBucketLayout = ozoneManager.getOMDefaultBucketLayout();
       BucketLayout defaultType = BucketLayout.fromString(omDefaultBucketLayout);
