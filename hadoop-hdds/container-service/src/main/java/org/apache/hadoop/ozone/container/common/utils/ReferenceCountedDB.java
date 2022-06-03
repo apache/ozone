@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -67,7 +68,8 @@ public class ReferenceCountedDB extends DBHandle {
   }
 
   public boolean cleanup() {
-    if (referenceCount.get() == 0 && getStore() != null) {
+    if (getStore() != null && getStore().isClosed()
+        || referenceCount.get() == 0) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Close {} refCnt {}", getContainerDBPath(),
             referenceCount.get());
@@ -85,7 +87,15 @@ public class ReferenceCountedDB extends DBHandle {
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     decrementReference();
+  }
+
+  /**
+   * Returns if the underlying DB is closed. This call is threadsafe.
+   * @return true if the DB is closed.
+   */
+  public boolean isClosed() {
+    return getStore().isClosed();
   }
 }
