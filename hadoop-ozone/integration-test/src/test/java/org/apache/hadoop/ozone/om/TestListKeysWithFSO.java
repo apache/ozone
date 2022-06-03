@@ -217,7 +217,166 @@ public class TestListKeysWithFSO {
     checkKeyList("a1", "a1/b3/e3/e31.tx", expectedKeys);
   }
 
+  @Test
+  public void testListKeysWithNonExistentStartKey() throws Exception {
+    // case-1: StartKey LeafNode is lexographically ahead than prefixKey.
+    // So, will return EmptyList
+    // a1/b2 < a1/b2Invalid
+    List<String> expectedKeys = getExpectedKeyList("a1", "a1/a111/b111");
+    checkKeyList("a1", "a1/a111/b111", expectedKeys);
+    // a1/b2 < a1/b20
+    expectedKeys = getExpectedKeyList("a1/b2", "a1/b20");
+    checkKeyList("a1/b2", "a1/b20", expectedKeys);
 
+    // case-2: StartKey LeafNode's parent is lexographically ahead than prefixKey.
+    // So, will return EmptyList
+    // a1/b1 < a1/b2
+    expectedKeys = getExpectedKeyList("a1/b1", "a1/b2/d0");
+    checkKeyList("a1/b1", "a1/b2/d0", expectedKeys);
+
+    // case-3:
+    // StartKey LeafNode's parent is not matching with than prefixKey's parent.
+    // So, will return EmptyList
+    expectedKeys = getExpectedKeyList("a1/b2", "a0/b123Invalid");
+    checkKeyList("a1/b2", "a0/b123Invalid", expectedKeys);
+
+    // case-4: StartKey LeafNode is lexographically behind prefixKey.
+    // So will return all the sub-paths of prefixKey
+    // startKey=a1/b123Invalid is lexographically before prefixKey=a1/b2
+    expectedKeys = getExpectedKeyList("a1/b2", "a1/b123Invalid");
+    /**
+     * a1/b2/
+     * a1/b2/d1/
+     * a1/b2/d1/d11.tx
+     * a1/b2/d2/
+     * a1/b2/d2/d21.tx
+     * a1/b2/d2/d22.tx
+     * a1/b2/d3/
+     * a1/b2/d3/d31.tx
+     */
+    checkKeyList("a1/b2", "a1/b123Invalid", expectedKeys);
+
+    // case-5:
+    // StartKey LeafNode is a sub-directory of prefixKey.
+    // So will fetch and return all the sub-paths after d0.
+    expectedKeys = getExpectedKeyList("a1/b2", "a1/b2/d0");
+    /**
+     a1/b2/d1/
+     a1/b2/d1/d11.tx
+     a1/b2/d2/
+     a1/b2/d2/d21.tx
+     a1/b2/d2/d22.tx
+     a1/b2/d3/
+     a1/b2/d3/d31.tx
+     */
+    checkKeyList("a1/b2", "a1/b2/d0", expectedKeys);
+
+    // case-6:
+    // StartKey LeafNode is a sub-file of prefixKey.
+    // So will fetch and return all the sub-paths after d111.txt.
+    expectedKeys = getExpectedKeyList("a1/b2", "a1/b2/d111.txt");
+    /**
+     * a1/b2/d2/
+     * a1/b2/d2/d21.tx
+     * a1/b2/d2/d22.tx
+     * a1/b2/d3/
+     * a1/b2/d3/d31.tx
+     */
+    checkKeyList("a1/b2", "a1/b2/d111.txt", expectedKeys);
+
+    // case-7:
+    // StartKey LeafNode is a sub-file of prefixKey.
+    // So will fetch and return all the sub-paths after "d3/d4111.tx".
+    // Since there is no sub-paths after "d3" it will return emptyList
+    expectedKeys = getExpectedKeyList("a1/b2", "a1/b2/d3/d4111.tx");
+    checkKeyList("a1/b2", "a1/b2/d3/d4111.tx", expectedKeys);
+
+    // case-8:
+    // StartKey LeafNode is a sub-dir of prefixKey.
+    // So will fetch and return all the sub-paths after "d311111".
+    expectedKeys = getExpectedKeyList("a1", "a1/b2/d311111");
+    /**
+     *  a1/b3/
+     *  a1/b3/e1/
+     *  a1/b3/e1/e11.tx
+     *  a1/b3/e2/
+     *  a1/b3/e2/e21.tx
+     *  a1/b3/e3/
+     *  a1/b3/e3/e31.tx
+     */
+    checkKeyList("a1", "a1/b2/d311111", expectedKeys);
+
+    // case-9:
+    // Immediate child of prefixKey is lexographically greater than "a1/b1".
+    // So will fetch and return all the sub-paths after "b11111", which is "a1/b2"
+    expectedKeys = getExpectedKeyList("a1", "a1/b11111/d311111");
+    /**
+     0 = "a1/b2/"
+     1 = "a1/b2/d1/"
+     2 = "a1/b2/d1/d11.tx"
+     3 = "a1/b2/d2/"
+     4 = "a1/b2/d2/d21.tx"
+     5 = "a1/b2/d2/d22.tx"
+     6 = "a1/b2/d3/"
+     7 = "a1/b2/d3/d31.tx"
+     8 = "a1/b3/"
+     9 = "a1/b3/e1/"
+     10 = "a1/b3/e1/e11.tx"
+     11 = "a1/b3/e2/"
+     12 = "a1/b3/e2/e21.tx"
+     13 = "a1/b3/e3/"
+     14 = "a1/b3/e3/e31.tx"
+     */
+    checkKeyList("a1", "a1/b11111/d311111", expectedKeys);
+
+    // case-10:
+    // StartKey "a1/b2/d2" is valid and get all the keys lexographically
+    // greater than "a1/b2/d2/d11111".
+    expectedKeys = getExpectedKeyList("a1", "a1/b2/d2/d21111");
+    /**
+     0 = "a1/b2/d2/d22.tx"
+     1 = "a1/b2/d3/"
+     2 = "a1/b2/d3/d31.tx"
+     3 = "a1/b3/"
+     4 = "a1/b3/e1/"
+     4 = "a1/b3/e1/e11.tx"
+     5 = "a1/b3/e2/"
+     6 = "a1/b3/e2/e21.tx"
+     7 = "a1/b3/e3/"
+     8 = "a1/b3/e3/e31.tx"
+     */
+    checkKeyList("a1", "a1/b2/d2/d21111", expectedKeys);
+
+    // case-10:
+    // StartKey is a sub-path of prefixKey.
+    // So will fetch and return all the sub-paths after "e311111".
+    // Return EmptyList as we reached the end of the tree
+    expectedKeys = getExpectedKeyList("a1", "a1/b3/e3/e311111.tx");
+    checkKeyList("a1", "a1/b3/e3/e311111.tx", expectedKeys);
+
+    // case-11:
+    // StartKey is a sub-path of prefixKey.
+    // So will fetch and return all the sub-paths after "e4444".
+    // Return EmptyList as we reached the end of the tree
+    expectedKeys = getExpectedKeyList("a1/b2", "a1/b3/e4444");
+    checkKeyList("a1/b2", "a1/b3/e4444", expectedKeys);
+
+    // case-12:
+    // PrefixKey is empty and search should consider startKey.
+    // Fetch all the keys after, a1/b2/d
+    expectedKeys = getExpectedKeyList("", "a1/b2/d");
+    checkKeyList("", "a1/b2/d", expectedKeys);
+
+    // case-13:
+    // PrefixKey is empty and search should consider startKey.
+    expectedKeys = getExpectedKeyList("", "a1/b2/d2/d21111");
+    checkKeyList("", "a1/b2/d2/d21111", expectedKeys);
+
+    // case-14:
+    // PrefixKey is empty and search should consider startKey.
+    expectedKeys = getExpectedKeyList("", "a0/b2/d2/d21111");
+    checkKeyList("", "a0/b2/d2/d21111", expectedKeys);
+  }
 
   /**
    * Verify listKeys at different levels.
