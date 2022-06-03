@@ -101,7 +101,8 @@ enum Type {
 
   RevokeS3Secret = 93;
 
-  PurgeDirectories = 94;
+  PurgePaths = 94; // [deprecated = true]
+  PurgeDirectories = 95;
 
   CreateTenant = 96;
   DeleteTenant = 97;
@@ -201,7 +202,8 @@ message OMRequest {
 
   optional RevokeS3SecretRequest            RevokeS3SecretRequest          = 93;
 
-  optional PurgeDirectoriesRequest          purgeDirectoriesRequest        = 94;
+  optional PurgePathsRequest                purgePathsRequest              = 94 [deprecated = true];
+  optional PurgeDirectoriesRequest          purgeDirectoriesRequest        = 108;
 
   optional S3Authentication                 s3Authentication               = 95;
 
@@ -297,7 +299,8 @@ message OMResponse {
 
   optional ListTrashResponse                  listTrashResponse            = 91;
   optional RecoverTrashResponse               RecoverTrashResponse         = 92;
-  optional PurgeDirectoriesResponse           purgeDirectoriesResponse     = 93;
+  optional PurgePathsResponse                 purgePathsResponse           = 93 [deprecated = true];
+  optional PurgeDirectoriesResponse           purgeDirectoriesResponse     = 108;
 
   // Skipped 94/95 to align with OMRequest
   optional CreateTenantResponse              CreateTenantResponse          = 96;
@@ -1081,20 +1084,33 @@ message PurgeKeysResponse {
 
 }
 
+message PurgePathsRequest {
+    // option deprecated = true;
+    // Use PurgeDirectoriesRequest
+    repeated string deletedDirs = 1;
+    repeated KeyInfo deletedSubFiles = 2;
+    repeated KeyInfo markDeletedSubDirs = 3;
+}
+
+message PurgePathsResponse {
+  // option deprecated = true;
+  // Use PurgeDirectoriesResponse
+}
+
 message PurgeDirectoriesRequest {
   repeated PurgePathRequest deletedPath = 1;
 }
 
-message PurgePathRequest {
-    required uint64 volumeId = 1;
-    required uint64 bucketId = 2;
-    optional string deletedDir = 3;
-    repeated KeyInfo deletedSubFiles = 4;
-    repeated KeyInfo markDeletedSubDirs = 5;
-}
-
 message PurgeDirectoriesResponse {
 
+}
+
+message PurgePathRequest {
+  required uint64 volumeId = 1;
+  required uint64 bucketId = 2;
+  optional string deletedDir = 3;
+  repeated KeyInfo deletedSubFiles = 4;
+  repeated KeyInfo markDeletedSubDirs = 5;
 }
 
 message DeleteOpenKeysRequest {

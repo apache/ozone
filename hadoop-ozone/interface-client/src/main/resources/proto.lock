@@ -1,162 +1,6 @@
 {
   "definitions": [
     {
-      "protopath": "OMAdminProtocol.proto",
-      "def": {
-        "enums": [
-          {
-            "name": "NodeState",
-            "enum_fields": [
-              {
-                "name": "ACTIVE",
-                "integer": 1
-              },
-              {
-                "name": "DECOMMISSIONED",
-                "integer": 2
-              }
-            ]
-          }
-        ],
-        "messages": [
-          {
-            "name": "OMConfigurationRequest"
-          },
-          {
-            "name": "OMConfigurationResponse",
-            "fields": [
-              {
-                "id": 1,
-                "name": "success",
-                "type": "bool"
-              },
-              {
-                "id": 2,
-                "name": "errorMsg",
-                "type": "string"
-              },
-              {
-                "id": 3,
-                "name": "nodesInMemory",
-                "type": "OMNodeInfo",
-                "is_repeated": true
-              },
-              {
-                "id": 4,
-                "name": "nodesInNewConf",
-                "type": "OMNodeInfo",
-                "is_repeated": true
-              }
-            ]
-          },
-          {
-            "name": "OMNodeInfo",
-            "fields": [
-              {
-                "id": 1,
-                "name": "nodeID",
-                "type": "string"
-              },
-              {
-                "id": 2,
-                "name": "hostAddress",
-                "type": "string"
-              },
-              {
-                "id": 3,
-                "name": "rpcPort",
-                "type": "uint32"
-              },
-              {
-                "id": 4,
-                "name": "ratisPort",
-                "type": "uint32"
-              },
-              {
-                "id": 5,
-                "name": "nodeState",
-                "type": "NodeState",
-                "options": [
-                  {
-                    "name": "default",
-                    "value": "ACTIVE"
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "name": "DecommissionOMRequest",
-            "fields": [
-              {
-                "id": 1,
-                "name": "nodeId",
-                "type": "string"
-              },
-              {
-                "id": 2,
-                "name": "nodeAddress",
-                "type": "string"
-              }
-            ]
-          },
-          {
-            "name": "DecommissionOMResponse",
-            "fields": [
-              {
-                "id": 1,
-                "name": "success",
-                "type": "bool"
-              },
-              {
-                "id": 3,
-                "name": "errorMsg",
-                "type": "string"
-              }
-            ]
-          }
-        ],
-        "services": [
-          {
-            "name": "OzoneManagerAdminService",
-            "rpcs": [
-              {
-                "name": "getOMConfiguration",
-                "in_type": "OMConfigurationRequest",
-                "out_type": "OMConfigurationResponse"
-              },
-              {
-                "name": "decommission",
-                "in_type": "DecommissionOMRequest",
-                "out_type": "DecommissionOMResponse"
-              }
-            ]
-          }
-        ],
-        "package": {
-          "name": "hadoop.ozone"
-        },
-        "options": [
-          {
-            "name": "java_package",
-            "value": "org.apache.hadoop.ozone.protocol.proto"
-          },
-          {
-            "name": "java_outer_classname",
-            "value": "OzoneManagerAdminProtocolProtos"
-          },
-          {
-            "name": "java_generic_services",
-            "value": "true"
-          },
-          {
-            "name": "java_generate_equals_and_hash",
-            "value": "true"
-          }
-        ]
-      }
-    },
-    {
       "protopath": "OmClientProtocol.proto",
       "def": {
         "enums": [
@@ -368,7 +212,7 @@
                 "integer": 93
               },
               {
-                "name": "PurgeDirectories",
+                "name": "PurgePaths",
                 "integer": 94
               }
             ]
@@ -659,10 +503,6 @@
               {
                 "name": "NOT_SUPPORTED_OPERATION_WHEN_PREPARED",
                 "integer": 74
-              },
-              {
-                "name": "NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION",
-                "integer": 75
               }
             ]
           },
@@ -1176,13 +1016,8 @@
               },
               {
                 "id": 94,
-                "name": "purgeDirectoriesRequest",
-                "type": "PurgeDirectoriesRequest"
-              },
-              {
-                "id": 95,
-                "name": "s3Authentication",
-                "type": "S3Authentication"
+                "name": "purgePathsRequest",
+                "type": "PurgePathsRequest"
               }
             ]
           },
@@ -1472,8 +1307,8 @@
               },
               {
                 "id": 93,
-                "name": "purgeDirectoriesResponse",
-                "type": "PurgeDirectoriesResponse"
+                "name": "purgePathsResponse",
+                "type": "PurgePathsResponse"
               }
             ]
           },
@@ -1960,16 +1795,6 @@
                 "id": 18,
                 "name": "bucketLayout",
                 "type": "BucketLayoutProto"
-              },
-              {
-                "id": 19,
-                "name": "owner",
-                "type": "string"
-              },
-              {
-                "id": 20,
-                "name": "defaultReplicationConfig",
-                "type": "hadoop.hdds.DefaultReplicationConfig"
               }
             ]
           },
@@ -2116,16 +1941,6 @@
                 "id": 9,
                 "name": "quotaInNamespace",
                 "type": "uint64"
-              },
-              {
-                "id": 10,
-                "name": "ownerName",
-                "type": "string"
-              },
-              {
-                "id": 11,
-                "name": "defaultReplicationConfig",
-                "type": "hadoop.hdds.DefaultReplicationConfig"
               }
             ]
           },
@@ -2384,14 +2199,7 @@
             ]
           },
           {
-            "name": "SetBucketPropertyResponse",
-            "fields": [
-              {
-                "id": 1,
-                "name": "response",
-                "type": "bool"
-              }
-            ]
+            "name": "SetBucketPropertyResponse"
           },
           {
             "name": "DeleteBucketRequest",
@@ -2473,24 +2281,12 @@
               {
                 "id": 5,
                 "name": "type",
-                "type": "hadoop.hdds.ReplicationType",
-                "options": [
-                  {
-                    "name": "default",
-                    "value": "NONE"
-                  }
-                ]
+                "type": "hadoop.hdds.ReplicationType"
               },
               {
                 "id": 6,
                 "name": "factor",
-                "type": "hadoop.hdds.ReplicationFactor",
-                "options": [
-                  {
-                    "name": "default",
-                    "value": "ZERO"
-                  }
-                ]
+                "type": "hadoop.hdds.ReplicationFactor"
               },
               {
                 "id": 7,
@@ -2554,11 +2350,6 @@
                 "id": 18,
                 "name": "headOp",
                 "type": "bool"
-              },
-              {
-                "id": 19,
-                "name": "ecReplicationConfig",
-                "type": "hadoop.hdds.ECReplicationConfig"
               }
             ]
           },
@@ -2725,11 +2516,6 @@
                 "id": 16,
                 "name": "parentID",
                 "type": "uint64"
-              },
-              {
-                "id": 17,
-                "name": "ecReplicationConfig",
-                "type": "hadoop.hdds.ECReplicationConfig"
               }
             ]
           },
@@ -3202,42 +2988,22 @@
             "name": "PurgeKeysResponse"
           },
           {
-            "name": "PurgeDirectoriesRequest",
+            "name": "PurgePathsRequest",
             "fields": [
               {
                 "id": 1,
-                "name": "deletedPath",
-                "type": "PurgePathRequest",
+                "name": "deletedDirs",
+                "type": "string",
                 "is_repeated": true
-              }
-            ]
-          },
-          {
-            "name": "PurgePathRequest",
-            "fields": [
-              {
-                "id": 1,
-                "name": "volumeId",
-                "type": "uint64"
               },
               {
                 "id": 2,
-                "name": "bucketId",
-                "type": "uint64"
-              },
-              {
-                "id": 3,
-                "name": "deletedDir",
-                "type": "string"
-              },
-              {
-                "id": 4,
                 "name": "deletedSubFiles",
                 "type": "KeyInfo",
                 "is_repeated": true
               },
               {
-                "id": 5,
+                "id": 3,
                 "name": "markDeletedSubDirs",
                 "type": "KeyInfo",
                 "is_repeated": true
@@ -3245,7 +3011,7 @@
             ]
           },
           {
-            "name": "PurgeDirectoriesResponse"
+            "name": "PurgePathsResponse"
           },
           {
             "name": "DeleteOpenKeysRequest",
@@ -3290,13 +3056,7 @@
               {
                 "id": 2,
                 "name": "clientID",
-                "type": "uint64",
-                "options": [
-                  {
-                    "name": "deprecated",
-                    "value": "true"
-                  }
-                ]
+                "type": "uint64"
               }
             ]
           },
@@ -3509,11 +3269,6 @@
                 "id": 1,
                 "name": "sequenceNumber",
                 "type": "uint64"
-              },
-              {
-                "id": 2,
-                "name": "limitCount",
-                "type": "uint64"
               }
             ]
           },
@@ -3552,11 +3307,6 @@
                 "name": "data",
                 "type": "bytes",
                 "is_repeated": true
-              },
-              {
-                "id": 3,
-                "name": "latestSequenceNumber",
-                "type": "uint64"
               }
             ]
           },
@@ -3741,17 +3491,6 @@
                 "id": 4,
                 "name": "omRole",
                 "type": "OMRoleInfo"
-              },
-              {
-                "id": 5,
-                "name": "OMVersion",
-                "type": "int32",
-                "options": [
-                  {
-                    "name": "default",
-                    "value": "0"
-                  }
-                ]
               }
             ]
           },
@@ -3833,11 +3572,6 @@
                 "id": 8,
                 "name": "parentID",
                 "type": "uint64"
-              },
-              {
-                "id": 9,
-                "name": "ecReplicationConfig",
-                "type": "hadoop.hdds.ECReplicationConfig"
               }
             ]
           },
@@ -4018,11 +3752,6 @@
                 "name": "partsList",
                 "type": "PartInfo",
                 "is_repeated": true
-              },
-              {
-                "id": 7,
-                "name": "ecReplicationConfig",
-                "type": "hadoop.hdds.ECReplicationConfig"
               }
             ]
           },
@@ -4099,11 +3828,6 @@
                 "id": 7,
                 "name": "factor",
                 "type": "hadoop.hdds.ReplicationFactor"
-              },
-              {
-                "id": 8,
-                "name": "ecReplicationConfig",
-                "type": "hadoop.hdds.ECReplicationConfig"
               }
             ]
           },
@@ -4228,26 +3952,6 @@
               {
                 "id": 2,
                 "name": "awsSecret",
-                "type": "string"
-              }
-            ]
-          },
-          {
-            "name": "S3Authentication",
-            "fields": [
-              {
-                "id": 1,
-                "name": "stringToSign",
-                "type": "string"
-              },
-              {
-                "id": 2,
-                "name": "signature",
-                "type": "string"
-              },
-              {
-                "id": 3,
-                "name": "accessId",
                 "type": "string"
               }
             ]
