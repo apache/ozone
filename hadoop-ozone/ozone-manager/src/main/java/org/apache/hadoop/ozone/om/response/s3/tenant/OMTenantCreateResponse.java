@@ -32,6 +32,7 @@ import javax.annotation.Nonnull;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_STATE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.USER_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 
 /**
@@ -39,7 +40,8 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
  */
 @CleanupTableInfo(cleanupTables = {
     TENANT_STATE_TABLE,
-    VOLUME_TABLE
+    VOLUME_TABLE,
+    USER_TABLE
 })
 public class OMTenantCreateResponse extends OMClientResponse {
 

@@ -192,8 +192,8 @@ public class TestCleanupTableInfo {
       throws IOException, IllegalAccessException {
     Map<String, Table> tableMap = omMetadataManager.listTables();
     Map<Table, Table> mockedTableMap = new HashMap<>();
-
-    for (String table:tableMap.keySet()) {
+    List<String> tables = new ArrayList<>(tableMap.keySet());
+    for (String table:tables) {
       Table mockedTable = Mockito.spy(tableMap.get(table));
       Answer answer = new Answer() {
         @Override
@@ -243,7 +243,7 @@ public class TestCleanupTableInfo {
   private <T> T getMockObject(Class<T> type,
                               Map<Class, Object> instanceMap,
                               Status status,
-                              boolean isFSO) throws IOException {
+                              boolean isFSO) {
     T instance =  Mockito.mock(type, invocationOnMock -> {
       try {
         return createInstance(invocationOnMock.getMethod().getReturnType(),
@@ -422,7 +422,10 @@ public class TestCleanupTableInfo {
             }
           }
           for (String t:updatedTables) {
-            Assert.assertTrue(tables.contains(t));
+            Assert.assertTrue(
+                String.format("Response Class: {} Tables for Cleanup: {},"
+                        + " Tables Actually Updated: {}",
+                    subType, tables, updatedTables), tables.contains(t));
           }
         } catch (Exception e) {
         }
