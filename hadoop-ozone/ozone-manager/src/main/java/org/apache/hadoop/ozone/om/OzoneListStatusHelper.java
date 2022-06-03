@@ -178,8 +178,9 @@ public class OzoneListStatusHelper {
     // Determine startKeyPrefix for DB iteration
     String startKeyPrefix = "";
     try {
-      String startDbKey = getDbKey(startKey, args, volumeInfo, omBucketInfo);
-      startKeyPrefix = Strings.isNullOrEmpty(startKey) ? "" : startDbKey;
+      if (!Strings.isNullOrEmpty(startKey)) {
+        startKeyPrefix = getDbKey(startKey, args, volumeInfo, omBucketInfo);
+      }
     } catch (OMException ome) {
       if (ome.getResult() != FILE_NOT_FOUND) {
         throw ome;
@@ -346,7 +347,16 @@ public class OzoneListStatusHelper {
         tableIterator.seek(prefixKey);
       }
 
-      if (!StringUtils.isBlank(startKey)) {
+      // only seek for the start key if the start key is lexicographically
+      // after the prefix key. For example
+      // Prefix key = 1024/c, Start key = 1024/a
+      // then do not seek for the start key
+      //
+      // on the other hand,
+      // Prefix key = 1024/a, Start key = 1024/c
+      // then seek for the start key
+      if (!StringUtils.isBlank(startKey) &&
+          startKey.compareTo(prefixKey) > 0) {
         tableIterator.seek(startKey);
       }
 
