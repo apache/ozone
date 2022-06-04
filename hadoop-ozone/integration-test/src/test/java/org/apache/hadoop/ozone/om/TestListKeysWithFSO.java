@@ -142,7 +142,7 @@ public class TestListKeysWithFSO {
     List<String> expectedKeys = getExpectedKeyList("a1/b2", "a1");
     checkKeyList("a1/b2", "a1", expectedKeys);
 
-    // case-2: Same prefixKey and startKey. but startKey with ending slash
+    // case-2: Same prefixKey and startKey, but with an ending slash
     expectedKeys = getExpectedKeyList("a1/b2", "a1/b2/");
     /**
      * a1/b2/d1/
@@ -155,7 +155,29 @@ public class TestListKeysWithFSO {
      */
     checkKeyList("a1/b2", "a1/b2/", expectedKeys);
 
-    // case-3:
+    // case-3: Same prefixKey and startKey, but without an ending slash.
+    //  StartKey(dir) to be included in the finalList, if its a
+    //  directory and not ended with trailing slash.
+    expectedKeys = getExpectedKeyList("a1/b2", "a1/b2");
+    /**
+     * a1/b2/
+     * a1/b2/d1/
+     * a1/b2/d1/d11.tx
+     * a1/b2/d2/
+     * a1/b2/d2/d21.tx
+     * a1/b2/d2/d22.tx
+     * a1/b2/d3/
+     * a1/b2/d3/d31.tx
+     */
+    checkKeyList("a1/b2", "a1/b2", expectedKeys);
+
+    // case-4: StartKey is a file with an ending slash.
+    //  StartKey(file) with or without an ending slash
+    //  to be excluded in the finalList.
+    expectedKeys = getExpectedKeyList("a1/b2/d2", "a1/b2/d2/d22.tx/");
+    checkKeyList("a1/b2/d2", "a1/b2/d2/d22.tx/", expectedKeys);
+
+    // case-5:
     // StartKey "a1/b2/d2/d22.tx" is a file and get all the keys lexographically
     // greater than "a1/b2/d2/d22.tx".
     expectedKeys = getExpectedKeyList("a1/b2", "a1/b2/d2/d22.tx");
@@ -165,7 +187,7 @@ public class TestListKeysWithFSO {
      */
     checkKeyList("a1/b2", "a1/b2/d2/d22.tx", expectedKeys);
 
-    // case-4:
+    // case-6:
     // StartKey "a1/b2/d2" is a dir and get all the keys lexographically
     // greater than "a1/b2/d2".
     expectedKeys = getExpectedKeyList("a1/b2", "a1/b2/d2/");
@@ -177,7 +199,7 @@ public class TestListKeysWithFSO {
      */
     checkKeyList("a1/b2", "a1/b2/d2/", expectedKeys);
 
-    // case-5: In below case, the startKey is a directory which is included
+    // case-7: In below case, the startKey is a directory which is included
     // in the finalList. So, should we include startKey file in the finalList ?
     expectedKeys = getExpectedKeyList("a1", "a1/b2/d2/d21.tx");
     /**
@@ -194,8 +216,8 @@ public class TestListKeysWithFSO {
      */
     checkKeyList("a1", "a1/b2/d2/d21.tx", expectedKeys);
 
-    // case-76 Here need to discuss - whether the startKey(dir) to be included
-    // in the finalList ?
+    // case-8: StartKey(dir) to be included in the finalList, if its a
+    //  directory and not ended with trailing slash.
     expectedKeys = getExpectedKeyList("a1", "a1/b2/d2/");
     /**
      1 = "a1/b2/d2/d21.tx"
@@ -203,16 +225,13 @@ public class TestListKeysWithFSO {
      3 = "a1/b2/d3/"
      4 = "a1/b2/d3/d31.tx"
      5 = "a1/b3/"
-     6 = "a1/b3/e1/"
-     7 = "a1/b3/e1/e11.tx"
-     8 = "a1/b3/e2/"
-     9 = "a1/b3/e2/e21.tx"
+     .....
      10 = "a1/b3/e3/"
      11 = "a1/b3/e3/e31.tx"
      */
     checkKeyList("a1", "a1/b2/d2/", expectedKeys);
 
-    // case-7: Reached Last Element, return EmptyList
+    // case-9: Reached Last Element, return EmptyList
     expectedKeys = getExpectedKeyList("a1", "a1/b3/e3/e31.tx");
     checkKeyList("a1", "a1/b3/e3/e31.tx", expectedKeys);
   }
@@ -249,8 +268,7 @@ public class TestListKeysWithFSO {
      * a1/b2/d1/
      * a1/b2/d1/d11.tx
      * a1/b2/d2/
-     * a1/b2/d2/d21.tx
-     * a1/b2/d2/d22.tx
+     * .....
      * a1/b2/d3/
      * a1/b2/d3/d31.tx
      */
@@ -263,9 +281,7 @@ public class TestListKeysWithFSO {
     /**
      a1/b2/d1/
      a1/b2/d1/d11.tx
-     a1/b2/d2/
-     a1/b2/d2/d21.tx
-     a1/b2/d2/d22.tx
+     .....
      a1/b2/d3/
      a1/b2/d3/d31.tx
      */
@@ -298,9 +314,7 @@ public class TestListKeysWithFSO {
     /**
      *  a1/b3/
      *  a1/b3/e1/
-     *  a1/b3/e1/e11.tx
-     *  a1/b3/e2/
-     *  a1/b3/e2/e21.tx
+     *  ....
      *  a1/b3/e3/
      *  a1/b3/e3/e31.tx
      */
@@ -334,32 +348,38 @@ public class TestListKeysWithFSO {
      */
     checkKeyList("a1", "a1/b2/d2/d21111", expectedKeys);
 
-    // case-10:
+    // case-11:
     // StartKey is a sub-path of prefixKey.
     // So will fetch and return all the sub-paths after "e311111".
     // Return EmptyList as we reached the end of the tree
     expectedKeys = getExpectedKeyList("a1", "a1/b3/e3/e311111.tx");
     checkKeyList("a1", "a1/b3/e3/e311111.tx", expectedKeys);
 
-    // case-11:
+    // case-12:
     // StartKey is a sub-path of prefixKey.
     // So will fetch and return all the sub-paths after "e4444".
     // Return EmptyList as we reached the end of the tree
     expectedKeys = getExpectedKeyList("a1/b2", "a1/b3/e4444");
     checkKeyList("a1/b2", "a1/b3/e4444", expectedKeys);
 
-    // case-12:
+    // case-13:
+    // StartKey is a sub-path of prefixKey and startKey with a trailing slash.
+    // So will fetch and return all the sub-paths after "e".
+    expectedKeys = getExpectedKeyList("a1/b3", "a1/b3/e/");
+    checkKeyList("a1/b3", "a1/b3/e/", expectedKeys);
+
+    // case-14:
     // PrefixKey is empty and search should consider startKey.
     // Fetch all the keys after, a1/b2/d
     expectedKeys = getExpectedKeyList("", "a1/b2/d");
     checkKeyList("", "a1/b2/d", expectedKeys);
 
-    // case-13:
+    // case-15:
     // PrefixKey is empty and search should consider startKey.
     expectedKeys = getExpectedKeyList("", "a1/b2/d2/d21111");
     checkKeyList("", "a1/b2/d2/d21111", expectedKeys);
 
-    // case-14:
+    // case-16:
     // PrefixKey is empty and search should consider startKey.
     expectedKeys = getExpectedKeyList("", "a0/b2/d2/d21111");
     checkKeyList("", "a0/b2/d2/d21111", expectedKeys);
@@ -415,7 +435,6 @@ public class TestListKeysWithFSO {
     Iterator<? extends OzoneKey> ozoneKeyIterator =
         legacyOzoneBucket.listKeys(keyPrefix, startKey);
 
-//    fsoOzoneBucket.listStatus(keyPrefix, false, startKey, 5);
     List<String> keys = new LinkedList<>();
     while (ozoneKeyIterator.hasNext()) {
       OzoneKey ozoneKey = ozoneKeyIterator.next();

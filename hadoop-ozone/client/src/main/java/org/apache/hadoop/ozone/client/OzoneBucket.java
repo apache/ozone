@@ -1394,31 +1394,29 @@ public class OzoneBucket extends WithMetadata {
         return;
       }
 
-      // TODO: HDDS-4859 will fix the case where startKey not started with
-      //  keyPrefix.
-
-      OzoneFileStatus status = null;
+      OzoneFileStatus status;
       try {
         status = proxy.getOzoneFileStatus(volumeName, name,
             keyPrefix);
       } catch (OMException ome) {
         // ignore and return empty result list
+        return;
       }
 
       if (status != null) {
         OmKeyInfo keyInfo = status.getKeyInfo();
         String keyName = keyInfo.getKeyName();
 
-        // removeStartKey - as the startKey is a placeholder, which is
-        // managed internally to traverse leaf node's sub-paths.
-        if (StringUtils.equals(keyName, removeStartKey)) {
-          return;
-        }
-
         if (status.isDirectory()) {
           // add trailing slash to represent directory
           keyName =
               OzoneFSUtils.addTrailingSlashIfNeeded(keyInfo.getKeyName());
+        }
+
+        // removeStartKey - as the startKey is a placeholder, which is
+        // managed internally to traverse leaf node's sub-paths.
+        if (StringUtils.equals(keyName, removeStartKey)) {
+          return;
         }
 
         OzoneKey ozoneKey = new OzoneKey(keyInfo.getVolumeName(),
