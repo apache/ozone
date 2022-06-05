@@ -257,7 +257,7 @@ public final class OMPBHelper {
       return new MD5MD5CRC32CastagnoliFileChecksum(bytesPerCRC, crcPerBlock,
           md5Hash);
     default:
-      return null;
+      throw new IOException("Unexpected checksum type " + checksumTypeProto);
     }
   }
 
