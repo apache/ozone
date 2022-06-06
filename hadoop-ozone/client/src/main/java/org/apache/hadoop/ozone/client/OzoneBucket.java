@@ -61,6 +61,7 @@ import java.util.NoSuchElementException;
 
 import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 
 /**
  * A class that encapsulates OzoneBucket.
@@ -1394,13 +1395,15 @@ public class OzoneBucket extends WithMetadata {
         return;
       }
 
-      OzoneFileStatus status;
+      OzoneFileStatus status = null;
       try {
         status = proxy.getOzoneFileStatus(volumeName, name,
             keyPrefix);
       } catch (OMException ome) {
-        // ignore and return empty result list
-        return;
+        if (ome.getResult() == FILE_NOT_FOUND) {
+          // keyPrefix path can't be found and skip adding it to result list
+          return;
+        }
       }
 
       if (status != null) {
