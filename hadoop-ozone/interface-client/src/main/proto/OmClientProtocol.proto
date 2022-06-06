@@ -888,6 +888,41 @@ message KeyLocationList {
     optional bool isMultipartKey = 4 [default = false];
 }
 
+/**
+ * Checksum algorithms/types used in Ozone
+ * Make sure this enum's integer values match enum values' id properties defined
+ * in org.apache.hadoop.util.DataChecksum.Type
+ */
+enum ChecksumTypeProto {
+  CHECKSUM_NULL = 0;
+  CHECKSUM_CRC32 = 1;
+  CHECKSUM_CRC32C = 2;
+}
+
+enum FileChecksumTypeProto {
+  MD5CRC = 1;  // BlockChecksum obtained by taking the MD5 digest of chunk CRCs
+  COMPOSITE_CRC = 2;  // Chunk-independent CRC, optionally striped
+}
+
+message CompositeCrcFileChecksumProto {
+  required ChecksumTypeProto checksumType = 1;
+  required uint32 bytesPerCrc = 2;
+  required uint32 crc = 3;
+}
+
+message MD5MD5Crc32FileChecksumProto {
+  required ChecksumTypeProto checksumType = 1;
+  required uint32 bytesPerCRC = 2;
+  required uint64 crcPerBlock = 3;
+  required bytes md5 = 4;
+}
+
+message FileChecksumProto {
+  required FileChecksumTypeProto checksumType = 1  [default = COMPOSITE_CRC];
+  optional CompositeCrcFileChecksumProto compositeCrc = 2;
+  optional MD5MD5Crc32FileChecksumProto md5Crc = 3;
+}
+
 message KeyInfo {
     required string volumeName = 1;
     required string bucketName = 2;
@@ -906,6 +941,7 @@ message KeyInfo {
     optional uint64 updateID = 15;
     optional uint64 parentID = 16;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
+    optional FileChecksumProto fileChecksum = 18;
 }
 
 message DirectoryInfo {
