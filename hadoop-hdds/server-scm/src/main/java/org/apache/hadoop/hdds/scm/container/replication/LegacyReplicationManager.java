@@ -1409,8 +1409,7 @@ public class LegacyReplicationManager {
             " to datanode {}.", containerID, datanode);
     CloseContainerCommand closeContainerCommand =
         new CloseContainerCommand(container.getContainerID(),
-            container.getPipelineID(),
-            container.getReplicationConfig().getReplicationType(), force);
+            container.getPipelineID(), force);
     try {
       closeContainerCommand.setTerm(scmContext.getTermOfLeader());
     } catch (NotLeaderException nle) {

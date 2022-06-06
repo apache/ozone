@@ -224,8 +224,7 @@ public class TestContainerStateMachineFailures {
       wc.notifyGroupRemove(RaftGroupId
           .valueOf(omKeyLocationInfo.getPipeline().getId().getId()));
       SCMCommand<?> command = new CloseContainerCommand(
-          containerID, omKeyLocationInfo.getPipeline().getId(),
-          HddsProtos.ReplicationType.RATIS);
+          containerID, omKeyLocationInfo.getPipeline().getId());
       command.setTerm(
           cluster
               .getStorageContainerManager()

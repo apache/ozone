@@ -49,7 +49,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.Descriptors.Descriptor;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -642,8 +641,7 @@ public class TestStateContext {
     ctx.addCommand(new ReplicateContainerCommand(2, null));
     ctx.addCommand(new ReplicateContainerCommand(3, null));
     ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
-    ctx.addCommand(new CloseContainerCommand(1, PipelineID.randomId(),
-        HddsProtos.ReplicationType.RATIS));
+    ctx.addCommand(new CloseContainerCommand(1, PipelineID.randomId()));
 
     Map<SCMCommandProto.Type, Integer> summary = ctx.getCommandQueueSummary();
     Assert.assertEquals(3,

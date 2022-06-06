@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -143,8 +142,8 @@ public class TestDeleteContainerHandler {
         cluster.getStorageContainerManager().getScmNodeManager();
 
     //send the order to close the container
-    SCMCommand<?> command = new CloseContainerCommand(containerId.getId(),
-        pipeline.getId(), HddsProtos.ReplicationType.RATIS);
+    SCMCommand<?> command = new CloseContainerCommand(
+        containerId.getId(), pipeline.getId());
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);

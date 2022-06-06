@@ -81,8 +81,7 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
       // Send close command to datanodes, if the container is in CLOSING state
       if (container.getState() == LifeCycleState.CLOSING) {
         SCMCommand<?> command = new CloseContainerCommand(
-            containerID.getId(), container.getPipelineID(),
-            container.getReplicationConfig().getReplicationType());
+            containerID.getId(), container.getPipelineID());
         command.setTerm(scmContext.getTermOfLeader());
         command.setEncodedToken(getContainerToken(containerID));
 
