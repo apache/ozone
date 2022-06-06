@@ -43,6 +43,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -70,6 +71,7 @@ public class OpenKeyCleanupService extends BackgroundService {
   private final int cleanupLimitPerTask;
   private final AtomicLong submittedOpenKeyCount;
   private final AtomicLong runCount;
+  private final AtomicBoolean suspended;
 
   public OpenKeyCleanupService(long interval, TimeUnit unit, long timeout,
       OzoneManager ozoneManager, ConfigurationSource conf) {
@@ -90,6 +92,7 @@ public class OpenKeyCleanupService extends BackgroundService {
 
     this.submittedOpenKeyCount = new AtomicLong(0);
     this.runCount = new AtomicLong(0);
+    this.suspended = new AtomicBoolean(false);
   }
 
   /**
@@ -100,6 +103,22 @@ public class OpenKeyCleanupService extends BackgroundService {
   @VisibleForTesting
   public long getRunCount() {
     return runCount.get();
+  }
+
+  /**
+   * Suspend the service (for testing).
+   */
+  @VisibleForTesting
+  public void suspend() {
+    suspended.set(true);
+  }
+
+  /**
+   * Resume the service if suspended (for testing).
+   */
+  @VisibleForTesting
+  public void resume() {
+    suspended.set(false);
   }
 
   /**
@@ -124,7 +143,7 @@ public class OpenKeyCleanupService extends BackgroundService {
   }
 
   private boolean shouldRun() {
-    return ozoneManager.isLeaderReady();
+    return !suspended.get() && ozoneManager.isLeaderReady();
   }
 
   private boolean isRatisEnabled() {
