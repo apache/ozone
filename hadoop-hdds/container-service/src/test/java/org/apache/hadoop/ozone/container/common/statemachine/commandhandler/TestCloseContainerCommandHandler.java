@@ -232,20 +232,6 @@ public class TestCloseContainerCommandHandler {
     }
   }
 
-  @Test
-  public void closeStandaloneContainerWithoutPipeline() throws IOException {
-    when(writeChannel.getServerType())
-        .thenReturn(HddsProtos.ReplicationType.STAND_ALONE);
-    subject.handle(closeWithReplicationType(
-        HddsProtos.ReplicationType.STAND_ALONE), ozoneContainer,
-        context, null);
-
-    verify(containerHandler)
-        .markContainerForClose(container);
-    verify(containerHandler, never())
-        .quasiCloseContainer(container);
-  }
-
   private CloseContainerCommand closeWithKnownPipeline() {
     return new CloseContainerCommand(CONTAINER_ID, pipelineID,
         HddsProtos.ReplicationType.RATIS);
@@ -264,12 +250,6 @@ public class TestCloseContainerCommandHandler {
   private CloseContainerCommand forceCloseWithoutPipeline() {
     return new CloseContainerCommand(CONTAINER_ID, nonExistentPipelineID,
         HddsProtos.ReplicationType.RATIS, true);
-  }
-
-  private CloseContainerCommand closeWithReplicationType(
-      HddsProtos.ReplicationType replicationType) {
-    return new CloseContainerCommand(CONTAINER_ID, nonExistentPipelineID,
-        replicationType, false);
   }
 
   /**
