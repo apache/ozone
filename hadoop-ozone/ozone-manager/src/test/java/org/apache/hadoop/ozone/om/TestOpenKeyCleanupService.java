@@ -75,7 +75,8 @@ public class TestOpenKeyCleanupService {
 
   private static final Duration SERVICE_INTERVAL = Duration.ofMillis(100);
   private static final Duration EXPIRE_THRESHOLD = Duration.ofMillis(200);
-  private OzoneConfiguration conf;
+  private KeyManager keyManager;
+  private OMMetadataManager omMetadataManager;
 
   @BeforeAll
   public static void setup() {
@@ -83,8 +84,8 @@ public class TestOpenKeyCleanupService {
   }
 
   @BeforeEach
-  public void createConfAndInitValues(@TempDir Path tempDir) {
-    conf = new OzoneConfiguration();
+  public void createConfAndInitValues(@TempDir Path tempDir) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
     System.setProperty(DBConfigFromFile.CONFIG_DIR, "/");
     ServerUtils.setOzoneMetaDirPath(conf, tempDir.toString());
     conf.setTimeDuration(OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL,
@@ -92,6 +93,11 @@ public class TestOpenKeyCleanupService {
     conf.setTimeDuration(OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
         EXPIRE_THRESHOLD.toMillis(), TimeUnit.MILLISECONDS);
     conf.setQuietMode(false);
+    OmTestManagers omTestManagers = new OmTestManagers(conf);
+    keyManager = omTestManagers.getKeyManager();
+    omMetadataManager = omTestManagers.getMetadataManager();
+    writeClient = omTestManagers.getWriteClient();
+    om = omTestManagers.getOzoneManager();
   }
 
   @AfterEach
@@ -117,23 +123,15 @@ public class TestOpenKeyCleanupService {
   @Timeout(300)
   public void checkIfCleanupServiceIsDeletingExpiredOpenKeys(
       int numDEFKeys, int numFSOKeys) throws Exception {
-    OmTestManagers omTestManagers = new OmTestManagers(conf);
-    final KeyManager keyManager = omTestManagers.getKeyManager();
-    final OMMetadataManager omMetadataManager =
-        omTestManagers.getMetadataManager();
-
-    writeClient = omTestManagers.getWriteClient();
-    om = omTestManagers.getOzoneManager();
-
 
     OpenKeyCleanupService openKeyCleanupService =
         (OpenKeyCleanupService) keyManager.getOpenKeyCleanupService();
+
     openKeyCleanupService.suspend();
 
     final int keyCount = numDEFKeys + numFSOKeys;
-    createOpenKeys(omMetadataManager, numDEFKeys, BucketLayout.DEFAULT);
-    createOpenKeys(omMetadataManager, numFSOKeys,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    createOpenKeys(numDEFKeys, BucketLayout.DEFAULT);
+    createOpenKeys(numFSOKeys, BucketLayout.FILE_SYSTEM_OPTIMIZED);
     Thread.sleep(EXPIRE_THRESHOLD.toMillis() + SERVICE_INTERVAL.toMillis());
     assertEquals(numDEFKeys == 0, keyManager.getExpiredOpenKeys(
         EXPIRE_THRESHOLD, 1, BucketLayout.DEFAULT).isEmpty());
@@ -153,8 +151,7 @@ public class TestOpenKeyCleanupService {
         1, BucketLayout.FILE_SYSTEM_OPTIMIZED).isEmpty());
   }
 
-  private void createOpenKeys(OMMetadataManager omMetadataManager,
-      int keyCount, BucketLayout bucketLayout)
+  private void createOpenKeys(int keyCount, BucketLayout bucketLayout)
       throws IOException {
     String volume = UUID.randomUUID().toString();
     String bucket = UUID.randomUUID().toString();
