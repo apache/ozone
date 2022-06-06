@@ -506,8 +506,13 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             OMException.ResultCodes.INVALID_PART);
       }
 
-      OmKeyInfo currentPartKeyInfo = OmKeyInfo
-          .getFromProtobuf(partKeyInfo.getPartKeyInfo());
+      OmKeyInfo currentPartKeyInfo = null;
+      try {
+        currentPartKeyInfo =
+            OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+      } catch (IOException ioe) {
+        throw new OMException(ioe, OMException.ResultCodes.INTERNAL_ERROR);
+      }
 
       // Except for last part all parts should have minimum size.
       if (currentPartCount != partsListSize) {
