@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManagerImpl;
 import org.apache.hadoop.hdds.scm.node.CommandQueueReportHandler;
@@ -556,10 +557,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   @SuppressWarnings("methodLength")
   private void initializeSystemManagers(OzoneConfiguration conf,
-                                        SCMConfigurator configurator)
-      throws IOException {
-    scmLayoutVersionManager = new HDDSLayoutVersionManager(
-        scmStorageConfig.getLayoutVersion());
+      SCMConfigurator configurator) throws IOException {
 
     Clock clock = new MonotonicClock(ZoneOffset.UTC);
 
@@ -575,6 +573,25 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     } else {
       scmHAManager = new SCMHAManagerImpl(conf, this);
     }
+
+    scmLayoutVersionManager = new HDDSLayoutVersionManager(
+        scmStorageConfig.getLayoutVersion());
+
+    UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
+        finalizationExecutor;
+    if (configurator.getUpgradeFinalizationExecutor() != null) {
+      finalizationExecutor = configurator.getUpgradeFinalizationExecutor();
+    } else {
+      finalizationExecutor = new DefaultUpgradeFinalizationExecutor<>();
+    }
+    finalizationManager = new FinalizationManagerImpl.Builder()
+        .setConfiguration(conf)
+        .setLayoutVersionManager(scmLayoutVersionManager)
+        .setStorage(scmStorageConfig)
+        .setHAManager(scmHAManager)
+        .setFinalizationStore(scmMetadataStore.getMetaTable())
+        .setFinalizationExecutor(finalizationExecutor)
+        .build();
 
     // inline upgrade for SequenceIdGenerator
     SequenceIdGenerator.upgradeToSequenceId(scmMetadataStore);
@@ -595,6 +612,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           .setIsInSafeMode(true)
           .setIsPreCheckComplete(false)
           .setSCM(this)
+          .setFinalizationCheckpoint(finalizationManager.getCheckpoint())
           .build();
     }
 
@@ -602,8 +620,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmNodeManager = configurator.getScmNodeManager();
     } else {
       scmNodeManager = new SCMNodeManager(conf, scmStorageConfig, eventQueue,
-          clusterMap, scmContext, scmLayoutVersionManager,
-          c -> finalizationManager.crossedCheckpoint(c));
+          clusterMap, scmContext, scmLayoutVersionManager);
     }
 
     placementMetrics = SCMContainerPlacementMetrics.create();
@@ -626,6 +643,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               clock
               );
     }
+
+    finalizationManager.buildUpgradeContext(scmNodeManager, pipelineManager,
+        scmContext);
 
     containerReplicaPendingOps = new ContainerReplicaPendingOps(conf, clock);
     if (configurator.getContainerManager() != null) {
@@ -670,24 +690,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           containerManager.getContainers(), containerManager,
           pipelineManager, eventQueue, serviceManager, scmContext);
     }
-
-    UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
-        finalizationExecutor;
-    if (configurator.getUpgradeFinalizationExecutor() != null) {
-      finalizationExecutor = configurator.getUpgradeFinalizationExecutor();
-    } else {
-      finalizationExecutor = new DefaultUpgradeFinalizationExecutor<>();
-    }
-    finalizationManager = new FinalizationManagerImpl.Builder()
-        .setConfiguration(conf)
-        .setLayoutVersionManager(scmLayoutVersionManager)
-        .setPipelineManager(pipelineManager)
-        .setNodeManager(scmNodeManager)
-        .setStorage(scmStorageConfig)
-        .setHAManager(scmHAManager)
-        .setFinalizationStore(scmMetadataStore.getMetaTable())
-        .setFinalizationExecutor(finalizationExecutor)
-        .build();
 
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
         containerManager, scmContext, eventQueue, replicationManager);

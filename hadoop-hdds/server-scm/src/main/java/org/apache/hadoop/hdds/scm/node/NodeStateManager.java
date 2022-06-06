@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
 import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -174,8 +175,7 @@ public class NodeStateManager implements Runnable, Closeable {
   public NodeStateManager(ConfigurationSource conf,
                           EventPublisher eventPublisher,
                           LayoutVersionManager layoutManager,
-                          Predicate<FinalizationCheckpoint>
-                              finalizationCheckpointIsPassed) {
+                          SCMContext scmContext) {
     this.layoutVersionManager = layoutManager;
     this.nodeStateMap = new NodeStateMap();
     this.node2PipelineMap = new Node2PipelineMap();
@@ -216,8 +216,8 @@ public class NodeStateManager implements Runnable, Closeable {
     // to healthy readonly until SCM finishes updating its MLV, hence the
     // checkpoint check here.
     layoutMisMatchCondition = (layout) ->
-            finalizationCheckpointIsPassed
-                .test(FinalizationCheckpoint.MLV_EQUALS_SLV) &&
+        scmContext.isFinalizationCheckpointCrossed(
+                    FinalizationCheckpoint.MLV_EQUALS_SLV) &&
             !layoutMatchCondition.test(layout);
 
     scheduleNextHealthCheck();

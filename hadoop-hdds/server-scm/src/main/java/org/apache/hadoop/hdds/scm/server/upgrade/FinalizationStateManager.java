@@ -36,23 +36,14 @@ public interface FinalizationStateManager {
   @Replicate
   void finalizeLayoutFeature(Integer layoutVersion) throws IOException;
 
-  void addReplicatedFinalizationStep(ReplicatedFinalizationStep step);
-
   /**
-   * @param checkpoint The checkpoint to check for being crossed.
+   * @param query The checkpoint to check for being crossed.
    * @return true if SCM's disk state indicates this checkpoint has been
    * crossed. False otherwise.
    */
-  boolean crossedCheckpoint(FinalizationCheckpoint checkpoint);
+  boolean crossedCheckpoint(FinalizationCheckpoint query);
 
-  /**
-   * Additional steps that must be run on all SCMs when a layout feature is
-   * finalized. This can be used to bring required finalization steps from
-   * the upgrade framework in {@link SCMUpgradeFinalizer} into replicated
-   * methods in the {@link FinalizationStateManager}.
-   */
-  @FunctionalInterface
-  interface ReplicatedFinalizationStep {
-    void run(HDDSLayoutFeature feature) throws UpgradeException;
-  }
+  FinalizationCheckpoint getFinalizationCheckpoint();
+
+  void setUpgradeContext(SCMUpgradeFinalizationContext context);
 }

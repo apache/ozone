@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.upgrade;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
@@ -29,12 +30,15 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
+import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
+import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizer;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.junit.Assert;
 import org.junit.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -91,19 +95,30 @@ public class TestScmFinalization {
     // test.
     FinalizationStateManager stateManager =
         new FinalizationStateManagerTestImpl.Builder()
-            .setVersionManager(versionManager)
             .setFinalizationStore(Mockito.mock(Table.class))
             .setRatisServer(Mockito.mock(SCMRatisServer.class))
             .setTransactionBuffer(Mockito.mock(DBTransactionBuffer.class))
+            .setUpgradeFinalizer(new SCMUpgradeFinalizer(versionManager))
             .build();
-    // This is normally handled by the FinalizationManager, which we do not
-    // have in this test.
-    stateManager.addReplicatedFinalizationStep(versionManager::finalized);
 
-    assertCurrentCheckpoint(stateManager,
+    // In the actual flow, this would be handled by the FinalizationManager.
+    SCMContext scmContext = SCMContext.emptyContext();
+    scmContext.setFinalizationCheckpoint(stateManager.getFinalizationCheckpoint());
+    SCMUpgradeFinalizationContext context = new SCMUpgradeFinalizationContext.Builder()
+        .setConfiguration(new OzoneConfiguration())
+        .setFinalizationStateManager(stateManager)
+        .setStorage(Mockito.mock(SCMStorageConfig.class))
+        .setLayoutVersionManager(versionManager)
+        .setSCMContext(scmContext)
+        .setPipelineManager(Mockito.mock(PipelineManager.class))
+        .setNodeManager(Mockito.mock(NodeManager.class))
+        .build();
+    stateManager.setUpgradeContext(context);
+
+    assertCurrentCheckpoint(scmContext, stateManager,
         FinalizationCheckpoint.FINALIZATION_REQUIRED);
     stateManager.addFinalizingMark();
-    assertCurrentCheckpoint(stateManager,
+    assertCurrentCheckpoint(scmContext, stateManager,
         FinalizationCheckpoint.FINALIZATION_STARTED);
 
     for (HDDSLayoutFeature feature: HDDSLayoutFeature.values()) {
@@ -111,26 +126,29 @@ public class TestScmFinalization {
       if (!feature.equals(HDDSLayoutFeature.INITIAL_VERSION)) {
         stateManager.finalizeLayoutFeature(feature.layoutVersion());
         if (versionManager.needsFinalization()) {
-          assertCurrentCheckpoint(stateManager,
+          assertCurrentCheckpoint(scmContext, stateManager,
               FinalizationCheckpoint.FINALIZATION_STARTED);
         } else {
-          assertCurrentCheckpoint(stateManager,
+          assertCurrentCheckpoint(scmContext, stateManager,
               FinalizationCheckpoint.MLV_EQUALS_SLV);
         }
       }
     }
     // Make sure we reached this checkpoint if we finished finalizing all
     // layout features.
-    assertCurrentCheckpoint(stateManager,
+    assertCurrentCheckpoint(scmContext, stateManager,
         FinalizationCheckpoint.MLV_EQUALS_SLV);
 
     stateManager.removeFinalizingMark();
-    assertCurrentCheckpoint(stateManager,
+    assertCurrentCheckpoint(scmContext, stateManager,
         FinalizationCheckpoint.FINALIZATION_COMPLETE);
   }
 
-  private void assertCurrentCheckpoint(FinalizationStateManager stateManager,
+  private void assertCurrentCheckpoint(SCMContext context,
+      FinalizationStateManager stateManager,
       FinalizationCheckpoint expectedCheckpoint) {
+
+    assertTrue(context.isFinalizationCheckpointCrossed(expectedCheckpoint));
     for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
       LOG.info("Comparing expected checkpoint {} to {}", expectedCheckpoint,
           checkpoint);
@@ -177,25 +195,27 @@ public class TestScmFinalization {
     Mockito.when(haManager.getDBTransactionBuffer()).thenReturn(buffer);
     NodeManager nodeManager = Mockito.mock(NodeManager.class);
     SCMStorageConfig storage = Mockito.mock(SCMStorageConfig.class);
+    SCMContext scmContext = SCMContext.emptyContext();
+    scmContext.setFinalizationCheckpoint(initialCheckpoint);
 
     FinalizationStateManager stateManager =
         new FinalizationStateManagerTestImpl.Builder()
-            .setVersionManager(versionManager)
             .setFinalizationStore(finalizationStore)
             .setRatisServer(Mockito.mock(SCMRatisServer.class))
             .setTransactionBuffer(buffer)
+            .setUpgradeFinalizer(new SCMUpgradeFinalizer(versionManager))
             .build();
 
     FinalizationManager manager = new FinalizationManagerTestImpl.Builder()
         .setFinalizationStateManager(stateManager)
         .setConfiguration(new OzoneConfiguration())
         .setLayoutVersionManager(versionManager)
-        .setPipelineManager(pipelineManager)
-        .setNodeManager(nodeManager)
         .setStorage(storage)
         .setHAManager(SCMHAManagerStub.getInstance(true))
         .setFinalizationStore(finalizationStore)
         .build();
+
+    manager.buildUpgradeContext(nodeManager, pipelineManager, scmContext);
 
     // Execute upgrade finalization, then check that events happened in the
     // correct order.

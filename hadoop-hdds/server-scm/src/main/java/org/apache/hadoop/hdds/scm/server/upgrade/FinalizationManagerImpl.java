@@ -19,11 +19,14 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
@@ -39,45 +42,62 @@ import java.util.Collections;
  */
 public class FinalizationManagerImpl implements FinalizationManager {
   private final SCMUpgradeFinalizer upgradeFinalizer;
-  private final SCMUpgradeFinalizationContext context;
+  private SCMUpgradeFinalizationContext context;
   private final SCMStorageConfig storage;
+  private final OzoneConfiguration conf;
   private final FinalizationStateManager finalizationStateManager;
+  private final HDDSLayoutVersionManager versionManager;
 
-  /**
-   * Used for testing so subclasses can inject their own state manager.
-   */
   protected FinalizationManagerImpl(Builder builder,
-      FinalizationStateManager stateManager) throws IOException {
+    FinalizationStateManager stateManager)
+      throws IOException {
     this.storage = builder.storage;
-    this.upgradeFinalizer = new SCMUpgradeFinalizer(builder.versionManager,
+    this.versionManager = builder.versionManager;
+    this.conf = builder.conf;
+    this.upgradeFinalizer = new SCMUpgradeFinalizer(this.versionManager,
         builder.executor);
-    finalizationStateManager = stateManager;
-    this.context =
-        new SCMUpgradeFinalizationContext.Builder()
-            .setStorage(this.storage)
-            .setFinalizationStateManager(finalizationStateManager)
-            .setConfiguration(builder.conf)
-            .setNodeManager(builder.nodeManager)
-            .setPipelineManager(builder.pipelineManager)
-            .setLayoutVersionManager(builder.versionManager)
-            .build();
-    finalizationStateManager.addReplicatedFinalizationStep(
-        lf -> this.upgradeFinalizer.replicatedFinalizationSteps(lf, context));
+    this.finalizationStateManager = stateManager;
+
   }
 
   private FinalizationManagerImpl(Builder builder) throws IOException {
-    this(builder, new FinalizationStateManagerImpl.Builder()
-        .setVersionManager(builder.versionManager)
+    // TODO: dedup
+    this.storage = builder.storage;
+    this.versionManager = builder.versionManager;
+    this.conf = builder.conf;
+    this.upgradeFinalizer = new SCMUpgradeFinalizer(this.versionManager,
+        builder.executor);
+    finalizationStateManager = new FinalizationStateManagerImpl.Builder()
+        .setUpgradeFinalizer(this.upgradeFinalizer)
         .setFinalizationStore(builder.finalizationStore)
         .setTransactionBuffer(builder.scmHAManager.getDBTransactionBuffer())
         .setRatisServer(builder.scmHAManager.getRatisServer())
-        .build());
+        .build();
+  }
+
+  @Override
+  public void buildUpgradeContext(NodeManager nodeManager,
+                                  PipelineManager pipelineManager,
+                                  SCMContext scmContext) {
+    this.context = new SCMUpgradeFinalizationContext.Builder()
+            .setStorage(this.storage)
+            .setFinalizationStateManager(finalizationStateManager)
+            .setConfiguration(conf)
+            .setNodeManager(nodeManager)
+            .setPipelineManager(pipelineManager)
+            .setLayoutVersionManager(versionManager)
+            .setSCMContext(scmContext)
+            .build();
+
+    finalizationStateManager.setUpgradeContext(this.context);
   }
 
   @Override
   public UpgradeFinalizer.StatusAndMessages finalizeUpgrade(
       String upgradeClientID)
       throws IOException {
+    Preconditions.checkNotNull(context, "Cannot finalize upgrade without " +
+        "first building the upgrade context.");
     return upgradeFinalizer.finalize(upgradeClientID, context);
   }
 
@@ -108,6 +128,11 @@ public class FinalizationManagerImpl implements FinalizationManager {
     return finalizationStateManager.crossedCheckpoint(checkpoint);
   }
 
+  @Override
+  public FinalizationCheckpoint getCheckpoint() {
+    return finalizationStateManager.getFinalizationCheckpoint();
+  }
+
   /**
    * Builds a {@link FinalizationManagerImpl}.
    */
@@ -115,8 +140,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
   public static class Builder {
     private OzoneConfiguration conf;
     private HDDSLayoutVersionManager versionManager;
-    private PipelineManager pipelineManager;
-    private NodeManager nodeManager;
     private SCMStorageConfig storage;
     private SCMHAManager scmHAManager;
     private Table<String, String> finalizationStore;
@@ -134,16 +157,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
     public Builder setLayoutVersionManager(
         HDDSLayoutVersionManager versionManager) {
       this.versionManager = versionManager;
-      return this;
-    }
-
-    public Builder setPipelineManager(PipelineManager pipelineManager) {
-      this.pipelineManager = pipelineManager;
-      return this;
-    }
-
-    public Builder setNodeManager(NodeManager nodeManager) {
-      this.nodeManager = nodeManager;
       return this;
     }
 
@@ -172,11 +185,11 @@ public class FinalizationManagerImpl implements FinalizationManager {
     public FinalizationManagerImpl build() throws IOException {
       Preconditions.checkNotNull(conf);
       Preconditions.checkNotNull(versionManager);
-      Preconditions.checkNotNull(pipelineManager);
-      Preconditions.checkNotNull(nodeManager);
       Preconditions.checkNotNull(storage);
       Preconditions.checkNotNull(scmHAManager);
       Preconditions.checkNotNull(finalizationStore);
+      Preconditions.checkNotNull(executor);
+
       return new FinalizationManagerImpl(this);
     }
   }

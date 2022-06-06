@@ -112,7 +112,7 @@ public class TestHDDSUpgrade {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestHDDSUpgrade.class);
   private static final int NUM_DATA_NODES = 3;
-  private static final int NUM_DATA_SCMS = 3;
+  private static final int NUM_SCMS = 3;
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -160,7 +160,8 @@ public class TestHDDSUpgrade {
 
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(NUM_DATA_NODES)
-        .setNumOfStorageContainerManagers(NUM_DATA_SCMS)
+        .setNumOfStorageContainerManagers(NUM_SCMS)
+        .setSCMServiceId("foobar")
         .setSCMConfigurator(scmConfigurator)
         // allow only one FACTOR THREE pipeline.
         .setTotalPipelineNumLimit(NUM_DATA_NODES + 1)

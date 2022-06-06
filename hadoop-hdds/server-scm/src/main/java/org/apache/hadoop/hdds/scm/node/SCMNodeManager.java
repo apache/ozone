@@ -128,29 +128,8 @@ public class SCMNodeManager implements NodeManager {
   private final int numPipelinesPerMetadataVolume;
   private final int heavyNodeCriteria;
   private final HDDSLayoutVersionManager scmLayoutVersionManager;
-  private final Predicate<FinalizationCheckpoint>
-      finalizationCheckpointIsPassed;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
-
-  /**
-   * Constructs an SCMNodeManager that does not check SCM's finalization
-   * checkpoint when handling datanode information. This is suitable for node
-   * manager unit tests not related to finalization.
-   */
-  // TODO: Refactor all tests constructing an SCMNodeManager to explicitly
-  //  pass a finalization checkpoint predicate based on their requirements,
-  //  then remove this constructor.
-  @VisibleForTesting
-  public SCMNodeManager(OzoneConfiguration conf,
-                        SCMStorageConfig scmStorageConfig,
-                        EventPublisher eventPublisher,
-                        NetworkTopology networkTopology,
-                        SCMContext scmContext,
-                        HDDSLayoutVersionManager layoutVersionManager) {
-    this(conf, scmStorageConfig, eventPublisher, networkTopology, scmContext,
-        layoutVersionManager, c -> true);
-  }
 
   /**
    * Constructs SCM machine Manager.
@@ -160,17 +139,14 @@ public class SCMNodeManager implements NodeManager {
                         EventPublisher eventPublisher,
                         NetworkTopology networkTopology,
                         SCMContext scmContext,
-                        HDDSLayoutVersionManager layoutVersionManager,
-                        Predicate<FinalizationCheckpoint>
-                            finalizationCheckpointIsPassed) {
+                        HDDSLayoutVersionManager layoutVersionManager) {
     this.scmNodeEventPublisher = eventPublisher;
     this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
-        layoutVersionManager, finalizationCheckpointIsPassed);
+        layoutVersionManager, scmContext);
     this.version = VersionInfo.getLatestVersion();
     this.commandQueue = new CommandQueue();
     this.scmStorageConfig = scmStorageConfig;
     this.scmLayoutVersionManager = layoutVersionManager;
-    this.finalizationCheckpointIsPassed = finalizationCheckpointIsPassed;
     LOG.info("Entering startup safe mode.");
     registerMXBean();
     this.metrics = SCMNodeMetrics.create(this);
@@ -623,7 +599,7 @@ public class SCMNodeManager implements NodeManager {
           datanodeDetails.getHostName(), dnSlv, scmSlv);
     }
 
-    if (finalizationCheckpointIsPassed.test(
+    if (scmContext.isFinalizationCheckpointCrossed(
         FinalizationCheckpoint.MLV_EQUALS_SLV)) {
       // Because we have crossed the MLV_EQUALS_SLV checkpoint, SCM metadata
       // layout version will not change. We can now compare it to the

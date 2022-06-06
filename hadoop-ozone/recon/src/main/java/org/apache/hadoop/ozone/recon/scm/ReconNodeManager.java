@@ -92,11 +92,8 @@ public class ReconNodeManager extends SCMNodeManager {
                           NetworkTopology networkTopology,
                           Table<UUID, DatanodeDetails> nodeDB,
                           HDDSLayoutVersionManager scmLayoutVersionManager) {
-    // Recon does not have information about SCM's current finalization
-    // checkpoint. Its node manager can act as if all finalization
-    // checkpoints have passed.
     super(conf, scmStorageConfig, eventPublisher, networkTopology,
-        SCMContext.emptyContext(), scmLayoutVersionManager, c -> true);
+        SCMContext.emptyContext(), scmLayoutVersionManager);
     this.reconDatanodeOutdatedTime = reconStaleDatanodeMultiplier *
         HddsServerUtil.getReconHeartbeatInterval(conf);
     this.nodeDB = nodeDB;

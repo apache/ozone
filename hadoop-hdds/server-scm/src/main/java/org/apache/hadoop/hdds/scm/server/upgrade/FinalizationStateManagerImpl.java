@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +49,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
   private final Table<String, String> finalizationStore;
   private final DBTransactionBuffer transactionBuffer;
-  private final List<ReplicatedFinalizationStep> finalizationSteps;
   private final HDDSLayoutVersionManager versionManager;
   // Ensures that we are not in the process of updating checkpoint state as
   // we read it to determine the current checkpoint.
@@ -56,15 +56,22 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   // SCM transaction buffer flushes asynchronously, so we must keep the most
   // up-to-date DB information in memory as well for reads.
   private volatile boolean hasFinalizingMark;
+  private SCMUpgradeFinalizationContext upgradeContext;
+  private final SCMUpgradeFinalizer upgradeFinalizer;
 
   protected FinalizationStateManagerImpl(Builder builder) throws IOException {
     this.finalizationStore = builder.finalizationStore;
     this.transactionBuffer = builder.transactionBuffer;
-    this.versionManager = builder.versionManager;
+    this.upgradeFinalizer = builder.upgradeFinalizer;
+    this.versionManager = this.upgradeFinalizer.getVersionManager();
     this.checkpointLock = new ReentrantReadWriteLock();
+    this.hasFinalizingMark =
+        finalizationStore.isExist(OzoneConsts.FINALIZING_KEY);
+  }
 
-    hasFinalizingMark = finalizationStore.isExist(OzoneConsts.FINALIZING_KEY);
-    this.finalizationSteps = new ArrayList<>();
+  @Override
+  public void setUpgradeContext(SCMUpgradeFinalizationContext context) {
+    this.upgradeContext = context;
   }
 
   @Override
@@ -75,6 +82,8 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     } finally {
       checkpointLock.writeLock().unlock();
     }
+    upgradeContext.getSCMContext().setFinalizationCheckpoint(
+        FinalizationCheckpoint.FINALIZATION_STARTED);
     transactionBuffer.addToBuffer(finalizationStore,
         OzoneConsts.FINALIZING_KEY, "");
   }
@@ -89,11 +98,14 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       // finalize from a snapshot.
       HDDSLayoutFeature feature =
           (HDDSLayoutFeature)versionManager.getFeature(layoutVersion);
-      for (ReplicatedFinalizationStep step: finalizationSteps) {
-        step.run(feature);
-      }
+      upgradeFinalizer.replicatedFinalizationSteps(feature, upgradeContext);
     } finally {
       checkpointLock.writeLock().unlock();
+    }
+
+    if (!versionManager.needsFinalization()) {
+      upgradeContext.getSCMContext().setFinalizationCheckpoint(
+          FinalizationCheckpoint.MLV_EQUALS_SLV);
     }
     transactionBuffer.addToBuffer(finalizationStore,
         OzoneConsts.LAYOUT_VERSION_KEY, String.valueOf(layoutVersion));
@@ -122,19 +134,18 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
           FinalizationCheckpoint.FINALIZATION_COMPLETE, checkpoint);
       ExitUtils.terminate(1, errorMessage, LOG);
     }
+
+    upgradeContext.getSCMContext().setFinalizationCheckpoint(
+        FinalizationCheckpoint.FINALIZATION_COMPLETE);
   }
 
   @Override
-  public void addReplicatedFinalizationStep(ReplicatedFinalizationStep step) {
-    this.finalizationSteps.add(step);
+  public boolean crossedCheckpoint(FinalizationCheckpoint query) {
+    return getFinalizationCheckpoint().hasCrossed(query);
   }
 
   @Override
-  public boolean crossedCheckpoint(FinalizationCheckpoint checkpoint) {
-    return getFinalizationCheckpoint().compareTo(checkpoint) >= 0;
-  }
-
-  protected FinalizationCheckpoint getFinalizationCheckpoint() {
+  public FinalizationCheckpoint getFinalizationCheckpoint() {
     // Get a point-in-time snapshot of the finalization state under the lock,
     // then use this to determine which checkpoint we were on at that time.
     boolean mlvBehindSlvSnapshot;
@@ -170,10 +181,15 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   public static class Builder {
     private Table<String, String> finalizationStore;
     private DBTransactionBuffer transactionBuffer;
-    private HDDSLayoutVersionManager versionManager;
     private SCMRatisServer scmRatisServer;
+    private SCMUpgradeFinalizer upgradeFinalizer;
 
     public Builder() {
+    }
+
+    public Builder setUpgradeFinalizer(final SCMUpgradeFinalizer finalizer) {
+      upgradeFinalizer = finalizer;
+      return this;
     }
 
     public Builder setRatisServer(final SCMRatisServer ratisServer) {
@@ -192,15 +208,10 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       return this;
     }
 
-    public Builder setVersionManager(HDDSLayoutVersionManager versionManager) {
-      this.versionManager = versionManager;
-      return this;
-    }
-
     public FinalizationStateManager build() throws IOException {
       Preconditions.checkNotNull(finalizationStore);
       Preconditions.checkNotNull(transactionBuffer);
-      Preconditions.checkNotNull(versionManager);
+      Preconditions.checkNotNull(upgradeFinalizer);
       final SCMHAInvocationHandler invocationHandler =
           new SCMHAInvocationHandler(SCMRatisProtocol.RequestType.FINALIZE,
               new FinalizationStateManagerImpl(this),

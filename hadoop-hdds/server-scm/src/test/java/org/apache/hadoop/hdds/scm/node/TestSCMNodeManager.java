@@ -862,17 +862,15 @@ public class TestSCMNodeManager {
     // TODO: Refactor this class to use org.junit.jupiter so test
     //  parameterization can be used.
     for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
-      Predicate<FinalizationCheckpoint> passedCheckpoint = c ->
-          checkpoint.compareTo(c) >= 0;
       LOG.info("Testing with SCM finalization checkpoint {}", checkpoint);
-      testProcessLayoutVersionLowerMlv(passedCheckpoint);
-      testProcessLayoutVersionReportHigherMlv(passedCheckpoint);
+      testProcessLayoutVersionLowerMlv(checkpoint);
+      testProcessLayoutVersionReportHigherMlv(checkpoint);
     }
   }
 
   // Currently invoked by testProcessLayoutVersion.
   public void testProcessLayoutVersionReportHigherMlv(
-      Predicate<FinalizationCheckpoint> passedCheckpoint)
+      FinalizationCheckpoint currentCheckpoint)
       throws IOException {
     final int healthCheckInterval = 200; // milliseconds
     final int heartbeatInterval = 1; // seconds
@@ -888,9 +886,11 @@ public class TestSCMNodeManager {
     EventPublisher eventPublisher = mock(EventPublisher.class);
     HDDSLayoutVersionManager lvm  =
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+    SCMContext scmContext = SCMContext.emptyContext();
+    scmContext.setFinalizationCheckpoint(currentCheckpoint);
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
-        SCMContext.emptyContext(), lvm, passedCheckpoint);
+        scmContext, lvm);
 
     // Regardless of SCM's finalization checkpoint, datanodes with higher MLV
     // than SCM should not be found in the cluster.
@@ -913,17 +913,19 @@ public class TestSCMNodeManager {
   }
 
   // Currently invoked by testProcessLayoutVersion.
-  public void testProcessLayoutVersionLowerMlv(Predicate<FinalizationCheckpoint>
-      passedCheckpoint) throws IOException {
+  public void testProcessLayoutVersionLowerMlv(FinalizationCheckpoint
+      currentCheckpoint) throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
     HDDSLayoutVersionManager lvm  =
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+    SCMContext scmContext = SCMContext.emptyContext();
+    scmContext.setFinalizationCheckpoint(currentCheckpoint);
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
-        SCMContext.emptyContext(), lvm, passedCheckpoint);
+        scmContext, lvm);
     DatanodeDetails node1 =
         HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
     verify(eventPublisher,
@@ -938,7 +940,7 @@ public class TestSCMNodeManager {
     ArgumentCaptor<CommandForDatanode> captor =
         ArgumentCaptor.forClass(CommandForDatanode.class);
 
-    if (passedCheckpoint.test(FinalizationCheckpoint.MLV_EQUALS_SLV)) {
+    if (currentCheckpoint.hasCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV)) {
       // If the mlv equals slv checkpoint passed, datanodes with older mlvs
       // should be instructed to finalize.
       verify(eventPublisher, times(1))

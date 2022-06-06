@@ -66,4 +66,8 @@ public enum FinalizationCheckpoint {
   public boolean needsMlvBehindSlv() {
     return needsMlvBehindSlv;
   }
+
+  public boolean hasCrossed(FinalizationCheckpoint query) {
+    return this.compareTo(query) >= 0;
+  }
 }

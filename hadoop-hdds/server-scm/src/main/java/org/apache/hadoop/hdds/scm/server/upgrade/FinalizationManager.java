@@ -17,6 +17,9 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
@@ -42,4 +45,10 @@ public interface FinalizationManager {
   void runPrefinalizeStateActions() throws IOException;
 
   boolean crossedCheckpoint(FinalizationCheckpoint checkpoint);
+
+  FinalizationCheckpoint getCheckpoint();
+
+  void buildUpgradeContext(NodeManager nodeManager,
+                                  PipelineManager pipelineManager,
+                                  SCMContext scmContext);
 }

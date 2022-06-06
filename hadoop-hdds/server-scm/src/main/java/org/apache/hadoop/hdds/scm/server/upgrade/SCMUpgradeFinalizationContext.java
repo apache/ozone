@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
@@ -35,6 +37,7 @@ public final class SCMUpgradeFinalizationContext {
   private final SCMStorageConfig storage;
   private final HDDSLayoutVersionManager versionManager;
   private final OzoneConfiguration conf;
+  private final SCMContext scmContext;
 
   private SCMUpgradeFinalizationContext(Builder builder) {
     pipelineManager = builder.pipelineManager;
@@ -43,6 +46,7 @@ public final class SCMUpgradeFinalizationContext {
     storage = builder.storage;
     versionManager = builder.versionManager;
     conf = builder.conf;
+    scmContext = builder.scmContext;
   }
 
   public NodeManager getNodeManager() {
@@ -65,6 +69,10 @@ public final class SCMUpgradeFinalizationContext {
     return versionManager;
   }
 
+  public SCMContext getSCMContext() {
+    return scmContext;
+  }
+
   public SCMStorageConfig getStorage() {
     return storage;
   }
@@ -80,8 +88,14 @@ public final class SCMUpgradeFinalizationContext {
     private SCMStorageConfig storage;
     private HDDSLayoutVersionManager versionManager;
     private OzoneConfiguration conf;
+    private SCMContext scmContext;
 
     public Builder() {
+    }
+
+    public Builder setSCMContext(SCMContext context) {
+      this.scmContext = context;
+      return this;
     }
 
     public Builder setPipelineManager(PipelineManager pipelineManager) {
@@ -117,6 +131,13 @@ public final class SCMUpgradeFinalizationContext {
     }
 
     public SCMUpgradeFinalizationContext build() {
+      Preconditions.checkNotNull(scmContext);
+      Preconditions.checkNotNull(pipelineManager);
+      Preconditions.checkNotNull(nodeManager);
+      Preconditions.checkNotNull(storage);
+      Preconditions.checkNotNull(versionManager);
+      Preconditions.checkNotNull(conf);
+      Preconditions.checkNotNull(finalizationStateManager);
       return new SCMUpgradeFinalizationContext(this);
     }
   }
