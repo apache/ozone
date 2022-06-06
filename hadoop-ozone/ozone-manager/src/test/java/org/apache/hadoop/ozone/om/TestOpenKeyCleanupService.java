@@ -163,7 +163,7 @@ public class TestOpenKeyCleanupService {
         }
       }
       String key = UUID.randomUUID().toString();
-      createVolumeAndBucket(omMetadataManager, volume, bucket, bucketLayout);
+      createVolumeAndBucket(volume, bucket, bucketLayout);
 
       final int numBlocks = RandomUtils.nextInt(0, 3);
       // Create the key
@@ -171,9 +171,8 @@ public class TestOpenKeyCleanupService {
     }
   }
 
-  private void createVolumeAndBucket(OMMetadataManager omMetadataManager,
-      String volumeName, String bucketName, BucketLayout bucketLayout)
-      throws IOException {
+  private void createVolumeAndBucket(String volumeName, String bucketName,
+      BucketLayout bucketLayout) throws IOException {
     // cheat here, just create a volume and bucket entry so that we can
     // create the keys, we put the same data for key and value since the
     // system does not decode the object
