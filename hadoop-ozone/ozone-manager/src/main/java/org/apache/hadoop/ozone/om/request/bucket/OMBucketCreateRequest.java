@@ -25,6 +25,7 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -154,16 +155,15 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     // bucketInfo.hasBucketLayout() would be true when user sets bucket layout.
     // Now, OM will create bucket with the user specified bucket layout.
-    // When the value is not specified by the user, OM will use the
-    // "ozone.default.bucket.layout" configured value.
+    // When the value is not specified by the user, OM will use
+    // "ozone.default.bucket.layout" configured value for the newer ozone
+    // client and LEGACY for an older ozone client.
     if (!bucketInfo.hasBucketLayout()) {
-      // Bucket Layout argument was not passed during bucket creation.
-      String omDefaultBucketLayout = ozoneManager.getOMDefaultBucketLayout();
-      BucketLayout defaultType = BucketLayout.fromString(omDefaultBucketLayout);
-      omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo, defaultType);
-      LOG.debug("Bucket Layout not present for volume/bucket = {}/{}, "
-              + "initialising with default bucket layout" + ": {}", volumeName,
-          bucketName, omDefaultBucketLayout);
+      BucketLayout defaultBucketLayout =
+          getDefaultBucketLayout(ozoneManager, bucketInfo, volumeName,
+              bucketName);
+      omBucketInfo =
+          OmBucketInfo.getFromProtobuf(bucketInfo, defaultBucketLayout);
     } else {
       omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
     }
@@ -267,6 +267,36 @@ public class OMBucketCreateRequest extends OMClientRequest {
       LOG.error("Bucket creation failed for bucket:{} in volume:{}",
           bucketName, volumeName, exception);
       return omClientResponse;
+    }
+  }
+
+  private BucketLayout getDefaultBucketLayout(OzoneManager ozoneManager,
+      BucketInfo bucketInfo, String volumeName, String bucketName) {
+
+    if (getOmRequest().getVersion() <
+        ClientVersion.BUCKET_LAYOUT_SUPPORT.toProtoValue()) {
+
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Bucket Layout not present for volume/bucket = {}/{}, "
+                + "initialising with default bucket layout" +
+                ": {} as client is an older version: {}",
+            volumeName, bucketName, bucketInfo, BucketLayout.LEGACY,
+            getOmRequest().getVersion());
+      }
+      return BucketLayout.LEGACY;
+    } else {
+      // Bucket Layout argument was not passed during bucket creation.
+      String omDefaultBucketLayout = ozoneManager.getOMDefaultBucketLayout();
+      BucketLayout defaultBuckLayout =
+          BucketLayout.fromString(omDefaultBucketLayout);
+
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Bucket Layout not present for volume/bucket = {}/{}, "
+                + "initialising with default bucket layout" + ": {}",
+            volumeName, bucketName, omDefaultBucketLayout);
+      }
+
+      return defaultBuckLayout;
     }
   }
 
