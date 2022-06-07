@@ -426,7 +426,7 @@ public abstract class ContainerData {
 
     this.writeBytes.addAndGet(bytes);
     /*
-       Decrement the cached Used Space in VolumeInfo as it
+       Increase the cached Used Space in VolumeInfo as it
        maybe not updated, DU or DedicatedDiskSpaceUsage runs
        periodically to update the Used Space in VolumeInfo.
      */
