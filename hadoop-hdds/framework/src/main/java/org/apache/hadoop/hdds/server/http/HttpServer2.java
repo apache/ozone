@@ -621,8 +621,8 @@ public final class HttpServer2 implements FilterContainer {
     final String appDir = getWebAppsPath(name);
     addDefaultApps(contexts, appDir, conf);
     webServer.setHandler(handlers);
-    Map<String, String> headers = setHeaders(conf);
-    addGlobalFilter("safety", QuotingInputFilter.class.getName(), headers);
+    Map<String, String> config = generateFilterConfiguration(conf);
+    addGlobalFilter("safety", QuotingInputFilter.class.getName(), config);
     final FilterInitializer[] initializers = getFilterInitializers(conf);
     if (initializers != null) {
       conf.set(BIND_ADDRESS, hostName);
@@ -1742,16 +1742,24 @@ public final class HttpServer2 implements FilterContainer {
     }
   }
 
-  private Map<String, String> setHeaders(ConfigurationSource conf) {
-    Map<String, String> headers = new HashMap<>();
-    headers.putAll(getDefaultHeaders());
+  /**
+   * Generate the configuration for the Quoting filter used.
+   * @param conf global configuration
+   * @return relevant configuration
+   */
+  private Map<String, String>
+  generateFilterConfiguration(ConfigurationSource conf) {
+    Map<String, String> config = new HashMap<>();
+
+    // Add headers to the configuration.
+    config.putAll(getDefaultHeaders());
     if (this.xFrameOptionIsEnabled) {
-      headers.put(HTTP_HEADER_PREFIX + X_FRAME_OPTIONS,
+      config.put(HTTP_HEADER_PREFIX + X_FRAME_OPTIONS,
           this.xFrameOption.toString());
     }
     // Config overrides default
-    headers.putAll(conf.getPropsMatchingPrefix(HTTP_HEADER_PREFIX));
-    return headers;
+    config.putAll(conf.getPropsMatchingPrefix(HTTP_HEADER_PREFIX));
+    return config;
   }
 
   private Map<String, String> getDefaultHeaders() {
