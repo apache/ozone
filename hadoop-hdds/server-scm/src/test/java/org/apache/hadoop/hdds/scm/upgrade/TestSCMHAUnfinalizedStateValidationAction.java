@@ -26,20 +26,14 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ratis.util.ExitUtils;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
+import java.nio.file.Path;
 import java.util.UUID;
 
 /**
@@ -54,82 +48,56 @@ import java.util.UUID;
  * Starting a new cluster finalized without SCM HA enabled should not trigger
  * the action. This is tested by all other tests that run non-HA clusters.
  */
-@RunWith(Parameterized.class)
 public class TestSCMHAUnfinalizedStateValidationAction {
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-  private final boolean haEnabledBefore;
-  private final boolean haEnabledPreFinalized;
-  private final boolean shouldFail;
-  private final String dataPath;
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() {
     ExitUtils.disableSystemExit();
   }
 
-
-  @Parameterized.Parameters(name = "haEnabledBefore={0} " +
-      "haEnabledPreFinalized={1}")
-  public static Collection<Object[]> cases() {
-    List<Object[]> params = new ArrayList<>();
-
-    for (boolean haBefore: Arrays.asList(true, false)) {
-      for (boolean haAfter: Arrays.asList(true, false)) {
-        params.add(new Object[]{haBefore, haAfter});
-      }
-    }
-
-    return params;
-  }
-
-  public TestSCMHAUnfinalizedStateValidationAction(
-      boolean haEnabledBefore, boolean haEnabledPreFinalized)
-      throws Exception {
-    this.haEnabledBefore = haEnabledBefore;
-    this.haEnabledPreFinalized = haEnabledPreFinalized;
-
-    shouldFail = !this.haEnabledBefore && this.haEnabledPreFinalized;
-
-    temporaryFolder.create();
-    dataPath = temporaryFolder.newFolder().getAbsolutePath();
-  }
-
-  @Test
-  public void testUpgrade() throws Exception {
+  @ParameterizedTest
+  @CsvSource({
+      "true, true",
+      "true, false",
+      "false, true",
+      "false, false",
+  })
+  public void testUpgrade(boolean haEnabledBefore,
+      boolean haEnabledPreFinalized, @TempDir Path dataPath) throws Exception {
     // Write version file for original version.
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION,
         HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, haEnabledBefore);
-    conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS, dataPath);
-    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, dataPath);
+    conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS, dataPath.toString());
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, dataPath.toString());
     // This init should always succeed, since SCM is not pre-finalized yet.
     boolean initResult1 = StorageContainerManager.scmInit(conf, CLUSTER_ID);
-    Assert.assertTrue(initResult1);
+    Assertions.assertTrue(initResult1);
 
     // Set up new pre-finalized SCM.
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
         haEnabledPreFinalized);
     StorageContainerManager scm = HddsTestUtils.getScm(conf);
 
-    Assert.assertEquals(UpgradeFinalizer.Status.FINALIZATION_REQUIRED,
+    Assertions.assertEquals(UpgradeFinalizer.Status.FINALIZATION_REQUIRED,
         scm.getUpgradeFinalizer().getStatus());
 
+    final boolean shouldFail = !haEnabledBefore && haEnabledPreFinalized;
     if (shouldFail) {
       // Start on its own should fail.
-      LambdaTestUtils.intercept(UpgradeException.class, scm::start);
+      Assertions.assertThrows(UpgradeException.class, scm::start);
 
       // Init followed by start should both fail.
       // Init is not necessary here, but is allowed to be run.
-      LambdaTestUtils.intercept(UpgradeException.class,
+      Assertions.assertThrows(UpgradeException.class,
           () -> StorageContainerManager.scmInit(conf, CLUSTER_ID));
-      LambdaTestUtils.intercept(UpgradeException.class, scm::start);
+      Assertions.assertThrows(UpgradeException.class, scm::start);
     } else {
       boolean initResult2 = StorageContainerManager.scmInit(conf, CLUSTER_ID);
-      Assert.assertTrue(initResult2);
+      Assertions.assertTrue(initResult2);
       scm.start();
       scm.stop();
     }
