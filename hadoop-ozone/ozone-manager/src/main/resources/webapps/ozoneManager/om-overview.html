@@ -22,5 +22,27 @@
         <td>Rpc port</td>
         <td>{{$ctrl.overview.jmx.RpcPort}}</td>
     </tr>
+    <tr>
+        <td>OM-Role</td>
+        <td>{{$ctrl.role.Role}}</td>
+    </tr>
+    <tr>
+        <td>Group Id</td>
+        <td>{{$ctrl.role.GroupId}}</td>
+    </tr>
+    </tbody>
+</table>
+
+<h2>Meta-Data Volume Information</h2>
+<table class="table table-bordered table-striped" class="col-md-6">
+    <tbody>
+    <tr>
+        <td>Ratis Log directory</td>
+        <td>{{$ctrl.overview.jmx.OmRatisLogDirectory}}</td>
+    </tr>
+    <tr>
+        <td>RocksDB Directory</td>
+        <td>{{$ctrl.overview.jmx.OmRocksDbDirectory}}</td>
+    </tr>
     </tbody>
 </table>

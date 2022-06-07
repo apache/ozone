@@ -69,6 +69,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.De
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.server.events.EventExecutor;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
@@ -2024,4 +2025,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     return null;
   }
+
+  @Override
+  public String getScmRatisLogDirectory() {
+    return  SCMHAUtils.getSCMRatisDirectory(configuration);
+  }
+
+  @Override
+  public String getScmRocksDbDirectory() {
+    return String.valueOf(ServerUtils.getScmDbDir(configuration));
+  }
+
 }

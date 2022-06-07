@@ -26,6 +26,12 @@
         },
         controller: function ($http) {
             var ctrl = this;
+
+            $http.get("http://localhost:9874/jmx?qry=Ratis:service=RaftServer,group=*,id=*")
+                .then(function (result){
+                    ctrl.role = result.data.beans[0]
+                })
+
             $http.get("jmx?qry=Hadoop:service=SCMNodeManager,name=SCMNodeManagerInfo")
                 .then(function (result) {
                     ctrl.nodemanagermetrics = result.data.beans[0];
