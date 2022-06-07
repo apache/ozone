@@ -387,15 +387,10 @@ public class TestECBlockInputStream {
       // Now make replication index 2 error on the next read
       streamFactory.getBlockStreams().get(1).setThrowException(true);
       buf.clear();
-      try {
-        ecb.read(buf);
-        Assertions.fail("Exception should be thrown");
-      } catch (IOException e) {
-        Assertions.assertTrue(e instanceof BadDataLocationException);
-        Assertions.assertEquals(2,
-            keyInfo.getPipeline().getReplicaIndex(
-                ((BadDataLocationException) e).getFailedLocation()));
-      }
+      BadDataLocationException e =
+          assertThrows(BadDataLocationException.class, () -> ecb.read(buf));
+      Assertions.assertEquals(2,
+          keyInfo.getPipeline().getReplicaIndex(e.getFailedLocation()));
     }
   }
 

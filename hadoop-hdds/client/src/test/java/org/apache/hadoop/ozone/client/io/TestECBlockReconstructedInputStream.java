@@ -39,6 +39,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.apache.hadoop.ozone.client.io.ECStreamTestUtil.generateParity;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test for the ECBlockReconstructedInputStream class.
@@ -331,12 +332,7 @@ public class TestECBlockReconstructedInputStream {
           b.clear();
         }
         // Seeking beyond EOF should give an error
-        try {
-          stream.seek(blockLength + 1);
-          Assertions.fail("Seek beyond EOF should error");
-        } catch (IOException e) {
-          // expected
-        }
+        assertThrows(IOException.class, () -> stream.seek(blockLength + 1));
       }
     }
   }

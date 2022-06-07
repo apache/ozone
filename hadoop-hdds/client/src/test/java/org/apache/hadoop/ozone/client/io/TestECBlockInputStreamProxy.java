@@ -40,6 +40,8 @@ import java.util.SplittableRandom;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 /**
  * Unit tests for the  ECBlockInputStreamProxy class.
  */
@@ -325,12 +327,7 @@ public class TestECBlockInputStreamProxy {
 
       // Finally, set the recon reader to fail on seek.
       streamFactory.getStreams().get(true).setShouldErrorOnSeek(true);
-      try {
-        bis.seek(1024);
-        Assertions.fail("Seek should have raised an exception");
-      } catch (IOException e) {
-        // expected
-      }
+      assertThrows(IOException.class, () -> bis.seek(1024));
     }
   }
 
