@@ -99,8 +99,8 @@ public class TestOzoneClientUtils {
     } finally {
       Mockito.reset(volume);
       Mockito.reset(bucket);
-      Mockito.reset(volume);
-      Mockito.reset(volume);
+      Mockito.reset(clientProtocol);
+      Mockito.reset(ozoneManagerProtocol);
     }
   }
 

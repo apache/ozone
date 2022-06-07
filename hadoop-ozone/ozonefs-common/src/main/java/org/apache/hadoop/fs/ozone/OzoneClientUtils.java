@@ -213,6 +213,7 @@ public final class OzoneClientUtils {
         .setLatestVersionLocation(true).build();
     OmKeyInfo keyInfo = rpcClient.getOzoneManagerClient().lookupKey(keyArgs);
 
+    // TODO: return null util ECFileChecksum is implemented.
     if (keyInfo.getReplicationConfig()
         .getReplicationType() == HddsProtos.ReplicationType.EC) {
       return null;
