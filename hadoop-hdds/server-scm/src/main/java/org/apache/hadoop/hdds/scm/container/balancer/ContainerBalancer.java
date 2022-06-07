@@ -508,8 +508,11 @@ public class ContainerBalancer extends StatefulService {
       long timeoutCounts = moveSelectionToFutureMap.entrySet().stream()
           .filter(entry -> !entry.getValue().isDone())
           .peek(entry -> {
-            LOG.warn("Container move canceled for container {} to target {} " +
-                "due to timeout.", entry.getKey().getContainerID(),
+            LOG.warn("Container move canceled for container {} from source {}" +
+                    " to target {} due to timeout.",
+                entry.getKey().getContainerID(),
+                containerFromSourceMap.get(entry.getKey().getContainerID())
+                    .getUuidString(),
                 entry.getKey().getTargetNode().getUuidString());
             entry.getValue().cancel(true);
           }).count();
@@ -638,15 +641,16 @@ public class ContainerBalancer extends StatefulService {
                     containerInfo.getUsedBytes() / OzoneConsts.GB);
                 metrics.incrementNumContainerMovesCompletedInLatestIteration(1);
                 if (LOG.isDebugEnabled()) {
-                  LOG.debug(
-                      "Container move completed for container {} to target {}",
-                      containerID,
+                  LOG.debug("Container move completed for container {} from " +
+                          "source {} to target {}", containerID,
+                      source.getUuidString(),
                       moveSelection.getTargetNode().getUuidString());
                 }
               } else {
                 LOG.warn(
-                    "Container move for container {} to target {} failed: {}",
-                    moveSelection.getContainerID(),
+                    "Container move for container {} from source {} to target" +
+                        " {} failed: {}",
+                    moveSelection.getContainerID(), source.getUuidString(),
                     moveSelection.getTargetNode().getUuidString(), result);
               }
             }
