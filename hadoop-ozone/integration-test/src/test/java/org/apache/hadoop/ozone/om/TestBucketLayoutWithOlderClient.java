@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -45,9 +44,6 @@ public class TestBucketLayoutWithOlderClient {
   private static String clusterId;
   private static String scmId;
   private static String omId;
-  private static String volumeName;
-  private static String bucketName;
-  private static FileSystem fs;
 
   @Rule
   public Timeout timeout = new Timeout(1200000);
@@ -75,8 +71,8 @@ public class TestBucketLayoutWithOlderClient {
   public void testCreateBucketWithOlderClient() throws Exception {
     // create a volume and a bucket
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster, null);
-    volumeName = bucket.getVolumeName();
-    bucketName = bucket.getName();
+    String volumeName = bucket.getVolumeName();
+    String bucketName = bucket.getName();
 
     // OM defaulted bucket layout
     Assert.assertEquals(BucketLayout.OBJECT_STORE, bucket.getBucketLayout());
