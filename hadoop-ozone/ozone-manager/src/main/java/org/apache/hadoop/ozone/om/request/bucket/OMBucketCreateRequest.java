@@ -275,14 +275,12 @@ public class OMBucketCreateRequest extends OMClientRequest {
     if (getOmRequest().getVersion() <
         ClientVersion.BUCKET_LAYOUT_SUPPORT.toProtoValue()) {
 
-      if (LOG.isDebugEnabled()) {
-        // Older client will default bucket layout to LEGACY to
-        // make its operations backward compatible.
-        LOG.debug("Bucket Layout not present for volume/bucket = {}/{}, "
-                + "initialising with default bucket layout" +
-                ": {} as client is an older version: {}", volumeName,
-            bucketName, BucketLayout.LEGACY, getOmRequest().getVersion());
-      }
+      // Older client will default bucket layout to LEGACY to
+      // make its operations backward compatible.
+      LOG.info("Bucket Layout not present for volume/bucket = {}/{}, "
+              + "initialising with default bucket layout" +
+              ": {} as client is an older version: {}", volumeName,
+          bucketName, BucketLayout.LEGACY, getOmRequest().getVersion());
       return BucketLayout.LEGACY;
     } else {
       // Newer client will default to the configured value.
