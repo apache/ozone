@@ -73,8 +73,8 @@ public class TestOpenKeyCleanupService {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOpenKeyCleanupService.class);
 
-  private static final Duration SERVICE_INTERVAL = Duration.ofMillis(100);
-  private static final Duration EXPIRE_THRESHOLD = Duration.ofMillis(200);
+  private static final Duration SERVICE_INTERVAL = Duration.ofMillis(500);
+  private static final Duration EXPIRE_THRESHOLD = Duration.ofMillis(1000);
   private KeyManager keyManager;
   private OMMetadataManager omMetadataManager;
 
@@ -113,7 +113,6 @@ public class TestOpenKeyCleanupService {
    *
    * @throws IOException - on Failure.
    */
-
   @ParameterizedTest
   @CsvSource({
       "99, 0",
