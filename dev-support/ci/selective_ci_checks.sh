@@ -521,12 +521,14 @@ function set_outputs() {
     initialization::ga_output basic-checks \
         "$(initialization::parameters_to_json ${BASIC_CHECKS})"
 
-    if [[ "${compose_tests_needed}" == "true" ]] || [[ "${kubernetes_tests_needed}" == "true" ]]; then
+    : ${compile_needed:=false}
+
+    if [[ "${compile_needed}" == "true" ]] ||  [[ "${compose_tests_needed}" == "true" ]] || [[ "${kubernetes_tests_needed}" == "true" ]]; then
         build_needed=true
     fi
 
     initialization::ga_output needs-build "${build_needed:-false}"
-    initialization::ga_output needs-compile "${compile_needed:-false}"
+    initialization::ga_output needs-compile "${compile_needed}"
     initialization::ga_output needs-compose-tests "${compose_tests_needed}"
     initialization::ga_output needs-dependency-check "${dependency_check_needed}"
     initialization::ga_output needs-integration-tests "${integration_tests_needed}"

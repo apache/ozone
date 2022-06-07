@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.shell.s3.S3Shell;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.hadoop.util.ToolRunner;
@@ -106,10 +107,10 @@ public class TestOzoneShellHA {
   private static File baseDir;
   private static File testFile;
   private static String testFilePathString;
-  private static OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster = null;
   private OzoneShell ozoneShell = null;
   private OzoneAdmin ozoneAdminShell = null;
+  private S3Shell s3Shell = null;
 
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
@@ -129,8 +130,11 @@ public class TestOzoneShellHA {
    */
   @BeforeClass
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    startCluster(conf);
+  }
 
+  protected static void startCluster(OzoneConfiguration conf) throws Exception {
     String path = GenericTestUtils.getTempPath(
         TestOzoneShellHA.class.getSimpleName());
     baseDir = new File(path);
@@ -175,6 +179,7 @@ public class TestOzoneShellHA {
   public void setup() throws UnsupportedEncodingException {
     ozoneShell = new OzoneShell();
     ozoneAdminShell = new OzoneAdmin();
+    s3Shell = new S3Shell();
     System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
   }
@@ -258,7 +263,7 @@ public class TestOzoneShellHA {
   }
 
   private String getSetConfStringFromConf(String key) {
-    return String.format("--set=%s=%s", key, conf.get(key));
+    return String.format("--set=%s=%s", key, cluster.getConf().get(key));
   }
 
   private String generateSetConfString(String key, String value) {
@@ -284,7 +289,7 @@ public class TestOzoneShellHA {
 
     String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
-    String omNodesVal = conf.get(omNodesKey);
+    String omNodesVal = cluster.getConf().get(omNodesKey);
     res[indexOmNodes] = generateSetConfString(omNodesKey, omNodesVal);
 
     String[] omNodesArr = omNodesVal.split(",");
@@ -389,7 +394,7 @@ public class TestOzoneShellHA {
     String omLeaderNodeId = getLeaderOMNodeId();
     String omLeaderNodeAddrKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omLeaderNodeId);
-    String omLeaderNodeAddr = conf.get(omLeaderNodeAddrKey);
+    String omLeaderNodeAddr = cluster.getConf().get(omLeaderNodeAddrKey);
     String omLeaderNodeAddrWithoutPort = omLeaderNodeAddr.split(":")[0];
 
     // Test case 2: ozone sh volume create o3://om1/volume2
@@ -557,7 +562,8 @@ public class TestOzoneShellHA {
   @Test
   public void testDeleteToTrashOrSkipTrash() throws Exception {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
-    OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
+    OzoneConfiguration clientConf =
+        getClientConfForOFS(hostPrefix, cluster.getConf());
     OzoneFsShell shell = new OzoneFsShell(clientConf);
     FileSystem fs = FileSystem.get(clientConf);
     final String strDir1 = hostPrefix + "/volumed2t/bucket1/dir1";
@@ -631,7 +637,7 @@ public class TestOzoneShellHA {
     // (default is TrashPolicyDefault)
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
     OzoneConfiguration clientConf =
-            getClientConfForOzoneTrashPolicy(hostPrefix, conf);
+            getClientConfForOzoneTrashPolicy(hostPrefix, cluster.getConf());
     OzoneFsShell shell = new OzoneFsShell(clientConf);
 
     int res;
@@ -1084,5 +1090,39 @@ public class TestOzoneShellHA {
         "bucket", "delete", firstVolumePrefix + bucket}));
     testVolumes.forEach(vol -> execute(ozoneShell, new String[] {
         "volume", "delete", vol}));
+  }
+
+  @Test
+  public void testClientBucketLayoutValidation() {
+    String volName = "/vol-" + UUID.randomUUID();
+    String[] args =
+        new String[]{"volume", "create", "o3://" + omServiceId + volName};
+    execute(ozoneShell, args);
+
+    args = new String[]{
+        "bucket", "create", "o3://" + omServiceId + volName + "/buck-1",
+        "--layout", ""
+    };
+    try {
+      execute(ozoneShell, args);
+      Assert.fail("Should throw exception on unsupported bucket layouts!");
+    } catch (Exception e) {
+      GenericTestUtils.assertExceptionContains(
+          "expected one of [FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY] ",
+          e);
+    }
+
+    args = new String[]{
+        "bucket", "create", "o3://" + omServiceId + volName + "/buck-2",
+        "--layout", "INVALID"
+    };
+    try {
+      execute(ozoneShell, args);
+      Assert.fail("Should throw exception on unsupported bucket layouts!");
+    } catch (Exception e) {
+      GenericTestUtils.assertExceptionContains(
+          "expected one of [FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY] ",
+          e);
+    }
   }
 }

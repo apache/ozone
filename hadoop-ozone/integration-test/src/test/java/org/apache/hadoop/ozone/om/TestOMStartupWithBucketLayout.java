@@ -78,10 +78,10 @@ public class TestOMStartupWithBucketLayout {
           BucketLayout.FILE_SYSTEM_OPTIMIZED);
       verifyBucketLayout(bucket1, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-      // 3. verify OM default behavior with LEGACY
+      // 3. verify OM default behavior with empty
       restartCluster();
       OzoneBucket bucket2 = TestDataUtil.createVolumeAndBucket(cluster,
-          BucketLayout.LEGACY);
+          null);
       verifyBucketLayout(bucket2, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
       // 4. create bucket with OBS bucket layout and verify
@@ -122,10 +122,10 @@ public class TestOMStartupWithBucketLayout {
           BucketLayout.FILE_SYSTEM_OPTIMIZED);
       verifyBucketLayout(bucket1, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-      // 3. verify OM default behavior with LEGACY
+      // 3. verify OM default behavior with empty
       restartCluster();
       OzoneBucket bucket2 = TestDataUtil.createVolumeAndBucket(cluster,
-          BucketLayout.LEGACY);
+          null);
       verifyBucketLayout(bucket2, BucketLayout.OBJECT_STORE);
 
       // 4. create bucket with OBS bucket layout and verify

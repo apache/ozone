@@ -145,9 +145,15 @@ public class S3InitiateMultipartUploadRequestWithFSO
           volumeName, bucketName, keyName,
           keyArgs.getMultipartUploadID());
 
+      final long volumeId = omMetadataManager.getVolumeId(volumeName);
+      final long bucketId = omMetadataManager.getBucketId(volumeName,
+              bucketName);
+
       String multipartOpenKey = omMetadataManager
-          .getMultipartKey(pathInfoFSO.getLastKnownParentId(),
-              pathInfoFSO.getLeafNodeName(), keyArgs.getMultipartUploadID());
+          .getMultipartKey(volumeId, bucketId,
+                  pathInfoFSO.getLastKnownParentId(),
+                  pathInfoFSO.getLeafNodeName(),
+                  keyArgs.getMultipartUploadID());
 
       // Even if this key already exists in the KeyTable, it would be taken
       // care of in the final complete multipart upload. AWS S3 behavior is
@@ -191,8 +197,8 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
       OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
-              Optional.absent(), Optional.of(missingParentInfos),
-              transactionLogIndex);
+              volumeId, bucketId, transactionLogIndex,
+              Optional.of(missingParentInfos), Optional.absent());
 
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
           multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),

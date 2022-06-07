@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -446,6 +447,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     try {
       omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
               .setClientId(CLIENT_ID.toString())
+              .setVersion(ClientVersion.CURRENT_VERSION)
               .setUserInfo(getUserInfo())
               .setRenameKeyRequest(renameKeyRequest)
               .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
@@ -510,6 +512,7 @@ public class TrashOzoneFileSystem extends FileSystem {
       omRequest =
           OzoneManagerProtocolProtos.OMRequest.newBuilder()
               .setClientId(CLIENT_ID.toString())
+              .setVersion(ClientVersion.CURRENT_VERSION)
               .setUserInfo(getUserInfo())
               .setDeleteKeyRequest(deleteKeyRequest)
               .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKey)
@@ -577,6 +580,7 @@ public class TrashOzoneFileSystem extends FileSystem {
       try {
         omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setClientId(CLIENT_ID.toString())
+            .setVersion(ClientVersion.CURRENT_VERSION)
             .setUserInfo(getUserInfo())
             .setDeleteKeysRequest(deleteKeysRequest)
             .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKeys)

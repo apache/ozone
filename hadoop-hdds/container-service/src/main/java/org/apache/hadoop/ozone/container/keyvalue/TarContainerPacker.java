@@ -43,8 +43,10 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 
 import static java.util.stream.Collectors.toList;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 
 /**
  * Compress/uncompress KeyValueContainer data to a tar.gz archive.
@@ -71,7 +73,7 @@ public class TarContainerPacker
       throws IOException {
     byte[] descriptorFileContent = null;
     KeyValueContainerData containerData = container.getContainerData();
-    Path dbRoot = containerData.getDbFile().toPath();
+    Path dbRoot = getDbPath(containerData);
     Path chunksRoot = Paths.get(containerData.getChunksPath());
 
     try (InputStream decompressed = decompress(input);
@@ -159,7 +161,7 @@ public class TarContainerPacker
     try (OutputStream compressed = compress(output);
          ArchiveOutputStream archiveOutput = tar(compressed)) {
 
-      includePath(containerData.getDbFile().toPath(), DB_DIR_NAME,
+      includePath(getDbPath(containerData), DB_DIR_NAME,
           archiveOutput);
 
       includePath(Paths.get(containerData.getChunksPath()), CHUNKS_DIR_NAME,
@@ -196,6 +198,15 @@ public class TarContainerPacker
 
     throw new IOException(
         "Container descriptor is missing from the container archive.");
+  }
+
+  public static Path getDbPath(KeyValueContainerData containerData) {
+    if (containerData.getSchemaVersion().equals(SCHEMA_V3)) {
+      return DatanodeStoreSchemaThreeImpl.getDumpDir(
+          new File(containerData.getMetadataPath())).toPath();
+    } else {
+      return containerData.getDbFile().toPath();
+    }
   }
 
   private byte[] readEntry(InputStream input, final long size)

@@ -96,7 +96,7 @@ public abstract class OMVolumeRequest extends OMClientRequest {
    * @throws OMException - if user has volumes greater than
    * maxUserVolumeCount, an exception is thrown.
    */
-  protected PersistedUserVolumeInfo addVolumeToOwnerList(
+  protected static PersistedUserVolumeInfo addVolumeToOwnerList(
       PersistedUserVolumeInfo volumeList, String volume, String owner,
       long maxUserVolumeCount, long txID) throws IOException {
 
@@ -132,7 +132,7 @@ public abstract class OMVolumeRequest extends OMClientRequest {
    * @param transactionLogIndex
    * @throws IOException
    */
-  protected void createVolume(
+  protected static void createVolume(
       final OMMetadataManager omMetadataManager, OmVolumeArgs omVolumeArgs,
       PersistedUserVolumeInfo volumeList, String dbVolumeKey,
       String dbUserKey, long transactionLogIndex) {

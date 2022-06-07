@@ -76,8 +76,15 @@ public class S3InitiateMultipartUploadResponseWithFSO extends
      * wait for File Commit request.
      */
     if (parentDirInfos != null) {
+      final OmKeyInfo keyInfo = getOmKeyInfo();
+      final long volumeId = omMetadataManager.getVolumeId(
+              keyInfo.getVolumeName());
+      final long bucketId = omMetadataManager.getBucketId(
+              keyInfo.getVolumeName(), keyInfo.getBucketName());
       for (OmDirectoryInfo parentDirInfo : parentDirInfos) {
-        String parentKey = parentDirInfo.getPath();
+        final String parentKey = omMetadataManager.getOzonePathKey(
+                volumeId, bucketId, parentDirInfo.getParentObjectID(),
+                parentDirInfo.getName());
         omMetadataManager.getDirectoryTable().putWithBatch(batchOperation,
                 parentKey, parentDirInfo);
       }
