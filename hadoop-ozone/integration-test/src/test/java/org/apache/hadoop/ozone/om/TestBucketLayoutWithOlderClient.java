@@ -61,7 +61,7 @@ public class TestBucketLayoutWithOlderClient {
     scmId = UUID.randomUUID().toString();
     omId = UUID.randomUUID().toString();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
+        BucketLayout.OBJECT_STORE.name());
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
         .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
@@ -69,15 +69,13 @@ public class TestBucketLayoutWithOlderClient {
 
   @Test
   public void testCreateBucketWithOlderClient() throws Exception {
-    // create a volume and a bucket
+    // create a volume and a bucket without bucket layout argument
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster, null);
     String volumeName = bucket.getVolumeName();
-    String bucketName = bucket.getName();
-
     // OM defaulted bucket layout
     Assert.assertEquals(BucketLayout.OBJECT_STORE, bucket.getBucketLayout());
 
-    // Sets bucket layout explicitly
+    // Sets bucket layout explicitly.
     OzoneBucket fsobucket = TestDataUtil
         .createVolumeAndBucket(cluster, BucketLayout.FILE_SYSTEM_OPTIMIZED);
     Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,

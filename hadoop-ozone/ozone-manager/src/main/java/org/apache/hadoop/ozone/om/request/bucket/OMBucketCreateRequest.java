@@ -160,8 +160,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     // client and LEGACY for an older ozone client.
     if (!bucketInfo.hasBucketLayout()) {
       BucketLayout defaultBucketLayout =
-          getDefaultBucketLayout(ozoneManager, bucketInfo, volumeName,
-              bucketName);
+          getDefaultBucketLayout(ozoneManager, volumeName, bucketName);
       omBucketInfo =
           OmBucketInfo.getFromProtobuf(bucketInfo, defaultBucketLayout);
     } else {
@@ -271,21 +270,22 @@ public class OMBucketCreateRequest extends OMClientRequest {
   }
 
   private BucketLayout getDefaultBucketLayout(OzoneManager ozoneManager,
-      BucketInfo bucketInfo, String volumeName, String bucketName) {
+      String volumeName, String bucketName) {
 
     if (getOmRequest().getVersion() <
         ClientVersion.BUCKET_LAYOUT_SUPPORT.toProtoValue()) {
 
       if (LOG.isDebugEnabled()) {
+        // Older client will default bucket layout to LEGACY to
+        // make its operations backward compatible.
         LOG.debug("Bucket Layout not present for volume/bucket = {}/{}, "
                 + "initialising with default bucket layout" +
-                ": {} as client is an older version: {}",
-            volumeName, bucketName, bucketInfo, BucketLayout.LEGACY,
-            getOmRequest().getVersion());
+                ": {} as client is an older version: {}", volumeName,
+            bucketName, BucketLayout.LEGACY, getOmRequest().getVersion());
       }
       return BucketLayout.LEGACY;
     } else {
-      // Bucket Layout argument was not passed during bucket creation.
+      // Newer client will default to the configured value.
       String omDefaultBucketLayout = ozoneManager.getOMDefaultBucketLayout();
       BucketLayout defaultBuckLayout =
           BucketLayout.fromString(omDefaultBucketLayout);
