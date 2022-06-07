@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
-import org.junit.Assert;
 import org.junit.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -103,8 +102,10 @@ public class TestScmFinalization {
 
     // In the actual flow, this would be handled by the FinalizationManager.
     SCMContext scmContext = SCMContext.emptyContext();
-    scmContext.setFinalizationCheckpoint(stateManager.getFinalizationCheckpoint());
-    SCMUpgradeFinalizationContext context = new SCMUpgradeFinalizationContext.Builder()
+    scmContext.setFinalizationCheckpoint(
+        stateManager.getFinalizationCheckpoint());
+    SCMUpgradeFinalizationContext context =
+        new SCMUpgradeFinalizationContext.Builder()
         .setConfiguration(new OzoneConfiguration())
         .setFinalizationStateManager(stateManager)
         .setStorage(Mockito.mock(SCMStorageConfig.class))

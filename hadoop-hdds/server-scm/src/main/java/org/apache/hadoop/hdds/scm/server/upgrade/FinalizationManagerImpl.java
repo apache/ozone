@@ -18,15 +18,14 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
@@ -41,38 +40,40 @@ import java.util.Collections;
  * Class to initiate SCM finalization and query its progress.
  */
 public class FinalizationManagerImpl implements FinalizationManager {
-  private final SCMUpgradeFinalizer upgradeFinalizer;
+  private SCMUpgradeFinalizer upgradeFinalizer;
   private SCMUpgradeFinalizationContext context;
-  private final SCMStorageConfig storage;
-  private final OzoneConfiguration conf;
+  private SCMStorageConfig storage;
+  private OzoneConfiguration conf;
+  private HDDSLayoutVersionManager versionManager;
   private final FinalizationStateManager finalizationStateManager;
-  private final HDDSLayoutVersionManager versionManager;
 
+  /**
+   * For test classes to inject their own state manager.
+   */
+  @VisibleForTesting
   protected FinalizationManagerImpl(Builder builder,
-    FinalizationStateManager stateManager)
-      throws IOException {
-    this.storage = builder.storage;
-    this.versionManager = builder.versionManager;
-    this.conf = builder.conf;
-    this.upgradeFinalizer = new SCMUpgradeFinalizer(this.versionManager,
-        builder.executor);
+      FinalizationStateManager stateManager) throws IOException {
+    initCommonFields(builder);
     this.finalizationStateManager = stateManager;
 
   }
 
   private FinalizationManagerImpl(Builder builder) throws IOException {
-    // TODO: dedup
-    this.storage = builder.storage;
-    this.versionManager = builder.versionManager;
-    this.conf = builder.conf;
-    this.upgradeFinalizer = new SCMUpgradeFinalizer(this.versionManager,
-        builder.executor);
-    finalizationStateManager = new FinalizationStateManagerImpl.Builder()
+    initCommonFields(builder);
+    this.finalizationStateManager = new FinalizationStateManagerImpl.Builder()
         .setUpgradeFinalizer(this.upgradeFinalizer)
         .setFinalizationStore(builder.finalizationStore)
         .setTransactionBuffer(builder.scmHAManager.getDBTransactionBuffer())
         .setRatisServer(builder.scmHAManager.getRatisServer())
         .build();
+  }
+
+  private void initCommonFields(Builder builder) {
+    this.storage = builder.storage;
+    this.versionManager = builder.versionManager;
+    this.conf = builder.conf;
+    this.upgradeFinalizer = new SCMUpgradeFinalizer(this.versionManager,
+        builder.executor);
   }
 
   @Override

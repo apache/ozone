@@ -886,11 +886,11 @@ public class TestSCMNodeManager {
     EventPublisher eventPublisher = mock(EventPublisher.class);
     HDDSLayoutVersionManager lvm  =
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
-    SCMContext scmContext = SCMContext.emptyContext();
-    scmContext.setFinalizationCheckpoint(currentCheckpoint);
+    SCMContext nodeManagerContext = SCMContext.emptyContext();
+    nodeManagerContext.setFinalizationCheckpoint(currentCheckpoint);
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
-        scmContext, lvm);
+        nodeManagerContext, lvm);
 
     // Regardless of SCM's finalization checkpoint, datanodes with higher MLV
     // than SCM should not be found in the cluster.
@@ -921,11 +921,11 @@ public class TestSCMNodeManager {
     EventPublisher eventPublisher = mock(EventPublisher.class);
     HDDSLayoutVersionManager lvm  =
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
-    SCMContext scmContext = SCMContext.emptyContext();
-    scmContext.setFinalizationCheckpoint(currentCheckpoint);
+    SCMContext nodeManagerContext = SCMContext.emptyContext();
+    nodeManagerContext.setFinalizationCheckpoint(currentCheckpoint);
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
-        scmContext, lvm);
+        nodeManagerContext, lvm);
     DatanodeDetails node1 =
         HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
     verify(eventPublisher,

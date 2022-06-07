@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -308,7 +307,8 @@ public final class SCMContext {
       return this;
     }
 
-    public Builder setFinalizationCheckpoint(FinalizationCheckpoint checkpoint) {
+    public Builder setFinalizationCheckpoint(
+        FinalizationCheckpoint checkpoint) {
       this.finalizationCheckpoint = checkpoint;
       return this;
     }
