@@ -25,10 +25,10 @@ import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.ozone.client.io.ECStreamTestUtil.TestBlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.ECStreamTestUtil.TestBlockInputStream;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -44,6 +44,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.apache.hadoop.ozone.client.io.ECStreamTestUtil.generateParity;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 
 /**
  * Test for the ECBlockReconstructedStripeInputStream.
@@ -61,7 +63,7 @@ public class TestECBlockReconstructedStripeInputStream {
   private ExecutorService ecReconstructExecutor =
       Executors.newFixedThreadPool(3);
 
-  @Before
+  @BeforeEach
   public void setup() {
     repConfig = new ECReplicationConfig(3, 2,
         ECReplicationConfig.EcCodec.RS, ONEMB);
@@ -71,7 +73,7 @@ public class TestECBlockReconstructedStripeInputStream {
     dataGen = new SplittableRandom(randomSeed);
   }
 
-  @After
+  @AfterEach
   public void teardown() {
     ecReconstructExecutor.shutdownNow();
   }
@@ -82,40 +84,40 @@ public class TestECBlockReconstructedStripeInputStream {
     BlockLocationInfo keyInfo = ECStreamTestUtil
         .createKeyInfo(repConfig, 1, ONEMB);
     try (ECBlockInputStream ecb = createInputStream(keyInfo)) {
-      Assert.assertTrue(ecb.hasSufficientLocations());
+      Assertions.assertTrue(ecb.hasSufficientLocations());
     }
     // Two Chunks, but missing data block 2.
     Map<DatanodeDetails, Integer> dnMap
         = ECStreamTestUtil.createIndexMap(1, 4, 5);
     keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, ONEMB * 2, dnMap);
     try (ECBlockInputStream ecb = createInputStream(keyInfo)) {
-      Assert.assertTrue(ecb.hasSufficientLocations());
+      Assertions.assertTrue(ecb.hasSufficientLocations());
     }
 
     // Three Chunks, but missing data block 2 and 3.
     dnMap = ECStreamTestUtil.createIndexMap(1, 4, 5);
     keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, ONEMB * 3, dnMap);
     try (ECBlockInputStream ecb =  createInputStream(keyInfo)) {
-      Assert.assertTrue(ecb.hasSufficientLocations());
+      Assertions.assertTrue(ecb.hasSufficientLocations());
       // Set a failed location
       List<DatanodeDetails> failed = new ArrayList<>();
       failed.add(keyInfo.getPipeline().getFirstNode());
       ((ECBlockReconstructedStripeInputStream)ecb).addFailedDatanodes(failed);
-      Assert.assertFalse(ecb.hasSufficientLocations());
+      Assertions.assertFalse(ecb.hasSufficientLocations());
     }
 
     // Three Chunks, but missing data block 2 and 3 and parity 1.
     dnMap = ECStreamTestUtil.createIndexMap(1, 4);
     keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, ONEMB * 3, dnMap);
     try (ECBlockInputStream ecb = createInputStream(keyInfo)) {
-      Assert.assertFalse(ecb.hasSufficientLocations());
+      Assertions.assertFalse(ecb.hasSufficientLocations());
     }
 
     // Three Chunks, all available but fail 3
     dnMap = ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
     keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, ONEMB * 3, dnMap);
     try (ECBlockInputStream ecb = createInputStream(keyInfo)) {
-      Assert.assertTrue(ecb.hasSufficientLocations());
+      Assertions.assertTrue(ecb.hasSufficientLocations());
       // Set a failed location
       List<DatanodeDetails> failed = new ArrayList<>();
       for (DatanodeDetails dn : dnMap.keySet()) {
@@ -125,7 +127,7 @@ public class TestECBlockReconstructedStripeInputStream {
         }
       }
       ((ECBlockReconstructedStripeInputStream)ecb).addFailedDatanodes(failed);
-      Assert.assertFalse(ecb.hasSufficientLocations());
+      Assertions.assertFalse(ecb.hasSufficientLocations());
     }
 
     // One chunk, indexes 2 and 3 are padding, but still reported in the
@@ -134,7 +136,7 @@ public class TestECBlockReconstructedStripeInputStream {
     dnMap = ECStreamTestUtil.createIndexMap(2, 3);
     keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, ONEMB, dnMap);
     try (ECBlockInputStream ecb = createInputStream(keyInfo)) {
-      Assert.assertFalse(ecb.hasSufficientLocations());
+      Assertions.assertFalse(ecb.hasSufficientLocations());
     }
   }
 
@@ -179,28 +181,28 @@ public class TestECBlockReconstructedStripeInputStream {
           for (int j = 0; j < bufs.length; j++) {
             ECStreamTestUtil.assertBufferMatches(bufs[j], dataGen);
           }
-          Assert.assertEquals(stripeSize(), read);
+          Assertions.assertEquals(stripeSize(), read);
 
           // Check the underlying streams have read 1 chunk per read:
           for (TestBlockInputStream bis : streamFactory.getBlockStreams()) {
-            Assert.assertEquals(chunkSize * (i + 1),
+            Assertions.assertEquals(chunkSize * (i + 1),
                 bis.getPos());
           }
-          Assert.assertEquals(stripeSize() * (i + 1), ecb.getPos());
+          Assertions.assertEquals(stripeSize() * (i + 1), ecb.getPos());
           clearBuffers(bufs);
         }
         // The next read is a partial stripe
         int read = ecb.readStripe(bufs);
-        Assert.assertEquals(partialStripeSize, read);
+        Assertions.assertEquals(partialStripeSize, read);
         ECStreamTestUtil.assertBufferMatches(bufs[0], dataGen);
         ECStreamTestUtil.assertBufferMatches(bufs[1], dataGen);
-        Assert.assertEquals(0, bufs[2].remaining());
-        Assert.assertEquals(0, bufs[2].position());
+        Assertions.assertEquals(0, bufs[2].remaining());
+        Assertions.assertEquals(0, bufs[2].position());
 
         // A further read should give EOF
         clearBuffers(bufs);
         read = ecb.readStripe(bufs);
-        Assert.assertEquals(-1, read);
+        Assertions.assertEquals(-1, read);
       }
     }
   }
@@ -227,21 +229,21 @@ public class TestECBlockReconstructedStripeInputStream {
     try (ECBlockReconstructedStripeInputStream ecb =
         createInputStream(keyInfo)) {
       int read = ecb.readStripe(bufs);
-      Assert.assertEquals(blockLength, read);
+      Assertions.assertEquals(blockLength, read);
       ECStreamTestUtil.assertBufferMatches(bufs[0], dataGen);
-      Assert.assertEquals(0, bufs[1].remaining());
-      Assert.assertEquals(0, bufs[1].position());
-      Assert.assertEquals(0, bufs[2].remaining());
-      Assert.assertEquals(0, bufs[2].position());
+      Assertions.assertEquals(0, bufs[1].remaining());
+      Assertions.assertEquals(0, bufs[1].position());
+      Assertions.assertEquals(0, bufs[2].remaining());
+      Assertions.assertEquals(0, bufs[2].position());
       // Check the underlying streams have been advanced by 1 blockLength:
       for (TestBlockInputStream bis : streamFactory.getBlockStreams()) {
-        Assert.assertEquals(blockLength, bis.getPos());
+        Assertions.assertEquals(blockLength, bis.getPos());
       }
-      Assert.assertEquals(ecb.getPos(), blockLength);
+      Assertions.assertEquals(ecb.getPos(), blockLength);
       clearBuffers(bufs);
       // A further read should give EOF
       read = ecb.readStripe(bufs);
-      Assert.assertEquals(-1, read);
+      Assertions.assertEquals(-1, read);
     }
   }
 
@@ -269,20 +271,20 @@ public class TestECBlockReconstructedStripeInputStream {
     try (ECBlockReconstructedStripeInputStream ecb =
         createInputStream(keyInfo)) {
       int read = ecb.readStripe(bufs);
-      Assert.assertEquals(blockLength, read);
+      Assertions.assertEquals(blockLength, read);
       ECStreamTestUtil.assertBufferMatches(bufs[0], dataGen);
       ECStreamTestUtil.assertBufferMatches(bufs[1], dataGen);
-      Assert.assertEquals(0, bufs[2].remaining());
-      Assert.assertEquals(0, bufs[2].position());
+      Assertions.assertEquals(0, bufs[2].remaining());
+      Assertions.assertEquals(0, bufs[2].position());
       // Check the underlying streams have been advanced by 1 chunk:
       for (TestBlockInputStream bis : streamFactory.getBlockStreams()) {
-        Assert.assertEquals(chunkSize, bis.getPos());
+        Assertions.assertEquals(chunkSize, bis.getPos());
       }
-      Assert.assertEquals(ecb.getPos(), blockLength);
+      Assertions.assertEquals(ecb.getPos(), blockLength);
       clearBuffers(bufs);
       // A further read should give EOF
       read = ecb.readStripe(bufs);
-      Assert.assertEquals(-1, read);
+      Assertions.assertEquals(-1, read);
     }
   }
 
@@ -326,19 +328,19 @@ public class TestECBlockReconstructedStripeInputStream {
       try (ECBlockReconstructedStripeInputStream ecb =
           createInputStream(keyInfo)) {
         int read = ecb.readStripe(bufs);
-        Assert.assertEquals(blockLength, read);
+        Assertions.assertEquals(blockLength, read);
         ECStreamTestUtil.assertBufferMatches(bufs[0], dataGen);
         ECStreamTestUtil.assertBufferMatches(bufs[1], dataGen);
         ECStreamTestUtil.assertBufferMatches(bufs[2], dataGen);
         // Check the underlying streams have been advanced by 1 chunk:
         for (TestBlockInputStream bis : streamFactory.getBlockStreams()) {
-          Assert.assertEquals(0, bis.getRemaining());
+          Assertions.assertEquals(0, bis.getRemaining());
         }
-        Assert.assertEquals(ecb.getPos(), blockLength);
+        Assertions.assertEquals(ecb.getPos(), blockLength);
         clearBuffers(bufs);
         // A further read should give EOF
         read = ecb.readStripe(bufs);
-        Assert.assertEquals(-1, read);
+        Assertions.assertEquals(-1, read);
       }
     }
   }
@@ -367,12 +369,8 @@ public class TestECBlockReconstructedStripeInputStream {
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
     try (ECBlockReconstructedStripeInputStream ecb =
         createInputStream(keyInfo)) {
-      try {
-        ecb.readStripe(bufs);
-        Assert.fail("Read should have thrown an exception");
-      } catch (InsufficientLocationsException e) {
-        // expected
-      }
+      assertThrows(InsufficientLocationsException.class,
+          () -> ecb.readStripe(bufs));
     }
   }
 
@@ -417,8 +415,8 @@ public class TestECBlockReconstructedStripeInputStream {
         for (int j = 0; j < bufs.length; j++) {
           validateContents(dataBufs[j], bufs[j], 0, chunkSize);
         }
-        Assert.assertEquals(stripeSize(), read);
-        Assert.assertEquals(dataLength - stripeSize(), ecb.getRemaining());
+        Assertions.assertEquals(stripeSize(), read);
+        Assertions.assertEquals(dataLength - stripeSize(), ecb.getRemaining());
 
         // Seek to 0 and read again
         clearBuffers(bufs);
@@ -427,8 +425,8 @@ public class TestECBlockReconstructedStripeInputStream {
         for (int j = 0; j < bufs.length; j++) {
           validateContents(dataBufs[j], bufs[j], 0, chunkSize);
         }
-        Assert.assertEquals(stripeSize(), read);
-        Assert.assertEquals(dataLength - stripeSize(), ecb.getRemaining());
+        Assertions.assertEquals(stripeSize(), read);
+        Assertions.assertEquals(dataLength - stripeSize(), ecb.getRemaining());
 
         // Seek to the last stripe
         // Seek to the last stripe
@@ -437,9 +435,9 @@ public class TestECBlockReconstructedStripeInputStream {
         read = ecb.readStripe(bufs);
         validateContents(dataBufs[0], bufs[0], 3 * chunkSize, chunkSize);
         validateContents(dataBufs[1], bufs[1], 3 * chunkSize, chunkSize - 1);
-        Assert.assertEquals(0, bufs[2].remaining());
-        Assert.assertEquals(partialStripeSize, read);
-        Assert.assertEquals(0, ecb.getRemaining());
+        Assertions.assertEquals(0, bufs[2].remaining());
+        Assertions.assertEquals(partialStripeSize, read);
+        Assertions.assertEquals(0, ecb.getRemaining());
 
         // seek to the start of stripe 3
         clearBuffers(bufs);
@@ -448,8 +446,8 @@ public class TestECBlockReconstructedStripeInputStream {
         for (int j = 0; j < bufs.length; j++) {
           validateContents(dataBufs[j], bufs[j], 2 * chunkSize, chunkSize);
         }
-        Assert.assertEquals(stripeSize(), read);
-        Assert.assertEquals(partialStripeSize, ecb.getRemaining());
+        Assertions.assertEquals(stripeSize(), read);
+        Assertions.assertEquals(partialStripeSize, ecb.getRemaining());
       }
     }
   }
@@ -464,13 +462,8 @@ public class TestECBlockReconstructedStripeInputStream {
 
     try (ECBlockReconstructedStripeInputStream ecb =
         createInputStream(keyInfo)) {
-      try {
-        ecb.seek(10);
-        Assert.fail("Seek should have thrown an exception");
-      } catch (IOException e) {
-        Assert.assertEquals("Requested position 10 does not align " +
-            "with a stripe offset", e.getMessage());
-      }
+      assertThrowsExactly(IOException.class, () -> ecb.seek(10),
+          "Requested position 10 does not align with a stripe offset");
     }
   }
 
@@ -513,8 +506,8 @@ public class TestECBlockReconstructedStripeInputStream {
           for (int j = 0; j < bufs.length; j++) {
             validateContents(dataBufs[j], bufs[j], i * chunkSize, chunkSize);
           }
-          Assert.assertEquals(stripeSize() * (i + 1), ecb.getPos());
-          Assert.assertEquals(stripeSize(), read);
+          Assertions.assertEquals(stripeSize() * (i + 1), ecb.getPos());
+          Assertions.assertEquals(stripeSize(), read);
           clearBuffers(bufs);
           if (i == 0) {
             Integer failStream =
@@ -526,11 +519,11 @@ public class TestECBlockReconstructedStripeInputStream {
         }
         // The next read is a partial stripe
         int read = ecb.readStripe(bufs);
-        Assert.assertEquals(partialStripeSize, read);
+        Assertions.assertEquals(partialStripeSize, read);
         validateContents(dataBufs[0], bufs[0], 3 * chunkSize, chunkSize);
         validateContents(dataBufs[1], bufs[1], 3 * chunkSize, chunkSize - 1);
-        Assert.assertEquals(0, bufs[2].remaining());
-        Assert.assertEquals(0, bufs[2].position());
+        Assertions.assertEquals(0, bufs[2].remaining());
+        Assertions.assertEquals(0, bufs[2].position());
 
         // seek back to zero and read a stripe to re-open the streams
         ecb.seek(0);
@@ -544,18 +537,14 @@ public class TestECBlockReconstructedStripeInputStream {
         Integer failStream = getRandomStreamIndex(currentStreams);
         streamFactory.getBlockStream(failStream)
             .setShouldError(true);
-        try {
-          clearBuffers(bufs);
-          ecb.readStripe(bufs);
-          Assert.fail("InsufficientLocationsException expected");
-        } catch (InsufficientLocationsException e) {
-          // expected
-        }
+        clearBuffers(bufs);
+        assertThrows(InsufficientLocationsException.class,
+            () -> ecb.readStripe(bufs));
       }
     }
   }
 
-  @Test(expected = InsufficientLocationsException.class)
+  @Test
   public void testAllLocationsFailOnFirstRead() throws IOException {
     // This test simulates stale nodes. When the nodes are stale, but not yet
     // dead, the locations will still be given to the client and it will try to
@@ -587,7 +576,8 @@ public class TestECBlockReconstructedStripeInputStream {
     ByteBuffer[] bufs = allocateByteBuffers(repConfig);
     try (ECBlockReconstructedStripeInputStream ecb =
              createInputStream(keyInfo)) {
-      ecb.readStripe(bufs);
+      assertThrows(InsufficientLocationsException.class,
+          () -> ecb.readStripe(bufs));
     }
   }
 
@@ -628,13 +618,13 @@ public class TestECBlockReconstructedStripeInputStream {
       for (int j = 0; j < bufs.length; j++) {
         ECStreamTestUtil.assertBufferMatches(bufs[j], dataGen);
       }
-      Assert.assertEquals(stripeSize(), read);
+      Assertions.assertEquals(stripeSize(), read);
 
       // Now ensure that streams with repIndexes 1, 2 and 3 have not been
       // created in the stream factory, indicating we did not read them.
       List<TestBlockInputStream> streams = streamFactory.getBlockStreams();
       for (TestBlockInputStream stream : streams) {
-        Assert.assertTrue(stream.getEcReplicaIndex() > 2);
+        Assertions.assertTrue(stream.getEcReplicaIndex() > 2);
       }
     }
   }
@@ -675,9 +665,9 @@ public class TestECBlockReconstructedStripeInputStream {
   private void validateContents(ByteBuffer src, ByteBuffer data, int offset,
       int count) {
     byte[] srcArray = src.array();
-    Assert.assertEquals(count, data.remaining());
+    Assertions.assertEquals(count, data.remaining());
     for (int i = offset; i < offset + count; i++) {
-      Assert.assertEquals("Element " + i, srcArray[i], data.get());
+      Assertions.assertEquals(srcArray[i], data.get(), "Element " + i);
     }
     data.flip();
   }
