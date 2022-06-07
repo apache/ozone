@@ -33,6 +33,7 @@ public interface ReconNamespaceSummaryManager {
 
   void clearNSSummaryTable() throws IOException;
 
+  @Deprecated
   void storeNSSummary(long objectId, NSSummary nsSummary) throws IOException;
 
   void batchStoreNSSummaries(BatchOperation batch, long objectId,

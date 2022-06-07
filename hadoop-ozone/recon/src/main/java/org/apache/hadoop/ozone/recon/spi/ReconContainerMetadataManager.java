@@ -52,6 +52,7 @@ public interface ReconContainerMetadataManager {
    * @param containerKeyPrefix the containerId, key-prefix tuple.
    * @param count              Count of Keys with that prefix.
    */
+  @Deprecated
   void storeContainerKeyMapping(ContainerKeyPrefix containerKeyPrefix,
                                 Integer count) throws IOException;
 
@@ -73,6 +74,7 @@ public interface ReconContainerMetadataManager {
    * @param count count of the keys within the given containerID.
    * @throws IOException
    */
+  @Deprecated
   void storeContainerKeyCount(Long containerID, Long count) throws IOException;
 
   /**
@@ -190,6 +192,7 @@ public interface ReconContainerMetadataManager {
    * @param containerKeyPrefix container key prefix to be deleted.
    * @throws IOException exception.
    */
+  @Deprecated
   void deleteContainerMapping(ContainerKeyPrefix containerKeyPrefix)
       throws IOException;
 
@@ -225,6 +228,11 @@ public interface ReconContainerMetadataManager {
    */
   void incrementContainerCountBy(long count);
 
+  /**
+   * Commit a batch operation into the containerDbStore.
+   *
+   * @param rdbBatchOperation batch operation we want to commit
+   */
   void commitBatchOperation(RDBBatchOperation rdbBatchOperation)
       throws IOException;
 

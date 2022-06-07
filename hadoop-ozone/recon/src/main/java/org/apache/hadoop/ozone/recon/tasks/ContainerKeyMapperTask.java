@@ -74,8 +74,11 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
     long omKeyCount = 0;
+    // Maps the (container, key) -> count
     Map<ContainerKeyPrefix, Integer> containerKeyMap = new HashMap<>();
+    // Maps the key -> containerId
     Map<Long, Long> containerKeyCountMap = new HashMap<>();
+    // List of the deleted (container, key) pair's
     List<ContainerKeyPrefix> deletedKeyCountList = new ArrayList<>();
 
     try {
@@ -230,10 +233,14 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   }
 
   /**
-   * Delete an OM Key from Container DB and update containerID -> no. of keys
-   * count.
+   * Note to delete an OM Key and update the containerID -> no. of keys counts
+   * (we are preparing for batch deletion in these data structures).
    *
    * @param key key String.
+   * @param containerKeyMap we keep the added containerKeys in this map
+   *                        (in this batch)
+   * @param containerKeyCountMap we keep the containerKey counts in this map
+   * @param deletedContainerKeyList list of the deleted containerKeys
    * @throws IOException If Unable to write to container DB.
    */
   private void handleDeleteOMKeyEvent(String key,
@@ -250,6 +257,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
 
     Set<ContainerKeyPrefix> keysToBeDeleted = new HashSet<>();
 
+    // Check if we have keys in this container in the DB
     while (containerIterator.hasNext()) {
       Table.KeyValue<ContainerKeyPrefix, Integer> keyValue =
           containerIterator.next();
@@ -259,6 +267,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       }
     }
 
+    // Check if we have keys in this container in our containerKeyMap
     containerKeyMap.keySet()
         .forEach((ContainerKeyPrefix containerKeyPrefix) -> {
           String keyPrefix = containerKeyPrefix.getKeyPrefix();
@@ -269,6 +278,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
 
     for (ContainerKeyPrefix containerKeyPrefix : keysToBeDeleted) {
       deletedContainerKeyList.add(containerKeyPrefix);
+      // Remove the container-key prefix from the map if we previously added
+      // it in this batch (and now we delete it)
       containerKeyMap.remove(containerKeyPrefix);
 
       // decrement count and update containerKeyCount.
@@ -287,11 +298,14 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   }
 
   /**
-   * Write an OM key to container DB and update containerID -> no. of keys
-   * count.
+   * Note to add an OM key and update containerID -> no. of keys count.
    *
    * @param key key String
    * @param omKeyInfo omKeyInfo value
+   * @param containerKeyMap we keep the added containerKeys in this map
+   *                        (in this batch)
+   * @param containerKeyCountMap we keep the containerKey counts in this map
+   * @param deletedContainerKeyList list of the deleted containerKeys
    * @throws IOException if unable to write to recon DB.
    */
   private void handlePutOMKeyEvent(String key, OmKeyInfo omKeyInfo,
@@ -316,6 +330,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
           // Save on writes. No need to save same container-key prefix
           // mapping again.
           containerKeyMap.put(containerKeyPrefix, 1);
+          // Remove the container-key prefix from the deleted list if we
+          // previously deleted it in this batch (and now we add it again)
           deletedContainerKeyList.remove(containerKeyPrefix);
 
 

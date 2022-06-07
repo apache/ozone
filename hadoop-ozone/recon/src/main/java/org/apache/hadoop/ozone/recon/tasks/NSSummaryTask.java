@@ -246,11 +246,15 @@ public class NSSummaryTask implements ReconOmTask {
   private void handlePutKeyEvent(OmKeyInfo keyInfo, Map<Long,
       NSSummary> nsSummaryMap) throws IOException {
     long parentObjectId = keyInfo.getParentObjectID();
+    // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
+      // If we don't have it in this batch we try to get it from the DB
       nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
     }
     if (nsSummary == null) {
+      // If we don't have it locally and in the DB we create a new instance
+      // as this is a new ID
       nsSummary = new NSSummary();
     }
     int numOfFile = nsSummary.getNumOfFiles();
@@ -273,22 +277,30 @@ public class NSSummaryTask implements ReconOmTask {
     long objectId = directoryInfo.getObjectID();
     // write the dir name to the current directory
     String dirName = directoryInfo.getName();
+    // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary curNSSummary = nsSummaryMap.get(objectId);
     if (curNSSummary == null) {
+      // If we don't have it in this batch we try to get it from the DB
       curNSSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
     }
     if (curNSSummary == null) {
+      // If we don't have it locally and in the DB we create a new instance
+      // as this is a new ID
       curNSSummary = new NSSummary();
     }
     curNSSummary.setDirName(dirName);
     nsSummaryMap.put(objectId, curNSSummary);
 
-    // write the child dir list to the parent directory
+    // Write the child dir list to the parent directory
+    // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
+      // If we don't have it in this batch we try to get it from the DB
       nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
     }
     if (nsSummary == null) {
+      // If we don't have it locally and in the DB we create a new instance
+      // as this is a new ID
       nsSummary = new NSSummary();
     }
     nsSummary.addChildDir(objectId);
@@ -299,8 +311,10 @@ public class NSSummaryTask implements ReconOmTask {
                                     Map<Long, NSSummary> nsSummaryMap)
           throws IOException {
     long parentObjectId = keyInfo.getParentObjectID();
+    // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
+      // If we don't have it in this batch we try to get it from the DB
       nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
     }
 
@@ -331,8 +345,10 @@ public class NSSummaryTask implements ReconOmTask {
           throws IOException {
     long parentObjectId = directoryInfo.getParentObjectID();
     long objectId = directoryInfo.getObjectID();
+    // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
+      // If we don't have it in this batch we try to get it from the DB
       nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
     }
 

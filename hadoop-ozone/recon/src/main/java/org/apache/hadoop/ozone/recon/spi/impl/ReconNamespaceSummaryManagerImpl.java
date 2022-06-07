@@ -75,6 +75,7 @@ public class ReconNamespaceSummaryManagerImpl
     return nsSummaryTable.get(objectId);
   }
 
+  @Override
   public void commitBatchOperation(RDBBatchOperation rdbBatchOperation)
       throws IOException {
     this.namespaceDbStore.commitBatchOperation(rdbBatchOperation);
