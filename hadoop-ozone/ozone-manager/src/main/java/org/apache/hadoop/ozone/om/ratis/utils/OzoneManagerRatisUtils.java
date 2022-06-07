@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
@@ -85,7 +84,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.ratis.protocol.RaftPeerId;
 import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
@@ -431,43 +429,13 @@ public final class OzoneManagerRatisUtils {
     return snapshotDir;
   }
 
-  public static void checkLeaderStatus(RaftServerStatus raftServerStatus,
-      RaftPeerId raftPeerId) throws ServiceException {
-    switch (raftServerStatus) {
-    case LEADER_AND_READY: return;
-
-    case LEADER_AND_NOT_READY: throw createLeaderNotReadyException(raftPeerId);
-
-    case NOT_LEADER: throw createNotLeaderException(raftPeerId);
-
-    default: throw new IllegalStateException(
-        "Unknown Ratis Server state: " + raftServerStatus);
+  public static void checkLeaderStatus(OzoneManager ozoneManager)
+      throws ServiceException {
+    try {
+      ozoneManager.checkLeaderStatus();
+    } catch (OMNotLeaderException | OMLeaderNotReadyException e) {
+      LOG.debug(e.getMessage());
+      throw new ServiceException(e);
     }
-  }
-
-  private static ServiceException createNotLeaderException(
-      RaftPeerId raftPeerId) {
-
-    // TODO: Set suggest leaderID. Right now, client is not using suggest
-    // leaderID. Need to fix this.
-
-    OMNotLeaderException notLeaderException =
-        new OMNotLeaderException(raftPeerId);
-
-    LOG.debug(notLeaderException.getMessage());
-
-    return new ServiceException(notLeaderException);
-  }
-
-  private static ServiceException createLeaderNotReadyException(
-      RaftPeerId raftPeerId) {
-
-    OMLeaderNotReadyException leaderNotReadyException =
-        new OMLeaderNotReadyException(raftPeerId.toString() + " is Leader " +
-            "but not ready to process request yet.");
-
-    LOG.debug(leaderNotReadyException.getMessage());
-
-    return new ServiceException(leaderNotReadyException);
   }
 }
