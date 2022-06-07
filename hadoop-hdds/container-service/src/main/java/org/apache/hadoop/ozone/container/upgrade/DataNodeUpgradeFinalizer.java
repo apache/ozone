@@ -70,11 +70,6 @@ public class DataNodeUpgradeFinalizer extends
       switch (state) {
       case OPEN:
       case CLOSING:
-        // CLOSING containers should eventually be moved to CLOSED as long as
-        // SCM's replication manager is running. If finalization is run
-        // immediately after safemode exit, it may not be able to proceed
-        // until the replication manager starts after
-        // HddsConfigKeys#HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT.
         LOG.warn("FinalizeUpgrade : Waiting for container {} to close, current "
             + "state is: {}", id, state);
         return false;
