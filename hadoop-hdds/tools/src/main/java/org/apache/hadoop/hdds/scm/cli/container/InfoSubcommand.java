@@ -28,8 +28,7 @@ import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;

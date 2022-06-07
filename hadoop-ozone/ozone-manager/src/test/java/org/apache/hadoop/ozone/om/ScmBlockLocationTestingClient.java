@@ -47,12 +47,9 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.hdds.protocol.proto
-    .ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result;
-import static org.apache.hadoop.hdds.protocol.proto
-    .ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.success;
-import static org.apache.hadoop.hdds.protocol.proto
-    .ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.unknownFailure;
+import static org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result;
+import static org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.success;
+import static org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.unknownFailure;
 
 /**
  * This is a testing client that allows us to intercept calls from OzoneManager

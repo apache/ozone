@@ -18,8 +18,7 @@
 package org.apache.hadoop.ozone.common;
 
 import org.apache.commons.collections.SetUtils;
-import org.apache.hadoop.ozone.common.statemachine
-    .InvalidStateTransitionException;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -34,8 +33,7 @@ import static org.apache.hadoop.ozone.common.TestStateMachine.STATES.CLOSED;
 import static org.apache.hadoop.ozone.common.TestStateMachine.STATES.CREATING;
 import static org.apache.hadoop.ozone.common.TestStateMachine.STATES.FINAL;
 import static org.apache.hadoop.ozone.common.TestStateMachine.STATES.INIT;
-import static org.apache.hadoop.ozone.common.TestStateMachine.STATES
-    .OPERATIONAL;
+import static org.apache.hadoop.ozone.common.TestStateMachine.STATES.OPERATIONAL;
 
 /**
  * This class is to test ozone common state machine.

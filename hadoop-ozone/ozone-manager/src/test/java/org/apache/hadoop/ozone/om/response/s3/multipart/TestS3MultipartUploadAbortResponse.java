@@ -28,8 +28,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.junit.Assert;
 import org.junit.Test;
 
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .PartKeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.util.Time;
 
 /**

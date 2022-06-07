@@ -21,8 +21,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .RepeatedKeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RepeatedKeyInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

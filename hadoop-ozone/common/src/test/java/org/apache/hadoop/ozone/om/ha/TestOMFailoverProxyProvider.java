@@ -36,10 +36,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.
-    OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.
-    OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
 
 /**
  * Tests OMFailoverProxyProvider failover behaviour.

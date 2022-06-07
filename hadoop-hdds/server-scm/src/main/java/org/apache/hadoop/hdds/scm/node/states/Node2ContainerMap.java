@@ -27,8 +27,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes
-    .NO_SUCH_DATANODE;
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.NO_SUCH_DATANODE;
 
 /**
  * This data structure maintains the list of containers that is on a datanode.

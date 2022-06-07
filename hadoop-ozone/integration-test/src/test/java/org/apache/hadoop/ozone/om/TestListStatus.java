@@ -36,8 +36,7 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.List;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.
-    OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 
 /**
  * A simple test that asserts that list status output is sorted.

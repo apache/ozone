@@ -19,8 +19,7 @@ package org.apache.hadoop.ozone.common;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos
-    .KeyBlocks;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.KeyBlocks;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -20,8 +20,7 @@
 package org.apache.hadoop.ozone.protocol;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.KeyValue;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 
 import java.util.HashMap;
 import java.util.LinkedList;

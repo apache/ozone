@@ -30,8 +30,7 @@ import org.apache.hadoop.security.authorize.Service;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL;
-import static org.apache.hadoop.ozone.om.OMConfigKeys
-    .OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL;
 
 /**
  * {@link PolicyProvider} for OM protocols.

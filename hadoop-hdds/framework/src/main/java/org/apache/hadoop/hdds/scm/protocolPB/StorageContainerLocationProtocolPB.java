@@ -18,9 +18,7 @@
 package org.apache.hadoop.hdds.scm.protocolPB;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerLocationProtocolProtos
-    .StorageContainerLocationProtocolService;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;

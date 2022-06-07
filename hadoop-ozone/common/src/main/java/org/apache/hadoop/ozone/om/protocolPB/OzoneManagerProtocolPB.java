@@ -20,8 +20,7 @@ package org.apache.hadoop.ozone.om.protocolPB;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ipc.ProtocolInfo;
-import org.apache.hadoop.ozone.protocol.proto
-    .OzoneManagerProtocolProtos.OzoneManagerService;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.TokenInfo;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;

@@ -22,8 +22,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

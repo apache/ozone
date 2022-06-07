@@ -57,10 +57,8 @@ import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys
-    .OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
-import static org.apache.hadoop.ozone.om.OMConfigKeys
-    .OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT;
 
 /**
  * Grpc transport for grpc between s3g and om.

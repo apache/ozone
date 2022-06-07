@@ -18,8 +18,7 @@
 package org.apache.hadoop.hdds.scm.exceptions;
 
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
-import org.apache.hadoop.hdds.protocol.proto.
-    ScmBlockLocationProtocolProtos.Status;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Status;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

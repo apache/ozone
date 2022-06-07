@@ -49,10 +49,8 @@ import java.util.Collection;
 import java.util.Collections;
 
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.
-    ResultCodes.FILE_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.
-    OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
  * Helper class for fetching List Status for a path.

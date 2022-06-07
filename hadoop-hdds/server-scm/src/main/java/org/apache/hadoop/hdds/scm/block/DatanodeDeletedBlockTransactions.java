@@ -16,8 +16,7 @@
  */
 package org.apache.hadoop.hdds.scm.block;
 
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 
 import java.util.HashMap;
 import java.util.List;

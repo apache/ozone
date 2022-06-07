@@ -19,10 +19,8 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .RepeatedKeyInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RepeatedKeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 
 /**
  * Args for deleted keys. This is written to om metadata deletedTable.

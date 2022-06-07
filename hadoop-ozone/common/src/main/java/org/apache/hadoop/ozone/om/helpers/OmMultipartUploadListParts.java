@@ -19,8 +19,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .PartInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
 
 import java.util.ArrayList;
 import java.util.List;

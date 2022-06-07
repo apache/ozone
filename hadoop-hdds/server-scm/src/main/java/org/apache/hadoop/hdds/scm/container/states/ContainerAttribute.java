@@ -29,8 +29,7 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.TreeSet;
 
-import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes
-    .FAILED_TO_CHANGE_CONTAINER_STATE;
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_CHANGE_CONTAINER_STATE;
 
 /**
  * Each Attribute that we manage for a container is maintained as a map.

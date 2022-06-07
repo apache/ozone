@@ -18,17 +18,14 @@
 package org.apache.hadoop.ozone.container.common.report;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys
-    .HDDS_NODE_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys
-    .HDDS_NODE_REPORT_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
 
 /**
  * Publishes NodeReport which will be sent to SCM as part of heartbeat.

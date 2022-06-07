@@ -19,8 +19,7 @@ package org.apache.hadoop.ozone.protocol.commands;
 
 import com.google.protobuf.GeneratedMessage;
 import org.apache.hadoop.hdds.HddsIdFactory;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.server.events.IdentifiableEventPayload;
 
 /**

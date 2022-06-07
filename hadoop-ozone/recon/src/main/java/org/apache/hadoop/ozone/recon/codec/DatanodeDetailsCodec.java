@@ -19,8 +19,7 @@
 
 package org.apache.hadoop.ozone.recon.codec;
 
-import static org.apache.hadoop.hdds.protocol.proto
-    .HddsProtos.ExtendedDatanodeDetailsProto.PARSER;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto.PARSER;
 
 import java.io.IOException;
 

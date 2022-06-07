@@ -17,8 +17,7 @@
 
 package org.apache.hadoop.ozone.admin.scm;
 
-import static org.apache.hadoop.ozone.upgrade.UpgradeException
-    .ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.INVALID_REQUEST;
 
 import java.io.IOException;
 
