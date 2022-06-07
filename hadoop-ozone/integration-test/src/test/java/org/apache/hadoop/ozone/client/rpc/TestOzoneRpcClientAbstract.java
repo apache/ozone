@@ -84,7 +84,7 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
@@ -278,7 +278,8 @@ public abstract class TestOzoneRpcClientAbstract {
 
   @Test
   public void testDefaultS3GVolumeExists() throws Exception {
-    String s3VolumeName = HddsClientUtils.getS3VolumeName(cluster.getConf());
+    String s3VolumeName =
+        HddsClientUtils.getDefaultS3VolumeName(cluster.getConf());
     OzoneVolume ozoneVolume = store.getVolume(s3VolumeName);
     Assert.assertEquals(ozoneVolume.getName(), s3VolumeName);
     OMMetadataManager omMetadataManager =
@@ -1623,10 +1624,9 @@ public abstract class TestOzoneRpcClientAbstract {
         (KeyValueContainerData)(datanodeService.getDatanodeStateMachine()
             .getContainer().getContainerSet().getContainer(containerID)
             .getContainerData());
-    try (ReferenceCountedDB db = BlockUtils.getDB(containerData,
-            cluster.getConf());
+    try (DBHandle db = BlockUtils.getDB(containerData, cluster.getConf());
          BlockIterator<BlockData> keyValueBlockIterator =
-                db.getStore().getBlockIterator()) {
+                db.getStore().getBlockIterator(containerID)) {
       while (keyValueBlockIterator.hasNext()) {
         BlockData blockData = keyValueBlockIterator.nextBlock();
         if (blockData.getBlockID().getLocalID() == localID) {
@@ -1744,11 +1744,10 @@ public abstract class TestOzoneRpcClientAbstract {
       // Change first and second replica commit sequenceId
       if (index < 3) {
         long newBCSID = container.getBlockCommitSequenceId() - 1;
-        try (ReferenceCountedDB db = BlockUtils.getDB(
-            (KeyValueContainerData) container.getContainerData(),
-            cluster.getConf())) {
-          db.getStore().getMetadataTable().put(
-              OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, newBCSID);
+        KeyValueContainerData cData =
+            (KeyValueContainerData) container.getContainerData();
+        try (DBHandle db = BlockUtils.getDB(cData, cluster.getConf())) {
+          db.getStore().getMetadataTable().put(cData.bcsIdKey(), newBCSID);
         }
         container.updateBlockCommitSequenceId(newBCSID);
         index++;
@@ -1884,10 +1883,9 @@ public abstract class TestOzoneRpcClientAbstract {
     // the container.
     KeyValueContainerData containerData =
         (KeyValueContainerData) container.getContainerData();
-    try (ReferenceCountedDB db = BlockUtils.getDB(containerData,
-            cluster.getConf());
+    try (DBHandle db = BlockUtils.getDB(containerData, cluster.getConf());
          BlockIterator<BlockData> keyValueBlockIterator =
-                 db.getStore().getBlockIterator()) {
+                 db.getStore().getBlockIterator(containerID)) {
       // Find the block corresponding to the key we put. We use the localID of
       // the BlockData to identify out key.
       BlockData blockData = null;
@@ -3770,7 +3768,8 @@ public abstract class TestOzoneRpcClientAbstract {
   @Test
   public void testSetS3VolumeAcl() throws Exception {
     OzoneObj s3vVolume = new OzoneObjInfo.Builder()
-        .setVolumeName(HddsClientUtils.getS3VolumeName(cluster.getConf()))
+        .setVolumeName(
+            HddsClientUtils.getDefaultS3VolumeName(cluster.getConf()))
         .setResType(OzoneObj.ResourceType.VOLUME)
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();

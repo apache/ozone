@@ -348,4 +348,45 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_KEY_PATH_LOCK_ENABLED =
       "ozone.om.key.path.lock.enabled";
   public static final boolean OZONE_OM_KEY_PATH_LOCK_ENABLED_DEFAULT = false;
+
+  public static final String OZONE_OM_MULTITENANCY_ENABLED =
+      "ozone.om.multitenancy.enabled";
+  public static final boolean OZONE_OM_MULTITENANCY_ENABLED_DEFAULT = false;
+
+  /**
+   * Temporary configuration properties for Ranger REST use in multitenancy.
+   */
+  public static final String OZONE_RANGER_OM_IGNORE_SERVER_CERT =
+      "ozone.om.ranger.ignore.cert";
+  public static final boolean OZONE_RANGER_OM_IGNORE_SERVER_CERT_DEFAULT =
+      true;
+  public static final String OZONE_RANGER_OM_CONNECTION_TIMEOUT =
+      "ozone.om.ranger.connection.timeout";
+  public static final String OZONE_RANGER_OM_CONNECTION_TIMEOUT_DEFAULT = "5s";
+  public static final String OZONE_RANGER_OM_CONNECTION_REQUEST_TIMEOUT =
+      "ozone.om.ranger.connection.request.timeout";
+  public static final String
+      OZONE_RANGER_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "5s";
+  public static final String OZONE_OM_RANGER_HTTPS_ADMIN_API_USER =
+      "ozone.om.ranger.https.admin.api.user";
+  // TODO: Note this should be removed once Ranger Java Client is in place.
+  //  And Ranger SPNEGO auth (ranger.spnego.kerberos.principal ?) should be used
+  //  instead. Or keep this solely for dev testing. See HDDS-5836.
+  public static final String OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD =
+      "ozone.om.ranger.https.admin.api.passwd";
+  public static final String OZONE_RANGER_HTTPS_ADDRESS_KEY =
+      "ozone.om.ranger.https-address";
+  public static final String OZONE_RANGER_SERVICE =
+      "ozone.om.ranger.service";
+
+  public static final String OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL
+      = "ozone.om.multitenancy.ranger.sync.interval";
+  public static final TimeDuration
+      OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT
+      = TimeDuration.valueOf(600, TimeUnit.SECONDS);
+  public static final String OZONE_OM_MULTITENANCY_RANGER_SYNC_TIMEOUT
+      = "ozone.om.multitenancy.ranger.sync.timeout";
+  public static final TimeDuration
+      OZONE_OM_MULTITENANCY_RANGER_SYNC_TIMEOUT_DEFAULT
+      = TimeDuration.valueOf(10, TimeUnit.SECONDS);
 }

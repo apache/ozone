@@ -25,10 +25,10 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -47,9 +47,8 @@ import static org.junit.Assert.assertFalse;
 public class TestKeyValueContainerCheck
     extends TestKeyValueContainerIntegrityChecks {
 
-  public TestKeyValueContainerCheck(ContainerLayoutTestInfo
-      containerLayoutTestInfo) {
-    super(containerLayoutTestInfo);
+  public TestKeyValueContainerCheck(ContainerTestVersionInfo versionInfo) {
+    super(versionInfo);
   }
 
   /**
@@ -71,7 +70,7 @@ public class TestKeyValueContainerCheck
 
     KeyValueContainerCheck kvCheck =
         new KeyValueContainerCheck(containerData.getMetadataPath(), conf,
-            containerID);
+            containerID, containerData.getVolume());
 
     // first run checks on a Open Container
     boolean valid = kvCheck.fastCheck();
@@ -106,16 +105,14 @@ public class TestKeyValueContainerCheck
 
     KeyValueContainerCheck kvCheck =
         new KeyValueContainerCheck(containerData.getMetadataPath(), conf,
-            containerID);
+            containerID, containerData.getVolume());
 
-    File metaDir = new File(containerData.getMetadataPath());
     File dbFile = KeyValueContainerLocationUtil
-        .getContainerDBFile(metaDir, containerID);
+        .getContainerDBFile(containerData);
     containerData.setDbFile(dbFile);
-    try (ReferenceCountedDB ignored =
-            BlockUtils.getDB(containerData, conf);
+    try (DBHandle ignored = BlockUtils.getDB(containerData, conf);
         BlockIterator<BlockData> kvIter =
-                ignored.getStore().getBlockIterator()) {
+                ignored.getStore().getBlockIterator(containerID)) {
       BlockData block = kvIter.nextBlock();
       assertFalse(block.getChunks().isEmpty());
       ContainerProtos.ChunkInfo c = block.getChunks().get(0);

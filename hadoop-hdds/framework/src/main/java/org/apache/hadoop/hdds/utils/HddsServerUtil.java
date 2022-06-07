@@ -92,6 +92,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR;
 
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -402,6 +403,12 @@ public final class HddsServerUtil {
           + HDDS_DATANODE_DIR_KEY + " or " + DFS_DATANODE_DATA_DIR_KEY);
     }
     return rawLocations;
+  }
+
+  public static Collection<String> getDatanodeDbDirs(
+      ConfigurationSource conf) {
+    // No fallback here, since this config is optional.
+    return conf.getTrimmedStringCollection(HDDS_DATANODE_CONTAINER_DB_DIR);
   }
 
   /**

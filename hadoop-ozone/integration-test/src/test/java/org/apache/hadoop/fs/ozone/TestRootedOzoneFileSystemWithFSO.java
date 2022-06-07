@@ -18,6 +18,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.junit.Assert;
@@ -222,6 +223,31 @@ public class TestRootedOzoneFileSystemWithFSO
     Assert.assertTrue(getFs().delete(volumePath1, true));
     long deletes = getOMMetrics().getNumKeyDeletes();
     Assert.assertTrue(deletes == prevDeletes + 1);
+  }
+
+  /**
+   * Test the consistency of listStatusFSO with TableCache present.
+   */
+  @Test
+  public void testListStatusFSO() throws Exception {
+    // list keys batch size is 1024. Creating keys greater than the
+    // batch size to test batch listing of the keys.
+    int valueGreaterBatchSize = 1200;
+    Path parent = new Path(getBucketPath(), "testListStatusFSO");
+    for (int i = 0; i < valueGreaterBatchSize; i++) {
+      Path key = new Path(parent, "tempKey" + i);
+      ContractTestUtils.touch(getFs(), key);
+      /*
+      To add keys to the cache. listStatusFSO goes through the cache first.
+      The cache is not continuous and may be greater than the batch size.
+      This may cause inconsistency in the listing of keys.
+       */
+      getFs().rename(key, new Path(parent, "key" + i));
+    }
+
+    FileStatus[] fileStatuses = getFs().listStatus(
+        new Path(getBucketPath() + "/testListStatusFSO"));
+    Assert.assertEquals(valueGreaterBatchSize, fileStatuses.length);
   }
 
 }

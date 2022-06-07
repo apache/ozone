@@ -68,10 +68,17 @@ public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
+    final long volumeId = omMetadataManager.getVolumeId(
+            getOmKeyInfo().getVolumeName());
+    final long bucketId = omMetadataManager.getBucketId(
+            getOmKeyInfo().getVolumeName(),
+            getOmKeyInfo().getBucketName());
+
     // For OmResponse with failure, this should do nothing. This method is
     // not called in failure scenario in OM code.
-    String ozoneDbKey = omMetadataManager.getOzonePathKey(
-            getOmKeyInfo().getParentObjectID(), getOmKeyInfo().getFileName());
+    String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId,
+            bucketId, getOmKeyInfo().getParentObjectID(),
+            getOmKeyInfo().getFileName());
 
     if (isDeleteDirectory) {
       omMetadataManager.getDirectoryTable().deleteWithBatch(batchOperation,

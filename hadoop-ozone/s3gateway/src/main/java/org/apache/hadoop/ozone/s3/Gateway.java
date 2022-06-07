@@ -91,8 +91,8 @@ public class Gateway extends GenericCli {
         Gateway.class, originalArgs, LOG);
 
     LOG.info("Starting Ozone S3 gateway");
-    httpServer.start();
     HddsServerUtil.initializeMetrics(ozoneConfiguration, "S3Gateway");
+    httpServer.start();
   }
 
   public void stop() throws Exception {

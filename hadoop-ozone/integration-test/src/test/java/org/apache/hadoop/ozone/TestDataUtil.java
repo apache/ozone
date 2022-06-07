@@ -59,7 +59,9 @@ public final class TestDataUtil {
     BucketArgs omBucketArgs;
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     builder.setStorageType(StorageType.DISK);
-    builder.setBucketLayout(bucketLayout);
+    if (bucketLayout != null) {
+      builder.setBucketLayout(bucketLayout);
+    }
     omBucketArgs = builder.build();
 
     return createVolumeAndBucket(cluster, volumeName, bucketName, bucketLayout,

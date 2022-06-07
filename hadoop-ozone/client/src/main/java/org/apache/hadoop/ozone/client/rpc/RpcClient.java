@@ -27,6 +27,7 @@ import java.net.URI;
 import java.security.InvalidKeyException;
 import java.security.PrivilegedExceptionAction;
 import java.security.SecureRandom;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -85,6 +86,7 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUpload;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
@@ -99,7 +101,9 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -114,14 +118,19 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
+import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
+import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
+import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
@@ -150,6 +159,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH;
 
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ratis.protocol.ClientId;
@@ -253,6 +263,14 @@ public class RpcClient implements ClientProtocol {
       caCertPem = serviceInfoEx.getCaCertificate();
       caCertPems = serviceInfoEx.getCaCertPemList();
       if (caCertPems == null || caCertPems.isEmpty()) {
+        if (caCertPem == null) {
+          LOG.error("RpcClient received empty caCertPems from serviceInfo");
+          CertificateException ex = new CertificateException(
+              "No caCerts found; caCertPem can" +
+                  " not be null when caCertPems is empty or null"
+          );
+          throw new IOException(ex);
+        }
         caCertPems = Collections.singletonList(caCertPem);
       }
       x509Certificates = OzoneSecurityUtil.convertToX509(caCertPems);
@@ -482,6 +500,15 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     verifyVolumeName(volumeName);
     OmVolumeArgs volume = ozoneManagerClient.getVolumeInfo(volumeName);
+    return buildOzoneVolume(volume);
+  }
+
+  @Override
+  public S3VolumeContext getS3VolumeContext() throws IOException {
+    return ozoneManagerClient.getS3VolumeContext();
+  }
+
+  public OzoneVolume buildOzoneVolume(OmVolumeArgs volume) {
     return new OzoneVolume(
         conf,
         this,
@@ -494,7 +521,8 @@ public class RpcClient implements ClientProtocol {
         volume.getCreationTime(),
         volume.getModificationTime(),
         volume.getAcls(),
-        volume.getMetadata());
+        volume.getMetadata(),
+        volume.getRefCount());
   }
 
   @Override
@@ -586,8 +614,8 @@ public class RpcClient implements ClientProtocol {
     // If S3 auth exists, set owner name to the short user name derived from the
     //  accessId. Similar to RpcClient#getDEK
     if (getThreadLocalS3Auth() != null) {
-      UserGroupInformation s3gUGI = UserGroupInformation.createRemoteUser(
-          getThreadLocalS3Auth().getAccessID());
+      final UserGroupInformation s3gUGI = UserGroupInformation.createRemoteUser(
+          getThreadLocalS3Auth().getUserPrincipal());
       owner = s3gUGI.getShortUserName();
     } else {
       owner = bucketArgs.getOwner() == null ?
@@ -598,6 +626,7 @@ public class RpcClient implements ClientProtocol {
         Boolean.FALSE : bucketArgs.getVersioning();
     StorageType storageType = bucketArgs.getStorageType() == null ?
         StorageType.DEFAULT : bucketArgs.getStorageType();
+    BucketLayout bucketLayout = bucketArgs.getBucketLayout();
     BucketEncryptionKeyInfo bek = null;
     if (bucketArgs.getEncryptionKey() != null) {
       bek = new BucketEncryptionKeyInfo.Builder()
@@ -621,7 +650,7 @@ public class RpcClient implements ClientProtocol {
         .setQuotaInBytes(bucketArgs.getQuotaInBytes())
         .setQuotaInNamespace(bucketArgs.getQuotaInNamespace())
         .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()))
-        .setBucketLayout(bucketArgs.getBucketLayout())
+        .setBucketLayout(bucketLayout)
         .setOwner(owner);
 
     if (bek != null) {
@@ -634,9 +663,10 @@ public class RpcClient implements ClientProtocol {
       builder.setDefaultReplicationConfig(defaultReplicationConfig);
     }
 
-    LOG.info("Creating Bucket: {}/{}, with {} as owner and Versioning {} and " +
-        "Storage Type set to {} and Encryption set to {} ",
-        volumeName, bucketName, owner, isVersionEnabled,
+    LOG.info("Creating Bucket: {}/{}, with the Bucket Layout {}, {} as " +
+            "owner, Versioning {}, Storage Type set to {} and Encryption set " +
+            "to {} ",
+        volumeName, bucketName, bucketLayout, owner, isVersionEnabled,
         storageType, bek != null);
     ozoneManagerClient.createBucket(builder.build());
   }
@@ -759,6 +789,33 @@ public class RpcClient implements ClientProtocol {
   }
 
   /**
+   * Returns s3 secret given a kerberos user.
+   * @param kerberosID
+   * @return S3SecretValue
+   * @throws IOException
+   */
+  @Override
+  public S3SecretValue getS3Secret(String kerberosID, boolean createIfNotExist)
+          throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(kerberosID),
+            "kerberosID cannot be null or empty.");
+    // No need to check createIfNotExist here which is a primitive
+    return ozoneManagerClient.getS3Secret(kerberosID, createIfNotExist);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  public S3SecretValue setS3Secret(String accessId, String secretKey)
+          throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(accessId),
+            "accessId cannot be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(secretKey),
+            "secretKey cannot be null or empty.");
+    return ozoneManagerClient.setS3Secret(accessId, secretKey);
+  }
+
+  /**
    * {@inheritDoc}
    */
   @Override
@@ -767,6 +824,147 @@ public class RpcClient implements ClientProtocol {
             "kerberosID cannot be null or empty.");
 
     ozoneManagerClient.revokeS3Secret(kerberosID);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void createTenant(String tenantId) throws IOException {
+    createTenant(tenantId, TenantArgs.newBuilder()
+        .setVolumeName(tenantId).build());
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void createTenant(String tenantId, TenantArgs tenantArgs)
+      throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(tenantId),
+        "tenantId cannot be null or empty.");
+    Preconditions.checkNotNull(tenantArgs);
+
+    final String volumeName = tenantArgs.getVolumeName();
+    verifyVolumeName(volumeName);
+
+    OmTenantArgs.Builder builder = OmTenantArgs.newBuilder();
+    builder.setTenantId(tenantId);
+    builder.setVolumeName(volumeName);
+    // TODO: Add more fields
+    // TODO: Include OmVolumeArgs in (Om)TenantArgs as well for volume creation?
+
+    LOG.info("Creating Tenant: '{}', with new volume: '{}'",
+        tenantId, volumeName);
+
+    ozoneManagerClient.createTenant(builder.build());
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public DeleteTenantState deleteTenant(String tenantId) throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(tenantId),
+        "tenantId cannot be null or empty.");
+    return ozoneManagerClient.deleteTenant(tenantId);
+  }
+
+  /**
+   * Assign user to tenant.
+   * @param username user name to be assigned.
+   * @param tenantId tenant name.
+   * @throws IOException
+   */
+  @Override
+  public S3SecretValue tenantAssignUserAccessId(
+      String username, String tenantId, String accessId) throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(username),
+        "username can't be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(tenantId),
+        "tenantId can't be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(accessId),
+        "accessId can't be null or empty.");
+    Preconditions.checkArgument(
+        accessId.length() <= OZONE_MAXIMUM_ACCESS_ID_LENGTH, "accessId length ("
+            + accessId.length() + ") exceeds the maximum length allowed ("
+            + OZONE_MAXIMUM_ACCESS_ID_LENGTH + ")");
+    return ozoneManagerClient.tenantAssignUserAccessId(
+        username, tenantId, accessId);
+  }
+
+  /**
+   * Revoke user accessId to tenant.
+   * @param accessId accessId to be revoked.
+   * @throws IOException
+   */
+  @Override
+  public void tenantRevokeUserAccessId(String accessId) throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(accessId),
+        "accessId can't be null or empty.");
+    ozoneManagerClient.tenantRevokeUserAccessId(accessId);
+  }
+
+  /**
+   * Assign admin role to an accessId in a tenant.
+   * @param accessId access ID.
+   * @param tenantId tenant name.
+   * @param delegated true if making delegated admin.
+   * @throws IOException
+   */
+  @Override
+  public void tenantAssignAdmin(String accessId, String tenantId,
+      boolean delegated)
+      throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(accessId),
+        "accessId can't be null or empty.");
+    // tenantId can be empty
+    ozoneManagerClient.tenantAssignAdmin(accessId, tenantId, delegated);
+  }
+
+  /**
+   * Revoke admin role of an accessId from a tenant.
+   * @param accessId access ID.
+   * @param tenantId tenant name.
+   * @throws IOException
+   */
+  @Override
+  public void tenantRevokeAdmin(String accessId, String tenantId)
+      throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(accessId),
+        "accessId can't be null or empty.");
+    // tenantId can be empty
+    ozoneManagerClient.tenantRevokeAdmin(accessId, tenantId);
+  }
+
+  /**
+   * Get tenant info for a user.
+   * @param userPrincipal Kerberos principal of a user.
+   * @return TenantUserInfo
+   * @throws IOException
+   */
+  @Override
+  public TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
+      throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(userPrincipal),
+        "userPrincipal can't be null or empty.");
+    return ozoneManagerClient.tenantGetUserInfo(userPrincipal);
+  }
+
+  /**
+   * List tenants.
+   * @return TenantStateList
+   * @throws IOException
+   */
+  @Override
+  public TenantStateList listTenant() throws IOException {
+    return ozoneManagerClient.listTenant();
+  }
+
+  @Override
+  public TenantUserList listUsersInTenant(String tenantId, String prefix)
+      throws IOException {
+    return ozoneManagerClient.listUsersInTenant(tenantId, prefix);
   }
 
   @Override
@@ -998,8 +1196,10 @@ public class RpcClient implements ClientProtocol {
       UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
       UserGroupInformation proxyUser;
       if (getThreadLocalS3Auth() != null) {
+        String userPrincipal = getThreadLocalS3Auth().getUserPrincipal();
+        Preconditions.checkNotNull(userPrincipal);
         UserGroupInformation s3gUGI = UserGroupInformation.createRemoteUser(
-            getThreadLocalS3Auth().getAccessID());
+            userPrincipal);
         proxyUser = UserGroupInformation.createProxyUser(
             s3gUGI.getShortUserName(), loginUser);
         decrypted = proxyUser.doAs(
@@ -1522,11 +1722,9 @@ public class RpcClient implements ClientProtocol {
     return createOutputStream(keySession, UUID.randomUUID().toString());
   }
 
-  @Override
-  public List<OzoneFileStatus> listStatus(String volumeName, String bucketName,
-      String keyName, boolean recursive, String startKey, long numEntries)
-      throws IOException {
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+  private OmKeyArgs prepareOmKeyArgs(String volumeName, String bucketName,
+      String keyName) {
+    return new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
@@ -1534,8 +1732,26 @@ public class RpcClient implements ClientProtocol {
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .setLatestVersionLocation(getLatestVersionLocation)
         .build();
+  }
+
+
+  @Override
+  public List<OzoneFileStatus> listStatus(String volumeName, String bucketName,
+      String keyName, boolean recursive, String startKey, long numEntries)
+      throws IOException {
+    OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName);
     return ozoneManagerClient
         .listStatus(keyArgs, recursive, startKey, numEntries);
+  }
+
+  @Override
+  public List<OzoneFileStatus> listStatus(String volumeName, String bucketName,
+      String keyName, boolean recursive, String startKey,
+      long numEntries, boolean allowPartialPrefixes) throws IOException {
+    OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName);
+    return ozoneManagerClient
+        .listStatus(keyArgs, recursive, startKey, numEntries,
+            allowPartialPrefixes);
   }
 
   /**
