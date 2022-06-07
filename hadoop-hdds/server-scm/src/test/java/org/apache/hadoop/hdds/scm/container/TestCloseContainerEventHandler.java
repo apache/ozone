@@ -48,15 +48,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
 import org.junit.Assert;
-import org.junit.Rule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
-import org.mockito.junit.MockitoJUnit;
-import org.mockito.junit.MockitoRule;
 
 /**
  * Tests the closeContainerEventHandler class.
@@ -75,9 +72,6 @@ public class TestCloseContainerEventHandler {
 
   @Captor
   private ArgumentCaptor<CommandForDatanode> commandCaptor;
-
-  @Rule
-  public MockitoRule rule = MockitoJUnit.rule();
 
   @BeforeEach
   public void setup() {
