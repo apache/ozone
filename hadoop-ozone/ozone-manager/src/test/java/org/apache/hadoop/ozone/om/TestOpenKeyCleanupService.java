@@ -127,11 +127,18 @@ public class TestOpenKeyCleanupService {
         (OpenKeyCleanupService) keyManager.getOpenKeyCleanupService();
 
     openKeyCleanupService.suspend();
+    // wait for submitted tasks to complete
+    Thread.sleep(SERVICE_INTERVAL.toMillis());
+    final long oldkeyCount = openKeyCleanupService.getSubmittedOpenKeyCount();
+    final long oldrunCount = openKeyCleanupService.getRunCount();
 
     final int keyCount = numDEFKeys + numFSOKeys;
     createOpenKeys(numDEFKeys, BucketLayout.DEFAULT);
     createOpenKeys(numFSOKeys, BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    Thread.sleep(EXPIRE_THRESHOLD.toMillis() + SERVICE_INTERVAL.toMillis());
+
+    // wait for open keys to expire
+    Thread.sleep(EXPIRE_THRESHOLD.toMillis());
+
     assertEquals(numDEFKeys == 0, keyManager.getExpiredOpenKeys(
         EXPIRE_THRESHOLD, 1, BucketLayout.DEFAULT).isEmpty());
     assertEquals(numFSOKeys == 0, keyManager.getExpiredOpenKeys(
@@ -140,10 +147,15 @@ public class TestOpenKeyCleanupService {
     openKeyCleanupService.resume();
 
     GenericTestUtils.waitFor(() -> openKeyCleanupService
-            .getSubmittedOpenKeyCount() >= keyCount,
+            .getRunCount() > oldrunCount,
         (int) SERVICE_INTERVAL.toMillis(),
-        10 * (int) SERVICE_INTERVAL.toMillis());
-    assertTrue(openKeyCleanupService.getRunCount() > 0);
+        5 * (int) SERVICE_INTERVAL.toMillis());
+
+    // wait for requests to complete
+    Thread.sleep(SERVICE_INTERVAL.toMillis());
+
+    assertTrue(openKeyCleanupService.getSubmittedOpenKeyCount() >=
+        oldkeyCount + keyCount);
     assertTrue(keyManager.getExpiredOpenKeys(EXPIRE_THRESHOLD,
         1, BucketLayout.DEFAULT).isEmpty());
     assertTrue(keyManager.getExpiredOpenKeys(EXPIRE_THRESHOLD,
