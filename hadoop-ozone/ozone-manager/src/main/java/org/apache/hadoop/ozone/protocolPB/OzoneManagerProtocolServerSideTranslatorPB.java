@@ -160,7 +160,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         // if current OM is leader and then proceed with processing the request.
         if (request.hasS3Authentication()) {
           s3Auth = true;
-          checkLeaderStatus();
           S3SecurityUtil.validateS3Credential(request, ozoneManager);
         }
       } catch (IOException ex) {
@@ -181,7 +180,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         // To validate credentials we have already verified leader status.
         // This will skip of checking leader status again if request has S3Auth.
         if (!s3Auth) {
-          checkLeaderStatus();
+          OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
         }
         try {
           omClientRequest =
@@ -267,7 +266,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   /**
    * Submits request directly to OM.
    */
-  private OMResponse submitRequestDirectlyToOM(OMRequest request) {
+  private OMResponse submitRequestDirectlyToOM(OMRequest request) throws
+      ServiceException {
     OMClientResponse omClientResponse = null;
     long index = 0L;
     try {
@@ -310,11 +310,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       Thread.currentThread().interrupt();
     }
     return omClientResponse.getOMResponse();
-  }
-
-  private void checkLeaderStatus() throws ServiceException {
-    OzoneManagerRatisUtils.checkLeaderStatus(omRatisServer.checkLeaderStatus(),
-        omRatisServer.getRaftPeerId());
   }
 
   /**

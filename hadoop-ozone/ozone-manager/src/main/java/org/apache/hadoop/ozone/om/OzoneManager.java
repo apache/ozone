@@ -277,6 +277,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
@@ -931,6 +932,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setTokenRenewInterval(tokenRenewInterval)
         .setTokenRemoverScanInterval(tokenRemoverScanInterval)
         .setService(omRpcAddressTxt)
+        .setOzoneManager(this)
         .setS3SecretManager(s3SecretManager)
         .setCertificateClient(certClient)
         .setOmServiceId(omNodeDetails.getServiceId())
@@ -1095,7 +1097,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OzoneManagerService.newReflectiveBlockingService(omServerProtocol);
 
     OMInterServiceProtocolServerSideImpl omInterServerProtocol =
-        new OMInterServiceProtocolServerSideImpl(omRatisServer,
+        new OMInterServiceProtocolServerSideImpl(this, omRatisServer,
             isRatisEnabled);
     BlockingService omInterService =
         OzoneManagerInterService.newReflectiveBlockingService(
@@ -3924,6 +3926,34 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public boolean isLeaderReady() {
     return isRatisEnabled ?
         omRatisServer.checkLeaderStatus() == LEADER_AND_READY : true;
+  }
+
+  /**
+   * Check the leader status.
+   *
+   * @return null                       leader is ready
+   *         OMLeaderNotReadyException  leader is not ready
+   *         OMNotLeaderException       not leader
+   */
+  public void checkLeaderStatus() throws OMNotLeaderException,
+      OMLeaderNotReadyException {
+    OzoneManagerRatisServer.RaftServerStatus raftServerStatus =
+        omRatisServer.checkLeaderStatus();
+    RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
+
+    switch (raftServerStatus) {
+    case LEADER_AND_READY: return;
+    case LEADER_AND_NOT_READY:
+      throw new OMLeaderNotReadyException(
+        raftPeerId.toString() + " is Leader " +
+            "but not ready to process request yet.");
+    case NOT_LEADER:
+      // TODO: Set suggest leaderID. Right now, client is not using suggest
+      // leaderID. Need to fix this.
+      throw new OMNotLeaderException(raftPeerId);
+    default: throw new IllegalStateException(
+        "Unknown Ratis Server state: " + raftServerStatus);
+    }
   }
 
   /**

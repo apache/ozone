@@ -17,11 +17,14 @@
 
 package org.apache.hadoop.ozone.security;
 
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
@@ -44,11 +47,12 @@ public final class S3SecurityUtil {
   /**
    * Validate S3 Credentials which are part of {@link OMRequest}.
    *
-   * If validation is successful returns, else throw {@link OMException}
-   * @throws OMException
+   * If validation is successful returns, else throw exception.
+   * @throws OMException         validation failure
+   *         ServiceException    Server is not leader or not ready
    */
   public static void validateS3Credential(OMRequest omRequest,
-      OzoneManager ozoneManager) throws OMException {
+      OzoneManager ozoneManager) throws ServiceException, OMException {
     if (ozoneManager.isSecurityEnabled()) {
       OzoneTokenIdentifier s3Token = constructS3Token(omRequest);
       try {
@@ -56,7 +60,13 @@ public final class S3SecurityUtil {
         // delegationTokenMgr validateToken via retrievePassword
         ozoneManager.getDelegationTokenMgr().retrievePassword(s3Token);
       } catch (SecretManager.InvalidToken e) {
-        // TODO: Just check are we okay to log enitre token in failure case.
+        if (e.getCause() != null &&
+            (e.getCause().getClass() == OMNotLeaderException.class ||
+            e.getCause().getClass() == OMLeaderNotReadyException.class)) {
+          throw new ServiceException(e.getCause());
+        }
+
+        // TODO: Just check are we okay to log entire token in failure case.
         OzoneManagerProtocolServerSideTranslatorPB.getLog().error(
             "signatures do NOT match for S3 identifier:{}", s3Token, e);
         throw new OMException("User " + s3Token.getAwsAccessId()
