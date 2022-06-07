@@ -117,6 +117,17 @@ public interface ConfigurationSource {
     return configMap;
   }
 
+  default Map<String, String> getPropsMatchingPrefix(String confPrefix) {
+    Map<String, String> configMap = new HashMap<>();
+    for (String name : getConfigKeys()) {
+      if (name.startsWith(confPrefix)) {
+        String value = get(name);
+        configMap.put(name, value);
+      }
+    }
+    return configMap;
+  }
+
   /**
    * Create a Configuration object and inject the required configuration values.
    *
