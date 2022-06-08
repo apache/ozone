@@ -83,7 +83,7 @@ public class TestSCMHAUnfinalizedStateValidationAction {
     StorageContainerManager scm = HddsTestUtils.getScm(conf);
 
     Assertions.assertEquals(UpgradeFinalizer.Status.FINALIZATION_REQUIRED,
-        scm.getUpgradeFinalizer().getStatus());
+        scm.getFinalizationManager().getUpgradeFinalizer().getStatus());
 
     final boolean shouldFail = !haEnabledBefore && haEnabledPreFinalized;
     if (shouldFail) {
