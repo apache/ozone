@@ -32,6 +32,7 @@ import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.CrcUtil;
@@ -51,6 +52,14 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
       OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
       ClientProtocol rpcClient) throws IOException {
     super(volume, bucket, keyName, length, checksumCombineMode, rpcClient);
+  }
+
+  public ReplicatedFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
+      String keyName, long length,
+      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
+      ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
+    super(volume, bucket, keyName, length, checksumCombineMode, rpcClient,
+        keyInfo);
   }
 
 
