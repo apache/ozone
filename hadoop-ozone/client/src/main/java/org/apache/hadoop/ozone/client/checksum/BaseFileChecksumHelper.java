@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.checksum;
 import org.apache.hadoop.fs.CompositeCrcFileChecksum;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.io.DataOutputBuffer;
@@ -47,6 +48,7 @@ import java.util.List;
 public abstract class BaseFileChecksumHelper {
   static final Logger LOG =
       LoggerFactory.getLogger(BaseFileChecksumHelper.class);
+  private OmKeyInfo keyInfo;
 
   private OzoneVolume volume;
   private OzoneBucket bucket;
@@ -82,6 +84,14 @@ public abstract class BaseFileChecksumHelper {
     if (this.length > 0) {
       fetchBlocks();
     }
+  }
+
+  public BaseFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
+      String keyName, long length,
+      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
+      ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
+    this(volume, bucket, keyName, length, checksumCombineMode, rpcClient);
+    this.keyInfo = keyInfo;
   }
 
   protected String getSrc() {
@@ -135,17 +145,21 @@ public abstract class BaseFileChecksumHelper {
    * @throws IOException
    */
   private void fetchBlocks() throws IOException {
-    OzoneManagerProtocol ozoneManagerClient =
-        getRpcClient().getOzoneManagerClient();
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(volume.getName())
-        .setBucketName(bucket.getName())
-        .setKeyName(keyName)
-        .setRefreshPipeline(true)
-        .setSortDatanodesInPipeline(true)
-        .setLatestVersionLocation(true)
-        .build();
-    OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);
+    if (keyInfo == null) {
+      OzoneManagerProtocol ozoneManagerClient =
+          getRpcClient().getOzoneManagerClient();
+      OmKeyArgs keyArgs =
+          new OmKeyArgs.Builder().setVolumeName(volume.getName())
+              .setBucketName(bucket.getName()).setKeyName(keyName)
+              .setRefreshPipeline(true).setSortDatanodesInPipeline(true)
+              .setLatestVersionLocation(true).build();
+      keyInfo = ozoneManagerClient.lookupKey(keyArgs);
+    }
+
+    if (keyInfo.getReplicationConfig()
+        .getReplicationType() == HddsProtos.ReplicationType.EC) {
+      return;
+    }
 
     if (keyInfo.getFileChecksum() != null &&
         isFullLength(keyInfo.getDataSize())) {
