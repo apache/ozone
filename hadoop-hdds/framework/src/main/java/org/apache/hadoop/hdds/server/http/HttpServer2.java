@@ -195,9 +195,9 @@ public final class HttpServer2 implements FilterContainer {
   private final SignerSecretProvider secretProvider;
   private XFrameOption xFrameOption;
   private boolean xFrameOptionIsEnabled;
-  public static final String HTTP_HEADER_PREFIX = "hadoop.http.header.";
+  public static final String HTTP_HEADER_PREFIX = "ozone.http.header.";
   private static final String HTTP_HEADER_REGEX =
-      "hadoop\\.http\\.header\\.([a-zA-Z\\-_]+)";
+      "ozone\\.http\\.header\\.([a-zA-Z\\-_]+)";
   static final String X_XSS_PROTECTION =
       "X-XSS-Protection:1; mode=block";
   static final String X_CONTENT_TYPE_OPTIONS =
@@ -621,9 +621,8 @@ public final class HttpServer2 implements FilterContainer {
     final String appDir = getWebAppsPath(name);
     addDefaultApps(contexts, appDir, conf);
     webServer.setHandler(handlers);
-
-    Map<String, String> xFrameParams = setHeaders(conf);
-    addGlobalFilter("safety", QuotingInputFilter.class.getName(), xFrameParams);
+    Map<String, String> config = generateFilterConfiguration(conf);
+    addGlobalFilter("safety", QuotingInputFilter.class.getName(), config);
     final FilterInitializer[] initializers = getFilterInitializers(conf);
     if (initializers != null) {
       conf.set(BIND_ADDRESS, hostName);
@@ -1743,15 +1742,23 @@ public final class HttpServer2 implements FilterContainer {
     }
   }
 
-  private Map<String, String> setHeaders(ConfigurationSource conf) {
-    Map<String, String> xFrameParams = new HashMap<>();
-
-    xFrameParams.putAll(getDefaultHeaders());
+  /**
+   * Generate the configuration for the Quoting filter used.
+   * @param conf global configuration
+   * @return relevant configuration
+   */
+  private Map<String, String> generateFilterConfiguration(
+      ConfigurationSource conf) {
+    Map<String, String> config = new HashMap<>();
+    // Add headers to the configuration.
+    config.putAll(getDefaultHeaders());
     if (this.xFrameOptionIsEnabled) {
-      xFrameParams.put(HTTP_HEADER_PREFIX + X_FRAME_OPTIONS,
+      config.put(HTTP_HEADER_PREFIX + X_FRAME_OPTIONS,
           this.xFrameOption.toString());
     }
-    return xFrameParams;
+    // Config overrides default
+    config.putAll(conf.getPropsMatchPrefix(HTTP_HEADER_PREFIX));
+    return config;
   }
 
   private Map<String, String> getDefaultHeaders() {
