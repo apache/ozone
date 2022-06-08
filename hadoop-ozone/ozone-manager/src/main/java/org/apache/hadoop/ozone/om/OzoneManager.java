@@ -2961,12 +2961,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public String getOmRatisLogDirectory() {
+  public String getRatisLogDirectory() {
     return  OzoneManagerRatisUtils.getOMRatisDirectory(configuration);
   }
 
   @Override
-  public String getOmRocksDbDirectory() {
+  public String getRocksDbDirectory() {
     return String.valueOf(OMStorage.getOmDbDir(configuration));
   }
 

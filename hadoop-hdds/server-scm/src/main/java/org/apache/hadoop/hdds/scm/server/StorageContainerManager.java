@@ -2027,12 +2027,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public String getScmRatisLogDirectory() {
+  public String getRatisLogDirectory() {
     return  SCMHAUtils.getSCMRatisDirectory(configuration);
   }
 
   @Override
-  public String getScmRocksDbDirectory() {
+  public String getRocksDbDirectory() {
     return String.valueOf(ServerUtils.getScmDbDir(configuration));
   }
 
