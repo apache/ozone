@@ -122,13 +122,17 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       String fileName = OzoneFSUtils.getFileName(keyName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
-      long bucketId = omBucketInfo.getObjectID();
-      long parentID = OMFileRequest.getParentID(bucketId, pathComponents,
-          keyName, omMetadataManager, "Cannot create file : " + keyName
+      final long volumeId = omMetadataManager.getVolumeId(volumeName);
+      final long bucketId = omMetadataManager.getBucketId(
+              volumeName, bucketName);
+      long parentID = OMFileRequest.getParentID(volumeId, bucketId,
+              pathComponents, keyName, omMetadataManager,
+              "Cannot create file : " + keyName
               + " as parent directory doesn't exist");
-      String dbFileKey = omMetadataManager.getOzonePathKey(parentID, fileName);
-      dbOpenFileKey = omMetadataManager.getOpenFileName(parentID, fileName,
-              commitKeyRequest.getClientID());
+      String dbFileKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+              parentID, fileName);
+      dbOpenFileKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
+              parentID, fileName, commitKeyRequest.getClientID());
 
       omKeyInfo = OMFileRequest.getOmKeyInfoFromFileTable(true,
               omMetadataManager, dbOpenFileKey, keyName);

@@ -143,20 +143,22 @@ public final class ContainerCache extends LRUMap {
       lock.lock();
       try {
         db = (ReferenceCountedDB) this.get(containerDBPath);
-        if (db != null) {
+        if (db != null && !db.isClosed()) {
           metrics.incNumCacheHits();
           db.incrementReference();
           return db;
-        } else {
-          metrics.incNumCacheMisses();
         }
+        if (db != null && db.isClosed()) {
+          removeDB(containerDBPath);
+        }
+        metrics.incNumCacheMisses();
       } finally {
         lock.unlock();
       }
 
       try {
         long start = Time.monotonicNow();
-        DatanodeStore store = BlockUtils.getUncachedDatanodeStore(containerID,
+        DatanodeStore store = BlockUtils.getUncachedDatanodeStore(
             containerDBPath, schemaVersion, conf, false);
         db = new ReferenceCountedDB(store, containerDBPath);
         metrics.incDbOpenLatency(Time.monotonicNow() - start);
@@ -170,18 +172,19 @@ public final class ContainerCache extends LRUMap {
       try {
         ReferenceCountedDB currentDB =
             (ReferenceCountedDB) this.get(containerDBPath);
-        if (currentDB != null) {
+        if (currentDB != null && !currentDB.isClosed()) {
           // increment the reference before returning the object
           currentDB.incrementReference();
           // clean the db created in previous step
           cleanupDb(db);
           return currentDB;
-        } else {
-          this.put(containerDBPath, db);
-          // increment the reference before returning the object
-          db.incrementReference();
-          return db;
+        } else if (currentDB != null && currentDB.isClosed()) {
+          removeDB(containerDBPath);
         }
+        this.put(containerDBPath, db);
+        // increment the reference before returning the object
+        db.incrementReference();
+        return db;
       } finally {
         lock.unlock();
       }
@@ -200,8 +203,11 @@ public final class ContainerCache extends LRUMap {
     try {
       ReferenceCountedDB db = (ReferenceCountedDB)this.get(containerDBPath);
       if (db != null) {
-        Preconditions.checkArgument(cleanupDb(db), "refCount:",
-            db.getReferenceCount());
+        boolean cleaned = cleanupDb(db);
+        if (!db.isClosed()) {
+          Preconditions.checkArgument(cleaned, "refCount:",
+              db.getReferenceCount());
+        }
       }
       this.remove(containerDBPath);
     } finally {

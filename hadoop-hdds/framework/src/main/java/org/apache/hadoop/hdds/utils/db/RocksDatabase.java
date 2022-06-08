@@ -24,6 +24,7 @@ import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
 import org.rocksdb.FlushOptions;
 import org.rocksdb.Holder;
+import org.rocksdb.IngestExternalFileOptions;
 import org.rocksdb.Options;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
@@ -62,6 +63,7 @@ public final class RocksDatabase {
   static final Logger LOG = LoggerFactory.getLogger(RocksDatabase.class);
 
   static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
+
 
   static IOException toIOException(Object name, String op, RocksDBException e) {
     return HddsServerUtil.toIOException(name + ": Failed to " + op, e);
@@ -176,6 +178,10 @@ public final class RocksDatabase {
     };
   }
 
+  public boolean isClosed() {
+    return isClosed.get();
+  }
+
   /**
    * Represents a checkpoint of the db.
    *
@@ -227,7 +233,7 @@ public final class RocksDatabase {
       return codec.fromPersistedFormat(nameBytes);
     }
 
-    private ColumnFamilyHandle getHandle() {
+    protected ColumnFamilyHandle getHandle() {
       return handle;
     }
 
@@ -280,7 +286,7 @@ public final class RocksDatabase {
     this.columnFamilies = columnFamilies;
   }
 
-  void close() {
+  public void close() {
     if (isClosed.compareAndSet(false, true)) {
       close(columnFamilies, db, descriptors, writeOptions, dbOptions);
     }
@@ -299,6 +305,19 @@ public final class RocksDatabase {
       return true;
     default:
       return false;
+    }
+  }
+
+  public void ingestExternalFile(ColumnFamily family, List<String> files,
+      IngestExternalFileOptions ingestOptions) throws IOException {
+    try {
+      db.ingestExternalFile(family.getHandle(), files, ingestOptions);
+    } catch (RocksDBException e) {
+      closeOnError(e);
+      String msg = "Failed to ingest external files " +
+          files.stream().collect(Collectors.joining(", ")) + " of " +
+          family.getName();
+      throw toIOException(this, msg, e);
     }
   }
 

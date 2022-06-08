@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import java.io.IOException;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -45,6 +46,9 @@ public class TestS3MultipartUploadAbortResponse
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
     String multipartUploadID = UUID.randomUUID().toString();
+
+    addVolumeToDB(volumeName);
+    addBucketToDB(volumeName, bucketName);
     String multipartOpenKey = getMultipartOpenKey(volumeName, bucketName,
         keyName, multipartUploadID);
 
@@ -107,6 +111,8 @@ public class TestS3MultipartUploadAbortResponse
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
     String multipartUploadID = UUID.randomUUID().toString();
+    addVolumeToDB(volumeName);
+    addBucketToDB(volumeName, bucketName);
     String multipartOpenKey = getMultipartOpenKey(volumeName, bucketName,
         keyName, multipartUploadID);
     String multipartKey = omMetadataManager.getMultipartKey(volumeName,
@@ -185,7 +191,7 @@ public class TestS3MultipartUploadAbortResponse
   }
 
   protected String getMultipartOpenKey(String volumeName, String bucketName,
-      String keyName, String multipartUploadID) {
+      String keyName, String multipartUploadID) throws IOException {
     return omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
   }

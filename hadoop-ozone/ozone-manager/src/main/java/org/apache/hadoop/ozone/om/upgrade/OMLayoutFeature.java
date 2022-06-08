@@ -36,8 +36,9 @@ public enum OMLayoutFeature implements LayoutFeature {
 
   BUCKET_LAYOUT_SUPPORT(2, "Ozone version supporting bucket " +
       "layouts and introducing the FILE_SYSTEM_OPTIMIZED and OBJECT_STORE " +
-      "bucket layout types.");
+      "bucket layout types."),
 
+  MULTITENANCY_SCHEMA(3, "Multi-Tenancy Schema");
 
   ///////////////////////////////  /////////////////////////////
   //    Example OM Layout Feature with Actions

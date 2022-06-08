@@ -111,6 +111,14 @@ public class TestRDBStore {
     // This test does not assert anything if there is any error this test
     // will throw and fail.
     rdbStore.close();
+    Assertions.assertTrue(rdbStore.isClosed());
+  }
+
+  @Test
+  public void closeUnderlyingDB() throws Exception {
+    Assertions.assertNotNull(rdbStore, "DBStore cannot be null");
+    rdbStore.getDb().close();
+    Assertions.assertTrue(rdbStore.isClosed());
   }
 
   @Test

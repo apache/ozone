@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -52,7 +53,7 @@ public class RepeatedOmKeyInfo {
   }
 
   public static RepeatedOmKeyInfo getFromProto(RepeatedKeyInfo
-      repeatedKeyInfo) {
+      repeatedKeyInfo) throws IOException {
     List<OmKeyInfo> list = new ArrayList<>();
     for (KeyInfo k : repeatedKeyInfo.getKeyInfoList()) {
       list.add(OmKeyInfo.getFromProtobuf(k));
