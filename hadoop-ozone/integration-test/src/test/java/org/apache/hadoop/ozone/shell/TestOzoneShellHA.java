@@ -72,6 +72,8 @@ import org.junit.Assert;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -381,6 +383,18 @@ public class TestOzoneShellHA {
   private ArrayList<LinkedTreeMap<String, String>> parseOutputIntoArrayList()
       throws UnsupportedEncodingException {
     return new Gson().fromJson(out.toString(DEFAULT_ENCODING), ArrayList.class);
+  }
+
+  @Test
+  public void testRATISTypeECReplication() {
+    String[] args = new String[] {"bucket", "create", "/vol/bucket",
+        "--type=RATIS", "--replication=rs-3-2-1024k"};
+    Throwable t = assertThrows(ExecutionException.class,
+        () -> execute(ozoneShell, args));
+    Throwable c = t.getCause();
+    assertTrue(c instanceof IllegalArgumentException);
+    assertEquals("rs-3-2-1024k is not supported for RATIS replication type",
+        c.getMessage());
   }
 
   /**
