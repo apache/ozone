@@ -1747,10 +1747,9 @@ public final class HttpServer2 implements FilterContainer {
    * @param conf global configuration
    * @return relevant configuration
    */
-  private Map<String, String>
-  generateFilterConfiguration(ConfigurationSource conf) {
+  private Map<String, String> generateFilterConfiguration(
+      ConfigurationSource conf) {
     Map<String, String> config = new HashMap<>();
-
     // Add headers to the configuration.
     config.putAll(getDefaultHeaders());
     if (this.xFrameOptionIsEnabled) {
@@ -1758,7 +1757,7 @@ public final class HttpServer2 implements FilterContainer {
           this.xFrameOption.toString());
     }
     // Config overrides default
-    config.putAll(conf.getPropsMatchingPrefix(HTTP_HEADER_PREFIX));
+    config.putAll(conf.getPropsMatchPrefix(HTTP_HEADER_PREFIX));
     return config;
   }
 

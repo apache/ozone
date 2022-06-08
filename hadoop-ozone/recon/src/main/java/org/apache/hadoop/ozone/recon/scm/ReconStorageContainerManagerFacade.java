@@ -244,7 +244,7 @@ public class ReconStorageContainerManagerFacade
     OzoneConfiguration reconScmConfiguration =
         new OzoneConfiguration(configuration);
     Map<String, String> reconScmConfigs =
-        configuration.getPropsWithPrefix(RECON_SCM_CONFIG_PREFIX);
+        configuration.getPropsMatchPrefixAndTrimPrefix(RECON_SCM_CONFIG_PREFIX);
     for (Map.Entry<String, String> entry : reconScmConfigs.entrySet()) {
       reconScmConfiguration.set(entry.getKey(), entry.getValue());
     }
