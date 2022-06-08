@@ -299,17 +299,17 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       reply.getCommitInfos().stream()
           .filter(i -> i.getCommitIndex() < index)
           .forEach(proto -> {
-        UUID address = RatisHelper.toDatanodeId(proto.getServer());
-        addDatanodetoReply(address, clientReply);
-        // since 3 way commit has failed, the updated map from now on  will
-        // only store entries for those datanodes which have had successful
-        // replication.
-        commitInfoMap.remove(address);
-        LOG.info(
-            "Could not commit index {} on pipeline {} to all the nodes. " +
-            "Server {} has failed. Committed by majority.",
-            index, pipeline, address);
-      });
+            UUID address = RatisHelper.toDatanodeId(proto.getServer());
+            addDatanodetoReply(address, clientReply);
+            // since 3 way commit has failed, the updated map from now on  will
+            // only store entries for those datanodes which have had successful
+            // replication.
+            commitInfoMap.remove(address);
+            LOG.info(
+                "Could not commit index {} on pipeline {} to all the nodes. " +
+                "Server {} has failed. Committed by majority.",
+                index, pipeline, address);
+          });
       return clientReply;
     }
   }
