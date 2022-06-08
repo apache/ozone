@@ -23,15 +23,14 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.DUFactory;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -94,8 +93,7 @@ public class ContainerBalancer implements SCMService {
   private long clusterUsed;
   private long clusterRemaining;
   private double clusterAvgUtilisation;
-  private PlacementPolicy placementPolicy;
-  private PlacementPolicy ecPlacementPolicy;
+  private PlacementPolicyValidateProxy placementPolicyValidateProxy;
   private NetworkTopology networkTopology;
   private double upperLimit;
   private double lowerLimit;
@@ -133,8 +131,7 @@ public class ContainerBalancer implements SCMService {
     this.underUtilizedNodes = new ArrayList<>();
     this.withinThresholdUtilizedNodes = new ArrayList<>();
     this.unBalancedNodes = new ArrayList<>();
-    this.placementPolicy = scm.getContainerPlacementPolicy();
-    this.ecPlacementPolicy = scm.getEcContainerPlacementPolicy();
+    this.placementPolicyValidateProxy = new PlacementPolicyValidateProxy(scm);
     this.networkTopology = scm.getClusterMap();
 
     this.lock = new ReentrantLock();
@@ -252,11 +249,11 @@ public class ContainerBalancer implements SCMService {
     this.maxSizeToMovePerIteration = config.getMaxSizeToMovePerIteration();
     if (config.getNetworkTopologyEnable()) {
       findTargetStrategy = new FindTargetGreedyByNetworkTopology(
-          containerManager, placementPolicy, ecPlacementPolicy,
+          containerManager, placementPolicyValidateProxy,
           nodeManager, networkTopology);
     } else {
       findTargetStrategy = new FindTargetGreedyByUsageInfo(containerManager,
-          placementPolicy, ecPlacementPolicy, nodeManager);
+          placementPolicyValidateProxy, nodeManager);
     }
     this.excludeNodes = config.getExcludeNodes();
     this.includeNodes = config.getIncludeNodes();

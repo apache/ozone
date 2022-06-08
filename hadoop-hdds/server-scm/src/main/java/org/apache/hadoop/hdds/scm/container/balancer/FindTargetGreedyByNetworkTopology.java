@@ -20,13 +20,11 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.LoggerFactory;
-
 
 import java.util.Collections;
 import java.util.LinkedList;
@@ -45,11 +43,10 @@ public class FindTargetGreedyByNetworkTopology
 
   public FindTargetGreedyByNetworkTopology(
       ContainerManager containerManager,
-      PlacementPolicy placementPolicy,
-      PlacementPolicy ecPlacementPolicy,
+      PlacementPolicyValidateProxy placementPolicyValidateProxy,
       NodeManager nodeManager,
       NetworkTopology networkTopology) {
-    super(containerManager, placementPolicy, ecPlacementPolicy, nodeManager);
+    super(containerManager, placementPolicyValidateProxy, nodeManager);
     setLogger(LoggerFactory.getLogger(FindTargetGreedyByNetworkTopology.class));
     potentialTargets = new LinkedList<>();
     setPotentialTargets(potentialTargets);

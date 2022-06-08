@@ -50,7 +50,7 @@ public class TestFindTargetStrategy {
   @Test
   public void testFindTargetGreedyByUsage() {
     FindTargetGreedyByUsageInfo findTargetStrategyByUsageInfo =
-        new FindTargetGreedyByUsageInfo(null, null, null, null);
+        new FindTargetGreedyByUsageInfo(null, null, null);
     List<DatanodeUsageInfo> overUtilizedDatanodes = new ArrayList<>();
 
     //create three datanodes with different usageinfo
@@ -161,7 +161,7 @@ public class TestFindTargetStrategy {
 
     FindTargetGreedyByNetworkTopology findTargetGreedyByNetworkTopology =
         new FindTargetGreedyByNetworkTopology(
-            null, null, null, null, newCluster);
+            null, null, null, newCluster);
 
     findTargetGreedyByNetworkTopology.reInitialize(
         overUtilizedDatanodes, null, null);

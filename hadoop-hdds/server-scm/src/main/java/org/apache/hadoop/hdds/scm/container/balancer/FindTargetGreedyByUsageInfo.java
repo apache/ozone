@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.LoggerFactory;
@@ -34,10 +33,9 @@ import java.util.TreeSet;
 public class FindTargetGreedyByUsageInfo extends AbstractFindTargetGreedy {
   public FindTargetGreedyByUsageInfo(
       ContainerManager containerManager,
-      PlacementPolicy placementPolicy,
-      PlacementPolicy ecPlacementPolicy,
+      PlacementPolicyValidateProxy placementPolicyValidateProxy,
       NodeManager nodeManager) {
-    super(containerManager, placementPolicy, ecPlacementPolicy, nodeManager);
+    super(containerManager, placementPolicyValidateProxy, nodeManager);
     setLogger(LoggerFactory.getLogger(FindTargetGreedyByUsageInfo.class));
     setPotentialTargets(new TreeSet<>((a, b) -> compareByUsage(a, b)));
   }
