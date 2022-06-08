@@ -63,8 +63,20 @@ Test EC Key Ratis Bucket
                     Key Should Match Local File         /${prefix}vol1/${prefix}ratis/${prefix}1mbEC    /tmp/1mb
                     Verify Key EC Replication Config    /${prefix}vol1/${prefix}ratis/${prefix}1mbEC    RS    3    2    1048576
 
-Test Ratis Type with EC Replication
-    ${message} =    Execute             ozone sh bucket create --replication=rs-3-2-1024k --type=RATIS /${prefix}vol1/${prefix}foo
-                    Should contain      ${message}      not supported
-    ${message} =    Execute             ozone sh key put --replication=rs-3-2-1024k --type=RATIS /${prefix}vol1/${prefix}foo/${prefix}bar /tmp/1mb
-                    Should contain      ${message}      not supported
+Test RATIS or STAND_ALONE Type with EC Replication
+    ${message} =    Execute And Ignore Error    ozone sh bucket create --replication=rs-3-2-1024k --type=RATIS /${prefix}vol1/${prefix}foo
+                    Should contain              ${message}          RATIS
+                    Should contain              ${message}          rs-3-2-1024k
+                    Should contain              ${message}          not supported
+    ${message} =    Execute And Ignore Error    ozone sh key put --replication=rs-6-3-1024k --type=RATIS /${prefix}vol1/${prefix}foo/${prefix}bar /tmp/1mb
+                    Should contain              ${message}          RATIS
+                    Should contain              ${message}          rs-6-3-1024k
+                    Should contain              ${message}          not supported
+    ${message} =    Execute And Ignore Error    ozone sh bucket create --replication=rs-6-3-1024k --type=STAND_ALONE /${prefix}vol1/${prefix}foo
+                    Should contain              ${message}          STAND_ALONE
+                    Should contain              ${message}          rs-6-3-1024k
+                    Should contain              ${message}          not supported
+    ${message} =    Execute And Ignore Error    ozone sh key put --replication=rs-3-2-1024k --type=STAND_ALONE /${prefix}vol1/${prefix}foo/${prefix}bar /tmp/1mb
+                    Should contain              ${message}          STAND_ALONE
+                    Should contain              ${message}          rs-3-2-1024k
+                    Should contain              ${message}          not supported
