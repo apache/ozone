@@ -31,9 +31,4 @@ jobs:
         env:
           TITLE: ${{ github.event.pull_request.title }}
         run:
-          echo "${TITLE}" | grep -E '^HDDS-[1-9][0-9]{3,4}\. .*[^ ]$'
-      - name: Check spaces in pull request title
-        env:
-          TITLE: ${{ github.event.pull_request.title }}
-        run:
-          echo "${TITLE}" | grep -v '  '
+          echo "${TITLE}" | grep -E '^HDDS-[1-9][0-9]{3,4}\. .*[^ ]$' | grep -v '  '
