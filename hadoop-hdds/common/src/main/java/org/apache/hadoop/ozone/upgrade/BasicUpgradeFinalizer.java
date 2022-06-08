@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FIRST_UPGRADE_START;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VALIDATE_IN_PREFINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.FIRST_UPGRADE_START_ACTION_FAILED;
@@ -36,6 +35,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.concurrent.TimeUnit;
 
@@ -52,27 +53,58 @@ import com.google.common.annotations.VisibleForTesting;
 public abstract class BasicUpgradeFinalizer
     <T, V extends AbstractLayoutVersionManager> implements UpgradeFinalizer<T> {
 
-  private V versionManager;
+  private final V versionManager;
   private String clientID;
   private T component;
-  private DefaultUpgradeFinalizationExecutor<T> finalizationExecutor;
+  private UpgradeFinalizationExecutor<T> finalizationExecutor;
+  // Ensures that there is only one finalization thread running at a time.
+  private final Lock finalizationLock;
 
-  private Queue<String> msgs = new ConcurrentLinkedQueue<>();
+  private final Queue<String> msgs = new ConcurrentLinkedQueue<>();
   private boolean isDone = false;
 
   public BasicUpgradeFinalizer(V versionManager) {
+    this(versionManager, new DefaultUpgradeFinalizationExecutor<>());
+  }
+
+  public BasicUpgradeFinalizer(V versionManager,
+                               UpgradeFinalizationExecutor<T> executor) {
     this.versionManager = versionManager;
-    this.finalizationExecutor = new DefaultUpgradeFinalizationExecutor<>();
+    this.finalizationExecutor = executor;
+    this.finalizationLock = new ReentrantLock();
   }
 
   public StatusAndMessages finalize(String upgradeClientID, T service)
       throws IOException {
+    // In some components, finalization can be driven asynchronously by a
+    // thread, not a single serialized Ratis request.
+    // A second request could closely follow the first before it
+    // sets the finalization status to FINALIZATION_IN_PROGRESS.
+    // Therefore, a lock is used to make sure only one finalization thread is
+    // running at a time.
     StatusAndMessages response = initFinalize(upgradeClientID, service);
-    if (response.status() != FINALIZATION_REQUIRED) {
-      return response;
+    if (finalizationLock.tryLock()) {
+      try {
+        // Even if the status indicates finalization completed, the component
+        // may not have finished all its specific steps if finalization was
+        // interrupted, so we should re-invoke them here.
+        if (response.status() == FINALIZATION_REQUIRED ||
+            !componentFinishedFinalizationSteps(service)) {
+          finalizationExecutor.execute(service, this);
+          response = STARTING_MSG;
+        }
+      } finally {
+        finalizationLock.unlock();
+      }
+    } else {
+      // We could not acquire the lock, so either finalization is ongoing, or
+      // it already finished but we received multiple requests to
+      // run it at the same time.
+      if (!isFinalized(response.status())) {
+        response = FINALIZATION_IN_PROGRESS_MSG;
+      }
     }
-    finalizationExecutor.execute(service, this);
-    return STARTING_MSG;
+    return response;
   }
 
   public synchronized StatusAndMessages reportStatus(
@@ -101,8 +133,6 @@ public abstract class BasicUpgradeFinalizer
   protected void postFinalizeUpgrade(T service) throws IOException {
     // No Op by default.
   }
-
-  public abstract void finalizeUpgrade(T service) throws UpgradeException;
 
   @Override
   public void finalizeAndWaitForCompletion(
@@ -139,10 +169,12 @@ public abstract class BasicUpgradeFinalizer
     }
   }
 
+  @VisibleForTesting
   public boolean isFinalizationDone() {
     return isDone;
   }
 
+  @VisibleForTesting
   public void markFinalizationDone() {
     isDone = true;
   }
@@ -194,19 +226,24 @@ public abstract class BasicUpgradeFinalizer
         || status.equals(FINALIZATION_DONE);
   }
 
-  protected void finalizeUpgrade(Function<LayoutFeature,
-      Function<UpgradeActionType, Optional<? extends UpgradeAction>>>
-      aFunction, Storage storage) throws UpgradeException {
-    for (Object obj : versionManager.unfinalizedFeatures()) {
-      LayoutFeature lf = (LayoutFeature) obj;
-      Function<UpgradeActionType, Optional<? extends UpgradeAction>> function =
-          aFunction.apply(lf);
-      Optional<? extends UpgradeAction> action = function.apply(ON_FINALIZE);
-      runFinalizationAction(lf, action);
-      updateLayoutVersionInVersionFile(lf, storage);
-      versionManager.finalized(lf);
-    }
-    versionManager.completeFinalization();
+  /**
+   * Child classes that have additional finalization steps can override this
+   * method to check component specific state to determine whether
+   * finalization still needs to be run.
+   */
+  protected boolean componentFinishedFinalizationSteps(T service) {
+    return true;
+  }
+
+  public abstract void finalizeLayoutFeature(LayoutFeature lf, T context)
+      throws UpgradeException;
+
+  protected void finalizeLayoutFeature(LayoutFeature lf, Optional<?
+      extends UpgradeAction> action, Storage storage)
+      throws UpgradeException {
+    runFinalizationAction(lf, action);
+    updateLayoutVersionInVersionFile(lf, storage);
+    versionManager.finalized(lf);
   }
 
   protected void runFinalizationAction(LayoutFeature feature,
@@ -215,6 +252,7 @@ public abstract class BasicUpgradeFinalizer
     if (!action.isPresent()) {
       emitNOOPMsg(feature.name());
     } else {
+      LOG.info("Running finalization actions for layout feature: {}", feature);
       try {
         action.get().execute(component);
       } catch (Exception e) {
@@ -362,7 +400,7 @@ public abstract class BasicUpgradeFinalizer
   }
 
   @VisibleForTesting
-  public void setFinalizationExecutor(DefaultUpgradeFinalizationExecutor
+  public void setFinalizationExecutor(DefaultUpgradeFinalizationExecutor<T>
                                             executor) {
     finalizationExecutor = executor;
   }

@@ -49,7 +49,8 @@ public class TestDefaultUpgradeFinalizationExecutor {
       }
 
       @Override
-      public void finalizeUpgrade(Object service) {
+      public void finalizeLayoutFeature(LayoutFeature layoutFeatture,
+          Object service) {
       }
 
       @Override
@@ -82,7 +83,7 @@ public class TestDefaultUpgradeFinalizationExecutor {
           }
 
           @Override
-          public void finalizeUpgrade(Object service) {
+          public void finalizeLayoutFeature(LayoutFeature lf, Object service) {
           }
 
           @Override

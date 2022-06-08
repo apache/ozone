@@ -41,6 +41,7 @@ public final class CodecFactory {
     codecs.put(GeneratedMessage.class, new GeneratedMessageCodec());
     codecs.put(ProtocolMessageEnum.class, new EnumCodec());
     codecs.put(List.class, new ListCodec());
+    codecs.put(Integer.class, new IntegerCodec());
     codecs.put(Long.class, new LongCodec());
     codecs.put(String.class, new StringCodec());
     codecs.put(Boolean.class, new BooleanCodec());

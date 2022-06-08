@@ -830,7 +830,9 @@ public class SCMClientProtocolServer implements
       LOG.error("Authorization failed for finalize scm upgrade", e);
       throw e;
     }
-    return scm.finalizeUpgrade(upgradeClientID);
+    // TODO HDDS-6762: Return to the client once the FINALIZATION_STARTED
+    //  checkpoint has been crossed and continue finalizing asynchronously.
+    return scm.getFinalizationManager().finalizeUpgrade(upgradeClientID);
   }
 
   @Override
@@ -848,8 +850,8 @@ public class SCMClientProtocolServer implements
       }
     }
 
-    return scm.queryUpgradeFinalizationProgress(upgradeClientID, force,
-        readonly);
+    return scm.getFinalizationManager()
+        .queryUpgradeFinalizationProgress(upgradeClientID, force, readonly);
   }
 
   @Override

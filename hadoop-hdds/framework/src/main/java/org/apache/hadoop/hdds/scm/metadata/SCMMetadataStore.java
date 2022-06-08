@@ -155,5 +155,11 @@ public interface SCMMetadataStore extends DBStoreHAManager {
    */
   Table<ContainerID, MoveDataNodePair> getMoveTable();
 
+  /**
+   * Table that maintains miscellaneous SCM metadata, including upgrade
+   * finalization status and metadata layout version.
+   */
+  Table<String, String> getMetaTable();
+
   Table<String, ByteString> getStatefulServiceConfigTable();
 }
