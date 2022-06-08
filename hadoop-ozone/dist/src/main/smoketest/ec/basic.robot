@@ -67,4 +67,4 @@ Test Ratis Type with EC Replication
     ${message} =    Execute             ozone sh bucket create --replication=rs-3-2-1024k --type=RATIS /${prefix}vol1/${prefix}foo
                     Should contain      ${message}      not supported
     ${message} =    Execute             ozone sh key put --replication=rs-3-2-1024k --type=RATIS /${prefix}vol1/${prefix}foo/${prefix}bar /tmp/1mb
-                    Should contain      ${message}     not supported
+                    Should contain      ${message}      not supported

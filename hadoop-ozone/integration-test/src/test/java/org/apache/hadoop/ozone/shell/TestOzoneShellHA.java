@@ -35,6 +35,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.fs.ozone.OzoneFsShell;
@@ -387,14 +388,17 @@ public class TestOzoneShellHA {
 
   @Test
   public void testRATISTypeECReplication() {
-    String[] args = new String[] {"bucket", "create", "/vol/bucket",
-        "--type=RATIS", "--replication=rs-3-2-1024k"};
-    Throwable t = assertThrows(ExecutionException.class,
-        () -> execute(ozoneShell, args));
-    Throwable c = t.getCause();
-    assertTrue(c instanceof IllegalArgumentException);
-    assertEquals("rs-3-2-1024k is not supported for RATIS replication type",
-        c.getMessage());
+    for (ReplicationType type : new ReplicationType[]{
+        ReplicationType.RATIS, ReplicationType.STAND_ALONE}) {
+      String[] args = new String[]{"bucket", "create", "/vol/bucket",
+          "--type=" + type, "--replication=rs-3-2-1024k"};
+      Throwable t = assertThrows(ExecutionException.class,
+          () -> execute(ozoneShell, args));
+      Throwable c = t.getCause();
+      assertTrue(c instanceof IllegalArgumentException);
+      assertEquals("rs-3-2-1024k is not supported for " +
+              type + " replication type", c.getMessage());
+    }
   }
 
   /**
