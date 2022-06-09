@@ -31,4 +31,4 @@ jobs:
         env:
           TITLE: ${{ github.event.pull_request.title }}
         run:
-          echo "${TITLE}" | grep -E '^HDDS-[1-9][0-9]{3,4}\. .*[^ ]$' | grep -v '  '
+          dev-support/ci/pr_title_check.sh "${TITLE}"
