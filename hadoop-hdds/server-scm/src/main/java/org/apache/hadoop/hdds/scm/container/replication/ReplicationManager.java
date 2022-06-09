@@ -422,12 +422,12 @@ public class ReplicationManager implements SCMService {
     return legacyReplicationManager.move(cid, src, tgt);
   }
 
-  public Map<ContainerID, List<InflightAction>>  getInflightReplication() {
-    return legacyReplicationManager.getInflightReplication();
+  public int getInflightSize(InflightType type) {
+    return legacyReplicationManager.getInflightSize(type);
   }
 
-  public Map<ContainerID, List<InflightAction>> getInflightDeletion() {
-    return legacyReplicationManager.getInflightDeletion();
+  public DatanodeDetails getFirstDatanode(InflightType type, ContainerID id) {
+    return legacyReplicationManager.getFirstDatanode(type, id);
   }
 
   public Map<ContainerID,

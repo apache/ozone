@@ -81,11 +81,14 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -101,6 +104,103 @@ public class LegacyReplicationManager {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(LegacyReplicationManager.class);
+
+  static class InflightMap {
+    private final Map<ContainerID, List<InflightAction>> map
+        = new ConcurrentHashMap<>();
+    private final InflightType type;
+    private final int sizeLimit;
+    private final AtomicInteger count = new AtomicInteger();
+
+    InflightMap(InflightType type, int sizeLimit) {
+      this.type = type;
+      this.sizeLimit = sizeLimit;
+    }
+
+    boolean isReplication() {
+      return type == InflightType.REPLICATION;
+    }
+
+    private List<InflightAction> get(ContainerID id) {
+      return map.get(id);
+    }
+
+    boolean containsKey(ContainerID id) {
+      return map.containsKey(id);
+    }
+
+    int size(ContainerID id) {
+      return Optional.ofNullable(map.get(id)).map(List::size).orElse(0);
+    }
+
+    int size() {
+      return map.size();
+    }
+
+    void clear() {
+      map.clear();
+    }
+
+    void iterate(ContainerID id, Function<InflightAction, Boolean> processor) {
+      for(;;) {
+        final List<InflightAction> actions = get(id);
+        if (actions == null) {
+          return;
+        }
+        synchronized (actions) {
+          if (get(id) != actions) {
+            continue; //actions is changed, retry
+          }
+          for (Iterator<InflightAction> i = actions.iterator(); i.hasNext(); ) {
+            final Boolean remove = processor.apply(i.next());
+            if (remove == Boolean.TRUE) {
+              i.remove();
+              count.decrementAndGet();
+            }
+          }
+          map.computeIfPresent(id, (k, v) -> v == actions && v.isEmpty() ? null : v);
+        }
+      }
+    }
+
+    boolean add(ContainerID id, InflightAction a) {
+      final int previous = count.getAndUpdate(n -> n < sizeLimit ? n + 1 : n);
+      if (previous >= sizeLimit) {
+        return false;
+      }
+      for(;;) {
+        final List<InflightAction> actions = map.computeIfAbsent(id,
+            key -> new LinkedList<>());
+        synchronized (actions) {
+          if (get(id) != actions) {
+            continue; //actions is changed, retry
+          }
+          final boolean added = actions.add(a);
+          if (!added) {
+            count.decrementAndGet();
+          }
+          return added;
+        }
+      }
+    }
+
+    List<DatanodeDetails> getDatanodeDetails(ContainerID id) {
+      for(;;) {
+        final List<InflightAction> actions = get(id);
+        if (actions == null) {
+          return Collections.emptyList();
+        }
+        synchronized (actions) {
+          if (get(id) != actions) {
+            continue; //actions is changed, retry
+          }
+          return actions.stream()
+              .map(InflightAction::getDatanode)
+              .collect(Collectors.toList());
+        }
+      }
+    }
+  }
 
   /**
    * Reference to the ContainerManager.
@@ -132,13 +232,13 @@ public class LegacyReplicationManager {
    * This is used for tracking container replication commands which are issued
    * by ReplicationManager and not yet complete.
    */
-  private final Map<ContainerID, List<InflightAction>> inflightReplication;
+  private final InflightMap inflightReplication;
 
   /**
    * This is used for tracking container deletion commands which are issued
    * by ReplicationManager and not yet complete.
    */
-  private final Map<ContainerID, List<InflightAction>> inflightDeletion;
+  private final InflightMap inflightDeletion;
 
 
   /**
@@ -252,8 +352,10 @@ public class LegacyReplicationManager {
     this.scmContext = scmContext;
     this.nodeManager = nodeManager;
     this.rmConf = conf.getObject(ReplicationManagerConfiguration.class);
-    this.inflightReplication = new ConcurrentHashMap<>();
-    this.inflightDeletion = new ConcurrentHashMap<>();
+    this.inflightReplication = new InflightMap(InflightType.REPLICATION,
+        rmConf.getContainerInflightReplicationLimit());
+    this.inflightDeletion = new InflightMap(InflightType.DELETION,
+        rmConf.getContainerInflightDeletionLimit());
     this.inflightMoveFuture = new ConcurrentHashMap<>();
     this.minHealthyForMaintenance = rmConf.getMaintenanceReplicaMinimum();
     this.clock = clock;
@@ -485,47 +587,49 @@ public class LegacyReplicationManager {
    * @param completedCounter update completed metrics
    */
   private void updateInflightAction(final ContainerInfo container,
-      final Map<ContainerID, List<InflightAction>> inflightActions,
+      final InflightMap inflightActions,
       final Predicate<InflightAction> filter,
       final Runnable timeoutCounter,
       final Consumer<InflightAction> completedCounter) {
     final ContainerID id = container.containerID();
     final long deadline = clock.millis() - rmConf.getEventTimeout();
-    if (inflightActions.containsKey(id)) {
-      final List<InflightAction> actions = inflightActions.get(id);
+    inflightActions.iterate(id, a -> updateInflightAction(
+        container, a, filter, timeoutCounter, completedCounter,
+        deadline, inflightActions.isReplication()));
+  }
 
-      Iterator<InflightAction> iter = actions.iterator();
-      while (iter.hasNext()) {
-        try {
-          InflightAction a = iter.next();
-          NodeStatus status = nodeManager.getNodeStatus(a.getDatanode());
-          boolean isUnhealthy = status.getHealth() != NodeState.HEALTHY;
-          boolean isCompleted = filter.test(a);
-          boolean isTimeout = a.getTime() < deadline;
-          boolean isNotInService = status.getOperationalState() !=
-              NodeOperationalState.IN_SERVICE;
-          if (isCompleted || isUnhealthy || isTimeout || isNotInService) {
-            iter.remove();
-
-            if (isTimeout) {
-              timeoutCounter.run();
-            } else if (isCompleted) {
-              completedCounter.accept(a);
-            }
-
-            updateMoveIfNeeded(isUnhealthy, isCompleted, isTimeout,
-                isNotInService, container, a.getDatanode(), inflightActions);
-          }
-        } catch (NodeNotFoundException | ContainerNotFoundException e) {
-          // Should not happen, but if it does, just remove the action as the
-          // node somehow does not exist;
-          iter.remove();
+  private boolean updateInflightAction(final ContainerInfo container,
+      final InflightAction a,
+      final Predicate<InflightAction> filter,
+      final Runnable timeoutCounter,
+      final Consumer<InflightAction> completedCounter,
+      final long deadline,
+      final boolean isReplication) {
+    boolean remove = false;
+    try {
+      final NodeStatus status = nodeManager.getNodeStatus(a.getDatanode());
+      final boolean isUnhealthy = status.getHealth() != NodeState.HEALTHY;
+      final boolean isCompleted = filter.test(a);
+      final boolean isTimeout = a.getTime() < deadline;
+      final boolean isNotInService = status.getOperationalState() !=
+          NodeOperationalState.IN_SERVICE;
+      if (isCompleted || isUnhealthy || isTimeout || isNotInService) {
+        if (isTimeout) {
+          timeoutCounter.run();
+        } else if (isCompleted) {
+          completedCounter.accept(a);
         }
+
+        updateMoveIfNeeded(isUnhealthy, isCompleted, isTimeout,
+            isNotInService, container, a.getDatanode(), isReplication);
+        remove = true;
       }
-      if (actions.isEmpty()) {
-        inflightActions.remove(id);
-      }
+    } catch (NodeNotFoundException | ContainerNotFoundException e) {
+      // Should not happen, but if it does, just remove the action as the
+      // node somehow does not exist;
+      remove = true;
     }
+    return remove;
   }
 
   /**
@@ -536,14 +640,13 @@ public class LegacyReplicationManager {
    * @param isTimeout is the action timeout
    * @param container Container to update
    * @param dn datanode which is removed from the inflightActions
-   * @param inflightActions inflightReplication (or) inflightDeletion
+   * @param isInflightReplication is inflightReplication?
    */
   private void updateMoveIfNeeded(final boolean isUnhealthy,
                    final boolean isCompleted, final boolean isTimeout,
                    final boolean isNotInService,
                    final ContainerInfo container, final DatanodeDetails dn,
-                   final Map<ContainerID,
-                       List<InflightAction>> inflightActions)
+                   final boolean isInflightReplication)
       throws ContainerNotFoundException {
     // make sure inflightMove contains the container
     ContainerID id = container.containerID();
@@ -559,8 +662,6 @@ public class LegacyReplicationManager {
     if (!isSource && !isTarget) {
       return;
     }
-    final boolean isInflightReplication =
-        inflightActions.equals(inflightReplication);
 
     /*
      * there are some case:
@@ -806,7 +907,7 @@ public class LegacyReplicationManager {
    * @return The number of inflight additions or zero if none
    */
   private int getInflightAdd(final ContainerID id) {
-    return inflightReplication.getOrDefault(id, Collections.emptyList()).size();
+    return inflightReplication.size(id);
   }
 
   /**
@@ -816,7 +917,7 @@ public class LegacyReplicationManager {
    * @return The number of inflight deletes or zero if none
    */
   private int getInflightDel(final ContainerID id) {
-    return inflightDeletion.getOrDefault(id, Collections.emptyList()).size();
+    return inflightDeletion.size(id);
   }
 
   /**
@@ -953,11 +1054,8 @@ public class LegacyReplicationManager {
       LOG.debug("Container {} state changes to DELETED", container);
     } else {
       // Check whether to resend the delete replica command
-      final List<DatanodeDetails> deletionInFlight = inflightDeletion
-          .getOrDefault(container.containerID(), Collections.emptyList())
-          .stream()
-          .map(action -> action.getDatanode())
-          .collect(Collectors.toList());
+      final List<DatanodeDetails> deletionInFlight
+          = inflightDeletion.getDatanodeDetails(container.containerID());
       Set<ContainerReplica> filteredReplicas = replicas.stream().filter(
           r -> !deletionInFlight.contains(r.getDatanodeDetails()))
           .collect(Collectors.toSet());
@@ -1032,16 +1130,10 @@ public class LegacyReplicationManager {
       }
       int repDelta = replicaSet.additionalReplicaNeeded();
       final ContainerID id = container.containerID();
-      final List<DatanodeDetails> deletionInFlight = inflightDeletion
-          .getOrDefault(id, Collections.emptyList())
-          .stream()
-          .map(action -> action.getDatanode())
-          .collect(Collectors.toList());
-      final List<DatanodeDetails> replicationInFlight = inflightReplication
-          .getOrDefault(id, Collections.emptyList())
-          .stream()
-          .map(action -> action.getDatanode())
-          .collect(Collectors.toList());
+      final List<DatanodeDetails> deletionInFlight
+          = inflightDeletion.getDatanodeDetails(id);
+      final List<DatanodeDetails> replicationInFlight
+          = inflightReplication.getDatanodeDetails(id);
       final List<DatanodeDetails> source = replicas.stream()
           .filter(r ->
               r.getState() == State.QUASI_CLOSED ||
@@ -1431,6 +1523,14 @@ public class LegacyReplicationManager {
     return ""; // unit test
   }
 
+  private boolean addInflight(InflightType type, ContainerID id, InflightAction action) {
+    final boolean added = inflightReplication.add(id, action);
+    if (!added) {
+      metrics.incrInflightSkipped(type);
+    }
+    return added;
+  }
+
   /**
    * Sends replicate container command for the given container to the given
    * datanode.
@@ -1450,9 +1550,8 @@ public class LegacyReplicationManager {
     final ContainerID id = container.containerID();
     final ReplicateContainerCommand replicateCommand =
         new ReplicateContainerCommand(id.getId(), sources);
-    inflightReplication.computeIfAbsent(id, k -> new ArrayList<>());
     sendAndTrackDatanodeCommand(datanode, replicateCommand,
-        action -> inflightReplication.get(id).add(action));
+        action -> addInflight(InflightType.REPLICATION, id, action));
 
     metrics.incrNumReplicationCmdsSent();
     metrics.incrNumReplicationBytesTotal(container.getUsedBytes());
@@ -1476,9 +1575,8 @@ public class LegacyReplicationManager {
     final ContainerID id = container.containerID();
     final DeleteContainerCommand deleteCommand =
         new DeleteContainerCommand(id.getId(), force);
-    inflightDeletion.computeIfAbsent(id, k -> new ArrayList<>());
     sendAndTrackDatanodeCommand(datanode, deleteCommand,
-        action -> inflightDeletion.get(id).add(action));
+        action -> addInflight(InflightType.DELETION, id, action));
 
     metrics.incrNumDeletionCmdsSent();
     metrics.incrNumDeletionBytesTotal(container.getUsedBytes());
@@ -1498,7 +1596,7 @@ public class LegacyReplicationManager {
   private <T extends GeneratedMessage> void sendAndTrackDatanodeCommand(
       final DatanodeDetails datanode,
       final SCMCommand<T> command,
-      final Consumer<InflightAction> tracker) {
+      final Function<InflightAction, Boolean> tracker) {
     try {
       command.setTerm(scmContext.getTermOfLeader());
     } catch (NotLeaderException nle) {
@@ -1506,10 +1604,14 @@ public class LegacyReplicationManager {
           + " since current SCM is not leader.", nle);
       return;
     }
+    final boolean allowed = tracker.apply(
+        new InflightAction(datanode, clock.millis()));
+    if (!allowed) {
+      return;
+    }
     final CommandForDatanode<T> datanodeCommand =
         new CommandForDatanode<>(datanode.getUuid(), command);
     eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
-    tracker.accept(new InflightAction(datanode, clock.millis()));
   }
 
   /**
@@ -1626,8 +1728,42 @@ public class LegacyReplicationManager {
             " entering maintenance state until a new replica is created.")
     private int maintenanceReplicaMinimum = 2;
 
+    @Config(key = "container.inflight.replication.limit",
+        type = ConfigType.INT,
+        defaultValue = "0", // 0 means unlimited.
+        tags = {SCM, OZONE},
+        description = "This property is used to limit" +
+            " the maximum number of inflight replication."
+    )
+    private int containerInflightReplicationLimit = 0;
+
+    @Config(key = "container.inflight.deletion.limit",
+        type = ConfigType.INT,
+        defaultValue = "0", // 0 means unlimited.
+        tags = {SCM, OZONE},
+        description = "This property is used to limit" +
+            " the maximum number of inflight deletion."
+    )
+    private int containerInflightDeletionLimit = 0;
+
+    public void setContainerInflightReplicationLimit(int containerInflightReplicationLimit) {
+      this.containerInflightReplicationLimit = containerInflightReplicationLimit;
+    }
+
+    public void setContainerInflightDeletionLimit(int containerInflightDeletionLimit) {
+      this.containerInflightDeletionLimit = containerInflightDeletionLimit;
+    }
+
     public void setMaintenanceReplicaMinimum(int replicaCount) {
       this.maintenanceReplicaMinimum = replicaCount;
+    }
+
+    public int getContainerInflightReplicationLimit() {
+      return containerInflightReplicationLimit;
+    }
+
+    public int getContainerInflightDeletionLimit() {
+      return containerInflightDeletionLimit;
     }
 
     public long getInterval() {
@@ -1649,12 +1785,23 @@ public class LegacyReplicationManager {
     onLeaderReadyAndOutOfSafeMode();
   }
 
-  public Map<ContainerID, List<InflightAction>> getInflightReplication() {
-    return inflightReplication;
+  private InflightMap getInflightMap(InflightType type) {
+    switch (type) {
+      case REPLICATION:
+        return inflightReplication;
+      case DELETION:
+        return inflightDeletion;
+      default:
+        throw new IllegalStateException("Unexpected type " + type);
+    }
   }
 
-  public Map<ContainerID, List<InflightAction>> getInflightDeletion() {
-    return inflightDeletion;
+  int getInflightSize(InflightType type) {
+    return getInflightMap(type).size();
+  }
+
+  DatanodeDetails getFirstDatanode(InflightType type, ContainerID id) {
+    return getInflightMap(type).get(id).get(0).getDatanode();
   }
 
   public Map<ContainerID, CompletableFuture<MoveResult>> getInflightMove() {
