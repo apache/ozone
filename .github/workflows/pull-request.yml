@@ -27,6 +27,8 @@ jobs:
   title:
     runs-on: ubuntu-20.04
     steps:
+      - name: Checkout project
+        uses: actions/checkout@v3
       - name: Check pull request title
         env:
           TITLE: ${{ github.event.pull_request.title }}
