@@ -24,7 +24,8 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 
@@ -132,14 +133,13 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
   }
 
   private void createStreamKey(long counter) throws Exception {
-    final ReplicationConfig replicationConfig = ReplicationConfig
-        .fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+    final ReplicationConfig conf = ReplicationConfig.fromProtoTypeAndFactor(
+        ReplicationType.RATIS, ReplicationFactor.THREE);
     final String key = generateObjectName(counter);
 
     timer.time(() -> {
-      try (OzoneDataStreamOutput stream = bucket
-          .createStreamKey(key, keySize, replicationConfig, metadata)) {
+      try (OzoneDataStreamOutput stream = bucket.createStreamKey(
+          key, keySize, conf, metadata)) {
         contentGenerator.write(stream);
       }
       return null;
