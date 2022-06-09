@@ -55,41 +55,41 @@ load bats-assert/load.bash
 @test "check illegal PR title examples" {
   # HDDS case matters
   run dev-support/ci/pr_title_check.sh 'Hdds-1234. Hello World'
-  assert_output 'Fail'
+  assert_output 'Fail: must start with HDDS'
 
   # missing dash in Jira
   run dev-support/ci/pr_title_check.sh 'HDDS 1234. Hello World'
-  assert_output 'Fail'
+  assert_output 'Fail: missing dash in Jira'
 
   # 3 digits Jira is over
   run dev-support/ci/pr_title_check.sh 'HDDS-123. Hello World'
-  assert_output 'Fail'
+  assert_output 'Fail: Jira must be 4 or 5 digits'
 
   # 6 digits Jira not needed yet 
   run dev-support/ci/pr_title_check.sh 'HDDS-123456. Hello World'
-  assert_output 'Fail'
+  assert_output 'Fail: Jira must be 4 or 5 digits'
 
   # leading zero in Jira
   run dev-support/ci/pr_title_check.sh 'HDDS-01234. Hello World'
-  assert_output 'Fail'
-
-  # missing space after Jira
-  run dev-support/ci/pr_title_check.sh 'HDDS-1234.Hello World'
-  assert_output 'Fail'
+  assert_output 'Fail: leading zero in Jira'
 
   # missing dot after Jira
   run dev-support/ci/pr_title_check.sh 'HDDS-1234 Hello World'
-  assert_output 'Fail'
+  assert_output 'Fail: missing dot after Jira'
+
+  # missing space after Jira
+  run dev-support/ci/pr_title_check.sh 'HDDS-1234.Hello World'
+  assert_output 'Fail: missing space after Jira'
 
   # trailing space
   run dev-support/ci/pr_title_check.sh 'HDDS-1234. Hello World '
-  assert_output 'Fail'
+  assert_output 'Fail: trailing space'
 
   # double spaces after Jira
   run dev-support/ci/pr_title_check.sh 'HDDS-1234.  Hello World'
-  assert_output 'Fail'
+  assert_output 'Fail: double spaces'
 
   # double spaces in summary
   run dev-support/ci/pr_title_check.sh 'HDDS-1234. Hello  World'
-  assert_output 'Fail'
+  assert_output 'Fail: double spaces'
 }

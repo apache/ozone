@@ -15,12 +15,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-echo "$1" | grep -E '^HDDS-[1-9][0-9]{3,4}\. .*[^ ]$' | grep -v '  ' >/dev/null
+TITLE=$1
 
-ret=$?
-if [ $ret -ne 0 ]; then
-    echo "Fail"
-    exit 1
-fi
+assertMatch() {
+    echo "${TITLE}" | grep -E "$1" >/dev/null
+    ret=$?
+    if [ $ret -ne 0 ]; then
+        echo $2
+        exit 1
+    fi
+}
+
+assertNotMatch() {
+    echo "${TITLE}" | grep -E -v "$1" >/dev/null
+    ret=$?
+    if [ $ret -ne 0 ]; then
+        echo $2
+        exit 1
+    fi
+}
+
+assertNotMatch '  '                                'Fail: double spaces'
+assertMatch    '^HDDS'                             'Fail: must start with HDDS'
+assertMatch    '^HDDS-'                            'Fail: missing dash in Jira'
+assertNotMatch '^HDDS-0'                           'Fail: leading zero in Jira'
+assertMatch    '^HDDS-[1-9][0-9]{3,4}[^0-9]'       'Fail: Jira must be 4 or 5 digits'
+assertMatch    '^HDDS-[1-9][0-9]{3,4}\.'           'Fail: missing dot after Jira'
+assertMatch    '^HDDS-[1-9][0-9]{3,4}\. '          'Fail: missing space after Jira'
+assertMatch    '[^ ]$'                             'Fail: trailing space'
+assertMatch    '^HDDS-[1-9][0-9]{3,4}\. .*[^ ]$'   'Fail: not match'
 
 echo 'OK'
