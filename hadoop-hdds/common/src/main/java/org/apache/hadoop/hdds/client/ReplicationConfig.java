@@ -215,4 +215,6 @@ public interface ReplicationConfig {
    */
   String getReplication();
 
+  String configFormat();
+
 }
