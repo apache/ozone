@@ -34,6 +34,8 @@ public class ReplicationTask {
 
   private List<DatanodeDetails> sources;
 
+  private final long timeoutMs;
+
   private final Instant queued = Instant.now();
 
   /**
@@ -43,10 +45,18 @@ public class ReplicationTask {
 
   public ReplicationTask(
       long containerId,
-      List<DatanodeDetails> sources
+      List<DatanodeDetails> sources) {
+    this(containerId, sources, 0L);
+  }
+
+  public ReplicationTask(
+      long containerId,
+      List<DatanodeDetails> sources,
+      long timeoutMs
   ) {
     this.containerId = containerId;
     this.sources = sources;
+    this.timeoutMs = timeoutMs;
   }
 
   @Override
@@ -74,6 +84,9 @@ public class ReplicationTask {
     return sources;
   }
 
+  public long getTimeoutMs() {
+    return timeoutMs;
+  }
   public Status getStatus() {
     return status;
   }

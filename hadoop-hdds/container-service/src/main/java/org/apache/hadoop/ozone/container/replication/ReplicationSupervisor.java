@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.ExecutorService;
@@ -53,6 +55,7 @@ public class ReplicationSupervisor {
   private final AtomicLong requestCounter = new AtomicLong();
   private final AtomicLong successCounter = new AtomicLong();
   private final AtomicLong failureCounter = new AtomicLong();
+  private final AtomicLong timeoutCounter = new AtomicLong();
 
   /**
    * A set of container IDs that are currently being downloaded
@@ -147,6 +150,17 @@ public class ReplicationSupervisor {
       final Long containerId = task.getContainerId();
       try {
         requestCounter.incrementAndGet();
+        if (task.getTimeoutMs() != 0) {
+          long msInQueue =
+              Duration.between(task.getQueued(), Instant.now()).toMillis();
+          if (msInQueue > task.getTimeoutMs()) {
+            LOG.info("Ignore this replicate container command for container" +
+                    " {} since queueTime larger then timeout {}ms",
+                containerId, task.getTimeoutMs());
+            timeoutCounter.incrementAndGet();
+            return;
+          }
+        }
 
         if (context != null) {
           DatanodeDetails dn = context.getParent().getDatanodeDetails();
@@ -205,5 +219,9 @@ public class ReplicationSupervisor {
 
   public long getReplicationFailureCount() {
     return failureCounter.get();
+  }
+
+  public long getReplicationTimeoutCount() {
+    return timeoutCounter.get();
   }
 }

@@ -66,12 +66,14 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
     final List<DatanodeDetails> sourceDatanodes =
         replicateCommand.getSourceDatanodes();
     final long containerID = replicateCommand.getContainerID();
+    final long timeoutMs = replicateCommand.getTimeoutMs();
 
     Preconditions.checkArgument(sourceDatanodes.size() > 0,
         "Replication command is received for container %s "
             + "without source datanodes.", containerID);
 
-    supervisor.addTask(new ReplicationTask(containerID, sourceDatanodes));
+    supervisor.addTask(new ReplicationTask(containerID, sourceDatanodes,
+        timeoutMs));
   }
 
   @Override

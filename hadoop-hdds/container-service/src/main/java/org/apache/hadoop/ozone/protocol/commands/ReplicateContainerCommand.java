@@ -41,20 +41,28 @@ public class ReplicateContainerCommand
 
   private final long containerID;
   private final List<DatanodeDetails> sourceDatanodes;
+  private final long timeoutMs;
 
   public ReplicateContainerCommand(long containerID,
       List<DatanodeDetails> sourceDatanodes) {
+    this(containerID, sourceDatanodes, 0L);
+  }
+
+  public ReplicateContainerCommand(long containerID,
+      List<DatanodeDetails> sourceDatanodes, long timeoutMs) {
     super();
     this.containerID = containerID;
     this.sourceDatanodes = sourceDatanodes;
+    this.timeoutMs = timeoutMs;
   }
 
   // Should be called only for protobuf conversion
   public ReplicateContainerCommand(long containerID,
-      List<DatanodeDetails> sourceDatanodes, long id) {
+      List<DatanodeDetails> sourceDatanodes, long id, long timeoutMs) {
     super(id);
     this.containerID = containerID;
     this.sourceDatanodes = sourceDatanodes;
+    this.timeoutMs = timeoutMs;
   }
 
   @Override
@@ -66,7 +74,8 @@ public class ReplicateContainerCommand
   public ReplicateContainerCommandProto getProto() {
     Builder builder = ReplicateContainerCommandProto.newBuilder()
         .setCmdId(getId())
-        .setContainerID(containerID);
+        .setContainerID(containerID)
+        .setTimeoutMs(timeoutMs);
     for (DatanodeDetails dd : sourceDatanodes) {
       builder.addSources(dd.getProtoBufMessage());
     }
@@ -84,7 +93,7 @@ public class ReplicateContainerCommand
             .collect(Collectors.toList());
 
     return new ReplicateContainerCommand(protoMessage.getContainerID(),
-        datanodeDetails, protoMessage.getCmdId());
+        datanodeDetails, protoMessage.getCmdId(), protoMessage.getTimeoutMs());
 
   }
 
@@ -94,5 +103,9 @@ public class ReplicateContainerCommand
 
   public List<DatanodeDetails> getSourceDatanodes() {
     return sourceDatanodes;
+  }
+
+  public long getTimeoutMs() {
+    return timeoutMs;
   }
 }

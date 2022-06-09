@@ -85,6 +85,9 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   @Metric("Number of replication commands sent.")
   private MutableCounterLong numReplicationCmdsSent;
 
+  @Metric("Number of revoke replication commands sent.")
+  private MutableCounterLong numRevokeReplicationCmdsSent;
+
   @Metric("Number of replication commands completed.")
   private MutableCounterLong numReplicationCmdsCompleted;
 
@@ -173,6 +176,10 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     this.numReplicationCmdsSent.incr();
   }
 
+  public void incrNumRevokeReplicationCmdsSent() {
+    this.numRevokeReplicationCmdsSent.incr();
+  }
+
   public void incrNumReplicationCmdsCompleted() {
     this.numReplicationCmdsCompleted.incr();
   }
@@ -231,6 +238,10 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   public long getNumReplicationCmdsSent() {
     return this.numReplicationCmdsSent.value();
+  }
+
+  public long getNumRevokeReplicationCmdsSent() {
+    return this.numRevokeReplicationCmdsSent.value();
   }
 
   public long getNumReplicationCmdsCompleted() {

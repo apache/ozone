@@ -228,6 +228,34 @@ public class TestReplicationSupervisor {
   }
 
   @Test
+  public void testTimeoutTask() {
+    // GIVEN
+    ReplicationSupervisor supervisor = supervisorWith(__ -> slowReplicator,
+        new ThreadPoolExecutor(1, 1, 60, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>()));
+
+    try {
+      //WHEN
+      supervisor.addTask(new ReplicationTask(1L, emptyList()));
+      supervisor.addTask(new ReplicationTask(2L, emptyList(), 100L));
+      supervisor.addTask(new ReplicationTask(3L, emptyList(), 100L));
+
+      //THEN
+      Assert.assertEquals(3, supervisor.getInFlightReplications());
+      Assert.assertEquals(2, supervisor.getQueueSize());
+      // Sleep 2s, wait all tasks processed
+      try {
+        Thread.sleep(2000);
+      } catch (InterruptedException e) {
+      }
+      Assert.assertEquals(0, supervisor.getInFlightReplications());
+      Assert.assertEquals(0, supervisor.getQueueSize());
+      Assert.assertEquals(2, supervisor.getReplicationTimeoutCount());
+    } finally {
+      supervisor.stop();
+    }
+  }
+  @Test
   public void testDownloadAndImportReplicatorFailure() {
     ReplicationSupervisor supervisor =
         new ReplicationSupervisor(set, null, mutableReplicator,

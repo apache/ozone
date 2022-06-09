@@ -1449,7 +1449,8 @@ public class LegacyReplicationManager {
 
     final ContainerID id = container.containerID();
     final ReplicateContainerCommand replicateCommand =
-        new ReplicateContainerCommand(id.getId(), sources);
+        new ReplicateContainerCommand(id.getId(), sources,
+            rmConf.getEventTimeout());
     inflightReplication.computeIfAbsent(id, k -> new ArrayList<>());
     sendAndTrackDatanodeCommand(datanode, replicateCommand,
         action -> inflightReplication.get(id).add(action));
