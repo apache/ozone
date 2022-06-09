@@ -612,7 +612,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  public static void validateReplicationConfigs(OzoneConfiguration conf) {
+  private void validateReplicationConfigs(OzoneConfiguration conf) {
     final String replication = conf.getTrimmed(
         OZONE_SERVER_DEFAULT_REPLICATION_KEY,
         OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT);
