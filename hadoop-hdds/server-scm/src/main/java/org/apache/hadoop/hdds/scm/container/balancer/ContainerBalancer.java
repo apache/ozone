@@ -108,13 +108,13 @@ public class ContainerBalancer extends StatefulService {
   Since a container can be selected only once during an iteration, these maps
    use it as a primary key to track source to target pairings.
   */
-  private Map<ContainerID, DatanodeDetails> containerFromSourceMap;
-  private Map<ContainerID, DatanodeDetails> containerToTargetMap;
+  private final Map<ContainerID, DatanodeDetails> containerFromSourceMap;
+  private final Map<ContainerID, DatanodeDetails> containerToTargetMap;
 
   private Set<DatanodeDetails> selectedTargets;
   private Set<DatanodeDetails> selectedSources;
   // maintaining a list of containers for testing
-  private List<ContainerID> selectedContainersList;
+  private final List<ContainerID> selectedContainersList;
   private FindTargetStrategy findTargetStrategy;
   private FindSourceStrategy findSourceStrategy;
   private Map<ContainerMoveSelection,
