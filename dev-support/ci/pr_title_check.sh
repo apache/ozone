@@ -35,14 +35,14 @@ assertNotMatch() {
     fi
 }
 
-assertNotMatch '  '                                'Fail: double spaces'
+assertNotMatch '  '                                'Fail: two consecutive spaces'
 assertMatch    '^HDDS'                             'Fail: must start with HDDS'
 assertMatch    '^HDDS-'                            'Fail: missing dash in Jira'
 assertNotMatch '^HDDS-0'                           'Fail: leading zero in Jira'
 assertMatch    '^HDDS-[1-9][0-9]{3,4}[^0-9]'       'Fail: Jira must be 4 or 5 digits'
 assertMatch    '^HDDS-[1-9][0-9]{3,4}\.'           'Fail: missing dot after Jira'
 assertMatch    '^HDDS-[1-9][0-9]{3,4}\. '          'Fail: missing space after Jira'
-assertMatch    '[^ ]$'                             'Fail: trailing space'
+assertNotMatch '[[:space:]]$'                      'Fail: trailing space'
 assertMatch    '^HDDS-[1-9][0-9]{3,4}\. .*[^ ]$'   'Fail: not match'
 
 echo 'OK'

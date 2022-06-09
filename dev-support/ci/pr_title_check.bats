@@ -87,9 +87,9 @@ load bats-assert/load.bash
 
   # double spaces after Jira
   run dev-support/ci/pr_title_check.sh 'HDDS-1234.  Hello World'
-  assert_output 'Fail: double spaces'
+  assert_output 'Fail: two consecutive spaces'
 
   # double spaces in summary
   run dev-support/ci/pr_title_check.sh 'HDDS-1234. Hello  World'
-  assert_output 'Fail: double spaces'
+  assert_output 'Fail: two consecutive spaces'
 }
