@@ -113,12 +113,5 @@
         require: {
             overview: "^overview"
         },
-        controller: function ($http) {
-            var ctrl = this;
-            $http.get("jmx?qry=Ratis:service=RaftServer,group=*,id=*")
-                .then(function (result){
-                    ctrl.role = result.data.beans[0]
-                })
-        }
     });
 })();
