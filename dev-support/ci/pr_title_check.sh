@@ -15,4 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-echo "$1" | grep -E '^HDDS-[1-9][0-9]{3,4}\. .*[^ ]$' | grep -v '  '
+echo "$1" | grep -E '^HDDS-[1-9][0-9]{3,4}\. .*[^ ]$' | grep -v '  ' >/dev/null
+
+ret=$?
+if [ $ret -ne 0 ]; then
+    echo "Fail"
+    exit 1
+fi
+
+echo 'OK'
