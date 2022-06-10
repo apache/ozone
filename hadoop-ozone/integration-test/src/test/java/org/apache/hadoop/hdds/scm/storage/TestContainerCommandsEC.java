@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -47,10 +48,15 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.KeyOutputStream;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECContainerOperationClient;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -65,10 +71,14 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -90,7 +100,8 @@ public class TestContainerCommandsEC {
   private static final EcCodec EC_CODEC = EcCodec.RS;
   private static final int EC_CHUNK_SIZE = 1024;
   private static final int STRIPE_DATA_SIZE = EC_DATA * EC_CHUNK_SIZE;
-  private static final int NUM_DN = EC_DATA + EC_PARITY;
+  private static final int NUM_DN = EC_DATA + EC_PARITY + 3;
+  private static byte[][] inputChunks = new byte[EC_DATA][EC_CHUNK_SIZE];
 
   // Each key size will be in range [min, max), min inclusive, max exclusive
   private static final int[][] KEY_SIZE_RANGES = new int[][]{
@@ -276,6 +287,178 @@ public class TestContainerCommandsEC {
     } finally {
       xceiverClientManager.releaseClient(dnClient, false);
     }
+  }
+
+  private static byte[] getBytesWith(int singleDigitNumber, int total) {
+    StringBuilder builder = new StringBuilder(singleDigitNumber);
+    for (int i = 1; i <= total; i++) {
+      builder.append(singleDigitNumber);
+    }
+    return builder.toString().getBytes(UTF_8);
+  }
+
+  @Test
+  public void testECReconstructionCoordinatorWithMissingIndexes1()
+      throws Exception {
+    testECReconstructionCoordinator(ImmutableList.of(1));
+  }
+
+  @Test
+  public void testECReconstructionCoordinatorWithMissingIndexes4()
+      throws Exception {
+    testECReconstructionCoordinator(ImmutableList.of(4));
+  }
+
+  @Test
+  public void testECReconstructionCoordinatorWithMissingIndexes5()
+      throws Exception {
+    testECReconstructionCoordinator(ImmutableList.of(5));
+  }
+
+  @Test
+  public void testECReconstructionCoordinatorWithMissingIndexes45()
+      throws Exception {
+    testECReconstructionCoordinator(ImmutableList.of(4, 5));
+  }
+
+  public void testECReconstructionCoordinator(List<Integer> missingIndexes)
+      throws Exception {
+    client = OzoneClientFactory.getRpcClient(config);
+    ObjectStore objectStore = client.getObjectStore();
+    String keyString = UUID.randomUUID().toString();
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = volumeName;
+    objectStore.createVolume(volumeName);
+    objectStore.getVolume(volumeName).createBucket(bucketName);
+    OzoneVolume volume = objectStore.getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    for (int i = 0; i < EC_DATA; i++) {
+      inputChunks[i] = getBytesWith(i + 1, EC_CHUNK_SIZE);
+    }
+    XceiverClientManager xceiverClientManager =
+        new XceiverClientManager(config);
+    try (OzoneOutputStream out = bucket.createKey(keyString, 4096,
+        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 1024),
+        new HashMap<>())) {
+      Assert.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
+      for (int i = 0; i < inputChunks.length; i++) {
+        out.write(inputChunks[i]);
+      }
+    }
+
+    ECReconstructionCoordinator coordinator =
+        new ECReconstructionCoordinator(config);
+
+    OzoneKeyDetails key = bucket.getKey(keyString);
+    long conID = key.getOzoneKeyLocations().get(0).getContainerID();
+
+    //Close the container first.
+    scm.getContainerManager().getContainerStateManager().updateContainerState(
+        HddsProtos.ContainerID.newBuilder().setId(conID).build(),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    scm.getContainerManager().getContainerStateManager().updateContainerState(
+        HddsProtos.ContainerID.newBuilder().setId(conID).build(),
+        HddsProtos.LifeCycleEvent.CLOSE);
+
+    Pipeline containerPipeline = scm.getPipelineManager().getPipeline(
+        scm.getContainerManager().getContainer(ContainerID.valueOf(conID))
+            .getPipelineID());
+
+    SortedMap<Integer, DatanodeDetails> sourceNodeMap = new TreeMap<>();
+
+    List<DatanodeDetails> nodeSet = containerPipeline.getNodes();
+    List<Pipeline> containerToDeletePipeline = new ArrayList<>();
+    for (DatanodeDetails srcDn : nodeSet) {
+      int replIndex = containerPipeline.getReplicaIndex(srcDn);
+      if (missingIndexes.contains(replIndex)) {
+        containerToDeletePipeline
+            .add(createSingleNodePipeline(containerPipeline, srcDn, replIndex));
+        continue;
+      }
+      sourceNodeMap.put(replIndex, srcDn);
+    }
+
+    //Find nodes outside of pipeline
+    List<DatanodeDetails> clusterDnsList =
+        cluster.getHddsDatanodes().stream().map(k -> k.getDatanodeDetails())
+            .collect(Collectors.toList());
+    List<DatanodeDetails> targetNodes = new ArrayList<>();
+    for (DatanodeDetails clusterDN : clusterDnsList) {
+      if (!nodeSet.contains(clusterDN)) {
+        targetNodes.add(clusterDN);
+        if (targetNodes.size() == missingIndexes.size()) {
+          break;
+        }
+      }
+    }
+
+    Assert.assertEquals(missingIndexes.size(),
+        targetNodes.size());
+
+    List<org.apache.hadoop.ozone.container.common.helpers.BlockData[]>
+        blockDataArrList = new ArrayList<>();
+    for (int j = 0; j < containerToDeletePipeline.size(); j++) {
+      org.apache.hadoop.ozone.container.common.helpers.BlockData[] blockData =
+          new ECContainerOperationClient(new OzoneConfiguration())
+              .listBlock(conID,
+                  containerToDeletePipeline.get(j).getFirstNode(),
+                  (ECReplicationConfig) containerToDeletePipeline.get(j)
+                      .getReplicationConfig());
+      blockDataArrList.add(blockData);
+      // Delete the first index container
+      ContainerProtocolCalls.deleteContainer(
+          xceiverClientManager.acquireClient(containerToDeletePipeline.get(j)),
+          conID, true, null);
+    }
+
+    //Give the new target to reconstruct the container
+    SortedMap<Integer, DatanodeDetails> targetNodeMap = new TreeMap<>();
+    for (int k = 0; k < missingIndexes.size(); k++) {
+      targetNodeMap.put(missingIndexes.get(k), targetNodes.get(k));
+    }
+
+    coordinator.reconstructECContainerGroup(conID,
+        (ECReplicationConfig) containerPipeline.getReplicationConfig(),
+        sourceNodeMap, targetNodeMap);
+
+    // Assert the original container metadata with the new recovered container.
+    Iterator<Map.Entry<Integer, DatanodeDetails>> iterator =
+        targetNodeMap.entrySet().iterator();
+    int i = 0;
+    while (iterator.hasNext()) {
+      Map.Entry<Integer, DatanodeDetails> next = iterator.next();
+      DatanodeDetails targetDN = next.getValue();
+      Map<DatanodeDetails, Integer> indexes = new HashMap<>();
+      indexes.put(targetNodeMap.entrySet().iterator().next().getValue(),
+          targetNodeMap.entrySet().iterator().next().getKey());
+      Pipeline newTargetPipeline =
+          Pipeline.newBuilder().setId(PipelineID.randomId())
+              .setReplicationConfig(containerPipeline.getReplicationConfig())
+              .setReplicaIndexes(indexes)
+              .setState(Pipeline.PipelineState.CLOSED)
+              .setNodes(ImmutableList.of(targetDN)).build();
+
+      org.apache.hadoop.ozone.container.common.helpers.BlockData[]
+          reconstructedBlockData =
+          new ECContainerOperationClient(new OzoneConfiguration())
+              .listBlock(conID, newTargetPipeline.getFirstNode(),
+                  (ECReplicationConfig) newTargetPipeline
+                      .getReplicationConfig());
+      Assert.assertEquals(blockDataArrList.get(i).length,
+          reconstructedBlockData.length);
+      Assert.assertEquals(Arrays.stream(blockDataArrList.get(i))
+              .map(b -> b.getProtoBufMessage()).collect(Collectors.toList()),
+          Arrays.stream(reconstructedBlockData).map(b -> b.getProtoBufMessage())
+              .collect(Collectors.toList()));
+      ContainerProtos.ReadContainerResponseProto readContainerResponseProto =
+          ContainerProtocolCalls.readContainer(
+              xceiverClientManager.acquireClient(newTargetPipeline),
+              conID, null);
+      Assert.assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
+          readContainerResponseProto.getContainerData().getState());
+      i++;
+    }
+
   }
 
   public static void startCluster(OzoneConfiguration conf) throws Exception {
