@@ -35,11 +35,23 @@ load bats-support/load.bash
 load bats-assert/load.bash
 
 @test "check legal PR title examples" {
-  # 4 digit Jira
+  # 1 digit Jira
+  run dev-support/ci/pr_title_check.sh 'HDDS-1. Hello World'
+  assert_output 'OK'
+
+  # 2 digits Jira
+  run dev-support/ci/pr_title_check.sh 'HDDS-12. Hello World'
+  assert_output 'OK'
+
+  # 3 digits Jira
+  run dev-support/ci/pr_title_check.sh 'HDDS-123. Hello World'
+  assert_output 'OK'
+
+  # 4 digits Jira
   run dev-support/ci/pr_title_check.sh 'HDDS-1234. Hello World'
   assert_output 'OK'
 
-  # 5 digit Jira
+  # 5 digits Jira
   run dev-support/ci/pr_title_check.sh 'HDDS-12345. Hello World'
   assert_output 'OK'
 
@@ -61,13 +73,9 @@ load bats-assert/load.bash
   run dev-support/ci/pr_title_check.sh 'HDDS 1234. Hello World'
   assert_output 'Fail: missing dash in Jira'
 
-  # 3 digits Jira is over
-  run dev-support/ci/pr_title_check.sh 'HDDS-123. Hello World'
-  assert_output 'Fail: Jira must be 4 or 5 digits'
-
   # 6 digits Jira not needed yet 
   run dev-support/ci/pr_title_check.sh 'HDDS-123456. Hello World'
-  assert_output 'Fail: Jira must be 4 or 5 digits'
+  assert_output 'Fail: Jira must be 1 to 5 digits'
 
   # leading zero in Jira
   run dev-support/ci/pr_title_check.sh 'HDDS-01234. Hello World'
