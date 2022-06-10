@@ -103,8 +103,8 @@ public class TestAuthorizationV4QueryParser {
   }
 
   /**
-   * Based on
-   * <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html">AWS example</a>
+   * Based on <a href="https://docs.aws.amazon.com
+   * /AmazonS3/latest/API/sigv4-query-string-auth.html">AWS example</a>.
    */
   @Test
   public void testWithAWSExample() throws Exception {
