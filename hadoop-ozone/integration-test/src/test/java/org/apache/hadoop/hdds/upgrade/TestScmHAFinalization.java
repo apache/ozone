@@ -1,15 +1,13 @@
 package org.apache.hadoop.hdds.upgrade;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints;
 import org.junit.jupiter.api.Assertions;
@@ -18,27 +16,30 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
-import static org.apache.hadoop.hdds.scm.ha.SCMContext.INVALID_TERM;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 
 public class TestScmHAFinalization {
   private static final String clientID = UUID.randomUUID().toString();
   
-  List<StorageContainerManager> scms;
   StorageContainerLocationProtocol scmClient;
-  // Used to unpause finalization at the halting point.
+  // Used to unpause finalization at the halting point once test conditions
+  // have been set up during finalization.
   CountDownLatch unpauseSignal = new CountDownLatch(1);
+  MiniOzoneHAClusterImpl cluster;
+  private static final int NUM_DATANODES = 3;
+  private static final int NUM_SCMS = 3;
 
   @BeforeEach
   @ParameterizedTest
   @EnumSource(UpgradeTestInjectionPoints.class)
   public void init(UpgradeTestInjectionPoints haltingPoint) throws Exception {
-    OzoneConfiguration conf = buildConfiguration();
-
+    // Make upgrade finalization halt at the specified halting point until
+    // the countdown latch is decremented. This allows triggering conditions
+    // on the SCM during finalization.
     InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor =
         new InjectedUpgradeFinalizationExecutor<>();
     executor.configureTestInjectionFunction(haltingPoint, () -> {
@@ -49,96 +50,83 @@ public class TestScmHAFinalization {
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setUpgradeFinalizationExecutor(executor);
 
-    scms = Arrays.asList(
-        HddsTestUtils.getScmSimple(conf, configurator),
-        HddsTestUtils.getScmSimple(conf, configurator),
-        HddsTestUtils.getScmSimple(conf, configurator)
-    );
+    // For testing snapshot install.
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_ENABLED, true);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP, 1);
+    conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
+        1);
 
-    scmClient = new
-        StorageContainerLocationProtocolClientSideTranslatorPB(
-            new SCMContainerLocationFailoverProxyProvider(conf, null));
-    
-    // TODO: Wait for SCM leader.
+    MiniOzoneCluster cluster =
+        new MiniOzoneHAClusterImpl.Builder(new OzoneConfiguration())
+        .setNumOfStorageContainerManagers(NUM_SCMS)
+        .setScmLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
+        .setSCMConfigurator(configurator)
+        .setNumOfOzoneManagers(1)
+        .setNumDatanodes(NUM_DATANODES)
+        .setDnLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
+        .build();
+    this.cluster = (MiniOzoneHAClusterImpl) cluster;
+
+    scmClient = cluster.getStorageContainerLocationClient();
+    cluster.waitForClusterToBeReady();
+
+    scmClient.finalizeScmUpgrade(clientID);
+    // finalization executor has now paused at the halting point, waiting for
+    // the tests to pick up finalization.
   }
 
   @Test
   public void testRestart() throws Exception {
-    // SCM should remain in safemode until we have registered all the 
-    // datanodes.
-    Assertions.assertTrue(scmClient.inSafeMode());
-    try {
-      scmClient.finalizeScmUpgrade(clientID);
-      Assertions.fail("SCM should not be able to finalize in safemode.");
-    } catch (Exception e) {
-      // TODO: test exception type.
-    }
-    
-    // Register datanodes and wait for SCM to leave safemode.
-    exitSafemode();
-    scmClient.finalizeScmUpgrade(clientID);
-    
-    // finalization executor has now paused at the specified point.
     // Restart SCMs.
+    List<StorageContainerManager> scms =
+        cluster.getStorageContainerManagersList();
     scms.forEach(StorageContainerManager::stop);
     for (StorageContainerManager scm : scms) {
       scm.start();
     }
-    exitSafemode();
+    cluster.waitForClusterToBeReady();
 
-    
+    for (StorageContainerManager scm: scms) {
+      Assertions.assertTrue(
+          scm.getPipelineManager().isPipelineCreationFrozen());
+    }
+
+    unpauseFinalization();
+    TestHddsUpgradeUtils.waitForFinalization(scmClient, clientID);
+
+    TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(scms, 0, NUM_DATANODES);
+    TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(cluster.getHddsDatanodes(),
+        CLOSED);
   }
 
   @Test
-  public void testLeaderChange() {
+  public void testLeaderChangeAndSnapshotFinalization() throws Exception {
+    // Stop SCM leader to trigger a leader change.
+    StorageContainerManager stoppedScm = null;
+    List<StorageContainerManager> scms =
+        cluster.getStorageContainerManagersList();
+    for (StorageContainerManager scm : scms) {
+      if (scm.getScmContext().isLeader()) {
+        scm.stop();
+        stoppedScm = scm;
+      }
+    }
+    Assertions.assertNotNull(stoppedScm);
+    cluster.waitForClusterToBeReady();
 
-  }
+    unpauseFinalization();
+    TestHddsUpgradeUtils.waitForFinalization(scmClient, clientID);
+    // Since more than one Ratis transaction has passed since this SCM was
+    // taken down, it will have to finish finalizing from a snapshot.
+    stoppedScm.start();
 
-  @Test
-  public void testSnapshotFinalization() {
-
-  }
-
-  private static OzoneConfiguration buildConfiguration() {
-    // TODO
-    return null;
+    TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(scms, 0, NUM_DATANODES);
+    TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(cluster.getHddsDatanodes(),
+        CLOSED);
   }
 
   private void unpauseFinalization() {
     unpauseSignal.countDown();
-  }
-  
-  private void exitSafemode() {
-    
-  }
-  
-  private void processScmCommands(SCMHeartbeatResponseProto responseWithCommands) {
-    processPipelienCommands();
-    processFinalizeCommands();
-  }
-
-  private SCMHeartbeatResponseProto sendHeartbeat(
-      SCMHeartbeatRequestProto heartbeatProto) throws Exception {
-    return sendHeartbeat(heartbeatProto, scms);
-  }
-
-  private SCMHeartbeatResponseProto sendHeartbeat(SCMHeartbeatRequestProto heartbeatProto,
-      List<StorageContainerManager> scmsToSendTo) throws Exception {
-
-    SCMHeartbeatResponseProto leaderResponseProto = null;
-    long maxTerm = INVALID_TERM;
-
-    for (StorageContainerManager scm: scmsToSendTo) {
-      SCMHeartbeatResponseProto responseProto = scm.getDatanodeProtocolServer().sendHeartbeat(heartbeatProto);
-      if (!responseProto.getCommandsList().isEmpty() && responseProto.getCommands(0).hasTerm()) {
-        long term = responseProto.getCommands(0).getTerm();
-        if (term >= maxTerm) {
-          leaderResponseProto = responseProto;
-          maxTerm = term;
-        }
-      }
-    }
-
-    return leaderResponseProto;
   }
 }

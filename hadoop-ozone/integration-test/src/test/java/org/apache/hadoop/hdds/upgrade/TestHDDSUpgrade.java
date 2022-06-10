@@ -53,15 +53,12 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -76,7 +73,6 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
@@ -84,7 +80,6 @@ import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
@@ -228,143 +223,6 @@ public class TestHDDSUpgrade {
   }
 
   /*
-   * Helper function to test Pre-Upgrade conditions on the SCM
-   */
-  private void testPreUpgradeConditionsSCM() {
-    Assert.assertEquals(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(),
-        scmVersionManager.getMetadataLayoutVersion());
-    for (ContainerInfo ci : scmContainerManager.getContainers()) {
-      Assert.assertEquals(HddsProtos.LifeCycleState.OPEN, ci.getState());
-    }
-  }
-
-  /*
-   * Helper function to test Post-Upgrade conditions on the SCM
-   */
-  private void testPostUpgradeConditionsSCM() {
-    loadSCMState();
-    Assert.assertEquals(scmVersionManager.getSoftwareLayoutVersion(),
-        scmVersionManager.getMetadataLayoutVersion());
-    Assert.assertTrue(scmVersionManager.getMetadataLayoutVersion() >= 1);
-
-    // SCM should not return from finalization until there is at least one
-    // pipeline to use.
-    try {
-      GenericTestUtils.waitFor(() -> {
-        int pipelineCount = scmPipelineManager.getPipelines(RATIS_THREE, OPEN)
-            .size();
-        if (pipelineCount >= 1) {
-          return true;
-        }
-        return false;
-      }, 500, 60000);
-    } catch (TimeoutException | InterruptedException e) {
-      Assert.fail("Timeout waiting for Upgrade to complete on SCM.");
-    }
-
-    // SCM will not return from finalization until there is at least one
-    // RATIS 3 pipeline. For this to exist, all three of our datanodes must
-    // be in the HEALTHY state.
-    testDataNodesStateOnSCM(HEALTHY, HEALTHY_READONLY);
-
-    int countContainers = 0;
-    for (ContainerInfo ci : scmContainerManager.getContainers()) {
-      HddsProtos.LifeCycleState ciState = ci.getState();
-      LOG.info("testPostUpgradeConditionsSCM: container state is {}",
-          ciState.name());
-      Assert.assertTrue((ciState == HddsProtos.LifeCycleState.CLOSED) ||
-          (ciState == HddsProtos.LifeCycleState.CLOSING) ||
-          (ciState == HddsProtos.LifeCycleState.DELETING) ||
-          (ciState == HddsProtos.LifeCycleState.DELETED) ||
-          (ciState == HddsProtos.LifeCycleState.QUASI_CLOSED));
-      countContainers++;
-    }
-    Assert.assertTrue(countContainers >= numContainersCreated);
-  }
-
-  /*
-   * Helper function to test Pre-Upgrade conditions on all the DataNodes.
-   */
-  private void testPreUpgradeConditionsDataNodes() {
-    for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {
-      DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
-      HDDSLayoutVersionManager dnVersionManager =
-          dsm.getLayoutVersionManager();
-      Assert.assertEquals(0, dnVersionManager.getMetadataLayoutVersion());
-    }
-
-    int countContainers = 0;
-    for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {
-      DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
-      // Also verify that all the existing containers are open.
-      for (Iterator<Container<?>> it =
-           dsm.getContainer().getController().getContainers(); it.hasNext();) {
-        Container container = it.next();
-        Assert.assertTrue(container.getContainerState() ==
-            ContainerProtos.ContainerDataProto.State.OPEN);
-        countContainers++;
-      }
-    }
-    Assert.assertTrue(countContainers >= 1);
-  }
-
-  /*
-   * Helper function to test Post-Upgrade conditions on all the DataNodes.
-   */
-  private void testPostUpgradeConditionsDataNodes(
-      ContainerProtos.ContainerDataProto.State... validClosedContainerStates) {
-    List<ContainerProtos.ContainerDataProto.State> closeStates =
-        Arrays.asList(validClosedContainerStates);
-    // Allow closed and quasi closed containers as valid closed containers by
-    // default.
-    if (closeStates.isEmpty()) {
-      closeStates = Arrays.asList(CLOSED, QUASI_CLOSED);
-    }
-
-    try {
-      GenericTestUtils.waitFor(() -> {
-        for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {
-          DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
-          try {
-            if ((dsm.queryUpgradeStatus().status() != FINALIZATION_DONE) &&
-                (dsm.queryUpgradeStatus().status() != ALREADY_FINALIZED)) {
-              return false;
-            }
-          } catch (IOException e) {
-            LOG.error("Exception. ", e);
-            return false;
-          }
-        }
-        return true;
-      }, 500, 60000);
-    } catch (TimeoutException | InterruptedException e) {
-      Assert.fail("Timeout waiting for Upgrade to complete on Data Nodes.");
-    }
-
-    int countContainers = 0;
-    for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {
-      DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
-      HDDSLayoutVersionManager dnVersionManager =
-          dsm.getLayoutVersionManager();
-      Assert.assertEquals(dnVersionManager.getSoftwareLayoutVersion(),
-          dnVersionManager.getMetadataLayoutVersion());
-      Assert.assertTrue(dnVersionManager.getMetadataLayoutVersion() >= 1);
-
-      // Also verify that all the existing containers are closed.
-      for (Iterator<Container<?>> it =
-           dsm.getContainer().getController().getContainers(); it.hasNext();) {
-        Container<?> container = it.next();
-        Assert.assertTrue("Container had unexpected state " +
-                container.getContainerState(),
-            closeStates.stream().anyMatch(
-                state -> container.getContainerState().equals(state)));
-        countContainers++;
-      }
-    }
-    Assert.assertTrue(countContainers >= 1);
-  }
-
-  /*
    * Helper function to test that we can create new pipelines Post-Upgrade.
    */
   private void testPostUpgradePipelineCreation() throws IOException {
@@ -376,31 +234,6 @@ public class TestHDDSUpgrade {
         "Owner1").getPipelineID();
     Assert.assertEquals(1, scmPipelineManager.getNumberOfContainers(pid));
     Assert.assertEquals(pid, ratisPipeline1.getId());
-  }
-
-  /*
-   * Helper function to test DataNode state on the SCM. Note that due to
-   * timing constraints, sometime the node-state can transition to the next
-   * state. This function expects the DataNode to be in NodeState "state" or
-   * "alternateState". Some tests can enforce a unique NodeState test by
-   * setting "alternateState = null".
-   */
-  private void testDataNodesStateOnSCM(NodeState state,
-                                       NodeState alternateState) {
-    int countNodes = 0;
-    for (DatanodeDetails dn : scm.getScmNodeManager().getAllNodes()) {
-      try {
-        NodeState dnState =
-            scm.getScmNodeManager().getNodeStatus(dn).getHealth();
-        Assert.assertTrue((dnState == state) ||
-            (alternateState == null ? false : dnState == alternateState));
-      } catch (NodeNotFoundException e) {
-        e.printStackTrace();
-        Assert.fail("Node not found");
-      }
-      ++countNodes;
-    }
-    Assert.assertEquals(NUM_DATA_NODES, countNodes);
   }
 
   /*
@@ -457,11 +290,7 @@ public class TestHDDSUpgrade {
     Assert.assertEquals(STARTING_FINALIZATION, status.status());
 
     // Wait for the Finalization to complete on the SCM.
-    while (status.status() != FINALIZATION_DONE) {
-      status = scm.getFinalizationManager()
-          .queryUpgradeFinalizationProgress("xyz",
-          false, false);
-    }
+    TestHddsUpgradeUtils.waitForFinalization("xyz");
 
     Set<PipelineID> postUpgradeOpenPipelines =
         scmPipelineManager.getPipelines(RATIS_THREE, OPEN)
