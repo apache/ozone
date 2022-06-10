@@ -190,14 +190,12 @@ public class ECReconstructionCoordinator implements Closeable {
     int dataLocs = ECBlockInputStreamProxy
         .expectedDataLocations(repConfig, safeBlockGroupLength);
     List<Integer> toReconstructIndexes = new ArrayList<>();
-    List<Integer> paddedIndexes = new ArrayList<>();
     for (int i = 0; i < missingContainerIndexes.size(); i++) {
       Integer index = missingContainerIndexes.get(i);
       if (index <= dataLocs || index > repConfig.getData()) {
         toReconstructIndexes.add(index);
-      } else {
-        paddedIndexes.add(index);
       }
+      // else padded indexes.
     }
 
     // Looks like we don't need to reconstruct any missing blocks in this block
