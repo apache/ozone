@@ -43,6 +43,6 @@ assertMatch    '^HDDS-[1-9][0-9]{0,4}\.'           'Fail: missing dot after Jira
 assertMatch    '^HDDS-[1-9][0-9]{0,4}\. '          'Fail: missing space after Jira'
 assertNotMatch '[[:space:]]$'                      'Fail: trailing space'
 assertNotMatch '  '                                'Fail: two consecutive spaces'
-assertMatch    '^HDDS-[1-9][0-9]{0,4}\. .*[^ ]$'   'Fail: not match'
+assertMatch    '^HDDS-[1-9][0-9]{0,4}\. .*[^ ]$'   'Fail: not match "^HDDS-[1-9][0-9]{0,4}\. .*[^ ]$"'
 
 echo 'OK'
