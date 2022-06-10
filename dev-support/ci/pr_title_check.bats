@@ -55,6 +55,10 @@ load bats-assert/load.bash
   run dev-support/ci/pr_title_check.sh 'HDDS-12345. Hello World'
   assert_output 'OK'
 
+  # PR with tag
+  run dev-support/ci/pr_title_check.sh 'HDDS-1234. [Tag] Hello World'
+  assert_output 'OK'
+
   # trailing dot is allowed
   run dev-support/ci/pr_title_check.sh 'HDDS-1234. Hello World.'
   assert_output 'OK'
