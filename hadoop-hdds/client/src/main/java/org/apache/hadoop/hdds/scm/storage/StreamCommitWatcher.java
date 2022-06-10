@@ -16,17 +16,13 @@
  *  limitations under the License.
  */
 
-/**
- * This class maintains the map of the commitIndexes to be watched for
- * successful replication in the datanodes in a given pipeline. It also releases
- * the buffers associated with the user data back to {@Link BufferPool} once
- * minimum replication criteria is achieved during an ozone key write.
- */
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.ratis.util.JavaUtils;
+import org.apache.ratis.util.MemoizedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,6 +30,9 @@ import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
@@ -49,13 +48,15 @@ public class StreamCommitWatcher {
       LoggerFactory.getLogger(StreamCommitWatcher.class);
 
   private Map<Long, List<StreamBuffer>> commitIndexMap;
-  private List<StreamBuffer> bufferList;
+  private final List<StreamBuffer> bufferList;
 
   // total data which has been successfully flushed and acknowledged
   // by all servers
   private long totalAckDataLength;
+  private final ConcurrentMap<Long, CompletableFuture<XceiverClientReply>>
+      replies = new ConcurrentHashMap<>();
 
-  private XceiverClientSpi xceiverClient;
+  private final XceiverClientSpi xceiverClient;
 
   public StreamCommitWatcher(XceiverClientSpi xceiverClient,
       List<StreamBuffer> bufferList) {
@@ -130,16 +131,24 @@ public class StreamCommitWatcher {
    */
   public XceiverClientReply streamWatchForCommit(long commitIndex)
       throws IOException {
-    final long index;
+    final MemoizedSupplier<CompletableFuture<XceiverClientReply>> supplier
+        = JavaUtils.memoize(CompletableFuture::new);
+    final CompletableFuture<XceiverClientReply> f = replies.compute(commitIndex,
+        (key, value) -> value != null ? value : supplier.get());
+    if (!supplier.isInitialized()) {
+      // future already exists
+      return f.join();
+    }
+
     try {
       XceiverClientReply reply =
           xceiverClient.watchForCommit(commitIndex);
-      if (reply == null) {
-        index = 0;
-      } else {
-        index = reply.getLogIndex();
-      }
-      adjustBuffers(index);
+      f.complete(reply);
+      final CompletableFuture<XceiverClientReply> removed
+          = replies.remove(commitIndex);
+      Preconditions.checkState(removed == f);
+
+      adjustBuffers(reply.getLogIndex());
       return reply;
     } catch (InterruptedException e) {
       // Re-interrupt the thread while catching InterruptedException
