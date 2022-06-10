@@ -203,6 +203,13 @@ public class TestHddsUpgradeUtils {
     Assert.assertTrue(countContainers >= 1);
   }
 
+  public static void testDataNodesStateOnSCM(List<StorageContainerManager> scms,
+      int expectedDatanodeCount, HddsProtos.NodeState state,
+      HddsProtos.NodeState alternateState) {
+    scms.forEach(scm -> testDataNodesStateOnSCM(scm, expectedDatanodeCount,
+        state, alternateState));
+  }
+
   /*
    * Helper function to test DataNode state on the SCM. Note that due to
    * timing constraints, sometime the node-state can transition to the next
@@ -210,7 +217,7 @@ public class TestHddsUpgradeUtils {
    * "alternateState". Some tests can enforce a unique NodeState test by
    * setting "alternateState = null".
    */
-  private static void testDataNodesStateOnSCM(StorageContainerManager scm,
+  public static void testDataNodesStateOnSCM(StorageContainerManager scm,
       int expectedDatanodeCount, HddsProtos.NodeState state,
       HddsProtos.NodeState alternateState) {
     int countNodes = 0;
