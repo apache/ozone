@@ -4026,7 +4026,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  public boolean isAdmin(String username) {
+  @VisibleForTesting
+  private boolean isAdmin(String username) {
     if (omAdminUsernames == null) {
       return false;
     } else {
