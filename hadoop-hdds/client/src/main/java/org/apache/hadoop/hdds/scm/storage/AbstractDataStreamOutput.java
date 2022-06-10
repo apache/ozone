@@ -29,6 +29,7 @@ import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * This class is used for error handling methods.
@@ -111,7 +112,7 @@ public abstract class AbstractDataStreamOutput
     if (Thread.currentThread().isInterrupted()) {
       setExceptionAndThrow(exception);
     }
-    Preconditions.checkNotNull(action);
+    Objects.requireNonNull(action);
     Preconditions.checkArgument(
         action.action == RetryPolicy.RetryAction.RetryDecision.RETRY);
     if (action.delayMillis > 0) {
