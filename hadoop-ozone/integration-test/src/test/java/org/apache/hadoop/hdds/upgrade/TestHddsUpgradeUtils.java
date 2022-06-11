@@ -48,7 +48,7 @@ public class TestHddsUpgradeUtils {
     UpgradeFinalizer.StatusAndMessages status = null;
     while (status == null || status.status() != FINALIZATION_DONE) {
       status = scmClient.queryUpgradeFinalizationProgress(clientID,
-              false, false);
+              true, true);
     }
   }
 
