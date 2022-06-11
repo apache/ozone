@@ -392,6 +392,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean grpcBlockTokenEnabled;
   private final boolean useRatisForReplication;
   private final String defaultBucketLayout;
+  private ReplicationConfig defaultReplicationConfig;
 
   private boolean isS3MultiTenancyEnabled;
 
@@ -519,7 +520,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               BucketLayout.OBJECT_STORE + ", " + BucketLayout.LEGACY + ".");
     }
 
-    validateReplicationConfigs(conf);
+    // Validates the default server-side replication configs.
+    this.defaultReplicationConfig = getDefaultReplicationConfig();
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     omRpcAddressTxt = new Text(omNodeDetails.getRpcAddressString());
 

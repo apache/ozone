@@ -50,8 +50,8 @@ public class TestReplicationConfigValidator {
     try {
       validator.validate(new ECReplicationConfig(invalidEcConfig1));
     } catch (IllegalArgumentException ex) {
-      GenericTestUtils.
-          assertExceptionContains("Invalid replication config EC/6-4", ex);
+      GenericTestUtils.assertExceptionContains("Invalid replication " +
+          "config for type EC and replication xor-6-4-{CHUNK_SIZE}", ex);
     }
 
   }
