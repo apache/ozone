@@ -18,15 +18,15 @@
 package org.apache.hadoop.hdds.client;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.XOR;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Unit test for ECReplicationConfig.
@@ -45,10 +45,10 @@ public class TestECReplicationConfig {
 
     for (Map.Entry<String, ECReplicationConfig> e : valid.entrySet()) {
       ECReplicationConfig ec = new ECReplicationConfig(e.getKey());
-      Assert.assertEquals(e.getValue().getData(), ec.getData());
-      Assert.assertEquals(e.getValue().getParity(), ec.getParity());
-      Assert.assertEquals(e.getValue().getCodec(), ec.getCodec());
-      Assert.assertEquals(e.getValue().getEcChunkSize(), ec.getEcChunkSize());
+      Assertions.assertEquals(e.getValue().getData(), ec.getData());
+      Assertions.assertEquals(e.getValue().getParity(), ec.getParity());
+      Assertions.assertEquals(e.getValue().getCodec(), ec.getCodec());
+      Assertions.assertEquals(e.getValue().getEcChunkSize(), ec.getEcChunkSize());
     }
   }
 
@@ -81,11 +81,11 @@ public class TestECReplicationConfig {
     HddsProtos.ECReplicationConfig proto = orig.toProto();
 
     ECReplicationConfig recovered = new ECReplicationConfig(proto);
-    Assert.assertEquals(orig.getData(), recovered.getData());
-    Assert.assertEquals(orig.getParity(), recovered.getParity());
-    Assert.assertEquals(orig.getCodec(), recovered.getCodec());
-    Assert.assertEquals(orig.getEcChunkSize(), recovered.getEcChunkSize());
-    Assert.assertTrue(orig.equals(recovered));
+    Assertions.assertEquals(orig.getData(), recovered.getData());
+    Assertions.assertEquals(orig.getParity(), recovered.getParity());
+    Assertions.assertEquals(orig.getCodec(), recovered.getCodec());
+    Assertions.assertEquals(orig.getEcChunkSize(), recovered.getEcChunkSize());
+    Assertions.assertTrue(orig.equals(recovered));
   }
 
 }

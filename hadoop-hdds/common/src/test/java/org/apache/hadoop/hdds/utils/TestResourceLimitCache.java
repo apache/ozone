@@ -17,8 +17,8 @@
 package org.apache.hadoop.hdds.utils;
 
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -56,9 +56,9 @@ public class TestResourceLimitCache {
       }
       return null;
     });
-    Assert.assertTrue(!future.isDone());
+    Assertions.assertTrue(!future.isDone());
     Thread.sleep(100);
-    Assert.assertTrue(!future.isDone());
+    Assertions.assertTrue(!future.isDone());
 
     // remove 4 so that permits are released for key 1 to be put. Currently map
     // has acquired 6 permits out of 10
@@ -66,8 +66,8 @@ public class TestResourceLimitCache {
 
     GenericTestUtils.waitFor(future::isDone, 100, 1000);
     // map has the key 1
-    Assert.assertTrue(future.isDone() && !future.isCompletedExceptionally());
-    Assert.assertNotNull(resourceCache.get(1));
+    Assertions.assertTrue(future.isDone() && !future.isCompletedExceptionally());
+    Assertions.assertNotNull(resourceCache.get(1));
 
     // Create a future which blocks to put 4. Currently map has acquired 7
     // permits out of 10
@@ -79,9 +79,9 @@ public class TestResourceLimitCache {
         return null;
       }
     }, pool);
-    Assert.assertTrue(!future.isDone());
+    Assertions.assertTrue(!future.isDone());
     Thread.sleep(100);
-    Assert.assertTrue(!future.isDone());
+    Assertions.assertTrue(!future.isDone());
 
     // Shutdown the thread pool for putting key 4
     pool.shutdownNow();
@@ -89,7 +89,7 @@ public class TestResourceLimitCache {
     future.cancel(true);
     // remove key 1 so currently map has acquired 6 permits out of 10
     resourceCache.remove(1);
-    Assert.assertNull(resourceCache.get(4));
+    Assertions.assertNull(resourceCache.get(4));
   }
 
   @Test(timeout = 5000)
@@ -124,7 +124,7 @@ public class TestResourceLimitCache {
 
     // THEN
     for (Integer k : removedKeys) {
-      Assert.assertNull(resourceCache.get(k));
+      Assertions.assertNull(resourceCache.get(k));
     }
     // can put new entries
     for (int i = 1; i <= removedKeys.length; ++i) {

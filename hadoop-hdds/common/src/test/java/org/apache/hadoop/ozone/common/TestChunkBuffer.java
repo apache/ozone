@@ -30,8 +30,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.hdds.utils.MockGatheringChannel;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assertions;
 
 /**
@@ -114,14 +114,14 @@ public class TestChunkBuffer {
     System.out.println("n=" + n + ", impl=" + impl);
 
     // check position, remaining
-    Assert.assertEquals(0, impl.position());
-    Assert.assertEquals(n, impl.remaining());
-    Assert.assertEquals(n, impl.limit());
+    Assertions.assertEquals(0, impl.position());
+    Assertions.assertEquals(n, impl.remaining());
+    Assertions.assertEquals(n, impl.limit());
 
     impl.put(expected);
-    Assert.assertEquals(n, impl.position());
-    Assert.assertEquals(0, impl.remaining());
-    Assert.assertEquals(n, impl.limit());
+    Assertions.assertEquals(n, impl.position());
+    Assertions.assertEquals(0, impl.remaining());
+    Assertions.assertEquals(n, impl.limit());
 
     // duplicate
     assertDuplicate(expected, impl);
@@ -159,8 +159,8 @@ public class TestChunkBuffer {
       byte[] expected, ChunkBuffer impl, int bpc) {
     final int n = expected.length;
     final ChunkBuffer duplicated = impl.duplicate(0, n);
-    Assert.assertEquals(0, duplicated.position());
-    Assert.assertEquals(n, duplicated.remaining());
+    Assertions.assertEquals(0, duplicated.position());
+    Assertions.assertEquals(n, duplicated.remaining());
 
     final int numChecksums = (n + bpc - 1) / bpc;
     final Iterator<ByteBuffer> i = duplicated.iterate(bpc).iterator();
@@ -169,55 +169,55 @@ public class TestChunkBuffer {
       final ByteBuffer b = i.next();
       final int expectedRemaining = j < numChecksums - 1 ?
           bpc : n - bpc * (numChecksums - 1);
-      Assert.assertEquals(expectedRemaining, b.remaining());
+      Assertions.assertEquals(expectedRemaining, b.remaining());
 
       final int offset = j * bpc;
       for (int k = 0; k < expectedRemaining; k++) {
-        Assert.assertEquals(expected[offset + k], b.get());
+        Assertions.assertEquals(expected[offset + k], b.get());
         count++;
       }
     }
-    Assert.assertEquals(n, count);
-    Assert.assertFalse(i.hasNext());
+    Assertions.assertEquals(n, count);
+    Assertions.assertFalse(i.hasNext());
     Assertions.assertThrows(NoSuchElementException.class, i::next);
   }
 
   private static void assertToByteString(
       byte[] expected, int offset, int length, ChunkBuffer impl) {
     final ChunkBuffer duplicated = impl.duplicate(offset, offset + length);
-    Assert.assertEquals(offset, duplicated.position());
-    Assert.assertEquals(length, duplicated.remaining());
+    Assertions.assertEquals(offset, duplicated.position());
+    Assertions.assertEquals(length, duplicated.remaining());
     final ByteString computed = duplicated.toByteString(buffer -> {
       buffer.mark();
       final ByteString string = ByteString.copyFrom(buffer);
       buffer.reset();
       return string;
     });
-    Assert.assertEquals(offset, duplicated.position());
-    Assert.assertEquals(length, duplicated.remaining());
+    Assertions.assertEquals(offset, duplicated.position());
+    Assertions.assertEquals(length, duplicated.remaining());
     assertEquals("offset=" + offset + ", length=" + length,
         ByteString.copyFrom(expected, offset, length), computed);
   }
 
   private static void assertWrite(byte[] expected, ChunkBuffer impl) {
     impl.rewind();
-    Assert.assertEquals(0, impl.position());
+    Assertions.assertEquals(0, impl.position());
 
     ByteArrayOutputStream output = new ByteArrayOutputStream(expected.length);
 
     try {
       impl.writeTo(new MockGatheringChannel(Channels.newChannel(output)));
     } catch (IOException e) {
-      Assert.fail("Unexpected error: " + e);
+      Assertions.fail("Unexpected error: " + e);
     }
 
-    Assert.assertArrayEquals(expected, output.toByteArray());
-    Assert.assertFalse(impl.hasRemaining());
+    Assertions.assertArrayEquals(expected, output.toByteArray());
+    Assertions.assertFalse(impl.hasRemaining());
   }
 
   private static void assertEquals(String message,
       ByteString expected, ByteString actual) {
-    Assert.assertEquals(message,
+    Assertions.assertEquals(message,
         toString(expected.toByteArray()),
         toString(actual.toByteArray()));
   }

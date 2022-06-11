@@ -22,9 +22,9 @@ import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
@@ -51,7 +51,7 @@ public class TestSCMNodeInfo {
   private String scmServiceId = "scmserviceId";
   private String[] nodes = new String[]{"scm1", "scm2", "scm3"};
 
-  @Before
+  @BeforeEach
   public void setup() {
     conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
     conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY + "." + scmServiceId,
@@ -92,15 +92,15 @@ public class TestSCMNodeInfo {
 
     int count = 1;
     for (SCMNodeInfo scmNodeInfo : scmNodeInfos) {
-      Assert.assertEquals(scmServiceId, scmNodeInfo.getServiceId());
-      Assert.assertEquals("scm" + count++, scmNodeInfo.getNodeId());
-      Assert.assertEquals("localhost:" + ++port,
+      Assertions.assertEquals(scmServiceId, scmNodeInfo.getServiceId());
+      Assertions.assertEquals("scm" + count++, scmNodeInfo.getNodeId());
+      Assertions.assertEquals("localhost:" + ++port,
           scmNodeInfo.getBlockClientAddress());
-      Assert.assertEquals("localhost:" + ++port,
+      Assertions.assertEquals("localhost:" + ++port,
           scmNodeInfo.getScmSecurityAddress());
-      Assert.assertEquals("localhost:" + ++port,
+      Assertions.assertEquals("localhost:" + ++port,
           scmNodeInfo.getScmClientAddress());
-      Assert.assertEquals("localhost:" + ++port,
+      Assertions.assertEquals("localhost:" + ++port,
           scmNodeInfo.getScmDatanodeAddress());
     }
   }
@@ -116,16 +116,16 @@ public class TestSCMNodeInfo {
 
     int count = 1;
     for (SCMNodeInfo scmNodeInfo : scmNodeInfos) {
-      Assert.assertEquals(scmServiceId, scmNodeInfo.getServiceId());
-      Assert.assertEquals("scm" + count++, scmNodeInfo.getNodeId());
-      Assert.assertEquals("localhost:" + OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT,
+      Assertions.assertEquals(scmServiceId, scmNodeInfo.getServiceId());
+      Assertions.assertEquals("scm" + count++, scmNodeInfo.getNodeId());
+      Assertions.assertEquals("localhost:" + OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT,
           scmNodeInfo.getBlockClientAddress());
-      Assert.assertEquals("localhost:" +
+      Assertions.assertEquals("localhost:" +
               OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT,
           scmNodeInfo.getScmSecurityAddress());
-      Assert.assertEquals("localhost:" + OZONE_SCM_CLIENT_PORT_DEFAULT,
+      Assertions.assertEquals("localhost:" + OZONE_SCM_CLIENT_PORT_DEFAULT,
           scmNodeInfo.getScmClientAddress());
-      Assert.assertEquals("localhost:" + OZONE_SCM_DATANODE_PORT_DEFAULT,
+      Assertions.assertEquals("localhost:" + OZONE_SCM_DATANODE_PORT_DEFAULT,
           scmNodeInfo.getScmDatanodeAddress());
     }
 
@@ -150,15 +150,15 @@ public class TestSCMNodeInfo {
 
     List< SCMNodeInfo > scmNodeInfos = SCMNodeInfo.buildNodeInfo(config);
 
-    Assert.assertNotNull(scmNodeInfos);
-    Assert.assertTrue(scmNodeInfos.size() == 1);
-    Assert.assertEquals("localhost:" + OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT,
+    Assertions.assertNotNull(scmNodeInfos);
+    Assertions.assertTrue(scmNodeInfos.size() == 1);
+    Assertions.assertEquals("localhost:" + OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT,
         scmNodeInfos.get(0).getBlockClientAddress());
-    Assert.assertEquals("localhost:" + OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT,
+    Assertions.assertEquals("localhost:" + OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT,
         scmNodeInfos.get(0).getScmSecurityAddress());
-    Assert.assertEquals("localhost:" + OZONE_SCM_CLIENT_PORT_DEFAULT,
+    Assertions.assertEquals("localhost:" + OZONE_SCM_CLIENT_PORT_DEFAULT,
         scmNodeInfos.get(0).getScmClientAddress());
-    Assert.assertEquals("localhost:" + OZONE_SCM_DATANODE_PORT_DEFAULT,
+    Assertions.assertEquals("localhost:" + OZONE_SCM_DATANODE_PORT_DEFAULT,
         scmNodeInfos.get(0).getScmDatanodeAddress());
   }
 

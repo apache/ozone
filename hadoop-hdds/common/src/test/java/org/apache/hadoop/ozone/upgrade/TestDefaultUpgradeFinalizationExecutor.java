@@ -25,7 +25,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test for DefaultUpgradeFinalizationExecutor.

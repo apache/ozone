@@ -39,11 +39,11 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_K
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
 
 import static org.hamcrest.core.Is.is;
-import org.junit.Assert;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import static org.junit.jupiter.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.api.Test;
 
 /**
  * Testing HddsUtils.
@@ -52,13 +52,13 @@ public class TestHddsUtils {
 
   @Test
   public void testGetHostName() {
-    Assert.assertEquals(Optional.of("localhost"),
+    Assertions.assertEquals(Optional.of("localhost"),
         HddsUtils.getHostName("localhost:1234"));
 
-    Assert.assertEquals(Optional.of("localhost"),
+    Assertions.assertEquals(Optional.of("localhost"),
         HddsUtils.getHostName("localhost"));
 
-    Assert.assertEquals(Optional.empty(),
+    Assertions.assertEquals(Optional.empty(),
         HddsUtils.getHostName(":1234"));
   }
 
@@ -205,8 +205,8 @@ public class TestHddsUtils {
     Collection<InetSocketAddress> scmAddressList =
         HddsUtils.getSCMAddressForDatanodes(conf);
 
-    Assert.assertNotNull(scmAddressList);
-    Assert.assertEquals(3, scmAddressList.size());
+    Assertions.assertNotNull(scmAddressList);
+    Assertions.assertEquals(3, scmAddressList.size());
 
     Iterator<InetSocketAddress> it = scmAddressList.iterator();
     while (it.hasNext()) {
@@ -214,7 +214,7 @@ public class TestHddsUtils {
       expected.remove(next.getHostName()  + ":" + next.getPort());
     }
 
-    Assert.assertTrue(expected.size() == 0);
+    Assertions.assertTrue(expected.size() == 0);
 
   }
 
@@ -228,14 +228,14 @@ public class TestHddsUtils {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         testnum1);
-    Assert.assertTrue(Integer.parseInt(testnum1) ==
+    Assertions.assertTrue(Integer.parseInt(testnum1) ==
         HddsUtils.getNumberFromConfigKeys(
             conf,
             OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT).orElse(0));
 
     /* Test to return first unempty key number from list */
     /* first key is absent */
-    Assert.assertTrue(Integer.parseInt(testnum1) ==
+    Assertions.assertTrue(Integer.parseInt(testnum1) ==
         HddsUtils.getNumberFromConfigKeys(
             conf,
             ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
@@ -246,7 +246,7 @@ public class TestHddsUtils {
     conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
             serviceId, nodeId),
         testnum2);
-    Assert.assertTrue(Integer.parseInt(testnum2) ==
+    Assertions.assertTrue(Integer.parseInt(testnum2) ==
         HddsUtils.getNumberFromConfigKeys(
             conf,
             ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
