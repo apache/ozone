@@ -21,7 +21,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.JsonUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -32,7 +31,9 @@ import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static com.fasterxml.jackson.databind.node.JsonNodeType.ARRAY;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for the ReplicationManagerReport class.
@@ -56,18 +57,18 @@ public class TestReplicationManagerReport {
     report.increment(HddsProtos.LifeCycleState.CLOSED);
     report.increment(HddsProtos.LifeCycleState.CLOSED);
 
-    Assertions.assertEquals(2,
+    assertEquals(2,
         report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    Assertions.assertEquals(1,
+    assertEquals(1,
         report.getStat(ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    Assertions.assertEquals(0,
+    assertEquals(0,
         report.getStat(ReplicationManagerReport.HealthState.MIS_REPLICATED));
 
-    Assertions.assertEquals(1,
+    assertEquals(1,
         report.getStat(HddsProtos.LifeCycleState.OPEN));
-    Assertions.assertEquals(2,
+    assertEquals(2,
         report.getStat(HddsProtos.LifeCycleState.CLOSED));
-    Assertions.assertEquals(0,
+    assertEquals(0,
         report.getStat(HddsProtos.LifeCycleState.QUASI_CLOSED));
   }
 
@@ -94,29 +95,29 @@ public class TestReplicationManagerReport {
     ObjectMapper mapper = new ObjectMapper();
     JsonNode json = mapper.readTree(jsonString);
 
-    Assertions.assertTrue(json.get("reportTimeStamp").longValue() > 0);
+    assertTrue(json.get("reportTimeStamp").longValue() > 0);
     JsonNode stats = json.get("stats");
-    Assertions.assertEquals(1, stats.get("OPEN").longValue());
-    Assertions.assertEquals(0, stats.get("CLOSING").longValue());
-    Assertions.assertEquals(0, stats.get("QUASI_CLOSED").longValue());
-    Assertions.assertEquals(2, stats.get("CLOSED").longValue());
-    Assertions.assertEquals(0, stats.get("DELETING").longValue());
-    Assertions.assertEquals(0, stats.get("DELETED").longValue());
+    assertEquals(1, stats.get("OPEN").longValue());
+    assertEquals(0, stats.get("CLOSING").longValue());
+    assertEquals(0, stats.get("QUASI_CLOSED").longValue());
+    assertEquals(2, stats.get("CLOSED").longValue());
+    assertEquals(0, stats.get("DELETING").longValue());
+    assertEquals(0, stats.get("DELETED").longValue());
 
-    Assertions.assertEquals(2, stats.get("UNDER_REPLICATED").longValue());
-    Assertions.assertEquals(1, stats.get("OVER_REPLICATED").longValue());
-    Assertions.assertEquals(0, stats.get("MIS_REPLICATED").longValue());
-    Assertions.assertEquals(0, stats.get("MISSING").longValue());
-    Assertions.assertEquals(0, stats.get("UNHEALTHY").longValue());
-    Assertions.assertEquals(0, stats.get("EMPTY").longValue());
-    Assertions.assertEquals(0, stats.get("OPEN_UNHEALTHY").longValue());
-    Assertions.assertEquals(0, stats.get("QUASI_CLOSED_STUCK").longValue());
+    assertEquals(2, stats.get("UNDER_REPLICATED").longValue());
+    assertEquals(1, stats.get("OVER_REPLICATED").longValue());
+    assertEquals(0, stats.get("MIS_REPLICATED").longValue());
+    assertEquals(0, stats.get("MISSING").longValue());
+    assertEquals(0, stats.get("UNHEALTHY").longValue());
+    assertEquals(0, stats.get("EMPTY").longValue());
+    assertEquals(0, stats.get("OPEN_UNHEALTHY").longValue());
+    assertEquals(0, stats.get("QUASI_CLOSED_STUCK").longValue());
 
     JsonNode samples = json.get("samples");
-    Assertions.assertEquals(ARRAY, samples.get("UNDER_REPLICATED").getNodeType());
-    Assertions.assertEquals(1, samples.get("UNDER_REPLICATED").get(0).longValue());
-    Assertions.assertEquals(2, samples.get("UNDER_REPLICATED").get(1).longValue());
-    Assertions.assertEquals(3, samples.get("OVER_REPLICATED").get(0).longValue());
+    assertEquals(ARRAY, samples.get("UNDER_REPLICATED").getNodeType());
+    assertEquals(1, samples.get("UNDER_REPLICATED").get(0).longValue());
+    assertEquals(2, samples.get("UNDER_REPLICATED").get(1).longValue());
+    assertEquals(3, samples.get("OVER_REPLICATED").get(0).longValue());
   }
 
   @Test
@@ -131,27 +132,27 @@ public class TestReplicationManagerReport {
         ReplicationManagerReport.HealthState.OVER_REPLICATED,
         new ContainerID(3));
 
-    Assertions.assertEquals(2,
+    assertEquals(2,
         report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    Assertions.assertEquals(1,
+    assertEquals(1,
         report.getStat(ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    Assertions.assertEquals(0,
+    assertEquals(0,
         report.getStat(ReplicationManagerReport.HealthState.MIS_REPLICATED));
 
     List<ContainerID> sample =
         report.getSample(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
-    Assertions.assertEquals(new ContainerID(1), sample.get(0));
-    Assertions.assertEquals(new ContainerID(2), sample.get(1));
-    Assertions.assertEquals(2, sample.size());
+    assertEquals(new ContainerID(1), sample.get(0));
+    assertEquals(new ContainerID(2), sample.get(1));
+    assertEquals(2, sample.size());
 
     sample =
         report.getSample(ReplicationManagerReport.HealthState.OVER_REPLICATED);
-    Assertions.assertEquals(new ContainerID(3), sample.get(0));
-    Assertions.assertEquals(1, sample.size());
+    assertEquals(new ContainerID(3), sample.get(0));
+    assertEquals(1, sample.size());
 
     sample =
         report.getSample(ReplicationManagerReport.HealthState.MIS_REPLICATED);
-    Assertions.assertEquals(0, sample.size());
+    assertEquals(0, sample.size());
   }
 
   @Test
@@ -163,9 +164,9 @@ public class TestReplicationManagerReport {
     }
     List<ContainerID> sample =
         report.getSample(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
-    Assertions.assertEquals(ReplicationManagerReport.SAMPLE_LIMIT, sample.size());
+    assertEquals(ReplicationManagerReport.SAMPLE_LIMIT, sample.size());
     for (int i = 0; i < ReplicationManagerReport.SAMPLE_LIMIT; i++) {
-      Assertions.assertEquals(new ContainerID(i), sample.get(i));
+      assertEquals(new ContainerID(i), sample.get(i));
     }
   }
 
@@ -188,16 +189,16 @@ public class TestReplicationManagerReport {
     HddsProtos.ReplicationManagerReportProto proto = report.toProtobuf();
     ReplicationManagerReport newReport
         = ReplicationManagerReport.fromProtobuf(proto);
-    Assertions.assertEquals(report.getReportTimeStamp(),
+    assertEquals(report.getReportTimeStamp(),
         newReport.getReportTimeStamp());
 
     for (HddsProtos.LifeCycleState s : HddsProtos.LifeCycleState.values()) {
-      Assertions.assertEquals(report.getStat(s), newReport.getStat(s));
+      assertEquals(report.getStat(s), newReport.getStat(s));
     }
 
     for (ReplicationManagerReport.HealthState s :
         ReplicationManagerReport.HealthState.values()) {
-      Assertions.assertEquals(report.getSample(s), newReport.getSample(s));
+      assertEquals(report.getSample(s), newReport.getSample(s));
     }
   }
 
@@ -226,7 +227,7 @@ public class TestReplicationManagerReport {
     // Ensure no exception is thrown
     ReplicationManagerReport newReport =
         ReplicationManagerReport.fromProtobuf(proto.build());
-    Assertions.assertEquals(20, newReport.getStat(
+    assertEquals(20, newReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
 

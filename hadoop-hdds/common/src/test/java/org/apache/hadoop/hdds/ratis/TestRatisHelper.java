@@ -75,7 +75,8 @@ public class TestRatisHelper {
     // As we dont match tls and server raft.grpc properties. So they should
     // be null.
     Assertions.assertNull(raftProperties.get("raft.grpc.tls.set"));
-    Assertions.assertNull(raftProperties.get("raft.grpc.tls.mutual_authn.enabled"));
+    Assertions.assertNull(
+        raftProperties.get("raft.grpc.tls.mutual_authn.enabled"));
     Assertions.assertNull(raftProperties.get("raft.grpc.server.port"));
 
   }
@@ -131,7 +132,8 @@ public class TestRatisHelper {
         raftProperties.get("raft.server.rpc.watch.request.timeout"));
     Assertions.assertEquals("30s",
         raftProperties.get("raft.server.rpc.request.timeout"));
-    Assertions.assertNull(raftProperties.get("raft.client.rpc.request.timeout"));
+    Assertions.assertNull(
+        raftProperties.get("raft.client.rpc.request.timeout"));
 
   }
 }

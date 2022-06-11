@@ -67,7 +67,8 @@ public class TestResourceLimitCache {
 
     GenericTestUtils.waitFor(future::isDone, 100, 1000);
     // map has the key 1
-    Assertions.assertTrue(future.isDone() && !future.isCompletedExceptionally());
+    Assertions.assertTrue(future.isDone());
+    Assertions.assertFalse(future.isCompletedExceptionally());
     Assertions.assertNotNull(resourceCache.get(1));
 
     // Create a future which blocks to put 4. Currently map has acquired 7
