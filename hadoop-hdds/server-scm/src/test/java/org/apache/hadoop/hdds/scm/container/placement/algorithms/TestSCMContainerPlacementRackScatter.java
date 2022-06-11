@@ -36,21 +36,21 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
-import org.hamcrest.MatcherAssert;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
@@ -58,24 +58,21 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLU
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.Mockito.when;
 
 /**
  * Test for the scm container rack aware placement.
  */
-@RunWith(Parameterized.class)
 public class TestSCMContainerPlacementRackScatter {
   private NetworkTopology cluster;
   private OzoneConfiguration conf;
   private NodeManager nodeManager;
-  private final Integer datanodeCount;
   private final List<DatanodeDetails> datanodes = new ArrayList<>();
   private final List<DatanodeInfo> dnInfos = new ArrayList<>();
   // policy with fallback capability
@@ -85,18 +82,12 @@ public class TestSCMContainerPlacementRackScatter {
   private SCMContainerPlacementMetrics metrics;
   private static final int NODE_PER_RACK = 5;
 
-  public TestSCMContainerPlacementRackScatter(Integer count) {
-    this.datanodeCount = count;
+  private static IntStream numDatanodes() {
+    return IntStream.concat(IntStream.rangeClosed(3, 15),
+        IntStream.of(20, 25, 30));
   }
 
-  @Parameterized.Parameters
-  public static Collection<Object[]> setupDatanodes() {
-    return Arrays.asList(new Object[][] {{3}, {4}, {5}, {6}, {7}, {8}, {9},
-        {10}, {11}, {12}, {13}, {14}, {15}, {20}, {25}, {30}});
-  }
-
-  @Before
-  public void setup() {
+  private void setup(int datanodeCount) {
     //initialize network topology instance
     conf = new OzoneConfiguration();
     // We are using small units here
@@ -189,18 +180,25 @@ public class TestSCMContainerPlacementRackScatter {
         .thenReturn(cluster);
 
     // create placement policy instances
-    metrics = SCMContainerPlacementMetrics.create();
     policy = new SCMContainerPlacementRackScatter(
         nodeManager, conf, cluster, true, metrics);
   }
 
-  @After
+  @BeforeEach
+  public void init() {
+    metrics = SCMContainerPlacementMetrics.create();
+  }
+
+  @AfterEach
   public void teardown() {
     metrics.unRegister();
   }
 
-  @Test
-  public void chooseNodeWithNoExcludedNodes() throws SCMException {
+  @ParameterizedTest
+  @MethodSource("numDatanodes")
+  public void chooseNodeWithNoExcludedNodes(int datanodeCount)
+      throws SCMException {
+    setup(datanodeCount);
     int rackLevel = cluster.getMaxLevel() - 1;
     int rackNum = cluster.getNumOfNodes(rackLevel);
 
@@ -209,21 +207,21 @@ public class TestSCMContainerPlacementRackScatter {
     int nodeNum = 1;
     List<DatanodeDetails> datanodeDetails =
         policy.chooseDatanodes(null, null, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
 
     // 2 replicas
     nodeNum = 2;
     datanodeDetails = policy.chooseDatanodes(null, null, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertTrue(!cluster.isSameParent(datanodeDetails.get(0),
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertTrue(!cluster.isSameParent(datanodeDetails.get(0),
         datanodeDetails.get(1)) || (datanodeCount <= NODE_PER_RACK));
 
     //  3 replicas
     nodeNum = 3;
     if (datanodeCount > nodeNum) {
       datanodeDetails = policy.chooseDatanodes(null, null, nodeNum, 0, 15);
-      Assert.assertEquals(nodeNum, datanodeDetails.size());
-      Assert.assertEquals(getRackSize(datanodeDetails),
+      Assertions.assertEquals(nodeNum, datanodeDetails.size());
+      Assertions.assertEquals(getRackSize(datanodeDetails),
           Math.min(nodeNum, rackNum));
     }
 
@@ -232,8 +230,8 @@ public class TestSCMContainerPlacementRackScatter {
     if (datanodeCount > nodeNum) {
       assumeTrue(datanodeCount >= NODE_PER_RACK);
       datanodeDetails = policy.chooseDatanodes(null, null, nodeNum, 0, 15);
-      Assert.assertEquals(nodeNum, datanodeDetails.size());
-      Assert.assertEquals(getRackSize(datanodeDetails),
+      Assertions.assertEquals(nodeNum, datanodeDetails.size());
+      Assertions.assertEquals(getRackSize(datanodeDetails),
           Math.min(nodeNum, rackNum));
     }
 
@@ -242,20 +240,23 @@ public class TestSCMContainerPlacementRackScatter {
     if (datanodeCount > nodeNum) {
       assumeTrue(datanodeCount > 2 * NODE_PER_RACK);
       datanodeDetails = policy.chooseDatanodes(null, null, nodeNum, 0, 15);
-      Assert.assertEquals(nodeNum, datanodeDetails.size());
-      Assert.assertEquals(getRackSize(datanodeDetails),
+      Assertions.assertEquals(nodeNum, datanodeDetails.size());
+      Assertions.assertEquals(getRackSize(datanodeDetails),
           Math.min(nodeNum, rackNum));
     }
   }
 
-  @Test
-  public void chooseNodeWithExcludedNodes() throws SCMException {
-    int rackLevel = cluster.getMaxLevel() - 1;
-    int rackNum = cluster.getNumOfNodes(rackLevel);
-    int totalNum;
+  @ParameterizedTest
+  @MethodSource("numDatanodes")
+  public void chooseNodeWithExcludedNodes(int datanodeCount)
+      throws SCMException {
     // test choose new datanodes for under replicated pipeline
     // 3 replicas, two existing datanodes on same rack
     assumeTrue(datanodeCount > NODE_PER_RACK);
+    setup(datanodeCount);
+    int rackLevel = cluster.getMaxLevel() - 1;
+    int rackNum = cluster.getNumOfNodes(rackLevel);
+    int totalNum;
     int nodeNum = 1;
     List<DatanodeDetails> excludedNodes = new ArrayList<>();
 
@@ -263,10 +264,10 @@ public class TestSCMContainerPlacementRackScatter {
     excludedNodes.add(datanodes.get(1));
     List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(
         excludedNodes, null, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertFalse(cluster.isSameParent(datanodeDetails.get(0),
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertFalse(cluster.isSameParent(datanodeDetails.get(0),
         excludedNodes.get(0)));
-    Assert.assertFalse(cluster.isSameParent(datanodeDetails.get(0),
+    Assertions.assertFalse(cluster.isSameParent(datanodeDetails.get(0),
         excludedNodes.get(1)));
 
     // 3 replicas, one existing datanode
@@ -276,8 +277,8 @@ public class TestSCMContainerPlacementRackScatter {
     excludedNodes.add(datanodes.get(0));
     datanodeDetails = policy.chooseDatanodes(
         excludedNodes, null, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertEquals(getRackSize(datanodeDetails, excludedNodes),
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertEquals(getRackSize(datanodeDetails, excludedNodes),
         Math.min(totalNum, rackNum));
 
     // 3 replicas, two existing datanodes on different rack
@@ -288,8 +289,8 @@ public class TestSCMContainerPlacementRackScatter {
     excludedNodes.add(datanodes.get(5));
     datanodeDetails = policy.chooseDatanodes(
         excludedNodes, null, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertEquals(getRackSize(datanodeDetails, excludedNodes),
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertEquals(getRackSize(datanodeDetails, excludedNodes),
         Math.min(totalNum, rackNum));
 
     // 5 replicas, one existing datanode
@@ -299,8 +300,8 @@ public class TestSCMContainerPlacementRackScatter {
     excludedNodes.add(datanodes.get(0));
     datanodeDetails = policy.chooseDatanodes(
         excludedNodes, null, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertEquals(getRackSize(datanodeDetails, excludedNodes),
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertEquals(getRackSize(datanodeDetails, excludedNodes),
         Math.min(totalNum, rackNum));
 
     // 5 replicas, two existing datanodes on different rack
@@ -331,14 +332,17 @@ public class TestSCMContainerPlacementRackScatter {
     } else {
       datanodeDetails = policy.chooseDatanodes(
           excludedNodes, null, nodeNum, 0, 15);
-      Assert.assertEquals(nodeNum, datanodeDetails.size());
-      Assert.assertEquals(getRackSize(datanodeDetails, excludedNodes),
+      Assertions.assertEquals(nodeNum, datanodeDetails.size());
+      Assertions.assertEquals(getRackSize(datanodeDetails, excludedNodes),
           Math.min(totalNum, rackNum));
     }
   }
 
-  @Test
-  public void chooseNodeWithFavoredNodes() throws SCMException {
+  @ParameterizedTest
+  @MethodSource("numDatanodes")
+  public void chooseNodeWithFavoredNodes(int datanodeCount)
+      throws SCMException {
+    setup(datanodeCount);
     int nodeNum = 1;
     List<DatanodeDetails> excludedNodes = new ArrayList<>();
     List<DatanodeDetails> favoredNodes = new ArrayList<>();
@@ -347,11 +351,11 @@ public class TestSCMContainerPlacementRackScatter {
     favoredNodes.add(datanodes.get(0));
     List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(
         excludedNodes, favoredNodes, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertEquals(datanodeDetails.get(0).getNetworkFullPath(),
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertEquals(datanodeDetails.get(0).getNetworkFullPath(),
         favoredNodes.get(0).getNetworkFullPath());
 
-    // no overlap between excludedNodes and favoredNodes, favoredNodes can been
+    // no overlap between excludedNodes and favoredNodes, favoredNodes can be
     // chosen.
     excludedNodes.clear();
     favoredNodes.clear();
@@ -359,8 +363,8 @@ public class TestSCMContainerPlacementRackScatter {
     favoredNodes.add(datanodes.get(1));
     datanodeDetails = policy.chooseDatanodes(
         excludedNodes, favoredNodes, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertEquals(datanodeDetails.get(0).getNetworkFullPath(),
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertEquals(datanodeDetails.get(0).getNetworkFullPath(),
         favoredNodes.get(0).getNetworkFullPath());
 
     // there is overlap between excludedNodes and favoredNodes, favoredNodes
@@ -371,13 +375,15 @@ public class TestSCMContainerPlacementRackScatter {
     favoredNodes.add(datanodes.get(0));
     datanodeDetails = policy.chooseDatanodes(
         excludedNodes, favoredNodes, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertFalse(datanodeDetails.get(0).getNetworkFullPath()
-        .equals(favoredNodes.get(0).getNetworkFullPath()));
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertNotEquals(datanodeDetails.get(0).getNetworkFullPath(),
+        favoredNodes.get(0).getNetworkFullPath());
   }
 
-  @Test
-  public void testNoInfiniteLoop() throws SCMException {
+  @ParameterizedTest
+  @MethodSource("numDatanodes")
+  public void testNoInfiniteLoop(int datanodeCount) {
+    setup(datanodeCount);
     int nodeNum = 1;
 
     try {
@@ -385,7 +391,7 @@ public class TestSCMContainerPlacementRackScatter {
       policy.chooseDatanodes(null, null, nodeNum, STORAGE_CAPACITY + 0, 15);
       fail("Storage requested exceeds capacity, this call should fail");
     } catch (Exception e) {
-      assertTrue(e.getClass().getSimpleName().equals("SCMException"));
+      assertEquals("SCMException", e.getClass().getSimpleName());
     }
 
     // get metrics
@@ -394,15 +400,17 @@ public class TestSCMContainerPlacementRackScatter {
     long tryCount = metrics.getDatanodeChooseAttemptCount();
     long compromiseCount = metrics.getDatanodeChooseFallbackCount();
 
-    Assert.assertEquals(totalRequest, nodeNum);
-    Assert.assertEquals(successCount, 0);
-    MatcherAssert.assertThat("Not enough try", tryCount,
-        greaterThanOrEqualTo((long) nodeNum));
-    Assert.assertEquals(compromiseCount, 0);
+    Assertions.assertEquals(totalRequest, nodeNum);
+    Assertions.assertEquals(successCount, 0);
+    Assertions.assertTrue(tryCount >= nodeNum, "Not enough try");
+    Assertions.assertEquals(compromiseCount, 0);
   }
 
-  @Test
-  public void testDatanodeWithDefaultNetworkLocation() throws SCMException {
+  @ParameterizedTest
+  @MethodSource("numDatanodes")
+  public void testDatanodeWithDefaultNetworkLocation(int datanodeCount)
+      throws SCMException {
+    setup(datanodeCount);
     String hostname = "node";
     List<DatanodeInfo> dnInfoList = new ArrayList<>();
     List<DatanodeDetails> dataList = new ArrayList<>();
@@ -432,7 +440,7 @@ public class TestSCMContainerPlacementRackScatter {
       clusterMap.add(dn);
       dnInfoList.add(dnInfo);
     }
-    Assert.assertEquals(dataList.size(), StringUtils.countMatches(
+    Assertions.assertEquals(dataList.size(), StringUtils.countMatches(
         clusterMap.toString(), NetConstants.DEFAULT_RACK));
     for (DatanodeInfo dn: dnInfoList) {
       when(nodeManager.getNodeByUuid(dn.getUuidString()))
@@ -446,14 +454,16 @@ public class TestSCMContainerPlacementRackScatter {
             true, metrics);
     List<DatanodeDetails> datanodeDetails =
         newPolicy.chooseDatanodes(null, null, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertEquals(1, getRackSize(datanodeDetails));
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertEquals(1, getRackSize(datanodeDetails));
   }
 
-  @Test
-  public void testvalidateContainerPlacement() {
+  @ParameterizedTest
+  @ValueSource(ints = {15, 20, 25, 30})
+  public void testValidateContainerPlacement(int datanodeCount) {
     // Only run this test for the full set of DNs. 5 DNs per rack on 6 racks.
     assumeTrue(datanodeCount >= 15);
+    setup(datanodeCount);
     List<DatanodeDetails> dns = new ArrayList<>();
     // First 5 node are on the same rack
     dns.add(datanodes.get(0));
@@ -488,8 +498,9 @@ public class TestSCMContainerPlacementRackScatter {
   }
 
   @Test
-  public void testvalidateContainerPlacementSingleRackCluster() {
-    assumeTrue(datanodeCount == 5);
+  public void testValidateContainerPlacementSingleRackCluster() {
+    final int datanodeCount = 5;
+    setup(datanodeCount);
 
     // All nodes are on the same rack in this test, and the cluster only has
     // one rack.
@@ -518,7 +529,8 @@ public class TestSCMContainerPlacementRackScatter {
 
   @Test
   public void testExcludedNodesOverlapsOutOfServiceNodes() throws SCMException {
-    assumeTrue(datanodeCount == 6);
+    final int datanodeCount = 6;
+    setup(datanodeCount);
 
     // DN 5 is out of service
     dnInfos.get(5).setNodeStatus(new NodeStatus(DECOMMISSIONED, HEALTHY));
@@ -536,7 +548,7 @@ public class TestSCMContainerPlacementRackScatter {
 
     List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(
         excludedNodes, null, nodeNum, 0, 5);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
   }
 
   private int getRackSize(List<DatanodeDetails>... datanodeDetails) {

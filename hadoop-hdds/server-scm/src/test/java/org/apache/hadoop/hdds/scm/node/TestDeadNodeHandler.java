@@ -119,7 +119,7 @@ public class TestDeadNodeHandler {
         Mockito.mock(PipelineManager.class), containerManager);
     healthyReadOnlyNodeHandler =
         new HealthyReadOnlyNodeHandler(nodeManager,
-            pipelineManager, conf);
+            pipelineManager);
     eventQueue.addHandler(SCMEvents.DEAD_NODE, deadNodeHandler);
     publisher = Mockito.mock(EventPublisher.class);
   }

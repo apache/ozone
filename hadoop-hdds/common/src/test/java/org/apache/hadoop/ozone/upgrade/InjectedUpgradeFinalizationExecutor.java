@@ -68,7 +68,7 @@ public class InjectedUpgradeFinalizationExecutor<T> extends
   }
 
   @Override
-  public void execute(T component, BasicUpgradeFinalizer finalizer)
+  public void execute(T component, BasicUpgradeFinalizer<T, ?> finalizer)
       throws IOException {
     try {
       injectTestFunctionAtThisPoint(BEFORE_PRE_FINALIZE_UPGRADE);
@@ -79,7 +79,8 @@ public class InjectedUpgradeFinalizationExecutor<T> extends
       finalizer.preFinalizeUpgrade(component);
       injectTestFunctionAtThisPoint(AFTER_PRE_FINALIZE_UPGRADE);
 
-      finalizer.finalizeUpgrade(component);
+      super.finalizeFeatures(component, finalizer,
+          finalizer.getVersionManager().unfinalizedFeatures());
       injectTestFunctionAtThisPoint(AFTER_COMPLETE_FINALIZATION);
 
       finalizer.postFinalizeUpgrade(component);

@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 
 /**
@@ -80,10 +81,20 @@ public class DataNodeUpgradeFinalizer extends
   }
 
   @Override
-  public void finalizeUpgrade(DatanodeStateMachine dsm)
-      throws UpgradeException {
-    super.finalizeUpgrade(lf -> ((HDDSLayoutFeature) lf)::datanodeAction,
-        dsm.getLayoutStorage());
+  public void finalizeLayoutFeature(LayoutFeature layoutFeature,
+      DatanodeStateMachine dsm) throws UpgradeException {
+    if (layoutFeature instanceof HDDSLayoutFeature) {
+      HDDSLayoutFeature hddslayoutFeature =  (HDDSLayoutFeature)layoutFeature;
+      super.finalizeLayoutFeature(hddslayoutFeature,
+          hddslayoutFeature
+              .datanodeAction(LayoutFeature.UpgradeActionType.ON_FINALIZE),
+          dsm.getLayoutStorage());
+    } else {
+      String msg = String.format("Failed to finalize datanode layout feature " +
+          "%s. It is not an HDDS Layout Feature.", layoutFeature);
+      throw new UpgradeException(msg,
+          UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
+    }
   }
 
   @Override

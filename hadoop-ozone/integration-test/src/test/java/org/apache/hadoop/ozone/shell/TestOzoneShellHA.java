@@ -35,6 +35,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.fs.ozone.OzoneFsShell;
@@ -72,6 +73,8 @@ import org.junit.Assert;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -381,6 +384,21 @@ public class TestOzoneShellHA {
   private ArrayList<LinkedTreeMap<String, String>> parseOutputIntoArrayList()
       throws UnsupportedEncodingException {
     return new Gson().fromJson(out.toString(DEFAULT_ENCODING), ArrayList.class);
+  }
+
+  @Test
+  public void testRATISTypeECReplication() {
+    for (ReplicationType type : new ReplicationType[]{
+        ReplicationType.RATIS, ReplicationType.STAND_ALONE}) {
+      String[] args = new String[]{"bucket", "create", "/vol/bucket",
+          "--type=" + type, "--replication=rs-3-2-1024k"};
+      Throwable t = assertThrows(ExecutionException.class,
+          () -> execute(ozoneShell, args));
+      Throwable c = t.getCause();
+      assertTrue(c instanceof IllegalArgumentException);
+      assertEquals("rs-3-2-1024k is not supported for " +
+              type + " replication type", c.getMessage());
+    }
   }
 
   /**
