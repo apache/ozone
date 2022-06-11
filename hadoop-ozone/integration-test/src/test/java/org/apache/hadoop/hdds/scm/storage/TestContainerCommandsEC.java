@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.InsufficientLocationsException;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -298,31 +299,106 @@ public class TestContainerCommandsEC {
     return builder.toString().getBytes(UTF_8);
   }
 
+  /**
+   * Tests the reconstruction of single missed data index.
+   */
   @Test
   public void testECReconstructionCoordinatorWithMissingIndexes1()
       throws Exception {
     testECReconstructionCoordinator(ImmutableList.of(1));
   }
 
+  /**
+   * Tests the reconstruction of single missed data index.
+   */
+  @Test
+  public void testECReconstructionCoordinatorWithMissingIndexes2()
+      throws Exception {
+    testECReconstructionCoordinator(ImmutableList.of(2));
+  }
+
+  /**
+   * Tests the reconstruction of single missed data index.
+   */
+  @Test
+  public void testECReconstructionCoordinatorWithMissingIndexes3()
+      throws Exception {
+    testECReconstructionCoordinator(ImmutableList.of(3));
+  }
+
+  /**
+   * Tests the reconstruction of single missed parity index.
+   */
   @Test
   public void testECReconstructionCoordinatorWithMissingIndexes4()
       throws Exception {
     testECReconstructionCoordinator(ImmutableList.of(4));
   }
 
+  /**
+   * Tests the reconstruction of single missed parity index.
+   */
   @Test
   public void testECReconstructionCoordinatorWithMissingIndexes5()
       throws Exception {
     testECReconstructionCoordinator(ImmutableList.of(5));
   }
 
+  /**
+   * Tests the reconstruction of all missed parity indexes.
+   */
   @Test
   public void testECReconstructionCoordinatorWithMissingIndexes45()
       throws Exception {
     testECReconstructionCoordinator(ImmutableList.of(4, 5));
   }
 
-  public void testECReconstructionCoordinator(List<Integer> missingIndexes)
+  /**
+   * Tests the reconstruction of multiple data indexes missed.
+   */
+  @Test
+  public void testECReconstructionCoordinatorWithMissingIndexes23()
+      throws Exception {
+    testECReconstructionCoordinator(ImmutableList.of(2, 3));
+  }
+
+  /**
+   * Tests the reconstruction of data and parity missing indexes.
+   */
+  @Test
+  public void testECReconstructionCoordinatorWithMissingIndexes24()
+      throws Exception {
+    testECReconstructionCoordinator(ImmutableList.of(2, 4));
+  }
+
+  /**
+   * Tests the reconstruction of data and parity missing indexes.
+   */
+  @Test
+  public void testECReconstructionCoordinatorWithMissingIndexes35()
+      throws Exception {
+    testECReconstructionCoordinator(ImmutableList.of(3, 5));
+  }
+
+  /**
+   * Tests the reconstruction of data when more than parity blocks missed.
+   * Test should throw InsufficientLocationsException.
+   */
+  @Test
+  public void testECReconstructionCoordinatorWithMissingIndexes135() {
+    InsufficientLocationsException exception =
+        Assert.assertThrows(InsufficientLocationsException.class, () -> {
+          testECReconstructionCoordinator(ImmutableList.of(1, 3, 5));
+        });
+
+    String expectedMessage =
+        "There are insufficient datanodes to read the EC block";
+    String actualMessage = exception.getMessage();
+
+    Assert.assertEquals(expectedMessage, actualMessage);
+  }
+
+  private void testECReconstructionCoordinator(List<Integer> missingIndexes)
       throws Exception {
     ObjectStore objectStore = rpcClient.getObjectStore();
     String keyString = UUID.randomUUID().toString();
@@ -400,10 +476,9 @@ public class TestContainerCommandsEC {
     for (int j = 0; j < containerToDeletePipeline.size(); j++) {
       org.apache.hadoop.ozone.container.common.helpers.BlockData[] blockData =
           new ECContainerOperationClient(new OzoneConfiguration())
-              .listBlock(conID,
-                  containerToDeletePipeline.get(j).getFirstNode(),
+              .listBlock(conID, containerToDeletePipeline.get(j).getFirstNode(),
                   (ECReplicationConfig) containerToDeletePipeline.get(j)
-                      .getReplicationConfig());
+                      .getReplicationConfig(), null);
       blockDataArrList.add(blockData);
       // Delete the first index container
       ContainerProtocolCalls.deleteContainer(
@@ -443,13 +518,10 @@ public class TestContainerCommandsEC {
           new ECContainerOperationClient(new OzoneConfiguration())
               .listBlock(conID, newTargetPipeline.getFirstNode(),
                   (ECReplicationConfig) newTargetPipeline
-                      .getReplicationConfig());
+                      .getReplicationConfig(), null);
       Assert.assertEquals(blockDataArrList.get(i).length,
           reconstructedBlockData.length);
-      Assert.assertEquals(Arrays.stream(blockDataArrList.get(i))
-              .map(b -> b.getProtoBufMessage()).collect(Collectors.toList()),
-          Arrays.stream(reconstructedBlockData).map(b -> b.getProtoBufMessage())
-              .collect(Collectors.toList()));
+      checkBlockData(blockDataArrList.get(i), reconstructedBlockData);
       ContainerProtos.ReadContainerResponseProto readContainerResponseProto =
           ContainerProtocolCalls.readContainer(
               xceiverClientManager.acquireClient(newTargetPipeline),
@@ -459,6 +531,33 @@ public class TestContainerCommandsEC {
       i++;
     }
 
+  }
+
+  private void checkBlockData(
+      org.apache.hadoop.ozone.container.common.helpers.BlockData[] blockData,
+      org.apache.hadoop.ozone.container.common.helpers.BlockData[]
+          reconstructedBlockData) {
+
+    for (int i = 0; i < blockData.length; i++) {
+      List<ContainerProtos.ChunkInfo> oldBlockDataChunks =
+          blockData[i].getChunks();
+      List<ContainerProtos.ChunkInfo> newBlockDataChunks =
+          reconstructedBlockData[i].getChunks();
+      for (int j = 0; j < oldBlockDataChunks.size(); j++) {
+        ContainerProtos.ChunkInfo chunkInfo = oldBlockDataChunks.get(j);
+        if (chunkInfo.getLen() == 0) {
+          // let's ignore the empty chunks
+          continue;
+        }
+        Assert.assertEquals(chunkInfo, newBlockDataChunks.get(j));
+      }
+    }
+
+   /* Assert.assertEquals(
+        Arrays.stream(blockData).map(b -> b.getProtoBufMessage())
+            .collect(Collectors.toList()),
+        Arrays.stream(reconstructedBlockData).map(b -> b.getProtoBufMessage())
+            .collect(Collectors.toList()));*/
   }
 
   public static void startCluster(OzoneConfiguration conf) throws Exception {

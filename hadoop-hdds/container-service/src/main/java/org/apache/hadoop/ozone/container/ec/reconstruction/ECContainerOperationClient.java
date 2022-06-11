@@ -23,16 +23,17 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.TokenIdentifier;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -55,44 +56,33 @@ public class ECContainerOperationClient implements Closeable {
   }
 
   public BlockData[] listBlock(long containerId, DatanodeDetails dn,
-      ECReplicationConfig repConfig) throws IOException {
+      ECReplicationConfig repConfig, Token<? extends TokenIdentifier> token)
+      throws IOException {
     List<ContainerProtos.BlockData> blockDataList = ContainerProtocolCalls
         .listBlock(this.xceiverClientManager.acquireClient(
             Pipeline.newBuilder().setId(PipelineID.randomId())
                 .setReplicationConfig(repConfig).setNodes(ImmutableList.of(dn))
                 .setState(Pipeline.PipelineState.CLOSED).build()), containerId,
-            null, Integer.MAX_VALUE, null).getBlockDataList();
+            null, Integer.MAX_VALUE, token).getBlockDataList();
     return blockDataList.stream().map(i -> {
       try {
         return BlockData.getFromProtoBuf(i);
       } catch (IOException e) {
+        // TODO: revisit here.
         return null;
       }
     }).collect(Collectors.toList())
         .toArray(new BlockData[blockDataList.size()]);
   }
 
-  public void closeContainer(long containerId, int replicaIndex,
-      DatanodeDetails dn) {
+  public void closeContainer(XceiverClientSpi client, long containerID,
+      String encodedToken) throws IOException {
+    ContainerProtocolCalls.closeContainer(client, containerID, null);
+    client.close();
   }
 
   public XceiverClientManager getXceiverClientManager() {
     return xceiverClientManager;
-  }
-
-  private Pipeline createSingleNodePipeline(DatanodeDetails dn,
-      int replicaIndex, ECReplicationConfig repConfig) {
-
-    Map<DatanodeDetails, Integer> indicesForSinglePipeline = new HashMap<>();
-    indicesForSinglePipeline.put(dn, replicaIndex);
-
-    return Pipeline.newBuilder()
-        .setId(PipelineID.randomId())
-        .setReplicationConfig(repConfig)
-        .setState(Pipeline.PipelineState.OPEN)
-        .setNodes(ImmutableList.of(dn))
-        .setReplicaIndexes(indicesForSinglePipeline)
-        .build();
   }
 
   @Override

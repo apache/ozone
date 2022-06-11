@@ -170,7 +170,7 @@ public class ECReconstructionCoordinator implements Closeable {
 
     // 3. Close containers
     for (int j = 0; j < targetPipelines.length; j++) {
-      ContainerProtocolCalls
+      this.containerOperationClient
           .closeContainer(targetXceiverClients[j], containerID, null);
       this.containerOperationClient.getXceiverClientManager()
           .releaseClient(targetXceiverClients[j], true);
@@ -312,7 +312,6 @@ public class ECReconstructionCoordinator implements Closeable {
     }
 
     if (containerCommandResponseProto == null) {
-
       return true;
     }
 
@@ -383,7 +382,7 @@ public class ECReconstructionCoordinator implements Closeable {
       DatanodeDetails dn = next.getValue();
 
       BlockData[] blockDataArr =
-          containerOperationClient.listBlock(containerID, dn, repConfig);
+          containerOperationClient.listBlock(containerID, dn, repConfig, null);
 
       for (BlockData blockData : blockDataArr) {
         BlockID blockID = blockData.getBlockID();
