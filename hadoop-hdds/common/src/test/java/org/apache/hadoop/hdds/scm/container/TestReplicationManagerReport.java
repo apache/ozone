@@ -32,6 +32,7 @@ import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static com.fasterxml.jackson.databind.node.JsonNodeType.ARRAY;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests for the ReplicationManagerReport class.
@@ -196,7 +197,7 @@ public class TestReplicationManagerReport {
 
     for (ReplicationManagerReport.HealthState s :
         ReplicationManagerReport.HealthState.values()) {
-      Assertions.assertTrue(report.getSample(s).equals(newReport.getSample(s)));
+      Assertions.assertEquals(report.getSample(s), newReport.getSample(s));
     }
   }
 
@@ -229,17 +230,19 @@ public class TestReplicationManagerReport {
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
 
-  @Test(expected = IllegalStateException.class)
+  @Test
   public void testStatCannotBeSetTwice() {
     report.setStat(HddsProtos.LifeCycleState.CLOSED.toString(), 10);
-    report.setStat(HddsProtos.LifeCycleState.CLOSED.toString(), 10);
+    assertThrows(IllegalStateException.class, () -> report
+        .setStat(HddsProtos.LifeCycleState.CLOSED.toString(), 10));
   }
 
-  @Test(expected = IllegalStateException.class)
+  @Test
   public void testSampleCannotBeSetTwice() {
     List<ContainerID> containers = new ArrayList<>();
     containers.add(ContainerID.valueOf(1));
     report.setSample(HddsProtos.LifeCycleState.CLOSED.toString(), containers);
-    report.setSample(HddsProtos.LifeCycleState.CLOSED.toString(), containers);
+    assertThrows(IllegalStateException.class, () -> report
+        .setSample(HddsProtos.LifeCycleState.CLOSED.toString(), containers));
   }
 }

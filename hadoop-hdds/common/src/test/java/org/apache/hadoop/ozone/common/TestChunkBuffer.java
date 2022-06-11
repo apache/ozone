@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.utils.MockGatheringChannel;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Test {@link ChunkBuffer} implementations.
@@ -42,7 +42,8 @@ public class TestChunkBuffer {
     return ThreadLocalRandom.current().nextInt(n);
   }
 
-  @Test(timeout = 1_000)
+  @Test
+  @Timeout(1)
   public void testImplWithByteBuffer() {
     runTestImplWithByteBuffer(1);
     runTestImplWithByteBuffer(1 << 10);
@@ -57,7 +58,8 @@ public class TestChunkBuffer {
     runTestImpl(expected, 0, ChunkBuffer.allocate(n));
   }
 
-  @Test(timeout = 1_000)
+  @Test
+  @Timeout(1)
   public void testIncrementalChunkBuffer() {
     runTestIncrementalChunkBuffer(1, 1);
     runTestIncrementalChunkBuffer(4, 8);
@@ -76,7 +78,8 @@ public class TestChunkBuffer {
         new IncrementalChunkBuffer(n, increment, false));
   }
 
-  @Test(timeout = 1_000)
+  @Test
+  @Timeout(1)
   public void testImplWithList() {
     runTestImplWithList(4, 8);
     runTestImplWithList(16, 1 << 10);
@@ -217,9 +220,10 @@ public class TestChunkBuffer {
 
   private static void assertEquals(String message,
       ByteString expected, ByteString actual) {
-    Assertions.assertEquals(message,
+    Assertions.assertEquals(
         toString(expected.toByteArray()),
-        toString(actual.toByteArray()));
+        toString(actual.toByteArray()),
+        message);
   }
 
   private static String toString(byte[] arr) {

@@ -22,6 +22,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Daemon;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -31,7 +32,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class TestLockManager {
 
-  @Test(timeout = 1000)
+  @Test
+  @Timeout(1)
   public void testWriteLockWithDifferentResource() {
     final LockManager<String> manager =
         new LockManager<>(new OzoneConfiguration());
@@ -67,7 +69,8 @@ public class TestLockManager {
     Assertions.assertTrue(gotLock.get());
   }
 
-  @Test(timeout = 1000)
+  @Test
+  @Timeout(1)
   public void testReadLockWithDifferentResource() {
     final LockManager<String> manager =
         new LockManager<>(new OzoneConfiguration());

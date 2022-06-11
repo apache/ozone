@@ -38,12 +38,12 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_D
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
 
-import static org.hamcrest.core.Is.is;
 import org.junit.jupiter.api.Assertions;
-import static org.junit.jupiter.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
-import org.junit.jupiter.api.Test;
 
 /**
  * Testing HddsUtils.
@@ -52,13 +52,13 @@ public class TestHddsUtils {
 
   @Test
   public void testGetHostName() {
-    Assertions.assertEquals(Optional.of("localhost"),
+    assertEquals(Optional.of("localhost"),
         HddsUtils.getHostName("localhost:1234"));
 
-    Assertions.assertEquals(Optional.of("localhost"),
+    assertEquals(Optional.of("localhost"),
         HddsUtils.getHostName("localhost"));
 
-    Assertions.assertEquals(Optional.empty(),
+    assertEquals(Optional.empty(),
         HddsUtils.getHostName(":1234"));
   }
 
@@ -91,26 +91,26 @@ public class TestHddsUtils {
     // Verify valid IP address setup
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "1.2.3.4");
     addresses = getSCMAddressForDatanodes(conf);
-    assertThat(addresses.size(), is(1));
+    assertEquals(1, addresses.size());
     addr = addresses.iterator().next();
-    assertThat(addr.getHostName(), is("1.2.3.4"));
-    assertThat(addr.getPort(), is(OZONE_SCM_DATANODE_PORT_DEFAULT));
+    assertEquals("1.2.3.4", addr.getHostName());
+    assertEquals(OZONE_SCM_DATANODE_PORT_DEFAULT, addr.getPort());
 
     // Verify valid hostname setup
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "scm1");
     addresses = getSCMAddressForDatanodes(conf);
-    assertThat(addresses.size(), is(1));
+    assertEquals(1, addresses.size());
     addr = addresses.iterator().next();
-    assertThat(addr.getHostName(), is("scm1"));
-    assertThat(addr.getPort(), is(OZONE_SCM_DATANODE_PORT_DEFAULT));
+    assertEquals("scm1", addr.getHostName());
+    assertEquals(OZONE_SCM_DATANODE_PORT_DEFAULT, addr.getPort());
 
     // Verify valid hostname and port
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "scm1:1234");
     addresses = getSCMAddressForDatanodes(conf);
-    assertThat(addresses.size(), is(1));
+    assertEquals(1, addresses.size());
     addr = addresses.iterator().next();
-    assertThat(addr.getHostName(), is("scm1"));
-    assertThat(addr.getPort(), is(1234));
+    assertEquals("scm1", addr.getHostName());
+    assertEquals(1234, addr.getPort());
 
     final Map<String, Integer> hostsAndPorts = new HashMap<>();
     hostsAndPorts.put("scm1", 1234);
@@ -121,7 +121,7 @@ public class TestHddsUtils {
     conf.setStrings(
         ScmConfigKeys.OZONE_SCM_NAMES, "scm1:1234,scm2:2345,scm3:3456");
     addresses = getSCMAddressForDatanodes(conf);
-    assertThat(addresses.size(), is(3));
+    assertEquals(3, addresses.size());
     it = addresses.iterator();
     HashMap<String, Integer> expected1 = new HashMap<>(hostsAndPorts);
     while (it.hasNext()) {
@@ -135,7 +135,7 @@ public class TestHddsUtils {
     conf.setStrings(
         ScmConfigKeys.OZONE_SCM_NAMES, " scm1:1234, scm2:2345 , scm3:3456 ");
     addresses = getSCMAddressForDatanodes(conf);
-    assertThat(addresses.size(), is(3));
+    assertEquals(3, addresses.size());
     it = addresses.iterator();
     HashMap<String, Integer> expected2 = new HashMap<>(hostsAndPorts);
     while (it.hasNext()) {
@@ -206,15 +206,13 @@ public class TestHddsUtils {
         HddsUtils.getSCMAddressForDatanodes(conf);
 
     Assertions.assertNotNull(scmAddressList);
-    Assertions.assertEquals(3, scmAddressList.size());
+    assertEquals(3, scmAddressList.size());
 
-    Iterator<InetSocketAddress> it = scmAddressList.iterator();
-    while (it.hasNext()) {
-      InetSocketAddress next = it.next();
-      expected.remove(next.getHostName()  + ":" + next.getPort());
+    for (InetSocketAddress next : scmAddressList) {
+      expected.remove(next.getHostName() + ":" + next.getPort());
     }
 
-    Assertions.assertTrue(expected.size() == 0);
+    assertEquals(0, expected.size());
 
   }
 
@@ -228,16 +226,14 @@ public class TestHddsUtils {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         testnum1);
-    Assertions.assertTrue(Integer.parseInt(testnum1) ==
-        HddsUtils.getNumberFromConfigKeys(
-            conf,
+    assertEquals(Integer.parseInt(testnum1),
+        HddsUtils.getNumberFromConfigKeys(conf,
             OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT).orElse(0));
 
     /* Test to return first unempty key number from list */
     /* first key is absent */
-    Assertions.assertTrue(Integer.parseInt(testnum1) ==
-        HddsUtils.getNumberFromConfigKeys(
-            conf,
+    assertEquals(Integer.parseInt(testnum1),
+        HddsUtils.getNumberFromConfigKeys(conf,
             ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
                 serviceId, nodeId),
             OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT).orElse(0));
@@ -246,9 +242,8 @@ public class TestHddsUtils {
     conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
             serviceId, nodeId),
         testnum2);
-    Assertions.assertTrue(Integer.parseInt(testnum2) ==
-        HddsUtils.getNumberFromConfigKeys(
-            conf,
+    assertEquals(Integer.parseInt(testnum2),
+        HddsUtils.getNumberFromConfigKeys(conf,
             ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
                 serviceId, nodeId),
             OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT).orElse(0));

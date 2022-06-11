@@ -57,8 +57,8 @@ public class TestChecksum {
     Assertions.assertEquals(6, checksumData.getChecksums().size());
 
     // Checksum verification should pass
-    Assertions.assertTrue("Checksum mismatch",
-        Checksum.verifyChecksum(data, checksumData));
+    Assertions.assertTrue(Checksum.verifyChecksum(data, checksumData),
+        "Checksum mismatch");
   }
 
   /**
@@ -75,8 +75,8 @@ public class TestChecksum {
     // mismatch
     data[50] = (byte) (data[50] + 1);
     ChecksumData newChecksumData = checksum.computeChecksum(data);
-    Assertions.assertNotEquals("Checksums should not match for different data",
-        originalChecksumData, newChecksumData);
+    Assertions.assertNotEquals(originalChecksumData, newChecksumData,
+        "Checksums should not match for different data");
   }
 
   /**
@@ -92,8 +92,7 @@ public class TestChecksum {
     Checksum checksum2 = getChecksum(ContainerProtos.ChecksumType.CRC32);
 
     // The two checksums should not match as they have different types
-    Assertions.assertNotEquals(
-        "Checksums should not match for different checksum types",
-        checksum1, checksum2);
+    Assertions.assertNotEquals(checksum1, checksum2,
+        "Checksums should not match for different checksum types");
   }
 }

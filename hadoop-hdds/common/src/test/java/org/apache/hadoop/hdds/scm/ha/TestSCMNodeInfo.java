@@ -41,6 +41,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_K
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests for {@link SCMNodeInfo}.
@@ -132,14 +133,15 @@ public class TestSCMNodeInfo {
 
   }
 
-  @Test(expected = ConfigurationException.class)
+  @Test
   public void testSCMHANodeInfoWithMissingSCMAddress() {
     conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
         scmServiceId, "scm1"), "localhost");
     conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
         scmServiceId, "scm1"), "localhost");
 
-    SCMNodeInfo.buildNodeInfo(conf);
+    assertThrows(ConfigurationException.class,
+        () -> SCMNodeInfo.buildNodeInfo(conf));
   }
 
   @Test
@@ -151,7 +153,7 @@ public class TestSCMNodeInfo {
     List< SCMNodeInfo > scmNodeInfos = SCMNodeInfo.buildNodeInfo(config);
 
     Assertions.assertNotNull(scmNodeInfos);
-    Assertions.assertTrue(scmNodeInfos.size() == 1);
+    Assertions.assertEquals(1, scmNodeInfos.size());
     Assertions.assertEquals("localhost:" + OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT,
         scmNodeInfos.get(0).getBlockClientAddress());
     Assertions.assertEquals("localhost:" + OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT,

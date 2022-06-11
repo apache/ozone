@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.audit.AuditEventStatus.FAILURE;
 import static org.apache.hadoop.ozone.audit.AuditEventStatus.SUCCESS;
-import static org.hamcrest.MatcherAssertions.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.StringContains.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -166,11 +166,11 @@ public class TestOzoneAuditLogger {
   @Test
   public void messageIncludesAllParts() {
     String message = WRITE_FAIL_MSG.getFormattedMessage();
-    assertTrue(message, message.contains(USER));
-    assertTrue(message, message.contains(IP_ADDRESS));
-    assertTrue(message, message.contains(DummyAction.CREATE_VOLUME.name()));
-    assertTrue(message, message.contains(PARAMS.toString()));
-    assertTrue(message, message.contains(FAILURE.getStatus()));
+    assertTrue(message.contains(USER), message);
+    assertTrue(message.contains(IP_ADDRESS), message);
+    assertTrue(message.contains(DummyAction.CREATE_VOLUME.name()), message);
+    assertTrue(message.contains(PARAMS.toString()), message);
+    assertTrue(message.contains(FAILURE.getStatus()), message);
   }
 
   /**

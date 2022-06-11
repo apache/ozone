@@ -66,8 +66,7 @@ public class TestPipeline {
 
     protobufMessage = subject.getProtobufMessage(1);
     Assertions.assertEquals(3, protobufMessage.getEcReplicationConfig().getData());
-    Assert
-        .assertEquals(2, protobufMessage.getEcReplicationConfig().getParity());
+    Assertions.assertEquals(2, protobufMessage.getEcReplicationConfig().getParity());
 
   }
 
@@ -84,7 +83,7 @@ public class TestPipeline {
   }
 
   @Test
-  public void testECPipelineIsAlwaysHealthy() throws IOException {
+  public void testECPipelineIsAlwaysHealthy() {
     Pipeline pipeline = MockPipeline.createEcPipeline();
     Assertions.assertTrue(pipeline.isHealthy());
   }

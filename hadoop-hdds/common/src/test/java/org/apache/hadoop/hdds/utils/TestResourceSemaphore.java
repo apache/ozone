@@ -19,12 +19,16 @@ package org.apache.hadoop.hdds.utils;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test for ResourceSemaphore.
  */
 public class TestResourceSemaphore {
-  @Test(timeout = 1000)
+  @Test
+  @Timeout(1)
   public void testGroup() {
     final ResourceSemaphore.Group g = new ResourceSemaphore.Group(3, 1);
 
@@ -49,16 +53,8 @@ public class TestResourceSemaphore {
     g.release(0, 0);
     assertUsed(g, 0, 0);
 
-    try {
-      g.release(1, 0);
-      Assertions.fail("Should have failed.");
-    } catch (IllegalStateException e) {
-    }
-    try {
-      g.release(0, 1);
-      Assertions.fail("Should have failed.");
-    } catch (IllegalStateException e) {
-    }
+    assertThrows(IllegalStateException.class, () -> g.release(1, 0));
+    assertThrows(IllegalStateException.class, () -> g.release(0, 1));
   }
 
   static void assertUsed(ResourceSemaphore.Group g, int... expected) {
