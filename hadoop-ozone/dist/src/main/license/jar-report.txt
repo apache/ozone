@@ -189,6 +189,11 @@ share/ozone/lib/netty-common.Final.jar
 share/ozone/lib/netty-handler.Final.jar
 share/ozone/lib/netty-handler-proxy.Final.jar
 share/ozone/lib/netty-resolver.Final.jar
+share/ozone/lib/netty-tcnative-boringssl-static.Final-linux-aarch_64.jar
+share/ozone/lib/netty-tcnative-boringssl-static.Final-linux-x86_64.jar
+share/ozone/lib/netty-tcnative-boringssl-static.Final-osx-aarch_64.jar
+share/ozone/lib/netty-tcnative-boringssl-static.Final-osx-x86_64.jar
+share/ozone/lib/netty-tcnative-boringssl-static.Final-windows-x86_64.jar
 share/ozone/lib/netty-tcnative-boringssl-static.Final.jar
 share/ozone/lib/netty-tcnative-classes.Final.jar
 share/ozone/lib/netty-tcnative.Final.jar
