@@ -196,19 +196,24 @@ public class SCMBlockProtocolServer implements
           blocks.add(block);
         }
       }
+      auditMap.put("allocated", String.valueOf(blocks.size()));
+
+      if (blocks.size() == num) {
+        AUDIT.logWriteSuccess(
+            buildAuditMessageForSuccess(SCMAction.ALLOCATE_BLOCK, auditMap)
+        );
+      } else {
+        AUDIT.logWriteFailure(buildAuditMessageForFailure(
+            SCMAction.ALLOCATE_BLOCK, auditMap, null)
+        );
+      }
+
       return blocks;
     } catch (Exception ex) {
-      auditSuccess = false;
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(SCMAction.ALLOCATE_BLOCK, auditMap, ex)
       );
       throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logWriteSuccess(
-            buildAuditMessageForSuccess(SCMAction.ALLOCATE_BLOCK, auditMap)
-        );
-      }
     }
   }
 
