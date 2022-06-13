@@ -25,12 +25,13 @@ import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.Service;
 import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.ServiceImpl;
-import org.junit.Assert;
-import org.junit.Test;
 
 import static org.apache.hadoop.hdds.tracing.TracingUtil.createProxy;
 import static org.apache.hadoop.hdds.tracing.TracingUtil.exportCurrentSpan;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import org.junit.jupiter.api.Test;
 
 /**
  * Test for {@link TracingUtil}.
@@ -54,7 +55,7 @@ public class TestTracingUtil {
         .createActivatedSpan("initTracing")) {
       exportCurrentSpan();
     } catch (Exception e) {
-      Assert.fail("Should not get exception");
+      fail("Should not get exception");
     }
   }
 
