@@ -30,6 +30,8 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -43,7 +45,8 @@ import java.util.stream.Collectors;
  *   - CloseContainer
  */
 public class ECContainerOperationClient implements Closeable {
-
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ECContainerOperationClient.class);
   private final XceiverClientManager xceiverClientManager;
 
   public ECContainerOperationClient(XceiverClientManager clientManager) {
@@ -61,27 +64,57 @@ public class ECContainerOperationClient implements Closeable {
   public BlockData[] listBlock(long containerId, DatanodeDetails dn,
       ECReplicationConfig repConfig, Token<? extends TokenIdentifier> token)
       throws IOException {
-    List<ContainerProtos.BlockData> blockDataList = ContainerProtocolCalls
-        .listBlock(this.xceiverClientManager.acquireClient(
-            Pipeline.newBuilder().setId(PipelineID.randomId())
-                .setReplicationConfig(repConfig).setNodes(ImmutableList.of(dn))
-                .setState(Pipeline.PipelineState.CLOSED).build()), containerId,
-            null, Integer.MAX_VALUE, token).getBlockDataList();
-    return blockDataList.stream().map(i -> {
-      try {
-        return BlockData.getFromProtoBuf(i);
-      } catch (IOException e) {
-        // TODO: revisit here.
-        return null;
-      }
-    }).collect(Collectors.toList())
-        .toArray(new BlockData[blockDataList.size()]);
+    XceiverClientSpi xceiverClient = this.xceiverClientManager.acquireClient(
+        Pipeline.newBuilder().setId(PipelineID.valueOf(dn.getUuid()))
+            .setReplicationConfig(repConfig).setNodes(ImmutableList.of(dn))
+            .setState(Pipeline.PipelineState.CLOSED).build());
+    try {
+      List<ContainerProtos.BlockData> blockDataList = ContainerProtocolCalls
+          .listBlock(xceiverClient, containerId, null, Integer.MAX_VALUE, token)
+          .getBlockDataList();
+      return blockDataList.stream().map(i -> {
+        try {
+          return BlockData.getFromProtoBuf(i);
+        } catch (IOException e) {
+          // TODO: revisit here.
+          return null;
+        }
+      }).collect(Collectors.toList())
+          .toArray(new BlockData[blockDataList.size()]);
+    } finally {
+      this.xceiverClientManager.releaseClient(xceiverClient, false);
+    }
   }
 
-  public void closeContainer(XceiverClientSpi client, long containerID,
-      String encodedToken) throws IOException {
-    ContainerProtocolCalls.closeContainer(client, containerID, null);
-    client.close();
+  public void closeContainer(long containerID, DatanodeDetails dn,
+      ECReplicationConfig repConfig, String encodedToken) throws IOException {
+    XceiverClientSpi xceiverClient = this.xceiverClientManager.acquireClient(
+        Pipeline.newBuilder().setId(PipelineID.valueOf(dn.getUuid()))
+            .setReplicationConfig(repConfig).setNodes(ImmutableList.of(dn))
+            .setState(Pipeline.PipelineState.CLOSED).build());
+    try {
+      ContainerProtocolCalls
+          .closeContainer(xceiverClient, containerID, encodedToken);
+    } finally {
+      this.xceiverClientManager.releaseClient(xceiverClient, false);
+    }
+  }
+
+  public void createRecoveringContainer(long containerID, DatanodeDetails dn,
+      ECReplicationConfig repConfig, String encodedToken) throws IOException {
+    XceiverClientSpi xceiverClient = this.xceiverClientManager.acquireClient(
+        // To get the same client from cache, we try to use the DN UUID as
+        // pipelineID for uniqueness. Please note, pipeline does not have any
+        // significance after it's close. So, we are ok to use any ID.
+        Pipeline.newBuilder().setId(PipelineID.valueOf(dn.getUuid()))
+            .setReplicationConfig(repConfig).setNodes(ImmutableList.of(dn))
+            .setState(Pipeline.PipelineState.CLOSED).build());
+    try {
+      ContainerProtocolCalls
+          .createRecoveringContainer(xceiverClient, containerID, encodedToken);
+    } finally {
+      this.xceiverClientManager.releaseClient(xceiverClient, false);
+    }
   }
 
   public XceiverClientManager getXceiverClientManager() {

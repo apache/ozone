@@ -27,12 +27,10 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
-import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
@@ -53,6 +51,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
@@ -136,51 +135,34 @@ public class ECReconstructionCoordinator implements Closeable {
         calcBlockLocationInfoMap(containerID, blockDataMap, pipeline);
 
     // 1. create target recovering containers.
+    Set<Map.Entry<Integer, DatanodeDetails>> targetIndexDns =
+        targetNodeMap.entrySet();
     Iterator<Map.Entry<Integer, DatanodeDetails>> iterator =
-        targetNodeMap.entrySet().iterator();
-    Pipeline[] targetPipelines = new Pipeline[targetNodeMap.entrySet().size()];
-    XceiverClientSpi[] targetXceiverClients =
-        new XceiverClientSpi[targetNodeMap.entrySet().size()];
-    int i = 0;
+        targetIndexDns.iterator();
     while (iterator.hasNext()) {
-      Map.Entry<Integer, DatanodeDetails> next = iterator.next();
-      DatanodeDetails dn = next.getValue();
-      Map<DatanodeDetails, Integer> indicesForSinglePipeline = new HashMap<>();
-      indicesForSinglePipeline.put(dn, next.getKey());
-
-      Pipeline targetPipeline =
-          Pipeline.newBuilder().setId(PipelineID.randomId())
-              .setReplicationConfig(repConfig).setNodes(ImmutableList.of(dn))
-              .setState(Pipeline.PipelineState.CLOSED)
-              .setReplicaIndexes(indicesForSinglePipeline).build();
-      targetPipelines[i] = targetPipeline;
-      XceiverClientSpi client =
-          this.containerOperationClient.getXceiverClientManager()
-              .acquireClient(targetPipeline);
-      targetXceiverClients[i++] = client;
-      ContainerProtocolCalls
-          .createRecoveringContainer(client, containerID, null);
+      DatanodeDetails dn = iterator.next().getValue();
+      this.containerOperationClient
+          .createRecoveringContainer(containerID, dn, repConfig, null);
     }
 
     // 2. Reconstruct and transfer to targets
     for (BlockLocationInfo blockLocationInfo : blockLocationInfoMap.values()) {
-      reconstructECBlockGroup(blockLocationInfo, repConfig, targetNodeMap,
-          targetPipelines);
+      reconstructECBlockGroup(blockLocationInfo, repConfig, targetNodeMap);
     }
 
     // 3. Close containers
-    for (int j = 0; j < targetPipelines.length; j++) {
+    iterator = targetIndexDns.iterator();
+    while (iterator.hasNext()) {
+      DatanodeDetails dn = iterator.next().getValue();
       this.containerOperationClient
-          .closeContainer(targetXceiverClients[j], containerID, null);
-      this.containerOperationClient.getXceiverClientManager()
-          .releaseClient(targetXceiverClients[j], true);
-      targetXceiverClients[j].close();
+          .closeContainer(containerID, dn, repConfig, null);
     }
+
   }
 
   void reconstructECBlockGroup(BlockLocationInfo blockLocationInfo,
       ECReplicationConfig repConfig,
-      SortedMap<Integer, DatanodeDetails> targetMap, Pipeline[] targetPipelines)
+      SortedMap<Integer, DatanodeDetails> targetMap)
       throws IOException {
     long safeBlockGroupLength = blockLocationInfo.getLength();
     List<Integer> missingContainerIndexes =
@@ -229,16 +211,18 @@ public class ECReconstructionCoordinator implements Closeable {
                 (int) (configuration.getStreamBufferMaxSize() / configuration
                     .getStreamBufferSize()),
                 ByteStringConversion.createByteBufferConversion(false));
-
         targetBlockStreams[i] =
             new ECBlockOutputStream(blockLocationInfo.getBlockID(),
                 this.containerOperationClient.getXceiverClientManager(),
-                targetPipelines[i], bufferPool, configuration, null);
-        bufs[i] = byteBufferPool.getBuffer(false,
-            ((ECReplicationConfig) targetPipelines[i].getReplicationConfig())
-                .getEcChunkSize());
+                Pipeline.newBuilder().setId(PipelineID.valueOf(
+                    targetMap.get(toReconstructIndexes.get(i)).getUuid()))
+                    .setReplicationConfig(repConfig).setNodes(ImmutableList
+                    .of(targetMap.get(toReconstructIndexes.get(i))))
+                    .setState(Pipeline.PipelineState.CLOSED).build(),
+                bufferPool, configuration, null);
+        bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
         // Make sure it's clean. Don't want to reuse the erroneously returned
-        // buffers.
+        // buffers from the pool.
         bufs[i].clear();
       }
 

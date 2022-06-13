@@ -85,16 +85,6 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
   }
 
   public XceiverClientManager(ConfigurationSource conf,
-      XceiverClientManagerConfig config, List<X509Certificate> caCerts)
-      throws IOException {
-    this(conf, new ScmClientConfig(), caCerts);
-    // TODO: revisit. Don't want to expose ScmClientConfig as it does not make
-    //  sense to use at DN.
-    clientConfig.setMaxSize(config.maxCacheSize);
-    clientConfig.setStaleThreshold(config.staleThresholdMs);
-  }
-
-  public XceiverClientManager(ConfigurationSource conf,
       ScmClientConfig clientConf,
       List<X509Certificate> caCerts) throws IOException {
     Preconditions.checkNotNull(clientConf);
@@ -366,20 +356,6 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
   }
 
   /**
-   * XceiverClientManager Config class.
-   */
-  public static final class XceiverClientManagerConfig {
-    private int maxCacheSize;
-    private long staleThresholdMs;
-
-    private XceiverClientManagerConfig(int maxCacheSize,
-        long staleThresholdMs) {
-      this.maxCacheSize = maxCacheSize;
-      this.staleThresholdMs = staleThresholdMs;
-    }
-  }
-
-  /**
    * Builder of XceiverClientManagerConfig.
    */
   public static class XceiverClientManagerConfigBuilder {
@@ -398,9 +374,11 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
       return this;
     }
 
-    public XceiverClientManagerConfig build() {
-      return new XceiverClientManagerConfig(this.maxCacheSize,
-          this.staleThresholdMs);
+    public ScmClientConfig build() {
+      ScmClientConfig clientConfig = new ScmClientConfig();
+      clientConfig.setMaxSize(this.maxCacheSize);
+      clientConfig.setStaleThreshold(this.staleThresholdMs);
+      return clientConfig;
     }
   }
 
