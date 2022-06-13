@@ -167,7 +167,7 @@ public final class SCMContainerPlacementRackScatter
       }
 
       if (mutableFavoredNodes.size() > 0) {
-        List<Node> chosenFavoredNodesInForLoop = new ArrayList<>();
+        List<DatanodeDetails> chosenFavoredNodesInForLoop = new ArrayList<>();
         for (DatanodeDetails favoredNode : mutableFavoredNodes) {
           Node curRack = getRackOfDatanodeDetails(favoredNode);
           if (toChooseRacks.contains(curRack)) {
