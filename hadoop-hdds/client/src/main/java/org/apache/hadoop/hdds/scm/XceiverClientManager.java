@@ -80,7 +80,8 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
    * @param conf configuration
    */
   public XceiverClientManager(ConfigurationSource conf) throws IOException {
-    this(conf, conf.getObject(ScmClientConfig.class), null);
+    // Revert the below line. This is to check CI.
+    this(conf, new ScmClientConfig(), null);
   }
 
   public XceiverClientManager(ConfigurationSource conf,
