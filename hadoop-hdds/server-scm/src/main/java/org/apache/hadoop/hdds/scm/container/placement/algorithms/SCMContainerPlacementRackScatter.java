@@ -140,7 +140,7 @@ public final class SCMContainerPlacementRackScatter
       racks = sortRackWithExcludedNodes(racks, excludedNodes);
     }
 
-    List<Node> toChooseRacks = new LinkedList<>(racks);
+    List<Node> toChooseRacks = new LinkedList<>();
     Set<DatanodeDetails> chosenNodes = new LinkedHashSet<>();
     List<Node> unavailableNodes = new ArrayList<>();
     Set<Node> skippedRacks = new HashSet<>();
