@@ -283,6 +283,7 @@ public class TestMiniOzoneCluster {
 
   @Test
   public void testKeepPortsWhenRestartDN() throws Exception {
+    conf.set(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, "1s");
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)
         .build();
