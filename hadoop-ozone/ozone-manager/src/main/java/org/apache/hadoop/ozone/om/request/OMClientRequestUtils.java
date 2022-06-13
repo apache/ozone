@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request;
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +46,29 @@ public final class OMClientRequestUtils {
       throw new OMException(
           errMsg,
           OMException.ResultCodes.INTERNAL_ERROR);
+    }
+  }
+
+  /**
+   * Validates the bucket associated with the request - to make sure it did
+   * not change since the request started processing.
+   *
+   * @param bucketId  - bucket ID of the associated bucket when the request
+   *                  is being processed.
+   * @param omRequest - request to be validated, contains the bucket ID of the
+   *                  associated bucket when the request was created.
+   * @throws OMException
+   */
+  public static void validateAssociatedBucketId(long bucketId,
+                                                OMRequest omRequest)
+      throws OMException {
+    if (omRequest.hasAssociatedBucketId()) {
+      if (bucketId != omRequest.getAssociatedBucketId()) {
+        throw new OMException(
+            "Bucket ID mismatch. Associated bucket was modified while this" +
+                " request was being processed. Please retry the request.",
+            OMException.ResultCodes.BUCKET_ID_MISMATCH);
+      }
     }
   }
 }

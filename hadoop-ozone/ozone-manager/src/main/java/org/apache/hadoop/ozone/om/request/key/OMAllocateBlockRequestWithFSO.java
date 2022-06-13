@@ -59,6 +59,7 @@ import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateAssociatedBucketId;
 
 /**
  * Handles allocate block request - prefix layout.
@@ -141,7 +142,13 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
 
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
               volumeName, bucketName);
+
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      final long bucketId = omBucketInfo.getObjectID();
+
+      // Bucket ID verification for in-flight requests.
+      validateAssociatedBucketId(bucketId, getOmRequest());
+
       // check bucket and volume quota
       long preAllocatedKeySize = newLocationList.size()
           * ozoneManager.getScmBlockSize();

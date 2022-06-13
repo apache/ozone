@@ -57,6 +57,7 @@ import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateAssociatedBucketId;
 
 /**
  * Handles rename key request - prefix layout.
@@ -125,6 +126,12 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
 
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+
+      final long bucketId =
+          omMetadataManager.getBucketId(volumeName, bucketName);
+
+      // Bucket ID verification for in-flight requests.
+      validateAssociatedBucketId(bucketId, getOmRequest());
 
       // Check if fromKey exists
       OzoneFileStatus fromKeyFileStatus =

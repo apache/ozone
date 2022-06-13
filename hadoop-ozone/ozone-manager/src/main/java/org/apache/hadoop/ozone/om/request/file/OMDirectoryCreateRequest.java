@@ -79,6 +79,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateAssociatedBucketId;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.NONE;
@@ -181,6 +182,14 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
           volumeName, bucketName);
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+
+      String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+      final long bucketId =
+          omMetadataManager.getBucketId(volumeName, bucketName);
+
+      // Bucket ID verification for in-flight requests.
+      validateAssociatedBucketId(bucketId, getOmRequest());
 
       Path keyPath = Paths.get(keyName);
 

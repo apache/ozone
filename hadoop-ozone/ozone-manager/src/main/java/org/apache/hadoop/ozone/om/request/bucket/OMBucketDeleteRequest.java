@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateAssociatedBucketId;
 
 /**
  * Handles DeleteBucket Request.
@@ -120,6 +121,12 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // No need to check volume exists here, as bucket cannot be created
       // with out volume creation. Check if bucket exists
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+      final long bucketId =
+          omMetadataManager.getBucketId(volumeName, bucketName);
+
+      // Bucket ID verification for in-flight requests.
+      validateAssociatedBucketId(bucketId, getOmRequest());
 
       OmBucketInfo omBucketInfo =
           omMetadataManager.getBucketTable().get(bucketKey);

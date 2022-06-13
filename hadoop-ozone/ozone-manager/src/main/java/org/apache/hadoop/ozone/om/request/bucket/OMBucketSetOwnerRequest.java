@@ -49,6 +49,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateAssociatedBucketId;
 
 /**
  * Handle set owner request for bucket.
@@ -123,6 +124,13 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
           BUCKET_LOCK, volumeName, bucketName);
 
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+      final long bucketId =
+          omMetadataManager.getBucketId(volumeName, bucketName);
+
+      // Bucket ID verification for in-flight requests.
+      validateAssociatedBucketId(bucketId, getOmRequest());
+
       OmBucketInfo omBucketInfo =
           omMetadataManager.getBucketTable().get(bucketKey);
       //Check if bucket exist

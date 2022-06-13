@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
@@ -39,16 +40,21 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.request.validation.RequestValidations;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.ozone.security.S3SecurityUtil;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
@@ -135,7 +141,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       OMRequest request) throws ServiceException {
     OMRequest validatedRequest;
     try {
-      validatedRequest = requestValidations.validateRequest(request);
+      OMRequest requestWithBucketId = associateBucketIdWithRequest(request);
+      validatedRequest =
+          requestValidations.validateRequest(requestWithBucketId);
     } catch (Exception e) {
       if (e instanceof OMException) {
         return createErrorResponse(request, (OMException) e);
@@ -322,6 +330,157 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       omResponse.setMessage(exception.getMessage());
     }
     return omResponse.build();
+  }
+
+  /**
+   * Associate bucket ID with requests that have an associated bucket.
+   * Returns a new OMRequest object with the bucket ID associated.
+   *
+   * @param omRequest OMRequest
+   * @return OMRequest with bucket ID associated.
+   * @throws IOException
+   */
+  private OMRequest associateBucketIdWithRequest(OMRequest omRequest)
+      throws IOException {
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    String volumeName = "";
+    String bucketName = "";
+
+    OzoneManagerProtocolProtos.KeyArgs keyArgs;
+    OzoneObj obj;
+    ObjectParser objectParser;
+    ObjectType type;
+
+    switch (omRequest.getCmdType()) {
+    case AddAcl:
+      type = omRequest.getAddAclRequest().getObj().getResType();
+      // No need for bucket ID validation in case of volume ACL
+      if (ObjectType.VOLUME == type) {
+        break;
+      }
+
+      obj =
+          OzoneObjInfo.fromProtobuf(omRequest.getAddAclRequest().getObj());
+      objectParser = new ObjectParser(obj.getPath(), type);
+
+      volumeName = objectParser.getVolume();
+      bucketName = objectParser.getBucket();
+      break;
+    case RemoveAcl:
+      type = omRequest.getAddAclRequest().getObj().getResType();
+      // No need for bucket ID validation in case of volume ACL
+      if (ObjectType.VOLUME == type) {
+        break;
+      }
+
+      obj =
+          OzoneObjInfo.fromProtobuf(omRequest.getRemoveAclRequest().getObj());
+      objectParser = new ObjectParser(obj.getPath(), type);
+
+      volumeName = objectParser.getVolume();
+      bucketName = objectParser.getBucket();
+      break;
+    case SetAcl:
+      type = omRequest.getAddAclRequest().getObj().getResType();
+      // No need for bucket ID validation in case of volume ACL
+      if (ObjectType.VOLUME == type) {
+        break;
+      }
+
+      obj =
+          OzoneObjInfo.fromProtobuf(omRequest.getSetAclRequest().getObj());
+      objectParser = new ObjectParser(obj.getPath(), type);
+
+      volumeName = objectParser.getVolume();
+      bucketName = objectParser.getBucket();
+      break;
+    case DeleteBucket:
+      volumeName = omRequest.getDeleteBucketRequest().getVolumeName();
+      bucketName = omRequest.getDeleteBucketRequest().getBucketName();
+      break;
+    case CreateDirectory:
+      keyArgs = omRequest.getCreateDirectoryRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
+    case CreateFile:
+      keyArgs = omRequest.getCreateFileRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
+    case CreateKey:
+      keyArgs = omRequest.getCreateKeyRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
+    case AllocateBlock:
+      keyArgs = omRequest.getAllocateBlockRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
+    case CommitKey:
+      keyArgs = omRequest.getCommitKeyRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
+    case DeleteKey:
+      keyArgs = omRequest.getDeleteKeyRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
+    case DeleteKeys:
+      OzoneManagerProtocolProtos.DeleteKeyArgs deleteKeyArgs =
+          omRequest.getDeleteKeysRequest()
+              .getDeleteKeys();
+      volumeName = deleteKeyArgs.getVolumeName();
+      bucketName = deleteKeyArgs.getBucketName();
+      break;
+    case RenameKey:
+      keyArgs = omRequest.getRenameKeyRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
+    case RenameKeys:
+      OzoneManagerProtocolProtos.RenameKeysArgs renameKeysArgs =
+          omRequest.getRenameKeysRequest().getRenameKeysArgs();
+      volumeName = renameKeysArgs.getVolumeName();
+      bucketName = renameKeysArgs.getBucketName();
+      break;
+    case InitiateMultiPartUpload:
+      keyArgs = omRequest.getInitiateMultiPartUploadRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
+    case CommitMultiPartUpload:
+      keyArgs = omRequest.getCommitMultiPartUploadRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
+    case AbortMultiPartUpload:
+      keyArgs = omRequest.getAbortMultiPartUploadRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
+    case CompleteMultiPartUpload:
+      keyArgs = omRequest.getCompleteMultiPartUploadRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
+    default:
+      // do nothing in case of other requests.
+      break;
+    }
+
+    // Check if there is any bucket associated with this request.
+    if (bucketName.equals("") && volumeName.equals("")) {
+      return omRequest;
+    }
+
+    long bucketId = metadataManager.getBucketId(volumeName, bucketName);
+
+    return OMRequest.newBuilder(omRequest)
+        .setAssociatedBucketId(bucketId)
+        .build();
   }
 
   public void stop() {

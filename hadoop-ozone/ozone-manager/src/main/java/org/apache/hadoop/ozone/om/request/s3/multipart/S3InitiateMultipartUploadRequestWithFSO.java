@@ -55,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateAssociatedBucketId;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 
 /**
@@ -114,6 +115,12 @@ public class S3InitiateMultipartUploadRequestWithFSO
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
+      final long bucketId =
+          omMetadataManager.getBucketId(volumeName, bucketName);
+
+      // Bucket ID verification for in-flight requests.
+      validateAssociatedBucketId(bucketId, getOmRequest());
+
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO = OMFileRequest
           .verifyDirectoryKeysInPath(omMetadataManager, volumeName, bucketName,
               keyName, Paths.get(keyName));
@@ -146,8 +153,6 @@ public class S3InitiateMultipartUploadRequestWithFSO
           keyArgs.getMultipartUploadID());
 
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
-      final long bucketId = omMetadataManager.getBucketId(volumeName,
-              bucketName);
 
       String multipartOpenKey = omMetadataManager
           .getMultipartKey(volumeId, bucketId,

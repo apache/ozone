@@ -228,6 +228,8 @@ message OMRequest {
   optional SetRangerServiceVersionRequest   SetRangerServiceVersionRequest = 107;
   optional RangerBGSyncRequest              RangerBGSyncRequest            = 109;
   optional EchoRPCRequest                   EchoRPCRequest                 = 110;
+
+  optional uint64 associatedBucketId = 111;
 }
 
 message OMResponse {

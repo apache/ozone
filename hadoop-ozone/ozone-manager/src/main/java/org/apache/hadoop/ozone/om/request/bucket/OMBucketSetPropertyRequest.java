@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateAssociatedBucketId;
 
 /**
  * Handle SetBucketProperty Request.
@@ -134,6 +135,13 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
           BUCKET_LOCK, volumeName, bucketName);
 
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+      final long bucketId =
+          omMetadataManager.getBucketId(volumeName, bucketName);
+
+      // Bucket ID verification for in-flight requests.
+      validateAssociatedBucketId(bucketId, getOmRequest());
+
       OmBucketInfo dbBucketInfo =
           omMetadataManager.getBucketTable().get(bucketKey);
       //Check if bucket exist

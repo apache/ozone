@@ -52,6 +52,7 @@ import java.util.Map;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateAssociatedBucketId;
 
 /**
  * Handles DeleteKey request - prefix layout.
@@ -109,6 +110,12 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
+      final long bucketId =
+          omMetadataManager.getBucketId(volumeName, bucketName);
+
+      // Bucket ID verification for in-flight requests.
+      validateAssociatedBucketId(bucketId, getOmRequest());
+
       OzoneFileStatus keyStatus =
               OMFileRequest.getOMKeyInfoIfExists(omMetadataManager, volumeName,
                       bucketName, keyName, 0);
@@ -128,8 +135,6 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
-      final long bucketId = omMetadataManager.getBucketId(volumeName,
-              bucketName);
       String ozonePathKey = omMetadataManager.getOzonePathKey(volumeId,
               bucketId, omKeyInfo.getParentObjectID(),
               omKeyInfo.getFileName());
