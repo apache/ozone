@@ -250,9 +250,12 @@ public class KeyValueContainerCheck {
             BlockData bdata = db.getStore()
                     .getBlockDataTable()
                     .get(blockKey);
+            // In EC, client may write empty putBlock in padding block nodes.
+            // So, we need to make sure, chunk length > 0, before declaring
+            // the missing chunk file.
             if (bdata != null) {
-              throw new IOException("Missing chunk file "
-                  + chunkFile.getAbsolutePath());
+              throw new IOException(
+                  "Missing chunk file " + chunkFile.getAbsolutePath());
             }
           } else if (chunk.getChecksumData().getType()
               != ContainerProtos.ChecksumType.NONE) {
