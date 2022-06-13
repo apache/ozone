@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -92,21 +91,22 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
             bucketName, keyName, 0);
 
     Assert.assertNotNull("key not found in DB!", keyStatus);
-
-    return omMetadataManager.getMultipartKey(keyStatus.getKeyInfo()
-                    .getParentObjectID(), keyStatus.getTrimmedName(),
-            multipartUploadID);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getMultipartKey(volumeId, bucketId,
+            keyStatus.getKeyInfo().getParentObjectID(),
+            keyStatus.getTrimmedName(), multipartUploadID);
   }
 
   private long getParentID(String volumeName, String bucketName,
                            String keyName) throws IOException {
     Path keyPath = Paths.get(keyName);
     Iterator<Path> elements = keyPath.iterator();
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-            omMetadataManager.getBucketTable().get(bucketKey);
-
-    return OMFileRequest.getParentID(omBucketInfo.getObjectID(),
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return OMFileRequest.getParentID(volumeId, bucketId,
             elements, keyName, omMetadataManager);
   }
 
@@ -115,7 +115,11 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
                                  String keyName) throws IOException {
     long parentID = getParentID(volumeName, bucketName, keyName);
     String fileName = OzoneFSUtils.getFileName(keyName);
-    return omMetadataManager.getOzonePathKey(parentID, fileName);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getOzonePathKey(volumeId, bucketId,
+            parentID, fileName);
   }
 
   @Override

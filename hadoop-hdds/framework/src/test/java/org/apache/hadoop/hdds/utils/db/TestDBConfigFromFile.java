@@ -20,12 +20,11 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.commons.io.FileUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
@@ -34,6 +33,7 @@ import org.rocksdb.RocksDB;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -49,13 +49,10 @@ import static org.apache.hadoop.hdds.utils.db.DBConfigFromFile.getOptionsFileNam
 public class TestDBConfigFromFile {
   private static final String DB_FILE = "test.db";
   private static final String INI_FILE = getOptionsFileNameFromDB(DB_FILE);
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
 
-  @Before
-  public void setUp() throws Exception {
-    System.setProperty(DBConfigFromFile.CONFIG_DIR,
-        folder.newFolder().toString());
+  @BeforeEach
+  public void setUp(@TempDir Path tempDir) throws Exception {
+    System.setProperty(DBConfigFromFile.CONFIG_DIR, tempDir.toString());
     ClassLoader classLoader = getClass().getClassLoader();
     File testData = new File(classLoader.getResource(INI_FILE).getFile());
     File dest = Paths.get(
@@ -63,7 +60,7 @@ public class TestDBConfigFromFile {
     FileUtils.copyFile(testData, dest);
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
   }
 
@@ -87,10 +84,10 @@ public class TestDBConfigFromFile {
 
     // Some Random Values Defined in the test.db.ini, we verify that we are
     // able to get values that are defined in the test.db.ini.
-    Assert.assertNotNull(options);
-    Assert.assertEquals(551615L, options.maxManifestFileSize());
-    Assert.assertEquals(1000L, options.keepLogFileNum());
-    Assert.assertEquals(1048576, options.writableFileMaxBufferSize());
+    Assertions.assertNotNull(options);
+    Assertions.assertEquals(551615L, options.maxManifestFileSize());
+    Assertions.assertEquals(1000L, options.keepLogFileNum());
+    Assertions.assertEquals(1048576, options.writableFileMaxBufferSize());
   }
 
   @Test
@@ -112,6 +109,6 @@ public class TestDBConfigFromFile {
         columnFamilyDescriptors);
 
     // This has to return a Null, since we have config defined for badfile.db
-    Assert.assertNull(options);
+    Assertions.assertNull(options);
   }
 }

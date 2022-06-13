@@ -687,7 +687,7 @@ public class SCMClientProtocolServer implements
   @Override
   public void activatePipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.ACTIVATE_PIPELINE, null));
     scm.getPipelineManager().activatePipeline(
         PipelineID.getFromProtobuf(pipelineID));
@@ -697,7 +697,7 @@ public class SCMClientProtocolServer implements
   public void deactivatePipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
     getScm().checkAdminAccess(getRemoteUser());
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.DEACTIVATE_PIPELINE, null));
     scm.getPipelineManager().deactivatePipeline(
         PipelineID.getFromProtobuf(pipelineID));
@@ -806,7 +806,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public boolean getReplicationManagerStatus() {
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_REPLICATION_MANAGER_STATUS, null));
     return scm.getReplicationManager().isRunning();
   }
@@ -815,7 +815,7 @@ public class SCMClientProtocolServer implements
   public ReplicationManagerReport getReplicationManagerReport()
       throws IOException {
     getScm().checkAdminAccess(getRemoteUser());
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_REPLICATION_MANAGER_REPORT, null));
     return scm.getReplicationManager().getContainerReport();
   }
@@ -830,7 +830,9 @@ public class SCMClientProtocolServer implements
       LOG.error("Authorization failed for finalize scm upgrade", e);
       throw e;
     }
-    return scm.finalizeUpgrade(upgradeClientID);
+    // TODO HDDS-6762: Return to the client once the FINALIZATION_STARTED
+    //  checkpoint has been crossed and continue finalizing asynchronously.
+    return scm.getFinalizationManager().finalizeUpgrade(upgradeClientID);
   }
 
   @Override
@@ -848,8 +850,8 @@ public class SCMClientProtocolServer implements
       }
     }
 
-    return scm.queryUpgradeFinalizationProgress(upgradeClientID, force,
-        readonly);
+    return scm.getFinalizationManager()
+        .queryUpgradeFinalizationProgress(upgradeClientID, force, readonly);
   }
 
   @Override
@@ -909,10 +911,9 @@ public class SCMClientProtocolServer implements
     }
 
     ContainerBalancer containerBalancer = scm.getContainerBalancer();
-    containerBalancer.setConfig(cbc);
     try {
-      containerBalancer.startBalancer();
-    } catch (IllegalContainerBalancerStateException |
+      containerBalancer.startBalancer(cbc);
+    } catch (IllegalContainerBalancerStateException | IOException |
         InvalidContainerBalancerConfigurationException e) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.START_CONTAINER_BALANCER, null, e));
@@ -931,14 +932,19 @@ public class SCMClientProtocolServer implements
   @Override
   public void stopContainerBalancer() throws IOException {
     getScm().checkAdminAccess(getRemoteUser());
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-        SCMAction.STOP_CONTAINER_BALANCER, null));
-    scm.getContainerBalancer().stopBalancer();
+    try {
+      scm.getContainerBalancer().stopBalancer();
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.STOP_CONTAINER_BALANCER, null));
+    } catch (IllegalContainerBalancerStateException e) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.STOP_CONTAINER_BALANCER, null, e));
+    }
   }
 
   @Override
   public boolean getContainerBalancerStatus() {
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_CONTAINER_BALANCER_STATUS, null));
     return scm.getContainerBalancer().isBalancerRunning();
   }

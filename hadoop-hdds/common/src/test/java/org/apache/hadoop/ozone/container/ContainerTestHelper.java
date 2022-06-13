@@ -175,19 +175,24 @@ public final class ContainerTestHelper {
         .build();
   }
 
+  public static Builder newWriteChunkRequestBuilder(Pipeline pipeline,
+      BlockID blockID, int datalen, int seq) throws IOException {
+    ChunkBuffer data = getData(datalen);
+    return newWriteChunkRequestBuilder(pipeline, blockID, data, seq);
+  }
+
   public static Builder newWriteChunkRequestBuilder(
-      Pipeline pipeline, BlockID blockID, int datalen, int seq)
+      Pipeline pipeline, BlockID blockID, ChunkBuffer data, int seq)
       throws IOException {
     LOG.trace("writeChunk {} (blockID={}) to pipeline={}",
-        datalen, blockID, pipeline);
+        data.limit(), blockID, pipeline);
     ContainerProtos.WriteChunkRequestProto.Builder writeRequest =
         ContainerProtos.WriteChunkRequestProto
             .newBuilder();
 
     writeRequest.setBlockID(blockID.getDatanodeBlockIDProtobuf());
 
-    ChunkBuffer data = getData(datalen);
-    ChunkInfo info = getChunk(blockID.getLocalID(), seq, 0, datalen);
+    ChunkInfo info = getChunk(blockID.getLocalID(), seq, 0, data.limit());
     setDataChecksum(info, data);
 
     writeRequest.setChunkData(info.getProtoBufMessage());

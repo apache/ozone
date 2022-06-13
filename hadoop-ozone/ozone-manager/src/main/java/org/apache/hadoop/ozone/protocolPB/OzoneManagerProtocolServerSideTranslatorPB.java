@@ -122,7 +122,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         new RequestValidations()
             .fromPackage(OM_REQUESTS_PACKAGE)
             .withinContext(
-                ValidationContext.of(ozoneManager.getVersionManager()))
+                ValidationContext.of(ozoneManager.getVersionManager(),
+                    ozoneManager.getMetadataManager()))
             .load();
   }
 
@@ -151,6 +152,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
 
   private OMResponse processRequest(OMRequest request) throws
       ServiceException {
+    OMClientRequest omClientRequest = null;
     if (isRatisEnabled) {
       boolean s3Auth = false;
       try {
@@ -158,7 +160,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         // if current OM is leader and then proceed with processing the request.
         if (request.hasS3Authentication()) {
           s3Auth = true;
-          checkLeaderStatus();
           S3SecurityUtil.validateS3Credential(request, ozoneManager);
         }
       } catch (IOException ex) {
@@ -179,17 +180,28 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         // To validate credentials we have already verified leader status.
         // This will skip of checking leader status again if request has S3Auth.
         if (!s3Auth) {
-          checkLeaderStatus();
+          OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
         }
         try {
-          OMClientRequest omClientRequest =
+          omClientRequest =
               createClientRequest(request, ozoneManager);
+          // TODO: Note: Due to HDDS-6055, createClientRequest() could now
+          //  return null, which triggered the findbugs warning.
+          //  Added the assertion.
+          assert (omClientRequest != null);
           request = omClientRequest.preExecute(ozoneManager);
         } catch (IOException ex) {
           // As some of the preExecute returns error. So handle here.
+          if (omClientRequest != null) {
+            omClientRequest.handleRequestFailure(ozoneManager);
+          }
           return createErrorResponse(request, ex);
         }
-        return submitRequestToRatis(request);
+        OMResponse response = submitRequestToRatis(request);
+        if (!response.getSuccess()) {
+          omClientRequest.handleRequestFailure(ozoneManager);
+        }
+        return response;
       }
     } else {
       return submitRequestDirectlyToOM(request);
@@ -254,7 +266,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   /**
    * Submits request directly to OM.
    */
-  private OMResponse submitRequestDirectlyToOM(OMRequest request) {
+  private OMResponse submitRequestDirectlyToOM(OMRequest request) throws
+      ServiceException {
     OMClientResponse omClientResponse = null;
     long index = 0L;
     try {
@@ -297,11 +310,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       Thread.currentThread().interrupt();
     }
     return omClientResponse.getOMResponse();
-  }
-
-  private void checkLeaderStatus() throws ServiceException {
-    OzoneManagerRatisUtils.checkLeaderStatus(omRatisServer.checkLeaderStatus(),
-        omRatisServer.getRaftPeerId());
   }
 
   /**

@@ -22,10 +22,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import picocli.CommandLine;
 
@@ -52,14 +52,14 @@ public class TestUsageInfoSubcommand {
   private final PrintStream originalErr = System.err;
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
-  @Before
+  @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     cmd = new UsageInfoSubcommand();
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     System.setOut(originalOut);
     System.setErr(originalErr);
@@ -79,18 +79,18 @@ public class TestUsageInfoSubcommand {
     ObjectMapper mapper = new ObjectMapper();
     JsonNode json = mapper.readTree(outContent.toString("UTF-8"));
 
-    Assert.assertEquals(ARRAY, json.getNodeType());
-    Assert.assertTrue(json.get(0).get("datanodeDetails") != null);
-    Assert.assertEquals(10, json.get(0).get("ozoneUsed").longValue());
-    Assert.assertEquals(100, json.get(0).get("capacity").longValue());
-    Assert.assertEquals(80, json.get(0).get("remaining").longValue());
-    Assert.assertEquals(20, json.get(0).get("totalUsed").longValue());
+    Assertions.assertEquals(ARRAY, json.getNodeType());
+    Assertions.assertNotNull(json.get(0).get("datanodeDetails"));
+    Assertions.assertEquals(10, json.get(0).get("ozoneUsed").longValue());
+    Assertions.assertEquals(100, json.get(0).get("capacity").longValue());
+    Assertions.assertEquals(80, json.get(0).get("remaining").longValue());
+    Assertions.assertEquals(20, json.get(0).get("totalUsed").longValue());
 
-    Assert.assertEquals(20.00,
+    Assertions.assertEquals(20.00,
         json.get(0).get("totalUsedPercent").doubleValue(), 0.001);
-    Assert.assertEquals(10.00,
+    Assertions.assertEquals(10.00,
         json.get(0).get("ozoneUsedPercent").doubleValue(), 0.001);
-    Assert.assertEquals(80.00,
+    Assertions.assertEquals(80.00,
         json.get(0).get("remainingPercent").doubleValue(), 0.001);
   }
 

@@ -50,10 +50,10 @@ import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +72,7 @@ public class TestOzoneBlockTokenIdentifier {
   private static KeyPair keyPair;
   private static X509Certificate cert;
 
-  @BeforeClass
+  @BeforeAll
   public static void setUp() throws Exception {
     File base = new File(BASEDIR);
     FileUtil.fullyDelete(base);
@@ -86,7 +86,7 @@ public class TestOzoneBlockTokenIdentifier {
         .generateCertificate("CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
   }
 
-  @After
+  @AfterEach
   public void cleanUp() throws Exception {
     // KeyStoreTestUtil.cleanupSSLConfig(KEYSTORES_DIR, sslConfsDir);
   }
@@ -174,8 +174,8 @@ public class TestOzoneBlockTokenIdentifier {
     decodedTokenId.readFields(new DataInputStream(
         new ByteArrayInputStream(decodedToken.getIdentifier())));
 
-    Assert.assertEquals(decodedTokenId, tokenId);
-    Assert.assertEquals(decodedTokenId.getMaxLength(), maxLength);
+    Assertions.assertEquals(tokenId, decodedTokenId);
+    Assertions.assertEquals(maxLength, decodedTokenId.getMaxLength());
 
     // Verify a decoded signed Token with public key(certificate)
     boolean isValidToken = verifyTokenAsymmetric(decodedTokenId, decodedToken

@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -35,7 +36,7 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCache;
  *
  */
 @InterfaceStability.Evolving
-public interface DBStore extends AutoCloseable, BatchOperationHandler {
+public interface DBStore extends Closeable, BatchOperationHandler {
 
   /**
    * Gets an existing TableStore.
@@ -197,4 +198,10 @@ public interface DBStore extends AutoCloseable, BatchOperationHandler {
    */
   DBUpdatesWrapper getUpdatesSince(long sequenceNumber, long limitCount)
       throws SequenceNumberNotFoundException;
+
+  /**
+   * Return if the underlying DB is closed. This call is thread safe.
+   * @return true if the DB is closed.
+   */
+  boolean isClosed();
 }

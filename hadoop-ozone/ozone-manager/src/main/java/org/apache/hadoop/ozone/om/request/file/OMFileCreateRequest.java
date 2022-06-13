@@ -42,6 +42,8 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +62,6 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -404,6 +405,38 @@ public class OMFileCreateRequest extends OMKeyRequest {
             + " an Erasure Coded replication type. Rejecting the request,"
             + " please finalize the cluster upgrade and then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  /**
+   * Validates file create requests.
+   * Handles the cases where an older client attempts to create a file
+   * inside a bucket with a non LEGACY bucket layout.
+   * We do not want an older client modifying a bucket that it cannot
+   * understand.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CreateFile
+  )
+  public static OMRequest blockCreateFileWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    if (req.getCreateFileRequest().hasKeyArgs()) {
+
+      KeyArgs keyArgs = req.getCreateFileRequest().getKeyArgs();
+
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
       }
     }
     return req;

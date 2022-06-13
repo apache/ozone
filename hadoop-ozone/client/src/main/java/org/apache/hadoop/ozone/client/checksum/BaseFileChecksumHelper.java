@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.checksum;
 import org.apache.hadoop.fs.CompositeCrcFileChecksum;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.io.DataOutputBuffer;
@@ -47,6 +48,7 @@ import java.util.List;
 public abstract class BaseFileChecksumHelper {
   static final Logger LOG =
       LoggerFactory.getLogger(BaseFileChecksumHelper.class);
+  private OmKeyInfo keyInfo;
 
   private OzoneVolume volume;
   private OzoneBucket bucket;
@@ -82,6 +84,14 @@ public abstract class BaseFileChecksumHelper {
     if (this.length > 0) {
       fetchBlocks();
     }
+  }
+
+  public BaseFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
+      String keyName, long length,
+      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
+      ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
+    this(volume, bucket, keyName, length, checksumCombineMode, rpcClient);
+    this.keyInfo = keyInfo;
   }
 
   protected String getSrc() {
@@ -135,17 +145,28 @@ public abstract class BaseFileChecksumHelper {
    * @throws IOException
    */
   private void fetchBlocks() throws IOException {
-    OzoneManagerProtocol ozoneManagerClient =
-        getRpcClient().getOzoneManagerClient();
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(volume.getName())
-        .setBucketName(bucket.getName())
-        .setKeyName(keyName)
-        .setRefreshPipeline(true)
-        .setSortDatanodesInPipeline(true)
-        .setLatestVersionLocation(true)
-        .build();
-    OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);
+    if (keyInfo == null) {
+      OzoneManagerProtocol ozoneManagerClient =
+          getRpcClient().getOzoneManagerClient();
+      OmKeyArgs keyArgs =
+          new OmKeyArgs.Builder().setVolumeName(volume.getName())
+              .setBucketName(bucket.getName()).setKeyName(keyName)
+              .setRefreshPipeline(true).setSortDatanodesInPipeline(true)
+              .setLatestVersionLocation(true).build();
+      keyInfo = ozoneManagerClient.lookupKey(keyArgs);
+    }
+
+    if (keyInfo.getReplicationConfig()
+        .getReplicationType() == HddsProtos.ReplicationType.EC) {
+      return;
+    }
+
+    if (keyInfo.getFileChecksum() != null &&
+        isFullLength(keyInfo.getDataSize())) {
+      // if the checksum is cached in OM, and we request the checksum of
+      // the full length.
+      fileChecksum = keyInfo.getFileChecksum();
+    }
 
     // use OmKeyArgs to call Om.lookup() and get OmKeyInfo
     keyLocationInfos = keyInfo
@@ -153,10 +174,28 @@ public abstract class BaseFileChecksumHelper {
   }
 
   /**
+   * Return true if the requested length is longer than the file length
+   * (dataSize).
+   *
+   * @param dataSize file length
+   * @return
+   */
+  private boolean isFullLength(long dataSize) {
+    return this.length >= dataSize;
+  }
+
+  /**
    * Compute file checksum given the list of chunk checksums requested earlier.
+   *
+   * Skip computation if the already computed, or if the OmKeyInfo of the key
+   * in OM has pre-computed checksum.
    * @throws IOException
    */
   public void compute() throws IOException {
+    if (fileChecksum != null) {
+      LOG.debug("Checksum is available. Skip computing it.");
+      return;
+    }
     /**
      * request length is 0 or the file is empty, return one with the
      * magic entry that matches the md5 of a 32 byte zero-padded byte array.
@@ -167,7 +206,7 @@ public abstract class BaseFileChecksumHelper {
       final int lenOfZeroBytes = 32;
       byte[] emptyBlockMd5 = new byte[lenOfZeroBytes];
       MD5Hash fileMD5 = MD5Hash.digest(emptyBlockMd5);
-      fileChecksum =  new MD5MD5CRC32GzipFileChecksum(0, 0, fileMD5);
+      fileChecksum = new MD5MD5CRC32GzipFileChecksum(0, 0, fileMD5);
     } else {
       checksumBlocks();
       fileChecksum = makeFinalResult();

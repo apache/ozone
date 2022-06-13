@@ -79,7 +79,7 @@ public class FinalizeNewLayoutVersionCommandHandler implements CommandHandler {
         }
       }
     } catch (Exception e) {
-      LOG.debug("Unexpected Error: {} ", e);
+      LOG.error("Exception during finalization.", e);
     } finally {
       long endTime = Time.monotonicNow();
       totalTime += endTime - startTime;

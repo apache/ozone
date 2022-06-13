@@ -50,6 +50,9 @@ public class TestS3InitiateMultipartUploadResponseWithFSO
 
     String multipartUploadID = UUID.randomUUID().toString();
 
+    addVolumeToDB(volumeName);
+    addBucketToDB(volumeName, bucketName);
+
     long parentID = 1027; // assume objectID of dir path "a/b/c/d" is 1027
     List<OmDirectoryInfo> parentDirInfos = new ArrayList<>();
 
@@ -66,8 +69,13 @@ public class TestS3InitiateMultipartUploadResponseWithFSO
     String multipartKey = omMetadataManager
         .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
 
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+
     String multipartOpenKey = omMetadataManager
-        .getMultipartKey(parentID, fileName, multipartUploadID);
+        .getMultipartKey(volumeId, bucketId, parentID,
+                fileName, multipartUploadID);
 
     OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
         .get(multipartOpenKey);

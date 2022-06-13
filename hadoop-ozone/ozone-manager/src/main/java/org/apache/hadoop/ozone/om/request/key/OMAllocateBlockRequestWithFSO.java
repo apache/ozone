@@ -205,16 +205,15 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       String keyName, long clientID, OzoneManager ozoneManager)
           throws IOException {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-            omMetadataManager.getBucketTable().get(bucketKey);
-    long bucketId = omBucketInfo.getObjectID();
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(
+            volumeName, bucketName);
     String fileName = OzoneFSUtils.getFileName(keyName);
     Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    long parentID = OMFileRequest.getParentID(bucketId, pathComponents,
-            keyName, omMetadataManager);
-    return omMetadataManager.getOpenFileName(parentID, fileName,
-            clientID);
+    long parentID = OMFileRequest.getParentID(volumeId, bucketId,
+            pathComponents, keyName, omMetadataManager);
+    return omMetadataManager.getOpenFileName(volumeId, bucketId, parentID,
+            fileName, clientID);
   }
 
   private void addOpenTableCacheEntry(long trxnLogIndex,

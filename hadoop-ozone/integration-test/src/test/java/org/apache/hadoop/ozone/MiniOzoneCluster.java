@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -310,6 +311,7 @@ public interface MiniOzoneCluster {
     protected String scmServiceId;
     protected int numOfSCMs;
     protected int numOfActiveSCMs = ACTIVE_SCMS_NOT_SET;
+    protected SCMConfigurator scmConfigurator;
 
     protected Optional<Boolean> enableTrace = Optional.of(false);
     protected Optional<Integer> hbInterval = Optional.empty();
@@ -344,11 +346,18 @@ public interface MiniOzoneCluster {
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
       setClusterId(UUID.randomUUID().toString());
+      // Use default SCM configurations if no override is provided.
+      setSCMConfigurator(new SCMConfigurator());
       ExitUtils.disableSystemExit();
     }
 
     public Builder setConf(OzoneConfiguration config) {
       this.conf = config;
+      return this;
+    }
+
+    public Builder setSCMConfigurator(SCMConfigurator configurator) {
+      this.scmConfigurator = configurator;
       return this;
     }
 
