@@ -24,6 +24,7 @@ import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 
+import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.kohsuke.MetaInfServices;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
@@ -45,8 +46,8 @@ public class ListTables implements Callable<Void>, SubcommandWithParent {
 
   @Override
   public Void call() throws Exception {
-    List<byte[]> columnFamilies = RocksDB.listColumnFamilies(new Options(),
-            parent.getDbPath());
+    List<byte[]> columnFamilies = RocksDatabase.listColumnFamiliesEmptyOptions(
+        parent.getDbPath());
     for (byte[] b : columnFamilies) {
       System.out.println(new String(b, StandardCharsets.UTF_8));
     }
