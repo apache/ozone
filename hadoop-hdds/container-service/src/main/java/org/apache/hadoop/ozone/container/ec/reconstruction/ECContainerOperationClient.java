@@ -52,7 +52,10 @@ public class ECContainerOperationClient implements Closeable {
 
   public ECContainerOperationClient(ConfigurationSource conf)
       throws IOException {
-    this(new XceiverClientManager(conf));
+    this(new XceiverClientManager(conf,
+        new XceiverClientManager.XceiverClientManagerConfigBuilder()
+            .setMaxCacheSize(256).setStaleThresholdMs(10 * 1000).build(),
+        null));
   }
 
   public BlockData[] listBlock(long containerId, DatanodeDetails dn,
