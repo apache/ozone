@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -140,7 +141,7 @@ public final class SCMContainerPlacementRackScatter
     }
 
     List<Node> toChooseRacks = new LinkedList<>(racks);
-    List<DatanodeDetails> chosenNodes = new ArrayList<>();
+    Set<DatanodeDetails> chosenNodes = new LinkedHashSet<>();
     List<Node> unavailableNodes = new ArrayList<>();
     Set<Node> skippedRacks = new HashSet<>();
     if (excludedNodes != null) {
@@ -219,8 +220,9 @@ public final class SCMContainerPlacementRackScatter
         retryCount = 0;
       }
     }
+    List<DatanodeDetails> result = new ArrayList<>(chosenNodes);
     ContainerPlacementStatus placementStatus =
-        validateContainerPlacement(chosenNodes, nodesRequiredToChoose);
+        validateContainerPlacement(result, nodesRequiredToChoose);
     if (!placementStatus.isPolicySatisfied()) {
       String errorMsg = "ContainerPlacementPolicy not met, currentRacks is" +
           placementStatus.actualPlacementCount() + "desired racks is" +
@@ -237,7 +239,7 @@ public final class SCMContainerPlacementRackScatter
       throw new SCMException(reason,
           SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
     }
-    return chosenNodes;
+    return result;
   }
 
   @Override
