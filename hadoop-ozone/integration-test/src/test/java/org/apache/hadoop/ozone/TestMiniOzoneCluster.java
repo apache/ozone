@@ -281,6 +281,22 @@ public class TestMiniOzoneCluster {
     }
   }
 
+  @Test
+  public void testKeepPortsWhenRestartDN() throws Exception {
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(1)
+        .build();
+    cluster.waitForClusterToBeReady();
+    DatanodeDetails before =
+        cluster.getHddsDatanodes().get(0).getDatanodeDetails();
+    cluster.restartHddsDatanode(0, true);
+    DatanodeDetails after =
+        cluster.getHddsDatanodes().get(0).getDatanodeDetails();
+    for (Port.Name name : Port.Name.ALL_PORTS) {
+      assertEquals(before.getPort(name), after.getPort(name));
+    }
+  }
+
   private void createMalformedIDFile(File malformedFile)
       throws IOException {
     malformedFile.delete();
