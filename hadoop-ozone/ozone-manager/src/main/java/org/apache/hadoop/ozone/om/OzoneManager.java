@@ -60,10 +60,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -612,43 +609,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } else {
       omState = State.INITIALIZED;
     }
-  }
-
-  private void validateReplicationConfigs(OzoneConfiguration conf) {
-    final String replication = conf.getTrimmed(
-        OZONE_SERVER_DEFAULT_REPLICATION_KEY,
-        OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT);
-    final String type = conf.getTrimmed(
-        OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY,
-        OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT);
-    ReplicationType replicationType = ReplicationType.valueOf(type);
-    ReplicationConfig replicationConfig;
-
-    switch (replicationType) {
-    case EC:
-      //Creating ECReplicationConfig checks for pattern match
-      replicationConfig = new ECReplicationConfig(replication);
-      break;
-    case RATIS:
-    case STAND_ALONE:
-      ReplicationFactor factor;
-      try {
-        factor = ReplicationFactor.valueOf(Integer.parseInt(replication));
-      } catch (NumberFormatException ex) {
-        factor = ReplicationFactor.valueOf(replication);
-      }
-      replicationConfig = ReplicationConfig
-          .fromTypeAndFactor(replicationType, factor);
-      break;
-    case CHAINED:
-    default:
-      throw new IllegalArgumentException("Replication type " + type +
-          " can not be parsed for Replication Factor " + replication);
-    }
-
-    ReplicationConfigValidator validator =
-        conf.getObject(ReplicationConfigValidator.class);
-    validator.validate(replicationConfig);
   }
 
   public boolean isStopped() {
