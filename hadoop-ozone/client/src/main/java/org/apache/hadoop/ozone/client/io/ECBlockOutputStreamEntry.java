@@ -100,14 +100,12 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   void createOutputStream() throws IOException {
     Pipeline ecPipeline = getPipeline();
     List<DatanodeDetails> nodes = getPipeline().getNodes();
-    blockOutputStreams[currentStreamIdx] = new ECBlockOutputStream(
-        getBlockID(),
-        getXceiverClientManager(),
-        createSingleECBlockPipeline(
-            ecPipeline, nodes.get(currentStreamIdx), currentStreamIdx + 1),
-        getBufferPool(),
-        getConf(),
-        getToken());
+    for (int i = currentStreamIdx; i < nodes.size(); i++) {
+      blockOutputStreams[i] =
+          new ECBlockOutputStream(getBlockID(), getXceiverClientManager(),
+              createSingleECBlockPipeline(ecPipeline, nodes.get(i), i + 1),
+              getBufferPool(), getConf(), getToken());
+    }
   }
 
   @Override
@@ -318,6 +316,11 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     List<ECBlockOutputStream> failedStreams = new ArrayList<>();
     while (iter.hasNext()) {
       final ECBlockOutputStream stream = iter.next();
+      if (stream.getWrittenDataLength() <= 0) {
+        // If we did not write any data to this stream yet, let's not consider
+        // for failure checking.
+        continue;
+      }
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
           responseFuture = null;
       if (forPutBlock) {

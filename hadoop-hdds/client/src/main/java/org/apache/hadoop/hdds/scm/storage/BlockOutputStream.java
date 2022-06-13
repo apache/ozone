@@ -268,9 +268,13 @@ public class BlockOutputStream extends OutputStream {
       writeChunkIfNeeded();
       off += writeLen;
       len -= writeLen;
-      writtenDataLength += writeLen;
+      updateWrittenDataLength(writeLen);
       doFlushOrWatchIfNeeded();
     }
+  }
+
+  public void updateWrittenDataLength(int writeLen) {
+    writtenDataLength += writeLen;
   }
 
   private void doFlushOrWatchIfNeeded() throws IOException {
