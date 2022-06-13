@@ -22,10 +22,10 @@ import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.Service;
 import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.ServiceImpl;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.hdds.tracing.TracingUtil.createProxy;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test for {@link TracingUtil}.
