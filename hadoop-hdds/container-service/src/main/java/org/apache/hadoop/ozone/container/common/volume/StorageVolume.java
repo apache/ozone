@@ -402,9 +402,9 @@ public abstract class StorageVolume
     }
   }
 
-  public void decrementUsedSpace(long usedSpace) {
+  public void decrementUsedSpace(long reclaimedSpace) {
     if (this.volumeInfo != null) {
-      this.volumeInfo.decrementUsedSpace(usedSpace);
+      this.volumeInfo.decrementUsedSpace(reclaimedSpace);
     }
   }
 

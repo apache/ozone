@@ -65,8 +65,8 @@ public class VolumeUsage implements SpaceUsageSource {
     source.incrementUsedSpace(usedSpace);
   }
 
-  public void decrementUsedSpace(long usedSpace) {
-    source.decrementUsedSpace(usedSpace);
+  public void decrementUsedSpace(long reclaimedSpace) {
+    source.decrementUsedSpace(reclaimedSpace);
   }
 
   /**

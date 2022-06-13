@@ -93,8 +93,8 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     cachedValue.addAndGet(usedSpace);
   }
 
-  public void decrementUsedSpace(long usedSpace) {
-    cachedValue.addAndGet(-1 * usedSpace);
+  public void decrementUsedSpace(long reclaimedSpace) {
+    cachedValue.addAndGet(-1 * reclaimedSpace);
   }
 
   public void start() {

@@ -210,8 +210,8 @@ public final class VolumeInfo {
     usage.incrementUsedSpace(usedSpace);
   }
 
-  public void decrementUsedSpace(long usedSpace) {
-    usage.decrementUsedSpace(usedSpace);
+  public void decrementUsedSpace(long reclaimedSpace) {
+    usage.decrementUsedSpace(reclaimedSpace);
   }
 
   public void refreshNow() {
