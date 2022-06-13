@@ -89,6 +89,7 @@ public class TestMiniOzoneCluster {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, TEST_ROOT.toString());
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setBoolean(DFS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
+    conf.set(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, "1s");
     WRITE_TMP.mkdirs();
     READ_TMP.mkdirs();
   }
@@ -283,7 +284,6 @@ public class TestMiniOzoneCluster {
 
   @Test
   public void testKeepPortsWhenRestartDN() throws Exception {
-    conf.set(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, "1s");
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)
         .build();
