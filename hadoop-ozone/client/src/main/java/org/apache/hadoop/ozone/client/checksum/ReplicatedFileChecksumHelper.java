@@ -121,8 +121,8 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
     return true;
   }
 
-  protected String prepareBlockChecksum(List<ContainerProtos.ChunkInfo> chunkInfos)
-      throws IOException {
+  protected String prepareBlockChecksum(
+      List<ContainerProtos.ChunkInfo> chunkInfos) throws IOException {
     ContainerProtos.ChecksumData checksumData =
         chunkInfos.get(0).getChecksumData();
     int bytesPerChecksum = checksumData.getBytesPerChecksum();

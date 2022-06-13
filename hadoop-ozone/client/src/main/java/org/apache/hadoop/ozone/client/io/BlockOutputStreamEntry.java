@@ -22,7 +22,6 @@ import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Collections;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
