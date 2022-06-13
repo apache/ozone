@@ -207,7 +207,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
     Path path = Paths.get(removeTrailingSlashIfNeeded(dbPath));
     DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);
-    constructColumnFamilyMap(DBDefinitionFactory.getDefinition(path, new OzoneConfiguration()));
+    constructColumnFamilyMap(DBDefinitionFactory.getDefinition(path,
+          new OzoneConfiguration()));
     if (columnFamilyMap != null) {
       if (!columnFamilyMap.containsKey(tableName)) {
         err().print("Table with name:" + tableName + " does not exist");
