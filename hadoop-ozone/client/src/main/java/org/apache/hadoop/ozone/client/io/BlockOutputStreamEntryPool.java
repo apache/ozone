@@ -379,6 +379,9 @@ public class BlockOutputStreamEntryPool {
     protected void checksumBlocks() throws IOException {
       long currentLength = 0;
       for (BlockOutputStreamEntry entry : streamEntries) {
+        if (entry.getOutputStream() == null) {
+          continue;
+        }
         ContainerProtos.BlockData.Builder blockData =
             entry.getOutputStreamContainerBlockDataData();
         List<ContainerProtos.ChunkInfo> chunkInfoList =
