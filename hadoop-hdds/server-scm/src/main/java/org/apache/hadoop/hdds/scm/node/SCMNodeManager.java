@@ -625,7 +625,8 @@ public class SCMNodeManager implements NodeManager {
             // Send Finalize command to the data node. Its OK to
             // send Finalize command multiple times.
             scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-                new CommandForDatanode<>(datanodeDetails.getUuid(), finalizeCmd));
+                new CommandForDatanode<>(datanodeDetails.getUuid(),
+                    finalizeCmd));
           } catch (NotLeaderException ex) {
             LOG.warn("Skip sending finalize upgrade command since current SCM" +
                 " is not leader.", ex);

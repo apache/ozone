@@ -31,8 +31,12 @@ import java.util.concurrent.Future;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 
+/**
+ * Tests upgrade finalization failure scenarios and corner cases specific to SCM
+ * HA.
+ */
 public class TestScmHAFinalization {
-  private static final String clientID = UUID.randomUUID().toString();
+  private static final String CLIENT_ID = UUID.randomUUID().toString();
   private static final Logger LOG =
       LoggerFactory.getLogger(TestScmHAFinalization.class);
   
@@ -55,8 +59,8 @@ public class TestScmHAFinalization {
     // on the SCM during finalization.
     unpauseSignal = new CountDownLatch(1);
     pauseSignal = new CountDownLatch(1);
-    InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor =
-        new InjectedUpgradeFinalizationExecutor<>();
+    InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
+        executor = new InjectedUpgradeFinalizationExecutor<>();
     executor.configureTestInjectionFunction(haltingPoint, () -> {
       LOG.info("Halting upgrade finalization at point: {}", haltingPoint);
       try {
@@ -80,7 +84,7 @@ public class TestScmHAFinalization {
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
         5);
 
-    MiniOzoneCluster cluster =
+    MiniOzoneCluster.Builder clusterBuilder =
         new MiniOzoneHAClusterImpl.Builder(conf)
         .setNumOfStorageContainerManagers(NUM_SCMS)
         .setNumOfActiveSCMs(NUM_SCMS - 1)
@@ -89,9 +93,8 @@ public class TestScmHAFinalization {
         .setSCMConfigurator(configurator)
         .setNumOfOzoneManagers(1)
         .setNumDatanodes(NUM_DATANODES)
-        .setDnLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
-        .build();
-    this.cluster = (MiniOzoneHAClusterImpl) cluster;
+        .setDnLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+    this.cluster = (MiniOzoneHAClusterImpl) clusterBuilder.build();
 
     scmClient = cluster.getStorageContainerLocationClient();
     cluster.waitForClusterToBeReady();
@@ -103,7 +106,7 @@ public class TestScmHAFinalization {
     finalizationFuture = Executors.newSingleThreadExecutor().submit(
         () -> {
           try {
-            scmClient.finalizeScmUpgrade(clientID);
+            scmClient.finalizeScmUpgrade(CLIENT_ID);
           } catch (Exception ex) {
             LOG.info("finalization client failed.", ex);
           }
@@ -128,8 +131,8 @@ public class TestScmHAFinalization {
     //  HDDS-6761 will need this behavior, however.
     init(UpgradeTestInjectionPoints.BEFORE_PRE_FINALIZE_UPGRADE);
 
-    GenericTestUtils.LogCapturer logCapture =
-        GenericTestUtils.LogCapturer.captureLogs(FinalizationStateManagerImpl.LOG);
+    GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
+        .captureLogs(FinalizationStateManagerImpl.LOG);
 
     StorageContainerManager inactiveScm = cluster.getInactiveSCM().next();
     LOG.info("Inactive SCM node ID: {}", inactiveScm.getSCMNodeId());
@@ -148,32 +151,32 @@ public class TestScmHAFinalization {
     //  HDDS-6761 testing leader changes and restarts.
     unpauseSignal.countDown();
     finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalization(scmClient, clientID);
+    TestHddsUpgradeUtils.waitForFinalization(scmClient, CLIENT_ID);
 
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
-        activeScms,0, NUM_DATANODES);
+        activeScms, 0, NUM_DATANODES);
     TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), 0, CLOSED);
 
     // Move SCM log index farther ahead to make sure a snapshot install
     // happens on the restarted SCM.
     for (int i = 0; i < 10; i++) {
-          ContainerWithPipeline container =
-              scmClient.allocateContainer(HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.ONE, "foo");
-          scmClient.closeContainer(
-              container.getContainerInfo().getContainerID());
+      ContainerWithPipeline container =
+          scmClient.allocateContainer(HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.ONE, "owner");
+      scmClient.closeContainer(
+          container.getContainerInfo().getContainerID());
     }
 
     cluster.startInactiveSCM(inactiveScm.getSCMNodeId());
     GenericTestUtils.waitFor(() -> !inactiveScm.isInSafeMode(), 500, 5000);
     GenericTestUtils.waitFor(() ->
-        inactiveScm.getScmContext()
-            .isFinalizationCheckpointCrossed(FinalizationCheckpoint.FINALIZATION_COMPLETE),
+        inactiveScm.getScmContext().isFinalizationCheckpointCrossed(
+                FinalizationCheckpoint.FINALIZATION_COMPLETE),
         500, 10000);
 
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
-        inactiveScm,0, NUM_DATANODES);
+        inactiveScm, 0, NUM_DATANODES);
 
     // Use log to verify a snapshot was installed.
     Assertions.assertTrue(logCapture.getOutput().contains("New SCM snapshot " +

@@ -621,7 +621,8 @@ public class PipelineManagerImpl implements PipelineManager {
 
   @Override
   public boolean isPipelineCreationFrozen() {
-    return freezePipelineCreation.get() && backgroundPipelineCreator.isRunning();
+    return freezePipelineCreation.get() &&
+        backgroundPipelineCreator.isRunning();
   }
 
   @Override

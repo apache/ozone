@@ -46,6 +46,6 @@ public interface FinalizationStateManager {
 
   void setUpgradeContext(SCMUpgradeFinalizationContext context);
 
-  void reinitialize(Table<String, String> finalizationStore)
+  void reinitialize(Table<String, String> newFinalizationStore)
       throws IOException;
 }

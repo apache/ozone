@@ -94,8 +94,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
   @Override
   public void finalizeLayoutFeature(Integer layoutVersion) throws IOException {
-    LOG.info("Finalizing layout version {} on SCM {}", layoutVersion,
-        upgradeContext.getSCMContext().getScm().getScmNodeDetails().getNodeId());
     finalizeLayoutFeatureLocal(layoutVersion);
   }
 
@@ -103,7 +101,8 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
    * A version of finalizeLayoutFeature without the {@link Replicate}
    * annotation that can be called by followers to finalize from a snapshot.
    */
-  private void finalizeLayoutFeatureLocal(Integer layoutVersion) throws IOException {
+  private void finalizeLayoutFeatureLocal(Integer layoutVersion)
+      throws IOException {
     checkpointLock.writeLock().lock();
     try {
       // The VERSION file is the source of truth for the current layout
@@ -190,12 +189,12 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   }
 
   @Override
-  public void reinitialize(Table<String, String> finalizationStore)
+  public void reinitialize(Table<String, String> newFinalizationStore)
       throws IOException {
     checkpointLock.writeLock().lock();
     try {
-      finalizationStore.close();
-      this.finalizationStore = finalizationStore;
+      newFinalizationStore.close();
+      this.finalizationStore = newFinalizationStore;
       initialize();
 
       int dbLayoutVersion = getDBLayoutVersion();
@@ -235,7 +234,8 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
    * framework was present.
    */
   private int getDBLayoutVersion() throws IOException {
-    String dbLayoutVersion = finalizationStore.get(OzoneConsts.LAYOUT_VERSION_KEY);
+    String dbLayoutVersion = finalizationStore.get(
+        OzoneConsts.LAYOUT_VERSION_KEY);
     if (dbLayoutVersion == null) {
       return HDDSLayoutFeature.INITIAL_VERSION.layoutVersion();
     } else {

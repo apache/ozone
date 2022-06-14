@@ -8,7 +8,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -34,7 +33,12 @@ import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 
-public class TestHddsUpgradeUtils {
+/**
+ * Helper methods for testing HDDS upgrade finalization in integration tests.
+ */
+public final class TestHddsUpgradeUtils {
+
+  private TestHddsUpgradeUtils() { }
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestHddsUpgradeUtils.class);
@@ -56,7 +60,8 @@ public class TestHddsUpgradeUtils {
   /*
    * Helper function to test Pre-Upgrade conditions on the SCM
    */
-  public static void testPreUpgradeConditionsSCM(List<StorageContainerManager> scms) {
+  public static void testPreUpgradeConditionsSCM(
+      List<StorageContainerManager> scms) {
     for (StorageContainerManager scm : scms) {
       Assert.assertEquals(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(),
           scm.getLayoutVersionManager().getMetadataLayoutVersion());
@@ -129,7 +134,8 @@ public class TestHddsUpgradeUtils {
   /*
    * Helper function to test Pre-Upgrade conditions on all the DataNodes.
    */
-  public static void testPreUpgradeConditionsDataNodes(List<HddsDatanodeService> datanodes) {
+  public static void testPreUpgradeConditionsDataNodes(
+        List<HddsDatanodeService> datanodes) {
     for (HddsDatanodeService dataNode : datanodes) {
       DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
       HDDSLayoutVersionManager dnVersionManager =
