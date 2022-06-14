@@ -242,7 +242,7 @@ public class TestContainerCommandsEC {
 
       //Create the recovering container in DN.
       ContainerProtocolCalls.createRecoveringContainer(dnClient,
-          container.containerID().getProtobuf().getId(), null);
+          container.containerID().getProtobuf().getId(), null, 4);
 
       BlockID blockID = ContainerTestHelper
           .getTestBlockID(container.containerID().getProtobuf().getId());

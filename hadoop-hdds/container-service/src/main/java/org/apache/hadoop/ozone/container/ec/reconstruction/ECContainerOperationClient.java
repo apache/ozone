@@ -116,7 +116,8 @@ public class ECContainerOperationClient implements Closeable {
   }
 
   public void createRecoveringContainer(long containerID, DatanodeDetails dn,
-      ECReplicationConfig repConfig, String encodedToken) throws IOException {
+      ECReplicationConfig repConfig, String encodedToken, int replicaIndex)
+      throws IOException {
     XceiverClientSpi xceiverClient = this.xceiverClientManager.acquireClient(
         // To get the same client from cache, we try to use the DN UUID as
         // pipelineID for uniqueness. Please note, pipeline does not have any
@@ -126,7 +127,8 @@ public class ECContainerOperationClient implements Closeable {
             .setState(Pipeline.PipelineState.CLOSED).build());
     try {
       ContainerProtocolCalls
-          .createRecoveringContainer(xceiverClient, containerID, encodedToken);
+          .createRecoveringContainer(xceiverClient, containerID, encodedToken,
+              replicaIndex);
     } finally {
       this.xceiverClientManager.releaseClient(xceiverClient, false);
     }

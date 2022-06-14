@@ -141,9 +141,10 @@ public class ECReconstructionCoordinator implements Closeable {
     Iterator<Map.Entry<Integer, DatanodeDetails>> iterator =
         targetIndexDns.iterator();
     while (iterator.hasNext()) {
-      DatanodeDetails dn = iterator.next().getValue();
+      Map.Entry<Integer, DatanodeDetails> indexDnPair = iterator.next();
       this.containerOperationClient
-          .createRecoveringContainer(containerID, dn, repConfig, null);
+          .createRecoveringContainer(containerID, indexDnPair.getValue(),
+              repConfig, null, indexDnPair.getKey());
     }
 
     // 2. Reconstruct and transfer to targets
@@ -220,7 +221,7 @@ public class ECReconstructionCoordinator implements Closeable {
                     .setReplicationConfig(repConfig).setNodes(ImmutableList
                     .of(targetMap.get(toReconstructIndexes.get(i))))
                     .setState(Pipeline.PipelineState.CLOSED).build(),
-                bufferPool, configuration, null);
+                bufferPool, configuration, blockLocationInfo.getToken());
         bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
         // Make sure it's clean. Don't want to reuse the erroneously returned
         // buffers from the pool.
