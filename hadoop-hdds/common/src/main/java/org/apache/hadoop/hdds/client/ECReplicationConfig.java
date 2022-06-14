@@ -204,4 +204,9 @@ public class ECReplicationConfig implements ReplicationConfig {
         + ", ecChunkSize=" + ecChunkSize
         + ", codec=" + codec + '}';
   }
+
+  @Override
+  public String configFormat() {
+    return HddsProtos.ReplicationType.EC.name() + "/" + data + "-" + parity;
+  }
 }

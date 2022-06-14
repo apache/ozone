@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.client;
 
 import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
@@ -36,11 +37,23 @@ public class TestReplicationConfigValidator {
 
     final ReplicationConfigValidator validator =
         config.getObject(ReplicationConfigValidator.class);
+    String ecConfig1 = "rs-3-2-1024k";
+    String ecConfig2 = "xor-6-3-2048k";
+    //Supported data-parity are 3-2,6-3,10-4
+    String invalidEcConfig1 = "xor-6-4-1024k";
 
     validator.validate(RatisReplicationConfig.getInstance(THREE));
     validator.validate(RatisReplicationConfig.getInstance(ONE));
     validator.validate(StandaloneReplicationConfig.getInstance(THREE));
     validator.validate(StandaloneReplicationConfig.getInstance(ONE));
+    validator.validate(new ECReplicationConfig(ecConfig1));
+    validator.validate(new ECReplicationConfig(ecConfig2));
+    try {
+      validator.validate(new ECReplicationConfig(invalidEcConfig1));
+    } catch (IllegalArgumentException ex) {
+      GenericTestUtils.assertExceptionContains("Invalid replication " +
+          "config for type EC and replication xor-6-4-{CHUNK_SIZE}", ex);
+    }
 
   }
 
