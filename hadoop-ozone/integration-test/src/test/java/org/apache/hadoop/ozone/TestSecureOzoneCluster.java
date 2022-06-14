@@ -29,7 +29,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
-import java.util.Optional;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -389,8 +388,8 @@ public final class TestSecureOzoneCluster {
     scmStore.initialize();
     if (SCMHAUtils.isSCMHAEnabled(conf)) {
       SCMRatisServerImpl.initialize(clusterId, scmId,
-          SCMHANodeDetails.loadSCMHAConfig(conf,
-              Optional.of(scmStore)).getLocalNodeDetails(), conf);
+          SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
+                  .getLocalNodeDetails(), conf);
     }
   }
 

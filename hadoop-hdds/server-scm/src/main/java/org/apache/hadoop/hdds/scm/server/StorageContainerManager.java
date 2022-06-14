@@ -169,7 +169,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -323,8 +322,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
      */
     scmStorageConfig = new SCMStorageConfig(conf);
 
-    scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf,
-        Optional.of(scmStorageConfig));
+    scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
     configuration = conf;
     initMetrics();
     containerReportCache = buildContainerReportCache();
@@ -1029,7 +1027,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     String primordialSCM = SCMHAUtils.getPrimordialSCM(conf);
     SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
     SCMHANodeDetails scmhaNodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf,
-        Optional.of(scmStorageConfig));
+        scmStorageConfig);
     String selfNodeId = scmhaNodeDetails.getLocalNodeDetails().getNodeId();
     final String selfHostName =
         scmhaNodeDetails.getLocalNodeDetails().getHostName();
@@ -1141,7 +1139,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
     StorageState state = scmStorageConfig.getState();
     final SCMHANodeDetails haDetails = SCMHANodeDetails.loadSCMHAConfig(conf,
-        Optional.of(scmStorageConfig));
+        scmStorageConfig);
     String primordialSCM = SCMHAUtils.getPrimordialSCM(conf);
     final String selfNodeId = haDetails.getLocalNodeDetails().getNodeId();
     final String selfHostName = haDetails.getLocalNodeDetails().getHostName();

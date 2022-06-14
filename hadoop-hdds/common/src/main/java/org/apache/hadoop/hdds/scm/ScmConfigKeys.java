@@ -453,6 +453,9 @@ public final class ScmConfigKeys {
   // SCM Ratis related
   public static final String OZONE_SCM_HA_ENABLE_KEY
       = "ozone.scm.ratis.enable";
+  /** Default Value would be Overriden based on the current state of Ratis.
+   {@link org.apache.hadoop.hdds.conf.DefaultConfigManager}
+   */
   public static final boolean OZONE_SCM_HA_ENABLE_DEFAULT
       = true;
   public static final String OZONE_SCM_RATIS_PORT_KEY

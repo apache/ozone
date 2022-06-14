@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
@@ -253,8 +252,7 @@ public class TestStorageContainerManagerHA {
     scmStorageConfig.setClusterId(UUID.randomUUID().toString());
     scmStorageConfig.getCurrentDir().delete();
     scmStorageConfig.setSCMHAFlag(isRatisEnabled);
-    HddsTestUtils.setField(DefaultConfigManager.class, "CONFIG_DEFAULT_MAP",
-        new HashMap<>());
+    DefaultConfigManager.clearDefaultConfigs();
     scmStorageConfig.initialize();
     scm0.scmInit(conf, clusterId);
     Assert.assertEquals(DefaultConfigManager.getValue(
@@ -274,17 +272,10 @@ public class TestStorageContainerManagerHA {
     scmStorageConfig.setClusterId(UUID.randomUUID().toString());
     scmStorageConfig.getCurrentDir().delete();
     scmStorageConfig.setSCMHAFlag(!isRatisEnabled);
-    HddsTestUtils.setField(DefaultConfigManager.class, "CONFIG_DEFAULT_MAP",
-        new HashMap<>());
+    DefaultConfigManager.clearDefaultConfigs();
     scmStorageConfig.initialize();
-
-    ConfigurationException exception =
-        Assertions.assertThrows(ConfigurationException.class,
+    Assertions.assertThrows(ConfigurationException.class,
             () -> StorageContainerManager.scmInit(conf, clusterId));
-    Assert.assertEquals("Invalid Config ozone.scm.ratis.enable Provided " +
-            String.format("ConfigValue: %s, Expected Config Value: %s",
-                isRatisEnabled, !isRatisEnabled),
-        exception.getMessage());
   }
 
 

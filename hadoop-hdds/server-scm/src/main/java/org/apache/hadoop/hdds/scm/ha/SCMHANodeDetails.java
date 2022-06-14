@@ -40,7 +40,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY;
@@ -157,16 +156,24 @@ public class SCMHANodeDetails {
         ? scmStorageConfig.isSCMHAEnabled()
         : SCMHAUtils.isSCMHAEnabled(conf);
     boolean scmHAEnabled = SCMHAUtils.isSCMHAEnabled(conf);
-    if (Storage.StorageState.INITIALIZED.equals(state) && scmHAEnabled != scmHAEnableDefault) {
+
+    if (Storage.StorageState.INITIALIZED.equals(state) &&
+            scmHAEnabled != scmHAEnableDefault) {
+      String errorMessage = String.format("Current State of SCM: %s",
+              scmHAEnableDefault ? "SCM HA is enabled with Ratis"
+              : "SCM is running in Non HA without Ratis")
+              + " HA SCM -> Non HA SCM or " +
+              "Non HA SCM -> HA SCM is not supported";
       if (Strings.isNotEmpty(conf.get(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY))) {
         throw new ConfigurationException(String.format("Invalid Config %s " +
-                "Provided ConfigValue: %s, Expected Config Value: %s",
+                "Provided ConfigValue: %s, Expected Config Value: %s. %s",
             ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, scmHAEnabled,
-            scmHAEnableDefault));
+            scmHAEnableDefault, errorMessage));
       } else {
-        LOG.warn("Invalid Config {}, Expected Config Value: {}, Default Config " +
-                "Value: {}", ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-            scmHAEnableDefault, scmHAEnabled);
+        LOG.warn("Invalid Config {}, Expected Config Value: {}, Default Config "
+                        + "Value: {}. {}",
+                ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
+            scmHAEnableDefault, scmHAEnabled, errorMessage);
       }
     }
     DefaultConfigManager.setConfigValue(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
@@ -174,8 +181,7 @@ public class SCMHANodeDetails {
   }
 
   public static SCMHANodeDetails loadSCMHAConfig(OzoneConfiguration conf,
-                                                 Optional<SCMStorageConfig>
-                                                     storageConfig)
+                                                 SCMStorageConfig storageConfig)
       throws IOException {
     InetSocketAddress localRpcAddress = null;
     String localScmServiceId = null;
@@ -189,10 +195,7 @@ public class SCMHANodeDetails {
         ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID);
 
     LOG.info("ServiceID for StorageContainerManager is {}", localScmServiceId);
-    if (!storageConfig.isPresent()) {
-      storageConfig = Optional.of(new SCMStorageConfig(conf));
-    }
-    validateSCMHAConfig(storageConfig.get(), conf);
+    validateSCMHAConfig(storageConfig, conf);
     if (localScmServiceId == null) {
       // There is no internal scm service id is being set, fall back to ozone
       // .scm.service.ids.

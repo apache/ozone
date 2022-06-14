@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hdds.conf;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -43,5 +45,10 @@ public final class DefaultConfigManager {
   }
   public static <T> T getValue(String config, T defaultValue) {
     return (T) CONFIG_DEFAULT_MAP.getOrDefault(config, defaultValue);
+  }
+
+  @VisibleForTesting
+  public static void clearDefaultConfigs() {
+    CONFIG_DEFAULT_MAP.clear();
   }
 }

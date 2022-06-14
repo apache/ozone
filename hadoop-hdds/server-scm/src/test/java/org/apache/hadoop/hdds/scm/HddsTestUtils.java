@@ -82,8 +82,6 @@ import org.apache.hadoop.security.authentication.client
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -790,15 +788,5 @@ public final class HddsTestUtils {
           .build());
     }
     return containerInfoList;
-  }
-
-  public static void setField(Class clazz, String fieldName, Object instance)
-      throws NoSuchFieldException, IllegalAccessException {
-    Field field = clazz.getDeclaredField(fieldName);
-    field.setAccessible(true);
-    Field modifiers = field.getClass().getDeclaredField("modifiers");
-    modifiers.setAccessible(true);
-    modifiers.setInt(field, field.getModifiers() & ~Modifier.FINAL);
-    field.set(null, instance);
   }
 }
