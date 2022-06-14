@@ -105,14 +105,12 @@ public class TestContainerCommandsEC {
   private static byte[][] inputChunks = new byte[EC_DATA][EC_CHUNK_SIZE];
 
   // Each key size will be in range [min, max), min inclusive, max exclusive
-  private static final int[][] KEY_SIZE_RANGES = new int[][]{
-      {1, EC_CHUNK_SIZE},
-      {EC_CHUNK_SIZE, EC_CHUNK_SIZE + 1},
-      {EC_CHUNK_SIZE + 1, STRIPE_DATA_SIZE},
-      {STRIPE_DATA_SIZE, STRIPE_DATA_SIZE + 1},
-      {STRIPE_DATA_SIZE + 1, STRIPE_DATA_SIZE + EC_CHUNK_SIZE},
-      {STRIPE_DATA_SIZE + EC_CHUNK_SIZE, STRIPE_DATA_SIZE * 2},
-  };
+  private static final int[][] KEY_SIZE_RANGES =
+      new int[][] {{1, EC_CHUNK_SIZE}, {EC_CHUNK_SIZE, EC_CHUNK_SIZE + 1},
+          {EC_CHUNK_SIZE + 1, STRIPE_DATA_SIZE},
+          {STRIPE_DATA_SIZE, STRIPE_DATA_SIZE + 1},
+          {STRIPE_DATA_SIZE + 1, STRIPE_DATA_SIZE + EC_CHUNK_SIZE},
+          {STRIPE_DATA_SIZE + EC_CHUNK_SIZE, STRIPE_DATA_SIZE * 2}};
   private static byte[][] values;
   private static long containerID;
   private static Pipeline pipeline;
@@ -143,13 +141,11 @@ public class TestContainerCommandsEC {
     Map<DatanodeDetails, Integer> indicesForSinglePipeline = new HashMap<>();
     indicesForSinglePipeline.put(node, replicaIndex);
 
-    return Pipeline.newBuilder()
-        .setId(ecPipeline.getId())
+    return Pipeline.newBuilder().setId(ecPipeline.getId())
         .setReplicationConfig(ecPipeline.getReplicationConfig())
         .setState(ecPipeline.getPipelineState())
         .setNodes(ImmutableList.of(node))
-        .setReplicaIndexes(indicesForSinglePipeline)
-        .build();
+        .setReplicaIndexes(indicesForSinglePipeline).build();
   }
 
   @BeforeEach
@@ -188,22 +184,27 @@ public class TestContainerCommandsEC {
   public void testListBlock() throws Exception {
     for (int i = 0; i < datanodeDetails.size(); i++) {
       final int minKeySize = i < EC_DATA ? i * EC_CHUNK_SIZE : 0;
-      final int numExpectedBlocks = (int) Arrays.stream(values)
-          .mapToInt(v -> v.length).filter(s -> s > minKeySize).count();
+      final int numExpectedBlocks =
+          (int) Arrays.stream(values).mapToInt(v -> v.length)
+              .filter(s -> s > minKeySize).count();
       Function<Integer, Integer> expectedChunksFunc = chunksInReplicaFunc(i);
-      final int numExpectedChunks = Arrays.stream(values)
-          .mapToInt(v -> v.length).map(expectedChunksFunc::apply).sum();
+      final int numExpectedChunks =
+          Arrays.stream(values).mapToInt(v -> v.length)
+              .map(expectedChunksFunc::apply).sum();
       if (numExpectedBlocks == 0) {
         final int j = i;
         Throwable t = Assertions.assertThrows(StorageContainerException.class,
-            () -> ContainerProtocolCalls.listBlock(clients.get(j),
-                containerID, null, numExpectedBlocks + 1, null));
-        Assertions.assertEquals(
-            "ContainerID " + containerID + " does not exist", t.getMessage());
+            () -> ContainerProtocolCalls
+                .listBlock(clients.get(j), containerID, null,
+                    numExpectedBlocks + 1, null));
+        Assertions
+            .assertEquals("ContainerID " + containerID + " does not exist",
+                t.getMessage());
         continue;
       }
-      ListBlockResponseProto response = ContainerProtocolCalls.listBlock(
-          clients.get(i), containerID, null, numExpectedBlocks + 1, null);
+      ListBlockResponseProto response = ContainerProtocolCalls
+          .listBlock(clients.get(i), containerID, null, numExpectedBlocks + 1,
+              null);
       Assertions.assertEquals(numExpectedBlocks, response.getBlockDataCount(),
           "blocks count doesn't match on DN " + i);
       Assertions.assertEquals(numExpectedChunks,
@@ -423,7 +424,7 @@ public class TestContainerCommandsEC {
     }
 
     ECReconstructionCoordinator coordinator =
-        new ECReconstructionCoordinator(config);
+        new ECReconstructionCoordinator(config, null);
 
     OzoneKeyDetails key = bucket.getKey(keyString);
     long conID = key.getOzoneKeyLocations().get(0).getContainerID();
@@ -468,14 +469,13 @@ public class TestContainerCommandsEC {
       }
     }
 
-    Assert.assertEquals(missingIndexes.size(),
-        targetNodes.size());
+    Assert.assertEquals(missingIndexes.size(), targetNodes.size());
 
     List<org.apache.hadoop.ozone.container.common.helpers.BlockData[]>
         blockDataArrList = new ArrayList<>();
     for (int j = 0; j < containerToDeletePipeline.size(); j++) {
       org.apache.hadoop.ozone.container.common.helpers.BlockData[] blockData =
-          new ECContainerOperationClient(new OzoneConfiguration())
+          new ECContainerOperationClient(new OzoneConfiguration(), null)
               .listBlock(conID, containerToDeletePipeline.get(j).getFirstNode(),
                   (ECReplicationConfig) containerToDeletePipeline.get(j)
                       .getReplicationConfig(), null);
@@ -515,7 +515,7 @@ public class TestContainerCommandsEC {
 
       org.apache.hadoop.ozone.container.common.helpers.BlockData[]
           reconstructedBlockData =
-          new ECContainerOperationClient(new OzoneConfiguration())
+          new ECContainerOperationClient(new OzoneConfiguration(), null)
               .listBlock(conID, newTargetPipeline.getFirstNode(),
                   (ECReplicationConfig) newTargetPipeline
                       .getReplicationConfig(), null);
@@ -524,8 +524,8 @@ public class TestContainerCommandsEC {
       checkBlockData(blockDataArrList.get(i), reconstructedBlockData);
       ContainerProtos.ReadContainerResponseProto readContainerResponseProto =
           ContainerProtocolCalls.readContainer(
-              xceiverClientManager.acquireClient(newTargetPipeline),
-              conID, null);
+              xceiverClientManager.acquireClient(newTargetPipeline), conID,
+              null);
       Assert.assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
           readContainerResponseProto.getContainerData().getState());
       i++;
@@ -569,11 +569,8 @@ public class TestContainerCommandsEC {
     writableECContainerProviderConfig.setMinimumPipelines(1);
     conf.setFromObject(writableECContainerProviderConfig);
 
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(NUM_DN)
-        .setScmId(SCM_ID)
-        .setClusterId(CLUSTER_ID)
-        .build();
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(NUM_DN)
+        .setScmId(SCM_ID).setClusterId(CLUSTER_ID).build();
     cluster.waitForClusterToBeReady();
     scm = cluster.getStorageContainerManager();
     rpcClient = OzoneClientFactory.getRpcClient(conf);
@@ -596,8 +593,8 @@ public class TestContainerCommandsEC {
       int keySize = RandomUtils.nextInt(ranges[i][0], ranges[i][1]);
       values[i] = RandomUtils.nextBytes(keySize);
       final String keyName = UUID.randomUUID().toString();
-      try (OutputStream out = bucket.createKey(
-          keyName, values[i].length, repConfig, new HashMap<>())) {
+      try (OutputStream out = bucket
+          .createKey(keyName, values[i].length, repConfig, new HashMap<>())) {
         out.write(values[i]);
       }
     }

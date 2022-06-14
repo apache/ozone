@@ -183,7 +183,7 @@ public class DatanodeStateMachine implements Closeable {
         ReplicationSupervisorMetrics.create(supervisor);
 
     ECReconstructionCoordinator ecReconstructionCoordinator =
-        new ECReconstructionCoordinator(conf);
+        new ECReconstructionCoordinator(conf, certClient);
     ecReconstructionSupervisor =
         new ECReconstructionSupervisor(container.getContainerSet(), context,
             replicationConfig.getReplicationMaxStreams(),

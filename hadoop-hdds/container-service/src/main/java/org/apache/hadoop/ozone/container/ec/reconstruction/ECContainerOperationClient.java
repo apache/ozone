@@ -27,9 +27,12 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,12 +56,21 @@ public class ECContainerOperationClient implements Closeable {
     this.xceiverClientManager = clientManager;
   }
 
-  public ECContainerOperationClient(ConfigurationSource conf)
+  public ECContainerOperationClient(ConfigurationSource conf,
+      CertificateClient certificateClient) throws IOException {
+    this(createClientManager(conf, certificateClient));
+  }
+
+  @NotNull
+  private static XceiverClientManager createClientManager(
+      ConfigurationSource conf, CertificateClient certificateClient)
       throws IOException {
-    this(new XceiverClientManager(conf,
+    return new XceiverClientManager(conf,
         new XceiverClientManager.XceiverClientManagerConfigBuilder()
             .setMaxCacheSize(256).setStaleThresholdMs(10 * 1000).build(),
-        null));
+        certificateClient != null ?
+            HAUtils.buildCAX509List(certificateClient, conf) :
+            null);
   }
 
   public BlockData[] listBlock(long containerId, DatanodeDetails dn,
@@ -76,6 +88,9 @@ public class ECContainerOperationClient implements Closeable {
         try {
           return BlockData.getFromProtoBuf(i);
         } catch (IOException e) {
+          LOG.debug("Failed while converting to protobuf BlockData. Returning"
+                  + " null for listBlock from DN: " + dn,
+              e);
           // TODO: revisit here.
           return null;
         }

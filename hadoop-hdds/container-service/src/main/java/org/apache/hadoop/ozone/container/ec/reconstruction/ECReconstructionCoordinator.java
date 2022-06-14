@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -106,9 +107,9 @@ public class ECReconstructionCoordinator implements Closeable {
     this.ecReconstructExecutor = reconstructExecutor;
   }
 
-  public ECReconstructionCoordinator(ConfigurationSource conf)
-      throws IOException {
-    this(new ECContainerOperationClient(conf), conf,
+  public ECReconstructionCoordinator(ConfigurationSource conf,
+      CertificateClient certificateClient) throws IOException {
+    this(new ECContainerOperationClient(conf, certificateClient), conf,
         new ElasticByteBufferPool(), null, null);
     this.ecReconstructExecutor =
         new ThreadPoolExecutor(EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE,
