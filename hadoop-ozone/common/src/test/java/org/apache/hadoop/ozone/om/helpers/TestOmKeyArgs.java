@@ -15,25 +15,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.net;
+package org.apache.hadoop.ozone.om.helpers;
 
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * Tests for {@link NetUtils}.
+ * Test for {@link OmKeyArgs}.
  */
-public class TestNetUtils {
+class TestOmKeyArgs {
 
-  @Test
-  public void testNormalize() {
-    assertEquals("", NetUtils.normalize(null));
-    assertEquals("", NetUtils.normalize(""));
-    assertEquals("/", NetUtils.normalize("/"));
-    assertThrows(IllegalArgumentException.class, () -> NetUtils.normalize("x"));
-    assertEquals("/a/b/c", NetUtils.normalize("/a/b/c"));
-    assertEquals("/a/b/c/$", NetUtils.normalize("/a/b/c/$"));
+  @ParameterizedTest
+  @ValueSource(booleans = { true, false })
+  void toBuilderPreservesHeadOp(boolean headOp) {
+    OmKeyArgs subject = new OmKeyArgs.Builder()
+        .setHeadOp(headOp)
+        .build();
+
+    assertEquals(headOp, subject.isHeadOp());
+    assertEquals(headOp, subject.toBuilder().build().isHeadOp());
   }
+
 }

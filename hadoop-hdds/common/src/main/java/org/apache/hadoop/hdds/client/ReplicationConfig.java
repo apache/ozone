@@ -182,7 +182,12 @@ public interface ReplicationConfig {
       try {
         factor = ReplicationFactor.valueOf(Integer.parseInt(replication));
       } catch (NumberFormatException ex) {
-        factor = ReplicationFactor.valueOf(replication);
+        try {
+          factor = ReplicationFactor.valueOf(replication);
+        } catch (IllegalArgumentException e) {
+          throw new IllegalArgumentException(replication +
+              " is not supported for " + type + " replication type", e);
+        }
       }
       replicationConfig = fromTypeAndFactor(type, factor);
       break;
