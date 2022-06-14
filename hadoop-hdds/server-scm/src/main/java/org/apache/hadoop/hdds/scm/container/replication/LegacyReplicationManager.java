@@ -1125,6 +1125,7 @@ public class LegacyReplicationManager {
   private void handleUnderReplicatedContainer(final ContainerInfo container,
       final ContainerReplicaCount replicaSet,
       final ContainerPlacementStatus placementStatus) {
+    LOG.debug("Handling under-replicated container: {}", container);
     Set<ContainerReplica> replicas = replicaSet.getReplica();
     try {
 
@@ -1558,11 +1559,13 @@ public class LegacyReplicationManager {
     final ContainerID id = container.containerID();
     final ReplicateContainerCommand replicateCommand =
         new ReplicateContainerCommand(id.getId(), sources);
-    sendAndTrackDatanodeCommand(datanode, replicateCommand,
+    final boolean sent = sendAndTrackDatanodeCommand(datanode, replicateCommand,
         action -> addInflight(InflightType.REPLICATION, id, action));
 
-    metrics.incrNumReplicationCmdsSent();
-    metrics.incrNumReplicationBytesTotal(container.getUsedBytes());
+    if (sent) {
+      metrics.incrNumReplicationCmdsSent();
+      metrics.incrNumReplicationBytesTotal(container.getUsedBytes());
+    }
   }
 
   /**
@@ -1583,11 +1586,13 @@ public class LegacyReplicationManager {
     final ContainerID id = container.containerID();
     final DeleteContainerCommand deleteCommand =
         new DeleteContainerCommand(id.getId(), force);
-    sendAndTrackDatanodeCommand(datanode, deleteCommand,
+    final boolean sent = sendAndTrackDatanodeCommand(datanode, deleteCommand,
         action -> addInflight(InflightType.DELETION, id, action));
 
-    metrics.incrNumDeletionCmdsSent();
-    metrics.incrNumDeletionBytesTotal(container.getUsedBytes());
+    if (sent) {
+      metrics.incrNumDeletionCmdsSent();
+      metrics.incrNumDeletionBytesTotal(container.getUsedBytes());
+    }
   }
 
   /**
@@ -1601,7 +1606,7 @@ public class LegacyReplicationManager {
    * @param tracker Tracker which tracks the inflight actions
    * @param <T> Type of SCMCommand
    */
-  private <T extends GeneratedMessage> void sendAndTrackDatanodeCommand(
+  private <T extends GeneratedMessage> boolean sendAndTrackDatanodeCommand(
       final DatanodeDetails datanode,
       final SCMCommand<T> command,
       final Predicate<InflightAction> tracker) {
@@ -1610,16 +1615,17 @@ public class LegacyReplicationManager {
     } catch (NotLeaderException nle) {
       LOG.warn("Skip sending datanode command,"
           + " since current SCM is not leader.", nle);
-      return;
+      return false;
     }
     final boolean allowed = tracker.test(
         new InflightAction(datanode, clock.millis()));
     if (!allowed) {
-      return;
+      return false;
     }
     final CommandForDatanode<T> datanodeCommand =
         new CommandForDatanode<>(datanode.getUuid(), command);
     eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
+    return true;
   }
 
   /**

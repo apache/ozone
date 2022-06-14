@@ -252,7 +252,8 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   }
 
   public long getInflightReplication() {
-    return replicationManager.getInflightCount(InflightType.REPLICATION);
+    return replicationManager.getLegacyReplicationManager()
+        .getInflightCount(InflightType.REPLICATION);
   }
 
   public long getInflightReplicationSkipped() {
@@ -260,7 +261,8 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   }
 
   public long getInflightDeletion() {
-    return replicationManager.getInflightCount(InflightType.DELETION);
+    return replicationManager.getLegacyReplicationManager()
+        .getInflightCount(InflightType.DELETION);
   }
 
   public long getInflightDeletionSkipped() {

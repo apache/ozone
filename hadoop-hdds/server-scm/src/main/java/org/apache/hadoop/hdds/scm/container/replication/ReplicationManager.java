@@ -422,14 +422,6 @@ public class ReplicationManager implements SCMService {
     return legacyReplicationManager.move(cid, src, tgt);
   }
 
-  public int getInflightCount(InflightType type) {
-    return legacyReplicationManager.getInflightCount(type);
-  }
-
-  public DatanodeDetails getFirstDatanode(InflightType type, ContainerID id) {
-    return legacyReplicationManager.getFirstDatanode(type, id);
-  }
-
   public Map<ContainerID,
       CompletableFuture<LegacyReplicationManager.MoveResult>>
       getInflightMove() {
