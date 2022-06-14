@@ -110,11 +110,11 @@ public class LegacyReplicationManager {
         = new ConcurrentHashMap<>();
     private final InflightType type;
     private final int sizeLimit;
-    private final AtomicInteger count = new AtomicInteger();
+    private final AtomicInteger inflightCount = new AtomicInteger();
 
     InflightMap(InflightType type, int sizeLimit) {
       this.type = type;
-      this.sizeLimit = sizeLimit;
+      this.sizeLimit = sizeLimit > 0 ? sizeLimit : Integer.MAX_VALUE;
     }
 
     boolean isReplication() {
@@ -129,12 +129,16 @@ public class LegacyReplicationManager {
       return map.containsKey(id);
     }
 
-    int size(ContainerID id) {
+    int inflightActionCount(ContainerID id) {
       return Optional.ofNullable(map.get(id)).map(List::size).orElse(0);
     }
 
-    int size() {
+    int containerCount() {
       return map.size();
+    }
+
+    boolean isFull() {
+      return inflightCount.get() >= sizeLimit;
     }
 
     void clear() {
@@ -142,7 +146,7 @@ public class LegacyReplicationManager {
     }
 
     void iterate(ContainerID id, Function<InflightAction, Boolean> processor) {
-      for(;;) {
+      for (; ;) {
         final List<InflightAction> actions = get(id);
         if (actions == null) {
           return;
@@ -151,24 +155,27 @@ public class LegacyReplicationManager {
           if (get(id) != actions) {
             continue; //actions is changed, retry
           }
-          for (Iterator<InflightAction> i = actions.iterator(); i.hasNext(); ) {
+          for (Iterator<InflightAction> i = actions.iterator(); i.hasNext();) {
             final Boolean remove = processor.apply(i.next());
             if (remove == Boolean.TRUE) {
               i.remove();
-              count.decrementAndGet();
+              inflightCount.decrementAndGet();
             }
           }
-          map.computeIfPresent(id, (k, v) -> v == actions && v.isEmpty() ? null : v);
+          map.computeIfPresent(id,
+              (k, v) -> v == actions && v.isEmpty() ? null : v);
+          return;
         }
       }
     }
 
     boolean add(ContainerID id, InflightAction a) {
-      final int previous = count.getAndUpdate(n -> n < sizeLimit ? n + 1 : n);
+      final int previous = inflightCount.getAndUpdate(
+          n -> n < sizeLimit ? n + 1 : n);
       if (previous >= sizeLimit) {
         return false;
       }
-      for(;;) {
+      for (; ;) {
         final List<InflightAction> actions = map.computeIfAbsent(id,
             key -> new LinkedList<>());
         synchronized (actions) {
@@ -176,8 +183,9 @@ public class LegacyReplicationManager {
             continue; //actions is changed, retry
           }
           final boolean added = actions.add(a);
+          LOG.info("XXX {} added? {}, {}, {}", type, added, id, a);
           if (!added) {
-            count.decrementAndGet();
+            inflightCount.decrementAndGet();
           }
           return added;
         }
@@ -185,7 +193,7 @@ public class LegacyReplicationManager {
     }
 
     List<DatanodeDetails> getDatanodeDetails(ContainerID id) {
-      for(;;) {
+      for (; ;) {
         final List<InflightAction> actions = get(id);
         if (actions == null) {
           return Collections.emptyList();
@@ -529,8 +537,10 @@ public class LegacyReplicationManager {
                 container.containerID());
 
           }
-          handleUnderReplicatedContainer(container,
-              replicaSet, placementStatus);
+          if (!inflightReplication.isFull() || !inflightDeletion.isFull()) {
+            handleUnderReplicatedContainer(container,
+                replicaSet, placementStatus);
+          }
           return;
         }
 
@@ -907,7 +917,7 @@ public class LegacyReplicationManager {
    * @return The number of inflight additions or zero if none
    */
   private int getInflightAdd(final ContainerID id) {
-    return inflightReplication.size(id);
+    return inflightReplication.inflightActionCount(id);
   }
 
   /**
@@ -917,7 +927,7 @@ public class LegacyReplicationManager {
    * @return The number of inflight deletes or zero if none
    */
   private int getInflightDel(final ContainerID id) {
-    return inflightDeletion.size(id);
+    return inflightDeletion.inflightActionCount(id);
   }
 
   /**
@@ -1117,7 +1127,6 @@ public class LegacyReplicationManager {
   private void handleUnderReplicatedContainer(final ContainerInfo container,
       final ContainerReplicaCount replicaSet,
       final ContainerPlacementStatus placementStatus) {
-    LOG.debug("Handling under-replicated container: {}", container);
     Set<ContainerReplica> replicas = replicaSet.getReplica();
     try {
 
@@ -1523,8 +1532,9 @@ public class LegacyReplicationManager {
     return ""; // unit test
   }
 
-  private boolean addInflight(InflightType type, ContainerID id, InflightAction action) {
-    final boolean added = inflightReplication.add(id, action);
+  private boolean addInflight(InflightType type, ContainerID id,
+      InflightAction action) {
+    final boolean added = getInflightMap(type).add(id, action);
     if (!added) {
       metrics.incrInflightSkipped(type);
     }
@@ -1746,12 +1756,12 @@ public class LegacyReplicationManager {
     )
     private int containerInflightDeletionLimit = 0;
 
-    public void setContainerInflightReplicationLimit(int containerInflightReplicationLimit) {
-      this.containerInflightReplicationLimit = containerInflightReplicationLimit;
+    public void setContainerInflightReplicationLimit(int replicationLimit) {
+      this.containerInflightReplicationLimit = replicationLimit;
     }
 
-    public void setContainerInflightDeletionLimit(int containerInflightDeletionLimit) {
-      this.containerInflightDeletionLimit = containerInflightDeletionLimit;
+    public void setContainerInflightDeletionLimit(int deletionLimit) {
+      this.containerInflightDeletionLimit = deletionLimit;
     }
 
     public void setMaintenanceReplicaMinimum(int replicaCount) {
@@ -1787,17 +1797,14 @@ public class LegacyReplicationManager {
 
   private InflightMap getInflightMap(InflightType type) {
     switch (type) {
-      case REPLICATION:
-        return inflightReplication;
-      case DELETION:
-        return inflightDeletion;
-      default:
-        throw new IllegalStateException("Unexpected type " + type);
+    case REPLICATION: return inflightReplication;
+    case DELETION: return inflightDeletion;
+    default: throw new IllegalStateException("Unexpected type " + type);
     }
   }
 
-  int getInflightSize(InflightType type) {
-    return getInflightMap(type).size();
+  int getInflightCount(InflightType type) {
+    return getInflightMap(type).containerCount();
   }
 
   DatanodeDetails getFirstDatanode(InflightType type, ContainerID id) {

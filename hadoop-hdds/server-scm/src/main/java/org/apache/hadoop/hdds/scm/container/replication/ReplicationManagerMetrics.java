@@ -240,19 +240,19 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   public void incrInflightSkipped(InflightType type) {
     switch (type) {
-      case REPLICATION:
-        this.numInflightReplicationSkipped.incr();
-        return;
-      case DELETION:
-        this.numInflightDeletionSkipped.incr();
-        return;
-      default:
-        throw new IllegalArgumentException("Unexpected type " + type);
+    case REPLICATION:
+      this.numInflightReplicationSkipped.incr();
+      return;
+    case DELETION:
+      this.numInflightDeletionSkipped.incr();
+      return;
+    default:
+      throw new IllegalArgumentException("Unexpected type " + type);
     }
   }
 
   public long getInflightReplication() {
-    return replicationManager.getInflightSize(InflightType.REPLICATION);
+    return replicationManager.getInflightCount(InflightType.REPLICATION);
   }
 
   public long getInflightReplicationSkipped() {
@@ -260,7 +260,7 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   }
 
   public long getInflightDeletion() {
-    return replicationManager.getInflightSize(InflightType.DELETION);
+    return replicationManager.getInflightCount(InflightType.DELETION);
   }
 
   public long getInflightDeletionSkipped() {

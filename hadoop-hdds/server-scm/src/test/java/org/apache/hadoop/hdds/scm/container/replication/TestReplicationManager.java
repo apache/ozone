@@ -489,7 +489,7 @@ public class TestReplicationManager {
     Assertions.assertEquals(currentBytesToReplicate + 100L,
         replicationManager.getMetrics().getNumReplicationBytesTotal());
     Assertions.assertEquals(1,
-        replicationManager.getInflightSize(InflightType.REPLICATION));
+        replicationManager.getInflightCount(InflightType.REPLICATION));
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightReplication());
 
@@ -518,7 +518,7 @@ public class TestReplicationManager {
     eventQueue.processAll(1000);
 
     Assertions.assertEquals(0,
-        replicationManager.getInflightSize(InflightType.REPLICATION));
+        replicationManager.getInflightCount(InflightType.REPLICATION));
     Assertions.assertEquals(0, replicationManager.getMetrics()
         .getInflightReplication());
     Assertions.assertEquals(currentReplicationCommandCompleted + 1,
@@ -570,7 +570,8 @@ public class TestReplicationManager {
             .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
     Assertions.assertEquals(currentDeleteCommandCount + 1,
         replicationManager.getMetrics().getNumDeletionCmdsSent());
-    Assertions.assertEquals(1, replicationManager.getInflightSize(InflightType.DELETION));
+    Assertions.assertEquals(1,
+        replicationManager.getInflightCount(InflightType.DELETION));
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightDeletion());
 
@@ -605,7 +606,8 @@ public class TestReplicationManager {
 
     replicationManager.processAll();
     eventQueue.processAll(1000);
-    Assertions.assertEquals(0, replicationManager.getInflightSize(InflightType.DELETION));
+    Assertions.assertEquals(0,
+        replicationManager.getInflightCount(InflightType.DELETION));
     Assertions.assertEquals(0, replicationManager.getMetrics()
         .getInflightDeletion());
     Assertions.assertEquals(currentDeleteCommandCompleted + 1,
@@ -662,7 +664,8 @@ public class TestReplicationManager {
         replicaOne.getDatanodeDetails()));
     Assertions.assertEquals(currentDeleteCommandCount + 1,
         replicationManager.getMetrics().getNumDeletionCmdsSent());
-    Assertions.assertEquals(1, replicationManager.getInflightSize(InflightType.DELETION));
+    Assertions.assertEquals(1,
+        replicationManager.getInflightCount(InflightType.DELETION));
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightDeletion());
 
@@ -683,7 +686,8 @@ public class TestReplicationManager {
 
     Assertions.assertEquals(currentDeleteCommandCompleted + 1,
         replicationManager.getMetrics().getNumDeletionCmdsCompleted());
-    Assertions.assertEquals(0, replicationManager.getInflightSize(InflightType.DELETION));
+    Assertions.assertEquals(0,
+        replicationManager.getInflightCount(InflightType.DELETION));
     Assertions.assertEquals(0, replicationManager.getMetrics()
         .getInflightDeletion());
 
@@ -729,7 +733,7 @@ public class TestReplicationManager {
     Assertions.assertEquals(currentBytesToReplicate + 100,
         replicationManager.getMetrics().getNumReplicationBytesTotal());
     Assertions.assertEquals(1,
-        replicationManager.getInflightSize(InflightType.REPLICATION));
+        replicationManager.getInflightCount(InflightType.REPLICATION));
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightReplication());
 
@@ -761,7 +765,7 @@ public class TestReplicationManager {
     Assertions.assertEquals(currentReplicateBytesCompleted + 100,
         replicationManager.getMetrics().getNumReplicationBytesCompleted());
     Assertions.assertEquals(0,
-        replicationManager.getInflightSize(InflightType.REPLICATION));
+        replicationManager.getInflightCount(InflightType.REPLICATION));
     Assertions.assertEquals(0, replicationManager.getMetrics()
         .getInflightReplication());
 
@@ -864,7 +868,7 @@ public class TestReplicationManager {
     Assertions.assertEquals(currentBytesToDelete + 99,
         replicationManager.getMetrics().getNumDeletionBytesTotal());
     Assertions.assertEquals(1,
-        replicationManager.getInflightSize(InflightType.DELETION));
+        replicationManager.getInflightCount(InflightType.DELETION));
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightDeletion());
 
@@ -890,7 +894,8 @@ public class TestReplicationManager {
     replicationManager.processAll();
     eventQueue.processAll(1000);
 
-    Assertions.assertEquals(0, replicationManager.getInflightSize(InflightType.DELETION));
+    Assertions.assertEquals(0,
+        replicationManager.getInflightCount(InflightType.DELETION));
     Assertions.assertEquals(0, replicationManager.getMetrics()
         .getInflightDeletion());
     Assertions.assertEquals(currentDeleteCommandCompleted + 1,
@@ -902,7 +907,7 @@ public class TestReplicationManager {
     Assertions.assertEquals(currentReplicateCommandCount + 2,
         replicationManager.getMetrics().getNumReplicationCmdsSent());
     Assertions.assertEquals(1,
-        replicationManager.getInflightSize(InflightType.REPLICATION));
+        replicationManager.getInflightCount(InflightType.REPLICATION));
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightReplication());
 
@@ -1097,7 +1102,7 @@ public class TestReplicationManager {
     Assertions.assertEquals(currentBytesToReplicate + 100,
         replicationManager.getMetrics().getNumReplicationBytesTotal());
     Assertions.assertEquals(1,
-        replicationManager.getInflightSize(InflightType.REPLICATION));
+        replicationManager.getInflightCount(InflightType.REPLICATION));
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightReplication());
 
@@ -1129,7 +1134,7 @@ public class TestReplicationManager {
     Assertions.assertEquals(currentReplicateCommandCount,
         replicationManager.getMetrics().getNumReplicationCmdsSent());
     Assertions.assertEquals(1,
-        replicationManager.getInflightSize(InflightType.REPLICATION));
+        replicationManager.getInflightCount(InflightType.REPLICATION));
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightReplication());
   }
@@ -1184,7 +1189,8 @@ public class TestReplicationManager {
     Assertions.assertTrue(datanodeCommandHandler.received(
         SCMCommandProto.Type.deleteContainerCommand,
         replicaFive.getDatanodeDetails()));
-    Assertions.assertEquals(1, replicationManager.getInflightSize(InflightType.DELETION));
+    Assertions.assertEquals(1,
+        replicationManager.getInflightCount(InflightType.DELETION));
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightDeletion());
     assertOverReplicatedCount(1);
@@ -1227,7 +1233,8 @@ public class TestReplicationManager {
             .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
     Assertions.assertEquals(currentDeleteCommandCount + 1,
         replicationManager.getMetrics().getNumDeletionCmdsSent());
-    Assertions.assertEquals(1, replicationManager.getInflightSize(InflightType.DELETION));
+    Assertions.assertEquals(1,
+        replicationManager.getInflightCount(InflightType.DELETION));
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightDeletion());
 
@@ -1275,7 +1282,8 @@ public class TestReplicationManager {
             .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
     Assertions.assertEquals(currentDeleteCommandCount + 2,
         replicationManager.getMetrics().getNumDeletionCmdsSent());
-    Assertions.assertEquals(1, replicationManager.getInflightSize(InflightType.DELETION));
+    Assertions.assertEquals(1,
+        replicationManager.getInflightCount(InflightType.DELETION));
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightDeletion());
   }
@@ -1464,7 +1472,8 @@ public class TestReplicationManager {
             .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
     Assertions.assertEquals(currentDeleteCommandCount + 2,
         replicationManager.getMetrics().getNumDeletionCmdsSent());
-    Assertions.assertEquals(1, replicationManager.getInflightSize(InflightType.DELETION));
+    Assertions.assertEquals(1,
+        replicationManager.getInflightCount(InflightType.DELETION));
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getInflightDeletion());
     // Get the DECOM and Maint replica and ensure none of them are scheduled
