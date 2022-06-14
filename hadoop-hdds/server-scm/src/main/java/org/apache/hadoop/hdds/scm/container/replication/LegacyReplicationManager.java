@@ -145,7 +145,7 @@ public class LegacyReplicationManager {
       map.clear();
     }
 
-    void iterate(ContainerID id, Function<InflightAction, Boolean> processor) {
+    void iterate(ContainerID id, Predicate<InflightAction> processor) {
       for (; ;) {
         final List<InflightAction> actions = get(id);
         if (actions == null) {
@@ -156,8 +156,8 @@ public class LegacyReplicationManager {
             continue; //actions is changed, retry
           }
           for (Iterator<InflightAction> i = actions.iterator(); i.hasNext();) {
-            final Boolean remove = processor.apply(i.next());
-            if (remove == Boolean.TRUE) {
+            final boolean remove = processor.test(i.next());
+            if (remove) {
               i.remove();
               inflightCount.decrementAndGet();
             }
@@ -183,7 +183,6 @@ public class LegacyReplicationManager {
             continue; //actions is changed, retry
           }
           final boolean added = actions.add(a);
-          LOG.info("XXX {} added? {}, {}, {}", type, added, id, a);
           if (!added) {
             inflightCount.decrementAndGet();
           }
@@ -1606,7 +1605,7 @@ public class LegacyReplicationManager {
   private <T extends GeneratedMessage> void sendAndTrackDatanodeCommand(
       final DatanodeDetails datanode,
       final SCMCommand<T> command,
-      final Function<InflightAction, Boolean> tracker) {
+      final Predicate<InflightAction> tracker) {
     try {
       command.setTerm(scmContext.getTermOfLeader());
     } catch (NotLeaderException nle) {
@@ -1614,7 +1613,7 @@ public class LegacyReplicationManager {
           + " since current SCM is not leader.", nle);
       return;
     }
-    final boolean allowed = tracker.apply(
+    final boolean allowed = tracker.test(
         new InflightAction(datanode, clock.millis()));
     if (!allowed) {
       return;
