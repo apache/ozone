@@ -188,7 +188,7 @@ public class TestECContainerHealthCheck {
             pending, 2);
     Assert.assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
     Assert.assertEquals(2, result.getExcessRedundancy());
-    Assert.assertTrue(result.isSufficientReplicatedAfterPending());
+    Assert.assertTrue(result.isSufficientlyReplicatedAfterPending());
   }
 
   @Test

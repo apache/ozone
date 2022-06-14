@@ -143,14 +143,14 @@ public class ContainerHealthResult {
   public static class OverReplicatedHealthResult extends ContainerHealthResult {
 
     private final int excessRedundancy;
-    private final boolean sufficientReplicatedAfterPending;
+    private final boolean sufficientlyReplicatedAfterPending;
 
 
     OverReplicatedHealthResult(ContainerInfo containerInfo,
         int excessRedundancy, boolean replicatedOkWithPending) {
       super(containerInfo, HealthState.OVER_REPLICATED);
       this.excessRedundancy = excessRedundancy;
-      this.sufficientReplicatedAfterPending = replicatedOkWithPending;
+      this.sufficientlyReplicatedAfterPending = replicatedOkWithPending;
     }
 
     /**
@@ -173,8 +173,8 @@ public class ContainerHealthResult {
      * @return True if the over-replication is corrected by the pending
      *         deletes. False otherwise.
      */
-    public boolean isSufficientReplicatedAfterPending() {
-      return sufficientReplicatedAfterPending;
+    public boolean isSufficientlyReplicatedAfterPending() {
+      return sufficientlyReplicatedAfterPending;
     }
   }
 }
