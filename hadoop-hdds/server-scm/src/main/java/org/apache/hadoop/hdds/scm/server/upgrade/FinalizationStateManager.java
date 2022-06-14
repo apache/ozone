@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
+import org.apache.hadoop.hdds.utils.db.Table;
 
 import java.io.IOException;
 
@@ -44,4 +45,7 @@ public interface FinalizationStateManager {
   FinalizationCheckpoint getFinalizationCheckpoint();
 
   void setUpgradeContext(SCMUpgradeFinalizationContext context);
+
+  void reinitialize(Table<String, String> finalizationStore)
+      throws IOException;
 }

@@ -18,10 +18,12 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -41,10 +43,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
-  private static final Logger LOG =
+  @VisibleForTesting
+  public static final Logger LOG =
       LoggerFactory.getLogger(FinalizationStateManagerImpl.class);
 
-  private final Table<String, String> finalizationStore;
+  private Table<String, String> finalizationStore;
   private final DBTransactionBuffer transactionBuffer;
   private final HDDSLayoutVersionManager versionManager;
   // Ensures that we are not in the process of updating checkpoint state as
@@ -62,6 +65,10 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     this.upgradeFinalizer = builder.upgradeFinalizer;
     this.versionManager = this.upgradeFinalizer.getVersionManager();
     this.checkpointLock = new ReentrantReadWriteLock();
+    initialize();
+  }
+
+  private void initialize() throws IOException {
     this.hasFinalizingMark =
         finalizationStore.isExist(OzoneConsts.FINALIZING_KEY);
   }
@@ -87,6 +94,16 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
   @Override
   public void finalizeLayoutFeature(Integer layoutVersion) throws IOException {
+    LOG.info("Finalizing layout version {} on SCM {}", layoutVersion,
+        upgradeContext.getSCMContext().getScm().getScmNodeDetails().getNodeId());
+    finalizeLayoutFeatureLocal(layoutVersion);
+  }
+
+  /**
+   * A version of finalizeLayoutFeature without the {@link Replicate}
+   * annotation that can be called by followers to finalize from a snapshot.
+   */
+  private void finalizeLayoutFeatureLocal(Integer layoutVersion) throws IOException {
     checkpointLock.writeLock().lock();
     try {
       // The VERSION file is the source of truth for the current layout
@@ -170,6 +187,66 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
         hasFinalizingMarkSnapshot, mlvBehindSlvSnapshot);
     Preconditions.checkNotNull(currentCheckpoint, errorMessage);
     return currentCheckpoint;
+  }
+
+  @Override
+  public void reinitialize(Table<String, String> finalizationStore)
+      throws IOException {
+    checkpointLock.writeLock().lock();
+    try {
+      finalizationStore.close();
+      this.finalizationStore = finalizationStore;
+      initialize();
+
+      int dbLayoutVersion = getDBLayoutVersion();
+      int currentLayoutVersion = versionManager.getMetadataLayoutVersion();
+      LOG.info("Reinitializing state machine with db lv {} file lv {}",
+          dbLayoutVersion, currentLayoutVersion);
+      if (currentLayoutVersion < dbLayoutVersion) {
+        // Snapshot contained a higher metadata layout version. Finalize this
+        // follower SCM as a result.
+        LOG.info("New SCM snapshot received with higher layout version {}. " +
+                "Attempting to finalize current SCM to that version.",
+            dbLayoutVersion);
+        // Since the SCM is finalizing from a snapshot, it is a follower, and
+        // does not need to run the leader only finalization driving actions
+        // that the UpgradeFinalizationExecutor contains. Just run the
+        // upgrade actions for the layout features, set the finalization
+        // checkpoint, and increase the version in the VERSION file.
+        for (int version = currentLayoutVersion + 1; version <= dbLayoutVersion;
+             version++) {
+          finalizeLayoutFeatureLocal(version);
+        }
+      }
+      upgradeContext.getSCMContext().setFinalizationCheckpoint(
+          getFinalizationCheckpoint());
+    } catch (Exception ex) {
+      LOG.error("Failed to reinitialize finalization state", ex);
+      throw new IOException(ex);
+    } finally {
+      checkpointLock.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Gets the metadata layout version from the SCM RocksDB. If there is no
+   * layout version in the DB, the first layout version will be returned.
+   * This may happen if working with an older SCM instance before the upgrade
+   * framework was present.
+   */
+  private int getDBLayoutVersion() throws IOException {
+    String dbLayoutVersion = finalizationStore.get(OzoneConsts.LAYOUT_VERSION_KEY);
+    if (dbLayoutVersion == null) {
+      return HDDSLayoutFeature.INITIAL_VERSION.layoutVersion();
+    } else {
+      try {
+        return Integer.parseInt(dbLayoutVersion);
+      } catch (NumberFormatException ex) {
+        LOG.error("Failed to read layout version from SCM DB. Found string {}",
+            dbLayoutVersion, ex);
+        throw ex;
+      }
+    }
   }
 
   /**

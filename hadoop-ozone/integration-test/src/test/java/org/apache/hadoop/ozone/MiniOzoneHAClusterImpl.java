@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.CheckedConsumer;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
+import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -94,12 +95,13 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    */
   public MiniOzoneHAClusterImpl(
       OzoneConfiguration conf,
+      SCMConfigurator scmConfigurator,
       OMHAService omhaService,
       SCMHAService scmhaService,
       List<HddsDatanodeService> hddsDatanodes,
       String clusterPath,
       ReconServer reconServer) {
-    super(conf, hddsDatanodes, reconServer);
+    super(conf, scmConfigurator, hddsDatanodes, reconServer);
     this.omhaService = omhaService;
     this.scmhaService = scmhaService;
     this.clusterMetaPath = clusterPath;
@@ -260,7 +262,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     OzoneConfiguration scmConf = scm.getConfiguration();
     shutdownStorageContainerManager(scm);
     scm.join();
-    scm = HddsTestUtils.getScmSimple(scmConf);
+    scm = HddsTestUtils.getScmSimple(scmConf, getSCMConfigurator());
     scmhaService.activate(scm);
     scm.start();
     if (waitForSCM) {
@@ -433,7 +435,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           scmService.getActiveServices(), reconServer);
 
       MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(conf,
-          omService, scmService, hddsDatanodes, path, reconServer);
+          scmConfigurator, omService, scmService, hddsDatanodes, path,
+          reconServer);
 
       if (startDataNodes) {
         cluster.startHddsDatanodes();
@@ -583,7 +586,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             } else {
               StorageContainerManager.scmBootstrap(scmConfig);
             }
-            StorageContainerManager scm = HddsTestUtils.getScmSimple(scmConfig);
+            StorageContainerManager scm =
+                HddsTestUtils.getScmSimple(scmConfig, scmConfigurator);
             HealthyPipelineSafeModeRule rule =
                 scm.getScmSafeModeManager().getHealthyPipelineSafeModeRule();
             if (rule != null) {

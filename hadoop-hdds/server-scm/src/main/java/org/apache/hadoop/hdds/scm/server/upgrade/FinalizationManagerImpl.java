@@ -134,6 +134,12 @@ public class FinalizationManagerImpl implements FinalizationManager {
     return finalizationStateManager.getFinalizationCheckpoint();
   }
 
+  @Override
+  public void reinitialize(Table<String, String> finalizationStore)
+      throws IOException {
+    finalizationStateManager.reinitialize(finalizationStore);
+  }
+
   /**
    * Builds a {@link FinalizationManagerImpl}.
    */

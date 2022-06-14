@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -72,6 +73,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ConfigurationProvider;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.log4j.spi.Configurator;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
@@ -113,6 +115,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       LoggerFactory.getLogger(MiniOzoneClusterImpl.class);
 
   private OzoneConfiguration conf;
+  private final SCMConfigurator scmConfigurator;
   private StorageContainerManager scm;
   private OzoneManager ozoneManager;
   private final List<HddsDatanodeService> hddsDatanodes;
@@ -123,26 +126,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private CertificateClient caClient;
 
   /**
-   * Creates a new MiniOzoneCluster.
-   *
-   * @throws IOException if there is an I/O error
-   */
-  protected MiniOzoneClusterImpl(OzoneConfiguration conf,
-                                 OzoneManager ozoneManager,
-                                 StorageContainerManager scm,
-                                 List<HddsDatanodeService> hddsDatanodes) {
-    this.conf = conf;
-    this.ozoneManager = ozoneManager;
-    this.scm = scm;
-    this.hddsDatanodes = hddsDatanodes;
-  }
-
-  /**
    * Creates a new MiniOzoneCluster with Recon.
    *
    * @throws IOException if there is an I/O error
    */
   MiniOzoneClusterImpl(OzoneConfiguration conf,
+                       SCMConfigurator scmConfigurator,
                        OzoneManager ozoneManager,
                        StorageContainerManager scm,
                        List<HddsDatanodeService> hddsDatanodes,
@@ -152,6 +141,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     this.scm = scm;
     this.hddsDatanodes = hddsDatanodes;
     this.reconServer = reconServer;
+    this.scmConfigurator = scmConfigurator;
   }
 
   /**
@@ -163,11 +153,16 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    * @param conf
    * @param hddsDatanodes
    */
-  MiniOzoneClusterImpl(OzoneConfiguration conf,
+  MiniOzoneClusterImpl(OzoneConfiguration conf, SCMConfigurator scmConfigurator,
       List<HddsDatanodeService> hddsDatanodes, ReconServer reconServer) {
+    this.scmConfigurator = scmConfigurator;
     this.conf = conf;
     this.hddsDatanodes = hddsDatanodes;
     this.reconServer = reconServer;
+  }
+
+  protected SCMConfigurator getSCMConfigurator() {
+    return scmConfigurator;
   }
 
   @Override
@@ -354,6 +349,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     LOG.info("Restarting SCM in cluster " + this.getClass());
     scm.stop();
     scm.join();
+    // TODO pass configurator
     scm = HddsTestUtils.getScmSimple(conf);
     scm.start();
     if (waitForDatanode) {
@@ -603,7 +599,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         hddsDatanodes = createHddsDatanodes(
             Collections.singletonList(scm), reconServer);
 
-        MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf, om, scm,
+        MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf,
+            scmConfigurator, om, scm,
             hddsDatanodes, reconServer);
 
         cluster.setCAClient(certClient);

@@ -10,6 +10,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -72,12 +73,17 @@ public class TestHddsUpgradeUtils {
   public static void testPostUpgradeConditionsSCM(
       List<StorageContainerManager> scms, int numContainers, int numDatanodes) {
     for (StorageContainerManager scm : scms) {
+      LOG.info("Testing post upgrade conditions on SCM with node ID: {}",
+          scm.getSCMNodeId());
       testPostUpgradeConditionsSCM(scm, numContainers, numDatanodes);
     }
   }
 
   public static void testPostUpgradeConditionsSCM(StorageContainerManager scm,
       int numContainers, int numDatanodes) {
+
+    Assert.assertTrue(scm.getScmContext().isFinalizationCheckpointCrossed(
+        FinalizationCheckpoint.FINALIZATION_COMPLETE));
 
     HDDSLayoutVersionManager scmVersionManager = scm.getLayoutVersionManager();
     Assert.assertEquals(scmVersionManager.getSoftwareLayoutVersion(),
@@ -150,7 +156,7 @@ public class TestHddsUpgradeUtils {
    * Helper function to test Post-Upgrade conditions on all the DataNodes.
    */
   public static void testPostUpgradeConditionsDataNodes(
-      List<HddsDatanodeService> datanodes,
+      List<HddsDatanodeService> datanodes, int numContainers,
       ContainerProtos.ContainerDataProto.State... validClosedContainerStates) {
     List<ContainerProtos.ContainerDataProto.State> closeStates =
         Arrays.asList(validClosedContainerStates);
@@ -200,7 +206,7 @@ public class TestHddsUpgradeUtils {
         countContainers++;
       }
     }
-    Assert.assertTrue(countContainers >= 1);
+    Assert.assertTrue(countContainers >= numContainers);
   }
 
   public static void testDataNodesStateOnSCM(List<StorageContainerManager> scms,

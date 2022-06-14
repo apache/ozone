@@ -383,6 +383,9 @@ public class SCMHAManagerImpl implements SCMHAManager {
       }
       scm.getScmCertificateServer().reinitialize(metadataStore);
     }
+    // This call also performs upgrade finalization if the new table contains a
+    // higher metadata layout version than the SCM's current one.
+    scm.getFinalizationManager().reinitialize(metadataStore.getMetaTable());
   }
 
   @VisibleForTesting

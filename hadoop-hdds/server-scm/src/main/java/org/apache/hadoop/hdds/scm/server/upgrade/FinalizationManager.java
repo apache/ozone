@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 
@@ -51,4 +52,6 @@ public interface FinalizationManager {
   void buildUpgradeContext(NodeManager nodeManager,
                                   PipelineManager pipelineManager,
                                   SCMContext scmContext);
+
+  void reinitialize(Table<String, String> finalizationStore) throws IOException;
 }
