@@ -361,12 +361,12 @@ public class BlockOutputStreamEntryPool {
       super(len, combineMode);
       this.streamEntries = entries;
 
-      this.keyLocationInfos = new ArrayList<OmKeyLocationInfo>();
-
       for (BlockOutputStreamEntry entry : streamEntries) {
         OmKeyLocationInfo keyLocationInfo =
-                new OmKeyLocationInfo.Builder().setLength(entry.getLength()).build();
-        keyLocationInfos.add(keyLocationInfo);
+                new OmKeyLocationInfo.Builder()
+                        .setLength(entry.getLength())
+                        .build();
+        getKeyLocationInfoList().add(keyLocationInfo);
       }
     }
 
@@ -402,7 +402,8 @@ public class BlockOutputStreamEntryPool {
     OzoneClientConfig.ChecksumCombineMode combineMode =
             config.getChecksumCombineMode();
     ReplicatedFileChecksumCommitHelper helper =
-        new ReplicatedFileChecksumCommitHelper(length, combineMode, streamEntries);
+        new ReplicatedFileChecksumCommitHelper(
+                length, combineMode, streamEntries);
     helper.compute();
     return helper.getFileChecksum();
   }

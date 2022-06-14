@@ -40,6 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -61,7 +62,7 @@ public abstract class BaseFileChecksumHelper {
   private final DataOutputBuffer blockChecksumBuf = new DataOutputBuffer();
   private XceiverClientFactory xceiverClientFactory;
   private FileChecksum fileChecksum;
-  protected List<OmKeyLocationInfo> keyLocationInfos;
+  private List<OmKeyLocationInfo> keyLocationInfos;
   private long remaining = 0L;
   private int bytesPerCRC = -1;
   private long crcPerBlock = 0;
@@ -74,6 +75,7 @@ public abstract class BaseFileChecksumHelper {
           long len, OzoneClientConfig.ChecksumCombineMode combineMode) {
     this.length = len;
     this.combineMode = combineMode;
+    this.keyLocationInfos = new ArrayList<OmKeyLocationInfo>();
   }
 
   // initialization

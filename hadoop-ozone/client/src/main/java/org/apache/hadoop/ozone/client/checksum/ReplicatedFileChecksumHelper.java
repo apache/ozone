@@ -53,7 +53,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
   }
 
   public ReplicatedFileChecksumHelper(
-          long len,OzoneClientConfig.ChecksumCombineMode combineMode) {
+          long len, OzoneClientConfig.ChecksumCombineMode combineMode) {
     super(len, combineMode);
   }
 
