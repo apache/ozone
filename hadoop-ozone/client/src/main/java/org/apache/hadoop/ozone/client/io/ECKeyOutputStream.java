@@ -465,7 +465,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
       Preconditions.checkArgument(writeOffset == offset,
           "Expected writeOffset= " + writeOffset
               + " Expected offset=" + offset);
-      blockOutputStreamEntryPool.commitKey(offset);
+      blockOutputStreamEntryPool.commitKey(offset, false);
     } finally {
       blockOutputStreamEntryPool.cleanup();
     }

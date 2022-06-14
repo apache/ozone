@@ -322,7 +322,7 @@ public class BlockOutputStreamEntryPool {
    *               the actual length written by the stream entries.)
    * @throws IOException in case there is an I/O problem during communication.
    */
-  void commitKey(long offset) throws IOException {
+  void commitKey(long offset, boolean computeChecksum) throws IOException {
     if (keyArgs != null) {
       // in test, this could be null
       long length = getKeyLength();
@@ -337,7 +337,9 @@ public class BlockOutputStreamEntryPool {
         commitUploadPartInfo =
             omClient.commitMultipartUploadPart(keyArgs, openID);
       } else {
-        keyArgs.setFileChecksum(getFileChecksum(length));
+        if (computeChecksum) {
+          keyArgs.setFileChecksum(getFileChecksum(length));
+        }
         omClient.commitKey(keyArgs, openID);
       }
     } else {
@@ -354,9 +356,18 @@ public class BlockOutputStreamEntryPool {
     private List<BlockOutputStreamEntry> streamEntries;
     ReplicatedFileChecksumCommitHelper(
         long len,
+        OzoneClientConfig.ChecksumCombineMode combineMode,
         List<BlockOutputStreamEntry> entries) {
-      super(len);
+      super(len, combineMode);
       this.streamEntries = entries;
+
+      this.keyLocationInfos = new ArrayList<OmKeyLocationInfo>();
+
+      for (BlockOutputStreamEntry entry : streamEntries) {
+        OmKeyLocationInfo keyLocationInfo =
+                new OmKeyLocationInfo.Builder().setLength(entry.getLength()).build();
+        keyLocationInfos.add(keyLocationInfo);
+      }
     }
 
     @Override
@@ -385,8 +396,10 @@ public class BlockOutputStreamEntryPool {
   @VisibleForTesting
   FileChecksum getFileChecksum(long length) throws IOException {
     // go through each BlockOutputStream
+    OzoneClientConfig.ChecksumCombineMode combineMode =
+            config.getChecksumCombineMode();
     ReplicatedFileChecksumCommitHelper helper =
-        new ReplicatedFileChecksumCommitHelper(length, streamEntries);
+        new ReplicatedFileChecksumCommitHelper(length, combineMode, streamEntries);
     helper.compute();
     return helper.getFileChecksum();
   }

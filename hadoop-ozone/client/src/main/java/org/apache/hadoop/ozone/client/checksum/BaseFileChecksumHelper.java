@@ -61,7 +61,7 @@ public abstract class BaseFileChecksumHelper {
   private final DataOutputBuffer blockChecksumBuf = new DataOutputBuffer();
   private XceiverClientFactory xceiverClientFactory;
   private FileChecksum fileChecksum;
-  private List<OmKeyLocationInfo> keyLocationInfos;
+  protected List<OmKeyLocationInfo> keyLocationInfos;
   private long remaining = 0L;
   private int bytesPerCRC = -1;
   private long crcPerBlock = 0;
@@ -70,8 +70,10 @@ public abstract class BaseFileChecksumHelper {
     this.length = 0;
   }
 
-  BaseFileChecksumHelper(long len) {
+  BaseFileChecksumHelper(
+          long len, OzoneClientConfig.ChecksumCombineMode combineMode) {
     this.length = len;
+    this.combineMode = combineMode;
   }
 
   // initialization

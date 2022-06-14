@@ -522,7 +522,7 @@ public class KeyOutputStream extends OutputStream {
       if (!isException) {
         Preconditions.checkArgument(writeOffset == offset);
       }
-      blockOutputStreamEntryPool.commitKey(offset);
+      blockOutputStreamEntryPool.commitKey(offset, true);
     } finally {
       blockOutputStreamEntryPool.cleanup();
     }
