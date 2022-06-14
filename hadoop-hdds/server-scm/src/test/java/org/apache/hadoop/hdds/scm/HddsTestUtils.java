@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -638,6 +639,7 @@ public final class HddsTestUtils {
       String scmId = UUID.randomUUID().toString();
       scmStore.setClusterId(clusterId);
       scmStore.setScmId(scmId);
+      scmStore.setSCMHAFlag(SCMHAUtils.isSCMHAEnabled(conf));
       // writes the version file properties
       scmStore.initialize();
     }
@@ -790,7 +792,8 @@ public final class HddsTestUtils {
     return containerInfoList;
   }
 
-  public static void setField(Class clazz, String fieldName, Object instance) throws NoSuchFieldException, IllegalAccessException {
+  public static void setField(Class clazz, String fieldName, Object instance)
+      throws NoSuchFieldException, IllegalAccessException {
     Field field = clazz.getDeclaredField(fieldName);
     field.setAccessible(true);
     Field modifiers = field.getClass().getDeclaredField("modifiers");

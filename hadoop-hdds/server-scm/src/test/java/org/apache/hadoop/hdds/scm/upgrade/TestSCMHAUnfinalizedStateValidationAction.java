@@ -17,16 +17,19 @@
  */
 package org.apache.hadoop.hdds.scm.upgrade;
 
+import org.apache.hadoop.hdds.conf.ConfigurationException;
+import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.ratis.util.ExitUtils;
+import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.io.TempDir;
@@ -34,6 +37,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.UUID;
 
 /**
@@ -74,18 +78,35 @@ public class TestSCMHAUnfinalizedStateValidationAction {
     conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS, dataPath.toString());
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, dataPath.toString());
     // This init should always succeed, since SCM is not pre-finalized yet.
+    HddsTestUtils.setField(DefaultConfigManager.class, "CONFIG_DEFAULT_MAP",
+        new HashMap<>());
     boolean initResult1 = StorageContainerManager.scmInit(conf, CLUSTER_ID);
     Assertions.assertTrue(initResult1);
 
     // Set up new pre-finalized SCM.
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
         haEnabledPreFinalized);
+    // Clusters from Ratis SCM -> Non Ratis SCM & Ratis SCM -> Non Ratis SCM not supported
+    if (haEnabledPreFinalized != haEnabledBefore) {
+      ConfigurationException exception =
+          Assertions.assertThrows(ConfigurationException.class,
+              () -> {
+                StorageContainerManager.scmInit(conf, CLUSTER_ID);
+              });
+      Assert.assertEquals("Invalid Config ozone.scm.ratis.enable Provided " +
+              String.format("ConfigValue: %s, Expected Config Value: %s",
+                  haEnabledPreFinalized, haEnabledBefore),
+          exception.getMessage());
+      return;
+    }
     StorageContainerManager scm = HddsTestUtils.getScm(conf);
 
     Assertions.assertEquals(UpgradeFinalizer.Status.FINALIZATION_REQUIRED,
         scm.getFinalizationManager().getUpgradeFinalizer().getStatus());
 
     final boolean shouldFail = !haEnabledBefore && haEnabledPreFinalized;
+    HddsTestUtils.setField(DefaultConfigManager.class, "CONFIG_DEFAULT_MAP",
+        new HashMap<>());
     if (shouldFail) {
       // Start on its own should fail.
       Assertions.assertThrows(UpgradeException.class, scm::start);

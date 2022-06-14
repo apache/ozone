@@ -127,8 +127,10 @@ public class TestSCMHAConfiguration {
           scmServiceId, nodeId), port++);
     }
 
-
-    SCMHANodeDetails.loadSCMHAConfig(conf, Optional.empty());
+    SCMStorageConfig scmStorageConfig = Mockito.mock(SCMStorageConfig.class);
+    Mockito.when(scmStorageConfig.getState())
+        .thenReturn(Storage.StorageState.NOT_INITIALIZED);
+    SCMHANodeDetails.loadSCMHAConfig(conf, Optional.of(scmStorageConfig));
 
     port = 9880;
 
@@ -221,9 +223,11 @@ public class TestSCMHAConfiguration {
     conf.set(OZONE_SCM_DATANODE_PORT_KEY, "9898");
     conf.set(OZONE_SCM_SECURITY_SERVICE_PORT_KEY, "9899");
 
-
-    SCMHANodeDetails scmhaNodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf
-        , Optional.empty());
+    SCMStorageConfig scmStorageConfig = Mockito.mock(SCMStorageConfig.class);
+    Mockito.when(scmStorageConfig.getState())
+        .thenReturn(Storage.StorageState.NOT_INITIALIZED);
+    SCMHANodeDetails scmhaNodeDetails =
+        SCMHANodeDetails.loadSCMHAConfig(conf, Optional.of(scmStorageConfig));
 
     Assertions.assertEquals("10000", conf.get(OZONE_SCM_RATIS_PORT_KEY));
     Assertions.assertEquals("10001", conf.get(OZONE_SCM_GRPC_PORT_KEY));
@@ -274,17 +278,20 @@ public class TestSCMHAConfiguration {
   }
 
   @Test
-  public void testRatisEnabledDefaultConfigWithoutInitializedSCM() throws IOException, NoSuchFieldException, IllegalAccessException {
+  public void testRatisEnabledDefaultConfigWithoutInitializedSCM()
+      throws IOException, NoSuchFieldException, IllegalAccessException {
     SCMStorageConfig scmStorageConfig = Mockito.mock(SCMStorageConfig.class);
-    Mockito.when(scmStorageConfig.getState()).thenReturn(Storage.StorageState.NOT_INITIALIZED);
+    Mockito.when(scmStorageConfig.getState())
+        .thenReturn(Storage.StorageState.NOT_INITIALIZED);
     SCMHANodeDetails.loadSCMHAConfig(conf, Optional.of(scmStorageConfig));
-    Assert.assertEquals(SCMHAUtils.isSCMHAEnabled(conf), ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
-    HddsTestUtils.setField(DefaultConfigManager.class, "configDefaultMap",
+    Assert.assertEquals(SCMHAUtils.isSCMHAEnabled(conf),
+        ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
+    HddsTestUtils.setField(DefaultConfigManager.class, "CONFIG_DEFAULT_MAP",
         new HashMap<>());
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     SCMHANodeDetails.loadSCMHAConfig(conf, Optional.of(scmStorageConfig));
     Assert.assertEquals(SCMHAUtils.isSCMHAEnabled(conf), false);
-    HddsTestUtils.setField(DefaultConfigManager.class, "configDefaultMap",
+    HddsTestUtils.setField(DefaultConfigManager.class, "CONFIG_DEFAULT_MAP",
         new HashMap<>());
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     SCMHANodeDetails.loadSCMHAConfig(conf, Optional.of(scmStorageConfig));
@@ -298,19 +305,21 @@ public class TestSCMHAConfiguration {
     Mockito.when(scmStorageConfig.getState())
         .thenReturn(Storage.StorageState.INITIALIZED);
     Mockito.when(scmStorageConfig.isSCMHAEnabled()).thenReturn(false);
+    HddsTestUtils.setField(DefaultConfigManager.class, "CONFIG_DEFAULT_MAP",
+        new HashMap<>());
     SCMHANodeDetails.loadSCMHAConfig(conf, Optional.of(scmStorageConfig));
     Assert.assertEquals(SCMHAUtils.isSCMHAEnabled(conf),
         scmStorageConfig.isSCMHAEnabled());
     Mockito.when(scmStorageConfig.isSCMHAEnabled()).thenReturn(false);
-    HddsTestUtils.setField(DefaultConfigManager.class, "configDefaultMap",
+    HddsTestUtils.setField(DefaultConfigManager.class, "CONFIG_DEFAULT_MAP",
         new HashMap<>());
     Assert.assertEquals(SCMHAUtils.isSCMHAEnabled(conf), true);
   }
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
-  public void testRatisEnabledDefaultConflictConfigWithInitializedSCM(boolean isRatisEnabled)
-      throws IOException {
+  public void testRatisEnabledDefaultConflictConfigWithInitializedSCM(
+      boolean isRatisEnabled) throws IOException {
     SCMStorageConfig scmStorageConfig = Mockito.mock(SCMStorageConfig.class);
     Mockito.when(scmStorageConfig.getState())
         .thenReturn(Storage.StorageState.INITIALIZED);
@@ -318,10 +327,9 @@ public class TestSCMHAConfiguration {
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, !isRatisEnabled);
     ConfigurationException exception =
         Assertions.assertThrows(ConfigurationException.class,
-        ()-> {
-          SCMHANodeDetails.loadSCMHAConfig(conf,
-              Optional.of(scmStorageConfig));
-        });
+            () -> SCMHANodeDetails.loadSCMHAConfig(conf,
+                Optional.of(scmStorageConfig))
+        );
     Assert.assertEquals("Invalid Config ozone.scm.ratis.enable Provided " +
         String.format("ConfigValue: %s, Expected Config Value: %s",
             !isRatisEnabled, isRatisEnabled),
