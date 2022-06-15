@@ -438,6 +438,8 @@ enum Status {
     TENANT_NOT_EMPTY = 85;
 
     FEATURE_NOT_ENABLED = 86;
+
+    BUCKET_ID_MISMATCH = 87;
 }
 
 /**
