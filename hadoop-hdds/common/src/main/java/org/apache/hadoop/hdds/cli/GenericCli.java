@@ -31,7 +31,6 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.ExecutionException;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.RunLast;
 
 /**
  * This is a generic parent class for all the ozone related cli tools.
@@ -83,17 +82,22 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
   }
 
   public void run(String[] argv) {
+    int exitCode;
     try {
-      execute(argv);
+      exitCode = execute(argv);
     } catch (ExecutionException ex) {
       printError(ex.getCause() == null ? ex : ex.getCause());
-      System.exit(-1);
+      exitCode = -1;
+    }
+
+    if (exitCode != CommandLine.ExitCode.OK) {
+      System.exit(exitCode);
     }
   }
 
   @VisibleForTesting
-  public void execute(String[] argv) {
-    cmd.parseWithHandler(new RunLast(), argv);
+  public int execute(String[] argv) {
+    return cmd.execute(argv);
   }
 
   protected void printError(Throwable error) {
