@@ -2985,7 +2985,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                 info.getOmRoleInfo().getNodeId(),
                 info.getOmRoleInfo().getServerRole()
             ));
-      }}
+      }
+    }
     return sb.toString();
   }
 
