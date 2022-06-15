@@ -2439,7 +2439,7 @@ public class KeyManagerImpl implements KeyManager {
           break;
         }
         fileInfo.setFileName(fileInfo.getKeyName());
-        String fullKeyPath =OMFileRequest.getAbsolutePath(
+        String fullKeyPath = OMFileRequest.getAbsolutePath(
             parentInfo.getKeyName(), fileInfo.getKeyName());
         fileInfo.setKeyName(fullKeyPath);
 
