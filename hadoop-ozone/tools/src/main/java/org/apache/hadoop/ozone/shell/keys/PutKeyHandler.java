@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -41,6 +42,7 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
 
@@ -94,7 +96,14 @@ public class PutKeyHandler extends KeyHandler {
     int chunkSize = (int) getConf().getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
         OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
 
-    if (dataFile.length() <= chunkSize) {
+    Boolean useAsync = false;
+    if (dataFile.length() <= chunkSize ||
+        (replicationConfig != null &&
+        replicationConfig.getReplicationType()  == EC) ||
+        bucket.getReplicationConfig() instanceof ECReplicationConfig) {
+      useAsync = true;
+    }
+    if (useAsync) {
       if (isVerbose()) {
         out().println("API: async");
       }
