@@ -38,8 +38,8 @@ public final class DefaultConfigManager {
     T prevValue = getValue(config, value);
     if (!value.equals(prevValue)) {
       throw new ConfigurationException(String.format("Setting conflicting " +
-          "Default Configs old default Value: {} New Default Value:{}",
-          prevValue, value));
+          "Default Configs old default Value: %s New Default Value:%s",
+          prevValue.toString(), value.toString()));
     }
     CONFIG_DEFAULT_MAP.putIfAbsent(config, value);
   }

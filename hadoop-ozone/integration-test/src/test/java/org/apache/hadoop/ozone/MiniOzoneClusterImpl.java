@@ -734,6 +734,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       return scm;
     }
 
+    //TODO: HDDS-6897
+    //Disabling Ratis for only of MiniOzoneClusterImpl. MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
     protected void initializeScmStorage(SCMStorageConfig scmStore)
         throws IOException {
       if (scmStore.getState() == StorageState.INITIALIZED) {
@@ -745,13 +747,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
       scmStore.setScmId(scmId.get());
       scmStore.initialize();
-      if (SCMHAUtils.isSCMHAEnabled(conf)) {
-        scmStore.setSCMHAFlag(true);
-        scmStore.persistCurrentState();
-        SCMRatisServerImpl.initialize(clusterId, scmId.get(),
-            SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
-                    .getLocalNodeDetails(), conf);
-      }
+
     }
 
     void initializeOmStorage(OMStorage omStorage) throws IOException {

@@ -118,6 +118,7 @@ public class TestStorageContainerManagerHA {
     if (cluster != null) {
       cluster.shutdown();
     }
+    DefaultConfigManager.clearDefaultConfigs();
   }
 
   @Test

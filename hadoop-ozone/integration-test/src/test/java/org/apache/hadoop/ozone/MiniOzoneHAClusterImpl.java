@@ -28,7 +28,11 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.CheckedConsumer;
+import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -623,6 +627,20 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       }
 
       return new SCMHAService(activeSCMs, inactiveSCMs, scmServiceId, scmPorts);
+    }
+
+    //TODO: HDDS-6897
+    //Disabling Ratis for only of MiniOzoneClusterImpl. MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
+    @Override
+    protected void initializeScmStorage(SCMStorageConfig scmStore) throws IOException {
+      super.initializeScmStorage(scmStore);
+      if (SCMHAUtils.isSCMHAEnabled(conf)) {
+        scmStore.setSCMHAFlag(true);
+        scmStore.persistCurrentState();
+        SCMRatisServerImpl.initialize(clusterId, scmId.get(),
+                SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
+                        .getLocalNodeDetails(), conf);
+      }
     }
 
     /**
