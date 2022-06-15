@@ -91,6 +91,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateAssociatedBucketId;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
 /**
@@ -204,6 +205,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // exception
       throw new OMException("Bucket not found " + bucketName, BUCKET_NOT_FOUND);
     }
+
+    // Bucket ID verification for in-flight requests.
+    validateAssociatedBucketId(
+        omMetadataManager.getBucketId(volumeName, bucketName), getOmRequest());
 
     // Make sure associated bucket's layout matches the one associated with
     // the request.

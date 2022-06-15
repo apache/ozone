@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateAssociatedBucketId;
 
 /**
  * Handles RecoverTrash request.
@@ -104,12 +103,6 @@ public class OMTrashRecoverRequest extends OMKeyRequest {
       // Validate.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       validateBucketAndVolume(omMetadataManager, volumeName, destinationBucket);
-
-      final long sourceBucketId =
-          omMetadataManager.getBucketId(volumeName, bucketName);
-
-      // Bucket ID verification for in-flight requests.
-      validateAssociatedBucketId(sourceBucketId, getOmRequest());
 
 
       /** TODO: HDDS-2425. HDDS-2426.
