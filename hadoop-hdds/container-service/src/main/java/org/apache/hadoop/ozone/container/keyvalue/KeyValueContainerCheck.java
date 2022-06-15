@@ -253,7 +253,8 @@ public class KeyValueContainerCheck {
             // In EC, client may write empty putBlock in padding block nodes.
             // So, we need to make sure, chunk length > 0, before declaring
             // the missing chunk file.
-            if (bdata != null) {
+            if (bdata != null && bdata.getChunks().size() > 0 && bdata
+                .getChunks().get(0).getLen() > 0) {
               throw new IOException(
                   "Missing chunk file " + chunkFile.getAbsolutePath());
             }
