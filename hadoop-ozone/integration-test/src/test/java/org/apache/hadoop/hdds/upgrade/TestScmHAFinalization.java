@@ -198,6 +198,6 @@ public class TestScmHAFinalization {
 
     // Use log to verify a snapshot was installed.
     Assertions.assertTrue(logCapture.getOutput().contains("New SCM snapshot " +
-        "received with higher layout version"));
+        "received with metadata layout version"));
   }
 }
