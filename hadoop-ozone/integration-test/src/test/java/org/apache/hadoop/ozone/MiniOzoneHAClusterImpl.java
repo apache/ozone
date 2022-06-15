@@ -630,9 +630,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
 
     //TODO: HDDS-6897
-    //Disabling Ratis for only of MiniOzoneClusterImpl. MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
+    //Disabling Ratis for only of MiniOzoneClusterImpl.
+    //MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
     @Override
-    protected void initializeScmStorage(SCMStorageConfig scmStore) throws IOException {
+    protected void initializeScmStorage(SCMStorageConfig scmStore)
+            throws IOException {
       super.initializeScmStorage(scmStore);
       if (SCMHAUtils.isSCMHAEnabled(conf)) {
         scmStore.setSCMHAFlag(true);

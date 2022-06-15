@@ -45,9 +45,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
-import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -735,7 +733,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
 
     //TODO: HDDS-6897
-    //Disabling Ratis for only of MiniOzoneClusterImpl. MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
+    //Disabling Ratis for only of MiniOzoneClusterImpl.
+    //MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
     protected void initializeScmStorage(SCMStorageConfig scmStore)
         throws IOException {
       if (scmStore.getState() == StorageState.INITIALIZED) {
