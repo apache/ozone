@@ -210,6 +210,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERV
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
@@ -2958,6 +2959,38 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public String getRpcPort() {
     return "" + omRpcAddress.getPort();
+  }
+
+  @Override
+  public String getOmRatisRoles() {
+    List<ServiceInfo> serviceList = null;
+    StringBuilder sb = new StringBuilder();
+    try {
+      serviceList = getServiceList();
+    } catch (IOException e) {
+    }
+    for (ServiceInfo info : serviceList) {
+      if (info.getOmRoleInfo() != null) {
+        sb.append(
+            String.format(
+                "{ HostName: %s, Ratis Port: %s, Node-Id: %s, Role: %s } ",
+                info.getHostname(),
+                info.getPort(ServicePort.Type.RATIS),
+                info.getOmRoleInfo().getNodeId(),
+                info.getOmRoleInfo().getServerRole()
+            ));
+      }}
+    return sb.toString();
+  }
+
+  @Override
+  public String getCurrentHost() {
+    String name = null;
+    try {
+      name = getHostName(configuration);
+    } catch (Exception e) {
+    }
+    return name;
   }
 
   @VisibleForTesting
