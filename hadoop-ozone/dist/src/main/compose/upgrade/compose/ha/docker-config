@@ -47,7 +47,7 @@ OZONE-SITE.XML_hdds.scm.wait.time.after.safemode.exit=5s
 # If datanodes take too long to close pipelines during finalization, let the
 # scrubber force close them to move the test forward.
 OZONE-SITE.XML_ozone.scm.pipeline.scrub.interval=1m
-OZONE-SITE.XML_ozone.scm.pipeline.allocated.timeout=1m
+OZONE-SITE.XML_ozone.scm.pipeline.allocated.timeout=2m
 
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
