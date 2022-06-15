@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.ec.reconstruction;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -33,6 +32,7 @@ import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -52,7 +52,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
@@ -70,14 +69,15 @@ import java.util.stream.Collectors;
  * For a container reconstruction task, the main flow is:
  * - ListBlock from all healthy replicas
  * - calculate effective block group len for all blocks
- * - for each block
- * - build a ReconstructInputStream to read healthy chunks
- * - build a ECBlockOutputStream to write out decoded chunks
- * - for each stripe
- * - use ReconstructInputStream.readStripe to decode missing chunks
- * - use ECBlockOutputStream.write to write decoded chunks to TargetDNs
- * - PutBlock
- * - CloseContainer
+ * - create RECOVERING containers in TargetDNs
+ * -  for each block
+ * -    build a ECReconstructedStripedInputStream to read healthy chunks
+ * -    build a ECBlockOutputStream to write out decoded chunks
+ * -      for each stripe
+ * -        use ECReconstructedStripedInputStream.recoverChunks to decode chunks
+ * -        use ECBlockOutputStream.write to write decoded chunks to TargetDNs
+ * -    PutBlock
+ * - Close RECOVERING containers in TargetDNs
  */
 public class ECReconstructionCoordinator implements Closeable {
 
@@ -136,12 +136,8 @@ public class ECReconstructionCoordinator implements Closeable {
         calcBlockLocationInfoMap(containerID, blockDataMap, pipeline);
 
     // 1. create target recovering containers.
-    Set<Map.Entry<Integer, DatanodeDetails>> targetIndexDns =
-        targetNodeMap.entrySet();
-    Iterator<Map.Entry<Integer, DatanodeDetails>> iterator =
-        targetIndexDns.iterator();
-    while (iterator.hasNext()) {
-      Map.Entry<Integer, DatanodeDetails> indexDnPair = iterator.next();
+    for (Map.Entry<Integer, DatanodeDetails> indexDnPair : targetNodeMap
+        .entrySet()) {
       this.containerOperationClient
           .createRecoveringContainer(containerID, indexDnPair.getValue(),
               repConfig, null, indexDnPair.getKey());
@@ -153,9 +149,9 @@ public class ECReconstructionCoordinator implements Closeable {
     }
 
     // 3. Close containers
-    iterator = targetIndexDns.iterator();
-    while (iterator.hasNext()) {
-      DatanodeDetails dn = iterator.next().getValue();
+    for (Map.Entry<Integer, DatanodeDetails> indexDnPair : targetNodeMap
+        .entrySet()) {
+      DatanodeDetails dn = indexDnPair.getValue();
       this.containerOperationClient
           .closeContainer(containerID, dn, repConfig, null);
     }
@@ -167,15 +163,13 @@ public class ECReconstructionCoordinator implements Closeable {
       SortedMap<Integer, DatanodeDetails> targetMap)
       throws IOException {
     long safeBlockGroupLength = blockLocationInfo.getLength();
-    List<Integer> missingContainerIndexes =
-        targetMap.keySet().stream().collect(Collectors.toList());
+    List<Integer> missingContainerIndexes = new ArrayList<>(targetMap.keySet());
 
     // calculate the real missing block indexes
     int dataLocs = ECBlockInputStreamProxy
         .expectedDataLocations(repConfig, safeBlockGroupLength);
     List<Integer> toReconstructIndexes = new ArrayList<>();
-    for (int i = 0; i < missingContainerIndexes.size(); i++) {
-      Integer index = missingContainerIndexes.get(i);
+    for (Integer index : missingContainerIndexes) {
       if (index <= dataLocs || index > repConfig.getData()) {
         toReconstructIndexes.add(index);
       }
@@ -205,23 +199,23 @@ public class ECReconstructionCoordinator implements Closeable {
       ECBlockOutputStream[] targetBlockStreams =
           new ECBlockOutputStream[toReconstructIndexes.size()];
       ByteBuffer[] bufs = new ByteBuffer[toReconstructIndexes.size()];
+      OzoneClientConfig configuration = new OzoneClientConfig();
+      // TODO: Let's avoid unnecessary bufferPool creation. This pool actually
+      //  not used in EC flows, but there are some dependencies on buffer pool.
+      BufferPool bufferPool =
+          new BufferPool(configuration.getStreamBufferSize(),
+              (int) (configuration.getStreamBufferMaxSize() / configuration
+                  .getStreamBufferSize()),
+              ByteStringConversion.createByteBufferConversion(false));
       for (int i = 0; i < toReconstructIndexes.size(); i++) {
-        OzoneClientConfig configuration = new OzoneClientConfig();
-        // TODO: Let's avoid unnecessary bufferPool creation for
-        BufferPool bufferPool =
-            new BufferPool(configuration.getStreamBufferSize(),
-                (int) (configuration.getStreamBufferMaxSize() / configuration
-                    .getStreamBufferSize()),
-                ByteStringConversion.createByteBufferConversion(false));
+        DatanodeDetails datanodeDetails =
+            targetMap.get(toReconstructIndexes.get(i));
         targetBlockStreams[i] =
             new ECBlockOutputStream(blockLocationInfo.getBlockID(),
                 this.containerOperationClient.getXceiverClientManager(),
-                Pipeline.newBuilder().setId(PipelineID.valueOf(
-                    targetMap.get(toReconstructIndexes.get(i)).getUuid()))
-                    .setReplicationConfig(repConfig).setNodes(ImmutableList
-                    .of(targetMap.get(toReconstructIndexes.get(i))))
-                    .setState(Pipeline.PipelineState.CLOSED).build(),
-                bufferPool, configuration, blockLocationInfo.getToken());
+                this.containerOperationClient
+                    .singleNodePipeline(datanodeDetails, repConfig), bufferPool,
+                configuration, blockLocationInfo.getToken());
         bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
         // Make sure it's clean. Don't want to reuse the erroneously returned
         // buffers from the pool.
@@ -235,43 +229,44 @@ public class ECReconstructionCoordinator implements Closeable {
         int readLen = sis.recoverChunks(bufs);
         // TODO: can be submitted in parallel
         for (int i = 0; i < bufs.length; i++) {
-          targetBlockStreams[i].write(bufs[i]);
-          if (isFailed(targetBlockStreams[i],
-              targetBlockStreams[i].getCurrentChunkResponseFuture())) {
-            // If one chunk response failed, we should retry.
-            // Even after retries if it failed, we should declare the
-            // reconstruction as failed.
-            // For now, let's throw the exception.
-            throw new IOException(
-                "Chunk write failed at the new target node: "
-                    + targetBlockStreams[i].getDatanodeDetails()
-                    + ". Aborting the reconstruction process.");
-          }
+          CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+              future = targetBlockStreams[i].write(bufs[i]);
+          checkFailures(targetBlockStreams[i], future);
           bufs[i].clear();
         }
         length -= readLen;
       }
 
-      for (int i = 0; i < targetBlockStreams.length; i++) {
-        try {
-          targetBlockStreams[i]
+      try {
+        for (ECBlockOutputStream targetStream : targetBlockStreams) {
+          targetStream
               .executePutBlock(true, true, blockLocationInfo.getLength());
-          if (isFailed(targetBlockStreams[i],
-              targetBlockStreams[i].getCurrentPutBlkResponseFuture())) {
-            // If one chunk response failed, we should retry.
-            // Even after retries if it failed, we should declare the
-            // reconstruction as failed.
-            // For now, let's throw the exception.
-            throw new IOException(
-                "Chunk write failed at the new target node: "
-                    + targetBlockStreams[i].getDatanodeDetails()
-                    + ". Aborting the reconstruction process.");
-          }
-        } finally {
-          byteBufferPool.putBuffer(bufs[i]);
-          targetBlockStreams[i].close();
+          checkFailures(targetStream,
+              targetStream.getCurrentPutBlkResponseFuture());
+        }
+      } finally {
+        for (ByteBuffer buf : bufs) {
+          byteBufferPool.putBuffer(buf);
+        }
+        for (ECBlockOutputStream targetStream : targetBlockStreams) {
+          IOUtils.cleanupWithLogger(LOG, targetStream);
         }
       }
+    }
+  }
+
+  private void checkFailures(ECBlockOutputStream targetBlockStream,
+      CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+          currentPutBlkResponseFuture)
+      throws IOException {
+    if (isFailed(targetBlockStream, currentPutBlkResponseFuture)) {
+      // If one chunk response failed, we should retry.
+      // Even after retries if it failed, we should declare the
+      // reconstruction as failed.
+      // For now, let's throw the exception.
+      throw new IOException(
+          "Chunk write failed at the new target node: " + targetBlockStream
+              .getDatanodeDetails() + ". Aborting the reconstruction process.");
     }
   }
 

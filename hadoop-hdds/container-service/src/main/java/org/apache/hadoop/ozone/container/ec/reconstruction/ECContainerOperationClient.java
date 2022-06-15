@@ -119,12 +119,7 @@ public class ECContainerOperationClient implements Closeable {
       ECReplicationConfig repConfig, String encodedToken, int replicaIndex)
       throws IOException {
     XceiverClientSpi xceiverClient = this.xceiverClientManager.acquireClient(
-        // To get the same client from cache, we try to use the DN UUID as
-        // pipelineID for uniqueness. Please note, pipeline does not have any
-        // significance after it's close. So, we are ok to use any ID.
-        Pipeline.newBuilder().setId(PipelineID.valueOf(dn.getUuid()))
-            .setReplicationConfig(repConfig).setNodes(ImmutableList.of(dn))
-            .setState(Pipeline.PipelineState.CLOSED).build());
+        singleNodePipeline(dn, repConfig));
     try {
       ContainerProtocolCalls
           .createRecoveringContainer(xceiverClient, containerID, encodedToken,
@@ -132,6 +127,16 @@ public class ECContainerOperationClient implements Closeable {
     } finally {
       this.xceiverClientManager.releaseClient(xceiverClient, false);
     }
+  }
+
+  Pipeline singleNodePipeline(DatanodeDetails dn,
+      ECReplicationConfig repConfig) {
+    // To get the same client from cache, we try to use the DN UUID as
+    // pipelineID for uniqueness. Please note, pipeline does not have any
+    // significance after it's close. So, we are ok to use any ID.
+    return Pipeline.newBuilder().setId(PipelineID.valueOf(dn.getUuid()))
+        .setReplicationConfig(repConfig).setNodes(ImmutableList.of(dn))
+        .setState(Pipeline.PipelineState.CLOSED).build();
   }
 
   public XceiverClientManager getXceiverClientManager() {

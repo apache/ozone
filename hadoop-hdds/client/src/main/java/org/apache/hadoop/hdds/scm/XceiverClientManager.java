@@ -356,7 +356,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
   }
 
   /**
-   * Builder of XceiverClientManagerConfig.
+   * Builder of ScmClientConfig.
    */
   public static class XceiverClientManagerConfigBuilder {
 

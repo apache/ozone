@@ -65,6 +65,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -80,6 +82,8 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -300,85 +304,18 @@ public class TestContainerCommandsEC {
     return builder.toString().getBytes(UTF_8);
   }
 
-  /**
-   * Tests the reconstruction of single missed data index.
-   */
-  @Test
-  public void testECReconstructionCoordinatorWithMissingIndexes1()
+  @ParameterizedTest
+  @MethodSource("recoverableMissingIndexes")
+  void testECReconstructionCoordinatorWith(List<Integer> missingIndexes)
       throws Exception {
-    testECReconstructionCoordinator(ImmutableList.of(1));
+    testECReconstructionCoordinator(missingIndexes);
   }
 
-  /**
-   * Tests the reconstruction of single missed data index.
-   */
-  @Test
-  public void testECReconstructionCoordinatorWithMissingIndexes2()
-      throws Exception {
-    testECReconstructionCoordinator(ImmutableList.of(2));
-  }
-
-  /**
-   * Tests the reconstruction of single missed data index.
-   */
-  @Test
-  public void testECReconstructionCoordinatorWithMissingIndexes3()
-      throws Exception {
-    testECReconstructionCoordinator(ImmutableList.of(3));
-  }
-
-  /**
-   * Tests the reconstruction of single missed parity index.
-   */
-  @Test
-  public void testECReconstructionCoordinatorWithMissingIndexes4()
-      throws Exception {
-    testECReconstructionCoordinator(ImmutableList.of(4));
-  }
-
-  /**
-   * Tests the reconstruction of single missed parity index.
-   */
-  @Test
-  public void testECReconstructionCoordinatorWithMissingIndexes5()
-      throws Exception {
-    testECReconstructionCoordinator(ImmutableList.of(5));
-  }
-
-  /**
-   * Tests the reconstruction of all missed parity indexes.
-   */
-  @Test
-  public void testECReconstructionCoordinatorWithMissingIndexes45()
-      throws Exception {
-    testECReconstructionCoordinator(ImmutableList.of(4, 5));
-  }
-
-  /**
-   * Tests the reconstruction of multiple data indexes missed.
-   */
-  @Test
-  public void testECReconstructionCoordinatorWithMissingIndexes23()
-      throws Exception {
-    testECReconstructionCoordinator(ImmutableList.of(2, 3));
-  }
-
-  /**
-   * Tests the reconstruction of data and parity missing indexes.
-   */
-  @Test
-  public void testECReconstructionCoordinatorWithMissingIndexes24()
-      throws Exception {
-    testECReconstructionCoordinator(ImmutableList.of(2, 4));
-  }
-
-  /**
-   * Tests the reconstruction of data and parity missing indexes.
-   */
-  @Test
-  public void testECReconstructionCoordinatorWithMissingIndexes35()
-      throws Exception {
-    testECReconstructionCoordinator(ImmutableList.of(3, 5));
+  static Stream<List<Integer>> recoverableMissingIndexes() {
+    return Stream
+        .concat(IntStream.rangeClosed(1, 5).mapToObj(ImmutableList::of), Stream
+            .of(ImmutableList.of(2, 3), ImmutableList.of(2, 4),
+                ImmutableList.of(3, 5), ImmutableList.of(4, 5)));
   }
 
   /**
