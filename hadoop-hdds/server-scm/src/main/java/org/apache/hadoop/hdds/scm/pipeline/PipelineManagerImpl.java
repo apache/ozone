@@ -620,6 +620,12 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
+  public boolean isPipelineCreationFrozen() {
+    return freezePipelineCreation.get() &&
+        backgroundPipelineCreator.isRunning();
+  }
+
+  @Override
   public void close() throws IOException {
     if (backgroundPipelineCreator != null) {
       backgroundPipelineCreator.stop();
