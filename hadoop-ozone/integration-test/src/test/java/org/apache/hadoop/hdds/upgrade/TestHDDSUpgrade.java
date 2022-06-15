@@ -403,7 +403,7 @@ public class TestHDDSUpgrade {
       }
       cluster.waitForClusterToBeReady();
     } catch (Exception e) {
-      LOG.info("DataNode Restarts Failed!");
+      LOG.error("DataNode Restarts Failed!", e);
       testPassed.set(false);
     }
     loadSCMState();
