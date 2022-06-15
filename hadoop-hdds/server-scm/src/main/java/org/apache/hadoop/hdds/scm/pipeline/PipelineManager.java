@@ -173,8 +173,6 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    */
   void resumePipelineCreation();
 
-  boolean isPipelineCreationFrozen();
-
   /**
    * Acquire read lock.
    */

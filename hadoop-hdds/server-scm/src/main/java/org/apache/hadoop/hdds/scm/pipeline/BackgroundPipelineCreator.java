@@ -160,10 +160,6 @@ public class BackgroundPipelineCreator implements SCMService {
     }
   }
 
-  public boolean isRunning() {
-    return running.get();
-  }
-
   private void run() {
     while (running.get()) {
       if (shouldRun()) {
