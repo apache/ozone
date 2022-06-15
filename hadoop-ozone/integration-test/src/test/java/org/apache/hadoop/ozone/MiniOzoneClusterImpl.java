@@ -347,8 +347,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     LOG.info("Restarting SCM in cluster " + this.getClass());
     scm.stop();
     scm.join();
-    // TODO pass configurator
-    scm = HddsTestUtils.getScmSimple(conf);
+    scm = HddsTestUtils.getScmSimple(conf, scmConfigurator);
     scm.start();
     if (waitForDatanode) {
       waitForClusterToBeReady();

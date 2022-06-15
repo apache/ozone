@@ -199,14 +199,13 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
       int dbLayoutVersion = getDBLayoutVersion();
       int currentLayoutVersion = versionManager.getMetadataLayoutVersion();
-      LOG.info("Reinitializing state machine with db lv {} file lv {}",
-          dbLayoutVersion, currentLayoutVersion);
       if (currentLayoutVersion < dbLayoutVersion) {
         // Snapshot contained a higher metadata layout version. Finalize this
         // follower SCM as a result.
-        LOG.info("New SCM snapshot received with higher layout version {}. " +
+        LOG.info("New SCM snapshot received with metadata layout version {}, " +
+                "which is higher than this SCM's metadata layout version {}." +
                 "Attempting to finalize current SCM to that version.",
-            dbLayoutVersion);
+            dbLayoutVersion, currentLayoutVersion);
         // Since the SCM is finalizing from a snapshot, it is a follower, and
         // does not need to run the leader only finalization driving actions
         // that the UpgradeFinalizationExecutor contains. Just run the
@@ -242,9 +241,11 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       try {
         return Integer.parseInt(dbLayoutVersion);
       } catch (NumberFormatException ex) {
-        LOG.error("Failed to read layout version from SCM DB. Found string {}",
-            dbLayoutVersion, ex);
-        throw ex;
+        String msg = String.format(
+            "Failed to read layout version from SCM DB. Found string %s",
+            dbLayoutVersion);
+        LOG.error(msg, ex);
+        throw new IOException(msg, ex);
       }
     }
   }

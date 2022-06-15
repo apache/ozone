@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
@@ -106,11 +107,14 @@ public class TestContainerStateMachineFlushDelay {
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setQuietMode(false);
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     OzoneManager.setTestSecureOmFlag(true);
     conf.setLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
     //  conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.toString());
     cluster =
-        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
+        MiniOzoneCluster.newHABuilder(conf).setNumDatanodes(3)
+            .setSCMServiceId("scmservice")
+            .setNumOfStorageContainerManagers(3)
             .setBlockSize(blockSize)
             .setChunkSize(chunkSize)
             .setStreamBufferFlushSize(flushSize)
@@ -120,7 +124,7 @@ public class TestContainerStateMachineFlushDelay {
             .setCertificateClient(new CertificateClientTestImpl(conf))
             .build();
     cluster.waitForClusterToBeReady();
-    cluster.getOzoneManager().startSecretManager();
+//    cluster.getOzoneManager().startSecretManager();
     //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
