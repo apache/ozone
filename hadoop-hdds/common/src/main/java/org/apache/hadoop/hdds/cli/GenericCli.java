@@ -51,6 +51,10 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
 
   public GenericCli() {
     cmd = new CommandLine(this);
+    cmd.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
+      printError(ex);
+      return -1;
+    });
   }
 
   public GenericCli(Class<?> type) {
@@ -82,13 +86,7 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
   }
 
   public void run(String[] argv) {
-    int exitCode;
-    try {
-      exitCode = execute(argv);
-    } catch (ExecutionException ex) {
-      printError(ex.getCause() == null ? ex : ex.getCause());
-      exitCode = -1;
-    }
+    int exitCode = execute(argv);
 
     if (exitCode != CommandLine.ExitCode.OK) {
       System.exit(exitCode);
