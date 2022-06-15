@@ -2997,6 +2997,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (Exception e) {
     }
     return name;
+  }
+
   public String getRatisLogDirectory() {
     return  OzoneManagerRatisUtils.getOMRatisDirectory(configuration);
   }
