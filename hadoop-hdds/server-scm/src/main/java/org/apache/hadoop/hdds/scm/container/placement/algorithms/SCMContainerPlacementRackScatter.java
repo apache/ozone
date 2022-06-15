@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -139,8 +140,8 @@ public final class SCMContainerPlacementRackScatter
       racks = sortRackWithExcludedNodes(racks, excludedNodes);
     }
 
-    List<Node> toChooseRacks = new LinkedList<>(racks);
-    List<DatanodeDetails> chosenNodes = new ArrayList<>();
+    List<Node> toChooseRacks = new LinkedList<>();
+    Set<DatanodeDetails> chosenNodes = new LinkedHashSet<>();
     List<Node> unavailableNodes = new ArrayList<>();
     Set<Node> skippedRacks = new HashSet<>();
     if (excludedNodes != null) {
@@ -166,7 +167,7 @@ public final class SCMContainerPlacementRackScatter
       }
 
       if (mutableFavoredNodes.size() > 0) {
-        List<Node> chosenFavoredNodesInForLoop = new ArrayList<>();
+        List<DatanodeDetails> chosenFavoredNodesInForLoop = new ArrayList<>();
         for (DatanodeDetails favoredNode : mutableFavoredNodes) {
           Node curRack = getRackOfDatanodeDetails(favoredNode);
           if (toChooseRacks.contains(curRack)) {
@@ -219,15 +220,26 @@ public final class SCMContainerPlacementRackScatter
         retryCount = 0;
       }
     }
+    List<DatanodeDetails> result = new ArrayList<>(chosenNodes);
     ContainerPlacementStatus placementStatus =
-        validateContainerPlacement(chosenNodes, nodesRequiredToChoose);
+        validateContainerPlacement(result, nodesRequiredToChoose);
     if (!placementStatus.isPolicySatisfied()) {
       String errorMsg = "ContainerPlacementPolicy not met, currentRacks is" +
           placementStatus.actualPlacementCount() + "desired racks is" +
           placementStatus.expectedPlacementCount();
       throw new SCMException(errorMsg, null);
     }
-    return chosenNodes;
+    if (nodesRequiredToChoose != chosenNodes.size()) {
+      String reason = "Chosen nodes size: " + chosenNodes
+          .size() + ", but required nodes to choose: " + nodesRequiredToChoose
+          + " do not match.";
+      LOG.warn("Placement policy could not choose the enough nodes."
+              + " {} Available nodes count: {}, Excluded nodes count: {}",
+          reason, totalNodesCount, excludedNodesCount);
+      throw new SCMException(reason,
+          SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
+    }
+    return result;
   }
 
   @Override

@@ -65,9 +65,8 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractDatanodeStore.class);
-  private DBStore store;
+  private volatile DBStore store;
   private final AbstractDatanodeDBDefinition dbDef;
-  private final long containerID;
   private final ColumnFamilyOptions cfOptions;
 
   private static DatanodeDBProfile dbProfile;
@@ -79,7 +78,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  protected AbstractDatanodeStore(ConfigurationSource config, long containerID,
+  protected AbstractDatanodeStore(ConfigurationSource config,
       AbstractDatanodeDBDefinition dbDef, boolean openReadOnly)
       throws IOException {
 
@@ -92,7 +91,6 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     cfOptions = dbProfile.getColumnFamilyOptions(config);
 
     this.dbDef = dbDef;
-    this.containerID = containerID;
     this.openReadOnly = openReadOnly;
     start(config);
   }
@@ -145,7 +143,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public void stop() throws Exception {
+  public synchronized void stop() throws Exception {
     if (store != null) {
       store.close();
       store = null;
@@ -178,15 +176,30 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public BlockIterator<BlockData> getBlockIterator() {
+  public BlockIterator<BlockData> getBlockIterator(long containerID)
+      throws IOException {
     return new KeyValueBlockIterator(containerID,
             blockDataTableWithIterator.iterator());
   }
 
   @Override
-  public BlockIterator<BlockData> getBlockIterator(KeyPrefixFilter filter) {
+  public BlockIterator<BlockData> getBlockIterator(long containerID,
+      KeyPrefixFilter filter) throws IOException {
     return new KeyValueBlockIterator(containerID,
             blockDataTableWithIterator.iterator(), filter);
+  }
+
+  @Override
+  public synchronized boolean isClosed() {
+    if (this.store == null) {
+      return true;
+    }
+    return this.store.isClosed();
+  }
+
+  @Override
+  public void close() throws IOException {
+    this.store.close();
   }
 
   @Override
@@ -209,6 +222,14 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     return dbProfile;
   }
 
+  protected AbstractDatanodeDBDefinition getDbDef() {
+    return this.dbDef;
+  }
+
+  protected Table<String, BlockData> getBlockDataTableWithIterator() {
+    return this.blockDataTableWithIterator;
+  }
+
   private static void checkTableStatus(Table<?, ?> table, String name)
           throws IOException {
     String logMessage = "Unable to get a reference to %s table. Cannot " +
@@ -228,7 +249,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
    * {@link MetadataKeyFilters#getUnprefixedKeyFilter()}
    */
   @InterfaceAudience.Public
-  private static class KeyValueBlockIterator implements
+  public static class KeyValueBlockIterator implements
           BlockIterator<BlockData>, Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(

@@ -1407,7 +1407,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>org.jetbrains.kotlin</groupId>
         <artifactId>kotlin-stdlib</artifactId>
-        <version>1.4.31</version>
+        <version>1.6.21</version>
       </dependency>
       <dependency>
         <groupId>io.opentracing</groupId>
@@ -1640,7 +1640,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>org.rocksdb</groupId>
         <artifactId>rocksdbjni</artifactId>
-        <version>7.2.2</version>
+        <version>6.29.5</version>
       </dependency>
       <dependency>
         <groupId>org.xerial</groupId>

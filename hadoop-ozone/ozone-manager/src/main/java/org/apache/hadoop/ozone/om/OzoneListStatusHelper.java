@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -48,6 +49,8 @@ import java.util.Collection;
 import java.util.Collections;
 
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.
+    ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.
     OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -86,11 +89,10 @@ public class OzoneListStatusHelper {
   }
 
   public Collection<OzoneFileStatus> listStatusFSO(OmKeyArgs args,
-      String startKey, long numEntries, String clientAddress)
-      throws IOException {
+      String startKey, long numEntries, String clientAddress,
+      boolean allowPartialPrefixes) throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
 
-    boolean listKeysMode = false;
     final String volumeName = args.getVolumeName();
     final String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
@@ -118,15 +120,16 @@ public class OzoneListStatusHelper {
     // if the keyName is null
     if (StringUtils.isNotBlank(startKey)) {
       if (StringUtils.isNotBlank(keyName)) {
-        if (!listKeysMode &&
+        if (!OzoneFSUtils.isSibling(keyName, startKey) &&
             !OzoneFSUtils.isImmediateChild(keyName, startKey)) {
           if (LOG.isDebugEnabled()) {
-            LOG.debug("StartKey {} is not an immediate child of keyName {}. " +
-                "Returns empty list", startKey, keyName);
+            LOG.debug("StartKey {} is not an immediate child or not a sibling"
+                + " of keyName {}. Returns empty list", startKey, keyName);
           }
           return new ArrayList<>();
         }
       } else {
+        // if the prefix is blank
         keyName = OzoneFSUtils.getParentDir(startKey);
         prefixKey = keyName;
         args = args.toBuilder()
@@ -137,15 +140,27 @@ public class OzoneListStatusHelper {
     }
 
     OzoneFileStatus fileStatus =
-        getStatusHelper.apply(args, clientAddress, listKeysMode);
+        getStatusHelper.apply(args, clientAddress, allowPartialPrefixes);
 
     String dbPrefixKey;
     if (fileStatus == null) {
       // if the file status is null, prefix is a not a valid filesystem path
       // this should only work in list keys mode.
       // fetch the db key based on the prefix path.
-      dbPrefixKey = getDbKey(keyName, args, volumeInfo, omBucketInfo);
-      prefixKey = OzoneFSUtils.getParentDir(keyName);
+      try {
+        dbPrefixKey = getDbKey(keyName, args, volumeInfo, omBucketInfo);
+        prefixKey = OzoneFSUtils.getParentDir(keyName);
+      } catch (OMException ome) {
+        if (ome.getResult() == FILE_NOT_FOUND) {
+          // the parent dir cannot be found return null list
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Parent directory of keyName:{} does not exist." +
+                "Returns empty list", keyName);
+          }
+          return new ArrayList<>();
+        }
+        throw ome;
+      }
     } else {
       // If the keyname is a file just return one entry
       if (fileStatus.isFile()) {
@@ -161,9 +176,16 @@ public class OzoneListStatusHelper {
     }
 
     // Determine startKeyPrefix for DB iteration
-    String startKeyPrefix =
-        Strings.isNullOrEmpty(startKey) ? "" :
-            getDbKey(startKey, args, volumeInfo, omBucketInfo);
+    String startKeyPrefix = "";
+    try {
+      if (!Strings.isNullOrEmpty(startKey)) {
+        startKeyPrefix = getDbKey(startKey, args, volumeInfo, omBucketInfo);
+      }
+    } catch (OMException ome) {
+      if (ome.getResult() != FILE_NOT_FOUND) {
+        throw ome;
+      }
+    }
 
     TreeMap<String, OzoneFileStatus> map = new TreeMap<>();
 
@@ -198,7 +220,7 @@ public class OzoneListStatusHelper {
         .setSortDatanodesInPipeline(false)
         .build();
     OzoneFileStatus fileStatusInfo = getStatusHelper.apply(startKeyArgs,
-        null, true);
+        null, false);
     Preconditions.checkNotNull(fileStatusInfo);
     startKeyParentId = getId(fileStatusInfo, omBucketInfo);
     final long volumeId = volumeInfo.getObjectID();
@@ -325,7 +347,16 @@ public class OzoneListStatusHelper {
         tableIterator.seek(prefixKey);
       }
 
-      if (!StringUtils.isBlank(startKey)) {
+      // only seek for the start key if the start key is lexicographically
+      // after the prefix key. For example
+      // Prefix key = 1024/c, Start key = 1024/a
+      // then do not seek for the start key
+      //
+      // on the other hand,
+      // Prefix key = 1024/a, Start key = 1024/c
+      // then seek for the start key
+      if (!StringUtils.isBlank(startKey) &&
+          startKey.compareTo(prefixKey) > 0) {
         tableIterator.seek(startKey);
       }
 

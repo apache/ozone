@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -33,6 +34,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FileChecksumProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
@@ -58,6 +60,7 @@ public final class OmKeyInfo extends WithParentObjectId {
   private long modificationTime;
   private ReplicationConfig replicationConfig;
   private FileEncryptionInfo encInfo;
+  private FileChecksum fileChecksum;
 
   /**
    * Represents leaf node name. This also will be used when the keyName is
@@ -78,7 +81,7 @@ public final class OmKeyInfo extends WithParentObjectId {
       ReplicationConfig replicationConfig,
       Map<String, String> metadata,
       FileEncryptionInfo encInfo, List<OzoneAcl> acls,
-      long objectID, long updateID) {
+      long objectID, long updateID, FileChecksum fileChecksum) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
@@ -92,6 +95,7 @@ public final class OmKeyInfo extends WithParentObjectId {
     this.acls = acls;
     this.objectID = objectID;
     this.updateID = updateID;
+    this.fileChecksum = fileChecksum;
   }
 
   @SuppressWarnings("parameternumber")
@@ -101,10 +105,11 @@ public final class OmKeyInfo extends WithParentObjectId {
             ReplicationConfig replicationConfig,
             Map<String, String> metadata,
             FileEncryptionInfo encInfo, List<OzoneAcl> acls,
-            long parentObjectID, long objectID, long updateID) {
+            long parentObjectID, long objectID, long updateID,
+            FileChecksum fileChecksum) {
     this(volumeName, bucketName, keyName, versions, dataSize,
             creationTime, modificationTime, replicationConfig, metadata,
-            encInfo, acls, objectID, updateID);
+            encInfo, acls, objectID, updateID, fileChecksum);
     this.fileName = fileName;
     this.parentObjectID = parentObjectID;
   }
@@ -355,6 +360,10 @@ public final class OmKeyInfo extends WithParentObjectId {
     this.replicationConfig = repConfig;
   }
 
+  public FileChecksum getFileChecksum() {
+    return fileChecksum;
+  }
+
   /**
    * Builder of OmKeyInfo.
    */
@@ -376,6 +385,7 @@ public final class OmKeyInfo extends WithParentObjectId {
     // not persisted to DB. FileName will be the last element in path keyName.
     private String fileName;
     private long parentObjectID;
+    private FileChecksum fileChecksum;
 
     public Builder() {
       this.metadata = new HashMap<>();
@@ -483,12 +493,17 @@ public final class OmKeyInfo extends WithParentObjectId {
       return this;
     }
 
+    public Builder setFileChecksum(FileChecksum checksum) {
+      this.fileChecksum = checksum;
+      return this;
+    }
+
     public OmKeyInfo build() {
       return new OmKeyInfo(
               volumeName, bucketName, keyName, fileName,
               omKeyLocationInfoGroups, dataSize, creationTime,
               modificationTime, replicationConfig, metadata, encInfo, acls,
-              parentObjectID, objectID, updateID);
+              parentObjectID, objectID, updateID, fileChecksum);
     }
   }
 
@@ -577,6 +592,11 @@ public final class OmKeyInfo extends WithParentObjectId {
         .setObjectID(objectID)
         .setUpdateID(updateID)
         .setParentID(parentObjectID);
+
+    FileChecksumProto fileChecksumProto = OMPBHelper.convert(fileChecksum);
+    if (fileChecksumProto != null) {
+      kb.setFileChecksum(fileChecksumProto);
+    }
     if (StringUtils.isNotBlank(fullKeyName)) {
       kb.setKeyName(fullKeyName);
     } else {
@@ -588,7 +608,7 @@ public final class OmKeyInfo extends WithParentObjectId {
     return kb.build();
   }
 
-  public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) {
+  public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) throws IOException {
     if (keyInfo == null) {
       return null;
     }
@@ -623,6 +643,10 @@ public final class OmKeyInfo extends WithParentObjectId {
     if (keyInfo.hasParentID()) {
       builder.setParentObjectID(keyInfo.getParentID());
     }
+    if (keyInfo.hasFileChecksum()) {
+      FileChecksum fileChecksum = OMPBHelper.convert(keyInfo.getFileChecksum());
+      builder.setFileChecksum(fileChecksum);
+    }
     // not persisted to DB. FileName will be filtered out from keyName
     builder.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
     return builder.build();
@@ -638,7 +662,8 @@ public final class OmKeyInfo extends WithParentObjectId {
         ", creationTime='" + creationTime + '\'' +
         ", objectID='" + objectID + '\'' +
         ", parentID='" + parentObjectID + '\'' +
-        ", replication='" + replicationConfig +
+        ", replication='" + replicationConfig + '\'' +
+        ", fileChecksum='" + fileChecksum +
         '}';
   }
 
@@ -702,6 +727,10 @@ public final class OmKeyInfo extends WithParentObjectId {
 
     if (metadata != null) {
       metadata.forEach((k, v) -> builder.addMetadata(k, v));
+    }
+
+    if (fileChecksum != null) {
+      builder.setFileChecksum(fileChecksum);
     }
 
     return builder.build();

@@ -37,6 +37,8 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.management.ObjectName;
+
 /**
  * Layout Version Manager containing generic method implementations.
  */
@@ -47,17 +49,18 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractLayoutVersionManager.class);
 
-  private int metadataLayoutVersion; // MLV.
-  private int softwareLayoutVersion; // SLV.
+  private volatile int metadataLayoutVersion; // MLV.
+  private volatile int softwareLayoutVersion; // SLV.
   @VisibleForTesting
-  protected final TreeMap<Integer, T> features = new TreeMap<>();
+  protected final TreeMap<Integer, LayoutFeature> features = new TreeMap<>();
   @VisibleForTesting
-  protected final Map<String, T> featureMap = new HashMap<>();
+  protected final Map<String, LayoutFeature> featureMap = new HashMap<>();
   private volatile Status currentUpgradeState = FINALIZATION_REQUIRED;
   // Allows querying upgrade state while an upgrade is in progress.
   // Note that MLV may have been incremented during the upgrade
   // by the time the value is read/used.
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+  private ObjectName mBean;
 
   protected void init(int version, T[] lfs) throws IOException {
     lock.writeLock().lock();
@@ -81,7 +84,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
           mlvFeature, mlvFeature.layoutVersion(),
           slvFeature, slvFeature.layoutVersion());
 
-      MBeans.register("LayoutVersionManager",
+      mBean = MBeans.register("LayoutVersionManager",
           getClass().getSimpleName(), this);
     } finally {
       lock.writeLock().unlock();
@@ -120,9 +123,13 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     try {
       if (layoutFeature.layoutVersion() == metadataLayoutVersion + 1) {
         metadataLayoutVersion = layoutFeature.layoutVersion();
+        LOG.info("Layout feature {} has been finalized.", layoutFeature);
+        if (!needsFinalization()) {
+          completeFinalization();
+        }
       } else {
         String msgStart = "";
-        if (layoutFeature.layoutVersion() < metadataLayoutVersion) {
+        if (layoutFeature.layoutVersion() <= metadataLayoutVersion) {
           msgStart = "Finalize attempt on a layoutFeature which has already "
               + "been finalized.";
         } else {
@@ -132,7 +139,8 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
         }
 
         throw new IllegalArgumentException(
-            msgStart + "Software Layout version: " + softwareLayoutVersion
+            msgStart + " Software layout version: " + softwareLayoutVersion
+                + " Metadata layout version: " + metadataLayoutVersion
                 + " Feature Layout version: " + layoutFeature.layoutVersion());
       }
     } finally {
@@ -140,10 +148,11 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     }
   }
 
-  public void completeFinalization() {
+  private void completeFinalization() {
     lock.writeLock().lock();
     try {
       currentUpgradeState = FINALIZATION_DONE;
+      LOG.info("Finalization is complete.");
     } finally {
       lock.writeLock().unlock();
     }
@@ -200,12 +209,17 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   }
 
   @Override
-  public T getFeature(String name) {
+  public LayoutFeature getFeature(String name) {
     return featureMap.get(name);
   }
 
   @Override
-  public Iterable<T> unfinalizedFeatures() {
+  public LayoutFeature getFeature(int layoutVersion) {
+    return features.get(layoutVersion);
+  }
+
+  @Override
+  public Iterable<LayoutFeature> unfinalizedFeatures() {
     lock.readLock().lock();
     try {
       return new ArrayList<>(features
@@ -213,6 +227,13 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
           .values());
     } finally {
       lock.readLock().unlock();
+    }
+  }
+
+  public void close() {
+    if (mBean != null) {
+      MBeans.unregister(mBean);
+      mBean = null;
     }
   }
 }

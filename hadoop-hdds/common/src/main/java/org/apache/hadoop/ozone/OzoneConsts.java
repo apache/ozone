@@ -135,6 +135,7 @@ public final class OzoneConsts {
   public static final String SCM_DB_NAME = "scm.db";
   public static final String OM_DB_BACKUP_PREFIX = "om.db.backup.";
   public static final String SCM_DB_BACKUP_PREFIX = "scm.db.backup.";
+  public static final String CONTAINER_DB_NAME = "container.db";
 
   public static final String STORAGE_DIR_CHUNKS = "chunks";
   public static final String OZONE_DB_CHECKPOINT_REQUEST_FLUSH =
@@ -276,9 +277,12 @@ public final class OzoneConsts {
   // V2: Metadata, block data, and delete transactions in their own
   // column families.
   public static final String SCHEMA_V2 = "2";
+  // V3: Column families definitions are close to V2,
+  // but have containerID as key prefixes.
+  public static final String SCHEMA_V3 = "3";
 
   public static final String[] SCHEMA_VERSIONS =
-      new String[] {SCHEMA_V1, SCHEMA_V2};
+      new String[] {SCHEMA_V1, SCHEMA_V2, SCHEMA_V3};
 
   // Supported store types.
   public static final String OZONE = "ozone";
@@ -461,6 +465,11 @@ public final class OzoneConsts {
 
   // Layout Version written into Meta Table ONLY during finalization.
   public static final String LAYOUT_VERSION_KEY = "#LAYOUTVERSION";
+  // Key written to Meta Table to indicate a component undergoing finalization.
+  // Currently this is only used on SCM, but may be useful on OM if/when
+  // finalizing one layout feature per Ratis request is implemented in
+  // HDDS-4286.
+  public static final String FINALIZING_KEY = "#FINALIZING";
 
   // Kerberos constants
   public static final String KERBEROS_CONFIG_VALUE = "kerberos";

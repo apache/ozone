@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
@@ -935,10 +936,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     ListKeysResponse resp =
         handleError(submitRequest(omRequest)).getListKeysResponse();
-    keys.addAll(
-        resp.getKeyInfoList().stream()
-            .map(OmKeyInfo::getFromProtobuf)
-            .collect(Collectors.toList()));
+    List<OmKeyInfo> list = new ArrayList<>();
+    for (OzoneManagerProtocolProtos.KeyInfo keyInfo : resp.getKeyInfoList()) {
+      OmKeyInfo fromProtobuf = OmKeyInfo.getFromProtobuf(keyInfo);
+      list.add(fromProtobuf);
+    }
+    keys.addAll(list);
     return keys;
 
   }
@@ -1835,7 +1838,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
-      String startKey, long numEntries) throws IOException {
+      String startKey, long numEntries, boolean allowPartialPrefixes)
+      throws IOException {
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
@@ -1843,15 +1847,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setSortDatanodes(args.getSortDatanodes())
         .setLatestVersionLocation(args.getLatestVersionLocation())
         .build();
-    ListStatusRequest listStatusRequest =
+    ListStatusRequest.Builder listStatusRequestBuilder =
         ListStatusRequest.newBuilder()
             .setKeyArgs(keyArgs)
             .setRecursive(recursive)
             .setStartKey(startKey)
-            .setNumEntries(numEntries)
-            .build();
+            .setNumEntries(numEntries);
+
+    if (allowPartialPrefixes) {
+      listStatusRequestBuilder.setAllowPartialPrefix(allowPartialPrefixes);
+    }
+
     OMRequest omRequest = createOMRequest(Type.ListStatus)
-        .setListStatusRequest(listStatusRequest)
+        .setListStatusRequest(listStatusRequestBuilder.build())
         .build();
     ListStatusResponse listStatusResponse =
         handleError(submitRequest(omRequest)).getListStatusResponse();
@@ -1862,6 +1870,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       statusList.add(OzoneFileStatus.getFromProtobuf(fileStatus));
     }
     return statusList;
+  }
+
+  @Override
+  public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
+      String startKey, long numEntries) throws IOException {
+    return listStatus(args, recursive, startKey, numEntries, false);
   }
 
   @Override
@@ -1895,10 +1909,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     List<RepeatedOmKeyInfo> deletedKeyList =
         new ArrayList<>(trashResponse.getDeletedKeysCount());
 
-    deletedKeyList.addAll(
-        trashResponse.getDeletedKeysList().stream()
-            .map(RepeatedOmKeyInfo::getFromProto)
-            .collect(Collectors.toList()));
+    List<RepeatedOmKeyInfo> list = new ArrayList<>();
+    for (OzoneManagerProtocolProtos.RepeatedKeyInfo
+        repeatedKeyInfo : trashResponse.getDeletedKeysList()) {
+      RepeatedOmKeyInfo fromProto =
+          RepeatedOmKeyInfo.getFromProto(repeatedKeyInfo);
+      list.add(fromProto);
+    }
+    deletedKeyList.addAll(list);
 
     return deletedKeyList;
   }

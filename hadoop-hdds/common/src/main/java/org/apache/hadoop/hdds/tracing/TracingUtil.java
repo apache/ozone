@@ -40,6 +40,8 @@ public final class TracingUtil {
 
   private static final String NULL_SPAN_AS_STRING = "";
 
+  private static volatile boolean isInit = false;
+
   private TracingUtil() {
   }
 
@@ -55,6 +57,7 @@ public final class TracingUtil {
           .registerInjector(StringCodec.FORMAT, new StringCodec())
           .build();
       GlobalTracer.registerIfAbsent(tracer);
+      isInit = true;
     }
   }
 
@@ -73,7 +76,7 @@ public final class TracingUtil {
    * @return encoded tracing context.
    */
   public static String exportSpan(Span span) {
-    if (span != null) {
+    if (span != null && isInit) {
       StringBuilder builder = new StringBuilder();
       GlobalTracer.get().inject(span.context(), StringCodec.FORMAT, builder);
       return builder.toString();
