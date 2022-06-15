@@ -115,7 +115,8 @@ public final class SCMContainerPlacementRackScatter
           "TotalNode = " + totalNodesCount +
           " AvailableNode = " + availableNodes.size() +
           " RequiredNode = " + nodesRequired +
-          " ExcludedNode = " + excludedNodesCount, null);
+          " ExcludedNode = " + excludedNodesCount,
+          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
 
     List<DatanodeDetails> mutableFavoredNodes = new ArrayList<>();
