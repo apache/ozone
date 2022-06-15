@@ -29,7 +29,7 @@ import java.util.Arrays;
  *
  * This class is copied from Hadoop to provide Hadoop2 compatibility for Ozone.
  */
-@InterfaceAudience.LimitedPrivate({"Common", "HDFS", "MapReduce", "Yarn"})
+@InterfaceAudience.LimitedPrivate({"OZONE"})
 @InterfaceStability.Unstable
 public final class CrcUtil {
     public static final int MULTIPLICATIVE_IDENTITY = 0x80000000;
