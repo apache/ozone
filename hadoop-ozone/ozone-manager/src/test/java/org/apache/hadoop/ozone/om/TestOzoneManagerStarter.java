@@ -22,7 +22,6 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import picocli.CommandLine.ExitCode;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -36,6 +35,7 @@ import static org.apache.hadoop.hdds.cli.GenericCli.EXECUTION_ERROR_EXIT_CODE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static picocli.CommandLine.ExitCode.OK;
 import static picocli.CommandLine.ExitCode.USAGE;
 
 /**
@@ -69,7 +69,7 @@ public class TestOzoneManagerStarter {
 
   @Test
   public void testCallsStartWhenServerStarted() throws Exception {
-    assertEquals(ExitCode.OK, executeCommand());
+    assertEquals(OK, executeCommand());
     assertTrue(mock.startCalled);
   }
 
@@ -87,7 +87,7 @@ public class TestOzoneManagerStarter {
 
   @Test
   public void testPassingInitSwitchCallsInit() {
-    assertEquals(ExitCode.OK, executeCommand("--init"));
+    assertEquals(OK, executeCommand("--init"));
     assertTrue(mock.initCalled);
   }
 
@@ -111,7 +111,7 @@ public class TestOzoneManagerStarter {
 
   @Test
   public void testCallsStartAndCancelPrepareWithUpgradeFlag() {
-    assertEquals(ExitCode.OK, executeCommand("--upgrade"));
+    assertEquals(OK, executeCommand("--upgrade"));
     assertTrue(mock.startAndCancelPrepareCalled);
   }
 
