@@ -66,6 +66,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
       LoggerFactory.getLogger(XceiverClientManager.class);
   //TODO : change this to SCM configuration class
   private final ConfigurationSource conf;
+  private final ScmClientConfig clientConfig;
   private final Cache<String, XceiverClientSpi> clientCache;
   private List<X509Certificate> caCerts;
 
@@ -88,6 +89,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
       List<X509Certificate> caCerts) throws IOException {
     Preconditions.checkNotNull(clientConf);
     Preconditions.checkNotNull(conf);
+    this.clientConfig = clientConf;
     long staleThresholdMs = clientConf.getStaleThreshold(MILLISECONDS);
     this.conf = conf;
     this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
@@ -347,6 +349,37 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
       this.maxSize = maxSize;
     }
 
+    public void setStaleThreshold(long threshold) {
+      this.staleThreshold = threshold;
+    }
+
+  }
+
+  /**
+   * Builder of ScmClientConfig.
+   */
+  public static class XceiverClientManagerConfigBuilder {
+
+    private int maxCacheSize;
+    private long staleThresholdMs;
+
+    public XceiverClientManagerConfigBuilder setMaxCacheSize(int maxCacheSize) {
+      this.maxCacheSize = maxCacheSize;
+      return this;
+    }
+
+    public XceiverClientManagerConfigBuilder setStaleThresholdMs(
+        long staleThresholdMs) {
+      this.staleThresholdMs = staleThresholdMs;
+      return this;
+    }
+
+    public ScmClientConfig build() {
+      ScmClientConfig clientConfig = new ScmClientConfig();
+      clientConfig.setMaxSize(this.maxCacheSize);
+      clientConfig.setStaleThreshold(this.staleThresholdMs);
+      return clientConfig;
+    }
   }
 
 }
