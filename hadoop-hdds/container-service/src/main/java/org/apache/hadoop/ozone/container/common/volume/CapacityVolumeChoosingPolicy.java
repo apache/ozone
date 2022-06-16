@@ -66,6 +66,17 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
     } else if (filtered.size() == 1) {
       return filtered.get(0);
     } else {
+      // Even we don't have too many volumes in filtered for choosing, this
+      // algorithm will still help us choose the volume with larger
+      // available space than other volumes.
+      // Say we have vol1 with larger available space than vol2, for two choices
+      // , the distribution of possibility is as follows;
+      // 1. vol1 + vol2: 25%, result is vol1
+      // 2. vol1 + vol1: 25%, result is vol1
+      // 3. vol2 + vol1: 25%, result is vol1
+      // 4. vol2 + vol2: 25%, result is vol2
+      // So we have a total of 75% chances to choose vol1, which meets our
+      // expectation.
       int firstIndex = random.nextInt(filtered.size());
       int secondIndex = random.nextInt(filtered.size());
 
