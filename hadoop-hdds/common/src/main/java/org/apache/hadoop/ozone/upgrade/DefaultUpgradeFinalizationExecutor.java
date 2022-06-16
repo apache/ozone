@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATI
 
 import java.io.IOException;
 
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,9 +60,10 @@ public class DefaultUpgradeFinalizationExecutor<T>
       if (finalizer.getVersionManager().needsFinalization()) {
         finalizer.getVersionManager()
             .setUpgradeState(FINALIZATION_REQUIRED);
-        throw (e);
+        throw e;
       }
     } finally {
+      // Used for testing.
       finalizer.markFinalizationDone();
     }
   }

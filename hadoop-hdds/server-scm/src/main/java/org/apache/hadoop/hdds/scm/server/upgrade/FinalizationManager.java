@@ -54,4 +54,22 @@ public interface FinalizationManager {
                                   SCMContext scmContext);
 
   void reinitialize(Table<String, String> finalizationStore) throws IOException;
+
+  /**
+   * Called in SCMStateMachine#notifyLeaderChanged when current SCM becomes
+   *  leader.
+   */
+  void onBecomeLeader();
+
+  static boolean shouldCreateNewPipelines(FinalizationCheckpoint checkpoint) {
+    return !checkpoint.hasCrossed(FinalizationCheckpoint.FINALIZATION_STARTED)
+        || checkpoint.hasCrossed(FinalizationCheckpoint.FINALIZATION_COMPLETE);
+  }
+
+  // TODO connect this to node manager.
+  static boolean shouldTellDatanodesToFinalize(
+      FinalizationCheckpoint checkpoint) {
+    return checkpoint.hasCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV);
+  }
+
 }

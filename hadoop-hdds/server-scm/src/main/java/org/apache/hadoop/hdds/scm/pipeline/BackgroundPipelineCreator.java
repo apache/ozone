@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,6 +45,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.FINALIZATION_CHECKPOINT_CROSSED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NEW_NODE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.PRE_CHECK_COMPLETED;
@@ -108,8 +110,12 @@ public class BackgroundPipelineCreator implements SCMService {
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    // start RatisPipelineUtilsThread
-    start();
+    // Check if RatisPipelineUtilsThread should be started based on
+    // current SCM upgrade finalization state.
+    if (FinalizationManager.shouldCreateNewPipelines(
+        scmContext.getFinalizationCheckpoint())) {
+      start();
+    }
   }
 
   /**
@@ -266,6 +272,17 @@ public class BackgroundPipelineCreator implements SCMService {
 
   @Override
   public void notifyEventTriggered(Event event) {
+    // Background pipeline creator must be started/stopped even on followers
+    // during finalization, in case they become the leader.
+    if (event == FINALIZATION_CHECKPOINT_CROSSED) {
+      if (FinalizationManager.shouldCreateNewPipelines(
+          scmContext.getFinalizationCheckpoint())) {
+        start();
+      } else {
+        stop();
+      }
+    }
+
     if (!scmContext.isLeader()) {
       LOG.info("ignore, not leader SCM.");
       return;

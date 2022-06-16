@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType;
 import org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 /**
  * UpgradeFinalizer implementation for the Storage Container Manager service.
@@ -93,7 +94,10 @@ public abstract class BasicUpgradeFinalizer
           finalizationExecutor.execute(service, this);
           response = STARTING_MSG;
         }
-      } finally {
+      } catch (NotLeaderException e) {
+        LOG.info("Leader change encountered during finalization. This " +
+            "component will continue to finalize as a follower.", e);
+      }finally {
         finalizationLock.unlock();
       }
     } else {

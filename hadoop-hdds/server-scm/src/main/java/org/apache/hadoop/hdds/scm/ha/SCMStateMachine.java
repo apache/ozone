@@ -268,6 +268,7 @@ public class SCMStateMachine extends BaseStateMachine {
         deletedBlockLog instanceof DeletedBlockLogImpl);
     ((DeletedBlockLogImpl) deletedBlockLog).onBecomeLeader();
     scm.getScmDecommissionManager().onBecomeLeader();
+    scm.getFinalizationManager().onBecomeLeader();
   }
 
   @Override

@@ -117,14 +117,6 @@ public class SCMUpgradeFinalizer extends
     super.finalizeLayoutFeature(lf,
         lf.scmAction(LayoutFeature.UpgradeActionType.ON_FINALIZE),
         context.getStorage());
-
-    if (!getVersionManager().needsFinalization()) {
-      // If we just finalized the last layout feature, don't wait for next
-      // heartbeat from datanodes in order to move them to
-      // Healthy - Readonly state. Force them to Healthy ReadOnly state so that
-      // we can resume pipeline creation right away.
-      context.getNodeManager().forceNodesToHealthyReadOnly();
-    }
   }
 
   public void postFinalizeUpgrade(SCMUpgradeFinalizationContext context)

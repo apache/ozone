@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ipc.Server;
@@ -598,8 +599,8 @@ public class SCMNodeManager implements NodeManager {
           datanodeDetails.getHostName(), dnSlv, scmSlv);
     }
 
-    if (scmContext.isFinalizationCheckpointCrossed(
-        FinalizationCheckpoint.MLV_EQUALS_SLV)) {
+    if (FinalizationManager.shouldTellDatanodesToFinalize(
+        scmContext.getFinalizationCheckpoint())) {
       // Because we have crossed the MLV_EQUALS_SLV checkpoint, SCM metadata
       // layout version will not change. We can now compare it to the
       // datanodes' metadata layout versions to tell them to finalize.

@@ -23,15 +23,21 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.ratis.util.ExitUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import sun.reflect.generics.reflectiveObjects.LazyReflectiveObjectGenerator;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -40,6 +46,9 @@ import java.util.Collections;
  * Class to initiate SCM finalization and query its progress.
  */
 public class FinalizationManagerImpl implements FinalizationManager {
+  private static final Logger LOG = LoggerFactory
+      .getLogger(FinalizationManagerImpl.class);
+
   private SCMUpgradeFinalizer upgradeFinalizer;
   private SCMUpgradeFinalizationContext context;
   private SCMStorageConfig storage;
@@ -65,6 +74,7 @@ public class FinalizationManagerImpl implements FinalizationManager {
         .setFinalizationStore(builder.finalizationStore)
         .setTransactionBuffer(builder.scmHAManager.getDBTransactionBuffer())
         .setRatisServer(builder.scmHAManager.getRatisServer())
+        .setServiceManager(builder.serviceManager)
         .build();
   }
 
@@ -140,6 +150,29 @@ public class FinalizationManagerImpl implements FinalizationManager {
     finalizationStateManager.reinitialize(finalizationStore);
   }
 
+  @Override
+  public void onBecomeLeader() {
+    FinalizationCheckpoint currentCheckpoint = getCheckpoint();
+    if (currentCheckpoint.hasCrossed(
+        FinalizationCheckpoint.FINALIZATION_STARTED) &&
+        !currentCheckpoint.hasCrossed(
+            FinalizationCheckpoint.FINALIZATION_COMPLETE)) {
+      LOG.info("SCM became leader. Resuming upgrade finalization from current" +
+          " checkpoint {}.", currentCheckpoint);
+      try {
+        finalizeUpgrade("resume-finalization-as-leader");
+      } catch (IOException ex) {
+        // TODO determine how to handle failures here. Also check what we do
+        //  when client initiates finalization.
+        ExitUtils.terminate(1,"Resuming upgrade finalization failed on SCM leader change" +
+            ".", ex , true, LOG);
+      }
+    } else if (LOG.isDebugEnabled()) {
+      LOG.debug("SCM became leader. No required upgrade finalization action " +
+          "required for current checkpoint {}", currentCheckpoint);
+    }
+  }
+
   /**
    * Builds a {@link FinalizationManagerImpl}.
    */
@@ -151,6 +184,7 @@ public class FinalizationManagerImpl implements FinalizationManager {
     private SCMHAManager scmHAManager;
     private Table<String, String> finalizationStore;
     private UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor;
+    private SCMServiceManager serviceManager;
 
     public Builder() {
       executor = new DefaultUpgradeFinalizationExecutor<>();
@@ -189,6 +223,11 @@ public class FinalizationManagerImpl implements FinalizationManager {
       return this;
     }
 
+    public Builder setServiceManager(SCMServiceManager serviceManager) {
+      this.serviceManager = serviceManager;
+      return this;
+    }
+
     public FinalizationManagerImpl build() throws IOException {
       Preconditions.checkNotNull(conf);
       Preconditions.checkNotNull(versionManager);
@@ -196,6 +235,7 @@ public class FinalizationManagerImpl implements FinalizationManager {
       Preconditions.checkNotNull(scmHAManager);
       Preconditions.checkNotNull(finalizationStore);
       Preconditions.checkNotNull(executor);
+      Preconditions.checkNotNull(serviceManager);
 
       return new FinalizationManagerImpl(this);
     }

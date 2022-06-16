@@ -22,6 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.ha.SCMService;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
@@ -58,11 +60,13 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   private volatile boolean hasFinalizingMark;
   private SCMUpgradeFinalizationContext upgradeContext;
   private final SCMUpgradeFinalizer upgradeFinalizer;
+  private final SCMServiceManager serviceManager;
 
   protected FinalizationStateManagerImpl(Builder builder) throws IOException {
     this.finalizationStore = builder.finalizationStore;
     this.transactionBuffer = builder.transactionBuffer;
     this.upgradeFinalizer = builder.upgradeFinalizer;
+    this.serviceManager = builder.serviceManager;
     this.versionManager = this.upgradeFinalizer.getVersionManager();
     this.checkpointLock = new ReentrantReadWriteLock();
     initialize();
@@ -71,6 +75,12 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   private void initialize() throws IOException {
     this.hasFinalizingMark =
         finalizationStore.isExist(OzoneConsts.FINALIZING_KEY);
+  }
+
+  private void setCheckpoint(FinalizationCheckpoint checkpoint) {
+    upgradeContext.getSCMContext().setFinalizationCheckpoint(checkpoint);
+    serviceManager.notifyEventTriggered(
+        SCMService.Event.FINALIZATION_CHECKPOINT_CROSSED);
   }
 
   @Override
@@ -86,8 +96,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     } finally {
       checkpointLock.writeLock().unlock();
     }
-    upgradeContext.getSCMContext().setFinalizationCheckpoint(
-        FinalizationCheckpoint.FINALIZATION_STARTED);
+    setCheckpoint(FinalizationCheckpoint.FINALIZATION_STARTED);
     transactionBuffer.addToBuffer(finalizationStore,
         OzoneConsts.FINALIZING_KEY, "");
   }
@@ -117,8 +126,16 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     }
 
     if (!versionManager.needsFinalization()) {
-      upgradeContext.getSCMContext().setFinalizationCheckpoint(
-          FinalizationCheckpoint.MLV_EQUALS_SLV);
+      setCheckpoint(FinalizationCheckpoint.MLV_EQUALS_SLV);
+      // If we just finalized the last layout feature, don't wait for next
+      // heartbeat from datanodes in order to move them to
+      // Healthy - Readonly state. Force them to Healthy ReadOnly state so that
+      // we can resume pipeline creation right away.
+      upgradeContext.getNodeManager().forceNodesToHealthyReadOnly();
+      // This may be a no-op on a follower who gets all finalization steps
+      // from a snapshot, since the background pipeline creator thread was
+      // never stopped.
+      upgradeContext.getPipelineManager().resumePipelineCreation();
     }
     transactionBuffer.addToBuffer(finalizationStore,
         OzoneConsts.LAYOUT_VERSION_KEY, String.valueOf(layoutVersion));
@@ -148,8 +165,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       ExitUtils.terminate(1, errorMessage, LOG);
     }
 
-    upgradeContext.getSCMContext().setFinalizationCheckpoint(
-        FinalizationCheckpoint.FINALIZATION_COMPLETE);
+    setCheckpoint(FinalizationCheckpoint.FINALIZATION_COMPLETE);
   }
 
   @Override
@@ -216,8 +232,8 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
           finalizeLayoutFeatureLocal(version);
         }
       }
-      upgradeContext.getSCMContext().setFinalizationCheckpoint(
-          getFinalizationCheckpoint());
+      FinalizationCheckpoint newCheckpoint = getFinalizationCheckpoint();
+      upgradeContext.getSCMContext().setFinalizationCheckpoint(newCheckpoint);
     } catch (Exception ex) {
       LOG.error("Failed to reinitialize finalization state", ex);
       throw new IOException(ex);
@@ -258,6 +274,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     private DBTransactionBuffer transactionBuffer;
     private SCMRatisServer scmRatisServer;
     private SCMUpgradeFinalizer upgradeFinalizer;
+    private SCMServiceManager serviceManager;
 
     public Builder() {
     }
@@ -280,6 +297,11 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
     public Builder setTransactionBuffer(DBTransactionBuffer transactionBuffer) {
       this.transactionBuffer = transactionBuffer;
+      return this;
+    }
+
+    public Builder setServiceManager(SCMServiceManager serviceManager) {
+      this.serviceManager = serviceManager;
       return this;
     }
 

@@ -254,7 +254,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     scmhaService.deactivate(scm);
   }
 
-  public void restartStorageContainerManager(
+  public StorageContainerManager restartStorageContainerManager(
       StorageContainerManager scm, boolean waitForSCM)
       throws IOException, TimeoutException,
       InterruptedException, AuthenticationException {
@@ -268,6 +268,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     if (waitForSCM) {
       waitForClusterToBeReady();
     }
+    return scm;
   }
 
   public String getClusterId() throws IOException {
