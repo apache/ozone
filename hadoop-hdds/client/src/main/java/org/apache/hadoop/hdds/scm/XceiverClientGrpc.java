@@ -280,10 +280,13 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       // Re-interrupt the thread while catching InterruptedException
       Thread.currentThread().interrupt();
     } catch (ExecutionException e) {
-      LOG.error("Failed to execute command {}." +
-                      "Exception Class: {}, Exception Message: {}",
-              request.getCmdType(), e.getClass().getName(), e.getMessage());
-      LOG.debug("{}", processForDebug(request), e);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Failed to execute command {}", processForDebug(request), e);
+      } else {
+        LOG.error("Failed to execute command {}." +
+                        "Exception Class: {}, Exception Message: {}",
+                request.getCmdType(), e.getClass().getName(), e.getMessage());
+      }
     }
     return responseProtoHashMap;
   }
