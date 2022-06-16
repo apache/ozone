@@ -149,6 +149,15 @@ public class SCMHANodeDetails {
     return new SCMHANodeDetails(scmNodeDetails, Collections.emptyList());
   }
 
+  /** Validates SCM HA Config.
+    For Non Initialized SCM the value is taken directly based on the config
+   {@link org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY}
+   which defaults to
+   {@link org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT}
+   For Previously Initialized SCM the values are taken from the version file
+   Ratis SCM -> Non Ratis SCM & vice versa is not supported
+   This values is validated with the config provided.
+  **/
   private static void validateSCMHAConfig(SCMStorageConfig scmStorageConfig,
                                           OzoneConfiguration conf) {
     Storage.StorageState state = scmStorageConfig.getState();
