@@ -26,56 +26,56 @@ import java.io.IOException;
 
 /**
  * Composite CRC.
- * 
+ *
  * This class is copied from Hadoop to provide Hadoop2 compatibility for Ozone.
  * */
 public class CompositeCrcFileChecksum extends FileChecksum {
-    public static final int LENGTH = Integer.SIZE / Byte.SIZE;
+  public static final int LENGTH = Integer.SIZE / Byte.SIZE;
 
-    private int crc;
-    private DataChecksum.Type crcType;
-    private int bytesPerCrc;
+  private int crc;
+  private DataChecksum.Type crcType;
+  private int bytesPerCrc;
 
-    /** Create a CompositeCrcFileChecksum. */
-    public CompositeCrcFileChecksum(
-            int crc, DataChecksum.Type crcType, int bytesPerCrc) {
-        this.crc = crc;
-        this.crcType = crcType;
-        this.bytesPerCrc = bytesPerCrc;
-    }
+  /** Create a CompositeCrcFileChecksum. */
+  public CompositeCrcFileChecksum(
+      int crc, DataChecksum.Type crcType, int bytesPerCrc) {
+    this.crc = crc;
+    this.crcType = crcType;
+    this.bytesPerCrc = bytesPerCrc;
+  }
 
-    @Override
-    public String getAlgorithmName() {
-        return "COMPOSITE-" + crcType.name();
-    }
+  @Override
+  public String getAlgorithmName() {
+    return "COMPOSITE-" + crcType.name();
+  }
 
-    @Override
-    public int getLength() {
-        return LENGTH;
-    }
+  @Override
+  public int getLength() {
+    return LENGTH;
+  }
 
-    @Override
-    public byte[] getBytes() {
-        return CrcUtil.intToBytes(crc);
-    }
+  @Override
+  public byte[] getBytes() {
+    return CrcUtil.intToBytes(crc);
+  }
 
-    @Override
-    public Options.ChecksumOpt getChecksumOpt() {
-        return new Options.ChecksumOpt(crcType, bytesPerCrc);
-    }
+  @Override
+  public Options.ChecksumOpt getChecksumOpt() {
+    return new Options.ChecksumOpt(crcType, bytesPerCrc);
+  }
 
-    @Override
-    public void readFields(DataInput in) throws IOException {
-        crc = in.readInt();
-    }
+  @Override
+  public void readFields(DataInput in) throws IOException {
+    crc = in.readInt();
+  }
 
-    @Override
-    public void write(DataOutput out) throws IOException {
-        out.writeInt(crc);
-    }
+  @Override
+  public void write(DataOutput out) throws IOException {
+    out.writeInt(crc);
+  }
 
-    @Override
-    public String toString() {
-        return getAlgorithmName() + ":" + String.format("0x%08x", crc);
-    }
+  @Override
+  public String toString() {
+    return getAlgorithmName() + ":" + String.format("0x%08x", crc);
+  }
 }

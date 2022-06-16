@@ -33,205 +33,207 @@ import java.io.IOException;
  * a large number of CRCs that correspond to underlying chunks of data all of
  * same size.
  */
-@InterfaceAudience.LimitedPrivate({"Common", "HDFS", "MapReduce", "Yarn"})
+@InterfaceAudience.LimitedPrivate({"OZONE"})
 @InterfaceStability.Unstable
 public class CrcComposer {
-    private static final int CRC_SIZE_BYTES = 4;
-    private static final Logger LOG = LoggerFactory.getLogger(CrcComposer.class);
+  private static final int CRC_SIZE_BYTES = 4;
+  private static final Logger LOG = LoggerFactory.getLogger(CrcComposer.class);
 
-    private final int crcPolynomial;
-    private final int precomputedMonomialForHint;
-    private final long bytesPerCrcHint;
-    private final long stripeLength;
+  private final int crcPolynomial;
+  private final int precomputedMonomialForHint;
+  private final long bytesPerCrcHint;
+  private final long stripeLength;
 
-    private int curCompositeCrc = 0;
-    private long curPositionInStripe = 0;
-    private ByteArrayOutputStream digestOut = new ByteArrayOutputStream();
+  private int curCompositeCrc = 0;
+  private long curPositionInStripe = 0;
+  private ByteArrayOutputStream digestOut = new ByteArrayOutputStream();
 
-    /**
-     * Returns a CrcComposer which will collapse all ingested CRCs into a single
-     * value.
-     *
-     * @param type type.
-     * @param bytesPerCrcHint bytesPerCrcHint.
-     * @throws IOException raised on errors performing I/O.
-     * @return a CrcComposer which will collapse all ingested CRCs into a single value.
-     */
-    public static CrcComposer newCrcComposer(
-            DataChecksum.Type type, long bytesPerCrcHint)
-            throws IOException {
-        return newStripedCrcComposer(type, bytesPerCrcHint, Long.MAX_VALUE);
+  /**
+   * Returns a CrcComposer which will collapse all ingested CRCs into a single
+   * value.
+   *
+   * @param type type.
+   * @param bytesPerCrcHint bytesPerCrcHint.
+   * @throws IOException raised on errors performing I/O.
+   * @return a CrcComposer which will collapse all ingested CRCs into a single
+   * value.
+   */
+  public static CrcComposer newCrcComposer(
+      DataChecksum.Type type, long bytesPerCrcHint)
+      throws IOException {
+    return newStripedCrcComposer(type, bytesPerCrcHint, Long.MAX_VALUE);
+  }
+
+  /**
+   * Returns a CrcComposer which will collapse CRCs for every combined
+   * underlying data size which aligns with the specified stripe boundary. For
+   * example, if "update" is called with 20 CRCs and bytesPerCrc == 5, and
+   * stripeLength == 10, then every two (10 / 5) consecutive CRCs will be
+   * combined with each other, yielding a list of 10 CRC "stripes" in the
+   * final digest, each corresponding to 10 underlying data bytes. Using
+   * a stripeLength greater than the total underlying data size is equivalent
+   * to using a non-striped CrcComposer.
+   *
+   * @param type type.
+   * @param bytesPerCrcHint bytesPerCrcHint.
+   * @param stripeLength stripeLength.
+   * @return a CrcComposer which will collapse CRCs for every combined.
+   * underlying data size which aligns with the specified stripe boundary.
+   * @throws IOException raised on errors performing I/O.
+   */
+  public static CrcComposer newStripedCrcComposer(
+      DataChecksum.Type type, long bytesPerCrcHint, long stripeLength)
+      throws IOException {
+    int polynomial = getCrcPolynomialForType(type);
+    return new CrcComposer(
+        polynomial,
+        CrcUtil.getMonomial(bytesPerCrcHint, polynomial),
+        bytesPerCrcHint,
+        stripeLength);
+  }
+
+  /**
+   * getCrcPolynomialForType.
+   *
+   * This method is copied from DataChecksum in Hadoop 3.
+   *
+   * @param type type.
+   * @return the int representation of the polynomial associated with the
+   *     CRC {@code type}, suitable for use with further CRC arithmetic.
+   * @throws IOException if there is no CRC polynomial applicable
+   *     to the given {@code type}.
+   */
+  public static int getCrcPolynomialForType(DataChecksum.Type type)
+      throws IOException {
+    switch (type) {
+    case CRC32:
+      return CrcUtil.GZIP_POLYNOMIAL;
+    case CRC32C:
+      return CrcUtil.CASTAGNOLI_POLYNOMIAL;
+    default:
+      throw new IOException(
+          "No CRC polynomial could be associated with type: " + type);
+    }
+  }
+
+  CrcComposer(
+      int crcPolynomial,
+      int precomputedMonomialForHint,
+      long bytesPerCrcHint,
+      long stripeLength) {
+    LOG.debug(
+        "crcPolynomial=0x{}, precomputedMonomialForHint=0x{}, "
+            + "bytesPerCrcHint={}, stripeLength={}",
+        Integer.toString(crcPolynomial, 16),
+        Integer.toString(precomputedMonomialForHint, 16),
+        bytesPerCrcHint,
+        stripeLength);
+    this.crcPolynomial = crcPolynomial;
+    this.precomputedMonomialForHint = precomputedMonomialForHint;
+    this.bytesPerCrcHint = bytesPerCrcHint;
+    this.stripeLength = stripeLength;
+  }
+
+  /**
+   * Composes length / CRC_SIZE_IN_BYTES more CRCs from crcBuffer, with
+   * each CRC expected to correspond to exactly {@code bytesPerCrc} underlying
+   * data bytes.
+   *
+   * @param crcBuffer crcBuffer.
+   * @param offset offset.
+   * @param length must be a multiple of the expected byte-size of a CRC.
+   * @param bytesPerCrc bytesPerCrc.
+   * @throws IOException raised on errors performing I/O.
+   */
+  public void update(
+      byte[] crcBuffer, int offset, int length, long bytesPerCrc)
+      throws IOException {
+    if (length % CRC_SIZE_BYTES != 0) {
+      throw new IOException(String.format(
+          "Trying to update CRC from byte array with length '%d' at offset "
+              + "'%d' which is not a multiple of %d!",
+          length, offset, CRC_SIZE_BYTES));
+    }
+    int limit = offset + length;
+    while (offset < limit) {
+      int crcB = CrcUtil.readInt(crcBuffer, offset);
+      update(crcB, bytesPerCrc);
+      offset += CRC_SIZE_BYTES;
+    }
+  }
+
+  /**
+   * Composes {@code numChecksumsToRead} additional CRCs into the current digest
+   * out of {@code checksumIn}, with each CRC expected to correspond to exactly
+   * {@code bytesPerCrc} underlying data bytes.
+   *
+   * @param checksumIn checksumIn.
+   * @param numChecksumsToRead numChecksumsToRead.
+   * @param bytesPerCrc bytesPerCrc.
+   * @throws IOException raised on errors performing I/O.
+   */
+  public void update(
+      DataInputStream checksumIn, long numChecksumsToRead, long bytesPerCrc)
+      throws IOException {
+    for (long i = 0; i < numChecksumsToRead; ++i) {
+      int crcB = checksumIn.readInt();
+      update(crcB, bytesPerCrc);
+    }
+  }
+
+  /**
+   * Updates with a single additional CRC which corresponds to an underlying
+   * data size of {@code bytesPerCrc}.
+   *
+   * @param crcB crcB.
+   * @param bytesPerCrc bytesPerCrc.
+   * @throws IOException raised on errors performing I/O.
+   */
+  public void update(int crcB, long bytesPerCrc) throws IOException {
+    if (curCompositeCrc == 0) {
+      curCompositeCrc = crcB;
+    } else if (bytesPerCrc == bytesPerCrcHint) {
+      curCompositeCrc = CrcUtil.composeWithMonomial(
+          curCompositeCrc, crcB, precomputedMonomialForHint, crcPolynomial);
+    } else {
+      curCompositeCrc = CrcUtil.compose(
+          curCompositeCrc, crcB, bytesPerCrc, crcPolynomial);
     }
 
-    /**
-     * Returns a CrcComposer which will collapse CRCs for every combined
-     * underlying data size which aligns with the specified stripe boundary. For
-     * example, if "update" is called with 20 CRCs and bytesPerCrc == 5, and
-     * stripeLength == 10, then every two (10 / 5) consecutive CRCs will be
-     * combined with each other, yielding a list of 10 CRC "stripes" in the
-     * final digest, each corresponding to 10 underlying data bytes. Using
-     * a stripeLength greater than the total underlying data size is equivalent
-     * to using a non-striped CrcComposer.
-     *
-     * @param type type.
-     * @param bytesPerCrcHint bytesPerCrcHint.
-     * @param stripeLength stripeLength.
-     * @return a CrcComposer which will collapse CRCs for every combined.
-     * underlying data size which aligns with the specified stripe boundary.
-     * @throws IOException raised on errors performing I/O.
-     */
-    public static CrcComposer newStripedCrcComposer(
-            DataChecksum.Type type, long bytesPerCrcHint, long stripeLength)
-            throws IOException {
-        int polynomial = getCrcPolynomialForType(type);
-        return new CrcComposer(
-                polynomial,
-                CrcUtil.getMonomial(bytesPerCrcHint, polynomial),
-                bytesPerCrcHint,
-                stripeLength);
+    curPositionInStripe += bytesPerCrc;
+
+    if (curPositionInStripe > stripeLength) {
+      throw new IOException(String.format(
+          "Current position in stripe '%d' after advancing by bytesPerCrc '%d' "
+              + "exceeds stripeLength '%d' without stripe alignment.",
+          curPositionInStripe, bytesPerCrc, stripeLength));
+    } else if (curPositionInStripe == stripeLength) {
+      // Hit a stripe boundary; flush the curCompositeCrc and reset for next
+      // stripe.
+      digestOut.write(CrcUtil.intToBytes(curCompositeCrc), 0, CRC_SIZE_BYTES);
+      curCompositeCrc = 0;
+      curPositionInStripe = 0;
     }
+  }
 
-    /**
-     * getCrcPolynomialForType.
-     *
-     * This method is copied from Hadoop3's DataChecksum.getCrcPolynomialForType().
-     *
-     * @param type type.
-     * @return the int representation of the polynomial associated with the
-     *     CRC {@code type}, suitable for use with further CRC arithmetic.
-     * @throws IOException if there is no CRC polynomial applicable
-     *     to the given {@code type}.
-     */
-    public static int getCrcPolynomialForType(DataChecksum.Type type) throws IOException {
-        switch (type) {
-            case CRC32:
-                return CrcUtil.GZIP_POLYNOMIAL;
-            case CRC32C:
-                return CrcUtil.CASTAGNOLI_POLYNOMIAL;
-            default:
-                throw new IOException(
-                        "No CRC polynomial could be associated with type: " + type);
-        }
+  /**
+   * Returns byte representation of composed CRCs; if no stripeLength was
+   * specified, the digest should be of length equal to exactly one CRC.
+   * Otherwise, the number of CRCs in the returned array is equal to the
+   * total sum bytesPerCrc divided by stripeLength. If the sum of bytesPerCrc
+   * is not a multiple of stripeLength, then the last CRC in the array
+   * corresponds to totalLength % stripeLength underlying data bytes.
+   *
+   * @return byte representation of composed CRCs.
+   */
+  public byte[] digest() {
+    if (curPositionInStripe > 0) {
+      digestOut.write(CrcUtil.intToBytes(curCompositeCrc), 0, CRC_SIZE_BYTES);
+      curCompositeCrc = 0;
+      curPositionInStripe = 0;
     }
-
-    CrcComposer(
-            int crcPolynomial,
-            int precomputedMonomialForHint,
-            long bytesPerCrcHint,
-            long stripeLength) {
-        LOG.debug(
-                "crcPolynomial=0x{}, precomputedMonomialForHint=0x{}, "
-                        + "bytesPerCrcHint={}, stripeLength={}",
-                Integer.toString(crcPolynomial, 16),
-                Integer.toString(precomputedMonomialForHint, 16),
-                bytesPerCrcHint,
-                stripeLength);
-        this.crcPolynomial = crcPolynomial;
-        this.precomputedMonomialForHint = precomputedMonomialForHint;
-        this.bytesPerCrcHint = bytesPerCrcHint;
-        this.stripeLength = stripeLength;
-    }
-
-    /**
-     * Composes length / CRC_SIZE_IN_BYTES more CRCs from crcBuffer, with
-     * each CRC expected to correspond to exactly {@code bytesPerCrc} underlying
-     * data bytes.
-     *
-     * @param crcBuffer crcBuffer.
-     * @param offset offset.
-     * @param length must be a multiple of the expected byte-size of a CRC.
-     * @param bytesPerCrc bytesPerCrc.
-     * @throws IOException raised on errors performing I/O.
-     */
-    public void update(
-            byte[] crcBuffer, int offset, int length, long bytesPerCrc)
-            throws IOException {
-        if (length % CRC_SIZE_BYTES != 0) {
-            throw new IOException(String.format(
-                    "Trying to update CRC from byte array with length '%d' at offset "
-                            + "'%d' which is not a multiple of %d!",
-                    length, offset, CRC_SIZE_BYTES));
-        }
-        int limit = offset + length;
-        while (offset < limit) {
-            int crcB = CrcUtil.readInt(crcBuffer, offset);
-            update(crcB, bytesPerCrc);
-            offset += CRC_SIZE_BYTES;
-        }
-    }
-
-    /**
-     * Composes {@code numChecksumsToRead} additional CRCs into the current digest
-     * out of {@code checksumIn}, with each CRC expected to correspond to exactly
-     * {@code bytesPerCrc} underlying data bytes.
-     *
-     * @param checksumIn checksumIn.
-     * @param numChecksumsToRead numChecksumsToRead.
-     * @param bytesPerCrc bytesPerCrc.
-     * @throws IOException raised on errors performing I/O.
-     */
-    public void update(
-            DataInputStream checksumIn, long numChecksumsToRead, long bytesPerCrc)
-            throws IOException {
-        for (long i = 0; i < numChecksumsToRead; ++i) {
-            int crcB = checksumIn.readInt();
-            update(crcB, bytesPerCrc);
-        }
-    }
-
-    /**
-     * Updates with a single additional CRC which corresponds to an underlying
-     * data size of {@code bytesPerCrc}.
-     *
-     * @param crcB crcB.
-     * @param bytesPerCrc bytesPerCrc.
-     * @throws IOException raised on errors performing I/O.
-     */
-    public void update(int crcB, long bytesPerCrc) throws IOException {
-        if (curCompositeCrc == 0) {
-            curCompositeCrc = crcB;
-        } else if (bytesPerCrc == bytesPerCrcHint) {
-            curCompositeCrc = CrcUtil.composeWithMonomial(
-                    curCompositeCrc, crcB, precomputedMonomialForHint, crcPolynomial);
-        } else {
-            curCompositeCrc = CrcUtil.compose(
-                    curCompositeCrc, crcB, bytesPerCrc, crcPolynomial);
-        }
-
-        curPositionInStripe += bytesPerCrc;
-
-        if (curPositionInStripe > stripeLength) {
-            throw new IOException(String.format(
-                    "Current position in stripe '%d' after advancing by bytesPerCrc '%d' "
-                            + "exceeds stripeLength '%d' without stripe alignment.",
-                    curPositionInStripe, bytesPerCrc, stripeLength));
-        } else if (curPositionInStripe == stripeLength) {
-            // Hit a stripe boundary; flush the curCompositeCrc and reset for next
-            // stripe.
-            digestOut.write(CrcUtil.intToBytes(curCompositeCrc), 0, CRC_SIZE_BYTES);
-            curCompositeCrc = 0;
-            curPositionInStripe = 0;
-        }
-    }
-
-    /**
-     * Returns byte representation of composed CRCs; if no stripeLength was
-     * specified, the digest should be of length equal to exactly one CRC.
-     * Otherwise, the number of CRCs in the returned array is equal to the
-     * total sum bytesPerCrc divided by stripeLength. If the sum of bytesPerCrc
-     * is not a multiple of stripeLength, then the last CRC in the array
-     * corresponds to totalLength % stripeLength underlying data bytes.
-     *
-     * @return byte representation of composed CRCs.
-     */
-    public byte[] digest() {
-        if (curPositionInStripe > 0) {
-            digestOut.write(CrcUtil.intToBytes(curCompositeCrc), 0, CRC_SIZE_BYTES);
-            curCompositeCrc = 0;
-            curPositionInStripe = 0;
-        }
-        byte[] digestValue = digestOut.toByteArray();
-        digestOut.reset();
-        return digestValue;
-    }
+    byte[] digestValue = digestOut.toByteArray();
+    digestOut.reset();
+    return digestValue;
+  }
 }
