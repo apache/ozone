@@ -235,8 +235,7 @@ public class TestWritableECContainerProvider {
         conf, pipelineManager, containerManager, pipelineChoosingPolicy);
 
     try {
-      ContainerInfo container =
-          provider.getContainer(1, repConfig, OWNER, new ExcludeList());
+      provider.getContainer(1, repConfig, OWNER, new ExcludeList());
     } catch (IOException ex) {
       GenericTestUtils.assertExceptionContains("Cannot create pipelines", ex);
     }
@@ -265,16 +264,14 @@ public class TestWritableECContainerProvider {
         conf, pipelineManager, containerManager, pipelineChoosingPolicy);
 
     try {
-      ContainerInfo container =
-          provider.getContainer(1, repConfig, OWNER, new ExcludeList());
+      provider.getContainer(1, repConfig, OWNER, new ExcludeList());
     } catch (IOException ex) {
       GenericTestUtils.assertExceptionContains("Cannot create pipelines", ex);
     }
 
     for (int i = 0; i < 5; i++) {
       try {
-        ContainerInfo nextContainer =
-            provider.getContainer(1, repConfig, OWNER, new ExcludeList());
+        provider.getContainer(1, repConfig, OWNER, new ExcludeList());
       } catch (IOException ex) {
         GenericTestUtils.assertExceptionContains("Cannot create pipelines", ex);
       }
