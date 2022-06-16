@@ -379,6 +379,7 @@ public class BlockDeletingService extends BackgroundService {
           containerData.decrPendingDeletionBlocks(deletedBlocksCount);
           containerData.decrBlockCount(deletedBlocksCount);
           containerData.decrBytesUsed(releasedBytes);
+          containerData.getVolume().decrementUsedSpace(releasedBytes);
         }
 
         if (!succeedBlocks.isEmpty()) {
@@ -489,10 +490,11 @@ public class BlockDeletingService extends BackgroundService {
               deletedBlocksCount, releasedBytes);
 
           // update count of pending deletion blocks, block count and used
-          // bytes in in-memory container status.
+          // bytes in in-memory container status and used space in volume.
           containerData.decrPendingDeletionBlocks(deletedBlocksCount);
           containerData.decrBlockCount(deletedBlocksCount);
           containerData.decrBytesUsed(releasedBytes);
+          containerData.getVolume().decrementUsedSpace(releasedBytes);
         }
 
         LOG.debug("Container: {}, deleted blocks: {}, space reclaimed: {}, " +

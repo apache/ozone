@@ -22,12 +22,14 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.mockito.Mockito;
 
 import static org.junit.Assert.assertEquals;
 
@@ -70,10 +72,12 @@ public class TestKeyValueContainerData {
     AtomicLong val = new AtomicLong(0);
     UUID pipelineId = UUID.randomUUID();
     UUID datanodeId = UUID.randomUUID();
+    HddsVolume vol = Mockito.mock(HddsVolume.class);
 
     KeyValueContainerData kvData = new KeyValueContainerData(containerId,
         layout,
         MAXSIZE, pipelineId.toString(), datanodeId.toString());
+    kvData.setVolume(vol);
 
     assertEquals(containerType, kvData.getContainerType());
     assertEquals(containerId, kvData.getContainerID());
