@@ -91,7 +91,7 @@ public class TestCapacityVolumeChoosingPolicy {
   }
 
   @Test
-  public void testRRVolumeChoosingPolicy() throws Exception {
+  public void testCapacityVolumeChoosingPolicy() throws Exception {
     HddsVolume hddsVolume1 = volumes.get(0);
     HddsVolume hddsVolume2 = volumes.get(1);
     HddsVolume hddsVolume3 = volumes.get(2);
@@ -118,7 +118,7 @@ public class TestCapacityVolumeChoosingPolicy {
   }
 
   @Test
-  public void testRRPolicyExceptionMessage() throws Exception {
+  public void testCapacityPolicyExceptionMessage() throws Exception {
     int blockSize = 300;
     try {
       policy.chooseVolume(volumes, blockSize);
