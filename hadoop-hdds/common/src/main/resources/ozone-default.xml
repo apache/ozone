@@ -1180,7 +1180,7 @@
       Default replication value. The actual number of replications can be
       specified when writing the key. The default is used if replication
       is not specified when creating key or no default replication set at
-      bucket. Supported values: 1, 3 and EC_3_2.
+      bucket. Supported values: 1, 3 and RS-3-2-1024k.
     </description>
   </property>
 
