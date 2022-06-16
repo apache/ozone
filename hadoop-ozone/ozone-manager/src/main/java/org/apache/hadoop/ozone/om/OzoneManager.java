@@ -2974,6 +2974,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       serviceList = getServiceList();
     } catch (IOException e) {
+      return "";
     }
     for (ServiceInfo info : serviceList) {
       if (info.getOmRoleInfo() != null) {
