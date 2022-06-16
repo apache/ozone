@@ -76,10 +76,8 @@ public class ECContainerOperationClient implements Closeable {
   public BlockData[] listBlock(long containerId, DatanodeDetails dn,
       ECReplicationConfig repConfig, Token<? extends TokenIdentifier> token)
       throws IOException {
-    XceiverClientSpi xceiverClient = this.xceiverClientManager.acquireClient(
-        Pipeline.newBuilder().setId(PipelineID.valueOf(dn.getUuid()))
-            .setReplicationConfig(repConfig).setNodes(ImmutableList.of(dn))
-            .setState(Pipeline.PipelineState.CLOSED).build());
+    XceiverClientSpi xceiverClient = this.xceiverClientManager
+        .acquireClient(singleNodePipeline(dn, repConfig));
     try {
       List<ContainerProtos.BlockData> blockDataList = ContainerProtocolCalls
           .listBlock(xceiverClient, containerId, null, Integer.MAX_VALUE, token)
@@ -103,10 +101,8 @@ public class ECContainerOperationClient implements Closeable {
 
   public void closeContainer(long containerID, DatanodeDetails dn,
       ECReplicationConfig repConfig, String encodedToken) throws IOException {
-    XceiverClientSpi xceiverClient = this.xceiverClientManager.acquireClient(
-        Pipeline.newBuilder().setId(PipelineID.valueOf(dn.getUuid()))
-            .setReplicationConfig(repConfig).setNodes(ImmutableList.of(dn))
-            .setState(Pipeline.PipelineState.CLOSED).build());
+    XceiverClientSpi xceiverClient = this.xceiverClientManager
+        .acquireClient(singleNodePipeline(dn, repConfig));
     try {
       ContainerProtocolCalls
           .closeContainer(xceiverClient, containerID, encodedToken);

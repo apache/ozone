@@ -248,9 +248,7 @@ public class ECReconstructionCoordinator implements Closeable {
         for (ByteBuffer buf : bufs) {
           byteBufferPool.putBuffer(buf);
         }
-        for (ECBlockOutputStream targetStream : targetBlockStreams) {
-          IOUtils.cleanupWithLogger(LOG, targetStream);
-        }
+        IOUtils.cleanupWithLogger(LOG, targetBlockStreams);
       }
     }
   }
