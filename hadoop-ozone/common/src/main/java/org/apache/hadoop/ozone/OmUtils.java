@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import org.apache.commons.lang3.StringUtils;
@@ -789,4 +790,22 @@ public final class OmUtils {
     printString.append("]");
     return printString.toString();
   }
+
+  public static String format(List<ServiceInfo> nodes) {
+    StringBuilder sb = new StringBuilder();
+    for (ServiceInfo info : nodes) {
+      if (info.getOmRoleInfo() != null) {
+        sb.append(
+            String.format(
+                "{ HostName: %s, Ratis Port: %s, Node-Id: %s, Role: %s } ",
+                info.getHostname(),
+                info.getPort(OzoneManagerProtocolProtos.ServicePort.Type.RATIS),
+                info.getOmRoleInfo().getNodeId(),
+                info.getOmRoleInfo().getServerRole()
+            ));
+      }
+    }
+    return sb.toString();
+  }
+
 }

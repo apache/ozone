@@ -30,9 +30,7 @@ public interface OMMXBean extends ServiceRuntimeInfo {
   String getRpcPort();
 
   String getOmRatisRoles();
-  
-  String getCurrentHost();
-  
+
   String getRatisLogDirectory();
 
   String getRocksDbDirectory();
