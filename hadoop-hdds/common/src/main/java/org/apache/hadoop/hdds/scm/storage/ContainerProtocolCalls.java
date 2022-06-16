@@ -425,13 +425,15 @@ public final class ContainerProtocolCalls  {
    * @param client  - client
    * @param containerID - ID of container
    * @param encodedToken - encodedToken if security is enabled
+   * @param replicaIndex - index position of the container replica
    * @throws IOException
    */
   @InterfaceStability.Evolving
   public static void createRecoveringContainer(XceiverClientSpi client,
-      long containerID, String encodedToken) throws IOException {
+      long containerID, String encodedToken, int replicaIndex)
+      throws IOException {
     createContainerInternal(client, containerID, encodedToken,
-        ContainerProtos.ContainerDataProto.State.RECOVERING);
+        ContainerProtos.ContainerDataProto.State.RECOVERING, replicaIndex);
   }
 
   /**
@@ -443,7 +445,7 @@ public final class ContainerProtocolCalls  {
    */
   public static void createContainer(XceiverClientSpi client, long containerID,
       String encodedToken) throws IOException {
-    createContainerInternal(client, containerID, encodedToken, null);
+    createContainerInternal(client, containerID, encodedToken, null, 0);
   }
   /**
    * createContainer call that creates a container on the datanode.
@@ -451,17 +453,22 @@ public final class ContainerProtocolCalls  {
    * @param containerID - ID of container
    * @param encodedToken - encodedToken if security is enabled
    * @param state - state of the container
+   * @param replicaIndex - index position of the container replica
    * @throws IOException
    */
   private static void createContainerInternal(XceiverClientSpi client,
       long containerID, String encodedToken,
-      ContainerProtos.ContainerDataProto.State state) throws IOException {
+      ContainerProtos.ContainerDataProto.State state, int replicaIndex)
+      throws IOException {
     ContainerProtos.CreateContainerRequestProto.Builder createRequest =
         ContainerProtos.CreateContainerRequestProto.newBuilder();
-    createRequest.setContainerType(ContainerProtos.ContainerType
-        .KeyValueContainer);
+    createRequest
+        .setContainerType(ContainerProtos.ContainerType.KeyValueContainer);
     if (state != null) {
       createRequest.setState(state);
+    }
+    if (replicaIndex > 0) {
+      createRequest.setReplicaIndex(replicaIndex);
     }
 
     String id = client.getPipeline().getFirstNode().getUuidString();
