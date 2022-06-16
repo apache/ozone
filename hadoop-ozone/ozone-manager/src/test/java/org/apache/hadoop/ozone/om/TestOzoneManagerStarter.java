@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.After;
@@ -33,9 +32,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.cli.GenericCli.EXECUTION_ERROR_EXIT_CODE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static picocli.CommandLine.ExitCode.USAGE;
 
 /**
  * This class is used to test the CLI provided by OzoneManagerStarter, which is
@@ -75,12 +76,12 @@ public class TestOzoneManagerStarter {
   @Test
   public void testExceptionThrownWhenStartFails() throws Exception {
     mock.throwOnStart = true;
-    assertEquals(GenericCli.EXECUTION_ERROR_EXIT_CODE, executeCommand());
+    assertEquals(EXECUTION_ERROR_EXIT_CODE, executeCommand());
   }
 
   @Test
   public void testStartNotCalledWithInvalidParam() throws Exception {
-    assertEquals(ExitCode.USAGE, executeCommand("--invalid"));
+    assertEquals(USAGE, executeCommand("--invalid"));
     assertFalse(mock.startCalled);
   }
 
@@ -92,21 +93,20 @@ public class TestOzoneManagerStarter {
 
   @Test
   public void testInitSwitchWithInvalidParamDoesNotRun() {
-    assertEquals(ExitCode.USAGE, executeCommand("--init", "--invalid"));
+    assertEquals(USAGE, executeCommand("--init", "--invalid"));
     assertFalse(mock.initCalled);
   }
 
   @Test
   public void testUnSuccessfulInitThrowsException() {
     mock.throwOnInit = true;
-    assertEquals(ExitCode.USAGE, executeCommand("--init"));
+    assertEquals(EXECUTION_ERROR_EXIT_CODE, executeCommand("--init"));
   }
 
   @Test
   public void testInitThatReturnsFalseThrowsException() {
     mock.initStatus = false;
-    assertEquals(GenericCli.EXECUTION_ERROR_EXIT_CODE,
-            executeCommand("--init"));
+    assertEquals(EXECUTION_ERROR_EXIT_CODE, executeCommand("--init"));
   }
 
   @Test
@@ -118,14 +118,13 @@ public class TestOzoneManagerStarter {
   @Test
   public void testUnsuccessfulUpgradeThrowsException() {
     mock.throwOnStartAndCancelPrepare = true;
-    assertEquals(GenericCli.EXECUTION_ERROR_EXIT_CODE,
-            executeCommand("--upgrade"));
+    assertEquals(EXECUTION_ERROR_EXIT_CODE, executeCommand("--upgrade"));
   }
 
   @Test
   public void testUsagePrintedOnInvalidInput()
       throws UnsupportedEncodingException {
-    assertEquals(ExitCode.USAGE, executeCommand("--invalid"));
+    assertEquals(USAGE, executeCommand("--invalid"));
     Pattern p = Pattern.compile("^Unknown option:.*--invalid.*\nUsage");
     Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
