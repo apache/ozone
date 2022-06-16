@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,7 +79,7 @@ public class OpenKeyCleanupService extends BackgroundService {
         // The new API for deleting expired open keys in OM HA will differ
         // significantly from the old implementation.
         // The old implementation has been removed so the code compiles.
-        keyManager.getExpiredOpenKeys(Duration.ZERO, 0);
+        keyManager.getExpiredOpenKeys(Duration.ZERO, 0, BucketLayout.DEFAULT);
       } catch (IOException e) {
         LOG.error("Unable to get hanging open keys, retry in"
             + " next interval", e);

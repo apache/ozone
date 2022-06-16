@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
@@ -78,7 +79,7 @@ public class PipelineManagerImpl implements PipelineManager {
   private PipelineFactory pipelineFactory;
   private PipelineStateManager stateManager;
   private BackgroundPipelineCreator backgroundPipelineCreator;
-  private BackgroundPipelineScrubber backgroundPipelineScrubber;
+  private BackgroundSCMService backgroundPipelineScrubber;
   private final ConfigurationSource conf;
   private final EventPublisher eventPublisher;
   // Pipeline Manager MXBean
@@ -153,9 +154,28 @@ public class PipelineManagerImpl implements PipelineManager {
     BackgroundPipelineCreator backgroundPipelineCreator =
         new BackgroundPipelineCreator(pipelineManager, conf, scmContext, clock);
 
-    BackgroundPipelineScrubber backgroundPipelineScrubber =
-        new BackgroundPipelineScrubber(pipelineManager, conf, scmContext,
-            clock);
+    final long scrubberIntervalInMillis = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    final long safeModeWaitMs = conf.getTimeDuration(
+        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
+        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+
+    BackgroundSCMService backgroundPipelineScrubber =
+        new BackgroundSCMService.Builder().setClock(clock)
+            .setScmContext(scmContext)
+            .setServiceName("BackgroundPipelineScrubber")
+            .setIntervalInMillis(scrubberIntervalInMillis)
+            .setWaitTimeInMillis(safeModeWaitMs)
+            .setPeriodicalTask(() -> {
+              try {
+                pipelineManager.scrubPipelines();
+              } catch (IOException e) {
+                LOG.error("Unexpected error during pipeline scrubbing", e);
+              }
+            }).build();
 
     pipelineManager.setBackgroundPipelineCreator(backgroundPipelineCreator);
     pipelineManager.setBackgroundPipelineScrubber(backgroundPipelineScrubber);
@@ -721,12 +741,12 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   private void setBackgroundPipelineScrubber(
-      BackgroundPipelineScrubber backgroundPipelineScrubber) {
+      BackgroundSCMService backgroundPipelineScrubber) {
     this.backgroundPipelineScrubber = backgroundPipelineScrubber;
   }
 
   @VisibleForTesting
-  public BackgroundPipelineScrubber getBackgroundPipelineScrubber() {
+  public BackgroundSCMService getBackgroundPipelineScrubber() {
     return this.backgroundPipelineScrubber;
   }
 

@@ -33,6 +33,8 @@ import org.apache.hadoop.ozone.client.checksum.ReplicatedFileChecksumHelper;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
 import java.io.IOException;
 import java.util.Set;
@@ -205,8 +207,20 @@ public final class OzoneClientUtils {
     if (keyName.length() == 0) {
       return null;
     }
-    BaseFileChecksumHelper helper = new ReplicatedFileChecksumHelper(
-        volume, bucket, keyName, length, combineMode, rpcClient);
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volume.getName())
+        .setBucketName(bucket.getName()).setKeyName(keyName)
+        .setRefreshPipeline(true).setSortDatanodesInPipeline(true)
+        .setLatestVersionLocation(true).build();
+    OmKeyInfo keyInfo = rpcClient.getOzoneManagerClient().lookupKey(keyArgs);
+
+    // TODO: return null util ECFileChecksum is implemented.
+    if (keyInfo.getReplicationConfig()
+        .getReplicationType() == HddsProtos.ReplicationType.EC) {
+      return null;
+    }
+    BaseFileChecksumHelper helper =
+        new ReplicatedFileChecksumHelper(volume, bucket, keyName, length,
+            combineMode, rpcClient, keyInfo);
     helper.compute();
     return helper.getFileChecksum();
   }

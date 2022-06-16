@@ -853,11 +853,11 @@ public class ContainerStateMachine extends BaseStateMachine {
                     + "{} Container Result: {}", gid, r.getCmdType(), index,
                 r.getMessage(), r.getResult());
           }
-          applyTransactionFuture.complete(r::toByteString);
           if (cmdType == Type.WriteChunk || cmdType == Type.PutSmallFile) {
             metrics.incNumBytesCommittedCount(
                 requestProto.getWriteChunk().getChunkData().getLen());
           }
+          applyTransactionFuture.complete(r::toByteString);
           // add the entry to the applyTransactionCompletionMap only if the
           // stateMachine is healthy i.e, there has been no applyTransaction
           // failures before.

@@ -67,7 +67,7 @@ public interface SCMService {
   /**
    * starts the SCM service.
    */
-  void start();
+  void start() throws SCMServiceException;
 
   /**
    * stops the SCM service.

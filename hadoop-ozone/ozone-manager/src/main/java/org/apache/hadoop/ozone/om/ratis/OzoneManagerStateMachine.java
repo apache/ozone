@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.protocolPB.RequestHandler;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
@@ -241,10 +242,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // Must authenticate prepare requests here, since we must determine
       // whether or not to apply the prepare gate before proceeding with the
       // prepare request.
-      String username = request.getUserInfo().getUserName();
-      if (ozoneManager.getAclsEnabled() && !ozoneManager.isAdmin(username)) {
-        String message = "Access denied for user " + username + ". " +
-            "Superuser privilege is required to prepare ozone managers.";
+      UserGroupInformation userGroupInformation =
+          UserGroupInformation.createRemoteUser(
+          request.getUserInfo().getUserName());
+      if (ozoneManager.getAclsEnabled()
+          && !ozoneManager.isAdmin(userGroupInformation)) {
+        String message = "Access denied for user " + userGroupInformation
+            + ". "
+            + "Superuser privilege is required to prepare ozone managers.";
         OMException cause =
             new OMException(message, OMException.ResultCodes.ACCESS_DENIED);
         // Leader should not step down because of this failure.

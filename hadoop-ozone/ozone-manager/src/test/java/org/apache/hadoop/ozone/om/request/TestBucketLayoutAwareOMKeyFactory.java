@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om.request;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
-import org.apache.hadoop.ozone.om.request.key.OMPathsPurgeRequestWithFSO;
+import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.junit.Assert;
@@ -132,8 +132,9 @@ public class TestBucketLayoutAwareOMKeyFactory {
       InstantiationException, IllegalAccessException {
     // Add an OMKeyRequest class that does not have a constructor compatible
     // with the Factory class.
-    addRequestClass(Type.PurgePaths, OMPathsPurgeRequestWithFSO.class,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    addRequestClass(Type.PurgeDirectories,
+            OMDirectoriesPurgeRequestWithFSO.class,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
     try {
       // This should fail, since this class does not have a valid constructor -
       // one that takes an OMRequest and a BucketLayout as parameters.
@@ -142,7 +143,7 @@ public class TestBucketLayoutAwareOMKeyFactory {
               .setCmdType(Type.PurgeKeys)
               .setClientId("xyz")
               .build(),
-          getKey(Type.PurgePaths, BucketLayout.FILE_SYSTEM_OPTIMIZED),
+          getKey(Type.PurgeDirectories, BucketLayout.FILE_SYSTEM_OPTIMIZED),
           BucketLayout.FILE_SYSTEM_OPTIMIZED);
       fail("No exception thrown for invalid OMKeyRequest class");
     } catch (NoSuchMethodException ex) {

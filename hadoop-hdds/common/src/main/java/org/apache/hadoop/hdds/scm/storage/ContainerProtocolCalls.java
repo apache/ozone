@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -40,6 +41,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockRe
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileResponseProto;
@@ -71,6 +74,50 @@ public final class ContainerProtocolCalls  {
    * There is no need to instantiate this class.
    */
   private ContainerProtocolCalls() {
+  }
+
+  /**
+   * Calls the container protocol to list blocks in container.
+   *
+   * @param xceiverClient client to perform call
+   * @param containerID the ID of the container to list block
+   * @param startLocalID the localID of the first block to get
+   * @param count max number of blocks to get
+   * @param token a token for this block (may be null)
+   * @return container protocol list block response
+   * @throws IOException if there is an I/O error while performing the call
+   */
+  public static ListBlockResponseProto listBlock(XceiverClientSpi xceiverClient,
+      long containerID, Long startLocalID, int count,
+      Token<? extends TokenIdentifier> token) throws IOException {
+
+    ListBlockRequestProto.Builder listBlockBuilder =
+        ListBlockRequestProto.newBuilder()
+            .setCount(count);
+
+    if (startLocalID != null) {
+      listBlockBuilder.setStartLocalID(startLocalID);
+    }
+
+    // datanodeID doesn't matter for read only requests
+    String datanodeID =
+        xceiverClient.getPipeline().getFirstNode().getUuidString();
+
+    ContainerCommandRequestProto.Builder builder =
+        ContainerCommandRequestProto.newBuilder()
+            .setCmdType(Type.ListBlock)
+            .setContainerID(containerID)
+            .setDatanodeUuid(datanodeID)
+            .setListBlock(listBlockBuilder.build());
+
+    if (token != null) {
+      builder.setEncodedToken(token.encodeToUrlString());
+    }
+
+    ContainerCommandRequestProto request = builder.build();
+    ContainerCommandResponseProto response =
+        xceiverClient.sendCommand(request, getValidatorList());
+    return response.getListBlock();
   }
 
   /**
@@ -371,6 +418,23 @@ public final class ContainerProtocolCalls  {
   }
 
   /**
+   * createRecoveringContainer call that creates a container on the datanode.
+   * Currently this is used for EC reconstruction containers. When EC
+   * reconstruction coordinator reconstructing the containers, the in progress
+   * containers would be created as "RECOVERING" state containers.
+   * @param client  - client
+   * @param containerID - ID of container
+   * @param encodedToken - encodedToken if security is enabled
+   * @throws IOException
+   */
+  @InterfaceStability.Evolving
+  public static void createRecoveringContainer(XceiverClientSpi client,
+      long containerID, String encodedToken) throws IOException {
+    createContainerInternal(client, containerID, encodedToken,
+        ContainerProtos.ContainerDataProto.State.RECOVERING);
+  }
+
+  /**
    * createContainer call that creates a container on the datanode.
    * @param client  - client
    * @param containerID - ID of container
@@ -379,11 +443,26 @@ public final class ContainerProtocolCalls  {
    */
   public static void createContainer(XceiverClientSpi client, long containerID,
       String encodedToken) throws IOException {
+    createContainerInternal(client, containerID, encodedToken, null);
+  }
+  /**
+   * createContainer call that creates a container on the datanode.
+   * @param client  - client
+   * @param containerID - ID of container
+   * @param encodedToken - encodedToken if security is enabled
+   * @param state - state of the container
+   * @throws IOException
+   */
+  private static void createContainerInternal(XceiverClientSpi client,
+      long containerID, String encodedToken,
+      ContainerProtos.ContainerDataProto.State state) throws IOException {
     ContainerProtos.CreateContainerRequestProto.Builder createRequest =
-        ContainerProtos.CreateContainerRequestProto
-            .newBuilder();
+        ContainerProtos.CreateContainerRequestProto.newBuilder();
     createRequest.setContainerType(ContainerProtos.ContainerType
         .KeyValueContainer);
+    if (state != null) {
+      createRequest.setState(state);
+    }
 
     String id = client.getPipeline().getFirstNode().getUuidString();
     ContainerCommandRequestProto.Builder request =

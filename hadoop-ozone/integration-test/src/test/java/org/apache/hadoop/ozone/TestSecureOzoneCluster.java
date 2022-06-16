@@ -618,7 +618,7 @@ public final class TestSecureOzoneCluster {
   }
 
   @Test
-  public void testGetS3SecretAndRevokeS3Secret() throws Exception {
+  public void testGetSetRevokeS3Secret() throws Exception {
 
     // Setup secure OM for start
     setupOm(conf);
@@ -649,6 +649,15 @@ public final class TestSecureOzoneCluster {
       // Revoke the existing secret
       omClient.revokeS3Secret(username);
 
+      // Set secret should fail since the accessId is revoked
+      final String secretKeySet = "somesecret1";
+      try {
+        omClient.setS3Secret(username, secretKeySet);
+      } catch (OMException omEx) {
+        assertEquals(OMException.ResultCodes.ACCESS_ID_NOT_FOUND,
+            omEx.getResult());
+      }
+
       // Get a new secret
       S3SecretValue attempt3 = omClient.getS3Secret(username);
 
@@ -657,6 +666,12 @@ public final class TestSecureOzoneCluster {
 
       // accessKey is still the same because it is derived from username
       assertEquals(attempt3.getAwsAccessKey(), attempt2.getAwsAccessKey());
+
+      // Admin can set secret for any user
+      omClient.setS3Secret(username, secretKeySet);
+      assertEquals(secretKeySet, omClient.getS3Secret(username).getAwsSecret());
+      // Clean up
+      omClient.revokeS3Secret(username);
 
       // Admin can get and revoke other users' secrets
       // omClient's ugi is current user, which is added as an OM admin

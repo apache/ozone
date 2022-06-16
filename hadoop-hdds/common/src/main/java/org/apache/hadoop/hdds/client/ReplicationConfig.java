@@ -182,12 +182,18 @@ public interface ReplicationConfig {
       try {
         factor = ReplicationFactor.valueOf(Integer.parseInt(replication));
       } catch (NumberFormatException ex) {
-        factor = ReplicationFactor.valueOf(replication);
+        try {
+          factor = ReplicationFactor.valueOf(replication);
+        } catch (IllegalArgumentException e) {
+          throw new IllegalArgumentException(replication +
+              " is not supported for " + type + " replication type", e);
+        }
       }
       replicationConfig = fromTypeAndFactor(type, factor);
       break;
     case EC:
-      return new ECReplicationConfig(replication);
+      replicationConfig = new ECReplicationConfig(replication);
+      break;
     default:
       throw new RuntimeException("Replication type" + type + " can not"
           + "be parsed.");
@@ -214,5 +220,7 @@ public interface ReplicationConfig {
    * Returns the replication option in string format.
    */
   String getReplication();
+
+  String configFormat();
 
 }

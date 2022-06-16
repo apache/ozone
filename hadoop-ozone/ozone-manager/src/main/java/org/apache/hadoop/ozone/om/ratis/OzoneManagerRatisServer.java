@@ -724,7 +724,8 @@ public final class OzoneManagerRatisServer {
 
   private static Map<String, String> getOMHAConfigs(
       ConfigurationSource configuration) {
-    return configuration.getPropsWithPrefix(OZONE_OM_HA_PREFIX + ".");
+    return configuration
+        .getPropsMatchPrefixAndTrimPrefix(OZONE_OM_HA_PREFIX + ".");
   }
 
   /**

@@ -28,6 +28,7 @@ enum RequestType {
     CERT_STORE = 5;
     MOVE = 6;
     STATEFUL_SERVICE_CONFIG = 7;
+    FINALIZE = 8;
 }
 
 message Method {

@@ -66,7 +66,7 @@ public class OzoneClientProducer {
   @Produces
   public synchronized OzoneClient createClient() throws WebApplicationException,
       IOException {
-    client = getClient(ozoneConfiguration);      
+    client = getClient(ozoneConfiguration);
     return client;
   }
 
@@ -91,9 +91,11 @@ public class OzoneClientProducer {
         throw ACCESS_DENIED;
       }
 
+      // Note: userPrincipal is initialized to be the same value as accessId,
+      //  could be updated later in RpcClient#getS3Volume
       return new S3Auth(stringToSign,
           signatureInfo.getSignature(),
-          awsAccessId);
+          awsAccessId, awsAccessId);
     } catch (OS3Exception ex) {
       LOG.debug("Error during Client Creation: ", ex);
       throw wrapOS3Exception(ex);
@@ -130,7 +132,7 @@ public class OzoneClientProducer {
   public void setSignatureParser(SignatureProcessor awsSignatureProcessor) {
     this.signatureProcessor = awsSignatureProcessor;
   }
-    
+
   private WebApplicationException wrapOS3Exception(OS3Exception os3Exception) {
     return new WebApplicationException(os3Exception.getErrorMessage(),
         os3Exception,

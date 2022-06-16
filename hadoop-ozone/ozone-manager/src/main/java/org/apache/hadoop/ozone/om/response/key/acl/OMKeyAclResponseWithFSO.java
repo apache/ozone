@@ -64,9 +64,14 @@ public class OMKeyAclResponseWithFSO extends OMKeyAclResponse {
   @Override public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
+    final long volumeId = omMetadataManager.getVolumeId(
+            getOmKeyInfo().getVolumeName());
+    final long bucketId = omMetadataManager.getBucketId(
+            getOmKeyInfo().getVolumeName(), getOmKeyInfo().getBucketName());
     String ozoneDbKey = omMetadataManager
-        .getOzonePathKey(getOmKeyInfo().getParentObjectID(),
-            getOmKeyInfo().getFileName());
+        .getOzonePathKey(volumeId, bucketId,
+                getOmKeyInfo().getParentObjectID(),
+                getOmKeyInfo().getFileName());
     if (isDirectory) {
       OmDirectoryInfo dirInfo = OMFileRequest.getDirectoryInfo(getOmKeyInfo());
       omMetadataManager.getDirectoryTable()

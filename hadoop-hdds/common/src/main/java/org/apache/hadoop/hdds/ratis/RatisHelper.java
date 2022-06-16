@@ -349,7 +349,7 @@ public final class RatisHelper {
 
   private static Map<String, String> getDatanodeRatisPrefixProps(
       ConfigurationSource configuration) {
-    return configuration.getPropsWithPrefix(
+    return configuration.getPropsMatchPrefixAndTrimPrefix(
         StringUtils.appendIfNotPresent(HDDS_DATANODE_RATIS_PREFIX_KEY, '.'));
   }
 

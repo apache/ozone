@@ -206,6 +206,14 @@ public final class VolumeInfo {
     return Math.max(Math.min(avail, usage.getAvailable()), 0);
   }
 
+  public void incrementUsedSpace(long usedSpace) {
+    usage.incrementUsedSpace(usedSpace);
+  }
+
+  public void decrementUsedSpace(long reclaimedSpace) {
+    usage.decrementUsedSpace(reclaimedSpace);
+  }
+
   public void refreshNow() {
     usage.refreshNow();
   }
