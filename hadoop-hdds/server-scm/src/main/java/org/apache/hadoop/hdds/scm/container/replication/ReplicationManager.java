@@ -422,14 +422,6 @@ public class ReplicationManager implements SCMService {
     return legacyReplicationManager.move(cid, src, tgt);
   }
 
-  public Map<ContainerID, List<InflightAction>>  getInflightReplication() {
-    return legacyReplicationManager.getInflightReplication();
-  }
-
-  public Map<ContainerID, List<InflightAction>> getInflightDeletion() {
-    return legacyReplicationManager.getInflightDeletion();
-  }
-
   public Map<ContainerID,
       CompletableFuture<LegacyReplicationManager.MoveResult>>
       getInflightMove() {
