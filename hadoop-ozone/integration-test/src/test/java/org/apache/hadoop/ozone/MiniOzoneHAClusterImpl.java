@@ -629,22 +629,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       return new SCMHAService(activeSCMs, inactiveSCMs, scmServiceId, scmPorts);
     }
 
-    //TODO: HDDS-6897
-    //Disabling Ratis for only of MiniOzoneClusterImpl.
-    //MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
-    @Override
-    protected void initializeScmStorage(SCMStorageConfig scmStore)
-            throws IOException {
-      super.initializeScmStorage(scmStore);
-      if (SCMHAUtils.isSCMHAEnabled(conf)) {
-        scmStore.setSCMHAFlag(true);
-        scmStore.persistCurrentState();
-        SCMRatisServerImpl.initialize(clusterId, scmId.get(),
-                SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
-                        .getLocalNodeDetails(), conf);
-      }
-    }
-
     /**
      * Initialize HA related configurations.
      */

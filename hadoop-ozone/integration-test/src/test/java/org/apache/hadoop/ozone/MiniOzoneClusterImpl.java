@@ -45,7 +45,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -70,6 +72,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ConfigurationProvider;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.logging.log4j.util.Strings;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
@@ -731,10 +734,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
       return scm;
     }
-
-    //TODO: HDDS-6897
-    //Disabling Ratis for only of MiniOzoneClusterImpl.
-    //MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
     protected void initializeScmStorage(SCMStorageConfig scmStore)
         throws IOException {
       if (scmStore.getState() == StorageState.INITIALIZED) {
@@ -746,7 +745,17 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
       scmStore.setScmId(scmId.get());
       scmStore.initialize();
-
+      //TODO: HDDS-6897
+      //Disabling Ratis for only of MiniOzoneClusterImpl.
+      //MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
+      if (Strings.isNotEmpty(conf.get(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY))
+              && SCMHAUtils.isSCMHAEnabled(conf)) {
+        scmStore.setSCMHAFlag(true);
+        scmStore.persistCurrentState();
+        SCMRatisServerImpl.initialize(clusterId, scmId.get(),
+                SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
+                        .getLocalNodeDetails(), conf);
+      }
     }
 
     void initializeOmStorage(OMStorage omStorage) throws IOException {

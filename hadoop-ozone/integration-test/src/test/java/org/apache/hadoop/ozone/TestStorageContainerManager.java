@@ -24,6 +24,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -75,11 +76,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServerConfigKeys;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.Timeout;
 import org.mockito.ArgumentMatcher;
@@ -148,6 +145,11 @@ public class TestStorageContainerManager {
     if (xceiverClientManager != null) {
       xceiverClientManager.close();
     }
+  }
+
+  @After
+  public void cleanupDefaults() {
+    DefaultConfigManager.clearDefaultConfigs();
   }
 
   @Test
@@ -491,7 +493,7 @@ public class TestStorageContainerManager {
     StorageContainerManager.scmInit(conf, testClusterId);
     Assert.assertEquals(NodeType.SCM, scmStore.getNodeType());
     Assert.assertEquals(testClusterId, scmStore.getClusterID());
-    Assert.assertFalse(scmStore.isSCMHAEnabled());
+    Assert.assertTrue(scmStore.isSCMHAEnabled());
   }
 
   @Test
@@ -543,6 +545,7 @@ public class TestStorageContainerManager {
         UUID.randomUUID().toString());
     Path scmPath = Paths.get(path, "scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     //This will set the cluster id in the version file
     final UUID clusterId = UUID.randomUUID();
       // This will initialize SCM
@@ -552,7 +555,11 @@ public class TestStorageContainerManager {
     Assert.assertEquals(clusterId.toString(), scmStore.getClusterID());
     Assert.assertFalse(scmStore.isSCMHAEnabled());
 
+
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    // Non Ratis SCM -> Ratis SCM is not supported {@see HDDS-6695}
+    FileUtils.deleteDirectory(scmStore.getCurrentDir());
+    DefaultConfigManager.clearDefaultConfigs();
     StorageContainerManager.scmInit(conf, clusterId.toString());
     scmStore = new SCMStorageConfig(conf);
     Assert.assertTrue(scmStore.isSCMHAEnabled());
@@ -599,7 +606,10 @@ public class TestStorageContainerManager {
           "Could not find any ratis group with id " + raftGroupId);
     }
   }
-  @Test
+
+  // Non Ratis SCM -> Ratis SCM is not supported {@see HDDS-6695}
+  // Invalid Testcase
+  // @Test
   public void testSCMReinitializationWithHAEnabled() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
@@ -607,7 +617,6 @@ public class TestStorageContainerManager {
         UUID.randomUUID().toString());
     Path scmPath = Paths.get(path, "scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     //This will set the cluster id in the version file
     MiniOzoneCluster cluster =
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
@@ -622,9 +631,11 @@ public class TestStorageContainerManager {
       } catch (IOException ioe) {
         // Exception is expected here
       }
+
       conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
       // This will re-initialize SCM
       StorageContainerManager.scmInit(conf, clusterId);
+      cluster.getStorageContainerManager().start();
       // Ratis group with cluster id exists now
       validateRatisGroupExists(conf, clusterId);
       SCMStorageConfig scmStore = new SCMStorageConfig(conf);
