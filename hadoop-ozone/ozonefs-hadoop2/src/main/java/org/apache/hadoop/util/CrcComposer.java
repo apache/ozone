@@ -83,12 +83,35 @@ public class CrcComposer {
     public static CrcComposer newStripedCrcComposer(
             DataChecksum.Type type, long bytesPerCrcHint, long stripeLength)
             throws IOException {
-        int polynomial = DataChecksum.getCrcPolynomialForType(type);
+        int polynomial = getCrcPolynomialForType(type);
         return new CrcComposer(
                 polynomial,
                 CrcUtil.getMonomial(bytesPerCrcHint, polynomial),
                 bytesPerCrcHint,
                 stripeLength);
+    }
+
+    /**
+     * getCrcPolynomialForType.
+     *
+     * This method is copied from Hadoop3's DataChecksum.getCrcPolynomialForType().
+     *
+     * @param type type.
+     * @return the int representation of the polynomial associated with the
+     *     CRC {@code type}, suitable for use with further CRC arithmetic.
+     * @throws IOException if there is no CRC polynomial applicable
+     *     to the given {@code type}.
+     */
+    public static int getCrcPolynomialForType(DataChecksum.Type type) throws IOException {
+        switch (type) {
+            case CRC32:
+                return CrcUtil.GZIP_POLYNOMIAL;
+            case CRC32C:
+                return CrcUtil.CASTAGNOLI_POLYNOMIAL;
+            default:
+                throw new IOException(
+                        "No CRC polynomial could be associated with type: " + type);
+        }
     }
 
     CrcComposer(
