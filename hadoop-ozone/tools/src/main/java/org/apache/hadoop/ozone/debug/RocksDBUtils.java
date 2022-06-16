@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.debug;
 
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.Options;
-import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
 import java.util.ArrayList;

@@ -902,7 +902,8 @@ public final class OMFileRequest {
     // Check dirTable entries for any sub paths.
     String seekDirInDB = metaMgr.getOzonePathKey(volumeId, bucketId,
             omKeyInfo.getObjectID(), "");
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
+    try (TableIterator<String, ? extends
+        Table.KeyValue<String, OmDirectoryInfo>>
             iterator = dirTable.iterator()) {
 
       iterator.seek(seekDirInDB);
@@ -910,7 +911,8 @@ public final class OMFileRequest {
       if (iterator.hasNext()) {
         Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
         OmDirectoryInfo dirInfo = entry.getValue();
-        return isImmediateChild(dirInfo.getParentObjectID(), omKeyInfo.getObjectID());
+        return isImmediateChild(dirInfo.getParentObjectID(),
+            omKeyInfo.getObjectID());
       }
 
     }
@@ -955,7 +957,8 @@ public final class OMFileRequest {
       if (iterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
         OmKeyInfo fileInfo = entry.getValue();
-        return isImmediateChild(fileInfo.getParentObjectID(), omKeyInfo.getObjectID()); // found a sub path file
+        return isImmediateChild(fileInfo.getParentObjectID(),
+            omKeyInfo.getObjectID()); // found a sub path file
       }
     }
     return false; // no sub paths found

@@ -1752,7 +1752,8 @@ public class KeyManagerImpl implements KeyManager {
         metadataManager.getLock()
             .acquireReadLock(BUCKET_LOCK, volumeName, bucketName);
         try {
-          BucketLayout bucketLayout = getBucketLayout(metadataManager, volumeName, bucketName);
+          BucketLayout bucketLayout = getBucketLayout(
+              metadataManager, volumeName, bucketName);
           iterator = metadataManager.getKeyTable(bucketLayout).iterator();
           countEntries =
               getFilesAndDirsFromCacheWithBucket(volumeName, bucketName,
@@ -1766,7 +1767,8 @@ public class KeyManagerImpl implements KeyManager {
         }
         countEntries =
             getFilesFromDirectory(cacheFileMap, seekFileInDB, prefixPath,
-                prefixKeyInDB, countEntries, numEntries, deletedKeySet, iterator);
+                prefixKeyInDB, countEntries, numEntries, deletedKeySet,
+                iterator);
 
       } else {
         /*
@@ -1850,8 +1852,8 @@ public class KeyManagerImpl implements KeyManager {
                   .iterator();
               countEntries = getFilesAndDirsFromCacheWithBucket(volumeName,
                   bucketName, cacheFileMap, tempCacheDirMap, deletedKeySet,
-                  prefixKeyInDB, seekFileInDB, seekDirInDB, prefixPath, startKey,
-                  countEntries, numEntries);
+                  prefixKeyInDB, seekFileInDB, seekDirInDB, prefixPath,
+                  startKey, countEntries, numEntries);
             } finally {
               metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
                   bucketName);

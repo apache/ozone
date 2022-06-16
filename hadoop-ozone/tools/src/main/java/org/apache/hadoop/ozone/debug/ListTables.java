@@ -26,8 +26,6 @@ import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.kohsuke.MetaInfServices;
-import org.rocksdb.Options;
-import org.rocksdb.RocksDB;
 import picocli.CommandLine;
 
 /**
