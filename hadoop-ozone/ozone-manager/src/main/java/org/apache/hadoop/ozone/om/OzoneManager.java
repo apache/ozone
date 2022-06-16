@@ -2969,7 +2969,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public String getOmRatisRoles() {
     List<ServiceInfo> serviceList = null;
-    StringBuilder sb = new StringBuilder();
     try {
       serviceList = getServiceList();
     } catch (IOException e) {
