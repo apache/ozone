@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -81,6 +82,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -777,7 +780,8 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testGetStalePipelines() throws IOException {
-    SCMHADBTransactionBuffer buffer = new SCMHADBTransactionBufferStub(dbStore);
+    SCMHADBTransactionBuffer buffer =
+            new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
             spy(createPipelineManager(true, buffer));
 
@@ -845,6 +849,29 @@ public class TestPipelineManagerImpl {
     Assertions.assertEquals(2, pipelineList2.size());
     Assertions.assertEquals(pipelines.get(0), pipelineList2.get(0));
     Assertions.assertEquals(pipelines.get(3), pipelineList2.get(1));
+  }
+
+  @Test
+  public void testCloseStalePipelines() throws IOException {
+    SCMHADBTransactionBuffer buffer =
+            new SCMHADBTransactionBufferStub(dbStore);
+    PipelineManagerImpl pipelineManager =
+            spy(createPipelineManager(true, buffer));
+
+    Pipeline pipeline0 = mock(Pipeline.class);
+    Pipeline pipeline1 = mock(Pipeline.class);
+    when(pipeline0.getId()).thenReturn(mock(PipelineID.class));
+    when(pipeline1.getId()).thenReturn(mock(PipelineID.class));
+    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
+    List<Pipeline> stalePipelines = Lists.newArrayList(pipeline0, pipeline1);
+    doReturn(stalePipelines).when(pipelineManager)
+            .getStalePipelines(datanodeDetails);
+
+    pipelineManager.closeStalePipelines(datanodeDetails);
+    verify(pipelineManager, times(1))
+            .closePipeline(stalePipelines.get(0), false);
+    verify(pipelineManager, times(1))
+            .closePipeline(stalePipelines.get(1), false);
   }
 
   public void testCreatePipelineForRead() throws IOException {
