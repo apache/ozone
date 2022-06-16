@@ -153,58 +153,59 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private OMResponse processRequest(OMRequest request) throws
       ServiceException {
     OMClientRequest omClientRequest = null;
-    if (isRatisEnabled) {
-      boolean s3Auth = false;
-      try {
-        // If Request has S3Authentication validate S3 credentials
-        // if current OM is leader and then proceed with processing the request.
-        if (request.hasS3Authentication()) {
+
+    boolean s3Auth = false;
+    try {
+      if (request.hasS3Authentication()) {
+        OzoneManager.setS3Auth(request.getS3Authentication());
+        try {
           s3Auth = true;
+          // If Request has S3Authentication validate S3 credentials
+          // if current OM is leader and then proceed with
+          // processing the request.
           S3SecurityUtil.validateS3Credential(request, ozoneManager);
-        }
-      } catch (IOException ex) {
-        // If validate credentials fail return error OM Response.
-        return createErrorResponse(request, ex);
-      }
-      // Check if the request is a read only request
-      if (OmUtils.isReadOnly(request)) {
-        try {
-          if (request.hasS3Authentication()) {
-            ozoneManager.setS3Auth(request.getS3Authentication());
-          }
-          return submitReadRequestToOM(request);
-        } finally {
-          ozoneManager.setS3Auth(null);
-        }
-      } else {
-        // To validate credentials we have already verified leader status.
-        // This will skip of checking leader status again if request has S3Auth.
-        if (!s3Auth) {
-          OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
-        }
-        try {
-          omClientRequest =
-              createClientRequest(request, ozoneManager);
-          // TODO: Note: Due to HDDS-6055, createClientRequest() could now
-          //  return null, which triggered the findbugs warning.
-          //  Added the assertion.
-          assert (omClientRequest != null);
-          request = omClientRequest.preExecute(ozoneManager);
         } catch (IOException ex) {
-          // As some of the preExecute returns error. So handle here.
-          if (omClientRequest != null) {
-            omClientRequest.handleRequestFailure(ozoneManager);
-          }
+          // If validate credentials fail return error OM Response.
           return createErrorResponse(request, ex);
         }
-        OMResponse response = submitRequestToRatis(request);
-        if (!response.getSuccess()) {
-          omClientRequest.handleRequestFailure(ozoneManager);
-        }
-        return response;
       }
-    } else {
-      return submitRequestDirectlyToOM(request);
+      if (isRatisEnabled) {
+        // Check if the request is a read only request
+        if (OmUtils.isReadOnly(request)) {
+          return submitReadRequestToOM(request);
+        } else {
+          // To validate credentials we have already verified leader status.
+          // This will skip of checking leader status again if request has
+          // S3Auth.
+          if (!s3Auth) {
+            OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
+          }
+          try {
+            omClientRequest =
+                createClientRequest(request, ozoneManager);
+            // TODO: Note: Due to HDDS-6055, createClientRequest() could now
+            //  return null, which triggered the findbugs warning.
+            //  Added the assertion.
+            assert (omClientRequest != null);
+            request = omClientRequest.preExecute(ozoneManager);
+          } catch (IOException ex) {
+            // As some of the preExecute returns error. So handle here.
+            if (omClientRequest != null) {
+              omClientRequest.handleRequestFailure(ozoneManager);
+            }
+            return createErrorResponse(request, ex);
+          }
+          OMResponse response = submitRequestToRatis(request);
+          if (!response.getSuccess()) {
+            omClientRequest.handleRequestFailure(ozoneManager);
+          }
+          return response;
+        }
+      } else {
+        return submitRequestDirectlyToOM(request);
+      }
+    } finally {
+      OzoneManager.setS3Auth(null);
     }
   }
 
@@ -271,20 +272,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     OMClientResponse omClientResponse = null;
     long index = 0L;
     try {
-      // If Request has S3Authentication validate S3 credentials and
-      // then proceed with processing the request.
-      if (request.hasS3Authentication()) {
-        S3SecurityUtil.validateS3Credential(request, ozoneManager);
-      }
       if (OmUtils.isReadOnly(request)) {
-        try {
-          if (request.hasS3Authentication()) {
-            ozoneManager.setS3Auth(request.getS3Authentication());
-          }
-          return handler.handleReadRequest(request);
-        } finally {
-          ozoneManager.setS3Auth(null);
-        }
+        return handler.handleReadRequest(request);
       } else {
         OMClientRequest omClientRequest =
             createClientRequest(request, ozoneManager);
