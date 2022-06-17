@@ -23,6 +23,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
 import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,9 +48,10 @@ public class ReconPipelineReportHandler extends PipelineReportHandler {
 
   public ReconPipelineReportHandler(SafeModeManager scmSafeModeManager,
       PipelineManager pipelineManager,
+      SCMContext scmContext,
       ConfigurationSource conf,
       StorageContainerServiceProvider scmServiceProvider) {
-    super(scmSafeModeManager, pipelineManager, conf);
+    super(scmSafeModeManager, pipelineManager, scmContext, conf);
     this.scmServiceProvider = scmServiceProvider;
   }
 
@@ -61,14 +64,29 @@ public class ReconPipelineReportHandler extends PipelineReportHandler {
     PipelineID pipelineID = PipelineID.getFromProtobuf(report.getPipelineID());
     if (!reconPipelineManager.containsPipeline(pipelineID)) {
       LOG.info("Unknown pipeline {}. Trying to get from SCM.", pipelineID);
-      Pipeline pipelineFromScm =
-          scmServiceProvider.getPipeline(report.getPipelineID());
+      Pipeline pipelineFromScm;
+
+      try {
+        pipelineFromScm =
+            scmServiceProvider.getPipeline(report.getPipelineID());
+      } catch (IOException ex) {
+        if (ex instanceof RemoteException) {
+          IOException ioe = ((RemoteException) ex)
+                  .unwrapRemoteException(PipelineNotFoundException.class);
+          if (ioe instanceof PipelineNotFoundException) {
+            LOG.error("Could not find pipeline {} at SCM.", pipelineID);
+            throw new PipelineNotFoundException();
+          }
+        }
+        throw ex;
+      }
+
       LOG.info("Adding new pipeline {} to Recon pipeline metadata.",
           pipelineFromScm);
       reconPipelineManager.addPipeline(pipelineFromScm);
     }
 
-    Pipeline pipeline = null;
+    Pipeline pipeline;
     try {
       pipeline = reconPipelineManager.getPipeline(pipelineID);
     } catch (PipelineNotFoundException ex) {
@@ -80,7 +98,7 @@ public class ReconPipelineReportHandler extends PipelineReportHandler {
     setPipelineLeaderId(report, pipeline, dn);
 
     if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
-      LOG.info("Pipeline {} {} reported by {}", pipeline.getFactor(),
+      LOG.info("Pipeline {} {} reported by {}", pipeline.getReplicationConfig(),
           pipeline.getId(), dn);
       if (pipeline.isHealthy()) {
         reconPipelineManager.openPipeline(pipelineID);

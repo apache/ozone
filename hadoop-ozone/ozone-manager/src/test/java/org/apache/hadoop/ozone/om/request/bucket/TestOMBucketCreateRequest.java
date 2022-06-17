@@ -22,7 +22,8 @@ package org.apache.hadoop.ozone.om.request.bucket;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -35,7 +36,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .StorageTypeProto;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
@@ -74,7 +75,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    OMRequest originalRequest = TestOMRequestUtils.createBucketRequest(
+    OMRequest originalRequest = OMRequestTestUtils.createBucketRequest(
         bucketName, volumeName, false, StorageTypeProto.SSD);
 
     OMBucketCreateRequest omBucketCreateRequest =
@@ -100,7 +101,6 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     Assert.assertNull(omMetadataManager.getBucketTable().get(bucketKey));
   }
 
-
   @Test
   public void testValidateAndUpdateCacheWithBucketAlreadyExists()
       throws Exception {
@@ -124,12 +124,27 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
         omResponse.getStatus());
   }
 
+  @Test
+  public void testValidateAndUpdateCacheVerifyBucketLayout() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    OMBucketCreateRequest omBucketCreateRequest = doPreExecute(volumeName,
+        bucketName);
+
+    doValidateAndUpdateCache(volumeName, bucketName,
+        omBucketCreateRequest.getOmRequest());
+
+    Assert.assertEquals(BucketLayout.LEGACY,
+        omMetadataManager.getBucketTable().get(bucketKey).getBucketLayout());
+  }
 
   private OMBucketCreateRequest doPreExecute(String volumeName,
       String bucketName) throws Exception {
     addCreateVolumeToTable(volumeName, omMetadataManager);
     OMRequest originalRequest =
-        TestOMRequestUtils.createBucketRequest(bucketName, volumeName, false,
+        OMRequestTestUtils.createBucketRequest(bucketName, volumeName, false,
             StorageTypeProto.SSD);
 
     OMBucketCreateRequest omBucketCreateRequest =
@@ -186,7 +201,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
 
   }
 
-  private void verifyRequest(OMRequest modifiedOmRequest,
+  protected void verifyRequest(OMRequest modifiedOmRequest,
       OMRequest originalRequest) {
     OzoneManagerProtocolProtos.BucketInfo original =
         originalRequest.getCreateBucketRequest().getBucketInfo();
@@ -217,6 +232,6 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
         OmVolumeArgs.newBuilder().setCreationTime(Time.now())
             .setVolume(volumeName).setAdminName(UUID.randomUUID().toString())
             .setOwnerName(UUID.randomUUID().toString()).build();
-    TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+    OMRequestTestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
   }
 }

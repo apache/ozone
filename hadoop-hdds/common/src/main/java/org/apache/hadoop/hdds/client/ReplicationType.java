@@ -26,7 +26,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 public enum ReplicationType {
   RATIS,
   STAND_ALONE,
-  CHAINED;
+  CHAINED,
+  EC;
 
   public static ReplicationType fromProto(
       HddsProtos.ReplicationType replicationType) {
@@ -40,9 +41,31 @@ public enum ReplicationType {
       return ReplicationType.STAND_ALONE;
     case CHAINED:
       return ReplicationType.CHAINED;
+    case EC:
+      return ReplicationType.EC;
     default:
       throw new IllegalArgumentException(
           "Unsupported ProtoBuf replication type: " + replicationType);
+    }
+  }
+
+  public static HddsProtos.ReplicationType toProto(
+       ReplicationType replicationType) {
+    if (replicationType == null) {
+      return null;
+    }
+    switch (replicationType) {
+    case RATIS:
+      return HddsProtos.ReplicationType.RATIS;
+    case STAND_ALONE:
+      return HddsProtos.ReplicationType.STAND_ALONE;
+    case CHAINED:
+      return HddsProtos.ReplicationType.CHAINED;
+    case EC:
+      return HddsProtos.ReplicationType.EC;
+    default:
+      throw new IllegalArgumentException(
+          "Unsupported replication type: " + replicationType);
     }
   }
 }

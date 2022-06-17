@@ -31,6 +31,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * {@link OzoneInputStream} for accessing MPU keys in encrypted buckets.
+ */
 public class MultipartCryptoKeyInputStream extends OzoneInputStream
     implements Seekable, CanUnbuffer {
 
@@ -168,6 +171,10 @@ public class MultipartCryptoKeyInputStream extends OzoneInputStream
                 "maintain Crypto buffer boundary limits", key, partIndex,
             actualNumBytesRead, numBytesRead, readPositionAdjustedBy,
             actualNumBytesRead - readPositionAdjustedBy);
+
+        if (readLengthAdjustedBy > 0) {
+          current.seek(current.getPos() - readLengthAdjustedBy);
+        }
 
         // Reset readPositionAdjustedBy and readLengthAdjustedBy
         readPositionAdjustedBy = 0;

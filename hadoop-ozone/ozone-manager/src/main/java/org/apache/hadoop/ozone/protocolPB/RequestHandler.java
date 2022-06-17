@@ -25,6 +25,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
     OMResponse;
 
+import java.io.IOException;
+
 /**
  * Handler to handleRequest the OmRequests.
  */
@@ -56,7 +58,7 @@ public interface RequestHandler {
    * @return OMClientResponse
    */
   OMClientResponse handleWriteRequest(OMRequest omRequest,
-      long transactionLogIndex);
+      long transactionLogIndex) throws IOException;
 
   /**
    * Update the OzoneManagerDoubleBuffer. This will be called when

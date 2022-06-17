@@ -31,7 +31,8 @@ import picocli.CommandLine;
     subcommands = {
         TestAllMiniChaosOzoneCluster.class,
         TestDatanodeMiniChaosOzoneCluster.class,
-        TestOzoneManagerMiniChaosOzoneCluster.class
+        TestOzoneManagerMiniChaosOzoneCluster.class,
+        TestStorageContainerManagerMiniChaosOzoneCluster.class
     },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)

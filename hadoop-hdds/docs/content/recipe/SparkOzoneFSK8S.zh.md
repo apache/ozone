@@ -77,7 +77,7 @@ kubectl cp om-0:/opt/hadoop/etc/hadoop/ozone-site.xml .
      </property>
 </configuration>
 ```
-kubectl cp om-0:/opt/hadoop/share/ozone/lib/hadoop-ozone-filesystem-hadoop2-VERSION.jar hadoop-ozone-filesystem-hadoop2.jar
+kubectl cp om-0:/opt/hadoop/share/ozone/lib/ozone-filesystem-hadoop2-VERSION.jar ozone-filesystem-hadoop2.jar
 ```
 
 
@@ -88,7 +88,7 @@ ADD core-site.xml /opt/hadoop/conf/core-site.xml
 ADD ozone-site.xml /opt/hadoop/conf/ozone-site.xml
 ENV HADOOP_CONF_DIR=/opt/hadoop/conf
 ENV SPARK_EXTRA_CLASSPATH=/opt/hadoop/conf
-ADD hadoop-ozone-filesystem-hadoop2.jar /opt/hadoop-ozone-filesystem-hadoop2.jar
+ADD ozone-filesystem-hadoop2.jar /opt/ozone-filesystem-hadoop2.jar
 ```
 
 ```bash
@@ -140,7 +140,7 @@ bin/spark-submit \
     --conf spark.kubernetes.authenticate.driver.serviceAccountName=spark \
     --conf spark.kubernetes.container.image=myrepo/spark-ozone \
     --conf spark.kubernetes.container.image.pullPolicy=Always \
-    --jars /opt/hadoop-ozone-filesystem-hadoop2.jar \
+    --jars /opt/ozone-filesystem-hadoop2.jar \
     local:///opt/spark/examples/jars/spark-examples_2.11-2.4.0.jar \
     o3fs://test.s3v.ozone-om-0.ozone-om:9862/alice.txt
 ```

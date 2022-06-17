@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.ozone.client;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 
 import java.time.Instant;
@@ -52,15 +55,14 @@ public class OzoneKey {
    */
   private Instant modificationTime;
 
-  private ReplicationType replicationType;
-
-  private int replicationFactor;
+  private ReplicationConfig replicationConfig;
 
   /**
    * Constructs OzoneKey from OmKeyInfo.
    *
    */
   @SuppressWarnings("parameternumber")
+  @Deprecated
   public OzoneKey(String volumeName, String bucketName,
                   String keyName, long size, long creationTime,
                   long modificationTime, ReplicationType type,
@@ -71,8 +73,25 @@ public class OzoneKey {
     this.dataSize = size;
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
-    this.replicationType = type;
-    this.replicationFactor = replicationFactor;
+    this.replicationConfig = ReplicationConfig.fromTypeAndFactor(type,
+            ReplicationFactor.valueOf(replicationFactor));
+  }
+
+  /**
+   * Constructs OzoneKey from OmKeyInfo.
+   *
+   */
+  @SuppressWarnings("parameternumber")
+  public OzoneKey(String volumeName, String bucketName,
+                  String keyName, long size, long creationTime,
+                  long modificationTime, ReplicationConfig replicationConfig) {
+    this.volumeName = volumeName;
+    this.bucketName = bucketName;
+    this.name = keyName;
+    this.dataSize = size;
+    this.creationTime = Instant.ofEpochMilli(creationTime);
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
+    this.replicationConfig = replicationConfig;
   }
 
   /**
@@ -89,7 +108,7 @@ public class OzoneKey {
    *
    * @return bucketName
    */
-  public String getBucketName(){
+  public String getBucketName() {
     return bucketName;
   }
 
@@ -134,17 +153,22 @@ public class OzoneKey {
    *
    * @return replicationType
    */
+
+  @Deprecated
+  @JsonIgnore
   public ReplicationType getReplicationType() {
-    return replicationType;
+    return ReplicationType
+            .fromProto(replicationConfig.getReplicationType());
   }
 
-  /**
-   * Returns the replication factor of the key.
-   *
-   * @return replicationFactor
-   */
+  @Deprecated
+  @JsonIgnore
   public int getReplicationFactor() {
-    return replicationFactor;
+    return replicationConfig.getRequiredNodes();
+  }
+
+  public ReplicationConfig getReplicationConfig() {
+    return replicationConfig;
   }
 
 }

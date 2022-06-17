@@ -21,7 +21,7 @@
  * Please see http://wiki.apache.org/hadoop/Compatibility
  * for what changes are allowed for a *unstable* .proto interface.
  */
-
+syntax = "proto2";
 option java_package = "org.apache.hadoop.hdds.protocol.proto";
 option java_outer_classname = "ScmBlockLocationProtocolProtos";
 option java_generic_services = true;
@@ -38,6 +38,7 @@ enum Type {
   DeleteScmKeyBlocks = 12;
   GetScmInfo         = 13;
   SortDatanodes      = 14;
+  AddScm             = 15;
 }
 
 message SCMBlockLocationRequest {
@@ -54,6 +55,7 @@ message SCMBlockLocationRequest {
   optional DeleteScmKeyBlocksRequestProto     deleteScmKeyBlocksRequest = 12;
   optional hadoop.hdds.GetScmInfoRequestProto getScmInfoRequest         = 13;
   optional SortDatanodesRequestProto          sortDatanodesRequest      = 14;
+  optional hadoop.hdds.AddScmRequestProto     addScmRequestProto       = 15;
 }
 
 message SCMBlockLocationResponse {
@@ -71,10 +73,13 @@ message SCMBlockLocationResponse {
 
   optional string leaderOMNodeId = 6;
 
+  optional string leaderSCMNodeId = 7;
+
   optional AllocateScmBlockResponseProto       allocateScmBlockResponse   = 11;
   optional DeleteScmKeyBlocksResponseProto     deleteScmKeyBlocksResponse = 12;
   optional hadoop.hdds.GetScmInfoResponseProto getScmInfoResponse         = 13;
   optional SortDatanodesResponseProto          sortDatanodesResponse      = 14;
+  optional hadoop.hdds.AddScmResponseProto     addScmResponse        = 15;
 }
 
 /**
@@ -117,6 +122,14 @@ enum Status {
   INTERNAL_ERROR = 29;
   FAILED_TO_INIT_PIPELINE_CHOOSE_POLICY = 30;
   FAILED_TO_INIT_LEADER_CHOOSE_POLICY = 31;
+  SCM_NOT_LEADER = 32;
+  FAILED_TO_REVOKE_CERTIFICATES = 33;
+  PIPELINE_NOT_FOUND = 34;
+  UNKNOWN_PIPELINE_STATE = 35;
+  CONTAINER_NOT_FOUND = 36;
+  CONTAINER_REPLICA_NOT_FOUND = 37;
+  FAILED_TO_CONNECT_TO_CRL_SERVICE = 38;
+  FAILED_TO_ADD_CRL_CLIENT = 39;
 }
 
 /**
@@ -126,9 +139,13 @@ message AllocateScmBlockRequestProto {
   required uint64 size = 1;
   required uint32 numBlocks = 2;
   required ReplicationType type = 3;
-  required hadoop.hdds.ReplicationFactor factor = 4;
+  optional hadoop.hdds.ReplicationFactor factor = 4;
   required string owner = 5;
   optional ExcludeListProto excludeList = 7;
+
+  //used for EC replicaiton instead of the replication factor
+  optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 8;
+
 }
 
 /**

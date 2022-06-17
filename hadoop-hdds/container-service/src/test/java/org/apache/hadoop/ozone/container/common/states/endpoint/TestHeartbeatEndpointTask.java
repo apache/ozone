@@ -18,18 +18,26 @@
 
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+
 import java.net.InetSocketAddress;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -96,7 +104,7 @@ public class TestHeartbeatEndpointTask {
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
-    context.addReport(NodeReportProto.getDefaultInstance());
+    context.refreshFullReport(NodeReportProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
     Assert.assertTrue(heartbeat.hasDatanodeDetails());
@@ -128,7 +136,7 @@ public class TestHeartbeatEndpointTask {
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
-    context.addReport(ContainerReportsProto.getDefaultInstance());
+    context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
     Assert.assertTrue(heartbeat.hasDatanodeDetails());
@@ -160,7 +168,8 @@ public class TestHeartbeatEndpointTask {
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
-    context.addReport(CommandStatusReportsProto.getDefaultInstance());
+    context.addIncrementalReport(
+        CommandStatusReportsProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
     Assert.assertTrue(heartbeat.hasDatanodeDetails());
@@ -205,8 +214,19 @@ public class TestHeartbeatEndpointTask {
   @Test
   public void testheartbeatWithAllReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanodeStateMachine =
+        Mockito.mock(DatanodeStateMachine.class);
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
-        Mockito.mock(DatanodeStateMachine.class));
+        datanodeStateMachine);
+
+    // Return a Map of command counts when the heartbeat logic requests it
+    final Map<SCMCommandProto.Type, Integer> commands = new HashMap<>();
+    int count = 1;
+    for (SCMCommandProto.Type cmd : SCMCommandProto.Type.values()) {
+      commands.put(cmd, count++);
+    }
+    Mockito.when(datanodeStateMachine.getQueuedCommandCount())
+        .thenReturn(commands);
 
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
         Mockito.mock(
@@ -224,9 +244,10 @@ public class TestHeartbeatEndpointTask {
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
-    context.addReport(NodeReportProto.getDefaultInstance());
-    context.addReport(ContainerReportsProto.getDefaultInstance());
-    context.addReport(CommandStatusReportsProto.getDefaultInstance());
+    context.refreshFullReport(NodeReportProto.getDefaultInstance());
+    context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
+    context.addIncrementalReport(
+        CommandStatusReportsProto.getDefaultInstance());
     context.addContainerAction(getContainerAction());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
@@ -235,6 +256,14 @@ public class TestHeartbeatEndpointTask {
     Assert.assertTrue(heartbeat.hasContainerReport());
     Assert.assertTrue(heartbeat.getCommandStatusReportsCount() != 0);
     Assert.assertTrue(heartbeat.hasContainerActions());
+    Assert.assertTrue(heartbeat.hasCommandQueueReport());
+    CommandQueueReportProto queueCount = heartbeat.getCommandQueueReport();
+    Assert.assertEquals(queueCount.getCommandCount(), commands.size());
+    Assert.assertEquals(queueCount.getCountCount(), commands.size());
+    for (int i = 0; i < commands.size(); i++) {
+      Assert.assertEquals(commands.get(queueCount.getCommand(i)).intValue(),
+          queueCount.getCount(i));
+    }
   }
 
   /**
@@ -277,10 +306,17 @@ public class TestHeartbeatEndpointTask {
     Mockito.when(endpointStateMachine.getEndPoint()).thenReturn(proxy);
     Mockito.when(endpointStateMachine.getAddress())
         .thenReturn(TEST_SCM_ENDPOINT);
+    HDDSLayoutVersionManager layoutVersionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(layoutVersionManager.getSoftwareLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+    Mockito.when(layoutVersionManager.getMetadataLayoutVersion())
+        .thenReturn(maxLayoutVersion());
     return HeartbeatEndpointTask.newBuilder()
         .setConfig(conf)
         .setDatanodeDetails(datanodeDetails)
         .setContext(context)
+        .setLayoutVersionManager(layoutVersionManager)
         .setEndpointStateMachine(endpointStateMachine)
         .build();
   }

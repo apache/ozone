@@ -59,6 +59,13 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
           " be removed in later versions.")
   private static int numOzoneManagers = 1;
 
+  @Option(names = {"-s", "--num-storage-container-manager",
+      "--numStorageContainerManagers"},
+      description = "num of storageContainerManagers." +
+          "Full name --numStorageContainerManagers will" +
+          " be removed in later versions.")
+  private static int numStorageContainerManagerss = 1;
+
   @Option(names = {"-t", "--num-threads", "--numThreads"},
       description = "num of IO threads. Full name --numThreads will be" +
           " removed in later versions.")
@@ -88,8 +95,10 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   private static MiniOzoneLoadGenerator loadGenerator;
 
   private static String omServiceId = null;
+  private static String scmServiceId = null;
 
   private static final String OM_SERVICE_ID = "ozoneChaosTest";
+  private static final String SCM_SERVICE_ID = "scmChaosTest";
 
   @BeforeClass
   public static void init() throws Exception {
@@ -102,6 +111,8 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
         .setNumDatanodes(numDatanodes)
         .setNumOzoneManagers(numOzoneManagers)
         .setOMServiceID(omServiceId)
+        .setNumStorageContainerManagers(numStorageContainerManagerss)
+        .setSCMServiceID(scmServiceId)
         .setNumDataVolumes(numDataVolumes);
     failureClasses.forEach(chaosBuilder::addFailures);
 
@@ -136,12 +147,17 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     numDatanodes = nDns;
   }
 
-  static void setNumOzoneManagers(int nOms, boolean enableHA) {
+  static void setNumManagers(int nOms, int numScms, boolean enableHA) {
 
     if (nOms > 1 || enableHA) {
       omServiceId = OM_SERVICE_ID;
     }
     numOzoneManagers = nOms;
+
+    if (numScms > 1 || enableHA) {
+      scmServiceId = SCM_SERVICE_ID;
+    }
+    numStorageContainerManagerss = numScms;
   }
 
   /**

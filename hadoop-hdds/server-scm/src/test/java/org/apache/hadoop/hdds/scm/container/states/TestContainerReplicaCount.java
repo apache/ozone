@@ -24,11 +24,14 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
-import org.junit.Before;
-import org.junit.Test;
-import java.util.*;
-import static junit.framework.TestCase.assertEquals;
-import static junit.framework.TestCase.assertTrue;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.HashSet;
+import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos
@@ -42,14 +45,14 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos
 import static org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
-import static org.junit.Assert.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Class used to test the ContainerReplicaCount class.
  */
 public class TestContainerReplicaCount {
 
-  @Before
+  @BeforeEach
   public void setup() {
   }
 
@@ -404,7 +407,7 @@ public class TestContainerReplicaCount {
       DatanodeDetails dn = r.getDatanodeDetails();
 
       ContainerReplica replace = new ContainerReplica.ContainerReplicaBuilder()
-          .setContainerID(new ContainerID(1))
+          .setContainerID(ContainerID.valueOf(1))
           .setContainerState(OPEN)
           .setDatanodeDetails(dn)
           .setOriginNodeId(dn.getUuid())
@@ -431,6 +434,16 @@ public class TestContainerReplicaCount {
     assertTrue(rcnt.isHealthy());
   }
 
+  @Test
+  public void testContainerWithNoReplicasIsMissing() {
+    Set<ContainerReplica> replica = new HashSet<>();
+    ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
+    ContainerReplicaCount rcnt =
+        new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
+    assertTrue(rcnt.isMissing());
+    assertFalse(rcnt.isSufficientlyReplicated());
+  }
+
   private void validate(ContainerReplicaCount rcnt,
       boolean sufficientlyReplicated, int replicaDelta,
       boolean overReplicated) {
@@ -446,7 +459,7 @@ public class TestContainerReplicaCount {
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       dn.setPersistedOpState(s);
       replica.add(new ContainerReplica.ContainerReplicaBuilder()
-          .setContainerID(new ContainerID(1))
+          .setContainerID(ContainerID.valueOf(1))
           .setContainerState(CLOSED)
           .setDatanodeDetails(dn)
           .setOriginNodeId(dn.getUuid())
@@ -458,7 +471,7 @@ public class TestContainerReplicaCount {
 
   private ContainerInfo createContainer(HddsProtos.LifeCycleState state) {
     return new ContainerInfo.Builder()
-        .setContainerID(new ContainerID(1).getId())
+        .setContainerID(ContainerID.valueOf(1).getId())
         .setState(state)
         .build();
   }

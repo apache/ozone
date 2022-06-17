@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Container placement policy that choose datanodes with network topology
@@ -49,12 +50,12 @@ import java.util.List;
 public final class SCMContainerPlacementRackAware
     extends SCMCommonPlacementPolicy {
   @VisibleForTesting
-  static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementRackAware.class);
   private final NetworkTopology networkTopology;
   private boolean fallback;
   private static final int RACK_LEVEL = 1;
-  private static final int MAX_RETRY= 3;
+  private static final int MAX_RETRY = 3;
   private final SCMContainerPlacementMetrics metrics;
   // Used to check the placement policy is validated in the parent class
   private static final int REQUIRED_RACKS = 2;
@@ -90,14 +91,16 @@ public final class SCMContainerPlacementRackAware
    *                     depends on whether the nodes meets the allocator's
    *                     requirement.
    * @param nodesRequired - number of datanodes required.
-   * @param sizeRequired - size required for the container or block.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
    * @return List of datanodes.
    * @throws SCMException  SCMException
    */
   @Override
   public List<DatanodeDetails> chooseDatanodes(
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      int nodesRequired, final long sizeRequired) throws SCMException {
+      int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
+      throws SCMException {
     Preconditions.checkArgument(nodesRequired > 0);
     metrics.incrDatanodeRequestCount(nodesRequired);
     int datanodeCount = networkTopology.getNumOfLeafNode(NetConstants.ROOT);
@@ -105,8 +108,8 @@ public final class SCMContainerPlacementRackAware
     if (datanodeCount < nodesRequired + excludedNodesCount) {
       throw new SCMException("No enough datanodes to choose. " +
           "TotalNode = " + datanodeCount +
-          "RequiredNode = " + nodesRequired +
-          "ExcludedNode = " + excludedNodesCount, null);
+          " RequiredNode = " + nodesRequired +
+          " ExcludedNode = " + excludedNodesCount, null);
     }
     List<DatanodeDetails> mutableFavoredNodes = favoredNodes;
     // sanity check of favoredNodes
@@ -115,22 +118,23 @@ public final class SCMContainerPlacementRackAware
       mutableFavoredNodes.addAll(favoredNodes);
       mutableFavoredNodes.removeAll(excludedNodes);
     }
-    int favoredNodeNum = mutableFavoredNodes == null? 0 :
+    int favoredNodeNum = mutableFavoredNodes == null ? 0 :
         mutableFavoredNodes.size();
 
-    List<Node> chosenNodes = new ArrayList<>();
+    List<DatanodeDetails> chosenNodes = new ArrayList<>();
     int favorIndex = 0;
     if (excludedNodes == null || excludedNodes.isEmpty()) {
       // choose all nodes for a new pipeline case
       // choose first datanode from scope ROOT or from favoredNodes if not null
-      Node favoredNode = favoredNodeNum > favorIndex ?
+      DatanodeDetails favoredNode = favoredNodeNum > favorIndex ?
           mutableFavoredNodes.get(favorIndex) : null;
-      Node firstNode;
+      DatanodeDetails firstNode;
       if (favoredNode != null) {
         firstNode = favoredNode;
         favorIndex++;
       } else {
-        firstNode = chooseNode(null, null, sizeRequired);
+        firstNode = chooseNode(null, null, metadataSizeRequired,
+            dataSizeRequired);
       }
       chosenNodes.add(firstNode);
       nodesRequired--;
@@ -141,13 +145,14 @@ public final class SCMContainerPlacementRackAware
       // choose second datanode on the same rack as first one
       favoredNode = favoredNodeNum > favorIndex ?
           mutableFavoredNodes.get(favorIndex) : null;
-      Node secondNode;
+      DatanodeDetails secondNode;
       if (favoredNode != null &&
           networkTopology.isSameParent(firstNode, favoredNode)) {
         secondNode = favoredNode;
         favorIndex++;
       } else {
-        secondNode = chooseNode(chosenNodes, firstNode, sizeRequired);
+        secondNode = chooseNode(chosenNodes, Arrays.asList(firstNode),
+            metadataSizeRequired, dataSizeRequired);
       }
       chosenNodes.add(secondNode);
       nodesRequired--;
@@ -156,26 +161,26 @@ public final class SCMContainerPlacementRackAware
       }
 
       // choose remaining datanodes on different rack as first and second
-      return chooseNodes(null, chosenNodes, mutableFavoredNodes, favorIndex,
-          nodesRequired, sizeRequired);
+      return chooseNodes(null, chosenNodes, mutableFavoredNodes,
+          favorIndex, nodesRequired, metadataSizeRequired, dataSizeRequired);
     } else {
-      List<Node> mutableExcludedNodes = new ArrayList<>();
+      List<DatanodeDetails> mutableExcludedNodes = new ArrayList<>();
       mutableExcludedNodes.addAll(excludedNodes);
       // choose node to meet replication requirement
       // case 1: one excluded node, choose one on the same rack as the excluded
       // node, choose others on different racks.
-      Node favoredNode;
+      DatanodeDetails favoredNode;
       if (excludedNodes.size() == 1) {
         favoredNode = favoredNodeNum > favorIndex ?
             mutableFavoredNodes.get(favorIndex) : null;
-        Node firstNode;
+        DatanodeDetails firstNode;
         if (favoredNode != null &&
             networkTopology.isSameParent(excludedNodes.get(0), favoredNode)) {
           firstNode = favoredNode;
           favorIndex++;
         } else {
-          firstNode = chooseNode(mutableExcludedNodes, excludedNodes.get(0),
-              sizeRequired);
+          firstNode = chooseNode(mutableExcludedNodes, excludedNodes,
+              metadataSizeRequired, dataSizeRequired);
         }
         chosenNodes.add(firstNode);
         nodesRequired--;
@@ -184,33 +189,35 @@ public final class SCMContainerPlacementRackAware
         }
         // choose remaining nodes on different racks
         return chooseNodes(null, chosenNodes, mutableFavoredNodes, favorIndex,
-            nodesRequired, sizeRequired);
+            nodesRequired, metadataSizeRequired, dataSizeRequired);
       }
       // case 2: two or more excluded nodes, if these two nodes are
       // in the same rack, then choose nodes on different racks, otherwise,
       // choose one on the same rack as one of excluded nodes, remaining chosen
       // are on different racks.
-      for(int i = 0; i < excludedNodesCount; i++) {
+      for (int i = 0; i < excludedNodesCount; i++) {
         for (int j = i + 1; j < excludedNodesCount; j++) {
           if (networkTopology.isSameParent(
               excludedNodes.get(i), excludedNodes.get(j))) {
             // choose remaining nodes on different racks
             return chooseNodes(mutableExcludedNodes, chosenNodes,
-                mutableFavoredNodes, favorIndex, nodesRequired, sizeRequired);
+                mutableFavoredNodes, favorIndex, nodesRequired,
+                metadataSizeRequired, dataSizeRequired);
           }
         }
       }
       // choose one data on the same rack with one excluded node
       favoredNode = favoredNodeNum > favorIndex ?
           mutableFavoredNodes.get(favorIndex) : null;
-      Node secondNode;
+      DatanodeDetails secondNode;
       if (favoredNode != null && networkTopology.isSameParent(
           mutableExcludedNodes.get(0), favoredNode)) {
         secondNode = favoredNode;
         favorIndex++;
       } else {
         secondNode =
-            chooseNode(chosenNodes, mutableExcludedNodes.get(0), sizeRequired);
+            chooseNode(chosenNodes, mutableExcludedNodes,
+                metadataSizeRequired, dataSizeRequired);
       }
       chosenNodes.add(secondNode);
       mutableExcludedNodes.add(secondNode);
@@ -220,7 +227,7 @@ public final class SCMContainerPlacementRackAware
       }
       // choose remaining nodes on different racks
       return chooseNodes(mutableExcludedNodes, chosenNodes, mutableFavoredNodes,
-          favorIndex, nodesRequired, sizeRequired);
+          favorIndex, nodesRequired, metadataSizeRequired, dataSizeRequired);
     }
   }
 
@@ -236,33 +243,49 @@ public final class SCMContainerPlacementRackAware
    *
    *
    * @param excludedNodes - list of the datanodes to excluded. Can be null.
-   * @param affinityNode - the chosen nodes should be on the same rack as
-   *                    affinityNode. Can be null.
-   * @param sizeRequired - size required for the container or block.
+   * @param affinityNodes - the chosen nodes should be on the same rack as
+   *                    affinityNodes. Can be null.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
    * @return List of chosen datanodes.
    * @throws SCMException  SCMException
    */
-  private Node chooseNode(List<Node> excludedNodes, Node affinityNode,
-      long sizeRequired) throws SCMException {
+  private DatanodeDetails chooseNode(List<DatanodeDetails> excludedNodes,
+      List<DatanodeDetails> affinityNodes, long metadataSizeRequired,
+      long dataSizeRequired) throws SCMException {
     int ancestorGen = RACK_LEVEL;
     int maxRetry = MAX_RETRY;
     List<String> excludedNodesForCapacity = null;
     boolean isFallbacked = false;
-    while(true) {
+    while (true) {
       metrics.incrDatanodeChooseAttemptCount();
-      Node node = networkTopology.chooseRandom(NetConstants.ROOT,
-          excludedNodesForCapacity, excludedNodes, affinityNode, ancestorGen);
+      DatanodeDetails node = null;
+      if (affinityNodes != null) {
+        for (Node affinityNode : affinityNodes) {
+          node = (DatanodeDetails)networkTopology.chooseRandom(
+              NetConstants.ROOT, excludedNodesForCapacity, excludedNodes,
+              affinityNode, ancestorGen);
+          if (node != null) {
+            break;
+          }
+        }
+      } else {
+        node = (DatanodeDetails)networkTopology.chooseRandom(NetConstants.ROOT,
+            excludedNodesForCapacity, excludedNodes, null, ancestorGen);
+      }
+
       if (node == null) {
         // cannot find the node which meets all constrains
         LOG.warn("Failed to find the datanode for container. excludedNodes:" +
             (excludedNodes == null ? "" : excludedNodes.toString()) +
             ", affinityNode:" +
-            (affinityNode == null ? "" : affinityNode.getNetworkFullPath()));
+            (affinityNodes == null ? "" : affinityNodes.stream()
+                .map(Object::toString).collect(Collectors.joining(", "))));
         if (fallback) {
           isFallbacked = true;
           // fallback, don't consider the affinity node
-          if (affinityNode != null) {
-            affinityNode = null;
+          if (affinityNodes != null) {
+            affinityNodes = null;
             continue;
           }
           // fallback, don't consider cross rack
@@ -275,28 +298,28 @@ public final class SCMContainerPlacementRackAware
         throw new SCMException("No satisfied datanode to meet the" +
             " excludedNodes and affinityNode constrains.", null);
       }
-      if (super.hasEnoughSpace((DatanodeDetails)node, sizeRequired)) {
-        LOG.debug("Datanode {} is chosen. Required size is {}",
-            node.toString(), sizeRequired);
+
+      if (isValidNode(node, metadataSizeRequired, dataSizeRequired)) {
         metrics.incrDatanodeChooseSuccessCount();
         if (isFallbacked) {
           metrics.incrDatanodeChooseFallbackCount();
         }
         return node;
-      } else {
-        maxRetry--;
-        if (maxRetry == 0) {
-          // avoid the infinite loop
-          String errMsg = "No satisfied datanode to meet the space constrains. "
-              + " sizeRequired: " + sizeRequired;
-          LOG.info(errMsg);
-          throw new SCMException(errMsg, null);
-        }
-        if (excludedNodesForCapacity == null) {
-          excludedNodesForCapacity = new ArrayList<>();
-        }
-        excludedNodesForCapacity.add(node.getNetworkFullPath());
       }
+
+      maxRetry--;
+      if (maxRetry == 0) {
+        // avoid the infinite loop
+        String errMsg = "No satisfied datanode to meet the space constrains. "
+            + "metadatadata size required: " + metadataSizeRequired +
+            " data size required: " + dataSizeRequired;
+        LOG.info(errMsg);
+        throw new SCMException(errMsg, null);
+      }
+      if (excludedNodesForCapacity == null) {
+        excludedNodesForCapacity = new ArrayList<>();
+      }
+      excludedNodesForCapacity.add(node.getNetworkFullPath());
     }
   }
 
@@ -312,30 +335,31 @@ public final class SCMContainerPlacementRackAware
    *                     are chosen depends on whether they meet the constrains.
    *                     Can be null.
    * @param favorIndex - the node index of favoredNodes which is not chosen yet.
-   * @param sizeRequired - size required for the container or block.
    * @param nodesRequired - number of datanodes required.
-   * @param sizeRequired - size required for the container or block.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
    * @return List of chosen datanodes.
    * @throws SCMException  SCMException
    */
-  private List<DatanodeDetails> chooseNodes(List<Node> excludedNodes,
-      List<Node> chosenNodes, List<DatanodeDetails> favoredNodes,
-      int favorIndex, int nodesRequired, long sizeRequired)
-      throws SCMException {
+  private List<DatanodeDetails> chooseNodes(List<DatanodeDetails> excludedNodes,
+      List<DatanodeDetails> chosenNodes, List<DatanodeDetails> favoredNodes,
+      int favorIndex, int nodesRequired, long metadataSizeRequired,
+      long dataSizeRequired) throws SCMException {
     Preconditions.checkArgument(chosenNodes != null);
-    List<Node> excludedNodeList = excludedNodes != null ?
+    List<DatanodeDetails> excludedNodeList = excludedNodes != null ?
         excludedNodes : chosenNodes;
-    int favoredNodeNum = favoredNodes == null? 0 : favoredNodes.size();
-    while(true) {
-      Node favoredNode = favoredNodeNum > favorIndex ?
+    int favoredNodeNum = favoredNodes == null ? 0 : favoredNodes.size();
+    while (true) {
+      DatanodeDetails favoredNode = favoredNodeNum > favorIndex ?
           favoredNodes.get(favorIndex) : null;
-      Node chosenNode;
+      DatanodeDetails chosenNode;
       if (favoredNode != null && networkTopology.isSameParent(
           excludedNodeList.get(excludedNodeList.size() - 1), favoredNode)) {
         chosenNode = favoredNode;
         favorIndex++;
       } else {
-        chosenNode = chooseNode(excludedNodeList, null, sizeRequired);
+        chosenNode = chooseNode(excludedNodeList, null,
+            metadataSizeRequired, dataSizeRequired);
       }
       excludedNodeList.add(chosenNode);
       if (excludedNodeList != chosenNodes) {
@@ -349,7 +373,7 @@ public final class SCMContainerPlacementRackAware
   }
 
   @Override
-  protected int getRequiredRackCount() {
+  protected int getRequiredRackCount(int numReplicas) {
     return REQUIRED_RACKS;
   }
 }

@@ -40,13 +40,13 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
-import org.apache.hadoop.ozone.container.common.impl.TestHddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -58,33 +58,34 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverSe
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.common.collect.Maps;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import org.apache.ratis.rpc.RpcType;
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
-import static org.apache.ratis.rpc.SupportedRpcType.NETTY;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.apache.ozone.test.tag.Slow;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.mock;
 
 /**
  * Test Containers.
  */
-@Ignore("Takes too long to run this test. Ignoring for time being.")
+@Slow
 public class TestContainerServer {
   static final String TEST_DIR = GenericTestUtils.getTestDir("dfs")
       .getAbsolutePath() + File.separator;
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static CertificateClient caClient;
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() {
+    DefaultMetricsSystem.setMiniClusterMode(true);
     CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, TEST_DIR);
     caClient = new DNCertificateClient(new SecurityConfig(CONF));
   }
@@ -105,12 +106,6 @@ public class TestContainerServer {
   @FunctionalInterface
   interface CheckedBiFunction<LEFT, RIGHT, OUT, THROWABLE extends Throwable> {
     OUT apply(LEFT left, RIGHT right) throws THROWABLE;
-  }
-
-  @Test
-  public void testClientServerRatisNetty() throws Exception {
-    runTestClientServerRatis(NETTY, 1);
-    runTestClientServerRatis(NETTY, 3);
   }
 
   @Test
@@ -182,6 +177,7 @@ public class TestContainerServer {
     }
   }
 
+  @Disabled("Fails with StatusRuntimeException: UNKNOWN")
   @Test
   public void testClientServerWithContainerDispatcher() throws Exception {
     XceiverServerGrpc server = null;
@@ -213,11 +209,11 @@ public class TestContainerServer {
             Handler.getHandlerForContainerType(containerType, conf,
                 context.getParent().getDatanodeDetails().getUuidString(),
                 containerSet, volumeSet, metrics,
-                TestHddsDispatcher.NO_OP_ICR_SENDER));
+                c -> { }));
       }
       HddsDispatcher dispatcher = new HddsDispatcher(
           conf, containerSet, volumeSet, handlers, context, metrics, null);
-      dispatcher.setScmId(scmId.toString());
+      dispatcher.setClusterId(scmId.toString());
       dispatcher.init();
 
       server = new XceiverServerGrpc(datanodeDetails, conf, dispatcher,
@@ -274,7 +270,7 @@ public class TestContainerServer {
     }
 
     @Override
-    public void setScmId(String scmId) {
+    public void setClusterId(String scmId) {
 
     }
 

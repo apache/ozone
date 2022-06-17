@@ -31,6 +31,8 @@ import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
+import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService.ContainerBlockInfo;
 
 /**
  * TopN Ordered choosing policy that choosing containers based on pending
@@ -49,13 +51,14 @@ public class TopNOrderedContainerDeletionChoosingPolicy
                   c1.getNumPendingDeletionBlocks());
 
   @Override
-  public List<ContainerData> chooseContainerForBlockDeletion(int count,
-      Map<Long, ContainerData> candidateContainers)
+  public List<ContainerBlockInfo> chooseContainerForBlockDeletion(
+      int totalBlocks, Map<Long, ContainerData> candidateContainers)
       throws StorageContainerException {
+
     Preconditions.checkNotNull(candidateContainers,
         "Internal assertion: candidate containers cannot be null");
 
-    List<ContainerData> result = new LinkedList<>();
+    List<ContainerBlockInfo> result = new ArrayList<>();
     List<KeyValueContainerData> orderedList = new LinkedList<>();
     for (ContainerData entry : candidateContainers.values()) {
       orderedList.add((KeyValueContainerData)entry);
@@ -63,29 +66,33 @@ public class TopNOrderedContainerDeletionChoosingPolicy
     Collections.sort(orderedList, KEY_VALUE_CONTAINER_DATA_COMPARATOR);
 
     // get top N list ordered by pending deletion blocks' number
-    int currentCount = 0;
+    // Here we are returning containers based on totalBlocks which is basically
+    // number of blocks to be deleted in an interval. We are also considering
+    // the boundary case where the blocks of the last container exceeds the
+    // number of blocks to be deleted in an interval, there we return that
+    // container but with container we also return an integer so that total
+    // blocks don't exceed the number of blocks to be deleted in an interval.
+
     for (KeyValueContainerData entry : orderedList) {
-      if (currentCount < count) {
-        if (entry.getNumPendingDeletionBlocks() > 0) {
-          result.add(entry);
-          currentCount++;
-          if (LOG.isDebugEnabled()) {
-            LOG.debug(
-                "Select container {} for block deletion, "
-                    + "pending deletion blocks num: {}.",
-                entry.getContainerID(),
-                entry.getNumPendingDeletionBlocks());
-          }
-        } else {
-          LOG.debug("Stop looking for next container, there is no"
-              + " pending deletion block contained in remaining containers.");
+      if (entry.getNumPendingDeletionBlocks() > 0) {
+        long numBlocksToDelete =
+            Math.min(totalBlocks, entry.getNumPendingDeletionBlocks());
+        totalBlocks -= numBlocksToDelete;
+        result.add(new ContainerBlockInfo(entry, numBlocksToDelete));
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Select container {} for block deletion, "
+                  + "pending deletion blocks num: {}.", entry.getContainerID(),
+              entry.getNumPendingDeletionBlocks());
+        }
+        if (totalBlocks == 0) {
           break;
         }
       } else {
+        LOG.debug("Stop looking for next container, there is no"
+            + " pending deletion block contained in remaining containers.");
         break;
       }
     }
-
     return result;
   }
 }

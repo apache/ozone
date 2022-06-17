@@ -20,6 +20,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 
@@ -36,18 +37,29 @@ public class RDBStoreIterator
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBStoreIterator.class);
 
-  private RocksIterator rocksDBIterator;
+  private final RocksIterator rocksDBIterator;
   private RDBTable rocksDBTable;
   private ByteArrayKeyValue currentEntry;
+  // This is for schemas that use a fixed-length
+  // prefix for each key.
+  private byte[] prefix;
 
   public RDBStoreIterator(RocksIterator iterator) {
-    this.rocksDBIterator = iterator;
-    seekToFirst();
+    this(iterator, null);
   }
 
   public RDBStoreIterator(RocksIterator iterator, RDBTable table) {
-    this(iterator);
+    this(iterator, table, null);
+  }
+
+  public RDBStoreIterator(RocksIterator iterator, RDBTable table,
+      byte[] prefix) {
+    this.rocksDBIterator = iterator;
     this.rocksDBTable = table;
+    if (prefix != null) {
+      this.prefix = Arrays.copyOf(prefix, prefix.length);
+    }
+    seekToFirst();
   }
 
   @Override
@@ -69,7 +81,8 @@ public class RDBStoreIterator
 
   @Override
   public boolean hasNext() {
-    return rocksDBIterator.isValid();
+    return rocksDBIterator.isValid() &&
+        (prefix == null || startsWith(prefix, rocksDBIterator.key()));
   }
 
   @Override
@@ -84,13 +97,21 @@ public class RDBStoreIterator
 
   @Override
   public void seekToFirst() {
-    rocksDBIterator.seekToFirst();
+    if (prefix == null) {
+      rocksDBIterator.seekToFirst();
+    } else {
+      rocksDBIterator.seek(prefix);
+    }
     setCurrentEntry();
   }
 
   @Override
   public void seekToLast() {
-    rocksDBIterator.seekToLast();
+    if (prefix == null) {
+      rocksDBIterator.seekToLast();
+    } else {
+      throw new UnsupportedOperationException("seekToLast");
+    }
     setCurrentEntry();
   }
 
@@ -99,23 +120,6 @@ public class RDBStoreIterator
     rocksDBIterator.seek(key);
     setCurrentEntry();
     return currentEntry;
-  }
-
-  @Override
-  public byte[] key() {
-    if (rocksDBIterator.isValid()) {
-      return rocksDBIterator.key();
-    }
-    return null;
-  }
-
-  @Override
-  public ByteArrayKeyValue value() {
-    if (rocksDBIterator.isValid()) {
-      return ByteArrayKeyValue.create(rocksDBIterator.key(),
-          rocksDBIterator.value());
-    }
-    return null;
   }
 
   @Override
@@ -133,5 +137,26 @@ public class RDBStoreIterator
   @Override
   public void close() throws IOException {
     rocksDBIterator.close();
+  }
+
+  private static boolean startsWith(byte[] prefix, byte[] value) {
+    if (prefix == null) {
+      return true;
+    }
+    if (value == null) {
+      return false;
+    }
+
+    int length = prefix.length;
+    if (value.length < length) {
+      return false;
+    }
+
+    for (int i = 0; i < length; i++) {
+      if (value[i] != prefix[i]) {
+        return false;
+      }
+    }
+    return true;
   }
 }

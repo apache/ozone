@@ -107,6 +107,10 @@ import org.slf4j.LoggerFactory;
  * // Java events:
  * //    alloc
  * //    lock
+ * Note for version usage:
+ * The default output format of the newest async profiler is HTML.
+ * If the user is using an older version such as 1.5, HTML is not supported.
+ * Please specify the corresponding output format.
  */
 public class ProfileServlet extends HttpServlet {
   private static final long serialVersionUID = 1L;
@@ -125,7 +129,7 @@ public class ProfileServlet extends HttpServlet {
   private static final int DEFAULT_DURATION_SECONDS = 10;
   private static final AtomicInteger ID_GEN = new AtomicInteger(0);
   static final Path OUTPUT_DIR =
-      Paths.get(System.getProperty("java.io.tmpdir"), "prof-output");
+      Paths.get(System.getProperty("java.io.tmpdir"), "prof-output-ozone");
   public static final String FILE_PREFIX = "async-prof-pid-";
 
   public static final Pattern FILE_NAME_PATTERN =
@@ -188,7 +192,7 @@ public class ProfileServlet extends HttpServlet {
   protected static String generateFileName(Integer pid, Output output,
       Event event) {
     String outputFormat = output.name().toLowerCase();
-    if(output == Output.FLAMEGRAPH) {
+    if (output == Output.FLAMEGRAPH) {
       outputFormat = "html";
     }
     return FILE_PREFIX + pid + "-" +
@@ -447,10 +451,10 @@ public class ProfileServlet extends HttpServlet {
       try {
         return Output.valueOf(outputArg.trim().toUpperCase());
       } catch (IllegalArgumentException e) {
-        return Output.SVG;
+        return Output.FLAMEGRAPH;
       }
     }
-    return Output.SVG;
+    return Output.FLAMEGRAPH;
   }
 
   private void setResponseHeader(final HttpServletResponse response) {
@@ -516,9 +520,11 @@ public class ProfileServlet extends HttpServlet {
     TRACES,
     FLAT,
     COLLAPSED,
+    // No SVG in 2.x asyncprofiler.
     SVG,
     TREE,
     JFR,
+    // In 2.x asyncprofiler, this is how you get flamegraphs.
     FLAMEGRAPH
   }
 

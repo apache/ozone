@@ -13,8 +13,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+set -u -o pipefail
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
+
+: ${KUBECONFIG:=/etc/rancher/k3s/k3s.yaml}
+
+export KUBECONFIG
+
+source "${DIR}/_lib.sh"
+
+install_flekszible
+install_virtualenv
+install_robot
+if [[ "$(uname -s)" = "Darwin" ]]; then
+  echo "Skip installing k3s, not supported on Mac.  Make sure a working Kubernetes cluster is available." >&2
+else
+  install_k3s
+fi
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/kubernetes"}
 
@@ -29,7 +47,7 @@ fi
 mkdir -p "$REPORT_DIR"
 
 cd "$DIST_DIR/kubernetes/examples" || exit 1
-./test-all.sh
+./test-all.sh 2>&1 | tee "${REPORT_DIR}/output.log"
 RES=$?
 cp -r result/* "$REPORT_DIR/"
 cp "$REPORT_DIR/log.html" "$REPORT_DIR/summary.html"

@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.scm;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -149,26 +151,29 @@ public class TestSCMMXBean {
     ContainerManager scmContainerManager = scm.getContainerManager();
 
     List<ContainerInfo> containerInfoList = new ArrayList<>();
-    for (int i=0; i < 10; i++) {
-      containerInfoList.add(scmContainerManager.allocateContainer(HddsProtos
-          .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor.ONE,
-          UUID.randomUUID().toString()));
+    for (int i = 0; i < 10; i++) {
+      containerInfoList.add(
+          scmContainerManager.allocateContainer(
+              StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE),
+              UUID.randomUUID().toString()));
     }
     long containerID;
-    for (int i=0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
       if (i % 2 == 0) {
         containerID = containerInfoList.get(i).getContainerID();
         scmContainerManager.updateContainerState(
-            new ContainerID(containerID), HddsProtos.LifeCycleEvent.FINALIZE);
-        assertEquals(scmContainerManager.getContainer(new ContainerID(
+            ContainerID.valueOf(containerID),
+            HddsProtos.LifeCycleEvent.FINALIZE);
+        assertEquals(scmContainerManager.getContainer(ContainerID.valueOf(
             containerID)).getState(), HddsProtos.LifeCycleState.CLOSING);
       } else {
         containerID = containerInfoList.get(i).getContainerID();
         scmContainerManager.updateContainerState(
-            new ContainerID(containerID), HddsProtos.LifeCycleEvent.FINALIZE);
+            ContainerID.valueOf(containerID),
+            HddsProtos.LifeCycleEvent.FINALIZE);
         scmContainerManager.updateContainerState(
-            new ContainerID(containerID), HddsProtos.LifeCycleEvent.CLOSE);
-        assertEquals(scmContainerManager.getContainer(new ContainerID(
+            ContainerID.valueOf(containerID), HddsProtos.LifeCycleEvent.CLOSE);
+        assertEquals(scmContainerManager.getContainer(ContainerID.valueOf(
             containerID)).getState(), HddsProtos.LifeCycleState.CLOSED);
       }
 
@@ -179,7 +184,7 @@ public class TestSCMMXBean {
     containerStateCount = scm.getContainerStateCount();
 
     containerStateCount.forEach((k, v) -> {
-      if(k.equals(HddsProtos.LifeCycleState.CLOSING.toString())) {
+      if (k.equals(HddsProtos.LifeCycleState.CLOSING.toString())) {
         assertEquals((int)v, 5);
       } else if (k.equals(HddsProtos.LifeCycleState.CLOSED.toString())) {
         assertEquals((int)v, 5);

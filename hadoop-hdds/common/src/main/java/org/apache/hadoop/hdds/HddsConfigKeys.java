@@ -26,6 +26,10 @@ public final class HddsConfigKeys {
       "hdds.heartbeat.interval";
   public static final String HDDS_HEARTBEAT_INTERVAL_DEFAULT =
       "30s";
+  public static final String HDDS_RECON_HEARTBEAT_INTERVAL =
+      "hdds.recon.heartbeat.interval";
+  public static final String HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT =
+      "60s";
   public static final String HDDS_NODE_REPORT_INTERVAL =
       "hdds.node.report.interval";
   public static final String HDDS_NODE_REPORT_INTERVAL_DEFAULT =
@@ -33,11 +37,15 @@ public final class HddsConfigKeys {
   public static final String HDDS_CONTAINER_REPORT_INTERVAL =
       "hdds.container.report.interval";
   public static final String HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT =
+      "60m";
+  public static final String HDDS_CRL_STATUS_REPORT_INTERVAL =
+      "hdds.crl.status.report.interval";
+  public static final String HDDS_CRL_STATUS_REPORT_INTERVAL_DEFAULT =
       "60s";
   public static final String HDDS_PIPELINE_REPORT_INTERVAL =
-          "hdds.pipeline.report.interval";
+      "hdds.pipeline.report.interval";
   public static final String HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT =
-          "60s";
+      "60s";
   public static final String HDDS_COMMAND_STATUS_REPORT_INTERVAL =
       "hdds.command.status.report.interval";
   public static final String HDDS_COMMAND_STATUS_REPORT_INTERVAL_DEFAULT =
@@ -140,19 +148,23 @@ public final class HddsConfigKeys {
       "hdds.block.token.expiry.time";
   public static final String HDDS_BLOCK_TOKEN_EXPIRY_TIME_DEFAULT = "1d";
   /**
-   * Maximum duration of certificates issued by SCM including Self-Signed Roots.
+   * Maximum duration of certificates issued by SCM including Self-Signed
+   * Roots and sub-ca certificates issued by root CA.
    * The formats accepted are based on the ISO-8601 duration format PnDTnHnMn.nS
    * Default value is 5 years and written as P1865D.
    */
   public static final String HDDS_X509_MAX_DURATION = "hdds.x509.max.duration";
   // Limit Certificate duration to a max value of 5 years.
-  public static final String HDDS_X509_MAX_DURATION_DEFAULT= "P1865D";
+  public static final String HDDS_X509_MAX_DURATION_DEFAULT = "P1865D";
   public static final String HDDS_X509_SIGNATURE_ALGO =
       "hdds.x509.signature.algorithm";
   public static final String HDDS_X509_SIGNATURE_ALGO_DEFAULT = "SHA256withRSA";
   public static final String HDDS_BLOCK_TOKEN_ENABLED =
       "hdds.block.token.enabled";
   public static final boolean HDDS_BLOCK_TOKEN_ENABLED_DEFAULT = false;
+  public static final String HDDS_CONTAINER_TOKEN_ENABLED =
+      "hdds.container.token.enabled";
+  public static final boolean HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT = false;
 
   public static final String HDDS_X509_DIR_NAME = "hdds.x509.dir.name";
   public static final String HDDS_X509_DIR_NAME_DEFAULT = "certs";
@@ -257,4 +269,11 @@ public final class HddsConfigKeys {
       "hdds.datanode.ratis.server.request.timeout";
   public static final String
       HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT = "2m";
+  public static final String HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED =
+          "hdds.container.checksum.verification.enabled";
+  public static final boolean
+          HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED_DEFAULT = true;
+
+  public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_DNAUDIT =
+      "ozone.audit.log.debug.cmd.list.dnaudit";
 }

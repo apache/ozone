@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -28,6 +28,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
@@ -38,8 +39,9 @@ import org.apache.hadoop.ozone.OzoneConsts;
 
 import org.apache.commons.io.FileUtils;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
+
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -54,7 +56,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Class used for testing the OM DB Checkpoint provider servlet.
+ * Class used for testing the SCM DB Checkpoint provider servlet.
  */
 public class TestSCMDbCheckpointServlet {
   private MiniOzoneCluster cluster = null;
@@ -75,7 +77,7 @@ public class TestSCMDbCheckpointServlet {
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true
    *
-   * @throws IOException
+   * @throws Exception
    */
   @Before
   public void init() throws Exception {
@@ -84,7 +86,8 @@ public class TestSCMDbCheckpointServlet {
     scmId = UUID.randomUUID().toString();
     omId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
-    conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
+    conf.setTimeDuration(OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
+        2, TimeUnit.SECONDS);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
@@ -118,7 +121,8 @@ public class TestSCMDbCheckpointServlet {
           scm.getScmMetadataStore().getStore(),
           scmMetrics.getDBCheckpointMetrics(),
           false,
-          Collections.emptyList());
+          Collections.emptyList(),
+          false);
 
       HttpServletRequest requestMock = mock(HttpServletRequest.class);
       HttpServletResponse responseMock = mock(HttpServletResponse.class);

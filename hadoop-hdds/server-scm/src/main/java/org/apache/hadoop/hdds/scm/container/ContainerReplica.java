@@ -37,21 +37,28 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
   private final ContainerReplicaProto.State state;
   private final DatanodeDetails datanodeDetails;
   private final UUID placeOfBirth;
+  private final int replicaIndex;
 
   private Long sequenceId;
   private final long keyCount;
   private final long bytesUsed;
 
 
-  private ContainerReplica(final ContainerID containerID,
-      final ContainerReplicaProto.State state, final DatanodeDetails datanode,
-      final UUID originNodeId, long keyNum, long dataSize) {
+  private ContainerReplica(
+      final ContainerID containerID,
+      final ContainerReplicaProto.State state,
+      final int replicaIndex,
+      final DatanodeDetails datanode,
+      final UUID originNodeId,
+      long keyNum,
+      long dataSize) {
     this.containerID = containerID;
     this.state = state;
     this.datanodeDetails = datanode;
     this.placeOfBirth = originNodeId;
     this.keyCount = keyNum;
     this.bytesUsed = dataSize;
+    this.replicaIndex = replicaIndex;
   }
 
   private void setSequenceId(Long seqId) {
@@ -181,6 +188,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     private Long sequenceId;
     private long bytesUsed;
     private long keyCount;
+    private int replicaIndex;
 
     /**
      * Set Container Id.
@@ -209,6 +217,12 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     public ContainerReplicaBuilder setDatanodeDetails(
         DatanodeDetails datanodeDetails) {
       datanode = datanodeDetails;
+      return this;
+    }
+
+    public ContainerReplicaBuilder setReplicaIndex(
+        int index) {
+      this.replicaIndex = index;
       return this;
     }
 
@@ -257,11 +271,15 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
       Preconditions.checkNotNull(datanode,
           "DatanodeDetails can't be null");
       ContainerReplica replica = new ContainerReplica(
-          containerID, state, datanode,
+          containerID, state, replicaIndex, datanode,
           Optional.ofNullable(placeOfBirth).orElse(datanode.getUuid()),
           keyCount, bytesUsed);
       Optional.ofNullable(sequenceId).ifPresent(replica::setSequenceId);
       return replica;
     }
+  }
+
+  public int getReplicaIndex() {
+    return replicaIndex;
   }
 }

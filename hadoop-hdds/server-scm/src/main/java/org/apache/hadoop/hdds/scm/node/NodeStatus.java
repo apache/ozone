@@ -35,7 +35,7 @@ public class NodeStatus {
   private long opStateExpiryEpochSeconds;
 
   public NodeStatus(HddsProtos.NodeOperationalState operationalState,
-             HddsProtos.NodeState health) {
+                    HddsProtos.NodeState health) {
     this.operationalState = operationalState;
     this.health = health;
     this.opStateExpiryEpochSeconds = 0;
@@ -54,6 +54,11 @@ public class NodeStatus {
         HddsProtos.NodeState.HEALTHY);
   }
 
+  public static NodeStatus inServiceHealthyReadOnly() {
+    return new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
+        HddsProtos.NodeState.HEALTHY_READONLY);
+  }
+
   public static NodeStatus inServiceStale() {
     return new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
         HddsProtos.NodeState.STALE);
@@ -62,6 +67,11 @@ public class NodeStatus {
   public static NodeStatus inServiceDead() {
     return new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
         HddsProtos.NodeState.DEAD);
+  }
+
+  public boolean isNodeWritable() {
+    return health == HddsProtos.NodeState.HEALTHY &&
+        operationalState == HddsProtos.NodeOperationalState.IN_SERVICE;
   }
 
   public HddsProtos.NodeState getHealth() {
@@ -199,8 +209,8 @@ public class NodeStatus {
 
   @Override
   public String toString() {
-    return "OperationalState: "+operationalState+" Health: "+health+
-        " OperastionStateExpiry: "+opStateExpiryEpochSeconds;
+    return "OperationalState: " + operationalState + " Health: " + health +
+        " OperationStateExpiry: " + opStateExpiryEpochSeconds;
   }
 
 }
