@@ -893,32 +893,36 @@ public class TestPipelineManagerImpl {
     SCMHADBTransactionBuffer buffer =
             new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
-      createPipelineManager(true, buffer);
+        createPipelineManager(true, buffer);
 
     PipelineManagerImpl pipelineManagerSpy = spy(pipelineManager);
-    ReplicationConfig repConfig = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+    ReplicationConfig repConfig =
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
     PipelineChoosePolicy pipelineChoosingPolicy
-      = new HealthyPipelineChoosePolicy();
+        = new HealthyPipelineChoosePolicy();
     ContainerManager containerManager
-      = mock(ContainerManager.class);
+        = mock(ContainerManager.class);
     
     WritableContainerProvider<ReplicationConfig> provider;
-    String OWNER = "TEST";
+    String owner = "TEST";
     Pipeline allocatedPipeline;
 
     // Throw on pipeline creates, so no new pipelines can be created
-    doThrow(SCMException.class).when(pipelineManagerSpy).createPipeline(any(), any(), anyList());
+    doThrow(SCMException.class).when(pipelineManagerSpy)
+        .createPipeline(any(), any(), anyList());
     provider = new WritableRatisContainerProvider(
         conf, pipelineManagerSpy, containerManager, pipelineChoosingPolicy);
 
     // Add a single pipeline to manager, (in the allocated state)
     allocatedPipeline = pipelineManager.createPipeline(repConfig);
-    pipelineManager.getStateManager().updatePipelineState(allocatedPipeline.getId()
+    pipelineManager.getStateManager()
+        .updatePipelineState(allocatedPipeline.getId()
             .getProtobuf(), HddsProtos.PipelineState.PIPELINE_ALLOCATED);
 
     // Assign a container to that pipeline
     ContainerInfo container = HddsTestUtils.
-            getContainer(HddsProtos.LifeCycleState.OPEN, allocatedPipeline.getId());
+            getContainer(HddsProtos.LifeCycleState.OPEN,
+                allocatedPipeline.getId());
     
     pipelineManager.addContainerToPipeline(
         allocatedPipeline.getId(), container.containerID());
@@ -926,8 +930,10 @@ public class TestPipelineManagerImpl {
         anyString(), eq(allocatedPipeline), any());
 
 
-    Assertions.assertTrue(pipelineManager.getPipelines(repConfig,  OPEN).isEmpty(), "No open pipelines exist");
-    Assertions.assertTrue(pipelineManager.getPipelines(repConfig,  ALLOCATED).contains(allocatedPipeline), "An allocated pipeline exists");
+    Assertions.assertTrue(pipelineManager.getPipelines(repConfig,  OPEN)
+        .isEmpty(), "No open pipelines exist");
+    Assertions.assertTrue(pipelineManager.getPipelines(repConfig,  ALLOCATED)
+        .contains(allocatedPipeline), "An allocated pipeline exists");
 
     // Instrument waitOnePipelineReady to open pipeline a bit after it is called
     Runnable r = () -> {
@@ -944,12 +950,16 @@ public class TestPipelineManagerImpl {
     }).when(pipelineManagerSpy).waitOnePipelineReady(any(), anyLong());
 
     
-    ContainerInfo c = provider.getContainer(1, repConfig, OWNER, new ExcludeList());
-    Assertions.assertTrue(c.equals(container), "Expected container was returned");
+    ContainerInfo c = provider.getContainer(1, repConfig,
+        owner, new ExcludeList());
+    Assertions.assertTrue(c.equals(container),
+        "Expected container was returned");
 
     // Confirm that waitOnePipelineReady was called on allocated pipelines
-    ArgumentCaptor<Collection<PipelineID>> captor = ArgumentCaptor.forClass(Collection.class);
-    verify(pipelineManagerSpy, times(1)).waitOnePipelineReady(captor.capture(), anyLong());
+    ArgumentCaptor<Collection<PipelineID>> captor =
+        ArgumentCaptor.forClass(Collection.class);
+    verify(pipelineManagerSpy, times(1))
+        .waitOnePipelineReady(captor.capture(), anyLong());
     Collection<PipelineID> coll = captor.getValue();
     Assertions.assertTrue(coll.contains(allocatedPipeline.getId()),
                "waitOnePipelineReady() was called on allocated pipeline");
