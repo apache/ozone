@@ -310,10 +310,12 @@ public abstract class EndpointBase implements Auditor {
   }
 
   protected void auditWriteFailure(AuditAction action, Throwable ex) {
-    AUDIT.logWriteFailure(buildAuditMessageForFailure(action, getAuditParameters(), ex));
+    AUDIT.logWriteFailure(
+        buildAuditMessageForFailure(action, getAuditParameters(), ex));
   }
 
   protected void auditReadFailure(AuditAction action, Exception ex) {
-    AUDIT.logReadFailure(buildAuditMessageForFailure(action, getAuditParameters(), ex));
+    AUDIT.logReadFailure(
+        buildAuditMessageForFailure(action, getAuditParameters(), ex));
   }
 }
