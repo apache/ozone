@@ -16,16 +16,14 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ECContainerReplicaCount;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Class to determine the health state of an EC Container. Given the container
@@ -49,11 +47,10 @@ public class ECContainerHealthCheck implements ContainerHealthCheck {
   @Override
   public ContainerHealthResult checkHealth(ContainerInfo container,
       Set<ContainerReplica> replicas,
-      List<Pair<Integer, DatanodeDetails>> replicasPendingAdd,
-      List<Pair<Integer, DatanodeDetails>> replicasPendingDelete,
+      List<ContainerReplicaOp> replicaPendingOps,
       int remainingRedundancyForMaintenance) {
     ECContainerReplicaCount replicaCount = getReplicaCountWithPending(container,
-          replicas, replicasPendingAdd, replicasPendingDelete,
+          replicas, replicaPendingOps,
           remainingRedundancyForMaintenance);
 
     ECReplicationConfig repConfig =
@@ -91,17 +88,19 @@ public class ECContainerHealthCheck implements ContainerHealthCheck {
 
   private ECContainerReplicaCount getReplicaCountWithPending(
       ContainerInfo container, Set<ContainerReplica> replicas,
-      List<Pair<Integer, DatanodeDetails>> replicasPendingAdd,
-      List<Pair<Integer, DatanodeDetails>> replicasPendingDelete,
+      List<ContainerReplicaOp> replicaPendingOps,
       int remainingRedundancyForMaintenance) {
-    List<Integer> indexesPendingAdd = replicasPendingAdd.stream()
-        .map(i -> i.getLeft()).collect(Collectors.toList());
-    List<Integer> indexesPendingDelete = replicasPendingDelete.stream()
-        .map(i -> i.getLeft()).collect(Collectors.toList());
-
-    return new ECContainerReplicaCount(container, replicas, indexesPendingAdd,
-        indexesPendingDelete, remainingRedundancyForMaintenance);
-
+    List<Integer> pendingAdd = new ArrayList<>();
+    List<Integer> pendingDelete = new ArrayList<>();
+    for (ContainerReplicaOp op : replicaPendingOps) {
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+        pendingAdd.add(op.getReplicaIndex());
+      } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+        pendingDelete.add(op.getReplicaIndex());
+      }
+    }
+    return new ECContainerReplicaCount(container, replicas, pendingAdd,
+        pendingDelete, remainingRedundancyForMaintenance);
   }
 
 }
