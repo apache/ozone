@@ -21,17 +21,20 @@ import com.google.common.base.Supplier;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
@@ -40,6 +43,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -57,6 +61,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
@@ -64,6 +69,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -75,11 +81,19 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -872,6 +886,74 @@ public class TestPipelineManagerImpl {
             .closePipeline(stalePipelines.get(0), false);
     verify(pipelineManager, times(1))
             .closePipeline(stalePipelines.get(1), false);
+  }
+
+  @Test
+  public void testWaitForAllocatedPipeline() throws IOException {
+    SCMHADBTransactionBuffer buffer =
+            new SCMHADBTransactionBufferStub(dbStore);
+    PipelineManagerImpl pipelineManager =
+      createPipelineManager(true, buffer);
+
+    PipelineManagerImpl pipelineManagerSpy = spy(pipelineManager);
+    ReplicationConfig repConfig = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+    PipelineChoosePolicy pipelineChoosingPolicy
+      = new HealthyPipelineChoosePolicy();
+    ContainerManager containerManager
+      = mock(ContainerManager.class);
+    
+    WritableContainerProvider<ReplicationConfig> provider;
+    String OWNER = "TEST";
+    Pipeline allocatedPipeline;
+
+    // Throw on pipeline creates, so no new pipelines can be created
+    doThrow(SCMException.class).when(pipelineManagerSpy).createPipeline(any(), any(), anyList());
+    provider = new WritableRatisContainerProvider(
+        conf, pipelineManagerSpy, containerManager, pipelineChoosingPolicy);
+
+    // Add a single pipeline to manager, (in the allocated state)
+    allocatedPipeline = pipelineManager.createPipeline(repConfig);
+    pipelineManager.getStateManager().updatePipelineState(allocatedPipeline.getId()
+            .getProtobuf(), HddsProtos.PipelineState.PIPELINE_ALLOCATED);
+
+    // Assign a container to that pipeline
+    ContainerInfo container = HddsTestUtils.
+            getContainer(HddsProtos.LifeCycleState.OPEN, allocatedPipeline.getId());
+    
+    pipelineManager.addContainerToPipeline(
+        allocatedPipeline.getId(), container.containerID());
+    doReturn(container).when(containerManager).getMatchingContainer(anyLong(),
+        anyString(), eq(allocatedPipeline), any());
+
+
+    Assertions.assertTrue(pipelineManager.getPipelines(repConfig,  OPEN).isEmpty(), "No open pipelines exist");
+    Assertions.assertTrue(pipelineManager.getPipelines(repConfig,  ALLOCATED).contains(allocatedPipeline), "An allocated pipeline exists");
+
+    // Instrument waitOnePipelineReady to open pipeline a bit after it is called
+    Runnable r = () -> {
+      try {
+        Thread.sleep(100);
+        pipelineManager.openPipeline(allocatedPipeline.getId());
+      } catch (Exception e) {
+        fail("exception on opening pipeline", e);
+      }
+    };
+    doAnswer(call -> {
+      new Thread(r).start();
+      return call.callRealMethod();
+    }).when(pipelineManagerSpy).waitOnePipelineReady(any(), anyLong());
+
+    
+    ContainerInfo c = provider.getContainer(1, repConfig, OWNER, new ExcludeList());
+    Assertions.assertTrue(c.equals(container), "Expected container was returned");
+
+    // Confirm that waitOnePipelineReady was called on allocated pipelines
+    ArgumentCaptor<Collection<PipelineID>> captor = ArgumentCaptor.forClass(Collection.class);
+    verify(pipelineManagerSpy, times(1)).waitOnePipelineReady(captor.capture(), anyLong());
+    Collection<PipelineID> coll = captor.getValue();
+    Assertions.assertTrue(coll.contains(allocatedPipeline.getId()),
+               "waitOnePipelineReady() was called on allocated pipeline");
+    pipelineManager.close();
   }
 
   public void testCreatePipelineForRead() throws IOException {
