@@ -170,6 +170,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
           .setId(PipelineID.randomId())
           .setState(Pipeline.PipelineState.CLOSED)
           .build();
+
       BlockLocationInfo blkInfo = new BlockLocationInfo.Builder()
           .setBlockID(blockInfo.getBlockID())
           .setLength(internalBlockLength(locationIndex + 1))
