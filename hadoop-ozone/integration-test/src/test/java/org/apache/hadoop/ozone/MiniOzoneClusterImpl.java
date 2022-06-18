@@ -159,7 +159,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     this.reconServer = reconServer;
   }
 
-  protected SCMConfigurator getSCMConfigurator() {
+  public SCMConfigurator getSCMConfigurator() {
     return scmConfigurator;
   }
 

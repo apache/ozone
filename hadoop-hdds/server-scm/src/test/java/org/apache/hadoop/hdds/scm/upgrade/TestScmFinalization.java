@@ -149,7 +149,9 @@ public class TestScmFinalization {
       FinalizationStateManager stateManager,
       FinalizationCheckpoint expectedCheckpoint) {
 
-    assertTrue(context.isFinalizationCheckpointCrossed(expectedCheckpoint));
+    // SCM context should have been updated with the current checkpoint.
+    assertTrue(context.getFinalizationCheckpoint()
+        .hasCrossed(expectedCheckpoint));
     for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
       LOG.info("Comparing expected checkpoint {} to {}", expectedCheckpoint,
           checkpoint);

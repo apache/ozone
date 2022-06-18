@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,12 +68,16 @@ public final class TestHddsUpgradeUtils {
 
   public static void waitForFinalization(
       StorageContainerLocationProtocol scmClient, String clientID)
-      throws IOException {
-    UpgradeFinalizer.StatusAndMessages status = null;
-    while (status == null || status.status() != FINALIZATION_DONE) {
-      status = scmClient.queryUpgradeFinalizationProgress(clientID,
-              true, true);
-    }
+      throws Exception {
+    LambdaTestUtils.await(10000, 500, () ->
+        {
+          UpgradeFinalizer.Status status = scmClient
+              .queryUpgradeFinalizationProgress(clientID, true, true)
+              .status();
+          LOG.info("Waiting for upgrade finalization to complete from client." +
+              " Current status is {}.", status);
+          return status == FINALIZATION_DONE || status == ALREADY_FINALIZED;
+        });
   }
 
   /*
@@ -105,8 +110,8 @@ public final class TestHddsUpgradeUtils {
   public static void testPostUpgradeConditionsSCM(StorageContainerManager scm,
       int numContainers, int numDatanodes) {
 
-    Assert.assertTrue(scm.getScmContext().isFinalizationCheckpointCrossed(
-        FinalizationCheckpoint.FINALIZATION_COMPLETE));
+    Assert.assertTrue(scm.getScmContext().getFinalizationCheckpoint()
+        .hasCrossed(FinalizationCheckpoint.FINALIZATION_COMPLETE));
 
     HDDSLayoutVersionManager scmVersionManager = scm.getLayoutVersionManager();
     Assert.assertEquals(scmVersionManager.getSoftwareLayoutVersion(),

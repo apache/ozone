@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
 
 import java.io.IOException;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -153,9 +154,11 @@ public class SCMUpgradeFinalizer extends
     msg += "\n  New pipelines creation will remain frozen until Upgrade " +
         "is finalized.";
 
-    // Pipeline creation will remain frozen until postFinalizeUpgrade()
-    pipelineManager.freezePipelineCreation();
-
+    // Pipeline creation should already be frozen when the finalization state
+    // manager set the checkpoint.
+    Preconditions.checkArgument(pipelineManager.isPipelineCreationFrozen(),
+        "Error during finalization. Pipeline creation should have been frozen" +
+            " before closing existing pipelines.");
     for (Pipeline pipeline : pipelineManager.getPipelines()) {
       if (pipeline.getPipelineState() != CLOSED) {
         pipelineManager.closePipeline(pipeline, true);
@@ -176,7 +179,11 @@ public class SCMUpgradeFinalizer extends
 
   private void createPipelinesAfterFinalization(
       PipelineManager pipelineManager) {
-    pipelineManager.resumePipelineCreation();
+    // Pipeline creation should already be frozen when the finalization state
+    // manager set the checkpoint.
+    Preconditions.checkArgument(!pipelineManager.isPipelineCreationFrozen(),
+        "Error during finalization. Pipeline creation should have been " +
+            "resumed before waiting for new pipelines.");
 
     // Wait for at least one pipeline to be created before finishing
     // finalization, so clients can write.

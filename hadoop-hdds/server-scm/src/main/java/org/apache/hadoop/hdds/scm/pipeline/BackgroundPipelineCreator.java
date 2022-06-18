@@ -109,13 +109,6 @@ public class BackgroundPipelineCreator implements SCMService {
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
-
-    // Check if RatisPipelineUtilsThread should be started based on
-    // current SCM upgrade finalization state.
-    if (FinalizationManager.shouldCreateNewPipelines(
-        scmContext.getFinalizationCheckpoint())) {
-      start();
-    }
   }
 
   /**
@@ -272,16 +265,16 @@ public class BackgroundPipelineCreator implements SCMService {
 
   @Override
   public void notifyEventTriggered(Event event) {
-    // Background pipeline creator must be started/stopped even on followers
-    // during finalization, in case they become the leader.
-    if (event == FINALIZATION_CHECKPOINT_CROSSED) {
-      if (FinalizationManager.shouldCreateNewPipelines(
-          scmContext.getFinalizationCheckpoint())) {
-        start();
-      } else {
-        stop();
-      }
-    }
+//    // Background pipeline creator must be started/stopped even on followers
+//    // during finalization, in case they become the leader.
+//    if (event == FINALIZATION_CHECKPOINT_CROSSED) {
+//      if (FinalizationManager.shouldCreateNewPipelines(
+//          scmContext.getFinalizationCheckpoint())) {
+//        start();
+//      } else {
+//        stop();
+//      }
+//    }
 
     if (!scmContext.isLeader()) {
       LOG.info("ignore, not leader SCM.");

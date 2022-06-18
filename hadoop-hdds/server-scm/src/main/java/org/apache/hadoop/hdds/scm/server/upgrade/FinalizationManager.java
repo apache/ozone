@@ -63,7 +63,7 @@ public interface FinalizationManager {
 
   static boolean shouldCreateNewPipelines(FinalizationCheckpoint checkpoint) {
     return !checkpoint.hasCrossed(FinalizationCheckpoint.FINALIZATION_STARTED)
-        || checkpoint.hasCrossed(FinalizationCheckpoint.FINALIZATION_COMPLETE);
+        || checkpoint.hasCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV);
   }
 
   // TODO connect this to node manager.

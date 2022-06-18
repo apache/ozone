@@ -22,10 +22,11 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
-import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -77,10 +78,32 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
         finalizationStore.isExist(OzoneConsts.FINALIZING_KEY);
   }
 
-  private void setCheckpoint(FinalizationCheckpoint checkpoint) {
+  private void publishCheckpoint(FinalizationCheckpoint checkpoint) {
+    // Check whether this checkpoint change requires us to move node state.
+    // If this is necessary, it must be done before unfreezing pipeline
+    // creation to make sure nodes are not added to pipelines based on
+    // outdated layout information.
+    // This operation is not idempotent.
+    if (checkpoint == FinalizationCheckpoint.MLV_EQUALS_SLV) {
+      upgradeContext.getNodeManager().forceNodesToHealthyReadOnly();
+    }
+
+    // Check whether this checkpoint change requires us to freeze pipeline
+    // creation. These are idempotent operations.
+    PipelineManager pipelineManager = upgradeContext.getPipelineManager();
+    if (FinalizationManager.shouldCreateNewPipelines(checkpoint) &&
+        pipelineManager.isPipelineCreationFrozen()) {
+      pipelineManager.resumePipelineCreation();
+    } else if (!FinalizationManager.shouldCreateNewPipelines(checkpoint) &&
+          !pipelineManager.isPipelineCreationFrozen()) {
+      pipelineManager.freezePipelineCreation();
+    }
+
+    // Set the checkpoint in the SCM context so other components can read it.
     upgradeContext.getSCMContext().setFinalizationCheckpoint(checkpoint);
-    serviceManager.notifyEventTriggered(
-        SCMService.Event.FINALIZATION_CHECKPOINT_CROSSED);
+
+//    serviceManager.notifyEventTriggered(
+//        SCMService.Event.FINALIZATION_CHECKPOINT_CROSSED);
   }
 
   @Override
@@ -96,7 +119,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     } finally {
       checkpointLock.writeLock().unlock();
     }
-    setCheckpoint(FinalizationCheckpoint.FINALIZATION_STARTED);
+    publishCheckpoint(FinalizationCheckpoint.FINALIZATION_STARTED);
     transactionBuffer.addToBuffer(finalizationStore,
         OzoneConsts.FINALIZING_KEY, "");
   }
@@ -126,16 +149,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     }
 
     if (!versionManager.needsFinalization()) {
-      setCheckpoint(FinalizationCheckpoint.MLV_EQUALS_SLV);
-      // If we just finalized the last layout feature, don't wait for next
-      // heartbeat from datanodes in order to move them to
-      // Healthy - Readonly state. Force them to Healthy ReadOnly state so that
-      // we can resume pipeline creation right away.
-      upgradeContext.getNodeManager().forceNodesToHealthyReadOnly();
-      // This may be a no-op on a follower who gets all finalization steps
-      // from a snapshot, since the background pipeline creator thread was
-      // never stopped.
-      upgradeContext.getPipelineManager().resumePipelineCreation();
+      publishCheckpoint(FinalizationCheckpoint.MLV_EQUALS_SLV);
     }
     transactionBuffer.addToBuffer(finalizationStore,
         OzoneConsts.LAYOUT_VERSION_KEY, String.valueOf(layoutVersion));
@@ -165,7 +179,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       ExitUtils.terminate(1, errorMessage, LOG);
     }
 
-    setCheckpoint(FinalizationCheckpoint.FINALIZATION_COMPLETE);
+    publishCheckpoint(FinalizationCheckpoint.FINALIZATION_COMPLETE);
   }
 
   @Override
@@ -232,8 +246,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
           finalizeLayoutFeatureLocal(version);
         }
       }
-      FinalizationCheckpoint newCheckpoint = getFinalizationCheckpoint();
-      upgradeContext.getSCMContext().setFinalizationCheckpoint(newCheckpoint);
+      publishCheckpoint(getFinalizationCheckpoint());
     } catch (Exception ex) {
       LOG.error("Failed to reinitialize finalization state", ex);
       throw new IOException(ex);

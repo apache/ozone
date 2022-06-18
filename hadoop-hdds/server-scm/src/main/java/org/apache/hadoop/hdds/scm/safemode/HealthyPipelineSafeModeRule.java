@@ -106,9 +106,16 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   @Override
   protected synchronized boolean validate() {
-    return FinalizationManager.shouldCreateNewPipelines(
-        scmContext.getFinalizationCheckpoint()) &&
-        currentHealthyPipelineCount >= healthyPipelineThresholdCount;
+    boolean hasPipelinesFromFinalization =
+        FinalizationManager.shouldCreateNewPipelines(
+            scmContext.getFinalizationCheckpoint());
+    if (!hasPipelinesFromFinalization) {
+      LOG.info("All SCM pipelines are closed due to ongoing upgrade " +
+          "finalization. Bypassing healthy pipeline safemode rule.");
+      return true;
+    } else {
+      return currentHealthyPipelineCount >= healthyPipelineThresholdCount;
+    }
   }
 
   @Override
