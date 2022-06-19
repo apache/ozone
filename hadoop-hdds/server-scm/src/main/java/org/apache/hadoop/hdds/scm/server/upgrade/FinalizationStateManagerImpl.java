@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,6 +80,10 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   }
 
   private void publishCheckpoint(FinalizationCheckpoint checkpoint) {
+    // Move the upgrade status according to this checkpoint. This is sent
+    // back to the client if they query for the current upgrade status.
+    versionManager.setUpgradeState(checkpoint.getStatus());
+
     // Check whether this checkpoint change requires us to move node state.
     // If this is necessary, it must be done before unfreezing pipeline
     // creation to make sure nodes are not added to pipelines based on

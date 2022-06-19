@@ -229,6 +229,12 @@ public class TestScmHAFinalization {
     //  error as test leader change (reports stuck in progress even though fin
     //  completed).
     TestHddsUpgradeUtils.waitForFinalization(scmClient, CLIENT_ID);
+    // Once the leader says finalization is complete, wait for all followers
+    // to catch up so we can check their state.
+    for (StorageContainerManager scm:
+        cluster.getStorageContainerManagersList()) {
+      waitForScmToFinalize(scm);
+    }
 
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
@@ -300,35 +306,13 @@ public class TestScmHAFinalization {
     GenericTestUtils.waitFor(() -> {
       FinalizationCheckpoint checkpoint =
           scm.getScmContext().getFinalizationCheckpoint();
-      LOG.info("Waiting for SCM {} to finalize. Current finalization " +
-          "checkpoint is {}", scm.getSCMNodeId(), checkpoint);
+      LOG.info("Waiting for SCM {} (leader? {}) to finalize. Current " +
+          "finalization checkpoint is {}",
+          scm.getSCMNodeId(), scm.checkLeader(), checkpoint);
       return checkpoint.hasCrossed(
           FinalizationCheckpoint.FINALIZATION_COMPLETE);
     }, 2_000, 60_000);
   }
-
-//  private StorageContainerManager getLeaderScm() throws Exception {
-//    // Wait for leader election to finish.
-//    // TODO handle this in miniozone.
-//    GenericTestUtils.waitFor(() -> {
-//      for (StorageContainerManager scm:
-//          cluster.getStorageContainerManagersList()) {
-//        if (scm.checkLeader()) {
-//          return true;
-//        }
-//      }
-//      return false;
-//    }, 500, 10000);
-//
-//    StorageContainerManager leaderScm = null;
-//    for (StorageContainerManager scm:
-//        cluster.getStorageContainerManagersList()) {
-//      if (scm.checkLeader()) {
-//        leaderScm = scm;
-//      }
-//    }
-//    return leaderScm;
-//  }
 
   private void checkMidFinalizationConditions(
       UpgradeTestInjectionPoints haltingPoint,

@@ -44,8 +44,6 @@ public class DefaultUpgradeFinalizationExecutor<T>
       throws IOException {
     try {
       finalizer.emitStartingMsg();
-      finalizer.getVersionManager()
-          .setUpgradeState(FINALIZATION_IN_PROGRESS);
 
       finalizer.preFinalizeUpgrade(component);
 

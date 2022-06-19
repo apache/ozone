@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOU
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PREFINALIZE_ACTION_VALIDATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
 
@@ -86,18 +87,14 @@ public abstract class BasicUpgradeFinalizer
     StatusAndMessages response = initFinalize(upgradeClientID, service);
     if (finalizationLock.tryLock()) {
       try {
-        // Even if the status indicates finalization completed, the component
-        // may not have finished all its specific steps if finalization was
-        // interrupted, so we should re-invoke them here.
-        if (response.status() == FINALIZATION_REQUIRED ||
-            !componentFinishedFinalizationSteps(service)) {
+        if (response.status() == FINALIZATION_REQUIRED) {
           finalizationExecutor.execute(service, this);
           response = STARTING_MSG;
         }
       } catch (NotLeaderException e) {
         LOG.info("Leader change encountered during finalization. This " +
             "component will continue to finalize as a follower.", e);
-      }finally {
+      } finally {
         finalizationLock.unlock();
       }
     } else {
@@ -135,7 +132,7 @@ public abstract class BasicUpgradeFinalizer
   }
 
   protected void postFinalizeUpgrade(T service) throws IOException {
-    // No Op by default.
+    versionManager.setUpgradeState(FINALIZATION_DONE);
   }
 
   @Override
@@ -230,15 +227,6 @@ public abstract class BasicUpgradeFinalizer
         || status.equals(FINALIZATION_DONE);
   }
 
-  /**
-   * Child classes that have additional finalization steps can override this
-   * method to check component specific state to determine whether
-   * finalization still needs to be run.
-   */
-  protected boolean componentFinishedFinalizationSteps(T service) {
-    return true;
-  }
-
   public abstract void finalizeLayoutFeature(LayoutFeature lf, T context)
       throws UpgradeException;
 
@@ -247,6 +235,7 @@ public abstract class BasicUpgradeFinalizer
       throws UpgradeException {
     runFinalizationAction(lf, action);
     updateLayoutVersionInVersionFile(lf, storage);
+    versionManager.setUpgradeState(FINALIZATION_DONE);
     versionManager.finalized(lf);
   }
 

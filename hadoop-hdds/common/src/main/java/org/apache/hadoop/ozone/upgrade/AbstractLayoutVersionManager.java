@@ -55,7 +55,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   protected final TreeMap<Integer, LayoutFeature> features = new TreeMap<>();
   @VisibleForTesting
   protected final Map<String, LayoutFeature> featureMap = new HashMap<>();
-  private volatile Status currentUpgradeState = FINALIZATION_REQUIRED;
+  private volatile Status currentUpgradeState;
   // Allows querying upgrade state while an upgrade is in progress.
   // Note that MLV may have been incremented during the upgrade
   // by the time the value is read/used.
@@ -75,6 +75,8 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
                 metadataLayoutVersion, softwareLayoutVersion));
       } else if (metadataLayoutVersion == softwareLayoutVersion) {
         currentUpgradeState = ALREADY_FINALIZED;
+      } else {
+        currentUpgradeState = FINALIZATION_REQUIRED;
       }
 
       LayoutFeature mlvFeature = features.get(metadataLayoutVersion);
@@ -125,7 +127,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
         metadataLayoutVersion = layoutFeature.layoutVersion();
         LOG.info("Layout feature {} has been finalized.", layoutFeature);
         if (!needsFinalization()) {
-          completeFinalization();
+          LOG.info("Finalization is complete.");
         }
       } else {
         String msgStart = "";
@@ -143,16 +145,6 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
                 + " Metadata layout version: " + metadataLayoutVersion
                 + " Feature Layout version: " + layoutFeature.layoutVersion());
       }
-    } finally {
-      lock.writeLock().unlock();
-    }
-  }
-
-  private void completeFinalization() {
-    lock.writeLock().lock();
-    try {
-      currentUpgradeState = FINALIZATION_DONE;
-      LOG.info("Finalization is complete.");
     } finally {
       lock.writeLock().unlock();
     }
