@@ -87,7 +87,12 @@ public abstract class BasicUpgradeFinalizer
     StatusAndMessages response = initFinalize(upgradeClientID, service);
     if (finalizationLock.tryLock()) {
       try {
-        if (response.status() == FINALIZATION_REQUIRED) {
+        // If we were able to enter the lock and finalization status is "in
+        // progress", we should resume finalization because the last attempt
+        // was interrupted. If an attempt was currently ongoing, the lock
+        // would have been held.
+        if (response.status() == FINALIZATION_REQUIRED ||
+            response.status() == FINALIZATION_IN_PROGRESS) {
           finalizationExecutor.execute(service, this);
           response = STARTING_MSG;
         }

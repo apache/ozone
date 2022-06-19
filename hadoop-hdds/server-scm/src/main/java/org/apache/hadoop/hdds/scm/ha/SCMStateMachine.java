@@ -268,7 +268,6 @@ public class SCMStateMachine extends BaseStateMachine {
         deletedBlockLog instanceof DeletedBlockLogImpl);
     ((DeletedBlockLogImpl) deletedBlockLog).onBecomeLeader();
     scm.getScmDecommissionManager().onBecomeLeader();
-    scm.getFinalizationManager().onBecomeLeader();
   }
 
   @Override
@@ -329,6 +328,7 @@ public class SCMStateMachine extends BaseStateMachine {
           .isLeaderReady()) {
         scm.getScmContext().setLeaderReady();
         scm.getSCMServiceManager().notifyStatusChanged();
+        scm.getFinalizationManager().onLeaderReady();
       }
 
       // Means all transactions before this term have been applied.

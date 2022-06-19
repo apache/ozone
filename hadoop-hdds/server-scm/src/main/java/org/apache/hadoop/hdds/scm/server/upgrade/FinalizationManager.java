@@ -55,11 +55,7 @@ public interface FinalizationManager {
 
   void reinitialize(Table<String, String> finalizationStore) throws IOException;
 
-  /**
-   * Called in SCMStateMachine#notifyLeaderChanged when current SCM becomes
-   *  leader.
-   */
-  void onBecomeLeader();
+  void onLeaderReady();
 
   static boolean shouldCreateNewPipelines(FinalizationCheckpoint checkpoint) {
     return !checkpoint.hasCrossed(FinalizationCheckpoint.FINALIZATION_STARTED)

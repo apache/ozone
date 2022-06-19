@@ -152,7 +152,7 @@ public class FinalizationManagerImpl implements FinalizationManager {
   }
 
   @Override
-  public void onBecomeLeader() {
+  public void onLeaderReady() {
     // Launch a background thread to drive finalization.
     Executors.newSingleThreadExecutor().submit(() -> {
       FinalizationCheckpoint currentCheckpoint = getCheckpoint();

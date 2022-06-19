@@ -73,8 +73,6 @@ public class InjectedUpgradeFinalizationExecutor<T> extends
     try {
       injectTestFunctionAtThisPoint(BEFORE_PRE_FINALIZE_UPGRADE);
       finalizer.emitStartingMsg();
-      finalizer.getVersionManager()
-          .setUpgradeState(FINALIZATION_IN_PROGRESS);
 
       finalizer.preFinalizeUpgrade(component);
       injectTestFunctionAtThisPoint(AFTER_PRE_FINALIZE_UPGRADE);
