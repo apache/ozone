@@ -58,9 +58,8 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private final SCMContext scmContext;
 
   HealthyPipelineSafeModeRule(String ruleName, EventQueue eventQueue,
-     PipelineManager pipelineManager,
-     SCMSafeModeManager manager, ConfigurationSource configuration,
-     SCMContext scmContext) {
+      PipelineManager pipelineManager, SCMSafeModeManager manager,
+      ConfigurationSource configuration, SCMContext scmContext) {
     super(manager, ruleName, eventQueue);
     this.pipelineManager = pipelineManager;
     this.scmContext = scmContext;

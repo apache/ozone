@@ -69,15 +69,14 @@ public final class TestHddsUpgradeUtils {
   public static void waitForFinalization(
       StorageContainerLocationProtocol scmClient, String clientID)
       throws Exception {
-    LambdaTestUtils.await(60_000, 1_000, () ->
-        {
-          UpgradeFinalizer.Status status = scmClient
-              .queryUpgradeFinalizationProgress(clientID, true, true)
-              .status();
-          LOG.info("Waiting for upgrade finalization to complete from client." +
+    LambdaTestUtils.await(60_000, 1_000, () -> {
+      UpgradeFinalizer.Status status = scmClient
+          .queryUpgradeFinalizationProgress(clientID, true, true)
+          .status();
+      LOG.info("Waiting for upgrade finalization to complete from client." +
               " Current status is {}.", status);
-          return status == FINALIZATION_DONE || status == ALREADY_FINALIZED;
-        });
+      return status == FINALIZATION_DONE || status == ALREADY_FINALIZED;
+    });
   }
 
   /*

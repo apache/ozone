@@ -62,7 +62,6 @@ public interface FinalizationManager {
         || checkpoint.hasCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV);
   }
 
-  // TODO connect this to node manager.
   static boolean shouldTellDatanodesToFinalize(
       FinalizationCheckpoint checkpoint) {
     return checkpoint.hasCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV);

@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.slf4j.Logger;
@@ -124,12 +123,6 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
             p.getPipelineState().equals(Pipeline.PipelineState.DORMANT) ||
             p.getPipelineState().equals(Pipeline.PipelineState.ALLOCATED))
         .forEach(p -> dnsUsed.addAll(p.getNodes()));
-
-    LOG.info("--- all nodes:\n{}",
-        nodeManager.getAllNodes().stream().map(n -> ((DatanodeInfo)n).getNodeStatus()).collect(Collectors.toList()));
-    LOG.info("--- healthy nodes:\n{}",
-        nodeManager.getNodes(NodeStatus.inServiceHealthy()));
-    LOG.info("--- used nodes:\n{}", dnsUsed);
 
     // Get list of healthy nodes
     List<DatanodeDetails> dns = nodeManager

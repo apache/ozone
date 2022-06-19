@@ -80,9 +80,8 @@ public class TestScmHAFinalization {
   private Future<?> finalizationFuture;
 
   public void init(OzoneConfiguration conf,
-                   UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor,
-                   int numInactiveSCMs)
-      throws Exception {
+      UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor,
+      int numInactiveSCMs) throws Exception {
 
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setUpgradeFinalizationExecutor(executor);
@@ -319,46 +318,43 @@ public class TestScmHAFinalization {
       List<StorageContainerManager> scms) {
     for (StorageContainerManager scm: scms) {
       switch (haltingPoint) {
-        case BEFORE_PRE_FINALIZE_UPGRADE:
-          // checkpoint should be finalization required.
-          // bpc should be running
-          Assertions.assertFalse(
-              scm.getPipelineManager().isPipelineCreationFrozen());
-          Assertions.assertEquals(
-              scm.getScmContext().getFinalizationCheckpoint(),
-              FinalizationCheckpoint.FINALIZATION_REQUIRED);
-          break;
-        case AFTER_PRE_FINALIZE_UPGRADE:
-          // checkpoint should be finalization started.
-          // bpc should not be running
-          Assertions.assertTrue(scm.getPipelineManager().isPipelineCreationFrozen());
-          Assertions.assertEquals(
-              scm.getScmContext().getFinalizationCheckpoint(),
-              FinalizationCheckpoint.FINALIZATION_STARTED);
-          break;
-        case AFTER_COMPLETE_FINALIZATION:
-          // checkpoint should be mlv == slv.
-          // bpc should not be running
-          Assertions.assertFalse(scm.getPipelineManager().isPipelineCreationFrozen());
-          Assertions.assertEquals(
-              scm.getScmContext().getFinalizationCheckpoint(),
-              FinalizationCheckpoint.MLV_EQUALS_SLV);
-          break;
-        case AFTER_POST_FINALIZE_UPGRADE:
-          // checkpoint should be finalization complete.
-          // bpc should be running
-          Assertions.assertFalse(scm.getPipelineManager().isPipelineCreationFrozen());
-          Assertions.assertEquals(
-              scm.getScmContext().getFinalizationCheckpoint(),
-              FinalizationCheckpoint.FINALIZATION_COMPLETE);
-          break;
+      case BEFORE_PRE_FINALIZE_UPGRADE:
+        Assertions.assertFalse(
+            scm.getPipelineManager().isPipelineCreationFrozen());
+        Assertions.assertEquals(
+            scm.getScmContext().getFinalizationCheckpoint(),
+            FinalizationCheckpoint.FINALIZATION_REQUIRED);
+        break;
+      case AFTER_PRE_FINALIZE_UPGRADE:
+        Assertions.assertTrue(
+            scm.getPipelineManager().isPipelineCreationFrozen());
+        Assertions.assertEquals(
+            scm.getScmContext().getFinalizationCheckpoint(),
+            FinalizationCheckpoint.FINALIZATION_STARTED);
+        break;
+      case AFTER_COMPLETE_FINALIZATION:
+        Assertions.assertFalse(
+            scm.getPipelineManager().isPipelineCreationFrozen());
+        Assertions.assertEquals(
+            scm.getScmContext().getFinalizationCheckpoint(),
+            FinalizationCheckpoint.MLV_EQUALS_SLV);
+        break;
+      case AFTER_POST_FINALIZE_UPGRADE:
+        Assertions.assertFalse(
+            scm.getPipelineManager().isPipelineCreationFrozen());
+        Assertions.assertEquals(
+            scm.getScmContext().getFinalizationCheckpoint(),
+            FinalizationCheckpoint.FINALIZATION_COMPLETE);
+        break;
+      default:
+        Assertions.fail("Unknown halting point in test: " + haltingPoint);
       }
     }
   }
 
   // Used for snapshot install and leader change.
   private InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
-  getPausingFinalizationExecutor(UpgradeTestInjectionPoints haltingPoint) {
+      getPausingFinalizationExecutor(UpgradeTestInjectionPoints haltingPoint) {
     InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
         executor =
         new InjectedUpgradeFinalizationExecutor<>();
@@ -380,7 +376,8 @@ public class TestScmHAFinalization {
 
   // Used when node will be restarted
   private InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
-  getTerminatingFinalizationExecutor(UpgradeTestInjectionPoints haltingPoint) {
+      getTerminatingFinalizationExecutor(
+          UpgradeTestInjectionPoints haltingPoint) {
     InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
         executor =
         new InjectedUpgradeFinalizationExecutor<>();

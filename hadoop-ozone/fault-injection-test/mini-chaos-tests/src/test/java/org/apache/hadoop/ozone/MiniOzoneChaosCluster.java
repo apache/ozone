@@ -427,9 +427,10 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     failedScmSet.add(scm);
   }
 
-  public StorageContainerManager restartStorageContainerManager(StorageContainerManager scm,
-      boolean waitForScm) throws IOException, TimeoutException,
-      InterruptedException, AuthenticationException {
+  public StorageContainerManager restartStorageContainerManager(
+      StorageContainerManager scm, boolean waitForScm)
+      throws IOException, TimeoutException, InterruptedException,
+      AuthenticationException {
     failedScmSet.remove(scm);
     return super.restartStorageContainerManager(scm, waitForScm);
   }
