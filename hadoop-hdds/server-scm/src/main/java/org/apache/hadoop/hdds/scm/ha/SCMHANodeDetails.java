@@ -169,9 +169,9 @@ public class SCMHANodeDetails {
     if (Storage.StorageState.INITIALIZED.equals(state) &&
             scmHAEnabled != scmHAEnableDefault) {
       String errorMessage = String.format("Current State of SCM: %s",
-              scmHAEnableDefault ? "SCM HA is enabled with Ratis"
-              : "SCM is running in Non HA without Ratis")
-              + " HA SCM -> Non HA SCM or " +
+              scmHAEnableDefault ? "Ratis SCM is enabled "
+              : "SCM is running in Non Ratis without Ratis")
+              + " Ratis SCM -> Non Ratis SCM or " +
               "Non HA SCM -> HA SCM is not supported";
       if (Strings.isNotEmpty(conf.get(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY))) {
         throw new ConfigurationException(String.format("Invalid Config %s " +
@@ -179,10 +179,13 @@ public class SCMHANodeDetails {
             ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, scmHAEnabled,
             scmHAEnableDefault, errorMessage));
       } else {
-        LOG.warn("Invalid Config {}, Expected Config Value: {}, Default Config "
-                        + "Value: {}. {}",
+        LOG.warn("Invalid config {}. The config was not specified, " +
+                        "but the default value {} conflicts with " +
+                        "the expected config value {}. " +
+                        "Falling back to the expected value. {}",
                 ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-            scmHAEnableDefault, scmHAEnabled, errorMessage);
+                ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT,
+                scmHAEnableDefault, errorMessage);
       }
     }
     DefaultConfigManager.setConfigValue(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,

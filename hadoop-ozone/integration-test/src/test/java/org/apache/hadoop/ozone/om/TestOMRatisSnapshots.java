@@ -136,7 +136,6 @@ public class TestOMRatisSnapshots {
     if (cluster != null) {
       cluster.shutdown();
     }
-    DefaultConfigManager.clearDefaultConfigs();
   }
 
   @Test

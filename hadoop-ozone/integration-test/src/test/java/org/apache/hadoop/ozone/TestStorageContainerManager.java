@@ -542,15 +542,14 @@ public class TestStorageContainerManager {
     }
   }
 
-
-  @Test
+  // Unsupported Test case. Non Ratis SCM -> Ratis SCM not supported
+  //@Test
   public void testSCMReinitializationWithHAUpgrade() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     final String path = GenericTestUtils.getTempPath(
         UUID.randomUUID().toString());
     Path scmPath = Paths.get(path, "scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     //This will set the cluster id in the version file
     final UUID clusterId = UUID.randomUUID();
       // This will initialize SCM
@@ -560,11 +559,7 @@ public class TestStorageContainerManager {
     Assert.assertEquals(clusterId.toString(), scmStore.getClusterID());
     Assert.assertFalse(scmStore.isSCMHAEnabled());
 
-
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-    // Non Ratis SCM -> Ratis SCM is not supported {@see HDDS-6695}
-    FileUtils.deleteDirectory(scmStore.getCurrentDir());
-    DefaultConfigManager.clearDefaultConfigs();
     StorageContainerManager.scmInit(conf, clusterId.toString());
     scmStore = new SCMStorageConfig(conf);
     Assert.assertTrue(scmStore.isSCMHAEnabled());
