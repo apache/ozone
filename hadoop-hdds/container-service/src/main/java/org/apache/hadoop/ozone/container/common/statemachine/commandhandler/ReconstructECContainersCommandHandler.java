@@ -53,8 +53,9 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
             ecContainersCommand.getMissingContainerIndexes(),
             ecContainersCommand.getSources(),
             ecContainersCommand.getTargetDatanodes());
-    this.supervisor.addTask(
-        new ECReconstructionCoordinatorTask(reconstructionCommandInfo));
+    this.supervisor.addTask(new ECReconstructionCoordinatorTask(
+        this.supervisor.getReconstructionCoordinator(),
+        reconstructionCommandInfo));
   }
 
   @Override

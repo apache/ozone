@@ -1151,6 +1151,7 @@ message PurgePathRequest {
 
 message DeleteOpenKeysRequest {
   repeated OpenKeyBucket openKeysPerBucket = 1;
+  optional BucketLayoutProto bucketLayout = 2;
 }
 
 message OpenKeyBucket {

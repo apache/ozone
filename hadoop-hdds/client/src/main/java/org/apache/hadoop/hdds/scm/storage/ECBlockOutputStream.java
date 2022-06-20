@@ -80,6 +80,11 @@ public class ECBlockOutputStream extends BlockOutputStream {
         writeChunkToContainer(ChunkBuffer.wrap(ByteBuffer.wrap(b, off, len)));
   }
 
+  public CompletableFuture<ContainerProtos.ContainerCommandResponseProto> write(
+      ByteBuffer buff) throws IOException {
+    return writeChunkToContainer(ChunkBuffer.wrap(buff));
+  }
+
   public CompletableFuture<ContainerProtos.
       ContainerCommandResponseProto> executePutBlock(boolean close,
       boolean force, long blockGroupLength) throws IOException {

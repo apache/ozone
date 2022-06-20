@@ -38,13 +38,10 @@ import java.util.function.Supplier;
 public class TenantShell extends Shell {
 
   @Override
-  public void execute(String[] argv) {
+  public int execute(String[] argv) {
     TracingUtil.initTracing("tenant-shell", createOzoneConfiguration());
-    TracingUtil.executeInNewSpan("tenant-shell",
-        (Supplier<Void>) () -> {
-          super.execute(argv);
-          return null;
-        });
+    return TracingUtil.executeInNewSpan("tenant-shell",
+        (Supplier<Integer>) () -> super.execute(argv));
   }
 
   /**

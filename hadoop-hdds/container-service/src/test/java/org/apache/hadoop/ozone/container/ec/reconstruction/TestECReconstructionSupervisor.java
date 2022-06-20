@@ -28,7 +28,7 @@ import java.util.concurrent.TimeoutException;
 public class TestECReconstructionSupervisor {
 
   private final ECReconstructionSupervisor supervisor =
-      new ECReconstructionSupervisor(null, null, 5);
+      new ECReconstructionSupervisor(null, null, 5, null);
 
   @Test
   public void testAddTaskShouldExecuteTheGivenTask()
@@ -42,7 +42,7 @@ public class TestECReconstructionSupervisor {
     private boolean isExecuted = false;
 
     FakeTask(ECReconstructionCommandInfo reconstructionCommandInfo) {
-      super(reconstructionCommandInfo);
+      super(null, reconstructionCommandInfo);
     }
 
     @Override

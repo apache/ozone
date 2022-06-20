@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketSetAclRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
+import org.apache.hadoop.ozone.om.request.key.OMOpenKeysDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMTrashRecoverRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequestWithFSO;
@@ -208,6 +209,13 @@ public final class OzoneManagerRatisUtils {
       return new OMTenantRevokeAdminRequest(omRequest);
     case SetRangerServiceVersion:
       return new OMSetRangerServiceVersionRequest(omRequest);
+    case DeleteOpenKeys:
+      BucketLayout bktLayout = BucketLayout.DEFAULT;
+      if (omRequest.getDeleteOpenKeysRequest().hasBucketLayout()) {
+        bktLayout = BucketLayout.fromProto(
+            omRequest.getDeleteOpenKeysRequest().getBucketLayout());
+      }
+      return new OMOpenKeysDeleteRequest(omRequest, bktLayout);
 
     /*
      * Key requests that can have multiple variants based on the bucket layout
