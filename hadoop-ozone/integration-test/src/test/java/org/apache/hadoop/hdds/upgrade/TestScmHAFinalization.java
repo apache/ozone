@@ -163,8 +163,6 @@ public class TestScmHAFinalization {
     // Client should complete exceptionally since the original SCM it
     // requested to was restarted.
     finalizationFuture.get();
-    // TODO: Finalization finishes, but this call times out returning
-    //  FINALIZATION_IN_PROGRESS every time.
     TestHddsUpgradeUtils.waitForFinalization(scmClient, CLIENT_ID);
     // Make sure old leader has caught up after the restart.
     waitForScmToFinalize(oldLeaderScmRestarted);
@@ -206,9 +204,8 @@ public class TestScmHAFinalization {
     cluster.getSCMConfigurator()
         .setUpgradeFinalizationExecutor(
             new DefaultUpgradeFinalizationExecutor<>());
-    // TODO: Handle this in mini ozone.
     List<StorageContainerManager> originalSCMs =
-        new ArrayList<>(cluster.getStorageContainerManagers());
+        cluster.getStorageContainerManagers();
 
     for (StorageContainerManager scm: originalSCMs) {
       cluster.restartStorageContainerManager(scm, false);
@@ -222,11 +219,6 @@ public class TestScmHAFinalization {
     cluster.waitForClusterToBeReady();
 
     finalizationFuture.get();
-    // TODO: This returns FINALIZATION_DONE after the mlv == slv checkpoint,
-    //  so the method that checks for finalization complete checkpint will fail.
-    // TODO: for AFTER_COMPLETE_FINALIZATION halting point, this has the same
-    //  error as test leader change (reports stuck in progress even though fin
-    //  completed).
     TestHddsUpgradeUtils.waitForFinalization(scmClient, CLIENT_ID);
     // Once the leader says finalization is complete, wait for all followers
     // to catch up so we can check their state.
@@ -251,7 +243,6 @@ public class TestScmHAFinalization {
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
         5);
 
-    // TODO: Investigate pausing.
     init(conf, new DefaultUpgradeFinalizationExecutor<>(), numInactiveSCMs);
 
     GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer

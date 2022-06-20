@@ -127,9 +127,9 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     } finally {
       checkpointLock.writeLock().unlock();
     }
-    publishCheckpoint(FinalizationCheckpoint.FINALIZATION_STARTED);
     transactionBuffer.addToBuffer(finalizationStore,
         OzoneConsts.FINALIZING_KEY, "");
+    publishCheckpoint(FinalizationCheckpoint.FINALIZATION_STARTED);
   }
 
   @Override

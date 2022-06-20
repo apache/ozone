@@ -116,9 +116,6 @@ public class SCMUpgradeFinalizer extends
         context.getFinalizationStateManager();
     if (!stateManager.crossedCheckpoint(
         FinalizationCheckpoint.FINALIZATION_COMPLETE)) {
-      LOG.info("Entering pipeline wait on scm {} leader {}",
-          context.getSCMContext().getScm().getScmNodeDetails().getNodeId(),
-          context.getSCMContext().isLeader());
       createPipelinesAfterFinalization(context.getPipelineManager());
       stateManager.removeFinalizingMark();
     }
