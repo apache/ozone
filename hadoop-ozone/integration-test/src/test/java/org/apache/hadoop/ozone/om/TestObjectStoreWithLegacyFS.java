@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
@@ -52,13 +51,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
-
-import static org.junit.Assert.fail;
 
 /**
  * Test verifies object store with OZONE_OM_ENABLE_FILESYSTEM_PATHS enabled.
@@ -230,25 +226,5 @@ public class TestObjectStoreWithLegacyFS {
     byte[] chars = new byte[size];
     Arrays.fill(chars, val);
     return chars;
-  }
-
-  private void assertTableRowCount(Table<String, ?> table, int count)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> getTableRowCount(count, table), 1000,
-        120000); // 2 minutes
-  }
-
-  private boolean getTableRowCount(int expectedCount,
-      Table<String, ?> table) {
-    long count = 0L;
-    try {
-      count = cluster.getOzoneManager().getMetadataManager()
-          .countRowsInTable(table);
-      LOG.info("{} actual row count={}, expectedCount={}", table.getName(),
-          count, expectedCount);
-    } catch (IOException ex) {
-      fail("testDoubleBuffer failed with: " + ex);
-    }
-    return count == expectedCount;
   }
 }
