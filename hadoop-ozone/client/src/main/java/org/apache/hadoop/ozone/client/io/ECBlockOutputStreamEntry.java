@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
+import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
@@ -90,6 +91,23 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     if (!isInitialized()) {
       blockOutputStreams =
           new ECBlockOutputStream[replicationConfig.getRequiredNodes()];
+      for (int i = 0; i < replicationConfig.getRequiredNodes(); i++) {
+        if (blockOutputStreams[i] != null) {
+          continue;
+        }
+        blockOutputStreams[i] =
+            new ECBlockOutputStream(getBlockID(), getXceiverClientManager(),
+                createSingleECBlockPipeline(getPipeline(),
+                    getPipeline().getNodes().get(i), i + 1), getBufferPool(),
+                getConf(), getToken());
+        System.out.println(
+            "Creating container from client: " + getBlockID().getContainerID());
+        ContainerProtocolCalls
+            .createContainerInternal(blockOutputStreams[i].getXceiverClient(),
+                getBlockID().getContainerID(),
+                getToken() != null ? getToken().encodeToUrlString() : null,
+                null, i + 1);
+      }
     }
     if (blockOutputStreams[currentStreamIdx] == null) {
       createOutputStream();
@@ -101,10 +119,18 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     Pipeline ecPipeline = getPipeline();
     List<DatanodeDetails> nodes = getPipeline().getNodes();
     for (int i = currentStreamIdx; i < nodes.size(); i++) {
-      blockOutputStreams[i] =
+      if (blockOutputStreams[i] != null) {
+        continue;
+      }
+      /*blockOutputStreams[i] =
           new ECBlockOutputStream(getBlockID(), getXceiverClientManager(),
               createSingleECBlockPipeline(ecPipeline, nodes.get(i), i + 1),
               getBufferPool(), getConf(), getToken());
+      ContainerProtocolCalls
+          .createContainerInternal(blockOutputStreams[i].getXceiverClient(),
+              getBlockID().getContainerID(),
+              getToken() != null ? getToken().encodeToUrlString() : null, null,
+              i + 1);*/
     }
   }
 
@@ -272,7 +298,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
       return;
     }
     for (ECBlockOutputStream stream : blockOutputStreams) {
-      if (stream == null) {
+      if (stream == null || stream.getWrittenDataLength() <= 0) {
         continue;
       }
       try {

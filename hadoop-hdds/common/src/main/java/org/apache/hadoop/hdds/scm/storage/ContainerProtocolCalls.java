@@ -456,7 +456,7 @@ public final class ContainerProtocolCalls  {
    * @param replicaIndex - index position of the container replica
    * @throws IOException
    */
-  private static void createContainerInternal(XceiverClientSpi client,
+  public static void createContainerInternal(XceiverClientSpi client,
       long containerID, String encodedToken,
       ContainerProtos.ContainerDataProto.State state, int replicaIndex)
       throws IOException {
