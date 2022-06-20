@@ -225,4 +225,10 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return Background service.
    */
   BackgroundService getDirDeletingService();
+
+  /**
+   * Returns the instance of Open Key Cleanup Service.
+   * @return Background service.
+   */
+  BackgroundService getOpenKeyCleanupService();
 }
