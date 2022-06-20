@@ -714,13 +714,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           containerPlacementPolicy,
           eventQueue,
           scmContext,
-          serviceManager,
           scmNodeManager,
           clock,
           scmHAManager,
           getScmMetadataStore().getMoveTable(),
           containerReplicaPendingOps);
     }
+    serviceManager.register(replicationManager);
     if (configurator.getScmSafeModeManager() != null) {
       scmSafeModeManager = configurator.getScmSafeModeManager();
     } else {

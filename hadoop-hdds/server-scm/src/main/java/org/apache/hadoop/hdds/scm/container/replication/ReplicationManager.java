@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -39,7 +38,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
-import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -150,7 +148,6 @@ public class ReplicationManager implements SCMService {
              final PlacementPolicy containerPlacement,
              final EventPublisher eventPublisher,
              final SCMContext scmContext,
-             final SCMServiceManager serviceManager,
              final NodeManager nodeManager,
              final Clock clock,
              final SCMHAManager scmhaManager,
@@ -174,11 +171,6 @@ public class ReplicationManager implements SCMService {
         conf, containerManager, containerPlacement, eventPublisher,
         scmContext, nodeManager, scmhaManager, clock, moveTable);
     this.ecContainerHealthCheck = new ECContainerHealthCheck();
-
-    // register ReplicationManager to SCMServiceManager.
-    serviceManager.register(this);
-
-    // start ReplicationManager.
     start();
   }
 
