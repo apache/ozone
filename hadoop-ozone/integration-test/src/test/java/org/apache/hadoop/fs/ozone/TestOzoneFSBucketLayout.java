@@ -106,10 +106,11 @@ public class TestOzoneFSBucketLayout {
   @Before
   public void createVolumeAndBucket() throws IOException {
     // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
-    volumeName =
+    TestOzoneFSBucketLayout.volumeName =
         TestDataUtil.createVolumeAndBucket(cluster)
             .getVolumeName();
-    volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
+    TestOzoneFSBucketLayout.volumePath =
+        new Path(OZONE_URI_DELIMITER, volumeName);
   }
 
   @After
