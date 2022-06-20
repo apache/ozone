@@ -1250,6 +1250,19 @@
   </property>
 
   <property>
+    <name>ozone.om.open.key.cleanup.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>A timeout value of open key cleanup service. If this is set
+      greater than 0, the service will stop waiting for the open key deleting
+      completion after this time. If timeout happens to a large proportion of
+      open key deletion, this value needs to be increased or
+      ozone.om.open.key.cleanup.limit.per.task should be decreased.
+      Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.open.key.expire.threshold</name>
     <value>7d</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
