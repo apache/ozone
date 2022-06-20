@@ -237,6 +237,10 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       // If FILE_EXISTS we just override like how we used to do for Key Create.
       List< OzoneAcl > inheritAcls;
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("BucketName: {}, BucketLayout: {}",
+            omBucketInfo.getBucketName(), omBucketInfo.getBucketLayout());
+      }
       if (bucketInfo.getBucketLayout()
           .shouldNormalizePaths(ozoneManager.getEnableFileSystemPaths())) {
         OMFileRequest.OMPathInfo pathInfo =

@@ -19,16 +19,27 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -42,6 +53,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
 
 import static org.junit.Assert.fail;
 
@@ -51,13 +66,15 @@ import static org.junit.Assert.fail;
 public class TestObjectStoreWithLegacyFS {
 
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public Timeout timeout = Timeout.seconds(200);
 
   private static MiniOzoneCluster cluster = null;
 
   private String volumeName;
 
   private String bucketName;
+
+  private OzoneVolume volume;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestObjectStoreWithLegacyFS.class);
@@ -90,11 +107,11 @@ public class TestObjectStoreWithLegacyFS {
     volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
     bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
 
-    OzoneConfiguration conf = cluster.getConf();
-
     // create a volume and a bucket to be used by OzoneFileSystem
     TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName,
         BucketLayout.OBJECT_STORE);
+    volume =
+        cluster.getRpcClient().getObjectStore().getVolume(volumeName);
   }
 
   /**
@@ -104,10 +121,7 @@ public class TestObjectStoreWithLegacyFS {
    */
   @Test
   public void testFlatKeyStructureWithOBS() throws Exception {
-    OzoneVolume ozoneVolume =
-        cluster.getRpcClient().getObjectStore().getVolume(volumeName);
-
-    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+    OzoneBucket ozoneBucket = volume.getBucket(bucketName);
     OzoneOutputStream stream = ozoneBucket
         .createKey("dir1/dir2/dir3/key-1", 0);
     stream.close();
@@ -118,12 +132,104 @@ public class TestObjectStoreWithLegacyFS {
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
         iterator = keyTable.iterator();
 
-    assertTableRowCount(keyTable, 1);
+    String seekKey = "dir";
+    String dbKey = cluster.getOzoneManager().getMetadataManager()
+        .getOzoneKey(volumeName, bucketName, seekKey);
+    iterator.seek(dbKey);
 
+    int countKeys = 0;
     while (iterator.hasNext()) {
       Table.KeyValue<String, OmKeyInfo> keyValue = iterator.next();
+      if (!keyValue.getKey().startsWith(dbKey)) {
+        break;
+      }
+      countKeys++;
       Assert.assertTrue(keyValue.getKey().endsWith("dir1/dir2/dir3/key-1"));
     }
+    Assert.assertEquals(1, countKeys);
+  }
+
+  @Test
+  public void testMultiPartCompleteUpload() throws Exception {
+    // Test-1: Upload MPU to an OBS layout with Directory Exists
+    String legacyBuckName = UUID.randomUUID().toString();
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setStorageType(StorageType.DISK);
+    builder.setBucketLayout(BucketLayout.OBJECT_STORE);
+    BucketArgs omBucketArgs = builder.build();
+    volume.createBucket(legacyBuckName, omBucketArgs);
+    OzoneBucket bucket = volume.getBucket(legacyBuckName);
+
+    String keyName = "abc/def/mpu-key1";
+
+    OmMultipartUploadCompleteInfo
+        omMultipartUploadCompleteInfo =
+        uploadMPUWithDirectoryExists(bucket, keyName);
+    // successfully uploaded MPU key
+    Assert.assertNotNull(omMultipartUploadCompleteInfo);
+
+    // Test-2: Upload MPU to an LEGACY layout with Directory Exists
+    legacyBuckName = UUID.randomUUID().toString();
+    builder = BucketArgs.newBuilder();
+    builder.setStorageType(StorageType.DISK);
+    builder.setBucketLayout(BucketLayout.LEGACY);
+    omBucketArgs = builder.build();
+    volume.createBucket(legacyBuckName, omBucketArgs);
+    bucket = volume.getBucket(legacyBuckName);
+
+    try {
+      uploadMPUWithDirectoryExists(bucket, keyName);
+      Assert.fail("Must throw error as there is " +
+          "already directory in the given path");
+    } catch (OMException ome) {
+      Assert.assertEquals(OMException.ResultCodes.NOT_A_FILE, ome.getResult());
+    }
+  }
+
+  private OmMultipartUploadCompleteInfo uploadMPUWithDirectoryExists(
+      OzoneBucket bucket, String keyName) throws IOException {
+    OmMultipartInfo omMultipartInfo = bucket.initiateMultipartUpload(keyName,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
+
+    Assert.assertNotNull(omMultipartInfo.getUploadID());
+
+    String uploadID = omMultipartInfo.getUploadID();
+
+    // upload part 1.
+    byte[] data = generateData(128, (byte) RandomUtils.nextLong());
+    OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
+        data.length, 1, uploadID);
+    ozoneOutputStream.write(data, 0, data.length);
+    ozoneOutputStream.close();
+
+    if (bucket.getBucketLayout() == BucketLayout.OBJECT_STORE) {
+      // Create a path with trailing slash, in LEGACY this represents a dir
+      OzoneOutputStream stream = bucket.createKey(
+          omMultipartInfo.getKeyName() + OzoneConsts.OZONE_URI_DELIMITER, 0);
+      stream.close();
+    } else if (bucket.getBucketLayout() == BucketLayout.LEGACY) {
+      // Create an intermediate path with trailing slash,
+      // in LEGACY this represents a directory
+      OzoneOutputStream stream = bucket.createKey(
+          keyName + OzoneConsts.OZONE_URI_DELIMITER + "newKey-1", 0);
+      stream.close();
+    }
+
+    OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
+        ozoneOutputStream.getCommitUploadPartInfo();
+
+    Map<Integer, String> partsMap = new LinkedHashMap<>();
+    partsMap.put(1, omMultipartCommitUploadPartInfo.getPartName());
+    OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo =
+        bucket.completeMultipartUpload(keyName,
+            uploadID, partsMap);
+    return omMultipartUploadCompleteInfo;
+  }
+
+  private byte[] generateData(int size, byte val) {
+    byte[] chars = new byte[size];
+    Arrays.fill(chars, val);
+    return chars;
   }
 
   private void assertTableRowCount(Table<String, ?> table, int count)
