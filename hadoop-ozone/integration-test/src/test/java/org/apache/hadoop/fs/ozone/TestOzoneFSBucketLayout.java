@@ -67,8 +67,8 @@ public class TestOzoneFSBucketLayout {
   private static ObjectStore objectStore;
   private static BasicRootedOzoneClientAdapterImpl adapter;
 
-  private static String volumeName;
-  private static Path volumePath;
+  private String volumeName;
+  private Path volumePath;
 
   @Parameterized.Parameters
   public static Collection<BucketLayout> data() {
@@ -106,11 +106,10 @@ public class TestOzoneFSBucketLayout {
   @Before
   public void createVolumeAndBucket() throws IOException {
     // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
-    TestOzoneFSBucketLayout.volumeName =
+    volumeName =
         TestDataUtil.createVolumeAndBucket(cluster)
             .getVolumeName();
-    TestOzoneFSBucketLayout.volumePath =
-        new Path(OZONE_URI_DELIMITER, volumeName);
+    volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
   }
 
   @After
