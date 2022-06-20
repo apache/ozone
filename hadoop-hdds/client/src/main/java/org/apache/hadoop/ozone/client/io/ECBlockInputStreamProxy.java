@@ -167,7 +167,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
       if (e instanceof BadDataLocationException) {
         String message = "Failing over to reconstruction read due" +
                 " to an error in ECBlockReader.";
-        if(LOG.isDebugEnabled()) {
+        if (LOG.isDebugEnabled()) {
           LOG.debug(message, e);
         } else {
           LOG.warn("{} Exception Class: {}, Exception Message: {}",
