@@ -25,13 +25,16 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -41,6 +44,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.ExitUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,8 +52,11 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
@@ -57,6 +64,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 
 /**
  * Replication Manager (RM) is the one which is responsible for making sure
@@ -125,6 +133,8 @@ public class ReplicationManager implements SCMService {
   private long lastTimeToBeReadyInMillis = 0;
   private final Clock clock;
   private final ContainerReplicaPendingOps containerReplicaPendingOps;
+  private final ContainerHealthCheck ecContainerHealthCheck;
+  private final EventPublisher eventPublisher;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -154,6 +164,7 @@ public class ReplicationManager implements SCMService {
     this.clock = clock;
     this.containerReport = new ReplicationManagerReport();
     this.metrics = null;
+    this.eventPublisher = eventPublisher;
     this.waitTimeInMillis = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
@@ -162,6 +173,7 @@ public class ReplicationManager implements SCMService {
     this.legacyReplicationManager = new LegacyReplicationManager(
         conf, containerManager, containerPlacement, eventPublisher,
         scmContext, nodeManager, scmhaManager, clock, moveTable);
+    this.ecContainerHealthCheck = new ECContainerHealthCheck();
 
     // register ReplicationManager to SCMServiceManager.
     serviceManager.register(this);
@@ -233,22 +245,75 @@ public class ReplicationManager implements SCMService {
     final List<ContainerInfo> containers =
         containerManager.getContainers();
     ReplicationManagerReport report = new ReplicationManagerReport();
+    List<ContainerHealthResult.UnderReplicatedHealthResult> underReplicated =
+        new ArrayList<>();
+    List<ContainerHealthResult.OverReplicatedHealthResult> overReplicated =
+        new ArrayList<>();
+
     for (ContainerInfo c : containers) {
       if (!shouldRun()) {
         break;
       }
-      switch (c.getReplicationType()) {
-      case EC:
-        break;
-      default:
+      report.increment(c.getState());
+      if (c.getReplicationType() != EC) {
         legacyReplicationManager.processContainer(c, report);
+        continue;
       }
+      List<SCMCommand> cmds =
+          processContainer(c, underReplicated, overReplicated, report);
+      // TODO - send commands
     }
     report.setComplete();
+    // Sort the pending lists by priority and assign to the main queue.
     this.containerReport = report;
     LOG.info("Replication Monitor Thread took {} milliseconds for" +
             " processing {} containers.", clock.millis() - start,
         containers.size());
+  }
+
+  protected List<SCMCommand> processContainer(ContainerInfo containerInfo,
+      List<ContainerHealthResult.UnderReplicatedHealthResult> underRep,
+      List<ContainerHealthResult.OverReplicatedHealthResult> overRep,
+      ReplicationManagerReport report) {
+    List<SCMCommand> cmds = Collections.emptyList();
+    Set<ContainerReplica> replicas;
+    try {
+      replicas = containerManager.getContainerReplicas(
+          containerInfo.containerID());
+    } catch (ContainerNotFoundException e) {
+      LOG.error("Container not found getting replicas for {}",
+          containerInfo.containerID(), e);
+      return cmds;
+    }
+    List<ContainerReplicaOp> pendingOps =
+        containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
+    ContainerHealthResult health = ecContainerHealthCheck
+        .checkHealth(containerInfo, replicas, pendingOps, 0);
+    if (health.getHealthState() ==
+        ContainerHealthResult.HealthState.HEALTHY) {
+      // TODO - should the report have a HEALTHY state, rather than just bad
+      //        state?
+    } else if (health.getHealthState()
+        == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
+      report.incrementAndSample(
+          HealthState.UNDER_REPLICATED, containerInfo.containerID());
+      ContainerHealthResult.UnderReplicatedHealthResult underHealth
+          = ((ContainerHealthResult.UnderReplicatedHealthResult) health);
+      if (!underHealth.isSufficientlyReplicatedAfterPending()) {
+        underRep.add(underHealth);
+      }
+      return cmds;
+    } else if (health.getHealthState()
+        == ContainerHealthResult.HealthState.OVER_REPLICATED) {
+      report.incrementAndSample(HealthState.OVER_REPLICATED,
+          containerInfo.containerID());
+      ContainerHealthResult.OverReplicatedHealthResult overHealth
+          = ((ContainerHealthResult.OverReplicatedHealthResult) health);
+      if (!overHealth.isSufficientlyReplicatedAfterPending()) {
+        overRep.add(overHealth);
+      }
+    }
+    return cmds;
   }
 
   public ReplicationManagerReport getContainerReport() {
