@@ -170,7 +170,7 @@ public class SCMHANodeDetails {
             scmHAEnabled != scmHAEnableDefault) {
       String errorMessage = String.format("Current State of SCM: %s",
               scmHAEnableDefault ? "Ratis SCM is enabled "
-              : "SCM is running in Non Ratis without Ratis")
+              : "SCM is running in Non-HA without Ratis")
               + " Ratis SCM -> Non Ratis SCM or " +
               "Non HA SCM -> HA SCM is not supported";
       if (Strings.isNotEmpty(conf.get(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY))) {
