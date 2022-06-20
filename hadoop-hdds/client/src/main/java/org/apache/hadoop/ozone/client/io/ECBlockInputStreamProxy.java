@@ -170,7 +170,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
         if (LOG.isDebugEnabled()) {
           LOG.debug(message, e);
         } else {
-          LOG.warn("{} Exception Class: {}, Exception Message: {}",
+          LOG.warn("{} Exception Class: {} , Exception Message: {}",
                   message, e.getClass().getName(), e.getMessage());
         }
 

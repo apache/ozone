@@ -284,7 +284,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       if (LOG.isDebugEnabled()) {
         LOG.debug(message, processForDebug(request), e);
       } else {
-        LOG.error(message + "Exception Class: {}, Exception Message: {}",
+        LOG.error(message + " Exception Class: {}, Exception Message: {}",
                 request.getCmdType(), e.getClass().getName(), e.getMessage());
       }
     }
