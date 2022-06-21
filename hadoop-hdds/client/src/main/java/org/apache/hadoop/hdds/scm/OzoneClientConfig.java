@@ -176,6 +176,14 @@ public class OzoneClientConfig {
   private String checksumCombineMode =
       ChecksumCombineMode.COMPOSITE_CRC.name();
 
+  @Config(key = "fs.default.bucket.layout",
+      defaultValue = "FILE_SYSTEM_OPTIMIZED",
+      type = ConfigType.STRING,
+      description = "The bucket layout used by buckets created using OFS. " +
+          "Valid values include FILE_SYSTEM_OPTIMIZED and LEGACY",
+      tags = ConfigTag.CLIENT)
+  private String fsDefaultBucketLayout = "FILE_SYSTEM_OPTIMIZED";
+
   @PostConstruct
   private void validate() {
     Preconditions.checkState(streamBufferSize > 0);
@@ -306,5 +314,15 @@ public class OzoneClientConfig {
 
   public int getEcReconstructStripeReadPoolLimit() {
     return ecReconstructStripeReadPoolLimit;
+  }
+
+  public void setFsDefaultBucketLayout(String bucketLayout) {
+    if (!bucketLayout.isEmpty()) {
+      this.fsDefaultBucketLayout = bucketLayout;
+    }
+  }
+
+  public String getFsDefaultBucketLayout() {
+    return fsDefaultBucketLayout;
   }
 }

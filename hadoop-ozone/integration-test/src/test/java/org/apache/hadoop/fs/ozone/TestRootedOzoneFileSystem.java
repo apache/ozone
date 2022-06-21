@@ -224,6 +224,8 @@ public class TestRootedOzoneFileSystem {
           bucketLayout.name());
     } else {
       bucketLayout = BucketLayout.LEGACY;
+      conf.set(OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT,
+          OzoneConfigKeys.OZONE_CLIENT_FS_BUCKET_LAYOUT_LEGACY);
       conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
           bucketLayout.name());
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
