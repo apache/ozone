@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
@@ -118,6 +119,7 @@ public class TestObjectStoreWithLegacyFS {
   @Test
   public void testFlatKeyStructureWithOBS() throws Exception {
     OzoneBucket ozoneBucket = volume.getBucket(bucketName);
+    String keyName = "dir1/dir2/dir3/key-1";
     OzoneOutputStream stream = ozoneBucket
         .createKey("dir1/dir2/dir3/key-1", 0);
     stream.close();
@@ -125,24 +127,46 @@ public class TestObjectStoreWithLegacyFS {
         cluster.getOzoneManager().getMetadataManager()
             .getKeyTable(BucketLayout.OBJECT_STORE);
 
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = keyTable.iterator();
-
     String seekKey = "dir";
     String dbKey = cluster.getOzoneManager().getMetadataManager()
         .getOzoneKey(volumeName, bucketName, seekKey);
-    iterator.seek(dbKey);
 
+    GenericTestUtils
+        .waitFor(() -> assertKeyCount(keyTable, dbKey, 1, keyName), 500,
+            60000);
+
+    ozoneBucket.renameKey(keyName, "dir1/NewKey-1");
+
+    GenericTestUtils
+        .waitFor(() -> assertKeyCount(keyTable, dbKey, 1, "dir1/NewKey-1"), 500,
+            60000);
+  }
+
+  private boolean assertKeyCount(
+      Table<String, OmKeyInfo> keyTable,
+      String dbKey, int expectedCnt, String keyName) {
+    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+        itr = keyTable.iterator();
     int countKeys = 0;
-    while (iterator.hasNext()) {
-      Table.KeyValue<String, OmKeyInfo> keyValue = iterator.next();
-      if (!keyValue.getKey().startsWith(dbKey)) {
-        break;
+    try {
+      itr.seek(dbKey);
+      while (itr.hasNext()) {
+
+        Table.KeyValue<String, OmKeyInfo> keyValue = itr.next();
+        if (!keyValue.getKey().startsWith(dbKey)) {
+          break;
+        }
+        countKeys++;
+        Assert.assertTrue(keyValue.getKey().endsWith(keyName));
       }
-      countKeys++;
-      Assert.assertTrue(keyValue.getKey().endsWith("dir1/dir2/dir3/key-1"));
+    } catch (IOException ex) {
+      LOG.info("Test failed with: " + ex.getMessage(), ex);
+      Assert.fail("Test failed with: " + ex.getMessage());
     }
-    Assert.assertEquals(1, countKeys);
+    if (countKeys != expectedCnt) {
+      LOG.info("Couldn't find KeyName:{} in KeyTable, retrying...", keyName);
+    }
+    return countKeys == expectedCnt;
   }
 
   @Test
