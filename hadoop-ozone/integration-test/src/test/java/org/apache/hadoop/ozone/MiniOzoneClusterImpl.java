@@ -80,6 +80,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS_ADMIN;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS_SERVER;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.REPLICATION;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.STANDALONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
@@ -415,6 +416,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         dn.getPort(RATIS_ADMIN).getValue());
     config.setInt(DFS_CONTAINER_RATIS_SERVER_PORT,
         dn.getPort(RATIS_SERVER).getValue());
+    config.setFromObject(conf.getObject(ReplicationConfig.class)
+        .setPort(dn.getPort(REPLICATION).getValue()));
     hddsDatanodes.remove(i);
     if (waitForDatanode) {
       // wait for node to be removed from SCM healthy node list.
