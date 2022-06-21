@@ -149,16 +149,13 @@ public class TestOzoneFSBucketLayout {
 
     // In case OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT is set to OBS,
     // FS initialization should fail.
-    FileSystem fs;
+
     if (ERROR_MAP.containsKey(defaultBucketLayout)) {
       try {
-        fs = FileSystem.newInstance(conf);
+        FileSystem.newInstance(conf);
         Assert.fail("File System initialization should fail in case " +
             " of invalid configuration of " +
             OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT);
-        // Dummy read op to avoid compiler warning. This is not expected to
-        // be executed.
-        fs.mkdirs(new Path("/dummy/operation/for/findbugs/warning"));
       } catch (OMException oe) {
         Assert.assertTrue(
             oe.getMessage().contains(ERROR_MAP.get(defaultBucketLayout)));
@@ -167,7 +164,7 @@ public class TestOzoneFSBucketLayout {
     }
 
     // initialize FS and adapter.
-    fs = FileSystem.newInstance(conf);
+    FileSystem fs = FileSystem.newInstance(conf);
     RootedOzoneFileSystem ofs = (RootedOzoneFileSystem) fs;
     adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
 
