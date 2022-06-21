@@ -415,7 +415,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         dn.getPort(RATIS_ADMIN).getValue());
     config.setInt(DFS_CONTAINER_RATIS_SERVER_PORT,
         dn.getPort(RATIS_SERVER).getValue());
-    config.setFromObject(new ReplicationConfig()
+    config.setFromObject(conf.getObject(ReplicationConfig.class)
         .setPort(dn.getPort(REPLICATION).getValue()));
     hddsDatanodes.remove(i);
     if (waitForDatanode) {
