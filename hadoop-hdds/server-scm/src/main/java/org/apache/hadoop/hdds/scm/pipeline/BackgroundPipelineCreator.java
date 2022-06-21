@@ -263,17 +263,6 @@ public class BackgroundPipelineCreator implements SCMService {
 
   @Override
   public void notifyEventTriggered(Event event) {
-//    // Background pipeline creator must be started/stopped even on followers
-//    // during finalization, in case they become the leader.
-//    if (event == FINALIZATION_CHECKPOINT_CROSSED) {
-//      if (FinalizationManager.shouldCreateNewPipelines(
-//          scmContext.getFinalizationCheckpoint())) {
-//        start();
-//      } else {
-//        stop();
-//      }
-//    }
-
     if (!scmContext.isLeader()) {
       LOG.info("ignore, not leader SCM.");
       return;

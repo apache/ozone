@@ -41,8 +41,8 @@ public enum FinalizationCheckpoint {
 
   private final boolean needsFinalizingMark;
   private final boolean needsMlvBehindSlv;
-  // The upgrade status that should be reported back to the client for this
-  // checkpoint.
+  // The upgrade status that should be reported back to the client when this
+  // checkpoint is crossed.
   private final UpgradeFinalizer.Status status;
 
   FinalizationCheckpoint(boolean needsFinalizingMark,

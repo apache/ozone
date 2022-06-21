@@ -60,13 +60,11 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   private volatile boolean hasFinalizingMark;
   private SCMUpgradeFinalizationContext upgradeContext;
   private final SCMUpgradeFinalizer upgradeFinalizer;
-  private final SCMServiceManager serviceManager;
 
   protected FinalizationStateManagerImpl(Builder builder) throws IOException {
     this.finalizationStore = builder.finalizationStore;
     this.transactionBuffer = builder.transactionBuffer;
     this.upgradeFinalizer = builder.upgradeFinalizer;
-    this.serviceManager = builder.serviceManager;
     this.versionManager = this.upgradeFinalizer.getVersionManager();
     this.checkpointLock = new ReentrantReadWriteLock();
     initialize();
@@ -104,9 +102,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
     // Set the checkpoint in the SCM context so other components can read it.
     upgradeContext.getSCMContext().setFinalizationCheckpoint(checkpoint);
-
-//    serviceManager.notifyEventTriggered(
-//        SCMService.Event.FINALIZATION_CHECKPOINT_CROSSED);
   }
 
   @Override
@@ -226,6 +221,9 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     return currentCheckpoint;
   }
 
+  /**
+   * Called on snapshot installation.
+   */
   @Override
   public void reinitialize(Table<String, String> newFinalizationStore)
       throws IOException {
@@ -295,7 +293,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     private DBTransactionBuffer transactionBuffer;
     private SCMRatisServer scmRatisServer;
     private SCMUpgradeFinalizer upgradeFinalizer;
-    private SCMServiceManager serviceManager;
 
     public Builder() {
     }
@@ -318,11 +315,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
     public Builder setTransactionBuffer(DBTransactionBuffer transactionBuffer) {
       this.transactionBuffer = transactionBuffer;
-      return this;
-    }
-
-    public Builder setServiceManager(SCMServiceManager serviceManager) {
-      this.serviceManager = serviceManager;
       return this;
     }
 

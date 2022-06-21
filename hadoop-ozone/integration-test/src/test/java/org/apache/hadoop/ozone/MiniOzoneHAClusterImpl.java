@@ -984,7 +984,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
     public boolean removeInstance(Type t) {
       boolean result =  services.remove(t);
-      serviceMap.put(serviceIdProvider.apply(t), t);
+      serviceMap.remove(serviceIdProvider.apply(t));
       activeServices.remove(t);
       inactiveServices.remove(t);
       return result;

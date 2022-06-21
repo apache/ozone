@@ -136,6 +136,10 @@ public abstract class BasicUpgradeFinalizer
     // No Op by default.
   }
 
+  /**
+   * Child classes may override this method to delay finalization being
+   * marked done until a set of post finalize actions complete.
+   */
   protected void postFinalizeUpgrade(T service) throws IOException {
     versionManager.setUpgradeState(FINALIZATION_DONE);
   }
@@ -240,7 +244,6 @@ public abstract class BasicUpgradeFinalizer
       throws UpgradeException {
     runFinalizationAction(lf, action);
     updateLayoutVersionInVersionFile(lf, storage);
-    versionManager.setUpgradeState(FINALIZATION_DONE);
     versionManager.finalized(lf);
   }
 

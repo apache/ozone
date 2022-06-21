@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
-import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
@@ -73,7 +72,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
         .setFinalizationStore(builder.finalizationStore)
         .setTransactionBuffer(builder.scmHAManager.getDBTransactionBuffer())
         .setRatisServer(builder.scmHAManager.getRatisServer())
-        .setServiceManager(builder.serviceManager)
         .build();
   }
 
@@ -163,14 +161,12 @@ public class FinalizationManagerImpl implements FinalizationManager {
         try {
           finalizeUpgrade("resume-finalization-as-leader");
         } catch (IOException ex) {
-          // TODO determine how to handle failures here. Also check what we do
-          //  when client initiates finalization.
           ExitUtils.terminate(1,
               "Resuming upgrade finalization failed on SCM leader change.",
               ex, true, LOG);
         }
       } else if (LOG.isDebugEnabled()) {
-        LOG.debug("SCM became leader. No required upgrade finalization action" +
+        LOG.debug("SCM became leader. No upgrade finalization action" +
             " required for current checkpoint {}", currentCheckpoint);
       }
     });
@@ -187,7 +183,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
     private SCMHAManager scmHAManager;
     private Table<String, String> finalizationStore;
     private UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor;
-    private SCMServiceManager serviceManager;
 
     public Builder() {
       executor = new DefaultUpgradeFinalizationExecutor<>();
@@ -226,11 +221,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
       return this;
     }
 
-    public Builder setServiceManager(SCMServiceManager serviceManager) {
-      this.serviceManager = serviceManager;
-      return this;
-    }
-
     public FinalizationManagerImpl build() throws IOException {
       Preconditions.checkNotNull(conf);
       Preconditions.checkNotNull(versionManager);
@@ -238,7 +228,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
       Preconditions.checkNotNull(scmHAManager);
       Preconditions.checkNotNull(finalizationStore);
       Preconditions.checkNotNull(executor);
-      Preconditions.checkNotNull(serviceManager);
 
       return new FinalizationManagerImpl(this);
     }

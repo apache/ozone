@@ -46,6 +46,9 @@ public interface FinalizationStateManager {
 
   void setUpgradeContext(SCMUpgradeFinalizationContext context);
 
+  /**
+   * Called on snapshot installation.
+   */
   void reinitialize(Table<String, String> newFinalizationStore)
       throws IOException;
 }

@@ -122,18 +122,32 @@ public class TestScmHAFinalization {
     }
   }
 
+  /**
+   * Argument supplier for parameterized tests.
+   */
+  public static Stream<Arguments> injectionPointsToTest() {
+    // Do not test from BEFORE_PRE_FINALIZE_UPGRADE injection point.
+    // Finalization will not have started so there will be no persisted state
+    // to resume from.
+    return Stream.of(
+        Arguments.of(UpgradeTestInjectionPoints.AFTER_PRE_FINALIZE_UPGRADE),
+        Arguments.of(UpgradeTestInjectionPoints.AFTER_COMPLETE_FINALIZATION),
+        Arguments.of(UpgradeTestInjectionPoints.AFTER_POST_FINALIZE_UPGRADE)
+    );
+  }
+
   @ParameterizedTest
   @MethodSource(METHOD_SOURCE)
   public void testFinalizationWithLeaderChange(
       UpgradeTestInjectionPoints haltingPoint) throws Exception {
 
     init(new OzoneConfiguration(),
-        getPausingFinalizationExecutor(haltingPoint), 0);
+        newPausingFinalizationExecutor(haltingPoint), 0);
     pauseSignal.await();
 
     // Stop the leader, forcing a leader change in the middle of finalization.
-    // This will cause the initial call to the finalization executor to be
-    // interrupted.
+    // This will cause the initial client call for finalization
+    // to be interrupted.
     StorageContainerManager oldLeaderScm = cluster.getActiveSCM();
     LOG.info("Stopping current SCM leader {} to initiate a leader change.",
         oldLeaderScm.getSCMNodeId());
@@ -173,34 +187,20 @@ public class TestScmHAFinalization {
         cluster.getHddsDatanodes(), 0, CLOSED);
   }
 
-  /**
-   * Argument supplier for parameterized tests.
-   */
-  public static Stream<Arguments> injectionPointsToTest() {
-    // Do not test from BEFORE_PRE_FINALIZE_UPGRADE injection point.
-    // Finalization will not have started so there will be no persisted state
-    // to resume from.
-    return Stream.of(
-        Arguments.of(UpgradeTestInjectionPoints.AFTER_PRE_FINALIZE_UPGRADE),
-        Arguments.of(UpgradeTestInjectionPoints.AFTER_COMPLETE_FINALIZATION),
-        Arguments.of(UpgradeTestInjectionPoints.AFTER_POST_FINALIZE_UPGRADE)
-    );
-  }
-
   @ParameterizedTest
   @MethodSource(METHOD_SOURCE)
   public void testFinalizationWithRestart(
       UpgradeTestInjectionPoints haltingPoint) throws Exception {
     init(new OzoneConfiguration(),
-        getTerminatingFinalizationExecutor(haltingPoint), 0);
+        newTerminatingFinalizationExecutor(haltingPoint), 0);
     pauseSignal.await();
 
-    // Restart all SCMs.
-    // This creates new SCMs, so a copy of the original list must be made to
-    // avoid concurrent modification.
+    // Once upgrade finalization is stopped at the halting point, restart all
+    // SCMs.
     LOG.info("Restarting all SCMs during upgrade finalization.");
-    // After restart, finalization should continue as normal without
-    // intervention.
+    // Restarting an SCM from mini ozone actually replaces the SCM with a new
+    // instance. We will use the normal upgrade finalization executor for
+    // these new instances, since the last one aborted at the halting point.
     cluster.getSCMConfigurator()
         .setUpgradeFinalizationExecutor(
             new DefaultUpgradeFinalizationExecutor<>());
@@ -343,9 +343,8 @@ public class TestScmHAFinalization {
     }
   }
 
-  // Used for snapshot install and leader change.
   private InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
-      getPausingFinalizationExecutor(UpgradeTestInjectionPoints haltingPoint) {
+      newPausingFinalizationExecutor(UpgradeTestInjectionPoints haltingPoint) {
     InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
         executor =
         new InjectedUpgradeFinalizationExecutor<>();
@@ -365,9 +364,8 @@ public class TestScmHAFinalization {
     return executor;
   }
 
-  // Used when node will be restarted
   private InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
-      getTerminatingFinalizationExecutor(
+      newTerminatingFinalizationExecutor(
           UpgradeTestInjectionPoints haltingPoint) {
     InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
         executor =

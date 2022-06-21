@@ -591,7 +591,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         .setHAManager(scmHAManager)
         .setFinalizationStore(scmMetadataStore.getMetaTable())
         .setFinalizationExecutor(finalizationExecutor)
-        .setServiceManager(serviceManager)
         .build();
 
     // inline upgrade for SequenceIdGenerator

@@ -312,6 +312,6 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public boolean isPipelineCreationFrozen() {
-    return true;
+    return false;
   }
 }
