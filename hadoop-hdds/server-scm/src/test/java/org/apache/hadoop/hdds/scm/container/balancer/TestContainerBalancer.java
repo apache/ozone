@@ -739,6 +739,14 @@ public class TestContainerBalancer {
 
   }
 
+  @Test
+  public void testStartAndImmediateStopForDeadlock()
+      throws IllegalContainerBalancerStateException, IOException,
+      InvalidContainerBalancerConfigurationException {
+    startBalancer(balancerConfiguration);
+    stopBalancer();
+  }
+
   /**
    * Determines unBalanced nodes, that is, over and under utilized nodes,
    * according to the generated utilization values for nodes and the threshold.
