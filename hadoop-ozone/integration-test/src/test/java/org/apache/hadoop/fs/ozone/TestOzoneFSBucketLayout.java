@@ -156,6 +156,9 @@ public class TestOzoneFSBucketLayout {
         Assert.fail("File System initialization should fail in case " +
             " of invalid configuration of " +
             OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT);
+        // Dummy read op to avoid compiler warning. This is not expected to
+        // be executed.
+        fs.mkdirs(new Path("/dummy/operation/for/findbugs/warning"));
       } catch (OMException oe) {
         Assert.assertTrue(
             oe.getMessage().contains(ERROR_MAP.get(defaultBucketLayout)));
