@@ -745,6 +745,7 @@ public class TestContainerBalancer {
       InvalidContainerBalancerConfigurationException {
     startBalancer(balancerConfiguration);
     stopBalancer();
+    Assertions.assertFalse(containerBalancer.isBalancerRunning());
   }
 
   /**
