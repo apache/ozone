@@ -18,36 +18,36 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.After;
+import org.junit.BeforeClass;
+import org.junit.AfterClass;
 import org.junit.Test;
+import org.junit.Assert;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
+import java.util.HashMap;
+import java.util.Map;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.junit.Assert.fail;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -60,51 +60,67 @@ import java.util.Collection;
 @RunWith(Parameterized.class)
 public class TestOzoneFSBucketLayout {
 
-  private static BucketLayout defaultBucketLayout;
-
+  private static String defaultBucketLayout;
   private static MiniOzoneCluster cluster = null;
-  private static FileSystem fs;
   private static ObjectStore objectStore;
   private static BasicRootedOzoneClientAdapterImpl adapter;
+  private static String rootPath;
+  private static FileSystem fs;
+  private static String volumeName;
+  private static Path volumePath;
 
-  private String volumeName;
-  private Path volumePath;
+  private static final String INVALID_CONFIG = "INVALID";
+  private static final Map<String, String> ERROR_MAP = new HashMap<>();
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestOzoneFSBucketLayout.class);
+
+  // Initialize error map.
+  static {
+    ERROR_MAP.put(BucketLayout.OBJECT_STORE.name(),
+        "Buckets created with OBJECT_STORE layout do not support file " +
+            "system semantics.");
+    ERROR_MAP.put(INVALID_CONFIG, "Unsupported value provided for " +
+        OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT);
+  }
 
   @Parameterized.Parameters
-  public static Collection<BucketLayout> data() {
+  public static Collection<String> data() {
     return Arrays.asList(
-        null,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED,
-        BucketLayout.LEGACY,
-        BucketLayout.OBJECT_STORE
+        // Empty Config
+        "",
+        // Invalid Config
+        INVALID_CONFIG,
+        // Unsupported Bucket Layout for OFS
+        BucketLayout.OBJECT_STORE.name(),
+        // Supported bucket layouts.
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.name(),
+        BucketLayout.LEGACY.name()
     );
   }
 
-  public TestOzoneFSBucketLayout(BucketLayout bucketLayout) {
+  public TestOzoneFSBucketLayout(String bucketLayout) {
     // Ignored. Actual init done in initParam().
     // This empty constructor is still required to avoid argument exception.
   }
 
   @Parameterized.BeforeParam
-  public static void initParam(BucketLayout bucketLayout)
-      throws IOException, InterruptedException, TimeoutException {
-    // Initialize the cluster before EACH set of parameters
+  public static void initDefaultLayout(String bucketLayout) {
     defaultBucketLayout = bucketLayout;
-
-    initClusterAndEnv();
+    LOG.info("Default bucket layout: {}", defaultBucketLayout);
   }
 
-  @Parameterized.AfterParam
-  public static void teardownParam() {
-    // Tear down the cluster after EACH set of parameters
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-    IOUtils.closeQuietly(fs);
-  }
+  @BeforeClass
+  public static void initCluster() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(3)
+        .build();
+    cluster.waitForClusterToBeReady();
+    objectStore = cluster.getClient().getObjectStore();
+    rootPath = String.format("%s://%s/",
+        OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
 
-  @Before
-  public void createVolumeAndBucket() throws IOException {
     // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
     volumeName =
         TestDataUtil.createVolumeAndBucket(cluster)
@@ -112,79 +128,48 @@ public class TestOzoneFSBucketLayout {
     volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
   }
 
-  @After
-  public void cleanup() throws IOException {
-    if (defaultBucketLayout != null &&
-        defaultBucketLayout.equals(BucketLayout.OBJECT_STORE)) {
-      return;
+  @AfterClass
+  public static void teardown() throws IOException {
+    // Tear down the cluster after EACH set of parameters
+    IOUtils.closeQuietly(fs);
+    if (cluster != null) {
+      cluster.shutdown();
     }
-    fs.delete(volumePath, true);
   }
 
-  public static FileSystem getFs() {
-    return fs;
-  }
-
-
-  public static void initClusterAndEnv() throws IOException,
-      InterruptedException, TimeoutException {
+  @Test
+  public void testFileSystemBucketLayoutConfiguration() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    if (defaultBucketLayout != null) {
-      clientConfig.setFsDefaultBucketLayout(defaultBucketLayout.name());
-    } else {
-      clientConfig.setFsDefaultBucketLayout("");
-    }
+    clientConfig.setFsDefaultBucketLayout(defaultBucketLayout);
 
     conf.setFromObject(clientConfig);
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
-        .build();
-    cluster.waitForClusterToBeReady();
-    objectStore = cluster.getClient().getObjectStore();
-    String rootPath = String.format("%s://%s/",
-        OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
 
     // Set the fs.defaultFS and start the filesystem
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    // Set the number of keys to be processed during batch operate.
-    conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
-
 
     // In case OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT is set to OBS,
     // FS initialization should fail.
-    if (defaultBucketLayout != null &&
-        defaultBucketLayout.equals(BucketLayout.OBJECT_STORE)) {
+    if (ERROR_MAP.containsKey(defaultBucketLayout)) {
       try {
-        fs = FileSystem.get(conf);
-        fail("File System initialization should fail in case " +
-            BucketLayout.OBJECT_STORE + " is used as the default value for " +
+        fs = FileSystem.newInstance(conf);
+        Assert.fail("File System initialization should fail in case " +
+            " of invalid configuration of " +
             OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT);
       } catch (OMException oe) {
-        Assert.assertTrue(oe.getMessage().contains(
-            "Buckets created with OBJECT_STORE layout do not support file " +
-                "system semantics."));
+        Assert.assertTrue(
+            oe.getMessage().contains(ERROR_MAP.get(defaultBucketLayout)));
         return;
       }
     }
 
-    // fs.ofs.impl would be loaded from META-INF, no need to manually set it
-    fs = FileSystem.get(conf);
-    conf.setClass("fs.trash.classname", TrashPolicyOzone.class,
-        TrashPolicy.class);
+    // initialize FS and adapter.
+    fs = FileSystem.newInstance(conf);
     RootedOzoneFileSystem ofs = (RootedOzoneFileSystem) fs;
     adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
-  }
 
-  @Test
-  public void testClientFsDefaultBucketLayout() throws Exception {
-    if (defaultBucketLayout != null &&
-        defaultBucketLayout.equals(BucketLayout.OBJECT_STORE)) {
-      // We do not need to test with OBS. FS initialization fails in this case.
-      return;
-    }
-
+    // Create a new directory, which in turn creates a new bucket.
     Path root = new Path("/" + volumeName);
 
     String bucketName = getBucketName();
@@ -192,31 +177,26 @@ public class TestOzoneFSBucketLayout {
 
     adapter.createDirectory(dir1.toString());
 
+    // Make sure the bucket layout of created bucket matches the config.
     OzoneBucket bucketInfo =
         objectStore.getClientProxy().getBucketDetails(volumeName, bucketName);
-
-    if (defaultBucketLayout != null) {
-      // Make sure the bucket layout matches the config.
-      Assert.assertEquals(defaultBucketLayout, bucketInfo.getBucketLayout());
+    if (StringUtils.isNotBlank(defaultBucketLayout)) {
+      Assert.assertEquals(defaultBucketLayout,
+          bucketInfo.getBucketLayout().name());
     } else {
-      // In case we provide an empty config, the File System should use the
-      // default config.
-      Assert.assertEquals(
-          "FS should use default config value in case of empty config",
-          OzoneConfigKeys.OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT,
-          bucketInfo.getBucketLayout().toString());
+      Assert.assertEquals(OzoneConfigKeys.OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT,
+          bucketInfo.getBucketLayout().name());
     }
   }
 
   private String getBucketName() {
     String bucketSuffix;
-    if (defaultBucketLayout != null) {
+    if (StringUtils.isNotBlank(defaultBucketLayout)) {
       bucketSuffix = defaultBucketLayout
-          .toString()
           .toLowerCase()
           .replaceAll("_", "-");
     } else {
-      bucketSuffix = "null";
+      bucketSuffix = "empty";
     }
 
     return "bucket-" + bucketSuffix;

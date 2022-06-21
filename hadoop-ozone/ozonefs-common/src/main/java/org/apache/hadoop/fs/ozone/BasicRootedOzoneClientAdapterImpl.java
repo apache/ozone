@@ -194,31 +194,42 @@ public class BasicRootedOzoneClientAdapterImpl
           OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
 
       // Fetches the bucket layout to be used by OFS.
-      try {
-        this.defaultOFSBucketLayout = BucketLayout.fromString(
-            conf.get(OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT,
-                OzoneConfigKeys.OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT));
-      } catch (IllegalArgumentException iae) {
-        throw new OMException("Unsupported value provided for " +
-            OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT +
-            ". Supported values are " + BucketLayout.FILE_SYSTEM_OPTIMIZED +
-            " and " + BucketLayout.LEGACY + ".",
-            OMException.ResultCodes.INVALID_REQUEST);
-      }
-
-      // Bucket Layout for buckets created with OFS cannot be OBJECT_STORE.
-      if (defaultOFSBucketLayout.equals(BucketLayout.OBJECT_STORE)) {
-        throw new OMException(
-            "Buckets created with OBJECT_STORE layout do not support file " +
-                "system semantics. Supported values for config " +
-                OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT +
-                " include " + BucketLayout.FILE_SYSTEM_OPTIMIZED + " and " +
-                BucketLayout.LEGACY, OMException.ResultCodes.INVALID_REQUEST);
-      }
+      initDefaultFsBucketLayout(conf);
 
       config = conf;
     } finally {
       Thread.currentThread().setContextClassLoader(contextClassLoader);
+    }
+  }
+
+  /**
+   * Initialize the default bucket layout to be used by OFS.
+   *
+   * @param conf OzoneConfiguration
+   * @throws OMException In case of unsupported value provided in the config.
+   */
+  private void initDefaultFsBucketLayout(OzoneConfiguration conf)
+      throws OMException {
+    try {
+      this.defaultOFSBucketLayout = BucketLayout.fromString(
+          conf.get(OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT,
+              OzoneConfigKeys.OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT));
+    } catch (IllegalArgumentException iae) {
+      throw new OMException("Unsupported value provided for " +
+          OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT +
+          ". Supported values are " + BucketLayout.FILE_SYSTEM_OPTIMIZED +
+          " and " + BucketLayout.LEGACY + ".",
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
+
+    // Bucket Layout for buckets created with OFS cannot be OBJECT_STORE.
+    if (defaultOFSBucketLayout.equals(BucketLayout.OBJECT_STORE)) {
+      throw new OMException(
+          "Buckets created with OBJECT_STORE layout do not support file " +
+              "system semantics. Supported values for config " +
+              OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT +
+              " include " + BucketLayout.FILE_SYSTEM_OPTIMIZED + " and " +
+              BucketLayout.LEGACY, OMException.ResultCodes.INVALID_REQUEST);
     }
   }
 
