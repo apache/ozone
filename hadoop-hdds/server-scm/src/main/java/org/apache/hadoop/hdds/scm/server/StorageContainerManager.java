@@ -317,15 +317,16 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     Objects.requireNonNull(configurator, "configurator cannot not be null");
     Objects.requireNonNull(conf, "configuration cannot not be null");
-
-    scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
-    configuration = conf;
-    initMetrics();
-    containerReportCache = buildContainerReportCache();
     /**
      * It is assumed the scm --init command creates the SCM Storage Config.
      */
     scmStorageConfig = new SCMStorageConfig(conf);
+
+    scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
+    configuration = conf;
+    initMetrics();
+    containerReportCache = buildContainerReportCache();
+
     if (scmStorageConfig.getState() != StorageState.INITIALIZED) {
       String errMsg = "Please make sure you have run \'ozone scm --init\' " +
           "command to generate all the required metadata to " +
@@ -1024,7 +1025,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       return false;
     }
     String primordialSCM = SCMHAUtils.getPrimordialSCM(conf);
-    SCMHANodeDetails scmhaNodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
+    SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
+    SCMHANodeDetails scmhaNodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf,
+        scmStorageConfig);
     String selfNodeId = scmhaNodeDetails.getLocalNodeDetails().getNodeId();
     final String selfHostName =
         scmhaNodeDetails.getLocalNodeDetails().getHostName();
@@ -1035,7 +1038,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               + "{}, self id {} " + "Ignoring it.", primordialSCM, selfNodeId);
       return true;
     }
-    SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
     final String persistedClusterId = scmStorageConfig.getClusterID();
     StorageState state = scmStorageConfig.getState();
     if (state == StorageState.INITIALIZED && conf
@@ -1136,7 +1138,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       String clusterId) throws IOException {
     SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
     StorageState state = scmStorageConfig.getState();
-    final SCMHANodeDetails haDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
+    final SCMHANodeDetails haDetails = SCMHANodeDetails.loadSCMHAConfig(conf,
+        scmStorageConfig);
     String primordialSCM = SCMHAUtils.getPrimordialSCM(conf);
     final String selfNodeId = haDetails.getLocalNodeDetails().getNodeId();
     final String selfHostName = haDetails.getLocalNodeDetails().getHostName();

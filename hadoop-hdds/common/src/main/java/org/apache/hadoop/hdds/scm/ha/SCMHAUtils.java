@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -89,7 +90,8 @@ public final class SCMHAUtils {
   // Check if SCM HA is enabled.
   public static boolean isSCMHAEnabled(ConfigurationSource conf) {
     return conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-        ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
+        DefaultConfigManager.getValue(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
+            ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT));
   }
 
   public static String getPrimordialSCM(ConfigurationSource conf) {
