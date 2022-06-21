@@ -239,7 +239,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       List< OzoneAcl > inheritAcls;
       if (LOG.isDebugEnabled()) {
         LOG.debug("BucketName: {}, BucketLayout: {}",
-            omBucketInfo.getBucketName(), omBucketInfo.getBucketLayout());
+            bucketInfo.getBucketName(), bucketInfo.getBucketLayout());
       }
       if (bucketInfo.getBucketLayout()
           .shouldNormalizePaths(ozoneManager.getEnableFileSystemPaths())) {
