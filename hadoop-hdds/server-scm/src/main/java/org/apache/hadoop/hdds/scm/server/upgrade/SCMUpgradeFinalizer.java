@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 /**
  * UpgradeFinalizer for the Storage Container Manager service.
@@ -116,7 +117,7 @@ public class SCMUpgradeFinalizer extends
         context.getFinalizationStateManager();
     if (!stateManager.crossedCheckpoint(
         FinalizationCheckpoint.FINALIZATION_COMPLETE)) {
-      createPipelinesAfterFinalization(context.getPipelineManager());
+      createPipelinesAfterFinalization(context);
       stateManager.removeFinalizingMark();
     }
     logCheckpointCrossed(FinalizationCheckpoint.FINALIZATION_COMPLETE);
@@ -165,9 +166,10 @@ public class SCMUpgradeFinalizer extends
   }
 
   private void createPipelinesAfterFinalization(
-      PipelineManager pipelineManager) {
+      SCMUpgradeFinalizationContext context) throws NotLeaderException {
     // Pipeline creation should already be frozen when the finalization state
     // manager set the checkpoint.
+    PipelineManager pipelineManager = context.getPipelineManager();
     Preconditions.checkArgument(!pipelineManager.isPipelineCreationFrozen(),
         "Error during finalization. Pipeline creation should have been " +
             "resumed before waiting for new pipelines.");
@@ -176,6 +178,10 @@ public class SCMUpgradeFinalizer extends
     // finalization, so clients can write.
     boolean hasPipeline = false;
     while (!hasPipeline) {
+      // Break out of the wait and step down from driving finalization if this
+      // SCM is no longer the leader by throwing NotLeaderException.
+      context.getSCMContext().getTermOfLeader();
+
       ReplicationConfig ratisThree =
           ReplicationConfig.fromProtoTypeAndFactor(
               HddsProtos.ReplicationType.RATIS,
