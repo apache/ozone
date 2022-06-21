@@ -166,8 +166,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
           .getMultipartInfoTable().get(multipartKey);
 
-      // Check for directory exists with same name, if it exists throw error. 
-      checkDirectoryAlreadyExists(ozoneManager, volumeName, bucketName, keyName,
+      // Check for directory exists with same name for the LEGACY_FS,
+      // if it exists throw error.
+      checkDirectoryAlreadyExists(ozoneManager, omBucketInfo, keyName,
           omMetadataManager);
 
       if (multipartKeyInfo == null) {
@@ -309,11 +310,16 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   }
 
   protected void checkDirectoryAlreadyExists(OzoneManager ozoneManager,
-      String volumeName, String bucketName, String keyName,
+      OmBucketInfo omBucketInfo, String keyName,
       OMMetadataManager omMetadataManager) throws IOException {
-    if (ozoneManager.getEnableFileSystemPaths()) {
-      if (checkDirectoryAlreadyExists(volumeName, bucketName, keyName,
-              omMetadataManager)) {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("BucketName: {}, BucketLayout: {}",
+          omBucketInfo.getBucketName(), omBucketInfo.getBucketLayout());
+    }
+    if (omBucketInfo.getBucketLayout()
+        .shouldNormalizePaths(ozoneManager.getEnableFileSystemPaths())) {
+      if (checkDirectoryAlreadyExists(omBucketInfo.getVolumeName(),
+          omBucketInfo.getBucketName(), keyName, omMetadataManager)) {
         throw new OMException("Can not Complete MPU for file: " + keyName +
                 " as there is already directory in the given path",
                 NOT_A_FILE);
