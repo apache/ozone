@@ -63,9 +63,8 @@ public class TestOzoneFSBucketLayout {
   private static String defaultBucketLayout;
   private static MiniOzoneCluster cluster = null;
   private static ObjectStore objectStore;
-  private static BasicRootedOzoneClientAdapterImpl adapter;
+  private BasicRootedOzoneClientAdapterImpl adapter;
   private static String rootPath;
-  private static FileSystem fs;
   private static String volumeName;
   private static Path volumePath;
 
@@ -131,7 +130,6 @@ public class TestOzoneFSBucketLayout {
   @AfterClass
   public static void teardown() throws IOException {
     // Tear down the cluster after EACH set of parameters
-    IOUtils.closeQuietly(fs);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -151,6 +149,7 @@ public class TestOzoneFSBucketLayout {
 
     // In case OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT is set to OBS,
     // FS initialization should fail.
+    FileSystem fs;
     if (ERROR_MAP.containsKey(defaultBucketLayout)) {
       try {
         fs = FileSystem.newInstance(conf);
@@ -187,6 +186,9 @@ public class TestOzoneFSBucketLayout {
       Assert.assertEquals(OzoneConfigKeys.OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT,
           bucketInfo.getBucketLayout().name());
     }
+
+    // cleanup
+    IOUtils.closeQuietly(fs);
   }
 
   private String getBucketName() {
