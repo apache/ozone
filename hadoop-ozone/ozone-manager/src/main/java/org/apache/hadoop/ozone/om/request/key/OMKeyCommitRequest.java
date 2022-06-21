@@ -180,7 +180,12 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       // Check for directory exists with same name, if it exists throw error.
-      if (ozoneManager.getEnableFileSystemPaths()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("BucketName: {}, BucketLayout: {}",
+            omBucketInfo.getBucketName(), omBucketInfo.getBucketLayout());
+      }
+      if (omBucketInfo.getBucketLayout()
+          .shouldNormalizePaths(ozoneManager.getEnableFileSystemPaths())) {
         if (checkDirectoryAlreadyExists(volumeName, bucketName, keyName,
             omMetadataManager)) {
           throw new OMException("Can not create file: " + keyName +
