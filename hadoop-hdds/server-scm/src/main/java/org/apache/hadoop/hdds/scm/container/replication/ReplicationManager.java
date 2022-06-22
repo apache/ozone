@@ -150,8 +150,7 @@ public class ReplicationManager implements SCMService {
              final SCMContext scmContext,
              final NodeManager nodeManager,
              final Clock clock,
-             final SCMHAManager scmhaManager,
-             final Table<ContainerID, MoveDataNodePair> moveTable,
+             final LegacyReplicationManager legacyReplicationManager,
              final ContainerReplicaPendingOps replicaPendingOps)
              throws IOException {
     this.containerManager = containerManager;
@@ -167,9 +166,7 @@ public class ReplicationManager implements SCMService {
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
         TimeUnit.MILLISECONDS);
     this.containerReplicaPendingOps = replicaPendingOps;
-    this.legacyReplicationManager = new LegacyReplicationManager(
-        conf, containerManager, containerPlacement, eventPublisher,
-        scmContext, nodeManager, scmhaManager, clock, moveTable);
+    this.legacyReplicationManager = legacyReplicationManager;
     this.ecContainerHealthCheck = new ECContainerHealthCheck();
     start();
   }

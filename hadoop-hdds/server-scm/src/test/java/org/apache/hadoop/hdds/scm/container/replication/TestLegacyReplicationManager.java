@@ -213,6 +213,7 @@ public class TestLegacyReplicationManager {
     clock = new TestClock(Instant.now(), ZoneId.of("UTC"));
     containerReplicaPendingOps = new ContainerReplicaPendingOps(conf, clock);
     createReplicationManager(new ReplicationManagerConfiguration());
+    serviceManager.register(replicationManager);
   }
 
   void createReplicationManager(int replicationLimit, int deletionLimit)
@@ -256,17 +257,20 @@ public class TestLegacyReplicationManager {
     dbStore = DBStoreBuilder.createDBStore(
       config, new SCMDBDefinition());
 
+    LegacyReplicationManager legacyRM = new LegacyReplicationManager(
+        config, containerManager, containerPlacementPolicy, eventQueue,
+        SCMContext.emptyContext(), nodeManager, scmHAManager, clock,
+        SCMDBDefinition.MOVE.getTable(dbStore));
+
     replicationManager = new ReplicationManager(
         config,
         containerManager,
         containerPlacementPolicy,
         eventQueue,
         SCMContext.emptyContext(),
-        serviceManager,
         nodeManager,
         clock,
-        scmHAManager,
-        SCMDBDefinition.MOVE.getTable(dbStore),
+        legacyRM,
         containerReplicaPendingOps);
 
     serviceManager.notifyStatusChanged();
