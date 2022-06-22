@@ -110,12 +110,14 @@ public class TestBasicUpgradeFinalizer {
     }
 
     @Override
-    protected void preFinalizeUpgrade(Object service) {
+    protected void preFinalizeUpgrade(Object service) throws IOException {
+      super.preFinalizeUpgrade(service);
       preCalled = true;
     }
 
     @Override
-    protected void postFinalizeUpgrade(Object service) {
+    protected void postFinalizeUpgrade(Object service) throws IOException {
+      super.postFinalizeUpgrade(service);
       postCalled = true;
     }
 
@@ -141,7 +143,7 @@ public class TestBasicUpgradeFinalizer {
 
     @Override
     public void runPrefinalizeStateActions(Storage storage, Object service) {
-
+      // no-op for testing.
     }
   }
 }
