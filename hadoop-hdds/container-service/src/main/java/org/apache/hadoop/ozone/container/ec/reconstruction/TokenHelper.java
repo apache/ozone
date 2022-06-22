@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
@@ -35,6 +36,8 @@ import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.DELETE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 
 /**
@@ -45,14 +48,17 @@ class TokenHelper {
   private final OzoneBlockTokenSecretManager blockTokenMgr;
   private final ContainerTokenSecretManager containerTokenMgr;
   private final String user;
-  private static final Set<AccessModeProto> MODES = EnumSet.of(WRITE);
+  private static final Set<AccessModeProto> MODES =
+      EnumSet.of(READ, WRITE, DELETE);
 
   TokenHelper(ConfigurationSource conf, CertificateClient certClient)
       throws IOException {
 
     SecurityConfig securityConfig = new SecurityConfig(conf);
+    boolean blockTokenEnabled = securityConfig.isBlockTokenEnabled();
+    boolean containerTokenEnabled = securityConfig.isContainerTokenEnabled();
 
-    if (securityConfig.isSecurityEnabled()) {
+    if (blockTokenEnabled || containerTokenEnabled) {
       user = UserGroupInformation.getCurrentUser().getShortUserName();
 
       long expiryTime = conf.getTimeDuration(
@@ -61,17 +67,42 @@ class TokenHelper {
           TimeUnit.MILLISECONDS);
       String certId = certClient.getCertificate().getSerialNumber().toString();
 
-      blockTokenMgr = securityConfig.isBlockTokenEnabled()
-          ? new OzoneBlockTokenSecretManager(securityConfig, expiryTime, certId)
-          : null;
+      if (blockTokenEnabled) {
+        blockTokenMgr = new OzoneBlockTokenSecretManager(
+            securityConfig, expiryTime, certId);
+        blockTokenMgr.start(certClient);
+      } else {
+        blockTokenMgr = null;
+      }
 
-      containerTokenMgr = securityConfig.isContainerTokenEnabled()
-          ? new ContainerTokenSecretManager(securityConfig, expiryTime, certId)
-          : null;
+      if (containerTokenEnabled) {
+        containerTokenMgr = new ContainerTokenSecretManager(
+            securityConfig, expiryTime, certId);
+        containerTokenMgr.start(certClient);
+      } else {
+        containerTokenMgr = null;
+      }
     } else {
       user = null;
       blockTokenMgr = null;
       containerTokenMgr = null;
+    }
+  }
+
+  void stop() {
+    if (blockTokenMgr != null) {
+      try {
+        blockTokenMgr.stop();
+      } catch (IOException ignored) {
+        // no threads involved, cannot really happen
+      }
+    }
+    if (containerTokenMgr != null) {
+      try {
+        containerTokenMgr.stop();
+      } catch (IOException ignored) {
+        // no threads involved, cannot really happen
+      }
     }
   }
 
@@ -81,10 +112,14 @@ class TokenHelper {
         : null;
   }
 
-  String getEncodedContainerToken(ContainerID containerID) throws IOException {
+  Token<ContainerTokenIdentifier> getContainerToken(ContainerID containerID) {
     return containerTokenMgr != null
-        ? containerTokenMgr.generateToken(user, containerID).encodeToUrlString()
+        ? containerTokenMgr.generateToken(user, containerID)
         : null;
+  }
+
+  static String encode(Token<?> token) throws IOException {
+    return token != null ? token.encodeToUrlString() : null;
   }
 
 }

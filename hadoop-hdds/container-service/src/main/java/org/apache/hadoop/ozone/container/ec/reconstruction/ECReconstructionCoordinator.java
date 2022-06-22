@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
+import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.io.ByteBufferPool;
@@ -42,6 +43,7 @@ import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,6 +64,8 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import static org.apache.hadoop.ozone.container.ec.reconstruction.TokenHelper.encode;
 
 /**
  * The Coordinator implements the main flow of reconstructing
@@ -130,7 +134,7 @@ public class ECReconstructionCoordinator implements Closeable {
     ContainerID cid = ContainerID.valueOf(containerID);
 
     // 1. create target recovering containers.
-    String containerToken = tokenHelper.getEncodedContainerToken(cid);
+    String containerToken = encode(tokenHelper.getContainerToken(cid));
     for (Map.Entry<Integer, DatanodeDetails> indexDnPair : targetNodeMap
         .entrySet()) {
       DatanodeDetails dn = indexDnPair.getValue();
@@ -323,6 +327,7 @@ public class ECReconstructionCoordinator implements Closeable {
     if (containerOperationClient != null) {
       containerOperationClient.close();
     }
+    tokenHelper.stop();
   }
 
   private Pipeline rebuildInputPipeline(ECReplicationConfig repConfig,
@@ -351,6 +356,8 @@ public class ECReconstructionCoordinator implements Closeable {
       Map<Integer, DatanodeDetails> sourceNodeMap) throws IOException {
 
     SortedMap<Long, BlockData[]> resultMap = new TreeMap<>();
+    Token<ContainerTokenIdentifier> containerToken =
+        tokenHelper.getContainerToken(new ContainerID(containerID));
 
     Iterator<Map.Entry<Integer, DatanodeDetails>> iterator =
         sourceNodeMap.entrySet().iterator();
@@ -360,8 +367,8 @@ public class ECReconstructionCoordinator implements Closeable {
       Integer index = next.getKey();
       DatanodeDetails dn = next.getValue();
 
-      BlockData[] blockDataArr =
-          containerOperationClient.listBlock(containerID, dn, repConfig, null);
+      BlockData[] blockDataArr = containerOperationClient.listBlock(
+          containerID, dn, repConfig, containerToken);
 
       for (BlockData blockData : blockDataArr) {
         BlockID blockID = blockData.getBlockID();
