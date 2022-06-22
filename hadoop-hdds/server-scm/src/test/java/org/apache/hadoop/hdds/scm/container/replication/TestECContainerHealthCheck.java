@@ -18,18 +18,12 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.OverReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.HealthState;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -37,7 +31,6 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -47,6 +40,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 
 /**
  * Tests for the ECContainerHealthCheck class.
@@ -223,54 +218,4 @@ public class TestECContainerHealthCheck {
         ((UnderReplicatedHealthResult)result).getRemainingRedundancy());
   }
 
-
-  private Set<ContainerReplica> createReplicas(ContainerID containerID,
-      Pair<HddsProtos.NodeOperationalState, Integer>... nodes) {
-    Set<ContainerReplica> replicas = new HashSet<>();
-    for (Pair<HddsProtos.NodeOperationalState, Integer> p : nodes) {
-      replicas.add(
-          createContainerReplica(containerID, p.getRight(), p.getLeft()));
-    }
-    return replicas;
-  }
-
-  private Set<ContainerReplica> createReplicas(ContainerID containerID,
-      int... indexes) {
-    Set<ContainerReplica> replicas = new HashSet<>();
-    for (int i : indexes) {
-      replicas.add(createContainerReplica(
-          containerID, i, IN_SERVICE));
-    }
-    return replicas;
-  }
-
-  private ContainerReplica createContainerReplica(ContainerID containerID,
-      int replicaIndex, HddsProtos.NodeOperationalState opState) {
-    ContainerReplica.ContainerReplicaBuilder builder
-        = ContainerReplica.newBuilder();
-    DatanodeDetails datanodeDetails
-        = MockDatanodeDetails.randomDatanodeDetails();
-    datanodeDetails.setPersistedOpState(opState);
-    builder.setContainerID(containerID);
-    builder.setReplicaIndex(replicaIndex);
-    builder.setKeyCount(123);
-    builder.setBytesUsed(1234);
-    builder.setContainerState(StorageContainerDatanodeProtocolProtos
-        .ContainerReplicaProto.State.CLOSED);
-    builder.setDatanodeDetails(datanodeDetails);
-    builder.setSequenceId(0);
-    builder.setOriginNodeId(datanodeDetails.getUuid());
-    return builder.build();
-  }
-
-  private ContainerInfo createContainerInfo(
-      ReplicationConfig replicationConfig) {
-    ContainerInfo.Builder builder = new ContainerInfo.Builder();
-    builder.setContainerID(1);
-    builder.setOwner("Ozone");
-    builder.setPipelineID(PipelineID.randomId());
-    builder.setReplicationConfig(replicationConfig);
-    builder.setState(HddsProtos.LifeCycleState.CLOSED);
-    return builder.build();
-  }
 }
