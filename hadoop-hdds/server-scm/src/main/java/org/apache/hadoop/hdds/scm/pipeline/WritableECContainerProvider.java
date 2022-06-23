@@ -157,7 +157,7 @@ public class WritableECContainerProvider
     } catch (IOException e) {
       LOG.error("Unable to allocate a container for {} after trying all "
           + "existing containers", repConfig, e);
-      return null;
+      throw e;
     }
   }
 
