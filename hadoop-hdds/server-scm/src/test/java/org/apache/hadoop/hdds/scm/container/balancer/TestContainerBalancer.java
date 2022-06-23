@@ -509,7 +509,8 @@ public class TestContainerBalancer {
     sleepWhileBalancing(500);
 
     Assertions.assertFalse(containerBalancer.getUnBalancedNodes().isEmpty());
-    Assertions.assertTrue(containerBalancer.getContainerFromSourceMap().isEmpty());
+    Assertions.assertTrue(containerBalancer.getContainerFromSourceMap()
+        .isEmpty());
     stopBalancer();
 
     // some containers should be selected when using default values
