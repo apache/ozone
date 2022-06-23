@@ -2969,13 +2969,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public String getOmRatisRoles() {
     List<ServiceInfo> serviceList = null;
+    int port = omNodeDetails.getRatisPort();
     try {
       serviceList = getServiceList();
     } catch (IOException e) {
       LOG.error("IO-Exception Occurred");
-      return "";
+      return "Null values found";
     }
-    return OmUtils.format(serviceList);
+    return OmUtils.format(serviceList, port);
   }
 
   public String getRatisLogDirectory() {

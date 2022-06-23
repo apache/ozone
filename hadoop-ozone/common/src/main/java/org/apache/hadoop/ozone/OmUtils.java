@@ -41,6 +41,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
@@ -791,21 +792,29 @@ public final class OmUtils {
     return printString.toString();
   }
 
-  public static String format(List<ServiceInfo> nodes) {
+  public static String format(List<ServiceInfo> nodes, int port) {
     StringBuilder sb = new StringBuilder();
+    int count = 0;
     for (ServiceInfo info : nodes) {
-      if (info.getOmRoleInfo() != null) {
+      // Printing only the OM's running
+      if (info.getNodeType() == HddsProtos.NodeType.OM) {
         sb.append(
             String.format(
-                "{ HostName: %s, Ratis Port: %s, Node-Id: %s, Role: %s } ",
+                "{ HostName: %s | Node-Id: %s | Ratis-Port : %d | Role: %s } ",
                 info.getHostname(),
-                info.getPort(OzoneManagerProtocolProtos.ServicePort.Type.RATIS),
                 info.getOmRoleInfo().getNodeId(),
+                port,
                 info.getOmRoleInfo().getServerRole()
             ));
+        count++;
       }
     }
-    return sb.toString();
+    // Print Stand-alone if only one OM exists
+    if (count == 1) {
+      return "STANDALONE";
+    } else {
+      return sb.toString();
+    }
   }
 
 }
