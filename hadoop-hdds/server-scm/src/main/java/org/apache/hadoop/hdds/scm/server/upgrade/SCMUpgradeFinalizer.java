@@ -25,6 +25,7 @@ import java.io.IOException;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
@@ -144,9 +145,12 @@ public class SCMUpgradeFinalizer extends
 
     // Pipeline creation should already be frozen when the finalization state
     // manager set the checkpoint.
-    Preconditions.checkArgument(pipelineManager.isPipelineCreationFrozen(),
-        "Error during finalization. Pipeline creation should have been frozen" +
-            " before closing existing pipelines.");
+    if (!pipelineManager.isPipelineCreationFrozen()) {
+      throw new SCMException("Error during finalization. Pipeline creation" +
+          "should have been frozen before closing existing pipelines.",
+          SCMException.ResultCodes.INTERNAL_ERROR);
+    }
+
     for (Pipeline pipeline : pipelineManager.getPipelines()) {
       if (pipeline.getPipelineState() != CLOSED) {
         pipelineManager.closePipeline(pipeline, true);
@@ -166,13 +170,16 @@ public class SCMUpgradeFinalizer extends
   }
 
   private void createPipelinesAfterFinalization(
-      SCMUpgradeFinalizationContext context) throws NotLeaderException {
-    // Pipeline creation should already be frozen when the finalization state
+      SCMUpgradeFinalizationContext context) throws SCMException,
+      NotLeaderException {
+    // Pipeline creation should already be resumed when the finalization state
     // manager set the checkpoint.
     PipelineManager pipelineManager = context.getPipelineManager();
-    Preconditions.checkArgument(!pipelineManager.isPipelineCreationFrozen(),
-        "Error during finalization. Pipeline creation should have been " +
-            "resumed before waiting for new pipelines.");
+    if (pipelineManager.isPipelineCreationFrozen()) {
+      throw new SCMException("Error during finalization. Pipeline creation " +
+          "should have been resumed before waiting for new pipelines.",
+          SCMException.ResultCodes.INTERNAL_ERROR);
+    }
 
     // Wait for at least one pipeline to be created before finishing
     // finalization, so clients can write.

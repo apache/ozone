@@ -212,11 +212,17 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       }
     }
 
-    String errorMessage = String.format("SCM upgrade finalization " +
-            "is in an unknown state.%nFinalizing mark present? %b%n" +
-            "Metadata layout version behind software layout version? %b",
-        hasFinalizingMarkSnapshot, mlvBehindSlvSnapshot);
-    Preconditions.checkNotNull(currentCheckpoint, errorMessage);
+    // SCM cannot function if it does not know which finalization checkpoint
+    // it is on, so it must terminate. This should only happen in the case of
+    // a serious bug.
+    if (currentCheckpoint == null) {
+      String errorMessage = String.format("SCM upgrade finalization " +
+              "is in an unknown state.%nFinalizing mark present? %b%n" +
+              "Metadata layout version behind software layout version? %b",
+          hasFinalizingMarkSnapshot, mlvBehindSlvSnapshot);
+      ExitUtils.terminate(1, errorMessage, LOG);
+    }
+
     return currentCheckpoint;
   }
 
