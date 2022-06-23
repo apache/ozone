@@ -91,6 +91,11 @@ public final class OMConfigKeys {
   public static final String
       OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT = "24h";
 
+  public static final String OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT =
+      "ozone.om.open.key.cleanup.service.timeout";
+  public static final String OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT_DEFAULT
+      = "300s";
+
   public static final String OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD =
       "ozone.om.open.key.expire.threshold";
   public static final String OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT =

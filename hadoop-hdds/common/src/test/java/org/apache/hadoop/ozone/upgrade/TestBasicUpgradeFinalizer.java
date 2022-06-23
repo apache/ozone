@@ -22,10 +22,12 @@ import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLa
 import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_3;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
+
 import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.inOrder;
@@ -42,8 +44,7 @@ import java.util.concurrent.Future;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.mockito.InOrder;
 import org.slf4j.Logger;
@@ -163,10 +164,10 @@ public class TestBasicUpgradeFinalizer {
     return Executors.newSingleThreadExecutor().submit(() -> {
       try {
         StatusAndMessages result = finalizer.finalize("test", new Object());
-        Assertions.assertEquals(expectedStatus, result.status());
+        assertEquals(expectedStatus, result.status());
       } catch (Exception ex) {
         LOG.error("Finalization failed", ex);
-        Assertions.fail("Finalization failed with exception: " +
+        fail("Finalization failed with exception: " +
             ex.getMessage());
       }
     });
@@ -175,7 +176,7 @@ public class TestBasicUpgradeFinalizer {
   private Future<?> runFinalizationQuery(UpgradeFinalizer<Object> finalizer,
       UpgradeFinalizer.Status expectedStatus) {
     return Executors.newSingleThreadExecutor().submit(() -> {
-      Assertions.assertEquals(expectedStatus, finalizer.getStatus());
+      assertEquals(expectedStatus, finalizer.getStatus());
     });
   }
 

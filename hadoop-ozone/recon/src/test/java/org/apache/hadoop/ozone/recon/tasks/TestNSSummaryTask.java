@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -137,7 +138,10 @@ public class TestNSSummaryTask {
 
     // write a NSSummary prior to reprocess and verify it got cleaned up after.
     NSSummary staleNSSummary = new NSSummary();
-    reconNamespaceSummaryManager.storeNSSummary(-1L, staleNSSummary);
+    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation, -1L,
+        staleNSSummary);
+    reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
     NSSummaryTask nsSummaryTask = new NSSummaryTask(
             reconNamespaceSummaryManager);
     nsSummaryTask.reprocess(reconOMMetadataManager);

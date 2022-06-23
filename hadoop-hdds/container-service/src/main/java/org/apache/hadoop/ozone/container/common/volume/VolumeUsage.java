@@ -61,6 +61,14 @@ public class VolumeUsage implements SpaceUsageSource {
     return source.getUsedSpace();
   }
 
+  public void incrementUsedSpace(long usedSpace) {
+    source.incrementUsedSpace(usedSpace);
+  }
+
+  public void decrementUsedSpace(long reclaimedSpace) {
+    source.decrementUsedSpace(reclaimedSpace);
+  }
+
   /**
    * Get the space used by others except hdds.
    * DU is refreshed periodically and could be not exact,

@@ -29,8 +29,8 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
-import org.junit.Test;
-import org.junit.Assert;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assertions;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -53,9 +53,9 @@ public class TestBlockInputStreamFactoryImpl {
     BlockExtendedInputStream stream =
         factory.create(repConfig, blockInfo, blockInfo.getPipeline(),
             blockInfo.getToken(), true, null, null);
-    Assert.assertTrue(stream instanceof BlockInputStream);
-    Assert.assertEquals(stream.getBlockID(), blockInfo.getBlockID());
-    Assert.assertEquals(stream.getLength(), blockInfo.getLength());
+    Assertions.assertTrue(stream instanceof BlockInputStream);
+    Assertions.assertEquals(stream.getBlockID(), blockInfo.getBlockID());
+    Assertions.assertEquals(stream.getLength(), blockInfo.getLength());
   }
 
   @Test
@@ -70,9 +70,9 @@ public class TestBlockInputStreamFactoryImpl {
     BlockExtendedInputStream stream =
         factory.create(repConfig, blockInfo, blockInfo.getPipeline(),
             blockInfo.getToken(), true, null, null);
-    Assert.assertTrue(stream instanceof ECBlockInputStreamProxy);
-    Assert.assertEquals(stream.getBlockID(), blockInfo.getBlockID());
-    Assert.assertEquals(stream.getLength(), blockInfo.getLength());
+    Assertions.assertTrue(stream instanceof ECBlockInputStreamProxy);
+    Assertions.assertEquals(stream.getBlockID(), blockInfo.getBlockID());
+    Assertions.assertEquals(stream.getLength(), blockInfo.getLength());
   }
 
   private BlockLocationInfo createKeyLocationInfo(ReplicationConfig repConf,

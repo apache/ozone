@@ -389,6 +389,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean grpcBlockTokenEnabled;
   private final boolean useRatisForReplication;
   private final String defaultBucketLayout;
+  private ReplicationConfig defaultReplicationConfig;
 
   private boolean isS3MultiTenancyEnabled;
 
@@ -516,6 +517,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               BucketLayout.OBJECT_STORE + ", " + BucketLayout.LEGACY + ".");
     }
 
+    // Validates the default server-side replication configs.
+    this.defaultReplicationConfig = getDefaultReplicationConfig();
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     omRpcAddressTxt = new Text(omNodeDetails.getRpcAddressString());
 
@@ -2962,6 +2965,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return "" + omRpcAddress.getPort();
   }
 
+  @Override
+  public String getRatisLogDirectory() {
+    return  OzoneManagerRatisUtils.getOMRatisDirectory(configuration);
+  }
+
+  @Override
+  public String getRocksDbDirectory() {
+    return String.valueOf(OMStorage.getOmDbDir(configuration));
+  }
+
   @VisibleForTesting
   public OzoneManagerHttpServer getHttpServer() {
     return httpServer;
@@ -4026,7 +4039,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  public boolean isAdmin(String username) {
+  @VisibleForTesting
+  private boolean isAdmin(String username) {
     if (omAdminUsernames == null) {
       return false;
     } else {
@@ -4172,6 +4186,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public ReplicationConfig getDefaultReplicationConfig() {
+    if (this.defaultReplicationConfig != null) {
+      return this.defaultReplicationConfig;
+    }
+
     final String replication = configuration.getTrimmed(
         OZONE_SERVER_DEFAULT_REPLICATION_KEY,
         OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT);

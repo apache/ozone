@@ -145,6 +145,17 @@ public class TestCloseContainerCommandHandler {
   }
 
   @Test
+  public void closeContainerWithForceFlagSet() throws IOException {
+    // close a container that's associated with an existing pipeline
+    subject.handle(forceCloseWithoutPipeline(), ozoneContainer, context, null);
+
+    verify(containerHandler)
+        .markContainerForClose(container);
+    verify(writeChannel, never()).submitRequest(any(), any());
+    verify(containerHandler).closeContainer(container);
+  }
+
+  @Test
   public void forceCloseQuasiClosedContainer() throws Exception {
     // force-close a container that's already quasi closed
     container.getContainerData()
@@ -165,10 +176,10 @@ public class TestCloseContainerCommandHandler {
 
     verify(writeChannel, never())
         .submitRequest(any(), any());
-    // Container in CLOSING state is moved to UNHEALTHY if pipeline does not
-    // exist. Container should not exist in CLOSING state without a pipeline.
+    // Container in CLOSING state is moved to CLOSED if pipeline does not
+    // exist and force is set to TRUE.
     verify(containerHandler)
-        .quasiCloseContainer(container);
+        .closeContainer(container);
   }
 
   @Test

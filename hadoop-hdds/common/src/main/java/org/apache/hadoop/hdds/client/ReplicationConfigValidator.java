@@ -50,10 +50,18 @@ public class ReplicationConfigValidator {
 
   public ReplicationConfig validate(ReplicationConfig replicationConfig) {
     if (validationRegexp != null) {
-      if (!validationRegexp.matcher(replicationConfig.toString()).matches()) {
+      if (!validationRegexp.matcher(
+          replicationConfig.configFormat()).matches()) {
+        String replication = replicationConfig.getReplication();
+        if (replicationConfig instanceof ECReplicationConfig) {
+          ECReplicationConfig ecConfig =
+              (ECReplicationConfig) replicationConfig;
+          replication =  ecConfig.getCodec() + "-" + ecConfig.getData() +
+              "-" + ecConfig.getParity() + "-{CHUNK_SIZE}";
+        }
         throw new IllegalArgumentException("Invalid replication config " +
-            replicationConfig + ". Replication config should match the "
-            + validationPattern + " pattern.");
+            "for type " + replicationConfig.getReplicationType() +
+            " and replication " + replication);
       }
     }
     return replicationConfig;
