@@ -120,10 +120,10 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         omBucketSetPropertyRequest.validateAndUpdateCache(ozoneManager, 1,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(
+    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         omMetadataManager.getBucketTable().get(
             omMetadataManager.getBucketKey(volumeName, bucketName))
-            .getBucketLayout(), BucketLayout.FILE_SYSTEM_OPTIMIZED);
+            .getBucketLayout());
 
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
