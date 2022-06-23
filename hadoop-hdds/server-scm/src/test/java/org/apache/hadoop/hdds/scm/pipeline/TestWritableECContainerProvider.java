@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoo
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Matchers;
@@ -236,6 +237,7 @@ public class TestWritableECContainerProvider {
 
     try {
       provider.getContainer(1, repConfig, OWNER, new ExcludeList());
+      Assert.fail();
     } catch (IOException ex) {
       GenericTestUtils.assertExceptionContains("Cannot create pipelines", ex);
     }
@@ -265,6 +267,7 @@ public class TestWritableECContainerProvider {
 
     try {
       provider.getContainer(1, repConfig, OWNER, new ExcludeList());
+      Assert.fail();
     } catch (IOException ex) {
       GenericTestUtils.assertExceptionContains("Cannot create pipelines", ex);
     }
@@ -272,6 +275,7 @@ public class TestWritableECContainerProvider {
     for (int i = 0; i < 5; i++) {
       try {
         provider.getContainer(1, repConfig, OWNER, new ExcludeList());
+        Assert.fail();
       } catch (IOException ex) {
         GenericTestUtils.assertExceptionContains("Cannot create pipelines", ex);
       }
