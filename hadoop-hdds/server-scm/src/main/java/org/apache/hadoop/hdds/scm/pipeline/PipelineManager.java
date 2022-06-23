@@ -111,6 +111,8 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
 
   void closePipeline(Pipeline pipeline, boolean onTimeout) throws IOException;
 
+  void closeStalePipelines(DatanodeDetails datanodeDetails);
+
   void scrubPipelines() throws IOException;
 
   void startPipelineCreator();
@@ -148,6 +150,19 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    */
   default void waitPipelineReady(PipelineID pipelineID, long timeout)
       throws IOException {
+  }
+
+  /**
+   * Wait one pipeline to be OPEN among a collection pipelines.
+   * @param pipelineIDs ID collection of the pipelines to wait for
+   * @param timeout wait timeout(millisecond), if 0, use default timeout
+   * @return Pipeline the pipeline which is OPEN
+   * @throws IOException in case of any Exception, such as timeout
+   */
+  default Pipeline waitOnePipelineReady(Collection<PipelineID> pipelineIDs,
+                                    long timeout)
+          throws IOException {
+    return null;
   }
 
   /**

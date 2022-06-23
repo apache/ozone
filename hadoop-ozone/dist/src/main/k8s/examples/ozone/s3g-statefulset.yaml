@@ -36,6 +36,7 @@ spec:
       containers:
       - name: s3g
         image: '@docker.image@'
+        imagePullPolicy: Always
         args:
         - ozone
         - s3g
