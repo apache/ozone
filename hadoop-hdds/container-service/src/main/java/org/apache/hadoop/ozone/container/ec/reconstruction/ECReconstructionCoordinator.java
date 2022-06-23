@@ -26,11 +26,13 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
+import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.io.ByteBufferPool;
@@ -41,6 +43,7 @@ import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +64,8 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import static org.apache.hadoop.ozone.container.ec.reconstruction.TokenHelper.encode;
 
 /**
  * The Coordinator implements the main flow of reconstructing
@@ -88,38 +93,30 @@ public class ECReconstructionCoordinator implements Closeable {
 
   private final ECContainerOperationClient containerOperationClient;
 
-  private final ConfigurationSource config;
-
   private final ByteBufferPool byteBufferPool;
+  private final CertificateClient certificateClient;
 
-  private ExecutorService ecReconstructExecutor;
+  private final ExecutorService ecReconstructExecutor;
 
-  private BlockInputStreamFactory blockInputStreamFactory;
-
-  public ECReconstructionCoordinator(ECContainerOperationClient containerClient,
-      ConfigurationSource conf, ByteBufferPool byteBufferPool,
-      ExecutorService reconstructExecutor,
-      BlockInputStreamFactory streamFactory) {
-    this.containerOperationClient = containerClient;
-    this.config = conf;
-    this.byteBufferPool = byteBufferPool;
-    this.blockInputStreamFactory = streamFactory;
-    this.ecReconstructExecutor = reconstructExecutor;
-  }
+  private final BlockInputStreamFactory blockInputStreamFactory;
+  private final TokenHelper tokenHelper;
 
   public ECReconstructionCoordinator(ConfigurationSource conf,
       CertificateClient certificateClient) throws IOException {
-    this(new ECContainerOperationClient(conf, certificateClient), conf,
-        new ElasticByteBufferPool(), null, null);
+    this.containerOperationClient = new ECContainerOperationClient(conf,
+        certificateClient);
+    this.byteBufferPool = new ElasticByteBufferPool();
+    this.certificateClient = certificateClient;
     this.ecReconstructExecutor =
         new ThreadPoolExecutor(EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE,
-            config.getObject(OzoneClientConfig.class)
+            conf.getObject(OzoneClientConfig.class)
                 .getEcReconstructStripeReadPoolLimit(), 60, TimeUnit.SECONDS,
             new SynchronousQueue<>(), new ThreadFactoryBuilder()
             .setNameFormat("ec-reconstruct-reader-TID-%d").build(),
             new ThreadPoolExecutor.CallerRunsPolicy());
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, () -> ecReconstructExecutor);
+    tokenHelper = new TokenHelper(conf, certificateClient);
   }
 
   public void reconstructECContainerGroup(long containerID,
@@ -134,13 +131,16 @@ public class ECReconstructionCoordinator implements Closeable {
 
     SortedMap<Long, BlockLocationInfo> blockLocationInfoMap =
         calcBlockLocationInfoMap(containerID, blockDataMap, pipeline);
+    ContainerID cid = ContainerID.valueOf(containerID);
 
     // 1. create target recovering containers.
+    String containerToken = encode(tokenHelper.getContainerToken(cid));
     for (Map.Entry<Integer, DatanodeDetails> indexDnPair : targetNodeMap
         .entrySet()) {
-      this.containerOperationClient
-          .createRecoveringContainer(containerID, indexDnPair.getValue(),
-              repConfig, null, indexDnPair.getKey());
+      DatanodeDetails dn = indexDnPair.getValue();
+      Integer index = indexDnPair.getKey();
+      containerOperationClient.createRecoveringContainer(containerID, dn,
+          repConfig, containerToken, index);
     }
 
     // 2. Reconstruct and transfer to targets
@@ -152,8 +152,8 @@ public class ECReconstructionCoordinator implements Closeable {
     for (Map.Entry<Integer, DatanodeDetails> indexDnPair : targetNodeMap
         .entrySet()) {
       DatanodeDetails dn = indexDnPair.getValue();
-      this.containerOperationClient
-          .closeContainer(containerID, dn, repConfig, null);
+      containerOperationClient.closeContainer(containerID, dn, repConfig,
+          containerToken);
     }
 
   }
@@ -309,9 +309,13 @@ public class ECReconstructionCoordinator implements Closeable {
       long blockGroupLen = calcEffectiveBlockGroupLen(blockGroup,
           pipeline.getReplicationConfig().getRequiredNodes());
       if (blockGroupLen > 0) {
+        BlockID blockID = new BlockID(containerID, localID);
         BlockLocationInfo blockLocationInfo = new BlockLocationInfo.Builder()
-            .setBlockID(new BlockID(containerID, localID))
-            .setLength(blockGroupLen).setPipeline(pipeline).build();
+            .setBlockID(blockID)
+            .setLength(blockGroupLen)
+            .setPipeline(pipeline)
+            .setToken(tokenHelper.getBlockToken(blockID, blockGroupLen))
+            .build();
         blockInfoMap.put(localID, blockLocationInfo);
       }
     }
@@ -323,6 +327,7 @@ public class ECReconstructionCoordinator implements Closeable {
     if (containerOperationClient != null) {
       containerOperationClient.close();
     }
+    tokenHelper.stop();
   }
 
   private Pipeline rebuildInputPipeline(ECReplicationConfig repConfig,
@@ -351,6 +356,8 @@ public class ECReconstructionCoordinator implements Closeable {
       Map<Integer, DatanodeDetails> sourceNodeMap) throws IOException {
 
     SortedMap<Long, BlockData[]> resultMap = new TreeMap<>();
+    Token<ContainerTokenIdentifier> containerToken =
+        tokenHelper.getContainerToken(new ContainerID(containerID));
 
     Iterator<Map.Entry<Integer, DatanodeDetails>> iterator =
         sourceNodeMap.entrySet().iterator();
@@ -360,8 +367,8 @@ public class ECReconstructionCoordinator implements Closeable {
       Integer index = next.getKey();
       DatanodeDetails dn = next.getValue();
 
-      BlockData[] blockDataArr =
-          containerOperationClient.listBlock(containerID, dn, repConfig, null);
+      BlockData[] blockDataArr = containerOperationClient.listBlock(
+          containerID, dn, repConfig, containerToken);
 
       for (BlockData blockData : blockDataArr) {
         BlockID blockID = blockData.getBlockID();
