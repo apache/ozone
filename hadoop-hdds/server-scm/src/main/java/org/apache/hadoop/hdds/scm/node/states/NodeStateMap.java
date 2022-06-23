@@ -92,6 +92,31 @@ public class NodeStateMap {
   }
 
   /**
+   * Update a node in NodeStateMap.
+   *
+   * @param datanodeDetails DatanodeDetails
+   * @param nodeStatus initial NodeStatus
+   * @param layoutInfo initial LayoutVersionProto
+   *
+   */
+  public void updateNode(DatanodeDetails datanodeDetails, NodeStatus nodeStatus,
+                         LayoutVersionProto layoutInfo)
+
+          throws NodeNotFoundException {
+    lock.writeLock().lock();
+    try {
+      UUID id = datanodeDetails.getUuid();
+      if (!nodeMap.containsKey(id)) {
+        throw new NodeNotFoundException("Node UUID: " + id);
+      }
+      nodeMap.put(id, new DatanodeInfo(datanodeDetails, nodeStatus,
+              layoutInfo));
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  /**
    * Updates the node health state.
    *
    * @param nodeId Node Id

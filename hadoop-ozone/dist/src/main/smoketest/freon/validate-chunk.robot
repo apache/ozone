@@ -14,7 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test freon data validation commands
+Documentation       Test freon chunk validation commands
 Resource            ../ozone-lib/freon.robot
 Test Timeout        5 minutes
 
@@ -22,5 +22,5 @@ Test Timeout        5 minutes
 ${PREFIX}    ${EMPTY}
 
 *** Test Cases ***
-Ozone Client Key Validator
-    Freon OCKV    prefix=ockg${PREFIX}
+DN Chunk Validator
+    Freon DCV     prefix=dcg${PREFIX}    n=100
