@@ -31,9 +31,9 @@ import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
-import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
+import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -44,7 +44,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -68,12 +67,6 @@ public class TestScmHAFinalization {
           ".TestScmHAFinalization#injectionPointsToTest";
 
   private StorageContainerLocationProtocol scmClient;
-  // Notifies the test that the halting point has been reached and
-  // finalization is paused.
-  private final CountDownLatch pauseSignal = new CountDownLatch(1);
-  // Used to notify the finalization executor to resume finalization from the
-  // halting point once test conditions have been set up during finalization.
-  private final CountDownLatch unpauseSignal = new CountDownLatch(1);
   private MiniOzoneHAClusterImpl cluster;
   private static final int NUM_DATANODES = 3;
   private static final int NUM_SCMS = 3;
@@ -141,9 +134,12 @@ public class TestScmHAFinalization {
   public void testFinalizationWithLeaderChange(
       UpgradeTestInjectionPoints haltingPoint) throws Exception {
 
+    CountDownLatch pauseLatch = new CountDownLatch(1);
+    CountDownLatch unpauseLatch = new CountDownLatch(1);
     init(new OzoneConfiguration(),
-        newPausingFinalizationExecutor(haltingPoint), 0);
-    pauseSignal.await();
+        UpgradeTestUtils.newPausingFinalizationExecutor(haltingPoint,
+            pauseLatch, unpauseLatch, LOG), 0);
+    pauseLatch.await();
 
     // Stop the leader, forcing a leader change in the middle of finalization.
     // This will cause the initial client call for finalization
@@ -172,7 +168,7 @@ public class TestScmHAFinalization {
         oldLeaderScm.getSCMNodeId());
 
     // Resume finalization from the new leader.
-    unpauseSignal.countDown();
+    unpauseLatch.countDown();
 
     // Client should complete exceptionally since the original SCM it
     // requested to was restarted.
@@ -191,9 +187,12 @@ public class TestScmHAFinalization {
   @MethodSource(METHOD_SOURCE)
   public void testFinalizationWithRestart(
       UpgradeTestInjectionPoints haltingPoint) throws Exception {
+    CountDownLatch terminateLatch = new CountDownLatch(1);
     init(new OzoneConfiguration(),
-        newTerminatingFinalizationExecutor(haltingPoint), 0);
-    pauseSignal.await();
+        UpgradeTestUtils.newTerminatingFinalizationExecutor(haltingPoint,
+            terminateLatch, LOG),
+        0);
+    terminateLatch.await();
 
     // Once upgrade finalization is stopped at the halting point, restart all
     // SCMs.
@@ -341,42 +340,5 @@ public class TestScmHAFinalization {
         Assertions.fail("Unknown halting point in test: " + haltingPoint);
       }
     }
-  }
-
-  private InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
-      newPausingFinalizationExecutor(UpgradeTestInjectionPoints haltingPoint) {
-    InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
-        executor =
-        new InjectedUpgradeFinalizationExecutor<>();
-    executor.configureTestInjectionFunction(haltingPoint, () -> {
-      LOG.info("Halting upgrade finalization at point: {}", haltingPoint);
-      try {
-        pauseSignal.countDown();
-        unpauseSignal.await();
-      } catch (InterruptedException ex) {
-        Thread.currentThread().interrupt();
-        throw new IOException("SCM test finalization interrupted.", ex);
-      }
-      LOG.info("Upgrade finalization resumed from point: {}", haltingPoint);
-      return false;
-    });
-
-    return executor;
-  }
-
-  private InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
-      newTerminatingFinalizationExecutor(
-          UpgradeTestInjectionPoints haltingPoint) {
-    InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
-        executor =
-        new InjectedUpgradeFinalizationExecutor<>();
-    executor.configureTestInjectionFunction(haltingPoint, () -> {
-      LOG.info("Terminating upgrade finalization at point: {}. This is " +
-          "expected test execution.", haltingPoint);
-      pauseSignal.countDown();
-      return true;
-    });
-
-    return executor;
   }
 }

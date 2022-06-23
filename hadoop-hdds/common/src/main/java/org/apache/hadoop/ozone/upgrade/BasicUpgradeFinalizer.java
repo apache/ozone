@@ -96,6 +96,8 @@ public abstract class BasicUpgradeFinalizer
           finalizationExecutor.execute(service, this);
           response = STARTING_MSG;
         }
+        // Else, the initial response we got from initFinalize was still
+        // correct.
       } catch (NotLeaderException e) {
         LOG.info("Leader change encountered during finalization. This " +
             "component will continue to finalize as a follower.", e);
@@ -132,8 +134,12 @@ public abstract class BasicUpgradeFinalizer
     return versionManager.getUpgradeState();
   }
 
+  /**
+   * Child classes may override this method to set when finalization has
+   * begun progress.
+   */
   protected void preFinalizeUpgrade(T service) throws IOException {
-    // No Op by default.
+    versionManager.setUpgradeState(FINALIZATION_IN_PROGRESS);
   }
 
   /**

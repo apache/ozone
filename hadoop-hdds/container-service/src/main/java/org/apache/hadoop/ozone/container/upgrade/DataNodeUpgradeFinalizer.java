@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.upgrade;
 
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PREFINALIZE_VALIDATION_FAILED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
 import java.io.IOException;
@@ -54,6 +55,8 @@ public class DataNodeUpgradeFinalizer extends
       String msg = "Pre Finalization checks failed on the DataNode.";
       logAndEmit(msg);
       throw new UpgradeException(msg, PREFINALIZE_VALIDATION_FAILED);
+    } else {
+      getVersionManager().setUpgradeState(FINALIZATION_IN_PROGRESS);
     }
   }
 
