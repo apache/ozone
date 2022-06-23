@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.util.ExitUtil;
@@ -85,6 +86,7 @@ public class ReplicationManager implements SCMService {
    * ReplicationManager specific configuration.
    */
   private final ReplicationManagerConfiguration rmConf;
+  private final NodeManager nodeManager;
 
   /**
    * ReplicationMonitor thread is the one which wakes up at configured
@@ -163,6 +165,7 @@ public class ReplicationManager implements SCMService {
     this.containerReplicaPendingOps = replicaPendingOps;
     this.legacyReplicationManager = legacyReplicationManager;
     this.ecContainerHealthCheck = new ECContainerHealthCheck();
+    this.nodeManager = nodeManager;
     start();
   }
 
@@ -488,6 +491,20 @@ public class ReplicationManager implements SCMService {
   public boolean isContainerReplicatingOrDeleting(ContainerID containerID) {
     return legacyReplicationManager
         .isContainerReplicatingOrDeleting(containerID);
+  }
+
+  /**
+   * Wrap the call to nodeManager.getNodeStatus, catching any
+   * NodeNotFoundException and instead throwing an IllegalStateException.
+   * @param dn The datanodeDetails to obtain the NodeStatus for
+   * @return NodeStatus corresponding to the given Datanode.
+   */
+  static NodeStatus getNodeStatus(DatanodeDetails dn, NodeManager nm) {
+    try {
+      return nm.getNodeStatus(dn);
+    } catch (NodeNotFoundException e) {
+      throw new IllegalStateException("Unable to find NodeStatus for " + dn, e);
+    }
   }
 }
 

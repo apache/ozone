@@ -68,11 +68,13 @@ public class ECContainerReplicaCount {
   private final Map<Integer, Integer> healthyIndexes = new HashMap<>();
   private final Map<Integer, Integer> decommissionIndexes = new HashMap<>();
   private final Map<Integer, Integer> maintenanceIndexes = new HashMap<>();
+  private final Set<ContainerReplica> replicas;
 
   public ECContainerReplicaCount(ContainerInfo containerInfo,
       Set<ContainerReplica> replicas, List<Integer> indexesPendingAdd,
       List<Integer> indexesPendingDelete, int remainingMaintenanceRedundancy) {
     this.containerInfo = containerInfo;
+    this.replicas = replicas;
     this.repConfig = (ECReplicationConfig)containerInfo.getReplicationConfig();
     this.pendingAdd = indexesPendingAdd;
     this.pendingDelete = indexesPendingDelete;
@@ -114,6 +116,10 @@ public class ECContainerReplicaCount {
     for (Integer i : pendingAdd) {
       ensureIndexWithinBounds(i, "pendingAdd");
     }
+  }
+
+  public Set<ContainerReplica> getReplicas() {
+    return replicas;
   }
 
   /**
@@ -267,8 +273,8 @@ public class ECContainerReplicaCount {
    * @return List of indexes which are over-replicated.
    */
   public List<Integer> overReplicatedIndexes(boolean includePendingDelete) {
-    final Map<Integer, Integer> availableIndexes
-        = getHealthyWithDelete(includePendingDelete);
+    final Map<Integer, Integer> availableIndexes =
+        getHealthyWithDelete(includePendingDelete);
     List<Integer> indexes = new ArrayList<>();
     for (Map.Entry<Integer, Integer> entry : availableIndexes.entrySet()) {
       if (entry.getValue() > 1) {

@@ -50,8 +50,8 @@ public class ECContainerHealthCheck implements ContainerHealthCheck {
       List<ContainerReplicaOp> replicaPendingOps,
       int remainingRedundancyForMaintenance) {
     ECContainerReplicaCount replicaCount = getReplicaCountWithPending(container,
-          replicas, replicaPendingOps,
-          remainingRedundancyForMaintenance);
+        replicas, replicaPendingOps,
+        remainingRedundancyForMaintenance);
 
     ECReplicationConfig repConfig =
         (ECReplicationConfig) container.getReplicationConfig();
