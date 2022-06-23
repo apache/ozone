@@ -1186,7 +1186,7 @@
       EC Codec: Codec for encoding Stripe. Supported Values - XOR, RS (Reed Solomon)
       Data Blocks: Number of Data Blocks in a Stripe
       Parity Blocks: Number of Parity Blocks in a Stripe
-      Supported Combinations of {Data Blocks}/{Parity Blocks} - 3/2, 10/4, 6/3
+      Supported Combinations of {Data Blocks}-{Parity Blocks} - 3-2, 10-4, 6-3
       Chunk Size: Chunk size in Bytes E.g. Values 1024k, 2048k etc.
     </description>
   </property>
