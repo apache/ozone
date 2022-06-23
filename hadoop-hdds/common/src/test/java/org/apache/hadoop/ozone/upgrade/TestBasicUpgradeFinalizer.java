@@ -190,6 +190,13 @@ public class TestBasicUpgradeFinalizer {
     private boolean finalizeCalled = false;
     private boolean postCalled = false;
 
+    /**
+     * Invoked by Mockito.
+     */
+    SimpleTestFinalizer() throws IOException {
+      super(new MockLayoutVersionManager(VERSION_1.layoutVersion()));
+    }
+
     SimpleTestFinalizer(MockLayoutVersionManager lvm) {
       super(lvm);
     }
