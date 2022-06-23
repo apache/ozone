@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.function.Function;
 
 /**
@@ -182,10 +183,41 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
               HddsProtos.ReplicationFactor.ONE),
           blkInfo, pipeline,
           blockInfo.getToken(), verifyChecksum, xceiverClientFactory,
-          refreshFunction);
+          ecPipelineRefreshFunction(locationIndex + 1, refreshFunction));
       blockStreams[locationIndex] = stream;
     }
     return stream;
+  }
+
+  /**
+   * Returns a function that builds a Standalone pipeline corresponding
+   * to the replicaIndex given based on the EC pipeline fetched from SCM.
+   * @param replicaIndex
+   * @param refreshFunc
+   * @return
+   */
+  protected Function<BlockID, Pipeline> ecPipelineRefreshFunction(
+      int replicaIndex, Function<BlockID, Pipeline> refreshFunc) {
+    return (blockID) -> {
+      Pipeline ecPipeline = refreshFunc.apply(blockID);
+      if (ecPipeline == null) {
+        return null;
+      }
+      DatanodeDetails curIndexNode = ecPipeline.getNodes()
+          .stream().filter(dn ->
+              ecPipeline.getReplicaIndex(dn) == replicaIndex)
+          .findAny().orElse(null);
+      if (curIndexNode == null) {
+        return null;
+      }
+      return Pipeline.newBuilder().setReplicationConfig(
+              StandaloneReplicationConfig.getInstance(
+                  HddsProtos.ReplicationFactor.ONE))
+          .setNodes(Collections.singletonList(curIndexNode))
+          .setId(PipelineID.randomId())
+          .setState(Pipeline.PipelineState.CLOSED)
+          .build();
+    };
   }
 
   /**

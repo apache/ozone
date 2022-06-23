@@ -114,7 +114,7 @@ public enum DBProfile {
     }
   };
 
-  private static long toLong(double value) {
+  public static long toLong(double value) {
     BigDecimal temp = BigDecimal.valueOf(value);
     return temp.longValue();
   }

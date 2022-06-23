@@ -135,7 +135,7 @@ public class TestUpgradeFinalizerActions {
     }
 
     @Override
-    public void finalizeUpgrade(MockComponent c) {
+    public void finalizeLayoutFeature(LayoutFeature lf, MockComponent c) {
       return;
     }
 

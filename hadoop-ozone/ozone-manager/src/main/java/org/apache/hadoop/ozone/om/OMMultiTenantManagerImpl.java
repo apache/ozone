@@ -672,8 +672,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     } else {
       return isTenantAdmin(callerUgi.getShortUserName(), tenantId, delegated)
           || isTenantAdmin(callerUgi.getUserName(), tenantId, delegated)
-          || ozoneManager.isAdmin(callerUgi.getShortUserName())
-          || ozoneManager.isAdmin(callerUgi.getUserName());
+          || ozoneManager.isAdmin(callerUgi);
     }
   }
 

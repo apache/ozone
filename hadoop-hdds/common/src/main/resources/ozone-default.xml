@@ -1250,6 +1250,19 @@
   </property>
 
   <property>
+    <name>ozone.om.open.key.cleanup.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>A timeout value of open key cleanup service. If this is set
+      greater than 0, the service will stop waiting for the open key deleting
+      completion after this time. If timeout happens to a large proportion of
+      open key deletion, this value needs to be increased or
+      ozone.om.open.key.cleanup.limit.per.task should be decreased.
+      Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.open.key.expire.threshold</name>
     <value>7d</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
@@ -2127,14 +2140,6 @@
     <description>
       optional config, the config when set to true skips the clusterId
       validation from leader scm during bootstrap
-    </description>
-  </property>
-  <property>
-    <name>ozone.scm.ratis.enable</name>
-    <value>false</value>
-    <tag>OZONE, SCM, HA, RATIS</tag>
-    <description>Property to enable or disable Ratis server on SCM.
-      Please note - this is a temporary property to disable SCM Ratis server.
     </description>
   </property>
 
@@ -3250,6 +3255,19 @@
     <description>
       The timeout for each Multi-Tenancy Ranger background sync thread run.
       If the timeout has been reached, a warning message will be logged.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.fs.default.bucket.layout</name>
+    <value>FILE_SYSTEM_OPTIMIZED</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      Default bucket layout value used when buckets are created using OFS.
+      Supported values are LEGACY and FILE_SYSTEM_OPTIMIZED.
+      FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
+      also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
+      will create intermediate directories.
     </description>
   </property>
 </configuration>

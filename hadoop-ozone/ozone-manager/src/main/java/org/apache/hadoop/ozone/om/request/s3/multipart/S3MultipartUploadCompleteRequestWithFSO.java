@@ -59,13 +59,14 @@ public class S3MultipartUploadCompleteRequestWithFSO
 
   @Override
   protected void checkDirectoryAlreadyExists(OzoneManager ozoneManager,
-      String volumeName, String bucketName, String keyName,
+      OmBucketInfo omBucketInfo, String keyName,
       OMMetadataManager omMetadataManager) throws IOException {
 
     Path keyPath = Paths.get(keyName);
     OMFileRequest.OMPathInfoWithFSO pathInfoFSO =
         OMFileRequest.verifyDirectoryKeysInPath(omMetadataManager,
-            volumeName, bucketName, keyName, keyPath);
+            omBucketInfo.getVolumeName(), omBucketInfo.getBucketName(),
+            keyName, keyPath);
     // Check for directory exists with same name, if it exists throw error.
     if (pathInfoFSO.getDirectoryResult() == DIRECTORY_EXISTS) {
       throw new OMException("Can not Complete MPU for file: " + keyName +

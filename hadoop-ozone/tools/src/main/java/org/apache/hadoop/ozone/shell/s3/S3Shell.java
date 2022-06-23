@@ -37,13 +37,10 @@ import picocli.CommandLine.Command;
 public class S3Shell extends Shell {
 
   @Override
-  public void execute(String[] argv) {
+  public int execute(String[] argv) {
     TracingUtil.initTracing("s3shell", createOzoneConfiguration());
-    TracingUtil.executeInNewSpan("s3shell",
-        (Supplier<Void>) () -> {
-          super.execute(argv);
-          return null;
-        });
+    return TracingUtil.executeInNewSpan("s3shell",
+        (Supplier<Integer>) () -> super.execute(argv));
   }
 
   /**

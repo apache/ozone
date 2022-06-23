@@ -87,11 +87,11 @@ public class Freon extends GenericCli {
   private OzoneConfiguration conf;
 
   @Override
-  public void execute(String[] argv) {
+  public int execute(String[] argv) {
     conf = createOzoneConfiguration();
     HddsServerUtil.initializeMetrics(conf, "ozone-freon");
     TracingUtil.initTracing("freon", conf);
-    super.execute(argv);
+    return super.execute(argv);
   }
 
   public void stopHttpServer() {

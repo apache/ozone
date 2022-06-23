@@ -101,7 +101,8 @@ enum Type {
 
   RevokeS3Secret = 93;
 
-  PurgeDirectories = 94;
+  PurgePaths = 94; // [deprecated = true]
+  PurgeDirectories = 95;
 
   CreateTenant = 96;
   DeleteTenant = 97;
@@ -201,7 +202,8 @@ message OMRequest {
 
   optional RevokeS3SecretRequest            RevokeS3SecretRequest          = 93;
 
-  optional PurgeDirectoriesRequest          purgeDirectoriesRequest        = 94;
+  optional PurgePathsRequest                purgePathsRequest              = 94 [deprecated = true];
+  optional PurgeDirectoriesRequest          purgeDirectoriesRequest        = 108;
 
   optional S3Authentication                 s3Authentication               = 95;
 
@@ -297,7 +299,8 @@ message OMResponse {
 
   optional ListTrashResponse                  listTrashResponse            = 91;
   optional RecoverTrashResponse               RecoverTrashResponse         = 92;
-  optional PurgeDirectoriesResponse           purgeDirectoriesResponse     = 93;
+  optional PurgePathsResponse                 purgePathsResponse           = 93 [deprecated = true];
+  optional PurgeDirectoriesResponse           purgeDirectoriesResponse     = 108;
 
   // Skipped 94/95 to align with OMRequest
   optional CreateTenantResponse              CreateTenantResponse          = 96;
@@ -885,6 +888,41 @@ message KeyLocationList {
     optional bool isMultipartKey = 4 [default = false];
 }
 
+/**
+ * Checksum algorithms/types used in Ozone
+ * Make sure this enum's integer values match enum values' id properties defined
+ * in org.apache.hadoop.util.DataChecksum.Type
+ */
+enum ChecksumTypeProto {
+  CHECKSUM_NULL = 0;
+  CHECKSUM_CRC32 = 1;
+  CHECKSUM_CRC32C = 2;
+}
+
+enum FileChecksumTypeProto {
+  MD5CRC = 1;  // BlockChecksum obtained by taking the MD5 digest of chunk CRCs
+  COMPOSITE_CRC = 2;  // Chunk-independent CRC, optionally striped
+}
+
+message CompositeCrcFileChecksumProto {
+  required ChecksumTypeProto checksumType = 1;
+  required uint32 bytesPerCrc = 2;
+  required uint32 crc = 3;
+}
+
+message MD5MD5Crc32FileChecksumProto {
+  required ChecksumTypeProto checksumType = 1;
+  required uint32 bytesPerCRC = 2;
+  required uint64 crcPerBlock = 3;
+  required bytes md5 = 4;
+}
+
+message FileChecksumProto {
+  required FileChecksumTypeProto checksumType = 1  [default = COMPOSITE_CRC];
+  optional CompositeCrcFileChecksumProto compositeCrc = 2;
+  optional MD5MD5Crc32FileChecksumProto md5Crc = 3;
+}
+
 message KeyInfo {
     required string volumeName = 1;
     required string bucketName = 2;
@@ -903,6 +941,7 @@ message KeyInfo {
     optional uint64 updateID = 15;
     optional uint64 parentID = 16;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
+    optional FileChecksumProto fileChecksum = 18;
 }
 
 message DirectoryInfo {
@@ -1081,24 +1120,38 @@ message PurgeKeysResponse {
 
 }
 
-message PurgeDirectoriesRequest {
-  repeated PurgePathRequest deletedPath = 1;
+message PurgePathsRequest {
+    // option deprecated = true;
+    // Use PurgeDirectoriesRequest
+    repeated string deletedDirs = 1;
+    repeated KeyInfo deletedSubFiles = 2;
+    repeated KeyInfo markDeletedSubDirs = 3;
 }
 
-message PurgePathRequest {
-    required uint64 volumeId = 1;
-    required uint64 bucketId = 2;
-    optional string deletedDir = 3;
-    repeated KeyInfo deletedSubFiles = 4;
-    repeated KeyInfo markDeletedSubDirs = 5;
+message PurgePathsResponse {
+  // option deprecated = true;
+  // Use PurgeDirectoriesResponse
+}
+
+message PurgeDirectoriesRequest {
+  repeated PurgePathRequest deletedPath = 1;
 }
 
 message PurgeDirectoriesResponse {
 
 }
 
+message PurgePathRequest {
+  required uint64 volumeId = 1;
+  required uint64 bucketId = 2;
+  optional string deletedDir = 3;
+  repeated KeyInfo deletedSubFiles = 4;
+  repeated KeyInfo markDeletedSubDirs = 5;
+}
+
 message DeleteOpenKeysRequest {
   repeated OpenKeyBucket openKeysPerBucket = 1;
+  optional BucketLayoutProto bucketLayout = 2;
 }
 
 message OpenKeyBucket {

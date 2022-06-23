@@ -54,6 +54,7 @@ import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.TRANSACTIONINF
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_CERTS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_SCM_CERTS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.SEQUENCE_ID;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.META;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 
 import org.apache.ratis.util.ExitUtils;
@@ -89,6 +90,8 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   private Table<String, Long> sequenceIdTable;
 
   private Table<ContainerID, MoveDataNodePair> moveTable;
+
+  private Table<String, String> metaTable;
 
   private Table<String, ByteString> statefulServiceConfigTable;
 
@@ -179,7 +182,12 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
       checkTableStatus(moveTable, MOVE.getName());
 
+      metaTable = META.getTable(store);
+
+      checkTableStatus(moveTable, META.getName());
+
       statefulServiceConfigTable = STATEFUL_SERVICE_CONFIG.getTable(store);
+
       checkTableStatus(statefulServiceConfigTable,
           STATEFUL_SERVICE_CONFIG.getName());
     }
@@ -288,6 +296,10 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   }
 
   @Override
+  public Table<String, String> getMetaTable() {
+    return metaTable;
+  }
+
   public Table<String, ByteString> getStatefulServiceConfigTable() {
     return statefulServiceConfigTable;
   }

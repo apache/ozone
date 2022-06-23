@@ -465,6 +465,11 @@ public final class OzoneConsts {
 
   // Layout Version written into Meta Table ONLY during finalization.
   public static final String LAYOUT_VERSION_KEY = "#LAYOUTVERSION";
+  // Key written to Meta Table to indicate a component undergoing finalization.
+  // Currently this is only used on SCM, but may be useful on OM if/when
+  // finalizing one layout feature per Ratis request is implemented in
+  // HDDS-4286.
+  public static final String FINALIZING_KEY = "#FINALIZING";
 
   // Kerberos constants
   public static final String KERBEROS_CONFIG_VALUE = "kerberos";

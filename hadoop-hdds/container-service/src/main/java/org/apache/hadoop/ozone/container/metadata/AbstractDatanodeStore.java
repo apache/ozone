@@ -18,12 +18,14 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
+import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -65,7 +67,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractDatanodeStore.class);
-  private DBStore store;
+  private volatile DBStore store;
   private final AbstractDatanodeDBDefinition dbDef;
   private final ColumnFamilyOptions cfOptions;
 
@@ -102,6 +104,12 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       DBOptions options = dbProfile.getDBOptions();
       options.setCreateIfMissing(true);
       options.setCreateMissingColumnFamilies(true);
+
+      if (this.dbDef instanceof DatanodeSchemaOneDBDefinition ||
+          this.dbDef instanceof DatanodeSchemaTwoDBDefinition) {
+        long maxWalSize = DBProfile.toLong(StorageUnit.MB.toBytes(2));
+        options.setMaxTotalWalSize(maxWalSize);
+      }
 
       String rocksDbStat = config.getTrimmed(
               OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
@@ -143,7 +151,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public void stop() throws Exception {
+  public synchronized void stop() throws Exception {
     if (store != null) {
       store.close();
       store = null;
@@ -187,6 +195,19 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       KeyPrefixFilter filter) throws IOException {
     return new KeyValueBlockIterator(containerID,
             blockDataTableWithIterator.iterator(), filter);
+  }
+
+  @Override
+  public synchronized boolean isClosed() {
+    if (this.store == null) {
+      return true;
+    }
+    return this.store.isClosed();
+  }
+
+  @Override
+  public void close() throws IOException {
+    this.store.close();
   }
 
   @Override

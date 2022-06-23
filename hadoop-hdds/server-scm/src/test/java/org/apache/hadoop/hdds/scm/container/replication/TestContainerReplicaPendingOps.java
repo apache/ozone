@@ -23,9 +23,9 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.ozone.test.TestClock;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -47,7 +47,7 @@ public class TestContainerReplicaPendingOps {
   private DatanodeDetails dn2;
   private DatanodeDetails dn3;
 
-  @Before
+  @BeforeEach
   public void setup() {
     config = new OzoneConfiguration();
     clock = new TestClock(Instant.now(), ZoneOffset.UTC);
@@ -61,7 +61,7 @@ public class TestContainerReplicaPendingOps {
   public void testGetPendingOpsReturnsEmptyList() {
     List<ContainerReplicaOp> ops =
         pendingOps.getPendingOps(new ContainerID(1));
-    Assert.assertEquals(0, ops.size());
+    Assertions.assertEquals(0, ops.size());
   }
 
   @Test
@@ -73,22 +73,22 @@ public class TestContainerReplicaPendingOps {
 
     List<ContainerReplicaOp> ops =
         pendingOps.getPendingOps(new ContainerID(1));
-    Assert.assertEquals(3, ops.size());
+    Assertions.assertEquals(3, ops.size());
     for (ContainerReplicaOp op : ops) {
-      Assert.assertEquals(0, op.getReplicaIndex());
-      Assert.assertEquals(ADD, op.getOpType());
+      Assertions.assertEquals(0, op.getReplicaIndex());
+      Assertions.assertEquals(ADD, op.getOpType());
     }
     List<DatanodeDetails> allDns = ops.stream()
         .map(s -> s.getTarget()).collect(Collectors.toList());
-    Assert.assertTrue(allDns.contains(dn1));
-    Assert.assertTrue(allDns.contains(dn2));
-    Assert.assertTrue(allDns.contains(dn3));
+    Assertions.assertTrue(allDns.contains(dn1));
+    Assertions.assertTrue(allDns.contains(dn2));
+    Assertions.assertTrue(allDns.contains(dn3));
 
     ops = pendingOps.getPendingOps(new ContainerID(2));
-    Assert.assertEquals(1, ops.size());
-    Assert.assertEquals(1, ops.get(0).getReplicaIndex());
-    Assert.assertEquals(ADD, ops.get(0).getOpType());
-    Assert.assertEquals(dn1, ops.get(0).getTarget());
+    Assertions.assertEquals(1, ops.size());
+    Assertions.assertEquals(1, ops.get(0).getReplicaIndex());
+    Assertions.assertEquals(ADD, ops.get(0).getOpType());
+    Assertions.assertEquals(dn1, ops.get(0).getTarget());
   }
 
   @Test
@@ -100,22 +100,22 @@ public class TestContainerReplicaPendingOps {
 
     List<ContainerReplicaOp> ops =
         pendingOps.getPendingOps(new ContainerID(1));
-    Assert.assertEquals(3, ops.size());
+    Assertions.assertEquals(3, ops.size());
     for (ContainerReplicaOp op : ops) {
-      Assert.assertEquals(0, op.getReplicaIndex());
-      Assert.assertEquals(DELETE, op.getOpType());
+      Assertions.assertEquals(0, op.getReplicaIndex());
+      Assertions.assertEquals(DELETE, op.getOpType());
     }
     List<DatanodeDetails> allDns = ops.stream()
         .map(s -> s.getTarget()).collect(Collectors.toList());
-    Assert.assertTrue(allDns.contains(dn1));
-    Assert.assertTrue(allDns.contains(dn2));
-    Assert.assertTrue(allDns.contains(dn3));
+    Assertions.assertTrue(allDns.contains(dn1));
+    Assertions.assertTrue(allDns.contains(dn2));
+    Assertions.assertTrue(allDns.contains(dn3));
 
     ops = pendingOps.getPendingOps(new ContainerID(2));
-    Assert.assertEquals(1, ops.size());
-    Assert.assertEquals(1, ops.get(0).getReplicaIndex());
-    Assert.assertEquals(DELETE, ops.get(0).getOpType());
-    Assert.assertEquals(dn1, ops.get(0).getTarget());
+    Assertions.assertEquals(1, ops.size());
+    Assertions.assertEquals(1, ops.get(0).getReplicaIndex());
+    Assertions.assertEquals(DELETE, ops.get(0).getOpType());
+    Assertions.assertEquals(dn1, ops.get(0).getTarget());
   }
 
   @Test
@@ -130,25 +130,25 @@ public class TestContainerReplicaPendingOps {
         pendingOps.getPendingOps(new ContainerID(1));
 
     // We expect 4 entries - 2 add and 2 delete.
-    Assert.assertEquals(4, ops.size());
+    Assertions.assertEquals(4, ops.size());
 
-    Assert.assertTrue(pendingOps
+    Assertions.assertTrue(pendingOps
         .completeAddReplica(new ContainerID(1), dn1, 0));
     ops = pendingOps.getPendingOps(new ContainerID(1));
-    Assert.assertEquals(3, ops.size());
+    Assertions.assertEquals(3, ops.size());
 
     // Complete one that does not exist:
-    Assert.assertFalse(pendingOps
+    Assertions.assertFalse(pendingOps
         .completeAddReplica(new ContainerID(1), dn1, 0));
     ops = pendingOps.getPendingOps(new ContainerID(1));
-    Assert.assertEquals(3, ops.size());
+    Assertions.assertEquals(3, ops.size());
 
     // Complete the remaining ones
     pendingOps.completeDeleteReplica(new ContainerID(1), dn1, 0);
     pendingOps.completeDeleteReplica(new ContainerID(1), dn2, 0);
     pendingOps.completeAddReplica(new ContainerID(1), dn3, 0);
     ops = pendingOps.getPendingOps(new ContainerID(1));
-    Assert.assertEquals(0, ops.size());
+    Assertions.assertEquals(0, ops.size());
   }
 
   @Test
@@ -161,14 +161,14 @@ public class TestContainerReplicaPendingOps {
 
     ContainerID cid = new ContainerID(1);
     List<ContainerReplicaOp> ops = pendingOps.getPendingOps(cid);
-    Assert.assertEquals(4, ops.size());
+    Assertions.assertEquals(4, ops.size());
     for (ContainerReplicaOp op : ops) {
-      Assert.assertTrue(pendingOps.removeOp(cid, op));
+      Assertions.assertTrue(pendingOps.removeOp(cid, op));
     }
     // Attempt to remove one that no longer exists
-    Assert.assertFalse(pendingOps.removeOp(cid, ops.get(0)));
+    Assertions.assertFalse(pendingOps.removeOp(cid, ops.get(0)));
     ops = pendingOps.getPendingOps(cid);
-    Assert.assertEquals(0, ops.size());
+    Assertions.assertEquals(0, ops.size());
   }
 
   @Test
@@ -183,44 +183,44 @@ public class TestContainerReplicaPendingOps {
 
     List<ContainerReplicaOp> ops =
         pendingOps.getPendingOps(new ContainerID(1));
-    Assert.assertEquals(4, ops.size());
+    Assertions.assertEquals(4, ops.size());
     ops = pendingOps.getPendingOps(new ContainerID(2));
-    Assert.assertEquals(1, ops.size());
+    Assertions.assertEquals(1, ops.size());
 
     // Some entries at "start" some at start + 1000 and start + 2000.
     // Clock is currently at +2000.
     pendingOps.removeExpiredEntries(2500);
     // Nothing is remove as nothing is older than the current clock time.
     ops = pendingOps.getPendingOps(new ContainerID(1));
-    Assert.assertEquals(4, ops.size());
+    Assertions.assertEquals(4, ops.size());
 
     clock.fastForward(1000);
     pendingOps.removeExpiredEntries(2500);
     // Nothing is remove as nothing is older than the current clock time.
     ops = pendingOps.getPendingOps(new ContainerID(1));
-    Assert.assertEquals(2, ops.size());
+    Assertions.assertEquals(2, ops.size());
     // We should lose the entries for DN1
     List<DatanodeDetails> dns = ops.stream()
         .map(s -> s.getTarget())
         .collect(Collectors.toList());
-    Assert.assertFalse(dns.contains(dn1));
-    Assert.assertTrue(dns.contains(dn2));
-    Assert.assertTrue(dns.contains(dn3));
+    Assertions.assertFalse(dns.contains(dn1));
+    Assertions.assertTrue(dns.contains(dn2));
+    Assertions.assertTrue(dns.contains(dn3));
 
     clock.fastForward(1000);
     pendingOps.removeExpiredEntries(2500);
 
     // Now should only have entries for container 2
     ops = pendingOps.getPendingOps(new ContainerID(1));
-    Assert.assertEquals(0, ops.size());
+    Assertions.assertEquals(0, ops.size());
     ops = pendingOps.getPendingOps(new ContainerID(2));
-    Assert.assertEquals(1, ops.size());
+    Assertions.assertEquals(1, ops.size());
 
     // Advance the clock again and all should be removed
     clock.fastForward(1000);
     pendingOps.removeExpiredEntries(2500);
     ops = pendingOps.getPendingOps(new ContainerID(2));
-    Assert.assertEquals(0, ops.size());
+    Assertions.assertEquals(0, ops.size());
   }
 
 }

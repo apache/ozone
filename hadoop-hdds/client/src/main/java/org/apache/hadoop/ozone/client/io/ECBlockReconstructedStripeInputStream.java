@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.client.io;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -39,22 +40,31 @@ import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Queue;
-import java.util.Random;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.function.Function;
+
+import static java.util.Collections.emptySortedSet;
+import static java.util.stream.Collectors.toCollection;
+import static java.util.stream.Collectors.toSet;
+import static java.util.stream.IntStream.range;
 
 /**
  * Class to read EC encoded data from blocks a stripe at a time, when some of
  * the data blocks are not available. The public API for this class is:
  *
  *     readStripe(ByteBuffer[] bufs)
+ *     recoverChunks(ByteBuffer[] bufs)
  *
  * The other inherited public APIs will throw a NotImplementedException. This is
  * because this class is intended to only read full stripes into a reusable set
@@ -88,6 +98,18 @@ import java.util.function.Function;
  * than a full stripe, the client can simply read upto remaining from each
  * buffer in turn. If there is a full stripe, each buffer should have ecChunk
  * size remaining.
+ *
+ * recoverChunks() handles the more generic case, where specific buffers, even
+ * parity ones, are to be recovered -- these should be passed to the method.
+ * The whole stripe is not important for the caller in this case.  The indexes
+ * of the buffers that need to be recovered should be set by calling
+ * setRecoveryIndexes() before any read operation.
+ *
+ * Example: with rs-3-2 there are 3 data and 2 parity replicas, indexes are [0,
+ * 1, 2, 3, 4].  If replicas 2 and 3 are missing and need to be recovered,
+ * caller should {@code setRecoveryIndexes([2, 3])}, and then can recover the
+ * part of each stripe for these replicas by calling
+ * {@code recoverChunks(bufs)}, passing two buffers.
  */
 public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
 
@@ -99,20 +121,34 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   private ByteBuffer[] decoderInputBuffers;
   // Missing chunks are recovered into these buffers.
   private ByteBuffer[] decoderOutputBuffers;
+
   // Missing indexes to be recovered into the recovered buffers. Required by the
   // EC decoder
-  private int[] missingIndexes;
-  // The blockLocation indexes to use to read data into the dataBuffers.
-  private List<Integer> dataIndexes = new ArrayList<>();
+  private final SortedSet<Integer> missingIndexes = new TreeSet<>();
+
+  // indexes for data, padding and parity blocks
+  private final SortedSet<Integer> dataIndexes;
+  private final SortedSet<Integer> paddingIndexes;
+  private final SortedSet<Integer> parityIndexes;
+  private final SortedSet<Integer> allIndexes;
+
+  // The blockLocation indexes to use to read data into the output buffers
+  private final SortedSet<Integer> selectedIndexes = new TreeSet<>();
+  // indexes of internal buffers (ones which are not requested by the caller,
+  // but needed for reconstructing missing data)
+  private final SortedSet<Integer> internalBuffers = new TreeSet<>();
   // Data Indexes we have tried to read from, and failed for some reason
-  private Set<Integer> failedDataIndexes = new HashSet<>();
-  private ByteBufferPool byteBufferPool;
+  private final Set<Integer> failedDataIndexes = new HashSet<>();
+  private final ByteBufferPool byteBufferPool;
 
   private RawErasureDecoder decoder;
 
   private boolean initialized = false;
 
-  private ExecutorService executor;
+  private final ExecutorService executor;
+
+  // for offline recovery: indexes to be recovered
+  private final Set<Integer> recoveryIndexes = new TreeSet<>();
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public ECBlockReconstructedStripeInputStream(ECReplicationConfig repConfig,
@@ -125,6 +161,13 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         refreshFunction, streamFactory);
     this.byteBufferPool = byteBufferPool;
     this.executor = ecReconstructExecutor;
+
+    int expectedDataBlocks = calculateExpectedDataBlocks(repConfig);
+    int d = repConfig.getData();
+    dataIndexes = setOfRange(0, expectedDataBlocks);
+    paddingIndexes = setOfRange(expectedDataBlocks, d);
+    parityIndexes = setOfRange(d, repConfig.getRequiredNodes());
+    allIndexes = setOfRange(0, repConfig.getRequiredNodes());
   }
 
   /**
@@ -138,7 +181,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
    *
    * @param dns A list of DatanodeDetails that are known to be bad.
    */
-  public synchronized void addFailedDatanodes(List<DatanodeDetails> dns) {
+  public synchronized void addFailedDatanodes(Collection<DatanodeDetails> dns) {
     if (initialized) {
       throw new RuntimeException("Cannot add failed datanodes after the " +
           "reader has been initialized");
@@ -154,92 +197,133 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     }
   }
 
+  /**
+   * Set the EC indexes that should be recovered by
+   * {@link #recoverChunks(ByteBuffer[])}.
+   */
+  public synchronized void setRecoveryIndexes(Collection<Integer> indexes) {
+    if (initialized) {
+      throw new IllegalStateException("Cannot set recovery indexes after the " +
+          "reader has been initialized");
+    }
+    Preconditions.assertNotNull(indexes, "recovery indexes");
+    recoveryIndexes.clear();
+    recoveryIndexes.addAll(indexes);
+  }
+
   private void init() throws InsufficientLocationsException {
     if (decoder == null) {
       decoder = CodecUtil.createRawDecoderWithFallback(getRepConfig());
-    }
-    if (decoderInputBuffers == null) {
-      // The EC decoder needs an array data+parity long, with missing or not
-      // needed indexes set to null.
-      decoderInputBuffers = new ByteBuffer[getRepConfig().getRequiredNodes()];
     }
     if (!hasSufficientLocations()) {
       throw new InsufficientLocationsException("There are insufficient " +
           "datanodes to read the EC block");
     }
-    dataIndexes.clear();
-    ECReplicationConfig repConfig = getRepConfig();
-    DatanodeDetails[] locations = getDataLocations();
-    setMissingIndexesAndDataLocations(locations);
-    List<Integer> parityIndexes =
-        selectParityIndexes(locations, missingIndexes.length);
-    // We read from the selected parity blocks, so add them to the data indexes.
-    dataIndexes.addAll(parityIndexes);
-    // The decoder inputs originally start as all nulls. Then we populate the
-    // pieces we have data for. The parity buffers are reused for the block
-    // so we can allocated them now. On re-init, we reuse any parity buffers
-    // already allocated.
-    for (int i = repConfig.getData(); i < repConfig.getRequiredNodes(); i++) {
-      if (parityIndexes.contains(i)) {
-        if (decoderInputBuffers[i] == null) {
-          decoderInputBuffers[i] = allocateBuffer(repConfig);
-        }
-      } else {
-        decoderInputBuffers[i] = null;
-      }
+    allocateInternalBuffers();
+    if (!isOfflineRecovery()) {
+      decoderOutputBuffers = new ByteBuffer[missingIndexes.size()];
     }
-    decoderOutputBuffers = new ByteBuffer[missingIndexes.length];
     initialized = true;
   }
 
-  /**
-   * Determine which indexes are missing, taking into account the length of the
-   * block. For a block shorter than a full EC stripe, it is expected that
-   * some of the data locations will not be present.
-   * Populates the missingIndex and dataIndexes instance variables.
-   * @param locations Available locations for the block group
-   */
-  private void setMissingIndexesAndDataLocations(DatanodeDetails[] locations) {
-    ECReplicationConfig repConfig = getRepConfig();
-    int expectedDataBlocks = calculateExpectedDataBlocks(repConfig);
-    List<Integer> missingInd = new ArrayList<>();
-    for (int i = 0; i < repConfig.getData(); i++) {
-      if ((locations[i] == null || failedDataIndexes.contains(i))
-          && i < expectedDataBlocks) {
-        missingInd.add(i);
-      } else if (locations[i] != null && !failedDataIndexes.contains(i)) {
-        dataIndexes.add(i);
+  private void allocateInternalBuffers() {
+    // The decoder inputs originally start as all nulls. Then we populate the
+    // pieces we have data for. The internal buffers are reused for the block,
+    // so we can allocate them now. On re-init, we reuse any internal buffers
+    // already allocated.
+    final int minIndex = isOfflineRecovery() ? 0 : getRepConfig().getData();
+    for (int i = minIndex; i < getRepConfig().getRequiredNodes(); i++) {
+      boolean internalInput = selectedIndexes.contains(i)
+          || paddingIndexes.contains(i);
+      boolean hasBuffer = decoderInputBuffers[i] != null;
+
+      if (internalInput && !hasBuffer) {
+        allocateInternalBuffer(i);
+      } else if (!internalInput && hasBuffer) {
+        releaseInternalBuffer(i);
       }
     }
-    missingIndexes = missingInd.stream().mapToInt(Integer::valueOf).toArray();
+  }
+
+  private void allocateInternalBuffer(int index) {
+    Preconditions.assertTrue(internalBuffers.add(index),
+        () -> "Buffer " + index + " already tracked as internal input");
+    decoderInputBuffers[index] =
+        byteBufferPool.getBuffer(false, getRepConfig().getEcChunkSize());
+  }
+
+  private void releaseInternalBuffer(int index) {
+    Preconditions.assertTrue(internalBuffers.remove(index),
+        () -> "Buffer " + index + " not tracked as internal input");
+    byteBufferPool.putBuffer(decoderInputBuffers[index]);
+    decoderInputBuffers[index] = null;
+  }
+
+  private void markMissingLocationsAsFailed() {
+    DatanodeDetails[] locations = getDataLocations();
+    for (int i = 0; i < locations.length; i++) {
+      if (locations[i] == null && failedDataIndexes.add(i)) {
+        LOG.debug("Marked index={} as failed", i);
+      }
+    }
+  }
+
+  private boolean isOfflineRecovery() {
+    return !recoveryIndexes.isEmpty();
   }
 
   private void assignBuffers(ByteBuffer[] bufs) {
-    ECReplicationConfig repConfig = getRepConfig();
-    Preconditions.assertTrue(bufs.length == repConfig.getData());
-    int recoveryIndex = 0;
-    // Here bufs come from the caller and will be filled with data read from
-    // the blocks or recovered. Therefore, if the index is missing, we assign
-    // the buffer to the decoder outputs, where data is recovered via EC
-    // decoding. Otherwise the buffer is set to the input. Note, it may be a
-    // buffer which needs padded.
-    for (int i = 0; i < repConfig.getData(); i++) {
-      if (isMissingIndex(i)) {
-        decoderOutputBuffers[recoveryIndex++] = bufs[i];
-        decoderInputBuffers[i] = null;
-      } else {
-        decoderInputBuffers[i] = bufs[i];
+    Preconditions.assertTrue(bufs.length == getExpectedBufferCount());
+
+    if (isOfflineRecovery()) {
+      decoderOutputBuffers = bufs;
+    } else {
+      int recoveryIndex = 0;
+      // Here bufs come from the caller and will be filled with data read from
+      // the blocks or recovered. Therefore, if the index is missing, we assign
+      // the buffer to the decoder outputs, where data is recovered via EC
+      // decoding. Otherwise the buffer is set to the input. Note, it may be a
+      // buffer which needs padded.
+      for (int i = 0; i < bufs.length; i++) {
+        if (isMissingIndex(i)) {
+          decoderOutputBuffers[recoveryIndex++] = bufs[i];
+          if (internalBuffers.contains(i)) {
+            releaseInternalBuffer(i);
+          } else {
+            decoderInputBuffers[i] = null;
+          }
+        } else {
+          decoderInputBuffers[i] = bufs[i];
+        }
       }
     }
   }
 
+  private int getExpectedBufferCount() {
+    return isOfflineRecovery()
+        ? recoveryIndexes.size()
+        : getRepConfig().getData();
+  }
+
   private boolean isMissingIndex(int ind) {
-    for (int i : missingIndexes) {
-      if (i == ind) {
-        return true;
-      }
-    }
-    return false;
+    return missingIndexes.contains(ind);
+  }
+
+  /**
+   * This method should be passed a list of byteBuffers which must contain the
+   * same number of entries as previously set recovery indexes. Each Bytebuffer
+   * should be at position 0 and have EC ChunkSize bytes remaining.
+   * After returning, the buffers will contain the data for the parts to be
+   * recovered in the block's next stripe. The buffers will be returned
+   * "ready to read" with their position set to zero and the limit set
+   * according to how much data they contain.
+   *
+   * @param bufs A list of byteBuffers into which recovered data is written
+   * @return The number of bytes read
+   */
+  public synchronized int recoverChunks(ByteBuffer[] bufs) throws IOException {
+    Preconditions.assertTrue(isOfflineRecovery());
+    return read(bufs);
   }
 
   /**
@@ -258,6 +342,11 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
    * @throws IOException
    */
   public synchronized int readStripe(ByteBuffer[] bufs) throws IOException {
+    return read(bufs);
+  }
+
+  @VisibleForTesting
+  synchronized int read(ByteBuffer[] bufs) throws IOException {
     int toRead = (int)Math.min(getRemaining(), getStripeSize());
     if (toRead == 0) {
       return EOF;
@@ -269,10 +358,10 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     while (true) {
       try {
         assignBuffers(bufs);
-        clearParityBuffers();
+        clearInternalBuffers();
         // Set the read limits on the buffers so we do not read any garbage data
         // from the end of the block that is unexpected.
-        setBufferReadLimits(bufs, toRead);
+        setBufferReadLimits(toRead);
         loadDataBuffersFromStream();
         break;
       } catch (IOException e) {
@@ -291,13 +380,13 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         throw new IOException("Interrupted waiting for reads to complete", ie);
       }
     }
-    if (missingIndexes.length > 0) {
+    if (!missingIndexes.isEmpty()) {
       padBuffers(toRead);
       flipInputs();
       decodeStripe();
       // Reset the buffer positions and limits to remove any padding added
       // before EC Decode.
-      setBufferReadLimits(bufs, toRead);
+      setBufferReadLimits(toRead);
     } else {
       // If we have no missing indexes, then the buffers will be at their
       // limits after reading so we need to flip them to ensure they are ready
@@ -316,7 +405,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   private void validateBuffers(ByteBuffer[] bufs) {
-    Preconditions.assertTrue(bufs.length == getRepConfig().getData());
+    Preconditions.assertTrue(bufs.length == getExpectedBufferCount());
     int chunkSize = getRepConfig().getEcChunkSize();
     for (ByteBuffer b : bufs) {
       Preconditions.assertTrue(b.remaining() == chunkSize);
@@ -358,38 +447,39 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     }
   }
 
-  private void setBufferReadLimits(ByteBuffer[] bufs, int toRead) {
+  private void setBufferReadLimits(int toRead) {
     int chunkSize = getRepConfig().getEcChunkSize();
     int fullChunks = toRead / chunkSize;
-    if (fullChunks == getRepConfig().getData()) {
+    int data = getRepConfig().getData();
+    if (fullChunks == data) {
       // We are reading a full stripe, no concerns over padding.
       return;
     }
 
-    if (fullChunks == 0) {
-      bufs[0].limit(toRead);
-      // All buffers except the first contain no data.
-      for (int i = 1; i < bufs.length; i++) {
-        bufs[i].position(0);
-        bufs[i].limit(0);
+    int partialLength = toRead % chunkSize;
+    setReadLimits(partialLength, fullChunks, decoderInputBuffers, allIndexes);
+    setReadLimits(partialLength, fullChunks, decoderOutputBuffers,
+        missingIndexes);
+  }
+
+  private void setReadLimits(int partialChunkSize, int fullChunks,
+      ByteBuffer[] buffers, Collection<Integer> indexes) {
+    int data = getRepConfig().getData();
+    Preconditions.assertTrue(buffers.length == indexes.size(),
+        "Mismatch: %d buffers but %d indexes", buffers.length, indexes.size());
+    Iterator<ByteBuffer> iter = Arrays.asList(buffers).iterator();
+    for (int i : indexes) {
+      ByteBuffer buf = iter.next();
+      if (buf == null) {
+        continue;
       }
-      // If we have less than 1 chunk, then the parity buffers are the size
-      // of the first chunk.
-      for (int i = getRepConfig().getData();
-           i < getRepConfig().getRequiredNodes(); i++) {
-        ByteBuffer b = decoderInputBuffers[i];
-        if (b != null) {
-          b.limit(toRead);
-        }
-      }
-    } else {
-      int remainingLength = toRead % chunkSize;
-      // The first partial has the remaining length
-      bufs[fullChunks].limit(remainingLength);
-      // All others have a zero limit
-      for (int i = fullChunks + 1; i < bufs.length; i++) {
-        bufs[i].position(0);
-        bufs[i].limit(0);
+      if (i == fullChunks) {
+        buf.limit(partialChunkSize);
+      } else if (fullChunks < i && i < data) {
+        buf.position(0);
+        buf.limit(0);
+      } else if (data <= i && fullChunks == 0) {
+        buf.limit(partialChunkSize);
       }
     }
   }
@@ -411,41 +501,38 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
    * Take the parity indexes which are already used, and the others which are
    * available, and select random indexes to meet numRequired. The resulting
    * list is sorted in ascending order of the indexes.
-   * @param locations The list of locations for all blocks in the block group/
-   * @param numRequired The number of parity chunks needed for reconstruction
-   * @return A list of indexes indicating which parity locations to read.
    */
   @SuppressWarnings("java:S2245") // no need for secure random
-  private List<Integer> selectParityIndexes(
-      DatanodeDetails[] locations, int numRequired) {
-    List<Integer> indexes = new ArrayList<>();
-    List<Integer> selected = new ArrayList<>();
-    ECReplicationConfig repConfig = getRepConfig();
-    for (int i = repConfig.getData(); i < repConfig.getRequiredNodes(); i++) {
-      if (locations[i] != null && !failedDataIndexes.contains(i)
-          && decoderInputBuffers[i] == null) {
-        indexes.add(i);
-      }
-      // If we are re-initializing, we want to make sure we are re-using any
-      // previously selected good parity indexes, as the block stream is already
-      // opened.
-      if (decoderInputBuffers[i] != null && !failedDataIndexes.contains(i)) {
+  private SortedSet<Integer> selectInternalInputs(
+      SortedSet<Integer> available, long count) {
+
+    LOG.debug("Selecting {} internal inputs from {}", count, available);
+
+    if (count <= 0) {
+      return emptySortedSet();
+    }
+
+    if (available.size() == count) {
+      return available;
+    }
+
+    SortedSet<Integer> selected = new TreeSet<>();
+    for (int i : available) {
+      if (decoderInputBuffers[i] != null) {
+        // If we are re-initializing, we want to make sure we are re-using any
+        // previously selected good parity indexes, as the block stream is
+        // already opened.
         selected.add(i);
       }
     }
-    Preconditions.assertTrue(indexes.size() + selected.size() >= numRequired);
-    Random rand = new Random();
-    while (selected.size() < numRequired) {
-      selected.add(indexes.remove(rand.nextInt(indexes.size())));
-    }
-    Collections.sort(selected);
-    return selected;
-  }
+    List<Integer> candidates = new ArrayList<>(available);
+    candidates.removeAll(selected);
+    Collections.shuffle(candidates);
+    selected.addAll(candidates.stream()
+        .limit(count - selected.size())
+        .collect(toSet()));
 
-  private ByteBuffer allocateBuffer(ECReplicationConfig repConfig) {
-    ByteBuffer buf = byteBufferPool.getBuffer(
-        false, repConfig.getEcChunkSize());
-    return buf;
+    return selected;
   }
 
   private void flipInputs() {
@@ -456,9 +543,8 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     }
   }
 
-  private void clearParityBuffers() {
-    for (int i = getRepConfig().getData();
-         i < getRepConfig().getRequiredNodes(); i++) {
+  private void clearInternalBuffers() {
+    for (int i : internalBuffers) {
       if (decoderInputBuffers[i] != null) {
         decoderInputBuffers[i].clear();
       }
@@ -469,9 +555,10 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
       throws IOException, InterruptedException {
     Queue<ImmutablePair<Integer, Future<Void>>> pendingReads
         = new ArrayDeque<>();
-    for (int i : dataIndexes) {
+    for (int i : selectedIndexes) {
+      ByteBuffer buf = decoderInputBuffers[i];
       pendingReads.add(new ImmutablePair<>(i, executor.submit(() -> {
-        readIntoBuffer(i, decoderInputBuffers[i]);
+        readIntoBuffer(i, buf);
         return null;
       })));
     }
@@ -544,12 +631,24 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
    * @throws IOException
    */
   private void decodeStripe() throws IOException {
-    decoder.decode(decoderInputBuffers, missingIndexes, decoderOutputBuffers);
+    int[] erasedIndexes = missingIndexes.stream()
+        .mapToInt(Integer::valueOf)
+        .toArray();
+    decoder.decode(decoderInputBuffers, erasedIndexes, decoderOutputBuffers);
     flipInputs();
   }
 
   @Override
   public synchronized boolean hasSufficientLocations() {
+    if (decoderInputBuffers == null) {
+      // The EC decoder needs an array data+parity long, with missing or not
+      // needed indexes set to null.
+      decoderInputBuffers = new ByteBuffer[getRepConfig().getRequiredNodes()];
+    }
+
+    markMissingLocationsAsFailed();
+    selectIndexes();
+
     // The number of locations needed is a function of the EC Chunk size. If the
     // block length is <= the chunk size, we should only have one data location.
     // If it is greater than the chunk size but less than chunk_size * 2, then
@@ -559,22 +658,8 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     // be all zeros.
     // Then we need a total of dataNum blocks available across the available
     // data, parity and padding blocks.
-    ECReplicationConfig repConfig = getRepConfig();
-    int expectedDataBlocks = calculateExpectedDataBlocks(repConfig);
-    int availableLocations =
-        availableDataLocations(expectedDataBlocks) + availableParityLocations();
-    int paddedLocations = repConfig.getData() - expectedDataBlocks;
-    int failedLocations = failedDataIndexes.size();
 
-    if (availableLocations + paddedLocations - failedLocations
-        >= repConfig.getData()) {
-      return true;
-    } else {
-      LOG.error("There are insufficient locations. {} available; {} padded;" +
-          " {} failed; {} expected;", availableLocations, paddedLocations,
-          failedLocations, expectedDataBlocks);
-      return false;
-    }
+    return selectedIndexes.size() >= dataIndexes.size();
   }
 
   @Override
@@ -596,18 +681,12 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   private void freeBuffers() {
-    // Inside this class, we only allocate buffers to read parity into. Data
-    // is reconstructed or read into a set of buffers passed in from the calling
-    // class. Therefore we only need to ensure we free the parity buffers here.
+    // free any internal buffers
     if (decoderInputBuffers != null) {
-      for (int i = getRepConfig().getData();
-           i < getRepConfig().getRequiredNodes(); i++) {
-        ByteBuffer buf = decoderInputBuffers[i];
-        if (buf != null) {
-          byteBufferPool.putBuffer(buf);
-          decoderInputBuffers[i] = null;
-        }
+      for (int i : new ArrayList<>(internalBuffers)) {
+        releaseInternalBuffer(i);
       }
+      internalBuffers.clear();
     }
     initialized = false;
   }
@@ -627,6 +706,65 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
           + " does not align with a stripe offset");
     }
     super.seek(pos);
+  }
+
+  /**
+   * Determine which indexes are missing, taking into account the length of the
+   * block. For a block shorter than a full EC stripe, it is expected that
+   * some data locations will not be present.
+   * Populates the missingIndexes and selectedIndexes instance variables.
+   */
+  private void selectIndexes() {
+    SortedSet<Integer> candidates;
+    int required;
+
+    missingIndexes.clear();
+    selectedIndexes.clear();
+
+    if (isOfflineRecovery()) {
+      if (!paddingIndexes.isEmpty()) {
+        paddingIndexes.forEach(i ->
+            Preconditions.assertTrue(!recoveryIndexes.contains(i)));
+      }
+
+      missingIndexes.addAll(recoveryIndexes);
+
+      // data locations available for reading
+      SortedSet<Integer> availableIndexes = new TreeSet<>();
+      availableIndexes.addAll(dataIndexes);
+      availableIndexes.addAll(parityIndexes);
+      availableIndexes.removeAll(failedDataIndexes);
+      availableIndexes.removeAll(recoveryIndexes);
+
+      // choose from all available
+      candidates = availableIndexes;
+      required = dataIndexes.size();
+    } else {
+      missingIndexes.addAll(failedDataIndexes);
+      missingIndexes.retainAll(dataIndexes);
+
+      SortedSet<Integer> dataAvailable = new TreeSet<>(dataIndexes);
+      dataAvailable.removeAll(failedDataIndexes);
+
+      SortedSet<Integer> parityAvailable = new TreeSet<>(parityIndexes);
+      parityAvailable.removeAll(failedDataIndexes);
+
+      selectedIndexes.addAll(dataAvailable);
+
+      // choose from parity
+      candidates = parityAvailable;
+      required = dataIndexes.size() - dataAvailable.size();
+    }
+
+    SortedSet<Integer> internal = selectInternalInputs(candidates, required);
+    selectedIndexes.addAll(internal);
+  }
+
+  private static SortedSet<Integer> setOfRange(
+      int startInclusive, int endExclusive) {
+
+    return range(startInclusive, endExclusive)
+        .boxed().collect(toCollection(TreeSet::new));
   }
 
 }
