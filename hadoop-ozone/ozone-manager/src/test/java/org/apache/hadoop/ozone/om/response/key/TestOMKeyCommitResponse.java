@@ -38,6 +38,12 @@ import java.io.IOException;
 @SuppressWarnings("visibilitymodifier")
 public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
+  private final long volumeId = 1000;
+
+  protected long getVolumeId() {
+    return volumeId;
+  }
+
   @Test
   public void testAddToDBBatch() throws Exception {
 

@@ -40,11 +40,13 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 public class OMKeyAclResponseWithFSO extends OMKeyAclResponse {
 
   private boolean isDirectory;
+  private long volumeId;
+  private long bucketId;
 
   public OMKeyAclResponseWithFSO(
       @NotNull OzoneManagerProtocolProtos.OMResponse omResponse,
       @NotNull OmKeyInfo omKeyInfo, boolean isDirectory,
-      @Nonnull BucketLayout bucketLayout) {
+      @Nonnull BucketLayout bucketLayout, long volumeId, long bucketId) {
     super(omResponse, omKeyInfo, bucketLayout);
     this.isDirectory = isDirectory;
   }
@@ -64,14 +66,8 @@ public class OMKeyAclResponseWithFSO extends OMKeyAclResponse {
   @Override public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    final long volumeId = omMetadataManager.getVolumeId(
-            getOmKeyInfo().getVolumeName());
-    final long bucketId = omMetadataManager.getBucketId(
-            getOmKeyInfo().getVolumeName(), getOmKeyInfo().getBucketName());
-    String ozoneDbKey = omMetadataManager
-        .getOzonePathKey(volumeId, bucketId,
-                getOmKeyInfo().getParentObjectID(),
-                getOmKeyInfo().getFileName());
+    String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+        getOmKeyInfo().getParentObjectID(), getOmKeyInfo().getFileName());
     if (isDirectory) {
       OmDirectoryInfo dirInfo = OMFileRequest.getDirectoryInfo(getOmKeyInfo());
       omMetadataManager.getDirectoryTable()

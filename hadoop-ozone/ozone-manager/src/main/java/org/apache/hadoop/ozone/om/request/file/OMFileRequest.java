@@ -574,13 +574,8 @@ public final class OMFileRequest {
    * @throws IOException DB failure
    */
   public static String addToOpenFileTable(OMMetadataManager omMetadataMgr,
-      BatchOperation batchOp, OmKeyInfo omFileInfo, String uploadID)
-          throws IOException {
-
-    final long volumeId = omMetadataMgr.getVolumeId(
-            omFileInfo.getVolumeName());
-    final long bucketId = omMetadataMgr.getBucketId(
-            omFileInfo.getVolumeName(), omFileInfo.getBucketName());
+      BatchOperation batchOp, OmKeyInfo omFileInfo, String uploadID,
+      long volumeId, long bucketId) throws IOException {
 
     String multipartFileKey = omMetadataMgr.getMultipartKey(volumeId,
             bucketId, omFileInfo.getParentObjectID(),
@@ -602,13 +597,9 @@ public final class OMFileRequest {
    * @throws IOException
    */
   public static String addToFileTable(OMMetadataManager omMetadataMgr,
-                                    BatchOperation batchOp,
-                                    OmKeyInfo omFileInfo)
-          throws IOException {
-    final long volumeId = omMetadataMgr.getVolumeId(
-            omFileInfo.getVolumeName());
-    final long bucketId = omMetadataMgr.getBucketId(
-            omFileInfo.getVolumeName(), omFileInfo.getBucketName());
+      BatchOperation batchOp, OmKeyInfo omFileInfo, long volumeId,
+      long bucketId) throws IOException {
+
     String dbFileKey = omMetadataMgr.getOzonePathKey(volumeId, bucketId,
             omFileInfo.getParentObjectID(), omFileInfo.getFileName());
 

@@ -65,7 +65,7 @@ public class TestOMFileCreateResponseWithFSO extends TestOMKeyCreateResponse {
       OmBucketInfo bucketInfo, OMResponse response) {
 
     return new OMFileCreateResponseWithFSO(response, keyInfo,
-        new ArrayList<>(), clientID, bucketInfo);
+        new ArrayList<>(), clientID, bucketInfo, getVolumeId());
   }
 
   @Override

@@ -43,7 +43,7 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
       String ozoneKey, RepeatedOmKeyInfo deleteKeys) {
     Assert.assertNotNull(omBucketInfo);
     return new OMKeyCommitResponseWithFSO(omResponse, omKeyInfo, ozoneKey,
-        openKey, omBucketInfo, deleteKeys);
+        openKey, omBucketInfo, deleteKeys, getVolumeId());
   }
 
   @NotNull

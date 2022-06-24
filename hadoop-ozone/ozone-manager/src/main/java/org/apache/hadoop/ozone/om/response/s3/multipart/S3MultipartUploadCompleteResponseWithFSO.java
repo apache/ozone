@@ -50,6 +50,9 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 public class S3MultipartUploadCompleteResponseWithFSO
         extends S3MultipartUploadCompleteResponse {
 
+  private long volumeId;
+  private long bucketId;
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadCompleteResponseWithFSO(
       @Nonnull OMResponse omResponse,
@@ -83,7 +86,8 @@ public class S3MultipartUploadCompleteResponseWithFSO
             getOmKeyInfo().getBucketName(), getOmKeyInfo().getKeyName());
 
     OMFileRequest
-        .addToFileTable(omMetadataManager, batchOperation, getOmKeyInfo());
+        .addToFileTable(omMetadataManager, batchOperation, getOmKeyInfo(),
+            volumeId, bucketId);
 
     return ozoneKey;
 

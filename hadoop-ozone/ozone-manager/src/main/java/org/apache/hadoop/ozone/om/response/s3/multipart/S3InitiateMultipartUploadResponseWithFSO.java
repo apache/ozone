@@ -46,6 +46,8 @@ public class S3InitiateMultipartUploadResponseWithFSO extends
         S3InitiateMultipartUploadResponse {
   private List<OmDirectoryInfo> parentDirInfos;
   private String mpuDBKey;
+  private long volumeId;
+  private long bucketId;
 
   public S3InitiateMultipartUploadResponseWithFSO(
       @Nonnull OMResponse omResponse,
@@ -76,11 +78,6 @@ public class S3InitiateMultipartUploadResponseWithFSO extends
      * wait for File Commit request.
      */
     if (parentDirInfos != null) {
-      final OmKeyInfo keyInfo = getOmKeyInfo();
-      final long volumeId = omMetadataManager.getVolumeId(
-              keyInfo.getVolumeName());
-      final long bucketId = omMetadataManager.getBucketId(
-              keyInfo.getVolumeName(), keyInfo.getBucketName());
       for (OmDirectoryInfo parentDirInfo : parentDirInfos) {
         final String parentKey = omMetadataManager.getOzonePathKey(
                 volumeId, bucketId, parentDirInfo.getParentObjectID(),
@@ -91,7 +88,8 @@ public class S3InitiateMultipartUploadResponseWithFSO extends
     }
 
     OMFileRequest.addToOpenFileTable(omMetadataManager, batchOperation,
-        getOmKeyInfo(), getOmMultipartKeyInfo().getUploadID());
+        getOmKeyInfo(), getOmMultipartKeyInfo().getUploadID(), volumeId,
+        bucketId);
 
     omMetadataManager.getMultipartInfoTable().putWithBatch(batchOperation,
         mpuDBKey, getOmMultipartKeyInfo());

@@ -63,7 +63,7 @@ public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
       OmBucketInfo bucketInfo, OMResponse response) {
 
     return new OMKeyCreateResponseWithFSO(response, keyInfo, new ArrayList<>(),
-        clientID, bucketInfo);
+        clientID, bucketInfo, getVolumeId());
   }
 
   @Override
