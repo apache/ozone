@@ -247,14 +247,6 @@ public class TestReplicationManager {
   }
 
   private Set<ContainerReplica> addReplicas(ContainerInfo container,
-      Pair<HddsProtos.NodeOperationalState, Integer>... nodes) {
-    final Set<ContainerReplica> replicas =
-        createReplicas(container.containerID(), nodes);
-    containerReplicaMap.put(container.containerID(), replicas);
-    return replicas;
-  }
-
-  private Set<ContainerReplica> addReplicas(ContainerInfo container,
       int... indexes) {
     final Set<ContainerReplica> replicas =
         createReplicas(container.containerID(), indexes);
