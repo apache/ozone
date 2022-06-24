@@ -100,17 +100,15 @@ public class ECUnderReplicationHandler {
 
     if (containerHealthResult.getHealthState()
         != ContainerHealthResult.HealthState.UNDER_REPLICATED) {
-      LOG.info("The container {} with replicas {} is sufficiently "
-              + "replicated and is not mis-replicated",
-          container.getContainerID(), replicaCount);
+      LOG.info(
+          "The container {} with replicas {} is sufficiently replicated",
+          container.getContainerID(), replicaCount.getReplicas());
       // Assert replicaCount also telling it's sufficiently replicated.
       return null;
     }
-
-
+    final ContainerID id = container.containerID();
     try {
      // State is UNDER_REPLICATED
-      final ContainerID id = container.containerID();
       List<ContainerReplicaOp> pendingOpsForContainer =
           pendingOps.getPendingOps(id);
       final List<DatanodeDetails> deletionInFlight = new ArrayList<>();
@@ -134,7 +132,7 @@ public class ECUnderReplicationHandler {
           .collect(Collectors.toList());
 
       if (missingIndexes.size() > 0 && !replicaCount.unRecoverable()) {
-        LOG.debug("Missing indexes detected for thge container {}." +
+        LOG.debug("Missing indexes detected for the container {}." +
                 " The missing indexes are {}", id, missingIndexes);
         // We have source nodes.
         if (sources.size() > 0) {
@@ -156,13 +154,13 @@ public class ECUnderReplicationHandler {
                   sourceDatanodesWithIndex, selectedDatanodes,
                   int2byte(missingIndexes),
                   repConfig);
+          // Keeping the first target node as coordinator.
           return ImmutableMap.of(selectedDatanodes.get(0),
               reconstructionCommand);
         } else {
-          LOG.warn(
-              "Cannot proceed for EC container reconstruction for {},"
-                  + " no healthy replica found.",
-              container.containerID());
+          LOG.warn("Cannot proceed for EC container reconstruction for {},"
+              + " not enough healthy replicas found. Available source"
+              + " replicas are: {}", container.containerID(), sources);
         }
       } else if (result.underReplicatedDueToDecommission()) {
         Map<DatanodeDetails, SCMCommand> commands = new HashMap<>();
@@ -173,6 +171,12 @@ public class ECUnderReplicationHandler {
         // In this case we need to do one to one copy.
         for (ContainerReplica replica : replicas) {
           if (decomIndexes.contains(replica.getReplicaIndex())) {
+            if (!iterator.hasNext()) {
+              LOG.warn("Couldn't find the enough targets. Source nodes:"
+                      + " {} and the target nodes: {}",
+                  sources, selectedDatanodes);
+              break;
+            }
             DatanodeDetails decommissioningSrcNode
                 = replica.getDatanodeDetails();
             final ReplicateContainerCommand replicateCommand =
@@ -185,7 +189,7 @@ public class ECUnderReplicationHandler {
         return commands;
       } else {
         if (replicaCount.unRecoverable()) {
-          LOG.warn("The Container {} is unrecoverable due to lack of"
+          LOG.warn("The container {} is unrecoverable due to lack of"
               + " available source replicas.", id);
         } else {
           LOG.info("There are no missing indexes or decommissioning indexes"
@@ -196,15 +200,14 @@ public class ECUnderReplicationHandler {
     } catch (IOException | IllegalStateException ex) {
       LOG.warn("Exception while processing for creating the EC reconstruction" +
               " container commands for {}.",
-          container.getContainerID(), ex);
+          id, ex);
     }
     return null;
   }
 
   private List<DatanodeDetails> getTargetDatanodes(
       Set<ContainerReplica> replicas, ContainerInfo container,
-      int requiredNodes)
-      throws IOException {
+      int requiredNodes) throws IOException {
     // We should ensure that the target datanode has enough space
     // for a complete container to be created, but since the container
     // size may be changed smaller than origin, we should be defensive.
