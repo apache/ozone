@@ -50,16 +50,18 @@ import java.util.stream.Collectors;
  * Handles the EC Under replication processing and forming the respective SCM
  * commands.
  */
-public class ECUnderReplicationHandler {
+public class ECUnderReplicationCommandCreator
+    implements ReplicationCommandCreator {
 
   public static final Logger LOG =
-      LoggerFactory.getLogger(ECUnderReplicationHandler.class);
+      LoggerFactory.getLogger(ECUnderReplicationCommandCreator.class);
   private final PlacementPolicy containerPlacement;
   private final long currentContainerSize;
   private final NodeManager nodeManager;
 
-  public ECUnderReplicationHandler(final PlacementPolicy containerPlacement,
-      final ConfigurationSource conf, NodeManager nodeManager) {
+  public ECUnderReplicationCommandCreator(
+      final PlacementPolicy containerPlacement, final ConfigurationSource conf,
+      NodeManager nodeManager) {
     this.containerPlacement = containerPlacement;
     this.currentContainerSize = (long) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
@@ -68,10 +70,9 @@ public class ECUnderReplicationHandler {
   }
 
   /**
-   * If the given container is under replicated, identify a new set of
-   * datanode(s) to reconstruct the container and form the SCM command to send
-   * it to DN. In the case of decommission, it will just generate the replicate
-   * commands instead of reconstruction commands.
+   * Identify a new set of datanode(s) to reconstruct the container and form the
+   * SCM command to send it to DN. In the case of decommission, it will just
+   * generate the replicate commands instead of reconstruction commands.
    *
    * @param replicas - An instance of ContainerReplicaCount, containing the
    *                   current replica count and inflight adds and deletes
@@ -82,16 +83,19 @@ public class ECUnderReplicationHandler {
    * @return Returns the key value pair of destination dn where the command gets
    * executed and the command itself.
    */
-  public Map<DatanodeDetails, SCMCommand> processAndGetCommands(
+  @Override
+  public Map<DatanodeDetails, SCMCommand> processAndCreateCommands(
       final Set<ContainerReplica> replicas,
       final ContainerReplicaPendingOps pendingOps,
-      final ContainerHealthResult.UnderReplicatedHealthResult result,
+      final ContainerHealthResult result,
       final int remainingMaintenanceRedundancy) {
     ContainerInfo container = result.getContainerInfo();
     ECReplicationConfig repConfig =
         (ECReplicationConfig) container.getReplicationConfig();
+
     final ECContainerReplicaCount replicaCount =
-        new ECContainerReplicaCount(container, replicas, pendingOps,
+        new ECContainerReplicaCount(container, replicas,
+            pendingOps.getPendingOps(container.containerID()),
             remainingMaintenanceRedundancy);
     ContainerHealthResult containerHealthResult =
         new ECContainerHealthCheck().checkHealth(container, replicaCount);
@@ -162,7 +166,8 @@ public class ECUnderReplicationHandler {
               + " not enough healthy replicas found. Available source"
               + " replicas are: {}", container.containerID(), sources);
         }
-      } else if (result.underReplicatedDueToDecommission()) {
+      } else if (((ContainerHealthResult.UnderReplicatedHealthResult) result)
+          .underReplicatedDueToDecommission()) {
         Map<DatanodeDetails, SCMCommand> commands = new HashMap<>();
         Set<Integer> decomIndexes = replicaCount.decommissioningIndexes();
         final List<DatanodeDetails> selectedDatanodes =
@@ -221,7 +226,7 @@ public class ECUnderReplicationHandler {
         .chooseDatanodes(excludeList, null, requiredNodes, 0, dataSizeRequired);
   }
 
-  public static byte[] int2byte(List<Integer> src) {
+  private static byte[] int2byte(List<Integer> src) {
     byte[] dst = new byte[src.size()];
 
     for (int i = 0; i < src.size(); i++) {

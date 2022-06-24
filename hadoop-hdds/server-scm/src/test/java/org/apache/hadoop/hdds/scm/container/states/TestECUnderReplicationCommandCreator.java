@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
-import org.apache.hadoop.hdds.scm.container.replication.ECUnderReplicationHandler;
+import org.apache.hadoop.hdds.scm.container.replication.ECUnderReplicationCommandCreator;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -70,7 +70,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 /**
  * Tests the ECUnderReplicationHandling functionality.
  */
-public class TestECUnderReplicationHandler {
+public class TestECUnderReplicationCommandCreator {
   private ECReplicationConfig repConfig;
   private ContainerInfo container;
   private NodeManager nodeManager;
@@ -185,8 +185,8 @@ public class TestECUnderReplicationHandler {
   public void testUnderReplicationWithMissingIndexes(
       List<Integer> missingIndexes, Set<ContainerReplica> availableReplicas,
       boolean decom) {
-    ECUnderReplicationHandler ecURH =
-        new ECUnderReplicationHandler(policy, conf, nodeManager);
+    ECUnderReplicationCommandCreator ecURH =
+        new ECUnderReplicationCommandCreator(policy, conf, nodeManager);
     ContainerReplicaPendingOps pendingOpsMock =
         Mockito.mock(ContainerReplicaPendingOps.class);
     ContainerHealthResult.UnderReplicatedHealthResult result =
@@ -196,7 +196,7 @@ public class TestECUnderReplicationHandler {
     Mockito.when(result.getContainerInfo()).thenReturn(container);
 
     Map<DatanodeDetails, SCMCommand> datanodeDetailsSCMCommandMap = ecURH
-        .processAndGetCommands(availableReplicas, pendingOpsMock,
+        .processAndCreateCommands(availableReplicas, pendingOpsMock,
             result, 1);
     if (!decom) {
       if (missingIndexes.size() <= repConfig.getParity()) {
