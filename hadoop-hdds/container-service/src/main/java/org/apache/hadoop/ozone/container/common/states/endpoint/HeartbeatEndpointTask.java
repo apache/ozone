@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
@@ -367,6 +368,19 @@ public class HeartbeatEndpointTask
               replicateContainerCommand.getContainerID());
         }
         this.context.addCommand(replicateContainerCommand);
+        break;
+      case reconstructECContainersCommand:
+        ReconstructECContainersCommand reccc =
+            ReconstructECContainersCommand.getFromProtobuf(
+                commandResponseProto.getReconstructECContainersCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          reccc.setTerm(commandResponseProto.getTerm());
+        }
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Received SCM reconstruct request for container {}",
+              reccc.getContainerID());
+        }
+        this.context.addCommand(reccc);
         break;
       case deleteContainerCommand:
         DeleteContainerCommand deleteContainerCommand =
