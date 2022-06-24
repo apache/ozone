@@ -34,15 +34,11 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
-import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.ExitUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +47,6 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -248,50 +243,50 @@ public class ReplicationManager implements SCMService {
         legacyReplicationManager.processContainer(c, report);
         continue;
       }
-      List<SCMCommand> cmds =
-          processContainer(c, underReplicated, overReplicated, report);
-      // TODO - send commands
+      try {
+        processContainer(c, underReplicated, overReplicated, report);
+        // TODO - send any commands contained in the health result
+      } catch (ContainerNotFoundException e) {
+        LOG.error("Container {} not found", c.getContainerID(), e);
+      }
     }
     report.setComplete();
-    // Sort the pending lists by priority and assign to the main queue.
+    // TODO - Sort the pending lists by priority and assign to the main queue,
+    //        which is yet to be defined.
     this.containerReport = report;
     LOG.info("Replication Monitor Thread took {} milliseconds for" +
             " processing {} containers.", clock.millis() - start,
         containers.size());
   }
 
-  protected List<SCMCommand> processContainer(ContainerInfo containerInfo,
+  protected ContainerHealthResult processContainer(ContainerInfo containerInfo,
       List<ContainerHealthResult.UnderReplicatedHealthResult> underRep,
       List<ContainerHealthResult.OverReplicatedHealthResult> overRep,
-      ReplicationManagerReport report) {
-    List<SCMCommand> cmds = Collections.emptyList();
+      ReplicationManagerReport report) throws ContainerNotFoundException {
     Set<ContainerReplica> replicas;
-    try {
-      replicas = containerManager.getContainerReplicas(
-          containerInfo.containerID());
-    } catch (ContainerNotFoundException e) {
-      LOG.error("Container not found getting replicas for {}",
-          containerInfo.containerID(), e);
-      return cmds;
-    }
+    replicas = containerManager.getContainerReplicas(
+        containerInfo.containerID());
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
     ContainerHealthResult health = ecContainerHealthCheck
         .checkHealth(containerInfo, replicas, pendingOps, 0);
-    if (health.getHealthState() ==
-        ContainerHealthResult.HealthState.HEALTHY) {
       // TODO - should the report have a HEALTHY state, rather than just bad
-      //        state?
-    } else if (health.getHealthState()
+      //        states? It would need to be added to legacy RM too.
+    if (health.getHealthState()
         == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
       report.incrementAndSample(
           HealthState.UNDER_REPLICATED, containerInfo.containerID());
       ContainerHealthResult.UnderReplicatedHealthResult underHealth
           = ((ContainerHealthResult.UnderReplicatedHealthResult) health);
-      if (!underHealth.isSufficientlyReplicatedAfterPending()) {
+      if (underHealth.isUnrecoverable()) {
+        // TODO - do we need a new health state for unrecoverable EC?
+        report.incrementAndSample(
+            HealthState.MISSING, containerInfo.containerID());
+      }
+      if (!underHealth.isSufficientlyReplicatedAfterPending() &&
+          !underHealth.isUnrecoverable()) {
         underRep.add(underHealth);
       }
-      return cmds;
     } else if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
       report.incrementAndSample(HealthState.OVER_REPLICATED,
@@ -302,7 +297,7 @@ public class ReplicationManager implements SCMService {
         overRep.add(overHealth);
       }
     }
-    return cmds;
+    return health;
   }
 
   public ReplicationManagerReport getContainerReport() {
