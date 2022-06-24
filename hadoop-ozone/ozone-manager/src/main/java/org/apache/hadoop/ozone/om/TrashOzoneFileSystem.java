@@ -48,6 +48,7 @@ import org.apache.ratis.protocol.RaftClientRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
@@ -164,8 +165,9 @@ public class TrashOzoneFileSystem extends FileSystem {
         equals(dstPath.getBucketName()));
     Preconditions.checkArgument(srcPath.getTrashRoot().
         toString().equals(dstPath.getTrashRoot().toString()));
-    RenameIterator iterator = new RenameIterator(src, dst);
-    iterator.iterate();
+    try (RenameIterator iterator = new RenameIterator(src, dst)) {
+      iterator.iterate();
+    }
     return true;
   }
 
@@ -194,8 +196,9 @@ public class TrashOzoneFileSystem extends FileSystem {
     if (bucket.getBucketLayout().isFileSystemOptimized()) {
       return deleteFSO(srcPath);
     }
-    DeleteIterator iterator = new DeleteIterator(path, true);
-    iterator.iterate();
+    try (DeleteIterator iterator = new DeleteIterator(path, true)) {
+      iterator.iterate();
+    }
     return true;
   }
 
@@ -342,7 +345,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     }
   }
 
-  private abstract class OzoneListingIterator {
+  private abstract class OzoneListingIterator implements Closeable {
     private final Path path;
     private final FileStatus status;
     private String pathKey;
@@ -419,6 +422,11 @@ public class TrashOzoneFileSystem extends FileSystem {
 
     FileStatus getStatus() {
       return status;
+    }
+
+    @Override
+    public void close() throws IOException {
+      keyIterator.close();
     }
   }
 
