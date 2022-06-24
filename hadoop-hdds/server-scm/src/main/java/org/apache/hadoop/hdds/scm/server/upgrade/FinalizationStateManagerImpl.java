@@ -234,7 +234,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       throws IOException {
     checkpointLock.writeLock().lock();
     try {
-      newFinalizationStore.close();
+      this.finalizationStore.close();
       this.finalizationStore = newFinalizationStore;
       initialize();
 
