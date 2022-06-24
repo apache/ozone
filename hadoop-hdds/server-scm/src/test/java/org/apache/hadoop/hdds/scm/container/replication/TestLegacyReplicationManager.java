@@ -213,7 +213,6 @@ public class TestLegacyReplicationManager {
     clock = new TestClock(Instant.now(), ZoneId.of("UTC"));
     containerReplicaPendingOps = new ContainerReplicaPendingOps(conf, clock);
     createReplicationManager(new ReplicationManagerConfiguration());
-    serviceManager.register(replicationManager);
   }
 
   void createReplicationManager(int replicationLimit, int deletionLimit)
@@ -273,6 +272,7 @@ public class TestLegacyReplicationManager {
         legacyRM,
         containerReplicaPendingOps);
 
+    serviceManager.register(replicationManager);
     serviceManager.notifyStatusChanged();
     scmLogs.clearOutput();
     Thread.sleep(100L);
