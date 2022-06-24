@@ -147,6 +147,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       bucketInfoBuilder.setVolumeName(dbBucketInfo.getVolumeName())
           .setBucketName(dbBucketInfo.getBucketName())
           .setObjectID(dbBucketInfo.getObjectID())
+          .setBucketLayout(dbBucketInfo.getBucketLayout())
           .setUpdateID(transactionLogIndex);
       bucketInfoBuilder.addAllMetadata(KeyValueUtil
           .getFromProtobuf(bucketArgs.getMetadataList()));
