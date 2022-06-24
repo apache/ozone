@@ -52,7 +52,7 @@ HDFS-SITE.XML_dfs.datanode.address=0.0.0.0:1019
 HDFS-SITE.XML_dfs.datanode.http.address=0.0.0.0:1012
 CORE-SITE.XML_dfs.data.transfer.protection=authentication
 CORE-SITE.XML_hadoop.security.authentication=kerberos
-CORE-SITE.XML_hadoop.security.auth_to_local="RULE:[2:$1](testuser2.*) RULE:[2:$1](testuser.*) RULE:[2:$1@$0](.*)s/.*/root/"
+CORE-SITE.XML_hadoop.security.auth_to_local="DEFAULT"
 CORE-SITE.XML_hadoop.security.key.provider.path=kms://http@kms:9600/kms
 
 
@@ -116,9 +116,9 @@ HADOOP-POLICY.XML_hdds.security.client.scm.certificate.protocol.acl=*
 HDFS-SITE.XML_rpc.metrics.quantile.enable=true
 HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
 
-KMS-SITE.XML_hadoop.kms.proxyuser.root.users=*
-KMS-SITE.XML_hadoop.kms.proxyuser.root.groups=*
-KMS-SITE.XML_hadoop.kms.proxyuser.root.hosts=*
+KMS-SITE.XML_hadoop.kms.proxyuser.s3g.users=*
+KMS-SITE.XML_hadoop.kms.proxyuser.s3g.groups=*
+KMS-SITE.XML_hadoop.kms.proxyuser.s3g.hosts=*
 
 #Enable this variable to print out all hadoop rpc traffic to the stdout. See http://byteman.jboss.org/ to define your own instrumentation.
 #BYTEMAN_SCRIPT_URL=https://raw.githubusercontent.com/apache/hadoop/trunk/dev-support/byteman/hadooprpc.btm
