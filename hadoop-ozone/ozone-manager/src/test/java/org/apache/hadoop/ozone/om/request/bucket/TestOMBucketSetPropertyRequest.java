@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.om.request.bucket;
 import java.util.UUID;
 
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
@@ -94,6 +95,35 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         omMetadataManager.getBucketTable().get(
             omMetadataManager.getBucketKey(volumeName, bucketName))
             .getIsVersionEnabled());
+
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+  }
+
+  @Test
+  public void testNonDefaultLayout() throws Exception {
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
+        bucketName, true, Long.MAX_VALUE);
+
+    // Create FSO Bucket
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    OMBucketSetPropertyRequest omBucketSetPropertyRequest =
+        new OMBucketSetPropertyRequest(omRequest);
+
+    OMClientResponse omClientResponse =
+        omBucketSetPropertyRequest.validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        omMetadataManager.getBucketTable().get(
+            omMetadataManager.getBucketKey(volumeName, bucketName))
+            .getBucketLayout());
 
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
