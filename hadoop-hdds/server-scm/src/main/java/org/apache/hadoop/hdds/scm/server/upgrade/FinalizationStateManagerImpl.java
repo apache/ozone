@@ -267,16 +267,22 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   }
 
   /**
-   * Gets the metadata layout version from the SCM RocksDB. If there is no
-   * layout version in the DB, the first layout version will be returned.
-   * This may happen if working with an older SCM instance before the upgrade
-   * framework was present.
+   * Gets the metadata layout version from the SCM RocksDB. This is used for
+   * Ratis snapshot based finalization in a slow follower. In all other
+   * cases, the VERSION file should be the source of truth.
+   *
+   * MLV was not stored in RocksDB until SCM HA supported snapshot based
+   * finalization, which was after a few HDDS layout features
+   * were introduced. If the SCM has not finalized since this code
+   * was added, the layout version will not be there. Defer to the MLV in the
+   * VERSION file in this case, since finalization is not ongoing. The key will
+   * be added once finalization is started with this software version.
    */
   private int getDBLayoutVersion() throws IOException {
     String dbLayoutVersion = finalizationStore.get(
         OzoneConsts.LAYOUT_VERSION_KEY);
     if (dbLayoutVersion == null) {
-      return HDDSLayoutFeature.INITIAL_VERSION.layoutVersion();
+      return versionManager.getMetadataLayoutVersion();
     } else {
       try {
         return Integer.parseInt(dbLayoutVersion);
