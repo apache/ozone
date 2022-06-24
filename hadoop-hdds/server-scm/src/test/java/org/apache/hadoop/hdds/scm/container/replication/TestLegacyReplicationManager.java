@@ -113,7 +113,7 @@ import static org.mockito.Mockito.when;
 /**
  * Test cases to verify the functionality of ReplicationManager.
  */
-public class TestReplicationManager {
+public class TestLegacyReplicationManager {
 
   private ReplicationManager replicationManager;
   private ContainerStateManager containerStateManager;
