@@ -18,13 +18,17 @@
 
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
+import static java.util.Collections.emptyList;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.mockito.ArgumentMatchers.any;
 
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -42,6 +46,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 
 import org.junit.Assert;
@@ -56,6 +61,43 @@ public class TestHeartbeatEndpointTask {
 
   private static final InetSocketAddress TEST_SCM_ENDPOINT =
       new InetSocketAddress("test-scm-1", 9861);
+
+  @Test
+  public void handlesReconstructContainerCommand() throws Exception {
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        Mockito.mock(
+            StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+
+    ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
+        1, emptyList(), emptyList(), new byte[]{2, 5},
+        new ECReplicationConfig(3, 2));
+
+    Mockito.when(scm.sendHeartbeat(any()))
+        .thenAnswer(invocation ->
+            SCMHeartbeatResponseProto.newBuilder()
+                .setDatanodeUUID(
+                    ((SCMHeartbeatRequestProto)invocation.getArgument(0))
+                        .getDatanodeDetails().getUuid())
+                .addCommands(SCMCommandProto.newBuilder()
+                    .setCommandType(reconstructECContainersCommand)
+                    .setReconstructECContainersCommandProto(cmd.getProto())
+                    .build())
+                .build());
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanodeStateMachine =
+        Mockito.mock(DatanodeStateMachine.class);
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
+        datanodeStateMachine);
+
+    // WHEN
+    HeartbeatEndpointTask task = getHeartbeatEndpointTask(conf, context, scm);
+    task.call();
+
+    // THEN
+    Assert.assertEquals(1, context.getCommandQueueSummary()
+        .get(reconstructECContainersCommand).intValue());
+  }
 
   @Test
   public void testheartbeatWithoutReports() throws Exception {
