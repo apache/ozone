@@ -51,7 +51,6 @@ public class S3MultipartUploadCompleteResponseWithFSO
         extends S3MultipartUploadCompleteResponse {
 
   private long volumeId;
-  private long bucketId;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadCompleteResponseWithFSO(
@@ -62,9 +61,10 @@ public class S3MultipartUploadCompleteResponseWithFSO
       @Nonnull List<OmKeyInfo> unUsedParts,
       @Nonnull BucketLayout bucketLayout,
       @Nonnull OmBucketInfo omBucketInfo,
-      RepeatedOmKeyInfo keysToDelete) {
+      RepeatedOmKeyInfo keysToDelete, long volumeId) {
     super(omResponse, multipartKey, multipartOpenKey, omKeyInfo, unUsedParts,
         bucketLayout, omBucketInfo, keysToDelete);
+    this.volumeId = volumeId;
   }
 
   /**
@@ -87,7 +87,7 @@ public class S3MultipartUploadCompleteResponseWithFSO
 
     OMFileRequest
         .addToFileTable(omMetadataManager, batchOperation, getOmKeyInfo(),
-            volumeId, bucketId);
+            volumeId, getOmBucketInfo().getObjectID());
 
     return ozoneKey;
 
