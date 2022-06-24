@@ -38,7 +38,7 @@ import java.io.IOException;
 @SuppressWarnings("visibilitymodifier")
 public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
-  private final long volumeId = 1000;
+  private long volumeId = 1000;
 
   protected long getVolumeId() {
     return volumeId;

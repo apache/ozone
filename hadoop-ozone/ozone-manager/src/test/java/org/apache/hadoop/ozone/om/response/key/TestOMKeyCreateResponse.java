@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
  */
 public class TestOMKeyCreateResponse extends TestOMKeyResponse {
 
-  private final long volumeId = 1000;
+  private long volumeId = 1000;
 
   protected long getVolumeId() {
     return volumeId;
