@@ -19,9 +19,11 @@ package org.apache.hadoop.ozone.om.multitenant;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
-import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
+import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -38,9 +40,11 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.model.RangerRole;
+import org.apache.ranger.plugin.model.RangerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,54 +65,106 @@ public class RangerClientMultiTenantAccessController implements
   private final Map<IAccessAuthorizer.ACLType, String> aclToString;
   private final Map<String, IAccessAuthorizer.ACLType> stringToAcl;
   private final String omPrincipal;
+  // execUser for Ranger
+  private final String shortName;
 
   public RangerClientMultiTenantAccessController(OzoneConfiguration conf)
       throws IOException {
+
     aclToString = MultiTenantAccessController.getRangerAclStrings();
     stringToAcl = new HashMap<>();
     aclToString.forEach((type, string) -> stringToAcl.put(string, type));
 
-    // Should have passed the check in OMMultiTenantManager
+    // Should have passed the config checks in
+    // OMMultiTenantManager#checkAndEnableMultiTenancy at this point.
+
     String rangerHttpsAddress = conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY);
     Preconditions.checkNotNull(rangerHttpsAddress);
     rangerServiceName = conf.get(OZONE_RANGER_SERVICE);
     Preconditions.checkNotNull(rangerServiceName);
 
-    String configuredOmPrincipal = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
-    Preconditions.checkNotNull(configuredOmPrincipal);
-    // Replace _HOST pattern with host name in the Kerberos principal. Ranger
-    // client currently does not do this automatically.
-    omPrincipal = SecurityUtil.getServerPrincipal(
-        configuredOmPrincipal, OmUtils.getOmAddress(conf).getHostName());
-    String keytabPath = conf.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY);
-    Preconditions.checkNotNull(keytabPath);
+    // Determine auth type (KERBEROS or SIMPLE)
+    final String authType;
+    final String usernameOrPrincipal;
+    final String passwordOrKeytab;
+
+    // If both OZONE_OM_RANGER_HTTPS_ADMIN_API_USER and
+    //  OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD are set, SIMPLE auth will be used
+    String fallbackUsername = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER);
+    String fallbackPassword = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD);
+
+    if (fallbackUsername != null && fallbackPassword != null) {
+      // Both clear text username and password are set, use SIMPLE auth.
+      authType = AuthenticationMethod.SIMPLE.name();
+
+      usernameOrPrincipal = fallbackUsername;
+      passwordOrKeytab = fallbackPassword;
+
+      omPrincipal = fallbackUsername;
+      shortName = fallbackUsername;
+    } else {
+      // Use KERBEROS auth.
+      authType = AuthenticationMethod.KERBEROS.name();
+
+      String configuredOmPrincipal = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
+      Preconditions.checkNotNull(configuredOmPrincipal);
+
+      // Replace _HOST pattern with host name in the Kerberos principal.
+      // Ranger client currently does not do this automatically.
+      omPrincipal = SecurityUtil.getServerPrincipal(
+          configuredOmPrincipal, OmUtils.getOmAddress(conf).getHostName());
+      final String keytabPath = conf.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY);
+      Preconditions.checkNotNull(keytabPath);
+
+      // Convert to short name to be used in some Ranger requests
+      shortName = UserGroupInformation.createRemoteUser(omPrincipal)
+          .getShortUserName();
+
+      usernameOrPrincipal = omPrincipal;
+      passwordOrKeytab = keytabPath;
+    }
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("authType = {}, username = {}", authType, usernameOrPrincipal);
+    }
 
     client = new RangerClient(rangerHttpsAddress,
-        KERBEROS.name().toLowerCase(), omPrincipal, keytabPath,
+        authType, usernameOrPrincipal, passwordOrKeytab,
         rangerServiceName, OzoneConsts.OZONE);
   }
 
   @Override
-  public void createPolicy(Policy policy) throws RangerServiceException {
+  public Policy createPolicy(Policy policy) throws IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Sending create request for policy {} to Ranger.",
           policy.getName());
     }
-    client.createPolicy(toRangerPolicy(policy));
+    RangerPolicy rangerPolicy;
+    try {
+      rangerPolicy = client.createPolicy(toRangerPolicy(policy));
+    } catch (RangerServiceException e) {
+      throw new IOException(e);
+    }
+    return fromRangerPolicy(rangerPolicy);
   }
 
   @Override
-  public Policy getPolicy(String policyName) throws RangerServiceException {
+  public Policy getPolicy(String policyName) throws IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Sending get request for policy {} to Ranger.",
           policyName);
     }
-    return fromRangerPolicy(client.getPolicy(rangerServiceName, policyName));
+    final RangerPolicy rangerPolicy;
+    try {
+      rangerPolicy = client.getPolicy(rangerServiceName, policyName);
+    } catch (RangerServiceException e) {
+      throw new IOException(e);
+    }
+    return fromRangerPolicy(rangerPolicy);
   }
 
   @Override
-  public List<Policy> getLabeledPolicies(String label)
-      throws RangerServiceException {
+  public List<Policy> getLabeledPolicies(String label) throws IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Sending get request for policies with label {} to Ranger.",
           label);
@@ -116,78 +172,129 @@ public class RangerClientMultiTenantAccessController implements
     Map<String, String> filterMap = new HashMap<>();
     filterMap.put("serviceName", rangerServiceName);
     filterMap.put("policyLabelsPartial", label);
-    return client.findPolicies(filterMap).stream()
-        .map(this::fromRangerPolicy)
-        .collect(Collectors.toList());
+    try {
+      return client.findPolicies(filterMap).stream()
+          .map(this::fromRangerPolicy)
+          .collect(Collectors.toList());
+    } catch (RangerServiceException e) {
+      throw new IOException(e);
+    }
   }
 
   @Override
-  public void updatePolicy(Policy policy) throws RangerServiceException {
+  public Policy updatePolicy(Policy policy) throws IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Sending update request for policy {} to Ranger.",
           policy.getName());
     }
-    client.updatePolicy(rangerServiceName, policy.getName(),
-        toRangerPolicy(policy));
+    final RangerPolicy rangerPolicy;
+    try {
+      rangerPolicy = client.updatePolicy(rangerServiceName,
+          policy.getName(), toRangerPolicy(policy));
+    } catch (RangerServiceException e) {
+      throw new IOException(e);
+    }
+    return fromRangerPolicy(rangerPolicy);
   }
 
   @Override
-  public void deletePolicy(String policyName) throws RangerServiceException {
+  public void deletePolicy(String policyName) throws IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Sending delete request for policy {} to Ranger.",
           policyName);
     }
-    client.deletePolicy(rangerServiceName, policyName);
+    try {
+      client.deletePolicy(rangerServiceName, policyName);
+    } catch (RangerServiceException e) {
+      throw new IOException(e);
+    }
   }
 
   @Override
-  public void createRole(Role role) throws RangerServiceException {
+  public Role createRole(Role role) throws IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Sending create request for role {} to Ranger.",
           role.getName());
     }
-    client.createRole(rangerServiceName, toRangerRole(role));
+    final RangerRole rangerRole;
+    try {
+      rangerRole = client.createRole(rangerServiceName,
+          toRangerRole(role, shortName));
+    } catch (RangerServiceException e) {
+      throw new IOException(e);
+    }
+    return fromRangerRole(rangerRole);
   }
 
   @Override
-  public Role getRole(String roleName) throws RangerServiceException {
+  public Role getRole(String roleName) throws IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Sending get request for role {} to Ranger.",
           roleName);
     }
-    return fromRangerRole(client.getRole(roleName, omPrincipal,
-        rangerServiceName));
+    final RangerRole rangerRole;
+    try {
+      rangerRole = client.getRole(roleName, shortName, rangerServiceName);
+    } catch (RangerServiceException e) {
+      throw new IOException(e);
+    }
+    return fromRangerRole(rangerRole);
   }
 
   @Override
-  public void updateRole(long roleID, Role role) throws RangerServiceException {
+  public Role updateRole(long roleId, Role role) throws IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Sending update request for role ID {} to Ranger.",
-          roleID);
+          roleId);
     }
-    client.updateRole(roleID, toRangerRole(role));
+    // TODO: Check if createdByUser is even needed for updateRole request.
+    //  If not, remove the createdByUser param and set it after.
+    final RangerRole rangerRole;
+    try {
+      rangerRole = client.updateRole(roleId, toRangerRole(role, shortName));
+    } catch (RangerServiceException e) {
+      throw new IOException(e);
+    }
+    return fromRangerRole(rangerRole);
   }
 
   @Override
-  public void deleteRole(String roleName) throws RangerServiceException {
+  public void deleteRole(String roleName) throws IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Sending delete request for role {} to Ranger.",
           roleName);
     }
-    client.deleteRole(roleName, omPrincipal, rangerServiceName);
+    try {
+      client.deleteRole(roleName, shortName, rangerServiceName);
+    } catch (RangerServiceException e) {
+      throw new IOException(e);
+    }
   }
 
   @Override
-  public long getRangerServiceVersion() {
-    throw new UnsupportedOperationException("Ranger client implementation " +
-        "does not currently support this method. A workaround will be " +
-        "implemented in HDDS-6755.");
+  public long getRangerServicePolicyVersion() throws IOException {
+    RangerService rangerOzoneService;
+    try {
+      rangerOzoneService = client.getService(rangerServiceName);
+    } catch (RangerServiceException e) {
+      // TODO: Check e.getStatus()
+      LOG.error("Error getting service: {}", e.getStatus());
+      throw new IOException(e);
+    }
+    // If the login user doesn't have sufficient privilege, policyVersion
+    // field could be null in RangerService.
+    final Long policyVersion = rangerOzoneService.getPolicyVersion();
+    return policyVersion == null ? -1L : policyVersion;
   }
 
   private static List<RangerRole.RoleMember> toRangerRoleMembers(
-      Collection<String> members) {
-    return members.stream()
-            .map(princ -> new RangerRole.RoleMember(princ, false))
+      Map<String, Boolean> members) {
+    return members.entrySet().stream()
+            .map(entry -> {
+              final String princ = entry.getKey();
+              final boolean isRoleAdmin = entry.getValue();
+              return new RangerRole.RoleMember(princ, isRoleAdmin);
+            })
             .collect(Collectors.toList());
   }
 
@@ -204,13 +311,20 @@ public class RangerClientMultiTenantAccessController implements
       .setName(rangerRole.getName())
       .setDescription(rangerRole.getDescription())
       .addUsers(fromRangerRoleMembers(rangerRole.getUsers()))
+      .setCreatedByUser(rangerRole.getCreatedByUser())
       .build();
   }
 
-  private static RangerRole toRangerRole(Role role) {
+  private static RangerRole toRangerRole(Role role, String createdByUser) {
     RangerRole rangerRole = new RangerRole();
     rangerRole.setName(role.getName());
-    rangerRole.setUsers(toRangerRoleMembers(role.getUsers()));
+    rangerRole.setCreatedByUser(createdByUser);
+    if (!role.getUsersMap().isEmpty()) {
+      rangerRole.setUsers(toRangerRoleMembers(role.getUsersMap()));
+    }
+    if (!role.getRolesMap().isEmpty()) {
+      rangerRole.setRoles(toRangerRoleMembers(role.getRolesMap()));
+    }
     if (role.getDescription().isPresent()) {
       rangerRole.setDescription(role.getDescription().get());
     }
@@ -220,7 +334,7 @@ public class RangerClientMultiTenantAccessController implements
   private Policy fromRangerPolicy(RangerPolicy rangerPolicy) {
     Policy.Builder policyBuilder = new Policy.Builder();
 
-    // Get roles and their acls from the policy.
+    // Get roles and their ACLs from the policy.
     for (RangerPolicy.RangerPolicyItem policyItem:
         rangerPolicy.getPolicyItems()) {
       Collection<Acl> acls = new ArrayList<>();
@@ -260,7 +374,8 @@ public class RangerClientMultiTenantAccessController implements
     }
 
     policyBuilder.setName(rangerPolicy.getName())
-       .setDescription(rangerPolicy.getDescription())
+        .setId(rangerPolicy.getId())
+        .setDescription(rangerPolicy.getDescription())
         .addLabels(rangerPolicy.getPolicyLabels());
 
     return policyBuilder.build();

@@ -19,18 +19,8 @@ package org.apache.hadoop.ozone.om.multitenant;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.multitenant.AccessPolicy.AccessGrantType.ALLOW;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ_ACL;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.framework;
@@ -64,9 +54,9 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
+import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Policy;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.ozone.test.GenericTestUtils;
@@ -114,7 +104,9 @@ public class TestRangerBGSyncService {
 
   private TemporaryFolder folder = new TemporaryFolder();
 
+  // TODO: Remove auth
   private MultiTenantAccessAuthorizer auth;
+  private MultiTenantAccessController accessController;
   private OMRangerBGSyncService bgSync;
 
   // List of policy names created in Ranger
@@ -222,13 +214,7 @@ public class TestRangerBGSyncService {
         .thenReturn(OMMultiTenantManager.getDefaultUserRoleName(TENANT_ID));
     when(omMultiTenantManager.getTenantAdminRoleName(TENANT_ID))
         .thenReturn(OMMultiTenantManager.getDefaultAdminRoleName(TENANT_ID));
-    when(omMultiTenantManager.newDefaultVolumeAccessPolicy(eq(TENANT_ID),
-        Mockito.any(OzoneTenantRolePrincipal.class),
-        Mockito.any(OzoneTenantRolePrincipal.class)))
-        .thenReturn(newVolumeAccessPolicy(TENANT_ID, TENANT_ID));
-    when(omMultiTenantManager.newDefaultBucketAccessPolicy(eq(TENANT_ID),
-        Mockito.any(OzoneTenantRolePrincipal.class)))
-        .thenReturn(newBucketAccessPolicy(TENANT_ID, TENANT_ID));
+
     when(omMultiTenantManager.getAuthorizerLock())
         .thenReturn(new AuthorizerLockImpl());
 
@@ -258,6 +244,7 @@ public class TestRangerBGSyncService {
     when(tenant.getTenantAccessPolicies()).thenReturn(new ArrayList<>());
 
     auth = new MultiTenantAccessAuthorizerRangerPlugin();
+    accessController = new InMemoryMultiTenantAccessController();
     auth.init(conf);
   }
 
@@ -269,43 +256,11 @@ public class TestRangerBGSyncService {
     framework().clearInlineMocks();
   }
 
-  private AccessPolicy newVolumeAccessPolicy(String vol, String tenantId)
-      throws IOException {
-    OzoneTenantRolePrincipal principal = new OzoneTenantRolePrincipal(
-        OMMultiTenantManager.getDefaultUserRoleName(tenantId));
-    OzoneTenantRolePrincipal adminRole = new OzoneTenantRolePrincipal(
-        OMMultiTenantManager.getDefaultAdminRoleName(tenantId));
-    AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
-        OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantId));
-    OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(VOLUME).setStoreType(OZONE).setVolumeName(vol)
-        .setBucketName("").setKeyName("").build();
-    tenantVolumeAccessPolicy.addAccessPolicyElem(obj, principal, READ, ALLOW);
-    tenantVolumeAccessPolicy.addAccessPolicyElem(obj, principal, LIST, ALLOW);
-    tenantVolumeAccessPolicy.addAccessPolicyElem(obj, principal,
-        READ_ACL, ALLOW);
-    tenantVolumeAccessPolicy.addAccessPolicyElem(obj, adminRole, ALL, ALLOW);
-    return tenantVolumeAccessPolicy;
-  }
-
-  private AccessPolicy newBucketAccessPolicy(String vol, String tenantId)
-      throws IOException {
-    OzoneTenantRolePrincipal principal = new OzoneTenantRolePrincipal(
-        OMMultiTenantManager.getDefaultUserRoleName(tenantId));
-    AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
-        OMMultiTenantManager.getDefaultBucketPolicyName(tenantId));
-    OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(BUCKET).setStoreType(OZONE).setVolumeName(vol)
-        .setBucketName("*").setKeyName("").build();
-    tenantVolumeAccessPolicy.addAccessPolicyElem(obj, principal, CREATE, ALLOW);
-    return tenantVolumeAccessPolicy;
-  }
-
   long initBGSync() throws IOException {
     bgSync = new OMRangerBGSyncService(ozoneManager,
-        ozoneManager.getMultiTenantManager(), auth,
+        ozoneManager.getMultiTenantManager(), accessController,
         TEST_SYNC_INTERVAL_SEC, TimeUnit.SECONDS, TEST_SYNC_TIMEOUT_SEC);
-    return bgSync.getLatestRangerServiceVersion();
+    return bgSync.getRangerOzoneServicePolicyVersion();
   }
 
   public void createRolesAndPoliciesInRanger(boolean populateDB) {
@@ -398,24 +353,31 @@ public class TestRangerBGSyncService {
       Assert.fail(e.getMessage());
     }
 
+    final String userRoleName =
+        OMMultiTenantManager.getDefaultUserRoleName(tenantId);
+    final String adminRoleName =
+        OMMultiTenantManager.getDefaultAdminRoleName(tenantId);
+
     try {
-      AccessPolicy tenant1VolumeAccessPolicy = newVolumeAccessPolicy(
-          volumeName, tenantId);
+      Policy tenant1VolumeAccessPolicy =
+          OMMultiTenantManager.getDefaultVolumeAccessPolicy(
+              tenantId, volumeName, userRoleName, adminRoleName);
       LOG.info("Creating VolumeAccess policy in Ranger: {}",
-          tenant1VolumeAccessPolicy.getPolicyName());
-      auth.createAccessPolicy(tenant1VolumeAccessPolicy);
-      policiesCreated.add(tenant1VolumeAccessPolicy.getPolicyName());
+          tenant1VolumeAccessPolicy.getName());
+      accessController.createPolicy(tenant1VolumeAccessPolicy);
+      policiesCreated.add(tenant1VolumeAccessPolicy.getName());
     } catch (Exception e) {
       Assert.fail(e.getMessage());
     }
 
     try {
-      AccessPolicy tenant1BucketCreatePolicy = newBucketAccessPolicy(
-          volumeName, tenantId);
+      Policy tenant1BucketCreatePolicy =
+          OMMultiTenantManager.getDefaultBucketAccessPolicy(
+              tenantId, volumeName, userRoleName);
       LOG.info("Creating BucketAccess policy in Ranger: {}",
-          tenant1BucketCreatePolicy.getPolicyName());
-      auth.createAccessPolicy(tenant1BucketCreatePolicy);
-      policiesCreated.add(tenant1BucketCreatePolicy.getPolicyName());
+          tenant1BucketCreatePolicy.getName());
+      accessController.createPolicy(tenant1BucketCreatePolicy);
+      policiesCreated.add(tenant1BucketCreatePolicy.getName());
     } catch (Exception e) {
       Assert.fail(e.getMessage());
     }
@@ -491,7 +453,8 @@ public class TestRangerBGSyncService {
     // backed up by OzoneManger Multi-Tenant tables
     createRolesAndPoliciesInRanger(false);
 
-    final long rangerSvcVersionBefore = bgSync.getLatestRangerServiceVersion();
+    final long rangerSvcVersionBefore =
+        bgSync.getRangerOzoneServicePolicyVersion();
     Assert.assertTrue(rangerSvcVersionBefore >= startingRangerVersion);
 
     // Note: DB Service Version will be -1 if the test starts with an empty DB
@@ -503,7 +466,8 @@ public class TestRangerBGSyncService {
         CHECK_SYNC_MILLIS, WAIT_SYNC_TIMEOUT_MILLIS);
     bgSync.shutdown();
     final long dbSvcVersionAfter = bgSync.getOMDBRangerServiceVersion();
-    final long rangerSvcVersionAfter = bgSync.getLatestRangerServiceVersion();
+    final long rangerSvcVersionAfter =
+        bgSync.getRangerOzoneServicePolicyVersion();
     Assert.assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
     Assert.assertTrue(dbSvcVersionAfter > dbSvcVersionBefore);
     Assert.assertTrue(rangerSvcVersionAfter > rangerSvcVersionBefore);
@@ -539,7 +503,7 @@ public class TestRangerBGSyncService {
     // backed up by OzoneManger Multi-Tenant tables
     createRolesAndPoliciesInRanger(true);
 
-    long rangerSvcVersionBefore = bgSync.getLatestRangerServiceVersion();
+    long rangerSvcVersionBefore = bgSync.getRangerOzoneServicePolicyVersion();
     Assert.assertTrue(rangerSvcVersionBefore >= startingRangerVersion);
 
     // Note: DB Service Version will be -1 if the test starts with an empty DB
@@ -551,7 +515,8 @@ public class TestRangerBGSyncService {
         CHECK_SYNC_MILLIS, WAIT_SYNC_TIMEOUT_MILLIS);
     bgSync.shutdown();
     final long dbSvcVersionAfter = bgSync.getOMDBRangerServiceVersion();
-    final long rangerSvcVersionAfter = bgSync.getLatestRangerServiceVersion();
+    final long rangerSvcVersionAfter =
+        bgSync.getRangerOzoneServicePolicyVersion();
     Assert.assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
     Assert.assertEquals(rangerSvcVersionAfter, rangerSvcVersionBefore);
     if (dbSvcVersionBefore != -1L) {
@@ -595,7 +560,8 @@ public class TestRangerBGSyncService {
 
     createRolesAndPoliciesInRanger(true);
 
-    long rangerVersionAfterCreation = bgSync.getLatestRangerServiceVersion();
+    long rangerVersionAfterCreation =
+        bgSync.getRangerOzoneServicePolicyVersion();
     Assert.assertTrue(rangerVersionAfterCreation >= startingRangerVersion);
 
     // Delete a user from user role, expect Ranger sync thread to update it
@@ -612,7 +578,8 @@ public class TestRangerBGSyncService {
 
     // Note: DB Service Version will be -1 if the test starts with an empty DB
     final long dbSvcVersionBefore = bgSync.getOMDBRangerServiceVersion();
-    final long rangerSvcVersionBefore = bgSync.getLatestRangerServiceVersion();
+    final long rangerSvcVersionBefore =
+        bgSync.getRangerOzoneServicePolicyVersion();
     final long currRunCount = bgSync.getRangerSyncRunCount();
     bgSync.start();
     // Wait for sync to finish once.
@@ -622,7 +589,8 @@ public class TestRangerBGSyncService {
         CHECK_SYNC_MILLIS, WAIT_SYNC_TIMEOUT_MILLIS);
     bgSync.shutdown();
     final long dbSvcVersionAfter = bgSync.getOMDBRangerServiceVersion();
-    final long rangerSvcVersionAfter = bgSync.getLatestRangerServiceVersion();
+    final long rangerSvcVersionAfter =
+        bgSync.getRangerOzoneServicePolicyVersion();
     Assert.assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
     Assert.assertTrue(dbSvcVersionAfter > dbSvcVersionBefore);
     Assert.assertTrue(rangerSvcVersionAfter > rangerSvcVersionBefore);
@@ -669,7 +637,8 @@ public class TestRangerBGSyncService {
     // backed up by OzoneManger Multi-Tenant tables
     createRolesAndPoliciesInRanger(true);
 
-    long rangerVersionAfterCreation = bgSync.getLatestRangerServiceVersion();
+    long rangerVersionAfterCreation =
+        bgSync.getRangerOzoneServicePolicyVersion();
     Assert.assertTrue(rangerVersionAfterCreation >= startingRangerVersion);
 
     // Delete both policies, expect Ranger sync thread to recover both
@@ -678,7 +647,8 @@ public class TestRangerBGSyncService {
     auth.deletePolicyByName(
         OMMultiTenantManager.getDefaultBucketPolicyName(TENANT_ID));
 
-    final long rangerSvcVersionBefore = bgSync.getLatestRangerServiceVersion();
+    final long rangerSvcVersionBefore =
+        bgSync.getRangerOzoneServicePolicyVersion();
     // Note: DB Service Version will be -1 if the test starts with an empty DB
     final long dbSvcVersionBefore = bgSync.getOMDBRangerServiceVersion();
     bgSync.start();
@@ -688,7 +658,8 @@ public class TestRangerBGSyncService {
         CHECK_SYNC_MILLIS, WAIT_SYNC_TIMEOUT_MILLIS);
     bgSync.shutdown();
     long dbSvcVersionAfter = bgSync.getOMDBRangerServiceVersion();
-    final long rangerSvcVersionAfter = bgSync.getLatestRangerServiceVersion();
+    final long rangerSvcVersionAfter =
+        bgSync.getRangerOzoneServicePolicyVersion();
     Assert.assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
     Assert.assertTrue(dbSvcVersionAfter > dbSvcVersionBefore);
     Assert.assertTrue(rangerSvcVersionAfter > rangerSvcVersionBefore);

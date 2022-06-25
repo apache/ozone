@@ -17,6 +17,8 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
@@ -27,22 +29,31 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
-import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.AuthorizerLock;
+import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Acl;
+import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Policy;
 import org.apache.hadoop.ozone.om.multitenant.OMRangerBGSyncService;
-import org.apache.hadoop.ozone.om.multitenant.OzoneTenantRolePrincipal;
+import org.apache.hadoop.ozone.om.multitenant.OzoneOwnerPrincipal;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.slf4j.Logger;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ_ACL;
 
 /**
  * OM MultiTenant manager interface.
@@ -282,18 +293,30 @@ public interface OMMultiTenantManager {
           OZONE_RANGER_HTTPS_ADDRESS_KEY);
     }
 
-    // TODO: Do not check Ranger user/passwd if Ranger Java client is enabled
-    final String rangerUser = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER);
-    if (StringUtils.isBlank(rangerUser)) {
-      isS3MultiTenancyEnabled = false;
-      logger.error("{} is required to enable S3 Multi-Tenancy but not set",
-          OZONE_OM_RANGER_HTTPS_ADMIN_API_USER);
-    }
-    final String rangerPw = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD);
-    if (StringUtils.isBlank(rangerPw)) {
-      isS3MultiTenancyEnabled = false;
-      logger.error("{} is required to enable S3 Multi-Tenancy but not set",
-          OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD);
+    String fallbackUsername = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER);
+    String fallbackPassword = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD);
+
+    if (fallbackUsername != null && fallbackPassword != null) {
+      logger.warn("Detected clear text username and password override configs. "
+          + "These will be used to authenticate to Ranger Admin Server instead "
+          + "of using the recommended Kerberos principal and keytab "
+          + "authentication method. "
+          + "This is NOT recommended on a production cluster.");
+    } else {
+      // Check Kerberos principal and keytab file path configs if not both
+      // clear text username and password overrides are set.
+      final String omKerbPrinc = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
+      if (StringUtils.isBlank(omKerbPrinc)) {
+        isS3MultiTenancyEnabled = false;
+        logger.error("{} is required to enable S3 Multi-Tenancy but not set",
+            OZONE_OM_KERBEROS_PRINCIPAL_KEY);
+      }
+      final String rangerPw = conf.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY);
+      if (StringUtils.isBlank(rangerPw)) {
+        isS3MultiTenancyEnabled = false;
+        logger.error("{} is required to enable S3 Multi-Tenancy but not set",
+            OZONE_OM_KERBEROS_KEYTAB_FILE_KEY);
+      }
     }
 
     if (!isS3MultiTenancyEnabled) {
@@ -304,18 +327,67 @@ public interface OMMultiTenantManager {
     return true;
   }
 
+  String OZONE_TENANT_RANGER_POLICY_DESCRIPTION =
+      "Created by Ozone Manager. WARNING: "
+          + "Changes will be lost when this tenant is deleted.";
+
   /**
    * Returns default VolumeAccess policy given tenant and role names.
    */
-  AccessPolicy newDefaultVolumeAccessPolicy(String tenantId,
-      OzoneTenantRolePrincipal userRole, OzoneTenantRolePrincipal adminRole)
-      throws IOException;
+  static Policy getDefaultVolumeAccessPolicy(
+      String tenantId, String volumeName,
+      String userRoleName, String adminRoleName)
+      throws IOException {
+
+    final String volumePolicyName = OMMultiTenantManager
+        .getDefaultBucketNamespacePolicyName(tenantId);
+
+    Policy policy = new Policy.Builder()
+        .setName(volumePolicyName)
+        .addVolume(volumeName)
+        // TODO: Double check bucket/key field when policy is created in Ranger
+//        .addBucket("vol1/bucket1")
+//        .addKey("vol1/bucket1/key1")
+        .setDescription(OZONE_TENANT_RANGER_POLICY_DESCRIPTION)
+        .addLabel(OZONE_TENANT_RANGER_POLICY_LABEL)
+        .addRoleAcl(userRoleName, new ArrayList<Acl>() {
+          {
+            add(Acl.allow(READ));
+            add(Acl.allow(LIST));
+            add(Acl.allow(READ_ACL));
+          }
+        })
+        .addRoleAcl(adminRoleName, Collections.singletonList(Acl.allow(ALL)))
+        .build();
+
+    return policy;
+  }
 
   /**
    * Returns default BucketAccess policy given tenant and user role name.
    */
-  AccessPolicy newDefaultBucketAccessPolicy(String tenantId,
-      OzoneTenantRolePrincipal userRole) throws IOException;
+  static Policy getDefaultBucketAccessPolicy(
+      String tenantId, String volumeName,
+      String userRoleName) throws IOException {
+    final String bucketPolicyName = OMMultiTenantManager
+        .getDefaultBucketPolicyName(tenantId);
+
+    Policy policy = new Policy.Builder()
+        .setName(bucketPolicyName)
+        .addVolume(volumeName)
+        // TODO: Double check bucket/key field when policy is created in Ranger
+        .addBucket("*")
+//        .addKey("vol1/bucket1/key1")
+        .setDescription(OZONE_TENANT_RANGER_POLICY_DESCRIPTION)
+        .addLabel(OZONE_TENANT_RANGER_POLICY_LABEL)
+        .addRoleAcl(userRoleName,
+            Collections.singletonList(Acl.allow(CREATE)))
+        .addRoleAcl(new OzoneOwnerPrincipal().getName(),
+            Collections.singletonList(Acl.allow(ALL)))
+        .build();
+
+    return policy;
+  }
 
   AuthorizerLock getAuthorizerLock();
 }
