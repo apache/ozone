@@ -166,7 +166,9 @@ public class ECUnderReplicationCommandCreator
               + " not enough healthy replicas found. Available source"
               + " replicas are: {}", container.containerID(), sources);
         }
-      } else if (((ContainerHealthResult.UnderReplicatedHealthResult) result)
+      } else if (result instanceof ContainerHealthResult
+          .UnderReplicatedHealthResult && ((ContainerHealthResult
+          .UnderReplicatedHealthResult) result)
           .underReplicatedDueToDecommission()) {
         Map<DatanodeDetails, SCMCommand> commands = new HashMap<>();
         Set<Integer> decomIndexes = replicaCount.decommissioningIndexes();
