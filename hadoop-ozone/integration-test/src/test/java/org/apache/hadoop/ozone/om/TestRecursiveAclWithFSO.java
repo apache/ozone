@@ -58,7 +58,7 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
  */
 public class TestRecursiveAclWithFSO {
 
-  @Rule public Timeout timeout = Timeout.seconds(500);
+  @Rule public Timeout timeout = Timeout.seconds(120);
 
   private MiniOzoneCluster cluster;
 
