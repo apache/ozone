@@ -1550,7 +1550,7 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     Table<String, OmKeyInfo> keyTable = metadataManager
         .getKeyTable(getBucketLayout(metadataManager, volName, buckName));
-    try(TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
         iterator = getIteratorForKeyInTableCache(recursive, startKey,
         volumeName, bucketName, cacheKeyMap, keyArgs, keyTable)) {
       findKeyInDbWithIterator(recursive, startKey, numEntries, volumeName,
@@ -1585,7 +1585,8 @@ public class KeyManagerImpl implements KeyManager {
     return fileStatusList;
   }
 
-  private TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getIteratorForKeyInTableCache(
+  private TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+      getIteratorForKeyInTableCache(
       boolean recursive, String startKey, String volumeName, String bucketName,
       TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
       Table<String, OmKeyInfo> keyTable) {
@@ -1608,6 +1609,7 @@ public class KeyManagerImpl implements KeyManager {
     return iterator;
   }
 
+  @SuppressWarnings("parameternumber")
   private void findKeyInDbWithIterator(boolean recursive, String startKey,
       long numEntries, String volumeName, String bucketName, String keyName,
       TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
