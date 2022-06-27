@@ -1467,6 +1467,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     metadataManager.start(configuration);
 
+    ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
+        getEnableFileSystemPaths());
+
     // Start Ratis services
     if (omRatisServer != null) {
       omRatisServer.start();
@@ -1541,9 +1544,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (omState == State.BOOTSTRAPPING) {
       bootstrap(omNodeDetails);
     }
-
-    ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
-        getEnableFileSystemPaths());
 
     omState = State.RUNNING;
   }
