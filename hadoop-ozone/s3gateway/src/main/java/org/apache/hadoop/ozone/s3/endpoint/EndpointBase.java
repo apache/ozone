@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -63,6 +64,8 @@ public abstract class EndpointBase implements Auditor {
   private S3Auth s3Auth;
   @Context
   private ContainerRequestContext context;
+  @Inject
+  private OzoneConfiguration ozoneConfiguration;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(EndpointBase.class);
@@ -98,6 +101,7 @@ public abstract class EndpointBase implements Auditor {
   @PostConstruct
   public void initialization() {
     LOG.debug("S3 access id: {}", s3Auth.getAccessID());
+    ozoneConfiguration.setIfUnset("ozone.om.group.rights", "NONE");
     getClient().getObjectStore()
         .getClientProxy()
         .setThreadLocalS3Auth(s3Auth);
