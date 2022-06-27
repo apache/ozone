@@ -30,17 +30,15 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
-import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.util.ExitUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,8 +46,10 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
@@ -57,6 +57,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 
 /**
  * Replication Manager (RM) is the one which is responsible for making sure
@@ -125,6 +126,8 @@ public class ReplicationManager implements SCMService {
   private long lastTimeToBeReadyInMillis = 0;
   private final Clock clock;
   private final ContainerReplicaPendingOps containerReplicaPendingOps;
+  private final ContainerHealthCheck ecContainerHealthCheck;
+  private final EventPublisher eventPublisher;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -140,11 +143,9 @@ public class ReplicationManager implements SCMService {
              final PlacementPolicy containerPlacement,
              final EventPublisher eventPublisher,
              final SCMContext scmContext,
-             final SCMServiceManager serviceManager,
              final NodeManager nodeManager,
              final Clock clock,
-             final SCMHAManager scmhaManager,
-             final Table<ContainerID, MoveDataNodePair> moveTable,
+             final LegacyReplicationManager legacyReplicationManager,
              final ContainerReplicaPendingOps replicaPendingOps)
              throws IOException {
     this.containerManager = containerManager;
@@ -154,19 +155,14 @@ public class ReplicationManager implements SCMService {
     this.clock = clock;
     this.containerReport = new ReplicationManagerReport();
     this.metrics = null;
+    this.eventPublisher = eventPublisher;
     this.waitTimeInMillis = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
         TimeUnit.MILLISECONDS);
     this.containerReplicaPendingOps = replicaPendingOps;
-    this.legacyReplicationManager = new LegacyReplicationManager(
-        conf, containerManager, containerPlacement, eventPublisher,
-        scmContext, nodeManager, scmhaManager, clock, moveTable);
-
-    // register ReplicationManager to SCMServiceManager.
-    serviceManager.register(this);
-
-    // start ReplicationManager.
+    this.legacyReplicationManager = legacyReplicationManager;
+    this.ecContainerHealthCheck = new ECContainerHealthCheck();
     start();
   }
 
@@ -233,22 +229,74 @@ public class ReplicationManager implements SCMService {
     final List<ContainerInfo> containers =
         containerManager.getContainers();
     ReplicationManagerReport report = new ReplicationManagerReport();
+    List<ContainerHealthResult.UnderReplicatedHealthResult> underReplicated =
+        new ArrayList<>();
+    List<ContainerHealthResult.OverReplicatedHealthResult> overReplicated =
+        new ArrayList<>();
+
     for (ContainerInfo c : containers) {
       if (!shouldRun()) {
         break;
       }
-      switch (c.getReplicationType()) {
-      case EC:
-        break;
-      default:
+      report.increment(c.getState());
+      if (c.getReplicationType() != EC) {
         legacyReplicationManager.processContainer(c, report);
+        continue;
+      }
+      try {
+        processContainer(c, underReplicated, overReplicated, report);
+        // TODO - send any commands contained in the health result
+      } catch (ContainerNotFoundException e) {
+        LOG.error("Container {} not found", c.getContainerID(), e);
       }
     }
     report.setComplete();
+    // TODO - Sort the pending lists by priority and assign to the main queue,
+    //        which is yet to be defined.
     this.containerReport = report;
     LOG.info("Replication Monitor Thread took {} milliseconds for" +
             " processing {} containers.", clock.millis() - start,
         containers.size());
+  }
+
+  protected ContainerHealthResult processContainer(ContainerInfo containerInfo,
+      List<ContainerHealthResult.UnderReplicatedHealthResult> underRep,
+      List<ContainerHealthResult.OverReplicatedHealthResult> overRep,
+      ReplicationManagerReport report) throws ContainerNotFoundException {
+    Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
+        containerInfo.containerID());
+    List<ContainerReplicaOp> pendingOps =
+        containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
+    ContainerHealthResult health = ecContainerHealthCheck
+        .checkHealth(containerInfo, replicas, pendingOps, 0);
+      // TODO - should the report have a HEALTHY state, rather than just bad
+      //        states? It would need to be added to legacy RM too.
+    if (health.getHealthState()
+        == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
+      report.incrementAndSample(
+          HealthState.UNDER_REPLICATED, containerInfo.containerID());
+      ContainerHealthResult.UnderReplicatedHealthResult underHealth
+          = ((ContainerHealthResult.UnderReplicatedHealthResult) health);
+      if (underHealth.isUnrecoverable()) {
+        // TODO - do we need a new health state for unrecoverable EC?
+        report.incrementAndSample(
+            HealthState.MISSING, containerInfo.containerID());
+      }
+      if (!underHealth.isSufficientlyReplicatedAfterPending() &&
+          !underHealth.isUnrecoverable()) {
+        underRep.add(underHealth);
+      }
+    } else if (health.getHealthState()
+        == ContainerHealthResult.HealthState.OVER_REPLICATED) {
+      report.incrementAndSample(HealthState.OVER_REPLICATED,
+          containerInfo.containerID());
+      ContainerHealthResult.OverReplicatedHealthResult overHealth
+          = ((ContainerHealthResult.OverReplicatedHealthResult) health);
+      if (!overHealth.isSufficientlyReplicatedAfterPending()) {
+        overRep.add(overHealth);
+      }
+    }
+    return health;
   }
 
   public ReplicationManagerReport getContainerReport() {
