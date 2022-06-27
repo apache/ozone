@@ -263,8 +263,7 @@ public class ReplicationManager implements SCMService {
       List<ContainerHealthResult.UnderReplicatedHealthResult> underRep,
       List<ContainerHealthResult.OverReplicatedHealthResult> overRep,
       ReplicationManagerReport report) throws ContainerNotFoundException {
-    Set<ContainerReplica> replicas;
-    replicas = containerManager.getContainerReplicas(
+    Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
         containerInfo.containerID());
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
