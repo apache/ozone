@@ -36,6 +36,12 @@ public class ContainerReplicaOp {
   private int replicaIndex;
   private long scheduledEpochMillis;
 
+  public static ContainerReplicaOp create(PendingOpType opType,
+      DatanodeDetails target, int replicaIndex) {
+    return new ContainerReplicaOp(opType, target, replicaIndex,
+        System.currentTimeMillis());
+  }
+
   public ContainerReplicaOp(PendingOpType opType,
       DatanodeDetails target, int replicaIndex, long scheduledTime) {
     this.opType = opType;

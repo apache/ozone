@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.crl.CRLStatusReportHandler;
 import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
@@ -708,19 +709,22 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getReplicationManager() != null) {
       replicationManager = configurator.getReplicationManager();
     }  else {
+      LegacyReplicationManager legacyRM = new LegacyReplicationManager(
+          conf, containerManager, containerPlacementPolicy, eventQueue,
+          scmContext, scmNodeManager, scmHAManager, clock,
+          getScmMetadataStore().getMoveTable());
       replicationManager = new ReplicationManager(
           conf,
           containerManager,
           containerPlacementPolicy,
           eventQueue,
           scmContext,
-          serviceManager,
           scmNodeManager,
           clock,
-          scmHAManager,
-          getScmMetadataStore().getMoveTable(),
+          legacyRM,
           containerReplicaPendingOps);
     }
+    serviceManager.register(replicationManager);
     if (configurator.getScmSafeModeManager() != null) {
       scmSafeModeManager = configurator.getScmSafeModeManager();
     } else {
