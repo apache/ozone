@@ -2007,9 +2007,25 @@ public class KeyManagerImpl implements KeyManager {
       throws IOException {
 
     Table dirTable = metadataManager.getDirectoryTable();
-    TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
-            iterator = dirTable.iterator();
+    try (TableIterator<String,
+        ? extends Table.KeyValue<String, OmDirectoryInfo>>
+            iterator = dirTable.iterator()) {
 
+      return getDirectoriesWithIterator(cacheKeyMap, seekDirInDB, prefixPath,
+          prefixKeyInDB, countEntries, numEntries, recursive, volumeName,
+          bucketName, deletedKeySet, iterator);
+    }
+  }
+
+  @SuppressWarnings("parameternumber")
+  private int getDirectoriesWithIterator(
+      TreeMap<String, OzoneFileStatus> cacheKeyMap, String seekDirInDB,
+      String prefixPath, long prefixKeyInDB, int countEntries, long numEntries,
+      boolean recursive, String volumeName, String bucketName,
+      Set<String> deletedKeySet,
+      TableIterator<String,
+          ? extends Table.KeyValue<String, OmDirectoryInfo>> iterator)
+      throws IOException {
     iterator.seek(seekDirInDB);
 
     while (iterator.hasNext() && numEntries - countEntries > 0) {
