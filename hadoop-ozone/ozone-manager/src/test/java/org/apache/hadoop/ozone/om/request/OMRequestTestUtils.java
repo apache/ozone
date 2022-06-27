@@ -483,13 +483,23 @@ public final class OMRequestTestUtils {
   public static void addBucketToDB(String volumeName, String bucketName,
       OMMetadataManager omMetadataManager, BucketLayout bucketLayout)
       throws Exception {
-
-    OmBucketInfo omBucketInfo =
+    addBucketToDB(omMetadataManager,
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
-                .setBucketName(bucketName)
-                .setObjectID(System.currentTimeMillis())
-                .setCreationTime(Time.now())
-                .setBucketLayout(bucketLayout).build();
+            .setBucketName(bucketName)
+            .setBucketLayout(bucketLayout)
+    );
+  }
+
+  public static void addBucketToDB(OMMetadataManager omMetadataManager,
+      OmBucketInfo.Builder builder) throws Exception {
+
+    OmBucketInfo omBucketInfo = builder
+        .setObjectID(System.currentTimeMillis())
+        .setCreationTime(Time.now())
+        .build();
+
+    String volumeName = omBucketInfo.getVolumeName();
+    String bucketName = omBucketInfo.getBucketName();
 
     // Add to cache.
     omMetadataManager.getBucketTable().addCacheEntry(

@@ -143,6 +143,11 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             OMException.ResultCodes.BUCKET_NOT_FOUND);
       }
 
+      if (dbBucketInfo.isLink()) {
+        throw new OMException("Cannot set property on link",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+      }
+
       OmBucketInfo.Builder bucketInfoBuilder = OmBucketInfo.newBuilder();
       bucketInfoBuilder.setVolumeName(dbBucketInfo.getVolumeName())
           .setBucketName(dbBucketInfo.getBucketName())
