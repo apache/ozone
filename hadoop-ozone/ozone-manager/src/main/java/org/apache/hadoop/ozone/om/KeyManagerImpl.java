@@ -1550,8 +1550,46 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     Table<String, OmKeyInfo> keyTable = metadataManager
         .getKeyTable(getBucketLayout(metadataManager, volName, buckName));
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator;
+    try(TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+        iterator = getIteratorForKeyInTableCache(recursive, startKey,
+        volumeName, bucketName, cacheKeyMap, keyArgs, keyTable)) {
+      findKeyInDbWithIterator(recursive, startKey, numEntries, volumeName,
+          bucketName, keyName, cacheKeyMap, keyArgs, keyTable, iterator);
+    }
+    int countEntries;
+
+    countEntries = 0;
+    // Convert results in cacheKeyMap to List
+    for (OzoneFileStatus fileStatus : cacheKeyMap.values()) {
+      // No need to check if a key is deleted or not here, this is handled
+      // when adding entries to cacheKeyMap from DB.
+      fileStatusList.add(fileStatus);
+      countEntries++;
+      if (countEntries >= numEntries) {
+        break;
+      }
+    }
+    // Clean up temp map and set
+    cacheKeyMap.clear();
+
+    List<OmKeyInfo> keyInfoList = new ArrayList<>(fileStatusList.size());
+    fileStatusList.stream().map(s -> s.getKeyInfo()).forEach(keyInfoList::add);
+    if (args.getLatestVersionLocation()) {
+      slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
+    }
+    refreshPipeline(keyInfoList);
+
+    if (args.getSortDatanodes()) {
+      sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
+    }
+    return fileStatusList;
+  }
+
+  private TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getIteratorForKeyInTableCache(
+      boolean recursive, String startKey, String volumeName, String bucketName,
+      TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
+      Table<String, OmKeyInfo> keyTable) {
+    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator;
     try {
       Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
           cacheIter = keyTable.cacheIterator();
@@ -1567,7 +1605,16 @@ public class KeyManagerImpl implements KeyManager {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
+    return iterator;
+  }
 
+  private void findKeyInDbWithIterator(boolean recursive, String startKey,
+      long numEntries, String volumeName, String bucketName, String keyName,
+      TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
+      Table<String, OmKeyInfo> keyTable,
+      TableIterator<String,
+          ? extends Table.KeyValue<String, OmKeyInfo>> iterator)
+      throws IOException {
     // Then, find key in DB
     String seekKeyInDb =
         metadataManager.getOzoneKey(volumeName, bucketName, startKey);
@@ -1634,32 +1681,6 @@ public class KeyManagerImpl implements KeyManager {
         }
       }
     }
-
-    countEntries = 0;
-    // Convert results in cacheKeyMap to List
-    for (OzoneFileStatus fileStatus : cacheKeyMap.values()) {
-      // No need to check if a key is deleted or not here, this is handled
-      // when adding entries to cacheKeyMap from DB.
-      fileStatusList.add(fileStatus);
-      countEntries++;
-      if (countEntries >= numEntries) {
-        break;
-      }
-    }
-    // Clean up temp map and set
-    cacheKeyMap.clear();
-
-    List<OmKeyInfo> keyInfoList = new ArrayList<>(fileStatusList.size());
-    fileStatusList.stream().map(s -> s.getKeyInfo()).forEach(keyInfoList::add);
-    if (args.getLatestVersionLocation()) {
-      slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
-    }
-    refreshPipeline(keyInfoList);
-
-    if (args.getSortDatanodes()) {
-      sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
-    }
-    return fileStatusList;
   }
 
   @SuppressWarnings("methodlength")
