@@ -2388,15 +2388,27 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public List<OmKeyInfo> getPendingDeletionSubDirs(long volumeId, long bucketId,
       OmKeyInfo parentInfo, long numEntries) throws IOException {
-    List<OmKeyInfo> directories = new ArrayList<>();
     String seekDirInDB = metadataManager.getOzonePathKey(volumeId, bucketId,
         parentInfo.getObjectID(), "");
     long countEntries = 0;
 
     Table dirTable = metadataManager.getDirectoryTable();
-    TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
-        iterator = dirTable.iterator();
+    try (TableIterator<String,
+        ? extends Table.KeyValue<String, OmDirectoryInfo>>
+        iterator = dirTable.iterator()) {
+      return gatherSubDirsWithIterator(parentInfo, numEntries,
+          seekDirInDB, countEntries, iterator);
+    }
 
+  }
+
+  private List<OmKeyInfo> gatherSubDirsWithIterator(OmKeyInfo parentInfo,
+      long numEntries, String seekDirInDB,
+      long countEntries,
+      TableIterator<String,
+          ? extends Table.KeyValue<String, OmDirectoryInfo>> iterator)
+      throws IOException {
+    List<OmKeyInfo> directories = new ArrayList<>();
     iterator.seek(seekDirInDB);
 
     while (iterator.hasNext() && numEntries - countEntries > 0) {
