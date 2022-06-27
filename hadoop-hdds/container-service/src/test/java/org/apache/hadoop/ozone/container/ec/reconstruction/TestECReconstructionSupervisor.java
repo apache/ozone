@@ -27,6 +27,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.util.SortedMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
 
 /**
@@ -37,8 +38,8 @@ public class TestECReconstructionSupervisor {
   @Test
   public void testAddTaskShouldExecuteTheGivenTask()
       throws InterruptedException, TimeoutException, IOException {
-    final boolean[] reconstructInvoked = {false};
-    final boolean[] holdOn = {true};
+    final CountDownLatch runnableInvoked = new CountDownLatch(1);
+    final CountDownLatch holdProcessing = new CountDownLatch(1);
     ECReconstructionSupervisor supervisor =
         new ECReconstructionSupervisor(null, null, 5,
             new ECReconstructionCoordinator(new OzoneConfiguration(), null) {
@@ -48,10 +49,9 @@ public class TestECReconstructionSupervisor {
                   SortedMap<Integer, DatanodeDetails> sourceNodeMap,
                   SortedMap<Integer, DatanodeDetails> targetNodeMap)
                   throws IOException {
-                reconstructInvoked[0] = true;
+                runnableInvoked.countDown();
                 try {
-                  GenericTestUtils.waitFor(() -> !holdOn[0], 100, 15000);
-                } catch (TimeoutException e) {
+                  holdProcessing.await();
                 } catch (InterruptedException e) {
                 }
                 super.reconstructECContainerGroup(containerID, repConfig,
@@ -62,11 +62,9 @@ public class TestECReconstructionSupervisor {
     supervisor.addTask(
         new ECReconstructionCommandInfo(1, new ECReplicationConfig(3, 2),
             new byte[0], ImmutableList.of(), ImmutableList.of()));
-    GenericTestUtils.waitFor(() -> reconstructInvoked[0], 100, 15000);
+    runnableInvoked.await();
     Assert.assertEquals(1, supervisor.getInFlightReplications());
-    holdOn[0] = false;
-    // After task execution, this counter should be removed. so, total count
-    // should be 0.
+    holdProcessing.countDown();
     GenericTestUtils
         .waitFor(() -> supervisor.getInFlightReplications() == 0, 100, 15000);
   }
