@@ -51,7 +51,8 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
   private long bucketId;
 
   public OMDirectoryCreateResponseWithFSO(@Nonnull OMResponse omResponse,
-      long volumeId, long bucketId, @Nonnull OmDirectoryInfo dirInfo,
+      @Nonnull long volumeId, @Nonnull long bucketId,
+      @Nonnull OmDirectoryInfo dirInfo,
       @Nonnull List<OmDirectoryInfo> pDirInfos, @Nonnull Result result,
       @Nonnull BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);

@@ -31,16 +31,16 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 
+import java.io.IOException;
+
 
 /**
  * Tests MKeyCreateResponse.
  */
 public class TestOMKeyCreateResponse extends TestOMKeyResponse {
 
-  private long volumeId = 1000;
-
-  protected long getVolumeId() {
-    return volumeId;
+  protected long getVolumeId() throws IOException {
+    return omMetadataManager.getVolumeId(volumeName);
   }
 
   @Test
@@ -112,7 +112,7 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
 
   @NotNull
   protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
-      OmBucketInfo bucketInfo, OMResponse response) {
+      OmBucketInfo bucketInfo, OMResponse response) throws IOException {
 
     return new OMKeyCreateResponse(response, keyInfo, null, clientID,
             bucketInfo);

@@ -46,9 +46,12 @@ public class OMKeyAclResponseWithFSO extends OMKeyAclResponse {
   public OMKeyAclResponseWithFSO(
       @NotNull OzoneManagerProtocolProtos.OMResponse omResponse,
       @NotNull OmKeyInfo omKeyInfo, boolean isDirectory,
-      @Nonnull BucketLayout bucketLayout, long volumeId, long bucketId) {
+      @Nonnull BucketLayout bucketLayout, @Nonnull long volumeId,
+      @Nonnull long bucketId) {
     super(omResponse, omKeyInfo, bucketLayout);
     this.isDirectory = isDirectory;
+    this.volumeId = volumeId;
+    this.bucketId = bucketId;
   }
 
   /**

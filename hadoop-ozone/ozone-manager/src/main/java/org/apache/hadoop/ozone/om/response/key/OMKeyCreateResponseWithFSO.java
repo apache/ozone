@@ -44,7 +44,7 @@ public class OMKeyCreateResponseWithFSO extends OMFileCreateResponseWithFSO {
       @Nonnull OmKeyInfo omKeyInfo,
       @Nonnull List<OmDirectoryInfo> parentDirInfos,
       long openKeySessionID, @Nonnull OmBucketInfo omBucketInfo,
-      long volumeId) {
+      @Nonnull long volumeId) {
     super(omResponse, omKeyInfo, parentDirInfos, openKeySessionID,
         omBucketInfo, volumeId);
   }

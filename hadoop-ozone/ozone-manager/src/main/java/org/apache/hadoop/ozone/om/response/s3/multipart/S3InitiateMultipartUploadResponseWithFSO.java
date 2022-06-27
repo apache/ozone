@@ -49,15 +49,19 @@ public class S3InitiateMultipartUploadResponseWithFSO extends
   private long volumeId;
   private long bucketId;
 
+  @SuppressWarnings("parameternumber")
   public S3InitiateMultipartUploadResponseWithFSO(
       @Nonnull OMResponse omResponse,
       @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
       @Nonnull OmKeyInfo omKeyInfo, @Nonnull String mpuDBKey,
       @Nonnull List<OmDirectoryInfo> parentDirInfos,
-      @Nonnull BucketLayout bucketLayout) {
+      @Nonnull BucketLayout bucketLayout, @Nonnull long volumeId,
+      @Nonnull long bucketId) {
     super(omResponse, omMultipartKeyInfo, omKeyInfo, bucketLayout);
     this.parentDirInfos = parentDirInfos;
     this.mpuDBKey = mpuDBKey;
+    this.volumeId = volumeId;
+    this.bucketId = bucketId;
   }
 
   /**

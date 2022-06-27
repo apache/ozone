@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.jetbrains.annotations.NotNull;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.util.List;
 
@@ -50,7 +51,7 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
       @NotNull OzoneManagerProtocolProtos.OMResponse omResponse,
       @NotNull List<OmKeyInfo> keyDeleteList,
       @NotNull List<OmKeyInfo> dirDeleteList, boolean isRatisEnabled,
-      @NotNull OmBucketInfo omBucketInfo, long volId) {
+      @NotNull OmBucketInfo omBucketInfo, @Nonnull long volId) {
     super(omResponse, keyDeleteList, isRatisEnabled, omBucketInfo);
     this.dirsList = dirDeleteList;
     this.volumeId = volId;

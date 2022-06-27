@@ -61,7 +61,7 @@ public class S3MultipartUploadCompleteResponseWithFSO
       @Nonnull List<OmKeyInfo> unUsedParts,
       @Nonnull BucketLayout bucketLayout,
       @Nonnull OmBucketInfo omBucketInfo,
-      RepeatedOmKeyInfo keysToDelete, long volumeId) {
+      RepeatedOmKeyInfo keysToDelete, @Nonnull long volumeId) {
     super(omResponse, multipartKey, multipartOpenKey, omKeyInfo, unUsedParts,
         bucketLayout, omBucketInfo, keysToDelete);
     this.volumeId = volumeId;
