@@ -78,6 +78,8 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     conf.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE,
+        true);
     startCluster(conf);
   }
 

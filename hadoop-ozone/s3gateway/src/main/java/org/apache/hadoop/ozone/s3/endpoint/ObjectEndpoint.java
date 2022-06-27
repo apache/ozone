@@ -53,8 +53,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -90,9 +91,14 @@ import org.apache.commons.io.IOUtils;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
@@ -132,6 +138,8 @@ public class ObjectEndpoint extends EndpointBase {
 
   private List<String> customizableGetHeaders = new ArrayList<>();
   private int bufferSize;
+  private int chunkSize;
+  private boolean datastreamEnabled;
 
   public ObjectEndpoint() {
     customizableGetHeaders.add("Content-Type");
@@ -150,6 +158,13 @@ public class ObjectEndpoint extends EndpointBase {
     bufferSize = (int) ozoneConfiguration.getStorageSize(
         OZONE_S3G_CLIENT_BUFFER_SIZE_KEY,
         OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT, StorageUnit.BYTES);
+    chunkSize = (int) ozoneConfiguration.getStorageSize(
+        OZONE_SCM_CHUNK_SIZE_KEY,
+        OZONE_SCM_CHUNK_SIZE_DEFAULT,
+        StorageUnit.BYTES);
+    datastreamEnabled = ozoneConfiguration.getBoolean(
+        DFS_CONTAINER_RATIS_DATASTREAM_ENABLE,
+        DFS_CONTAINER_RATIS_DATASTREAM_ENABLE_DEFAULT);
   }
 
   /**
@@ -185,11 +200,21 @@ public class ObjectEndpoint extends EndpointBase {
       storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
       boolean storageTypeDefault = StringUtils.isEmpty(storageType);
 
+      if (storageTypeDefault) {
+        storageType = S3StorageType.getDefault(ozoneConfiguration).toString();
+      }
+
       // Normal put object
       OzoneBucket bucket = getBucket(bucketName);
       ReplicationConfig replicationConfig =
           getReplicationConfig(bucket, storageType);
 
+      boolean enableEC = false;
+      if ((replicationConfig != null &&
+              replicationConfig.getReplicationType() == EC) ||
+          bucket.getReplicationConfig() instanceof ECReplicationConfig) {
+        enableEC = true;
+      }
       if (copyHeader != null) {
         //Copy object, as copy source available.
         s3GAction = S3GAction.COPY_OBJECT;
@@ -199,15 +224,20 @@ public class ObjectEndpoint extends EndpointBase {
             "Connection", "close").build();
       }
 
-      output =
-          bucket.createKey(keyPath, length, replicationConfig, new HashMap<>());
-
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
         body = new SignedChunksInputStream(body);
       }
 
-      IOUtils.copy(body, output);
+      if (datastreamEnabled && !enableEC) {
+        return ObjectEndpointStreaming
+            .put(bucket, keyPath, length, replicationConfig, chunkSize, body);
+      } else {
+        output =
+            bucket
+                .createKey(keyPath, length, replicationConfig, new HashMap<>());
+        IOUtils.copy(body, output);
+      }
 
       getMetrics().incCreateKeySuccess();
       return Response.ok().status(HttpStatus.SC_OK)
@@ -690,7 +720,6 @@ public class ObjectEndpoint extends EndpointBase {
       throws IOException, OS3Exception {
     try {
       OzoneBucket ozoneBucket = getBucket(bucket);
-      String copyHeader;
       OzoneOutputStream ozoneOutputStream = null;
 
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
@@ -698,10 +727,36 @@ public class ObjectEndpoint extends EndpointBase {
         body = new SignedChunksInputStream(body);
       }
 
+      String copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
+      String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
+      ReplicationConfig replicationConfig =
+          getReplicationConfig(ozoneBucket, storageType);
+
+      boolean enableEC = false;
+      if ((replicationConfig != null &&
+          replicationConfig.getReplicationType()  == EC) ||
+          ozoneBucket.getReplicationConfig() instanceof ECReplicationConfig) {
+        enableEC = true;
+      }
+
       try {
+        if (datastreamEnabled && !enableEC && copyHeader != null) {
+          Pair<String, String> result = parseSourceHeader(copyHeader);
+          String sourceBucket = result.getLeft();
+          String sourceKey = result.getRight();
+          OzoneBucket sourceOzoneBucket = getBucket(sourceBucket);
+          return ObjectEndpointStreaming
+              .copyMultipartKey(Pair.of(sourceOzoneBucket, sourceKey),
+                  Pair.of(ozoneBucket, key), length, partNumber, uploadID,
+                  chunkSize, headers);
+        } else if (datastreamEnabled && !enableEC) {
+          return ObjectEndpointStreaming
+              .createMultipartKey(ozoneBucket, key, length, partNumber,
+                  uploadID, chunkSize, body);
+        }
+
         ozoneOutputStream = ozoneBucket.createMultipartKey(
             key, length, partNumber, uploadID);
-        copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
         if (copyHeader != null) {
           Pair<String, String> result = parseSourceHeader(copyHeader);
 
@@ -734,6 +789,7 @@ public class ObjectEndpoint extends EndpointBase {
                     "Bytes to skip: "
                         + rangeHeader.getStartOffset() + " actual: " + skipped);
               }
+
               IOUtils.copyLarge(sourceObject, ozoneOutputStream, 0,
                   rangeHeader.getEndOffset() - rangeHeader.getStartOffset()
                       + 1);
@@ -881,7 +937,6 @@ public class ObjectEndpoint extends EndpointBase {
         }
       }
 
-
       OzoneBucket sourceOzoneBucket = getBucket(sourceBucket);
       OzoneBucket destOzoneBucket = destBucket;
 
@@ -890,15 +945,22 @@ public class ObjectEndpoint extends EndpointBase {
 
       sourceInputStream = sourceOzoneBucket.readKey(sourceKey);
 
-      destOutputStream = destOzoneBucket
-          .createKey(destkey, sourceKeyLen, replicationConfig, new HashMap<>());
+      if (datastreamEnabled) {
+        ObjectEndpointStreaming
+            .putKeyWithStream(destOzoneBucket, destkey, sourceKeyLen, chunkSize,
+                replicationConfig, new HashMap<>(), sourceInputStream);
+      } else {
+        destOutputStream = destOzoneBucket
+            .createKey(destkey, sourceKeyLen, replicationConfig,
+                new HashMap<>());
 
-      IOUtils.copy(sourceInputStream, destOutputStream);
+        IOUtils.copy(sourceInputStream, destOutputStream);
+        destOutputStream.close();
+      }
 
       // Closing here, as if we don't call close this key will not commit in
       // OM, and getKey fails.
       sourceInputStream.close();
-      destOutputStream.close();
       closed = true;
 
       OzoneKeyDetails destKeyDetails = destOzoneBucket.getKey(destkey);
@@ -991,7 +1053,8 @@ public class ObjectEndpoint extends EndpointBase {
     }
   }
 
-  private boolean checkCopySourceModificationTime(Long lastModificationTime,
+  public static boolean checkCopySourceModificationTime(
+      Long lastModificationTime,
       String copySourceIfModifiedSinceStr,
       String copySourceIfUnmodifiedSinceStr) {
     long copySourceIfModifiedSince = Long.MIN_VALUE;
@@ -1015,5 +1078,15 @@ public class ObjectEndpoint extends EndpointBase {
   @VisibleForTesting
   public void setOzoneConfiguration(OzoneConfiguration config) {
     this.ozoneConfiguration = config;
+  }
+
+  @VisibleForTesting
+  public boolean isDatastreamEnabled() {
+    return datastreamEnabled;
+  }
+
+  @VisibleForTesting
+  public void setDatastreamEnabled(boolean datastreamEnabled) {
+    this.datastreamEnabled = datastreamEnabled;
   }
 }

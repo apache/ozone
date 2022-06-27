@@ -99,6 +99,8 @@ public class TestContainerStateMachineStream {
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 30, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 1,
         TimeUnit.SECONDS);
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE,
+        true);
 
     RatisClientConfig ratisClientConfig =
         conf.getObject(RatisClientConfig.class);

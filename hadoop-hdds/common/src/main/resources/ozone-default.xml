@@ -55,7 +55,7 @@
   </property>
   <property>
     <name>dfs.container.ratis.datastream.enable</name>
-    <value>true</value>
+    <value>false</value>
     <tag>OZONE, CONTAINER, RATIS, DATASTREAM</tag>
     <description>If enable datastream ipc of container.</description>
   </property>

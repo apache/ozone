@@ -96,6 +96,8 @@ public class TestBlockDataStreamOutput {
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE,
+        true);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(7)
