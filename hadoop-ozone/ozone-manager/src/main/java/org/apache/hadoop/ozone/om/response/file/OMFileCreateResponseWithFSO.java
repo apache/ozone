@@ -90,7 +90,7 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
     }
 
     OMFileRequest.addToOpenFileTable(omMetadataMgr, batchOp, getOmKeyInfo(),
-            getOpenKeySessionID());
+        getOpenKeySessionID(), volumeId, getOmBucketInfo().getObjectID());
   }
 
   @Override

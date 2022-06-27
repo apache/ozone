@@ -546,15 +546,9 @@ public final class OMFileRequest {
    * @throws IOException DB failure
    */
   public static void addToOpenFileTable(OMMetadataManager omMetadataMgr,
-                                        BatchOperation batchOp,
-                                        OmKeyInfo omFileInfo,
-                                        long openKeySessionID)
-          throws IOException {
+      BatchOperation batchOp, OmKeyInfo omFileInfo, long openKeySessionID,
+      long volumeId, long bucketId) throws IOException {
 
-    final long volumeId = omMetadataMgr.getVolumeId(
-            omFileInfo.getVolumeName());
-    final long bucketId = omMetadataMgr.getBucketId(
-            omFileInfo.getVolumeName(), omFileInfo.getBucketName());
     String dbOpenFileKey = omMetadataMgr.getOpenFileName(volumeId, bucketId,
             omFileInfo.getParentObjectID(), omFileInfo.getFileName(),
             openKeySessionID);

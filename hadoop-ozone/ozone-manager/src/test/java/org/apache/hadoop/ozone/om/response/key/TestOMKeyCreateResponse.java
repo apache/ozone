@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
@@ -45,10 +44,6 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
 
   @Test
   public void testAddToDBBatch() throws Exception {
-
-    omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
 
     OmKeyInfo omKeyInfo = getOmKeyInfo();
 
@@ -77,10 +72,6 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
 
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
-
-    omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
 
     OmKeyInfo omKeyInfo = getOmKeyInfo();
 
