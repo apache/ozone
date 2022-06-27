@@ -451,9 +451,20 @@ public class ContainerBalancer extends StatefulService {
   private void processMoveSelection(DatanodeDetails source,
                                     ContainerMoveSelection moveSelection,
                                     Set<DatanodeDetails> selectedTargets) {
-    LOG.info("ContainerBalancer is trying to move container {} from " +
-            "source datanode {} to target datanode {}",
+    ContainerInfo containerInfo;
+    try {
+      containerInfo =
+          containerManager.getContainer(moveSelection.getContainerID());
+    } catch (ContainerNotFoundException e) {
+      LOG.warn("Could not get container {} from Container Manager before " +
+          "starting a container move", moveSelection.getContainerID(),
+          e);
+      return;
+    }
+    LOG.info("ContainerBalancer is trying to move container {} with size " +
+            "{}B from source datanode {} to target datanode {}",
         moveSelection.getContainerID().toString(),
+        containerInfo.getUsedBytes(),
         source.getUuidString(),
         moveSelection.getTargetNode().getUuidString());
 
@@ -839,20 +850,34 @@ public class ContainerBalancer extends StatefulService {
   @Override
   public void notifyStatusChanged() {
     if (!scmContext.isLeader() || scmContext.isInSafeMode()) {
-      if (isBalancerRunning()) {
+      boolean shouldStop = false;
+
+      // lock here to ensure no change is made to the balancing thread while
+      // we're reading it
+      lock.lock();
+      try {
+        shouldStop = isBalancerRunning();
+      } finally {
+        lock.unlock();
+      }
+
+      if (shouldStop) {
         LOG.info("Stopping ContainerBalancer in this scm on status change");
         stop();
       }
     } else {
-      if (shouldRun()) {
-        try {
+      lock.lock();
+      try {
+        if (shouldRun()) {
           LOG.info("Starting ContainerBalancer in this scm on status change");
           start();
-        } catch (IllegalContainerBalancerStateException |
-                InvalidContainerBalancerConfigurationException e) {
-          LOG.warn("Could not start ContainerBalancer on raft/safe-mode " +
-                  "status change.", e);
         }
+      } catch (IllegalContainerBalancerStateException |
+          InvalidContainerBalancerConfigurationException e) {
+        LOG.warn("Could not start ContainerBalancer on raft/safe-mode " +
+            "status change.", e);
+      } finally {
+        lock.unlock();
       }
     }
   }
