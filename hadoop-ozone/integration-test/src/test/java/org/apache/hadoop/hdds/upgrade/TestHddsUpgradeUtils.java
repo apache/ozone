@@ -66,7 +66,7 @@ public final class TestHddsUpgradeUtils {
       ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.THREE);
 
-  public static void waitForFinalization(
+  public static void waitForFinalizationFromClient(
       StorageContainerLocationProtocol scmClient, String clientID)
       throws Exception {
     LambdaTestUtils.await(60_000, 1_000, () -> {

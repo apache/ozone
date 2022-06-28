@@ -291,7 +291,7 @@ public class TestHDDSUpgrade {
     Assert.assertEquals(STARTING_FINALIZATION, status.status());
 
     // Wait for the Finalization to complete on the SCM.
-    TestHddsUpgradeUtils.waitForFinalization(
+    TestHddsUpgradeUtils.waitForFinalizationFromClient(
         cluster.getStorageContainerLocationClient(), "xyz");
 
     Set<PipelineID> postUpgradeOpenPipelines =

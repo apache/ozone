@@ -45,6 +45,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -173,9 +174,9 @@ public class TestScmHAFinalization {
     // Client should complete exceptionally since the original SCM it
     // requested to was restarted.
     finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalization(scmClient, CLIENT_ID);
-    // Make sure old leader has caught up after the restart.
-    waitForScmToFinalize(oldLeaderScmRestarted);
+    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    // Make sure old leader has caught up and all SCMs have finalized.
+    waitForScmsToFinalize(cluster.getStorageContainerManagersList());
 
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
@@ -218,13 +219,10 @@ public class TestScmHAFinalization {
     cluster.waitForClusterToBeReady();
 
     finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalization(scmClient, CLIENT_ID);
-    // Once the leader says finalization is complete, wait for all followers
-    // to catch up so we can check their state.
-    for (StorageContainerManager scm:
-        cluster.getStorageContainerManagersList()) {
-      waitForScmToFinalize(scm);
-    }
+    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    // Once the leader tells the client finalization is complete, wait for all
+    // followers to catch up so we can check their state.
+    waitForScmsToFinalize(cluster.getStorageContainerManagersList());
 
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
@@ -259,9 +257,11 @@ public class TestScmHAFinalization {
       }
     }
 
-    // Wait for finalization on the two active SCMs.
+    // Wait for finalization from the client perspective.
     finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalization(scmClient, CLIENT_ID);
+    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    // Wait for two running SCMs to finish finalization.
+    waitForScmsToFinalize(activeScms);
 
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         activeScms, 0, NUM_DATANODES);
@@ -287,6 +287,13 @@ public class TestScmHAFinalization {
     // Use log to verify a snapshot was installed.
     Assertions.assertTrue(logCapture.getOutput().contains("New SCM snapshot " +
         "received with metadata layout version"));
+  }
+
+  private void waitForScmsToFinalize(Collection<StorageContainerManager> scms)
+      throws Exception {
+    for (StorageContainerManager scm: scms) {
+      waitForScmToFinalize(scm);
+    }
   }
 
   private void waitForScmToFinalize(StorageContainerManager scm)
