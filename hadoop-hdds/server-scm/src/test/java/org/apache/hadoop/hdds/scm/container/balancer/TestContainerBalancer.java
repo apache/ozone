@@ -747,10 +747,13 @@ public class TestContainerBalancer {
     CompletableFuture<MoveResult> future
         = CompletableFuture.supplyAsync(() ->
         MoveResult.REPLICATION_FAIL_TIME_OUT);
+    CompletableFuture<MoveResult> future2
+        = CompletableFuture.supplyAsync(() ->
+        MoveResult.DELETION_FAIL_TIME_OUT);
     Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
             Mockito.any(DatanodeDetails.class),
             Mockito.any(DatanodeDetails.class)))
-        .thenReturn(future);
+        .thenReturn(future, future2);
 
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setIterations(1);
@@ -765,7 +768,6 @@ public class TestContainerBalancer {
     Assertions.assertTrue(containerBalancer.getMetrics()
         .getNumContainerMovesTimeoutInLatestIteration() > 0);
     stopBalancer();
-
   }
 
   /**

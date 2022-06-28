@@ -133,6 +133,7 @@ public final class ContainerBalancerMetrics {
       this.numContainerMovesCompletedInLatestIteration.incr(valueToAdd);
       break;
     case REPLICATION_FAIL_TIME_OUT:
+    case DELETION_FAIL_TIME_OUT:
       this.numContainerMovesTimeoutInLatestIteration.incr(valueToAdd);
       break;
     // TODO: Add metrics for other errors that need to be tracked.
@@ -146,7 +147,6 @@ public final class ContainerBalancerMetrics {
     case REPLICATION_FAIL_NODE_NOT_IN_SERVICE:
     case DELETION_FAIL_NODE_NOT_IN_SERVICE:
     case REPLICATION_FAIL_NODE_UNHEALTHY:
-    case DELETION_FAIL_TIME_OUT:
     case DELETION_FAIL_NODE_UNHEALTHY:
     case DELETE_FAIL_POLICY:
     case PLACEMENT_POLICY_NOT_SATISFIED:
