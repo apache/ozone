@@ -167,7 +167,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.datanode.volume.reserved</name>
+    <name>hdds.datanode.dir.du.reserved.percent</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
     <description>Percentage of volume that should be reserved. This space is left free for other usage.

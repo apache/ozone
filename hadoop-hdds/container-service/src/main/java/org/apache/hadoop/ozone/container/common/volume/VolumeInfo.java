@@ -33,7 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_VOLUME_RESERVED;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT;
 
 /**
  * Stores information about a disk/volume.
@@ -135,45 +136,45 @@ public final class VolumeInfo {
   }
 
   private long getReserved(ConfigurationSource conf) {
-    final float defaultValue = Float.MAX_VALUE;
-    float percentage = conf.getFloat(HDDS_DATANODE_VOLUME_RESERVED,
-        defaultValue);
-    Collection<String> reserveList = conf.getTrimmedStringCollection(
-        HDDS_DATANODE_DIR_DU_RESERVED);
-    //Both the configs are set. Log it and return 0
-    if (reserveList.size() > 0 && percentage != defaultValue) {
+    if (conf.isConfigured(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT)
+        && conf.isConfigured(HDDS_DATANODE_DIR_DU_RESERVED)) {
       LOG.error("Both {} and {} are set. Set either one, not both. " +
-          "Setting reserved to 0.", HDDS_DATANODE_VOLUME_RESERVED,
+          "Setting reserved to 0.", HDDS_DATANODE_DIR_DU_RESERVED_PERCENT,
           HDDS_DATANODE_DIR_DU_RESERVED);
       return 0;
     }
 
-    if (reserveList.size() > 0) {
-      for (String reserve : reserveList) {
-        String[] words = reserve.split(":");
-        if (words.length < 2) {
-          LOG.error("Reserved space should config in pair, but current is {}",
-              reserve);
-          continue;
-        }
-
-        if (words[0].trim().equals(rootDir)) {
-          try {
-            StorageSize size = StorageSize.parse(words[1].trim());
-            return (long) size.getUnit().toBytes(size.getValue());
-          } catch (Exception e) {
-            LOG.error("Failed to parse StorageSize:{}", words[1].trim(), e);
-            return 0;
-          }
-        }
-      }
-    } else if (percentage != defaultValue) {
+    if (conf.isConfigured(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT)) {
+      float percentage = conf.getFloat(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT,
+          HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
       if (0 <= percentage && percentage <= 1) {
         return (long) Math.ceil(this.usage.getCapacity() * percentage);
       }
       //If it comes here then the percentage is not between 0-1.
       LOG.error("The value of {} should be between 0 to 1. Defaulting to 0.",
-          HDDS_DATANODE_VOLUME_RESERVED);
+          HDDS_DATANODE_DIR_DU_RESERVED_PERCENT);
+      return 0;
+    }
+
+    Collection<String> reserveList = conf.getTrimmedStringCollection(
+        HDDS_DATANODE_DIR_DU_RESERVED);
+    for (String reserve : reserveList) {
+      String[] words = reserve.split(":");
+      if (words.length < 2) {
+        LOG.error("Reserved space should config in pair, but current is {}",
+            reserve);
+        continue;
+      }
+
+      if (words[0].trim().equals(rootDir)) {
+        try {
+          StorageSize size = StorageSize.parse(words[1].trim());
+          return (long) size.getUnit().toBytes(size.getValue());
+        } catch (Exception e) {
+          LOG.error("Failed to parse StorageSize:{}", words[1].trim(), e);
+          return 0;
+        }
+      }
     }
 
     return 0;

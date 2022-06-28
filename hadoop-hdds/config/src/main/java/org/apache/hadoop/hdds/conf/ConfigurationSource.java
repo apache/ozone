@@ -144,6 +144,18 @@ public interface ConfigurationSource {
   }
 
   /**
+   * Checks if the property <value> is set.
+   * @param key The property name.
+   * @return true if the value is set else false.
+   */
+  default boolean isConfigured(String key) {
+    String configValue = get(key);
+    if (configValue != null) {
+      return true;
+    }
+    return false;
+  }
+  /**
    * Create a Configuration object and inject the required configuration values.
    *
    * @param configurationClass The class where the fields are annotated with

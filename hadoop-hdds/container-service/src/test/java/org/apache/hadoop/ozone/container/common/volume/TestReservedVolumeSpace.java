@@ -29,7 +29,8 @@ import org.junit.rules.TemporaryFolder;
 
 import java.util.UUID;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_VOLUME_RESERVED;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT;
 
 /**
  * To test the reserved volume space.
@@ -55,10 +56,11 @@ public class TestReservedVolumeSpace {
   @Test
   public void testVolumeCapacityAfterReserve() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HDDS_DATANODE_VOLUME_RESERVED, "0.3");
+    conf.set(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT, "0.3");
     HddsVolume hddsVolume = volumeBuilder.conf(conf).build();
     //Reserving
-    float percentage = conf.getFloat(HDDS_DATANODE_VOLUME_RESERVED, -1);
+    float percentage = conf.getFloat(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT,
+        HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
 
     long volumeCapacity = hddsVolume.getCapacity();
     //Gets the actual total capacity
@@ -83,7 +85,7 @@ public class TestReservedVolumeSpace {
   @Test
   public void testReservedToZeroWhenBothConfigSet() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HDDS_DATANODE_VOLUME_RESERVED, "0.3");
+    conf.set(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT, "0.3");
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
         folder.getRoot() + ":500B");
     HddsVolume hddsVolume = volumeBuilder.conf(conf).build();
