@@ -617,13 +617,14 @@ public class TestLegacyNSSummaryEndpoint {
   private void populateOMDB() throws Exception {
     // write all 4 directories
 
-/*    Christos fix these:
     writeKeyToOm(reconOMMetadataManager,
         (DIR_ONE + OM_KEY_PREFIX),
         BUCKET_ONE,
         VOL,
         DIR_ONE,
         DIR_ONE_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
@@ -632,6 +633,8 @@ public class TestLegacyNSSummaryEndpoint {
         VOL,
         DIR_TWO,
         DIR_TWO_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
         DIR_ONE_OBJECT_ID,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
@@ -640,6 +643,8 @@ public class TestLegacyNSSummaryEndpoint {
         VOL,
         DIR_THREE,
         DIR_THREE_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
         DIR_ONE_OBJECT_ID,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
@@ -648,9 +653,11 @@ public class TestLegacyNSSummaryEndpoint {
         VOL,
         DIR_FOUR,
         DIR_FOUR_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
         DIR_ONE_OBJECT_ID,
         getBucketLayout());
-*/
+
     // write all 6 keys
     writeKeyToOm(reconOMMetadataManager,
             KEY_ONE,
@@ -851,10 +858,11 @@ public class TestLegacyNSSummaryEndpoint {
     OmKeyLocationInfoGroup locationInfoGroup =
         new OmKeyLocationInfoGroup(0L, locationInfoList);
 
-/*    Christos fix these:
     if (entityType.equals(EntityType.ROOT) ||
         entityType.equals(EntityType.VOLUME)) {
       writeKeyToOm(reconOMMetadataManager,
+          VOL_OBJECT_ID,
+          BUCKET_TWO_OBJECT_ID,
           BUCKET_TWO_OBJECT_ID,
           KEY_FOUR_OBJECT_ID,
           VOL, BUCKET_TWO,
@@ -864,6 +872,8 @@ public class TestLegacyNSSummaryEndpoint {
           getBucketLayout());
 
       writeKeyToOm(reconOMMetadataManager,
+          VOL_OBJECT_ID,
+          BUCKET_TWO_OBJECT_ID,
           BUCKET_TWO_OBJECT_ID,
           KEY_FIVE_OBJECT_ID,
           VOL, BUCKET_TWO,
@@ -873,6 +883,8 @@ public class TestLegacyNSSummaryEndpoint {
           getBucketLayout());
 
       writeKeyToOm(reconOMMetadataManager,
+          VOL_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
           BUCKET_ONE_OBJECT_ID,
           KEY_ONE_OBJECT_ID,
           VOL, BUCKET_ONE,
@@ -884,6 +896,8 @@ public class TestLegacyNSSummaryEndpoint {
 
     if (entityType.equals(EntityType.BUCKET)) {
       writeKeyToOm(reconOMMetadataManager,
+          VOL_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
           BUCKET_ONE_OBJECT_ID,
           KEY_ONE_OBJECT_ID,
           VOL, BUCKET_ONE,
@@ -895,6 +909,8 @@ public class TestLegacyNSSummaryEndpoint {
 
     // add the keys to Recon's OM
     writeKeyToOm(reconOMMetadataManager,
+        VOL_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
         DIR_TWO_OBJECT_ID,
         KEY_TWO_OBJECT_ID,
         VOL, BUCKET_ONE,
@@ -904,6 +920,8 @@ public class TestLegacyNSSummaryEndpoint {
         getBucketLayout());
 
     writeKeyToOm(reconOMMetadataManager,
+        VOL_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
         DIR_THREE_OBJECT_ID,
         KEY_THREE_OBJECT_ID,
         VOL, BUCKET_ONE,
@@ -913,6 +931,8 @@ public class TestLegacyNSSummaryEndpoint {
         getBucketLayout());
 
     writeKeyToOm(reconOMMetadataManager,
+        VOL_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
         DIR_FOUR_OBJECT_ID,
         KEY_SIX_OBJECT_ID,
         VOL, BUCKET_ONE,
@@ -922,6 +942,8 @@ public class TestLegacyNSSummaryEndpoint {
         getBucketLayout());
 
     writeKeyToOm(reconOMMetadataManager,
+        VOL_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
         DIR_ONE_OBJECT_ID,
         KEY_SEVEN_OBJECT_ID,
         VOL, BUCKET_ONE,
@@ -929,7 +951,6 @@ public class TestLegacyNSSummaryEndpoint {
         FILE_SEVEN,
         Collections.singletonList(locationInfoGroup),
         getBucketLayout());
-*/
   }
 
   /**

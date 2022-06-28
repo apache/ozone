@@ -827,10 +827,11 @@ public class TestFSONSSummaryEndpoint {
     OmKeyLocationInfoGroup locationInfoGroup =
         new OmKeyLocationInfoGroup(0L, locationInfoList);
 
-/*    Christos fix these:
     if (entityType.equals(EntityType.ROOT) ||
         entityType.equals(EntityType.VOLUME)) {
       writeKeyToOm(reconOMMetadataManager,
+          VOL_OBJECT_ID,
+          BUCKET_TWO_OBJECT_ID,
           BUCKET_TWO_OBJECT_ID,
           KEY_FOUR_OBJECT_ID,
           VOL, BUCKET_TWO,
@@ -840,6 +841,8 @@ public class TestFSONSSummaryEndpoint {
           getBucketLayout());
 
       writeKeyToOm(reconOMMetadataManager,
+          VOL_OBJECT_ID,
+          BUCKET_TWO_OBJECT_ID,
           BUCKET_TWO_OBJECT_ID,
           KEY_FIVE_OBJECT_ID,
           VOL, BUCKET_TWO,
@@ -849,6 +852,8 @@ public class TestFSONSSummaryEndpoint {
           getBucketLayout());
 
       writeKeyToOm(reconOMMetadataManager,
+          VOL_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
           BUCKET_ONE_OBJECT_ID,
           KEY_ONE_OBJECT_ID,
           VOL, BUCKET_ONE,
@@ -860,6 +865,8 @@ public class TestFSONSSummaryEndpoint {
 
     if (entityType.equals(EntityType.BUCKET)) {
       writeKeyToOm(reconOMMetadataManager,
+          VOL_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
           BUCKET_ONE_OBJECT_ID,
           KEY_ONE_OBJECT_ID,
           VOL, BUCKET_ONE,
@@ -871,6 +878,8 @@ public class TestFSONSSummaryEndpoint {
 
     // add the keys to Recon's OM
     writeKeyToOm(reconOMMetadataManager,
+        VOL_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
         DIR_TWO_OBJECT_ID,
         KEY_TWO_OBJECT_ID,
         VOL, BUCKET_ONE,
@@ -880,6 +889,8 @@ public class TestFSONSSummaryEndpoint {
         getBucketLayout());
 
     writeKeyToOm(reconOMMetadataManager,
+        VOL_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
         DIR_THREE_OBJECT_ID,
         KEY_THREE_OBJECT_ID,
         VOL, BUCKET_ONE,
@@ -889,6 +900,8 @@ public class TestFSONSSummaryEndpoint {
         getBucketLayout());
 
     writeKeyToOm(reconOMMetadataManager,
+        VOL_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
         DIR_FOUR_OBJECT_ID,
         KEY_SIX_OBJECT_ID,
         VOL, BUCKET_ONE,
@@ -898,6 +911,8 @@ public class TestFSONSSummaryEndpoint {
         getBucketLayout());
 
     writeKeyToOm(reconOMMetadataManager,
+        VOL_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
         DIR_ONE_OBJECT_ID,
         KEY_SEVEN_OBJECT_ID,
         VOL, BUCKET_ONE,
@@ -905,7 +920,6 @@ public class TestFSONSSummaryEndpoint {
         FILE_SEVEN,
         Collections.singletonList(locationInfoGroup),
         getBucketLayout());
-*/
   }
 
   /**
