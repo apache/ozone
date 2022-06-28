@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.container;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -71,15 +72,24 @@ public class ECContainerReplicaCount {
   private final Set<ContainerReplica> replicas;
 
   public ECContainerReplicaCount(ContainerInfo containerInfo,
-      Set<ContainerReplica> replicas, List<Integer> indexesPendingAdd,
-      List<Integer> indexesPendingDelete, int remainingMaintenanceRedundancy) {
+      Set<ContainerReplica> replicas,
+      List<ContainerReplicaOp> replicaPendingOps,
+      int remainingMaintenanceRedundancy) {
     this.containerInfo = containerInfo;
     this.replicas = replicas;
     this.repConfig = (ECReplicationConfig)containerInfo.getReplicationConfig();
-    this.pendingAdd = indexesPendingAdd;
-    this.pendingDelete = indexesPendingDelete;
+    this.pendingAdd = new ArrayList<>();
+    this.pendingDelete = new ArrayList<>();
     this.remainingMaintenanceRedundancy
         = Math.min(repConfig.getParity(), remainingMaintenanceRedundancy);
+
+    for (ContainerReplicaOp op : replicaPendingOps) {
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+        pendingAdd.add(op.getReplicaIndex());
+      } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+        pendingDelete.add(op.getReplicaIndex());
+      }
+    }
 
     for (ContainerReplica replica : replicas) {
       HddsProtos.NodeOperationalState state =
@@ -100,7 +110,7 @@ public class ECContainerReplicaCount {
     // Remove the pending delete replicas from the healthy set as we assume they
     // will eventually be removed and reduce the count for this replica. If the
     // count goes to zero, remove it from the map.
-    for (Integer i : indexesPendingDelete) {
+    for (Integer i : pendingDelete) {
       ensureIndexWithinBounds(i, "pendingDelete");
       Integer count = healthyIndexes.get(i);
       if (count != null) {

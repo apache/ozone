@@ -50,16 +50,17 @@ import java.util.stream.Collectors;
  * Handles the EC Under replication processing and forming the respective SCM
  * commands.
  */
-public class ECUnderReplicationCommandCreator
-    implements ReplicationCommandCreator {
+public class ECUnderReplicationHandler implements UnderReplicationHandler {
 
   public static final Logger LOG =
-      LoggerFactory.getLogger(ECUnderReplicationCommandCreator.class);
+      LoggerFactory.getLogger(ECUnderReplicationHandler.class);
+  private final ECContainerHealthCheck ecContainerHealthCheck =
+      new ECContainerHealthCheck();
   private final PlacementPolicy containerPlacement;
   private final long currentContainerSize;
   private final NodeManager nodeManager;
 
-  public ECUnderReplicationCommandCreator(
+  public ECUnderReplicationHandler(
       final PlacementPolicy containerPlacement, final ConfigurationSource conf,
       NodeManager nodeManager) {
     this.containerPlacement = containerPlacement;
@@ -92,20 +93,24 @@ public class ECUnderReplicationCommandCreator
     ContainerInfo container = result.getContainerInfo();
     ECReplicationConfig repConfig =
         (ECReplicationConfig) container.getReplicationConfig();
-
+    List<ContainerReplicaOp> pendingOpsForContainer =
+        pendingOps.getPendingOps(container.containerID());
     final ECContainerReplicaCount replicaCount =
-        new ECContainerReplicaCount(container, replicas,
-            pendingOps.getPendingOps(container.containerID()),
+        new ECContainerReplicaCount(container, replicas, pendingOpsForContainer,
             remainingMaintenanceRedundancy);
-    ContainerHealthResult containerHealthResult =
-        new ECContainerHealthCheck().checkHealth(container, replicaCount);
+
+    ContainerHealthResult.UnderReplicatedHealthResult containerHealthResult =
+        (ContainerHealthResult.UnderReplicatedHealthResult)
+            ecContainerHealthCheck
+            .checkHealth(container, replicas, pendingOpsForContainer,
+                remainingMaintenanceRedundancy);
 
     LOG.debug("Handling under-replicated EC container: {}", container);
-
-    if (containerHealthResult.getHealthState()
-        != ContainerHealthResult.HealthState.UNDER_REPLICATED) {
-      LOG.info(
-          "The container {} with replicas {} is sufficiently replicated",
+    if (containerHealthResult
+        .isSufficientlyReplicatedAfterPending() || containerHealthResult
+        .getHealthState() != ContainerHealthResult.HealthState
+        .UNDER_REPLICATED) {
+      LOG.info("The container {} with replicas {} is sufficiently replicated",
           container.getContainerID(), replicaCount.getReplicas());
       // Assert replicaCount also telling it's sufficiently replicated.
       return null;
@@ -113,8 +118,6 @@ public class ECUnderReplicationCommandCreator
     final ContainerID id = container.containerID();
     try {
      // State is UNDER_REPLICATED
-      List<ContainerReplicaOp> pendingOpsForContainer =
-          pendingOps.getPendingOps(id);
       final List<DatanodeDetails> deletionInFlight = new ArrayList<>();
       for (ContainerReplicaOp op : pendingOpsForContainer) {
         if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
@@ -139,7 +142,7 @@ public class ECUnderReplicationCommandCreator
         LOG.debug("Missing indexes detected for the container {}." +
                 " The missing indexes are {}", id, missingIndexes);
         // We have source nodes.
-        if (sources.size() > 0) {
+        if (sources.size() >= repConfig.getData()) {
           final List<DatanodeDetails> selectedDatanodes =
               getTargetDatanodes(replicas, container, missingIndexes.size());
 
@@ -162,9 +165,11 @@ public class ECUnderReplicationCommandCreator
           return ImmutableMap.of(selectedDatanodes.get(0),
               reconstructionCommand);
         } else {
-          LOG.warn("Cannot proceed for EC container reconstruction for {},"
-              + " not enough healthy replicas found. Available source"
-              + " replicas are: {}", container.containerID(), sources);
+          LOG.warn("Cannot proceed for EC container reconstruction for {}, due"
+              + "to insufficient source replicas found. Number of source "
+              + "replicas needed: {}. Number of available source replicas are:"
+              + "  {}. Available sources are: {}", container.containerID(),
+              repConfig.getData(), sources.size(), sources);
         }
       } else if (result instanceof ContainerHealthResult
           .UnderReplicatedHealthResult && ((ContainerHealthResult

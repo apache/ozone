@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.states;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -28,14 +29,18 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ECContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.ozone.common.MonotonicClock;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
@@ -95,14 +100,11 @@ public class TestECContainerReplicaCount {
         registerNodes(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5));
-    ContainerReplicaPendingOps pendingOps =
-        new ContainerReplicaPendingOps(new OzoneConfiguration(),
-            new MonotonicClock(ZoneOffset.UTC));
-    pendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 1);
+
+    List<ContainerReplicaOp> pending =
+        getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1));
     ECContainerReplicaCount rcnt =
-        new ECContainerReplicaCount(container, replica,
-            pendingOps.getPendingOps(container.containerID()), 1);
+        new ECContainerReplicaCount(container, replica, pending, 1);
     Assertions.assertFalse(rcnt.isSufficientlyReplicated(false));
     Assertions.assertEquals(1, rcnt.unavailableIndexes(true).size());
     Assertions.assertEquals(1,
@@ -116,16 +118,11 @@ public class TestECContainerReplicaCount {
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5), Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 2));
-    ContainerReplicaPendingOps pendingOps =
-        new ContainerReplicaPendingOps(new OzoneConfiguration(),
-            new MonotonicClock(ZoneOffset.UTC));
-    pendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 1);
-    pendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 2);
+    List<ContainerReplicaOp> pending =
+        getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1, 2));
+
     ECContainerReplicaCount rcnt =
-        new ECContainerReplicaCount(container, replica,
-            pendingOps.getPendingOps(container.containerID()), 1);
+        new ECContainerReplicaCount(container, replica, pending, 1);
     Assertions.assertTrue(rcnt.isSufficientlyReplicated(false));
     Assertions.assertFalse(rcnt.isOverReplicated(true));
   }
@@ -137,18 +134,11 @@ public class TestECContainerReplicaCount {
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5), Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 2));
-    ContainerReplicaPendingOps pendingOps =
-        new ContainerReplicaPendingOps(new OzoneConfiguration(),
-            new MonotonicClock(ZoneOffset.UTC));
-    pendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 1);
-    pendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 2);
-    pendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 2);
+
+    List<ContainerReplicaOp> pending =
+        getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1, 2, 2));
     ECContainerReplicaCount rcnt =
-        new ECContainerReplicaCount(container, replica,
-            pendingOps.getPendingOps(container.containerID()), 1);
+        new ECContainerReplicaCount(container, replica, pending, 1);
     Assertions.assertFalse(rcnt.isSufficientlyReplicated(false));
     Assertions.assertEquals(1, rcnt.unavailableIndexes(true).size());
     Assertions.assertEquals(2,
@@ -185,15 +175,12 @@ public class TestECContainerReplicaCount {
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5), Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 2));
-    ContainerReplicaPendingOps pendingOps =
-        new ContainerReplicaPendingOps(new OzoneConfiguration(),
-            new MonotonicClock(ZoneOffset.UTC));
-    pendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 1);
+
+    List<ContainerReplicaOp> pending =
+        getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1));
 
     ECContainerReplicaCount rcnt =
-        new ECContainerReplicaCount(container, replica,
-            pendingOps.getPendingOps(container.containerID()), 1);
+        new ECContainerReplicaCount(container, replica, pending, 1);
     Assertions.assertTrue(rcnt.isSufficientlyReplicated(false));
     Assertions.assertTrue(rcnt.isOverReplicated(true));
     Assertions.assertEquals(2,
@@ -210,17 +197,15 @@ public class TestECContainerReplicaCount {
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5), Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 2));
-    ContainerReplicaPendingOps pendingOps =
-        new ContainerReplicaPendingOps(new OzoneConfiguration(),
-            new MonotonicClock(ZoneOffset.UTC));
-    pendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 1);
-    pendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 2);
+
+    List<ContainerReplicaOp> pending =
+        getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1));
+    pending.add(ContainerReplicaOp
+        .create(ContainerReplicaOp.PendingOpType.DELETE,
+            MockDatanodeDetails.randomDatanodeDetails(), 2));
 
     ECContainerReplicaCount rcnt =
-        new ECContainerReplicaCount(container, replica,
-            pendingOps.getPendingOps(container.containerID()), 1);
+        new ECContainerReplicaCount(container, replica, pending, 1);
     Assertions.assertTrue(rcnt.isSufficientlyReplicated(false));
     Assertions.assertFalse(rcnt.isOverReplicated(true));
     Assertions.assertEquals(0, rcnt.overReplicatedIndexes(true).size());
@@ -235,14 +220,11 @@ public class TestECContainerReplicaCount {
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5), Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 2));
-    ContainerReplicaPendingOps pendingOps =
-        new ContainerReplicaPendingOps(new OzoneConfiguration(),
-            new MonotonicClock(ZoneOffset.UTC));
-    pendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 1);
+    List<ContainerReplicaOp> pending =
+        getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1));
+
     ECContainerReplicaCount rcnt =
-        new ECContainerReplicaCount(container, replica,
-            pendingOps.getPendingOps(container.containerID()), 1);
+        new ECContainerReplicaCount(container, replica, pending, 1);
     Assertions.assertFalse(rcnt.isSufficientlyReplicated(false));
     Assertions.assertTrue(rcnt.isOverReplicated(true));
     Assertions.assertEquals(2,
@@ -302,14 +284,12 @@ public class TestECContainerReplicaCount {
         registerNodes(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_MAINTENANCE, 5), Pair.of(IN_MAINTENANCE, 1));
-    ContainerReplicaPendingOps pendingOps =
-        new ContainerReplicaPendingOps(new OzoneConfiguration(),
-            new MonotonicClock(ZoneOffset.UTC));
-    pendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 1);
+    List<ContainerReplicaOp> pending =
+        getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1));
+
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, replica,
-            pendingOps.getPendingOps(container.containerID()), 1);
+            pending, 1);
     Assertions.assertFalse(rcnt.isSufficientlyReplicated(false));
     Assertions.assertFalse(rcnt.isOverReplicated(true));
     Assertions.assertEquals(1, rcnt.additionalMaintenanceCopiesNeeded());
@@ -402,17 +382,11 @@ public class TestECContainerReplicaCount {
         registerNodes(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3));
 
-    ContainerReplicaPendingOps pendingOps =
-        new ContainerReplicaPendingOps(new OzoneConfiguration(),
-            new MonotonicClock(ZoneOffset.UTC));
-    pendingOps.scheduleAddReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 4);
-    pendingOps.scheduleAddReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 5);
+    List<ContainerReplicaOp> pending =
+        getContainerReplicaOps(ImmutableList.of(4, 5), ImmutableList.of());
 
     ECContainerReplicaCount rcnt =
-        new ECContainerReplicaCount(container, replica,
-            pendingOps.getPendingOps(container.containerID()), 1);
+        new ECContainerReplicaCount(container, replica, pending, 1);
     Assertions.assertFalse(rcnt.isSufficientlyReplicated(false));
     Assertions.assertTrue(rcnt.isSufficientlyReplicated(true));
     Assertions.assertFalse(rcnt.isOverReplicated(true));
@@ -432,15 +406,11 @@ public class TestECContainerReplicaCount {
         registerNodes(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_MAINTENANCE, 4));
 
-    ContainerReplicaPendingOps pendingOps =
-        new ContainerReplicaPendingOps(new OzoneConfiguration(),
-            new MonotonicClock(ZoneOffset.UTC));
-    pendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 1);
+    List<ContainerReplicaOp> pending =
+        getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1));
 
     ECContainerReplicaCount rcnt =
-        new ECContainerReplicaCount(container, replica,
-            pendingOps.getPendingOps(container.containerID()), 1);
+        new ECContainerReplicaCount(container, replica, pending, 1);
     Assertions.assertFalse(rcnt.isSufficientlyReplicated(false));
     Assertions.assertFalse(rcnt.isOverReplicated(true));
 
@@ -456,15 +426,11 @@ public class TestECContainerReplicaCount {
             Pair.of(IN_MAINTENANCE, 3), Pair.of(IN_MAINTENANCE, 4),
             Pair.of(IN_MAINTENANCE, 5));
 
-    ContainerReplicaPendingOps pendingOps =
-        new ContainerReplicaPendingOps(new OzoneConfiguration(),
-            new MonotonicClock(ZoneOffset.UTC));
-    pendingOps.scheduleAddReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 1);
+    List<ContainerReplicaOp> pending =
+        getContainerReplicaOps(ImmutableList.of(1), ImmutableList.of());
 
     ECContainerReplicaCount rcnt =
-        new ECContainerReplicaCount(container, replica,
-            pendingOps.getPendingOps(container.containerID()), 1);
+        new ECContainerReplicaCount(container, replica, pending, 1);
     Assertions.assertFalse(rcnt.isSufficientlyReplicated(false));
     Assertions.assertFalse(rcnt.isOverReplicated(true));
 
@@ -478,19 +444,33 @@ public class TestECContainerReplicaCount {
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
 
     // 5 is missing, but there is a pending add.
-    ContainerReplicaPendingOps pendingOps =
-        new ContainerReplicaPendingOps(new OzoneConfiguration(),
-            new MonotonicClock(ZoneOffset.UTC));
-    pendingOps.scheduleAddReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 5);
+    List<ContainerReplicaOp> pending =
+        getContainerReplicaOps(ImmutableList.of(5), ImmutableList.of());
 
     ECContainerReplicaCount rcnt =
-        new ECContainerReplicaCount(container, replica,
-            pendingOps.getPendingOps(container.containerID()), 1);
+        new ECContainerReplicaCount(container, replica, pending, 1);
     Assertions.assertFalse(rcnt.isSufficientlyReplicated(false));
     Assertions.assertFalse(rcnt.isOverReplicated(true));
 
     Assertions.assertEquals(0, rcnt.unavailableIndexes(true).size());
+  }
+
+  @NotNull
+  private List<ContainerReplicaOp> getContainerReplicaOps(
+      List<Integer> addIndexes, List<Integer> deleteIndexes) {
+    List<ContainerReplicaOp> pending = new ArrayList<>();
+    for (Integer addIndex : addIndexes) {
+      pending.add(ContainerReplicaOp
+          .create(ContainerReplicaOp.PendingOpType.ADD,
+              MockDatanodeDetails.randomDatanodeDetails(), addIndex));
+    }
+
+    for (Integer deleteIndex : deleteIndexes) {
+      pending.add(ContainerReplicaOp
+          .create(ContainerReplicaOp.PendingOpType.DELETE,
+              MockDatanodeDetails.randomDatanodeDetails(), deleteIndex));
+    }
+    return pending;
   }
 
   @Test

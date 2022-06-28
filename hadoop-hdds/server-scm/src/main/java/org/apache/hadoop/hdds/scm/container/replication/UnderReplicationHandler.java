@@ -28,7 +28,7 @@ import java.util.Set;
  * This interface to create respective commands after processing the replicas
  * with pending ops and health check results.
  */
-public interface ReplicationCommandCreator {
+public interface UnderReplicationHandler {
 
   /**
    * Identify a new set of datanode(s) to replicate/reconstruct the container
