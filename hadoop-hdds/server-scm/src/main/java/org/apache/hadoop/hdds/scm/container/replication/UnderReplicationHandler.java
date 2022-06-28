@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -44,6 +45,6 @@ public interface UnderReplicationHandler {
    * executed and the command itself.
    */
   Map<DatanodeDetails, SCMCommand> processAndCreateCommands(
-      Set<ContainerReplica> replicas, ContainerReplicaPendingOps pendingOps,
+      Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult result, int remainingMaintenanceRedundancy);
 }

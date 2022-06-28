@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
-import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.ECUnderReplicationHandler;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -187,8 +186,6 @@ public class TestECUnderReplicationHandler {
       boolean decom) {
     ECUnderReplicationHandler ecURH =
         new ECUnderReplicationHandler(policy, conf, nodeManager);
-    ContainerReplicaPendingOps pendingOpsMock =
-        Mockito.mock(ContainerReplicaPendingOps.class);
     ContainerHealthResult.UnderReplicatedHealthResult result =
         Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
     Mockito.when(result.underReplicatedDueToDecommission()).thenReturn(decom);
@@ -196,7 +193,7 @@ public class TestECUnderReplicationHandler {
     Mockito.when(result.getContainerInfo()).thenReturn(container);
 
     Map<DatanodeDetails, SCMCommand> datanodeDetailsSCMCommandMap = ecURH
-        .processAndCreateCommands(availableReplicas, pendingOpsMock,
+        .processAndCreateCommands(availableReplicas, ImmutableList.of(),
             result, 1);
     if (!decom) {
       if (missingIndexes.size() <= repConfig.getParity()) {

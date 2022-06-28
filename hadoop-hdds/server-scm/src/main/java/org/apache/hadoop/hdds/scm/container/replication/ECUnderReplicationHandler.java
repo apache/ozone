@@ -87,22 +87,19 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
   @Override
   public Map<DatanodeDetails, SCMCommand> processAndCreateCommands(
       final Set<ContainerReplica> replicas,
-      final ContainerReplicaPendingOps pendingOps,
+      final List<ContainerReplicaOp> pendingOps,
       final ContainerHealthResult result,
       final int remainingMaintenanceRedundancy) {
     ContainerInfo container = result.getContainerInfo();
     ECReplicationConfig repConfig =
         (ECReplicationConfig) container.getReplicationConfig();
-    List<ContainerReplicaOp> pendingOpsForContainer =
-        pendingOps.getPendingOps(container.containerID());
     final ECContainerReplicaCount replicaCount =
-        new ECContainerReplicaCount(container, replicas, pendingOpsForContainer,
+        new ECContainerReplicaCount(container, replicas, pendingOps,
             remainingMaintenanceRedundancy);
 
     ContainerHealthResult.UnderReplicatedHealthResult containerHealthResult =
         (ContainerHealthResult.UnderReplicatedHealthResult)
-            ecContainerHealthCheck
-            .checkHealth(container, replicas, pendingOpsForContainer,
+            ecContainerHealthCheck.checkHealth(container, replicas, pendingOps,
                 remainingMaintenanceRedundancy);
 
     LOG.debug("Handling under-replicated EC container: {}", container);
@@ -119,7 +116,7 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
     try {
      // State is UNDER_REPLICATED
       final List<DatanodeDetails> deletionInFlight = new ArrayList<>();
-      for (ContainerReplicaOp op : pendingOpsForContainer) {
+      for (ContainerReplicaOp op : pendingOps) {
         if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
           deletionInFlight.add(op.getTarget());
         }
