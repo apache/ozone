@@ -127,18 +127,18 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
       List<Integer> missingIndexes = replicaCount.unavailableIndexes(true);
       // We got the missing indexes, this is excluded any decommissioning
       // indexes. Find the good source nodes.
-      List<ContainerReplica> sources = replicas.stream().filter(r -> r
-          .getState() == StorageContainerDatanodeProtocolProtos
-          .ContainerReplicaProto.State.CLOSED)
-          // Exclude stale and dead nodes. This is particularly important for
-          // maintenance nodes, as the replicas will remain present in the
-          // container manager, even when they go dead.
-          .filter(r -> ReplicationManager
-              .getNodeStatus(r.getDatanodeDetails(), nodeManager).isHealthy())
-          .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
-          .collect(Collectors.toList());
 
       if (missingIndexes.size() > 0 && !replicaCount.unRecoverable()) {
+        List<ContainerReplica> sources = replicas.stream().filter(r -> r
+            .getState() == StorageContainerDatanodeProtocolProtos
+            .ContainerReplicaProto.State.CLOSED)
+            // Exclude stale and dead nodes. This is particularly important for
+            // maintenance nodes, as the replicas will remain present in the
+            // container manager, even when they go dead.
+            .filter(r -> ReplicationManager
+                .getNodeStatus(r.getDatanodeDetails(), nodeManager).isHealthy())
+            .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
+            .collect(Collectors.toList());
         LOG.debug("Missing indexes detected for the container {}." +
                 " The missing indexes are {}", id, missingIndexes);
         // We have source nodes.
@@ -168,7 +168,7 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
           LOG.warn("Cannot proceed for EC container reconstruction for {}, due"
               + "to insufficient source replicas found. Number of source "
               + "replicas needed: {}. Number of available source replicas are:"
-              + "  {}. Available sources are: {}", container.containerID(),
+              + " {}. Available sources are: {}", container.containerID(),
               repConfig.getData(), sources.size(), sources);
         }
       } else if (result instanceof ContainerHealthResult
@@ -184,9 +184,9 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
         for (ContainerReplica replica : replicas) {
           if (decomIndexes.contains(replica.getReplicaIndex())) {
             if (!iterator.hasNext()) {
-              LOG.warn("Couldn't find the enough targets. Source nodes:"
-                      + " {} and the target nodes: {}",
-                  sources, selectedDatanodes);
+              LOG.warn("Couldn't find the enough targets. Available source"
+                  + " nodes: {}, the target nodes: {} and the decommission"
+                  + " indexes: {}", replicas, selectedDatanodes, decomIndexes);
               break;
             }
             DatanodeDetails decommissioningSrcNode
