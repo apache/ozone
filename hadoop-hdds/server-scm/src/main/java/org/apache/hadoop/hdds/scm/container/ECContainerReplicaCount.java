@@ -146,13 +146,23 @@ public class ECContainerReplicaCount {
   /**
    * Get a set containing all decommissioning only indexes, or an empty set if
    * none are decommissioning.
+   * @param includePendingAdd - removes the indexes from
+   *                         decommissioningOnlyIndexes if we already scheduled
+   *                         for reconstruction before.
    * @return Set of indexes in decommission only.
    */
-  public Set<Integer> decommissioningOnlyIndexes() {
+  public Set<Integer> decommissioningOnlyIndexes(boolean includePendingAdd) {
     Set<Integer> decommissioningOnlyIndexes = new HashSet<>();
     for (Integer i : decommissionIndexes.keySet()) {
       if (!healthyIndexes.containsKey(i)) {
         decommissioningOnlyIndexes.add(i);
+      }
+    }
+    // Now we have a list of decommissionIndexes. Remove any pending add as they
+    // should eventually recover.
+    if (includePendingAdd) {
+      for (Integer i : pendingAdd) {
+        decommissioningOnlyIndexes.remove(i);
       }
     }
     return decommissioningOnlyIndexes;

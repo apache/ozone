@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.states;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -496,5 +497,22 @@ public class TestECContainerReplicaCount {
     // Not missing as the decommission replicas are still online
     Assertions.assertFalse(rcnt.unRecoverable());
     Assertions.assertEquals(0, rcnt.unavailableIndexes(true).size());
+  }
+
+  @Test
+  public void testDecommissioningOnlyIndexes() {
+    Set<ContainerReplica> replica = ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
+    List<ContainerReplicaOp> pending =
+        getContainerReplicaOps(ImmutableList.of(1), ImmutableList.of());
+
+    ECContainerReplicaCount rcnt =
+        new ECContainerReplicaCount(container, replica, pending, 1);
+    Assertions.assertEquals(ImmutableSet.of(1),
+        rcnt.decommissioningOnlyIndexes(false));
+    Assertions
+        .assertEquals(ImmutableSet.of(), rcnt.decommissioningOnlyIndexes(true));
   }
 }
