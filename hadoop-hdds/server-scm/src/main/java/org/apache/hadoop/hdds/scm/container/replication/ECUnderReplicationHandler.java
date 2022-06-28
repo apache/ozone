@@ -182,7 +182,7 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
       }
 
       if (containerHealthResult.underReplicatedDueToDecommission()) {
-        Map<DatanodeDetails, SCMCommand> commands = new HashMap<>();
+        Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
         Set<Integer> decomIndexes = replicaCount.decommissioningOnlyIndexes();
         final List<DatanodeDetails> selectedDatanodes =
             getTargetDatanodes(replicas, container, decomIndexes.size());

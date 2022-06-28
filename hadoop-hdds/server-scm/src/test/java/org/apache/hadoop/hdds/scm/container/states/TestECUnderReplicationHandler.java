@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
@@ -61,7 +60,6 @@ import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
@@ -120,8 +118,8 @@ public class TestECUnderReplicationHandler {
 
   @Test
   public void testUnderReplicationWithMissingParityIndex5() {
-    Set<ContainerReplica> availableReplicas =
-        registerNodes(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
         availableReplicas, false);
@@ -129,8 +127,8 @@ public class TestECUnderReplicationHandler {
 
   @Test
   public void testUnderReplicationWithMissingIndex34() {
-    Set<ContainerReplica> availableReplicas =
-        registerNodes(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 5));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(3, 4),
         availableReplicas, false);
@@ -139,7 +137,7 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testUnderReplicationWithMissingIndex2345() {
     Set<ContainerReplica> availableReplicas =
-        registerNodes(Pair.of(IN_SERVICE, 1));
+        ReplicationTestUtil.createReplicas(Pair.of(IN_SERVICE, 1));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(2, 3, 4, 5),
         availableReplicas, false);
   }
@@ -153,8 +151,8 @@ public class TestECUnderReplicationHandler {
 
   @Test
   public void testUnderReplicationWithDecomIndex1() {
-    Set<ContainerReplica> availableReplicas =
-        registerNodes(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5));
     testUnderReplicationWithMissingIndexes(Lists.emptyList(), availableReplicas,
@@ -163,19 +161,20 @@ public class TestECUnderReplicationHandler {
 
   @Test
   public void testUnderReplicationWithDecomIndex12() {
-    Set<ContainerReplica> availableReplicas =
-        registerNodes(Pair.of(DECOMMISSIONING, 1), Pair.of(DECOMMISSIONING, 2),
-            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-            Pair.of(IN_SERVICE, 5));
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1),
+            Pair.of(DECOMMISSIONING, 2), Pair.of(IN_SERVICE, 3),
+            Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
     testUnderReplicationWithMissingIndexes(Lists.emptyList(), availableReplicas,
         true);
   }
 
   @Test
   public void testUnderReplicationWithMixedDecomAndMissingIndexes() {
-    Set<ContainerReplica> availableReplicas =
-        registerNodes(Pair.of(DECOMMISSIONING, 1), Pair.of(DECOMMISSIONING, 2),
-            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1),
+            Pair.of(DECOMMISSIONING, 2), Pair.of(IN_SERVICE, 3),
+            Pair.of(IN_SERVICE, 4));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
         availableReplicas, false);
   }
@@ -191,13 +190,13 @@ public class TestECUnderReplicationHandler {
     Mockito.when(result.isUnrecoverable()).thenReturn(false);
     Mockito.when(result.getContainerInfo()).thenReturn(container);
 
-    Map<DatanodeDetails, SCMCommand> datanodeDetailsSCMCommandMap = ecURH
+    Map<DatanodeDetails, SCMCommand<?>> datanodeDetailsSCMCommandMap = ecURH
         .processAndCreateCommands(availableReplicas, ImmutableList.of(),
             result, 1);
     if (!decom) {
       if (missingIndexes.size() <= repConfig.getParity()) {
         Assertions.assertEquals(1, datanodeDetailsSCMCommandMap.size());
-        Map.Entry<DatanodeDetails, SCMCommand> dnVsCommand =
+        Map.Entry<DatanodeDetails, SCMCommand<?>> dnVsCommand =
             datanodeDetailsSCMCommandMap.entrySet().iterator().next();
         Assert.assertTrue(
             dnVsCommand.getValue() instanceof ReconstructECContainersCommand);
@@ -221,26 +220,12 @@ public class TestECUnderReplicationHandler {
       }
       Assertions
           .assertEquals(numDecomIndexes, datanodeDetailsSCMCommandMap.size());
-      Set<Map.Entry<DatanodeDetails, SCMCommand>> entries =
+      Set<Map.Entry<DatanodeDetails, SCMCommand<?>>> entries =
           datanodeDetailsSCMCommandMap.entrySet();
-      for (Map.Entry<DatanodeDetails, SCMCommand> dnCommand : entries) {
+      for (Map.Entry<DatanodeDetails, SCMCommand<?>> dnCommand : entries) {
         Assert.assertTrue(
             dnCommand.getValue() instanceof ReplicateContainerCommand);
       }
     }
-  }
-
-  private Set<ContainerReplica> registerNodes(
-      Pair<HddsProtos.NodeOperationalState, Integer>... states) {
-    Set<ContainerReplica> replica = new HashSet<>();
-    for (Pair<HddsProtos.NodeOperationalState, Integer> s : states) {
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
-      dn.setPersistedOpState(s.getLeft());
-      replica.add(new ContainerReplica.ContainerReplicaBuilder()
-          .setContainerID(ContainerID.valueOf(1)).setContainerState(CLOSED)
-          .setDatanodeDetails(dn).setOriginNodeId(dn.getUuid()).setSequenceId(1)
-          .setReplicaIndex(s.getRight()).build());
-    }
-    return replica;
   }
 }
