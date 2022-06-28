@@ -124,8 +124,9 @@ public class TestS3MultipartResponse {
                 .setKeyName(keyName)
                 .setMultipartUploadID(multipartUploadID)).build();
 
+    // some volID and buckID as these values are not used in legacy buckets
     return getS3InitiateMultipartUploadResp(multipartKeyInfo, omKeyInfo,
-        omResponse);
+        omResponse, -1, -1);
   }
 
   public S3MultipartUploadAbortResponse createS3AbortMPUResponse(
@@ -188,9 +189,11 @@ public class TestS3MultipartResponse {
             .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build();
   }
 
+  @SuppressWarnings("parameternumber")
   public S3InitiateMultipartUploadResponse createS3InitiateMPUResponseFSO(
       String volumeName, String bucketName, long parentID, String keyName,
-      String multipartUploadID, List<OmDirectoryInfo> parentDirInfos) {
+      String multipartUploadID, List<OmDirectoryInfo> parentDirInfos,
+      long volumeId, long bucketId) {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
             .setUploadID(multipartUploadID)
             .setCreationTime(Time.now())
@@ -230,7 +233,8 @@ public class TestS3MultipartResponse {
         keyName, multipartUploadID);
 
     return new S3InitiateMultipartUploadResponseWithFSO(omResponse,
-        multipartKeyInfo, omKeyInfo, mpuKey, parentDirInfos, getBucketLayout());
+        multipartKeyInfo, omKeyInfo, mpuKey, parentDirInfos, getBucketLayout(),
+        volumeId, bucketId);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -317,12 +321,12 @@ public class TestS3MultipartResponse {
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse,
         multipartKey, multipartOpenKey, omKeyInfo, unUsedParts,
-        getBucketLayout(), omBucketInfo, keysToDelete);
+        getBucketLayout(), omBucketInfo, keysToDelete, volumeId);
   }
 
   protected S3InitiateMultipartUploadResponse getS3InitiateMultipartUploadResp(
       OmMultipartKeyInfo multipartKeyInfo, OmKeyInfo omKeyInfo,
-      OMResponse omResponse) {
+      OMResponse omResponse, long volumeId, long bucketId) {
     return new S3InitiateMultipartUploadResponse(omResponse, multipartKeyInfo,
         omKeyInfo, getBucketLayout());
   }

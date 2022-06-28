@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -41,15 +40,8 @@ import java.util.List;
  */
 public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
-  private OmBucketInfo omBucketInfo;
-
   @Test
   public void testAddToDBBatch() throws Exception {
-    omBucketInfo = OmBucketInfo.newBuilder()
-            .setVolumeName(volumeName).setBucketName(bucketName)
-            .setObjectID(System.currentTimeMillis())
-            .setCreationTime(Time.now()).build();
-
     String ozoneKey = addKeyToTable();
     OmKeyInfo omKeyInfo = omMetadataManager
             .getKeyTable(getBucketLayout()).get(ozoneKey);
@@ -85,11 +77,6 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
   @Test
   public void testAddToDBBatchWithNonEmptyBlocks() throws Exception {
-    omBucketInfo = OmBucketInfo.newBuilder()
-            .setVolumeName(volumeName).setBucketName(bucketName)
-            .setObjectID(System.currentTimeMillis())
-            .setCreationTime(Time.now()).build();
-
     final String ozoneKey = addKeyToTable();
     final OmKeyInfo omKeyInfo = omMetadataManager
             .getKeyTable(getBucketLayout())
@@ -146,9 +133,6 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
-    omBucketInfo = OmBucketInfo.newBuilder()
-            .setVolumeName(volumeName).setBucketName(bucketName)
-            .setCreationTime(Time.now()).build();
     OmKeyInfo omKeyInfo = getOmKeyInfo();
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
@@ -188,7 +172,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
   }
 
   protected OMKeyDeleteResponse getOmKeyDeleteResponse(OmKeyInfo omKeyInfo,
-      OzoneManagerProtocolProtos.OMResponse omResponse) {
+      OzoneManagerProtocolProtos.OMResponse omResponse) throws Exception {
     return new OMKeyDeleteResponse(omResponse, omKeyInfo, true, omBucketInfo);
   }
 
