@@ -29,13 +29,10 @@ import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ECUnderReplicationHandler;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.net.NetworkTopology;
-import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -72,9 +69,7 @@ public class TestECUnderReplicationHandler {
   private ContainerInfo container;
   private NodeManager nodeManager;
   private OzoneConfiguration conf;
-  private NetworkTopology cluster;
   private PlacementPolicy policy;
-  private SCMContainerPlacementMetrics metrics;
 
   @BeforeEach
   public void setup() {
@@ -89,8 +84,6 @@ public class TestECUnderReplicationHandler {
     repConfig = new ECReplicationConfig(3, 2);
     container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
-    // create placement policy instances
-    cluster = new NetworkTopologyImpl(NodeSchemaManager.getInstance());
     policy = new SCMCommonPlacementPolicy(nodeManager, conf) {
       @Override
       public List<DatanodeDetails> chooseDatanodes(
@@ -113,7 +106,6 @@ public class TestECUnderReplicationHandler {
     NodeSchema[] schemas =
         new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
-    metrics = SCMContainerPlacementMetrics.create();
   }
 
   @Test
