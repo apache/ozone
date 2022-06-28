@@ -357,4 +357,33 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     }
     return req;
   }
+
+  /**
+   * Validates S3 MPU commit part requests.
+   * We do not want to allow older clients to commit MPU keys to buckets which
+   * use non LEGACY layouts.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CommitMultiPartUpload
+  )
+  public static OMRequest blockMPUCommitWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    if (req.getCommitMultiPartUploadRequest().hasKeyArgs()) {
+      KeyArgs keyArgs = req.getCommitMultiPartUploadRequest().getKeyArgs();
+
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
+      }
+    }
+    return req;
+  }
 }

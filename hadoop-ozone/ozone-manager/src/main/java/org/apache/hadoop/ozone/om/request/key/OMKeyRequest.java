@@ -78,7 +78,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
-import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -739,8 +739,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
     Preconditions.checkNotNull(uploadID);
     String multipartKey = "";
     if (omPathInfo != null) {
+      final long volumeId = omMetadataManager.getVolumeId(
+              args.getVolumeName());
+      final long bucketId = omMetadataManager.getBucketId(
+              args.getVolumeName(), args.getBucketName());
       // FileTable metadata format
-      multipartKey = omMetadataManager.getMultipartKey(
+      multipartKey = omMetadataManager.getMultipartKey(volumeId, bucketId,
               omPathInfo.getLastKnownParentId(),
               omPathInfo.getLeafNodeName(), uploadID);
     } else {

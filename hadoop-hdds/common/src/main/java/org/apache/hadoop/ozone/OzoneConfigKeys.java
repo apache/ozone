@@ -316,6 +316,11 @@ public final class OzoneConfigKeys {
   public static final String
       HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT = "1GB";
 
+  // Specifying the dedicated volumes for per-disk db instances.
+  // For container schema v3 only.
+  public static final String HDDS_DATANODE_CONTAINER_DB_DIR =
+      "hdds.datanode.container.db.dir";
+
   public static final String OZONE_SECURITY_ENABLED_KEY =
       "ozone.security.enabled";
   public static final boolean OZONE_SECURITY_ENABLED_DEFAULT = false;
@@ -470,6 +475,15 @@ public final class OzoneConfigKeys {
   public static final long
       OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS =
       300 * 1000;
+
+  public static final String OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT =
+      "ozone.client.fs.default.bucket.layout";
+
+  public static final String OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT =
+      "FILE_SYSTEM_OPTIMIZED";
+
+  public static final String OZONE_CLIENT_FS_BUCKET_LAYOUT_LEGACY =
+      "LEGACY";
 
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_OMAUDIT =
       "ozone.audit.log.debug.cmd.list.omaudit";

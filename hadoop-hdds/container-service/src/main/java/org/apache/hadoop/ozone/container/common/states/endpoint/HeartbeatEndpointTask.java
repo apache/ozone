@@ -55,9 +55,11 @@ import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -309,145 +311,145 @@ public class HeartbeatEndpointTask
     for (SCMCommandProto commandResponseProto : response.getCommandsList()) {
       switch (commandResponseProto.getCommandType()) {
       case reregisterCommand:
-        if (rpcEndpoint.getState() == EndPointStates.HEARTBEAT) {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Received SCM notification to register."
-                + " Interrupt HEARTBEAT and transit to REGISTER state.");
-          }
-          rpcEndpoint.setState(EndPointStates.REGISTER);
-        } else {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Illegal state {} found, expecting {}.",
-                rpcEndpoint.getState().name(), EndPointStates.HEARTBEAT);
-          }
-        }
+        processReregisterCommand();
         break;
       case deleteBlocksCommand:
         DeleteBlocksCommand deleteBlocksCommand = DeleteBlocksCommand
             .getFromProtobuf(
                 commandResponseProto.getDeleteBlocksCommandProto());
-        if (commandResponseProto.hasTerm()) {
-          deleteBlocksCommand.setTerm(commandResponseProto.getTerm());
-        }
         if (!deleteBlocksCommand.blocksTobeDeleted().isEmpty()) {
           if (LOG.isDebugEnabled()) {
             LOG.debug(DeletedContainerBlocksSummary
                 .getFrom(deleteBlocksCommand.blocksTobeDeleted())
                 .toString());
           }
-          this.context.addCommand(deleteBlocksCommand);
+          processCommonCommand(commandResponseProto, deleteBlocksCommand);
         }
         break;
       case closeContainerCommand:
         CloseContainerCommand closeContainer =
             CloseContainerCommand.getFromProtobuf(
                 commandResponseProto.getCloseContainerCommandProto());
-        if (commandResponseProto.hasTerm()) {
-          closeContainer.setTerm(commandResponseProto.getTerm());
-        }
-        if (commandResponseProto.hasEncodedToken()) {
-          closeContainer.setEncodedToken(
-              commandResponseProto.getEncodedToken());
-        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM container close request for container {}",
               closeContainer.getContainerID());
         }
-        this.context.addCommand(closeContainer);
+        processCommonCommand(commandResponseProto, closeContainer);
         break;
       case replicateContainerCommand:
         ReplicateContainerCommand replicateContainerCommand =
             ReplicateContainerCommand.getFromProtobuf(
                 commandResponseProto.getReplicateContainerCommandProto());
-        if (commandResponseProto.hasTerm()) {
-          replicateContainerCommand.setTerm(commandResponseProto.getTerm());
-        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM container replicate request for container {}",
               replicateContainerCommand.getContainerID());
         }
-        this.context.addCommand(replicateContainerCommand);
+        processCommonCommand(commandResponseProto, replicateContainerCommand);
+        break;
+      case reconstructECContainersCommand:
+        ReconstructECContainersCommand reccc =
+            ReconstructECContainersCommand.getFromProtobuf(
+                commandResponseProto.getReconstructECContainersCommandProto());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Received SCM reconstruct request for container {}",
+              reccc.getContainerID());
+        }
+        processCommonCommand(commandResponseProto, reccc);
         break;
       case deleteContainerCommand:
         DeleteContainerCommand deleteContainerCommand =
             DeleteContainerCommand.getFromProtobuf(
                 commandResponseProto.getDeleteContainerCommandProto());
-        if (commandResponseProto.hasTerm()) {
-          deleteContainerCommand.setTerm(commandResponseProto.getTerm());
-        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM delete container request for container {}",
               deleteContainerCommand.getContainerID());
         }
-        this.context.addCommand(deleteContainerCommand);
+        processCommonCommand(commandResponseProto, deleteContainerCommand);
         break;
       case createPipelineCommand:
         CreatePipelineCommand createPipelineCommand =
             CreatePipelineCommand.getFromProtobuf(
                 commandResponseProto.getCreatePipelineCommandProto());
-        if (commandResponseProto.hasTerm()) {
-          createPipelineCommand.setTerm(commandResponseProto.getTerm());
-        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM create pipeline request {}",
               createPipelineCommand.getPipelineID());
         }
-        this.context.addCommand(createPipelineCommand);
+        processCommonCommand(commandResponseProto, createPipelineCommand);
         break;
       case closePipelineCommand:
         ClosePipelineCommand closePipelineCommand =
             ClosePipelineCommand.getFromProtobuf(
                 commandResponseProto.getClosePipelineCommandProto());
-        if (commandResponseProto.hasTerm()) {
-          closePipelineCommand.setTerm(commandResponseProto.getTerm());
-        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM close pipeline request {}",
               closePipelineCommand.getPipelineID());
         }
-        this.context.addCommand(closePipelineCommand);
+        processCommonCommand(commandResponseProto, closePipelineCommand);
         break;
       case setNodeOperationalStateCommand:
         SetNodeOperationalStateCommand setNodeOperationalStateCommand =
             SetNodeOperationalStateCommand.getFromProtobuf(
                 commandResponseProto.getSetNodeOperationalStateCommandProto());
-        if (commandResponseProto.hasTerm()) {
-          setNodeOperationalStateCommand.setTerm(
-              commandResponseProto.getTerm());
-        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM set operational state command. State: {} " +
               "Expiry: {}", setNodeOperationalStateCommand.getOpState(),
               setNodeOperationalStateCommand.getStateExpiryEpochSeconds());
         }
-        this.context.addCommand(setNodeOperationalStateCommand);
+        processCommonCommand(commandResponseProto,
+            setNodeOperationalStateCommand);
         break;
       case finalizeNewLayoutVersionCommand:
         FinalizeNewLayoutVersionCommand finalizeNewLayoutVersionCommand =
             FinalizeNewLayoutVersionCommand.getFromProtobuf(
                 commandResponseProto.getFinalizeNewLayoutVersionCommandProto());
-        if (commandResponseProto.hasTerm()) {
-          finalizeNewLayoutVersionCommand.setTerm(
-              commandResponseProto.getTerm());
-        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM finalize command {}",
               finalizeNewLayoutVersionCommand.getId());
         }
-        this.context.addCommand(finalizeNewLayoutVersionCommand);
+        processCommonCommand(commandResponseProto,
+            finalizeNewLayoutVersionCommand);
         break;
       case refreshVolumeUsageInfo:
         RefreshVolumeUsageCommand refreshVolumeUsageCommand =
             RefreshVolumeUsageCommand.getFromProtobuf(
             commandResponseProto.getRefreshVolumeUsageCommandProto());
-        if (commandResponseProto.hasTerm()) {
-          refreshVolumeUsageCommand.setTerm(commandResponseProto.getTerm());
-        }
-        this.context.addCommand(refreshVolumeUsageCommand);
+        processCommonCommand(commandResponseProto, refreshVolumeUsageCommand);
         break;
       default:
         throw new IllegalArgumentException("Unknown response : "
             + commandResponseProto.getCommandType().name());
+      }
+    }
+  }
+
+  /**
+   * Common processing for SCM commands.
+   *  - set term
+   *  - set encoded token
+   *  - add to context's queue
+   */
+  private void processCommonCommand(
+      SCMCommandProto response, SCMCommand<?> cmd) {
+    if (response.hasTerm()) {
+      cmd.setTerm(response.getTerm());
+    }
+    if (response.hasEncodedToken()) {
+      cmd.setEncodedToken(response.getEncodedToken());
+    }
+    context.addCommand(cmd);
+  }
+
+  private void processReregisterCommand() {
+    if (rpcEndpoint.getState() == EndPointStates.HEARTBEAT) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Received SCM notification to register."
+            + " Interrupt HEARTBEAT and transit to REGISTER state.");
+      }
+      rpcEndpoint.setState(EndPointStates.REGISTER);
+    } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Illegal state {} found, expecting {}.",
+            rpcEndpoint.getState().name(), EndPointStates.HEARTBEAT);
       }
     }
   }

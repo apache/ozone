@@ -30,6 +30,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
+import java.io.IOException;
+
 /**
  * Tests OMKeyCommitResponse.
  */
@@ -144,7 +146,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
   }
 
   @NotNull
-  protected String getOzoneKey() {
+  protected String getOzoneKey() throws IOException {
     Assert.assertNotNull(omBucketInfo);
     return omMetadataManager.getOzoneKey(volumeName,
             omBucketInfo.getBucketName(), keyName);

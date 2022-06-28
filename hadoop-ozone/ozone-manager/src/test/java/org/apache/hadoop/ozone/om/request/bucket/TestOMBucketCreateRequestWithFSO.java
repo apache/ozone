@@ -44,6 +44,7 @@ public class TestOMBucketCreateRequestWithFSO
         BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
 
     Assert.assertEquals(0, omMetrics.getNumFSOBucketCreates());
 
@@ -54,6 +55,8 @@ public class TestOMBucketCreateRequestWithFSO
         omBucketCreateRequest.getOmRequest());
 
     Assert.assertEquals(1, omMetrics.getNumFSOBucketCreates());
+    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        omMetadataManager.getBucketTable().get(bucketKey).getBucketLayout());
   }
 
   private OMBucketCreateRequest doPreExecute(String volumeName,

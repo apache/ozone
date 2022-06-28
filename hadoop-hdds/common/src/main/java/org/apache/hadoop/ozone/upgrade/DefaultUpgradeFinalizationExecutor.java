@@ -31,14 +31,15 @@ import org.slf4j.LoggerFactory;
  * Unit/Integration tests can override this to provide error injected version
  * of this class.
  */
-public class DefaultUpgradeFinalizationExecutor<T> {
+public class DefaultUpgradeFinalizationExecutor<T>
+    implements UpgradeFinalizationExecutor<T> {
   static final Logger LOG =
       LoggerFactory.getLogger(DefaultUpgradeFinalizationExecutor.class);
 
   public DefaultUpgradeFinalizationExecutor() {
   }
 
-  public void execute(T component, BasicUpgradeFinalizer finalizer)
+  public void execute(T component, BasicUpgradeFinalizer<T, ?> finalizer)
       throws IOException {
     try {
       finalizer.emitStartingMsg();
@@ -47,7 +48,8 @@ public class DefaultUpgradeFinalizationExecutor<T> {
 
       finalizer.preFinalizeUpgrade(component);
 
-      finalizer.finalizeUpgrade(component);
+      finalizeFeatures(component, finalizer,
+          finalizer.getVersionManager().unfinalizedFeatures());
 
       finalizer.postFinalizeUpgrade(component);
 
@@ -61,6 +63,14 @@ public class DefaultUpgradeFinalizationExecutor<T> {
       }
     } finally {
       finalizer.markFinalizationDone();
+    }
+  }
+
+  protected void finalizeFeatures(T component,
+      BasicUpgradeFinalizer<T, ?> finalizer,  Iterable<LayoutFeature> lfs)
+      throws UpgradeException {
+    for (LayoutFeature lf: lfs) {
+      finalizer.finalizeLayoutFeature(lf, component);
     }
   }
 }

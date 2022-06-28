@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoo
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Matchers;
@@ -66,7 +67,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 
@@ -221,7 +221,8 @@ public class TestWritableECContainerProvider {
   }
 
   @Test
-  public void testUnableToCreateAnyPipelinesReturnsNull() throws IOException {
+  public void testUnableToCreateAnyPipelinesThrowsException()
+      throws IOException {
     pipelineManager = new MockPipelineManager(
         dbStore, scmhaManager, nodeManager) {
       @Override
@@ -234,9 +235,12 @@ public class TestWritableECContainerProvider {
     provider = new WritableECContainerProvider(
         conf, pipelineManager, containerManager, pipelineChoosingPolicy);
 
-    ContainerInfo container =
-        provider.getContainer(1, repConfig, OWNER, new ExcludeList());
-    assertNull(container);
+    try {
+      provider.getContainer(1, repConfig, OWNER, new ExcludeList());
+      Assert.fail();
+    } catch (IOException ex) {
+      GenericTestUtils.assertExceptionContains("Cannot create pipelines", ex);
+    }
   }
 
   @Test
@@ -261,12 +265,20 @@ public class TestWritableECContainerProvider {
     provider = new WritableECContainerProvider(
         conf, pipelineManager, containerManager, pipelineChoosingPolicy);
 
-    ContainerInfo container =
-        provider.getContainer(1, repConfig, OWNER, new ExcludeList());
+    try {
+      provider.getContainer(1, repConfig, OWNER, new ExcludeList());
+      Assert.fail();
+    } catch (IOException ex) {
+      GenericTestUtils.assertExceptionContains("Cannot create pipelines", ex);
+    }
+
     for (int i = 0; i < 5; i++) {
-      ContainerInfo nextContainer =
-          provider.getContainer(1, repConfig, OWNER, new ExcludeList());
-      assertEquals(container, nextContainer);
+      try {
+        provider.getContainer(1, repConfig, OWNER, new ExcludeList());
+        Assert.fail();
+      } catch (IOException ex) {
+        GenericTestUtils.assertExceptionContains("Cannot create pipelines", ex);
+      }
     }
   }
 

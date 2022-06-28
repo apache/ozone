@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
@@ -33,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -85,7 +85,7 @@ public final class SCMContainerPlacementRackScatter
    *                     allocator, whether the favored nodes will be used
    *                     depends on whether the nodes meets the allocator's
    *                     requirement.
-   * @param nodesRequired - number of datanodes required.
+   * @param nodesRequiredToChoose - number of datanodes required.
    * @param dataSizeRequired - size required for the container.
    * @param metadataSizeRequired - size required for Ratis metadata.
    * @return List of datanodes.
@@ -93,11 +93,17 @@ public final class SCMContainerPlacementRackScatter
    */
   @Override
   public List<DatanodeDetails> chooseDatanodes(
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
-      throws SCMException {
-    Preconditions.checkArgument(nodesRequired > 0);
-    metrics.incrDatanodeRequestCount(nodesRequired);
+      final List<DatanodeDetails> excludedNodes,
+      final List<DatanodeDetails> favoredNodes,
+      final int nodesRequiredToChoose, final long metadataSizeRequired,
+      final long dataSizeRequired) throws SCMException {
+    if (nodesRequiredToChoose <= 0) {
+      String errorMsg = "num of nodes required to choose should bigger" +
+          "than 0, but the given num is " + nodesRequiredToChoose;
+      throw new SCMException(errorMsg, null);
+    }
+    metrics.incrDatanodeRequestCount(nodesRequiredToChoose);
+    int nodesRequired = nodesRequiredToChoose;
     int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
     List<Node> availableNodes = networkTopology.getNodes(
         networkTopology.getMaxLevel());
@@ -110,7 +116,8 @@ public final class SCMContainerPlacementRackScatter
           "TotalNode = " + totalNodesCount +
           " AvailableNode = " + availableNodes.size() +
           " RequiredNode = " + nodesRequired +
-          " ExcludedNode = " + excludedNodesCount, null);
+          " ExcludedNode = " + excludedNodesCount,
+          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
 
     List<DatanodeDetails> mutableFavoredNodes = new ArrayList<>();
@@ -134,8 +141,8 @@ public final class SCMContainerPlacementRackScatter
       racks = sortRackWithExcludedNodes(racks, excludedNodes);
     }
 
-    List<Node> toChooseRacks = new LinkedList<>(racks);
-    List<DatanodeDetails> chosenNodes = new ArrayList<>();
+    List<Node> toChooseRacks = new LinkedList<>();
+    Set<DatanodeDetails> chosenNodes = new LinkedHashSet<>();
     List<Node> unavailableNodes = new ArrayList<>();
     Set<Node> skippedRacks = new HashSet<>();
     if (excludedNodes != null) {
@@ -161,7 +168,7 @@ public final class SCMContainerPlacementRackScatter
       }
 
       if (mutableFavoredNodes.size() > 0) {
-        List<Node> chosenFavoredNodesInForLoop = new ArrayList<>();
+        List<DatanodeDetails> chosenFavoredNodesInForLoop = new ArrayList<>();
         for (DatanodeDetails favoredNode : mutableFavoredNodes) {
           Node curRack = getRackOfDatanodeDetails(favoredNode);
           if (toChooseRacks.contains(curRack)) {
@@ -214,14 +221,26 @@ public final class SCMContainerPlacementRackScatter
         retryCount = 0;
       }
     }
+    List<DatanodeDetails> result = new ArrayList<>(chosenNodes);
     ContainerPlacementStatus placementStatus =
-        validateContainerPlacement(chosenNodes, nodesRequired);
+        validateContainerPlacement(result, nodesRequiredToChoose);
     if (!placementStatus.isPolicySatisfied()) {
-      LOG.warn("ContainerPlacementPolicy not met, currentRacks is {}," +
-          " desired racks is {}.", placementStatus.actualPlacementCount(),
-          placementStatus.expectedPlacementCount());
+      String errorMsg = "ContainerPlacementPolicy not met, currentRacks is" +
+          placementStatus.actualPlacementCount() + "desired racks is" +
+          placementStatus.expectedPlacementCount();
+      throw new SCMException(errorMsg, null);
     }
-    return chosenNodes;
+    if (nodesRequiredToChoose != chosenNodes.size()) {
+      String reason = "Chosen nodes size: " + chosenNodes
+          .size() + ", but required nodes to choose: " + nodesRequiredToChoose
+          + " do not match.";
+      LOG.warn("Placement policy could not choose the enough nodes."
+              + " {} Available nodes count: {}, Excluded nodes count: {}",
+          reason, totalNodesCount, excludedNodesCount);
+      throw new SCMException(reason,
+          SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
+    }
+    return result;
   }
 
   @Override

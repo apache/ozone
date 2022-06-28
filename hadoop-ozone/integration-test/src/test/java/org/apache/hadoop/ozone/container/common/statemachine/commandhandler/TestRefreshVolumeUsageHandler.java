@@ -104,7 +104,8 @@ public class TestRefreshVolumeUsageHandler {
     key.close();
 
     //a new key is created , but the datanode default REFRESH_PERIOD is 1 hour,
-    //so scm does not get the latest usage info of this datanode for now.
+    //still the cache is updated, so the scm will eventually get the new
+    //used space from the datanode through node report.
     Assert.assertTrue(cluster.getStorageContainerManager()
             .getScmNodeManager().getUsageInfo(datanodeDetails)
             .getScmNodeStat().getScmUsed().isEqual(currentScmUsed));
@@ -113,18 +114,16 @@ public class TestRefreshVolumeUsageHandler {
       GenericTestUtils.waitFor(() -> isUsageInfoRefreshed(cluster,
           datanodeDetails, currentScmUsed), 500, 5 * 1000);
     } catch (TimeoutException te) {
-      //no op , this is to show that if we do not trigger refresh volume
-      //usage info command, we can not get the latest usage info within
-      // a refresh period
+      //no op
     } catch (InterruptedException ie) {
       //no op
     }
 
-    //after waiting for several node report , this usage info in scm
-    //is still not updated
+    //after waiting for several node report , this usage info
+    //in SCM should be updated as we have updated the DN's cached usage info.
     Assert.assertTrue(cluster.getStorageContainerManager()
         .getScmNodeManager().getUsageInfo(datanodeDetails)
-        .getScmNodeStat().getScmUsed().isEqual(currentScmUsed));
+        .getScmNodeStat().getScmUsed().isGreater(currentScmUsed));
 
     //send refresh volume usage command to datanode
     cluster.getStorageContainerManager()

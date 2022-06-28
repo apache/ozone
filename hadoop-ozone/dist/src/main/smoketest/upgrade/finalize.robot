@@ -16,7 +16,7 @@
 *** Settings ***
 Documentation       Finalize Upgrade of OMs and SCM
 Resource            ../commonlib.robot
-Test Timeout        5 minutes
+Test Timeout        10 minutes
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
 *** Test Cases ***

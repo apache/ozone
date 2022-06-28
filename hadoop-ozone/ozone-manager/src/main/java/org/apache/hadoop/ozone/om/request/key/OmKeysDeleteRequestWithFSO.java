@@ -92,17 +92,23 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
   }
 
   @Override
-  protected long markKeysAsDeletedInCache(OzoneManager ozoneManager,
-      long trxnLogIndex,
-      List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
-      OMMetadataManager omMetadataManager, long quotaReleased) {
+  protected long markKeysAsDeletedInCache(
+          OzoneManager ozoneManager, long trxnLogIndex,
+          List<OmKeyInfo> omKeyInfoList,
+          List<OmKeyInfo> dirList, OMMetadataManager omMetadataManager,
+          long quotaReleased) throws IOException {
 
     // Mark all keys which can be deleted, in cache as deleted.
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
+      final long volumeId = omMetadataManager.getVolumeId(
+              omKeyInfo.getVolumeName());
+      final long bucketId = omMetadataManager.getBucketId(
+              omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(omMetadataManager
-              .getOzonePathKey(omKeyInfo.getParentObjectID(),
-                  omKeyInfo.getFileName())),
+              .getOzonePathKey(volumeId, bucketId,
+                      omKeyInfo.getParentObjectID(),
+                      omKeyInfo.getFileName())),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
@@ -110,8 +116,13 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
     }
     // Mark directory keys.
     for (OmKeyInfo omKeyInfo : dirList) {
+      final long volumeId = omMetadataManager.getVolumeId(
+              omKeyInfo.getVolumeName());
+      final long bucketId = omMetadataManager.getBucketId(
+              omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
       omMetadataManager.getDirectoryTable().addCacheEntry(new CacheKey<>(
-              omMetadataManager.getOzonePathKey(omKeyInfo.getParentObjectID(),
+              omMetadataManager.getOzonePathKey(volumeId, bucketId,
+                      omKeyInfo.getParentObjectID(),
                   omKeyInfo.getFileName())),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 

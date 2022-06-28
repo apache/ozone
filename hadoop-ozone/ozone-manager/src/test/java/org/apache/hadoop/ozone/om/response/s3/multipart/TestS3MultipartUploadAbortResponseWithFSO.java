@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.UUID;
 
@@ -51,10 +52,13 @@ public class TestS3MultipartUploadAbortResponseWithFSO
 
   @Override
   protected String getMultipartOpenKey(String volumeName, String bucketName,
-      String keyName, String multipartUploadID) {
+      String keyName, String multipartUploadID) throws IOException {
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
     String fileName = StringUtils.substringAfter(keyName, dirName);
-    return omMetadataManager.getMultipartKey(parentID, fileName,
-        multipartUploadID);
+    return omMetadataManager.getMultipartKey(volumeId, bucketId,
+            parentID, fileName, multipartUploadID);
   }
 
   @Override
@@ -94,7 +98,8 @@ public class TestS3MultipartUploadAbortResponseWithFSO
 
   @Override
   public OzoneManagerProtocolProtos.PartKeyInfo createPartKeyInfo(
-      String volumeName, String bucketName, String keyName, int partNumber) {
+      String volumeName, String bucketName, String keyName, int partNumber)
+          throws IOException {
 
     String fileName = OzoneFSUtils.getFileName(keyName);
     return createPartKeyInfoFSO(volumeName, bucketName, parentID, fileName,

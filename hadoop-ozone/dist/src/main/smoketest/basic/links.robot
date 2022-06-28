@@ -157,3 +157,10 @@ Source bucket not affected by deleting link
                         Should Not Contain          ${bucket_list}    link1
     ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.[].name'
                         Should Contain              ${source_list}    key1
+
+Setting bucket property on link not allowed
+                        Execute                     ozone sh bucket link ${source}/bucket1 ${target}/link4
+    ${result} =         Execute And Ignore Error    ozone sh bucket setquota ${target}/link4 --quota 1GB
+                        Should Contain              ${result}    NOT_SUPPORTED_OPERATION
+    ${result} =         Execute                     ozone sh bucket info ${target}/link4
+                        Should Contain              ${result}            sourceBucket

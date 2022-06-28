@@ -359,6 +359,17 @@ public final class ScmConfigKeys {
   public static final boolean OZONE_SCM_DATANODE_DISALLOW_SAME_PEERS_DEFAULT =
       false;
 
+  public static final String
+      OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL =
+      "ozone.scm.expired.container.replica.op.scrub.interval";
+  public static final String
+      OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL_DEFAULT =
+      "5m";
+  public static final String OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT =
+      "ozone.scm.expired.container.replica.op.time.out";
+  public static final String
+      OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT_DEFAULT = "30m";
+
   // Upper limit for how many pipelines can be created
   // across the cluster nodes managed by SCM.
   // Only for test purpose now.
@@ -442,8 +453,11 @@ public final class ScmConfigKeys {
   // SCM Ratis related
   public static final String OZONE_SCM_HA_ENABLE_KEY
       = "ozone.scm.ratis.enable";
+  /** Default Value would be Overriden based on the current state of Ratis.
+   {@link org.apache.hadoop.hdds.conf.DefaultConfigManager}
+   */
   public static final boolean OZONE_SCM_HA_ENABLE_DEFAULT
-      = false;
+      = true;
   public static final String OZONE_SCM_RATIS_PORT_KEY
       = "ozone.scm.ratis.port";
   public static final int OZONE_SCM_RATIS_PORT_DEFAULT

@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
@@ -42,6 +43,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +63,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 
 /**
  * SCM Pipeline Manager implementation.
@@ -76,7 +79,7 @@ public class PipelineManagerImpl implements PipelineManager {
   private PipelineFactory pipelineFactory;
   private PipelineStateManager stateManager;
   private BackgroundPipelineCreator backgroundPipelineCreator;
-  private BackgroundPipelineScrubber backgroundPipelineScrubber;
+  private BackgroundSCMService backgroundPipelineScrubber;
   private final ConfigurationSource conf;
   private final EventPublisher eventPublisher;
   // Pipeline Manager MXBean
@@ -151,9 +154,28 @@ public class PipelineManagerImpl implements PipelineManager {
     BackgroundPipelineCreator backgroundPipelineCreator =
         new BackgroundPipelineCreator(pipelineManager, conf, scmContext, clock);
 
-    BackgroundPipelineScrubber backgroundPipelineScrubber =
-        new BackgroundPipelineScrubber(pipelineManager, conf, scmContext,
-            clock);
+    final long scrubberIntervalInMillis = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    final long safeModeWaitMs = conf.getTimeDuration(
+        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
+        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+
+    BackgroundSCMService backgroundPipelineScrubber =
+        new BackgroundSCMService.Builder().setClock(clock)
+            .setScmContext(scmContext)
+            .setServiceName("BackgroundPipelineScrubber")
+            .setIntervalInMillis(scrubberIntervalInMillis)
+            .setWaitTimeInMillis(safeModeWaitMs)
+            .setPeriodicalTask(() -> {
+              try {
+                pipelineManager.scrubPipelines();
+              } catch (IOException e) {
+                LOG.error("Unexpected error during pipeline scrubbing", e);
+              }
+            }).build();
 
     pipelineManager.setBackgroundPipelineCreator(backgroundPipelineCreator);
     pipelineManager.setBackgroundPipelineScrubber(backgroundPipelineScrubber);
@@ -419,6 +441,46 @@ public class PipelineManagerImpl implements PipelineManager {
     }
   }
 
+  /** close the pipelines whose nodes' IPs are stale.
+   *
+   * @param datanodeDetails new datanodeDetails
+   */
+  @Override
+  public void closeStalePipelines(DatanodeDetails datanodeDetails) {
+    List<Pipeline> pipelinesWithStaleIpOrHostname =
+            getStalePipelines(datanodeDetails);
+    if (pipelinesWithStaleIpOrHostname.isEmpty()) {
+      LOG.debug("No stale pipelines for datanode {}",
+              datanodeDetails.getUuidString());
+      return;
+    }
+    LOG.info("Found {} stale pipelines",
+            pipelinesWithStaleIpOrHostname.size());
+    pipelinesWithStaleIpOrHostname.forEach(p -> {
+      try {
+        LOG.info("Closing the stale pipeline: {}", p.getId());
+        closePipeline(p, false);
+        LOG.info("Closed the stale pipeline: {}", p.getId());
+      } catch (IOException e) {
+        LOG.error("Closing the stale pipeline failed: {}", p, e);
+      }
+    });
+  }
+
+  @VisibleForTesting
+  List<Pipeline> getStalePipelines(DatanodeDetails datanodeDetails) {
+    List<Pipeline> pipelines = getPipelines();
+    return pipelines.stream()
+            .filter(p -> p.getNodes().stream()
+                    .anyMatch(n -> n.getUuid()
+                            .equals(datanodeDetails.getUuid())
+                            && (!n.getIpAddress()
+                            .equals(datanodeDetails.getIpAddress())
+                            || !n.getHostName()
+                            .equals(datanodeDetails.getHostName()))))
+            .collect(Collectors.toList());
+  }
+
   /**
    * Scrub pipelines.
    */
@@ -530,34 +592,57 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public void waitPipelineReady(PipelineID pipelineID, long timeout)
       throws IOException {
+    waitOnePipelineReady(Lists.newArrayList(pipelineID), timeout);
+  }
+
+  @Override
+  public Pipeline waitOnePipelineReady(Collection<PipelineID> pipelineIDs,
+                                   long timeout)
+          throws IOException {
     long st = clock.millis();
     if (timeout == 0) {
       timeout = pipelineWaitDefaultTimeout;
     }
-
-    boolean ready;
-    Pipeline pipeline;
+    List<String> pipelineIDStrs =
+            pipelineIDs.stream()
+                    .map(id -> id.getId().toString())
+                            .collect(Collectors.toList());
+    String piplineIdsStr = String.join(",", pipelineIDStrs);
+    Pipeline pipeline = null;
     do {
-      try {
-        pipeline = stateManager.getPipeline(pipelineID);
-      } catch (PipelineNotFoundException e) {
-        throw new PipelineNotFoundException(String.format(
-            "Pipeline %s cannot be found", pipelineID));
+      boolean found = false;
+      for (PipelineID pipelineID : pipelineIDs) {
+        try {
+          Pipeline tempPipeline = stateManager.getPipeline(pipelineID);
+          found = true;
+          if (tempPipeline.isOpen()) {
+            pipeline = tempPipeline;
+            break;
+          }
+        } catch (PipelineNotFoundException e) {
+          LOG.warn("Pipeline {} cannot be found", pipelineID);
+        }
       }
-      ready = pipeline.isOpen();
-      if (!ready) {
+
+      if (!found) {
+        throw new PipelineNotFoundException("The input pipeline IDs " +
+                piplineIdsStr + " cannot be found");
+      }
+
+      if (pipeline == null) {
         try {
           Thread.sleep((long)100);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
         }
       }
-    } while (!ready && clock.millis() - st < timeout);
+    } while (pipeline == null && clock.millis() - st < timeout);
 
-    if (!ready) {
+    if (pipeline == null) {
       throw new IOException(String.format("Pipeline %s is not ready in %d ms",
-          pipelineID, timeout));
+              piplineIdsStr, timeout));
     }
+    return pipeline;
   }
 
   @Override
@@ -656,12 +741,12 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   private void setBackgroundPipelineScrubber(
-      BackgroundPipelineScrubber backgroundPipelineScrubber) {
+      BackgroundSCMService backgroundPipelineScrubber) {
     this.backgroundPipelineScrubber = backgroundPipelineScrubber;
   }
 
   @VisibleForTesting
-  public BackgroundPipelineScrubber getBackgroundPipelineScrubber() {
+  public BackgroundSCMService getBackgroundPipelineScrubber() {
     return this.backgroundPipelineScrubber;
   }
 
