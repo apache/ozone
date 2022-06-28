@@ -97,20 +97,29 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
         new ECContainerReplicaCount(container, replicas, pendingOps,
             remainingMaintenanceRedundancy);
 
-    ContainerHealthResult.UnderReplicatedHealthResult containerHealthResult =
-        (ContainerHealthResult.UnderReplicatedHealthResult)
-            ecContainerHealthCheck.checkHealth(container, replicas, pendingOps,
-                remainingMaintenanceRedundancy);
+    ContainerHealthResult currentUnderRepRes = ecContainerHealthCheck
+        .checkHealth(container, replicas, pendingOps,
+            remainingMaintenanceRedundancy);
 
     LOG.debug("Handling under-replicated EC container: {}", container);
-    if (containerHealthResult
-        .isSufficientlyReplicatedAfterPending() || containerHealthResult
-        .getHealthState() != ContainerHealthResult.HealthState
-        .UNDER_REPLICATED) {
+    if (currentUnderRepRes
+        .getHealthState() != ContainerHealthResult.HealthState.UNDER_REPLICATED) {
+      LOG.info("The container {} state changed and it's not in under"
+              + " replication any more. Current state is: {}",
+          container.getContainerID(), currentUnderRepRes);
+      return null;
+    }
+    ContainerHealthResult.UnderReplicatedHealthResult containerHealthResult =
+        ((ContainerHealthResult.UnderReplicatedHealthResult)
+            currentUnderRepRes);
+    if (containerHealthResult.isSufficientlyReplicatedAfterPending()) {
       LOG.info("The container {} with replicas {} is sufficiently replicated",
           container.getContainerID(), replicaCount.getReplicas());
-      // Assert replicaCount also telling it's sufficiently replicated.
       return null;
+    }
+    if (replicaCount.unRecoverable()) {
+      LOG.warn("The container {} is unrecoverable. The available replicas" +
+          " are: {}.", container.containerID(), replicaCount.getReplicas());
     }
     final ContainerID id = container.containerID();
     try {
@@ -168,10 +177,7 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
               + " {}. Available sources are: {}", container.containerID(),
               repConfig.getData(), sources.size(), sources);
         }
-      } else if (result instanceof ContainerHealthResult
-          .UnderReplicatedHealthResult && ((ContainerHealthResult
-          .UnderReplicatedHealthResult) result)
-          .underReplicatedDueToDecommission()) {
+      } else if (containerHealthResult.underReplicatedDueToDecommission()) {
         Map<DatanodeDetails, SCMCommand> commands = new HashMap<>();
         Set<Integer> decomIndexes = replicaCount.decommissioningIndexes();
         final List<DatanodeDetails> selectedDatanodes =
@@ -197,13 +203,8 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
         }
         return commands;
       } else {
-        if (replicaCount.unRecoverable()) {
-          LOG.warn("The container {} is unrecoverable due to lack of"
-              + " available source replicas.", id);
-        } else {
-          LOG.info("There are no missing indexes or decommissioning indexes"
-                  + " found for {}", id);
-        }
+        LOG.info("There are no missing indexes or decommissioning indexes"
+                + " found for {}", id);
       }
 
     } catch (IOException | IllegalStateException ex) {
