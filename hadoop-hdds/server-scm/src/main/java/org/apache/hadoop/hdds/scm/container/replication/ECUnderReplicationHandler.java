@@ -77,7 +77,7 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
    *
    * @param replicas - An instance of ContainerReplicaCount, containing the
    *                   current replica count and inflight adds and deletes
-   * @param pendingOps - Inflight replications and deletion metrics.
+   * @param pendingOps - Inflight replications and deletion ops.
    * @param result - Health check result.
    * @param remainingMaintenanceRedundancy - represents that how many nodes go
    *                                      into maintenance.
