@@ -192,7 +192,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
               omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject(),
-              oldKeyVersionsToDelete);
+              oldKeyVersionsToDelete, volumeId);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
