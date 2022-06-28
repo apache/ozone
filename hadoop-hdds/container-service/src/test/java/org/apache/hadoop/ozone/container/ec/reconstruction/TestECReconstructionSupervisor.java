@@ -17,9 +17,17 @@
  */
 package org.apache.hadoop.ozone.container.ec.reconstruction;
 
+import com.google.common.collect.ImmutableList;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.Assert;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.util.SortedMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
 
 /**
@@ -27,27 +35,37 @@ import java.util.concurrent.TimeoutException;
  */
 public class TestECReconstructionSupervisor {
 
-  private final ECReconstructionSupervisor supervisor =
-      new ECReconstructionSupervisor(null, null, 5, null);
-
   @Test
   public void testAddTaskShouldExecuteTheGivenTask()
-      throws InterruptedException, TimeoutException {
-    FakeTask task = new FakeTask(null);
-    supervisor.addTask(task);
-    GenericTestUtils.waitFor(() -> task.isExecuted, 100, 15000);
-  }
-
-  static class FakeTask extends ECReconstructionCoordinatorTask {
-    private boolean isExecuted = false;
-
-    FakeTask(ECReconstructionCommandInfo reconstructionCommandInfo) {
-      super(null, reconstructionCommandInfo);
-    }
-
-    @Override
-    public void run() {
-      isExecuted = true;
-    }
+      throws InterruptedException, TimeoutException, IOException {
+    final CountDownLatch runnableInvoked = new CountDownLatch(1);
+    final CountDownLatch holdProcessing = new CountDownLatch(1);
+    ECReconstructionSupervisor supervisor =
+        new ECReconstructionSupervisor(null, null, 5,
+            new ECReconstructionCoordinator(new OzoneConfiguration(), null) {
+              @Override
+              public void reconstructECContainerGroup(long containerID,
+                  ECReplicationConfig repConfig,
+                  SortedMap<Integer, DatanodeDetails> sourceNodeMap,
+                  SortedMap<Integer, DatanodeDetails> targetNodeMap)
+                  throws IOException {
+                runnableInvoked.countDown();
+                try {
+                  holdProcessing.await();
+                } catch (InterruptedException e) {
+                }
+                super.reconstructECContainerGroup(containerID, repConfig,
+                    sourceNodeMap, targetNodeMap);
+              }
+            }) {
+        };
+    supervisor.addTask(
+        new ECReconstructionCommandInfo(1, new ECReplicationConfig(3, 2),
+            new byte[0], ImmutableList.of(), ImmutableList.of()));
+    runnableInvoked.await();
+    Assert.assertEquals(1, supervisor.getInFlightReplications());
+    holdProcessing.countDown();
+    GenericTestUtils
+        .waitFor(() -> supervisor.getInFlightReplications() == 0, 100, 15000);
   }
 }
