@@ -2973,8 +2973,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       serviceList = getServiceList();
     } catch (IOException e) {
-      LOG.error("IO-Exception Occurred");
-      return "Null values found";
+      LOG.error("IO-Exception Occurred", e);
+      return "Exception: " + e.toString();
     }
     return OmUtils.format(serviceList, port);
   }
