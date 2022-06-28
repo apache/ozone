@@ -103,7 +103,8 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
 
     LOG.debug("Handling under-replicated EC container: {}", container);
     if (currentUnderRepRes
-        .getHealthState() != ContainerHealthResult.HealthState.UNDER_REPLICATED) {
+        .getHealthState() != ContainerHealthResult.HealthState
+        .UNDER_REPLICATED) {
       LOG.info("The container {} state changed and it's not in under"
               + " replication any more. Current state is: {}",
           container.getContainerID(), currentUnderRepRes);
