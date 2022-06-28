@@ -49,7 +49,7 @@ import java.util.stream.Collectors;
  * recommend to use this if the network topology has more layers.
  * <p>
  */
-public class SCMContainerPlacementRackScatter
+public final class SCMContainerPlacementRackScatter
     extends SCMCommonPlacementPolicy {
   @VisibleForTesting
   public static final Logger LOG =

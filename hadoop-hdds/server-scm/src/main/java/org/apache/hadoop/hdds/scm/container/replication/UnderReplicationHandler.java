@@ -35,8 +35,7 @@ public interface UnderReplicationHandler {
    * Identify a new set of datanode(s) to replicate/reconstruct the container
    * and form the SCM commands to send it to DN.
    *
-   * @param replicas - An instance of ContainerReplicaCount, containing the
-   *                   current replica count and inflight adds and deletes
+   * @param replicas - Set of available container replicas.
    * @param pendingOps - Inflight replications and deletion ops.
    * @param result - Health check result.
    * @param remainingMaintenanceRedundancy - represents that how many nodes go
@@ -44,7 +43,7 @@ public interface UnderReplicationHandler {
    * @return Returns the key value pair of destination dn where the command gets
    * executed and the command itself.
    */
-  Map<DatanodeDetails, SCMCommand> processAndCreateCommands(
+  Map<DatanodeDetails, SCMCommand<?>> processAndCreateCommands(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult result, int remainingMaintenanceRedundancy);
 }

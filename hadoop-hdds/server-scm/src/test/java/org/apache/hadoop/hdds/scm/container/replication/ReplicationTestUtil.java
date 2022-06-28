@@ -96,4 +96,10 @@ public final class ReplicationTestUtil {
     return builder.build();
   }
 
+  public static ContainerInfo createContainer(HddsProtos.LifeCycleState state,
+      ReplicationConfig replicationConfig) {
+    return new ContainerInfo.Builder()
+        .setContainerID(ContainerID.valueOf(1).getId()).setState(state)
+        .setReplicationConfig(replicationConfig).build();
+  }
 }

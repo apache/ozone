@@ -46,6 +46,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyMap;
+
 /**
  * Handles the EC Under replication processing and forming the respective SCM
  * commands.
@@ -75,8 +77,7 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
    * SCM command to send it to DN. In the case of decommission, it will just
    * generate the replicate commands instead of reconstruction commands.
    *
-   * @param replicas - An instance of ContainerReplicaCount, containing the
-   *                   current replica count and inflight adds and deletes
+   * @param replicas - Set of available container replicas.
    * @param pendingOps - Inflight replications and deletion ops.
    * @param result - Health check result.
    * @param remainingMaintenanceRedundancy - represents that how many nodes go
@@ -85,7 +86,7 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
    * executed and the command itself.
    */
   @Override
-  public Map<DatanodeDetails, SCMCommand> processAndCreateCommands(
+  public Map<DatanodeDetails, SCMCommand<?>> processAndCreateCommands(
       final Set<ContainerReplica> replicas,
       final List<ContainerReplicaOp> pendingOps,
       final ContainerHealthResult result,
@@ -108,7 +109,7 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
       LOG.info("The container {} state changed and it's not in under"
               + " replication any more. Current state is: {}",
           container.getContainerID(), currentUnderRepRes);
-      return null;
+      return emptyMap();
     }
     ContainerHealthResult.UnderReplicatedHealthResult containerHealthResult =
         ((ContainerHealthResult.UnderReplicatedHealthResult)
@@ -116,11 +117,12 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
     if (containerHealthResult.isSufficientlyReplicatedAfterPending()) {
       LOG.info("The container {} with replicas {} is sufficiently replicated",
           container.getContainerID(), replicaCount.getReplicas());
-      return null;
+      return emptyMap();
     }
     if (replicaCount.unRecoverable()) {
       LOG.warn("The container {} is unrecoverable. The available replicas" +
           " are: {}.", container.containerID(), replicaCount.getReplicas());
+      return emptyMap();
     }
     final ContainerID id = container.containerID();
     try {
@@ -134,7 +136,6 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
       List<Integer> missingIndexes = replicaCount.unavailableIndexes(true);
       // We got the missing indexes, this is excluded any decommissioning
       // indexes. Find the good source nodes.
-
       if (missingIndexes.size() > 0 && !replicaCount.unRecoverable()) {
         List<ContainerReplica> sources = replicas.stream().filter(r -> r
             .getState() == StorageContainerDatanodeProtocolProtos
@@ -178,9 +179,11 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
               + " {}. Available sources are: {}", container.containerID(),
               repConfig.getData(), sources.size(), sources);
         }
-      } else if (containerHealthResult.underReplicatedDueToDecommission()) {
+      }
+
+      if (containerHealthResult.underReplicatedDueToDecommission()) {
         Map<DatanodeDetails, SCMCommand> commands = new HashMap<>();
-        Set<Integer> decomIndexes = replicaCount.decommissioningIndexes();
+        Set<Integer> decomIndexes = replicaCount.decommissioningOnlyIndexes();
         final List<DatanodeDetails> selectedDatanodes =
             getTargetDatanodes(replicas, container, decomIndexes.size());
         Iterator<DatanodeDetails> iterator = selectedDatanodes.iterator();
@@ -203,17 +206,13 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
           }
         }
         return commands;
-      } else {
-        LOG.info("There are no missing indexes or decommissioning indexes"
-                + " found for {}", id);
       }
-
     } catch (IOException | IllegalStateException ex) {
       LOG.warn("Exception while processing for creating the EC reconstruction" +
               " container commands for {}.",
           id, ex);
     }
-    return null;
+    return emptyMap();
   }
 
   private List<DatanodeDetails> getTargetDatanodes(
@@ -236,7 +235,7 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
     byte[] dst = new byte[src.size()];
 
     for (int i = 0; i < src.size(); i++) {
-      dst[i] = (byte) ((int) src.get(i));
+      dst[i] = src.get(i).byteValue();
     }
     return dst;
   }

@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.container.states;
 import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -31,6 +30,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ECContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
@@ -64,7 +64,8 @@ public class TestECContainerReplicaCount {
   @BeforeEach
   public void setup() {
     repConfig = new ECReplicationConfig(3, 2);
-    container = createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
+    container = ReplicationTestUtil
+        .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
   }
 
   @Test
@@ -516,14 +517,5 @@ public class TestECContainerReplicaCount {
           .build());
     }
     return replica;
-  }
-
-  private ContainerInfo createContainer(HddsProtos.LifeCycleState state,
-      ReplicationConfig replicationConfig) {
-    return new ContainerInfo.Builder()
-        .setContainerID(ContainerID.valueOf(1).getId())
-        .setState(state)
-        .setReplicationConfig(replicationConfig)
-        .build();
   }
 }

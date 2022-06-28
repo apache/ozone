@@ -20,20 +20,20 @@ package org.apache.hadoop.hdds.scm.container.states;
 import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ECUnderReplicationHandler;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -89,33 +89,32 @@ public class TestECUnderReplicationHandler {
     };
     conf = SCMTestUtils.getConf();
     repConfig = new ECReplicationConfig(3, 2);
-    container = createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
+    container = ReplicationTestUtil
+        .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
     // create placement policy instances
     cluster = new NetworkTopologyImpl(NodeSchemaManager.getInstance());
-    policy =
-        new SCMContainerPlacementRackScatter(nodeManager, conf, cluster, true,
-            metrics) {
-          @Override
-          public List<DatanodeDetails> chooseDatanodes(
-              List<DatanodeDetails> excludedNodes,
-              List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
-              long metadataSizeRequired, long dataSizeRequired)
-              throws SCMException {
-            List<DatanodeDetails> dns = new ArrayList<>();
-            for (int i = 0; i < nodesRequiredToChoose; i++) {
-              dns.add(MockDatanodeDetails.randomDatanodeDetails());
-            }
-            return dns;
-          }
-        };
+    policy = new SCMCommonPlacementPolicy(nodeManager, conf) {
+      @Override
+      public List<DatanodeDetails> chooseDatanodes(
+          List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
+          long metadataSizeRequired, long dataSizeRequired)
+          throws SCMException {
+        List<DatanodeDetails> dns = new ArrayList<>();
+        for (int i = 0; i < nodesRequiredToChoose; i++) {
+          dns.add(MockDatanodeDetails.randomDatanodeDetails());
+        }
+        return dns;
+      }
+
+      @Override
+      public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes) {
+        return null;
+      }
+    };
     NodeSchema[] schemas =
         new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
-
-  }
-
-  @BeforeEach
-  public void init() {
     metrics = SCMContainerPlacementMetrics.create();
   }
 
@@ -210,7 +209,7 @@ public class TestECUnderReplicationHandler {
             ((ReconstructECContainersCommand) dnVsCommand.getValue())
                 .getMissingContainerIndexes());
       } else {
-        Assertions.assertNull(datanodeDetailsSCMCommandMap);
+        Assert.assertEquals(0, datanodeDetailsSCMCommandMap.size());
       }
     } else {
       int numDecomIndexes = 0;
@@ -243,13 +242,5 @@ public class TestECUnderReplicationHandler {
           .setReplicaIndex(s.getRight()).build());
     }
     return replica;
-  }
-
-  private ContainerInfo createContainer(HddsProtos.LifeCycleState state,
-      ReplicationConfig replicationConfig) {
-
-    return new ContainerInfo.Builder()
-        .setContainerID(ContainerID.valueOf(1).getId()).setState(state)
-        .setReplicationConfig(replicationConfig).build();
   }
 }

@@ -144,6 +144,21 @@ public class ECContainerReplicaCount {
   }
 
   /**
+   * Get a set containing all decommissioning only indexes, or an empty set if
+   * none are decommissioning.
+   * @return Set of indexes in decommission only.
+   */
+  public Set<Integer> decommissioningOnlyIndexes() {
+    Set<Integer> decommissioningOnlyIndexes = new HashSet<>();
+    for (Integer i : decommissionIndexes.keySet()) {
+      if (!healthyIndexes.containsKey(i)) {
+        decommissioningOnlyIndexes.add(i);
+      }
+    }
+    return decommissioningOnlyIndexes;
+  }
+
+  /**
    * Get a set containing all maintenance indexes, or an empty set if none are
    * in maintenance. Note it is possible for an index to be
    * decommissioning, healthy and in maintenance, if there are multiple copies
