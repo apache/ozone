@@ -62,7 +62,7 @@ public final class OzoneManagerUtils {
    * omMetadataManager().getBucketTable().get(buckKey)
    */
 
-  private static OmBucketInfo getOmBucketInfo(OMMetadataManager metaMgr,
+  public static OmBucketInfo getOmBucketInfo(OMMetadataManager metaMgr,
       String volName, String buckName) throws IOException {
     String buckKey = metaMgr.getBucketKey(volName, buckName);
     return metaMgr.getBucketTable().get(buckKey);
