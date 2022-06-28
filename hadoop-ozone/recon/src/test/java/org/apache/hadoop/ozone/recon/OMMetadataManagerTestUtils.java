@@ -196,6 +196,8 @@ public final class OMMetadataManagerTestUtils {
                                     String fileName,
                                     long objectID,
                                     long parentObjectId,
+                                    long bucketObjectId,
+                                    long volumeObjectId,
                                     long dataSize,
                                     BucketLayout bucketLayout)
           throws IOException {
@@ -203,7 +205,8 @@ public final class OMMetadataManagerTestUtils {
     // DB key in KeyTable => "/volume/bucket/key"
     String omKey;
     if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-      omKey = omMetadataManager.getOzonePathKey(parentObjectId, fileName);
+      omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
+             bucketObjectId, parentObjectId, fileName);
     } else {
       omKey = omMetadataManager.getOzoneKey(volume, bucket, key);
     }
@@ -232,6 +235,8 @@ public final class OMMetadataManagerTestUtils {
                                   String volume,
                                   String fileName,
                                   long objectID,
+                                  long bucketObjectId,
+                                  long volumeObjectId,
                                   long parentObjectId,
                                   BucketLayout bucketLayout)
       throws IOException {
@@ -239,7 +244,8 @@ public final class OMMetadataManagerTestUtils {
     // DB key in KeyTable => "/volume/bucket/key"
     String omKey;
     if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-      omKey = omMetadataManager.getOzonePathKey(parentObjectId, fileName);
+      omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
+             bucketObjectId, parentObjectId, fileName);
     } else {
       omKey = omMetadataManager.getOzoneKey(volume, bucket, key);
     }
@@ -257,6 +263,8 @@ public final class OMMetadataManagerTestUtils {
 
   @SuppressWarnings("checkstyle:parameternumber")
   public static void writeKeyToOm(OMMetadataManager omMetadataManager,
+                                  long volumeObjectId,
+                                  long bucketObjectId,
                                   long parentObjectId,
                                   long objectId,
                                   String volName,
@@ -269,7 +277,8 @@ public final class OMMetadataManagerTestUtils {
 
     String omKey;
     if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-      omKey = omMetadataManager.getOzonePathKey(parentObjectId, fileName);
+      omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
+              bucketObjectId, parentObjectId, fileName);
     } else {
       omKey = omMetadataManager.getOzoneKey(volName, bucketName, keyName);
     }
@@ -289,9 +298,12 @@ public final class OMMetadataManagerTestUtils {
   public static void writeDirToOm(OMMetadataManager omMetadataManager,
                                   long objectId,
                                   long parentObjectId,
+                                  long bucketObjectId,
+                                  long volumeObjectId,
                                   String dirName) throws IOException {
     // DB key in DirectoryTable => "parentId/dirName"
-    String omKey = omMetadataManager.getOzonePathKey(parentObjectId, dirName);
+    String omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
+            bucketObjectId, parentObjectId, dirName);
     omMetadataManager.getDirectoryTable().put(omKey,
             new OmDirectoryInfo.Builder()
                     .setName(dirName)

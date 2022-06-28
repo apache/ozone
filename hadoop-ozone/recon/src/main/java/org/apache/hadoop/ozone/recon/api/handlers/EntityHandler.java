@@ -188,8 +188,9 @@ public abstract class EntityHandler {
         return EntityType.UNKNOWN.create(reconNamespaceSummaryManager,
                 omMetadataManager, reconSCM, null);
       }
+      final long volumeId = bucketHandler.getVolumeObjectId(names);
       long bucketObjectId = bucketHandler.getBucketObjectId(names);
-      return bucketHandler.determineKeyPath(keyName,
+      return bucketHandler.determineKeyPath(keyName, volumeId,
           bucketObjectId).create(reconNamespaceSummaryManager,
               omMetadataManager, reconSCM, bucketHandler);
     }

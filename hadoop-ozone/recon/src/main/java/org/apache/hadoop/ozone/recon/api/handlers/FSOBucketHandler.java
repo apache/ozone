@@ -58,7 +58,7 @@ public class FSOBucketHandler extends BucketHandler {
    * @throws IOException
    */
   @Override
-  public EntityType determineKeyPath(String keyName, long bucketObjectId)
+  public EntityType determineKeyPath(String keyName, long volumeId, long bucketObjectId)
           throws IOException {
     Path keyPath = Paths.get(keyName);
     Iterator<Path> elements = keyPath.iterator();
@@ -73,8 +73,8 @@ public class FSOBucketHandler extends BucketHandler {
       // 'buck1' to the leaf node component, which is 'file1.txt'.
       // 2. If there is no dir exists for the leaf node component 'file1.txt'
       // then do look it on fileTable.
-      String dbNodeName = getOmMetadataManager()
-              .getOzonePathKey(lastKnownParentId, fileName);
+      String dbNodeName = getOmMetadataManager().getOzonePathKey(volumeId,
+              bucketObjectId, lastKnownParentId, fileName);
       omDirInfo = getOmMetadataManager().getDirectoryTable()
               .getSkipCache(dbNodeName);
 
@@ -248,7 +248,8 @@ public class FSOBucketHandler extends BucketHandler {
     long dirObjectId = getBucketObjectId(names);
     String dirKey = null;
     for (int i = 2; i < cutoff; ++i) {
-      dirKey = getOmMetadataManager().getOzonePathKey(dirObjectId, names[i]);
+      dirKey = getOmMetadataManager().getOzonePathKey(getVolumeObjectId(names),
+              getBucketObjectId(names), dirObjectId, names[i]);
       OmDirectoryInfo dirInfo =
               getOmMetadataManager().getDirectoryTable().getSkipCache(dirKey);
       dirObjectId = dirInfo.getObjectID();
@@ -280,11 +281,14 @@ public class FSOBucketHandler extends BucketHandler {
   @Override
   public OmKeyInfo getKeyInfo(String[] names) throws IOException {
     // The object ID for the directory that the key is directly in
+    final long volumeId = getVolumeObjectId(names);
+    final long bucketId = getBucketObjectId(names);
     long parentObjectId = getDirObjectId(names,
         names.length - 1);
     String fileName = names[names.length - 1];
-    String ozoneKey = getOmMetadataManager()
-        .getOzonePathKey(parentObjectId, fileName);
+    String ozoneKey =
+        getOmMetadataManager().getOzonePathKey(volumeId, bucketId,
+        parentObjectId, fileName);
     OmKeyInfo keyInfo = getKeyTable().getSkipCache(ozoneKey);
     return keyInfo;
   }

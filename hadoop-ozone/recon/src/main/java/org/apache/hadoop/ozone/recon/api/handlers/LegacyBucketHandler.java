@@ -64,7 +64,7 @@ public class LegacyBucketHandler extends BucketHandler {
    * @throws IOException
    */
   @Override
-  public EntityType determineKeyPath(String keyName, long bucketObjectId)
+  public EntityType determineKeyPath(String keyName, long volumeId, long bucketObjectId)
           throws IOException {
 
     String filename = OzoneFSUtils.removeTrailingSlashIfNeeded(keyName);

@@ -6,25 +6,28 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.recon.tasks;
 
+package org.apache.hadoop.ozone.recon.tasks;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
+import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +36,9 @@ import javax.inject.Inject;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
@@ -66,6 +71,7 @@ public class FSONSSummaryTask extends NSSummaryTask {
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     final Collection<String> taskTables = getTaskTables();
+    Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, ? extends
@@ -91,22 +97,22 @@ public class FSONSSummaryTask extends NSSummaryTask {
 
           switch (action) {
           case PUT:
-            writeOmKeyInfoOnNamespaceDB(updatedKeyInfo);
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
             break;
 
           case DELETE:
-            deleteOmKeyInfoOnNamespaceDB(updatedKeyInfo);
+            handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
             break;
 
           case UPDATE:
             if (oldKeyInfo != null) {
               // delete first, then put
-              deleteOmKeyInfoOnNamespaceDB(oldKeyInfo);
+              handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
             } else {
               LOG.warn("Update event does not have the old keyInfo for {}.",
                   updatedKey);
             }
-            writeOmKeyInfoOnNamespaceDB(updatedKeyInfo);
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
             break;
 
           default:
@@ -122,22 +128,22 @@ public class FSONSSummaryTask extends NSSummaryTask {
 
           switch (action) {
           case PUT:
-            writeOmDirectoryInfoOnNamespaceDB(updatedDirectoryInfo);
+            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
             break;
 
           case DELETE:
-            deleteOmDirectoryInfoOnNamespaceDB(updatedDirectoryInfo);
+            handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
             break;
 
           case UPDATE:
             if (oldDirectoryInfo != null) {
               // delete first, then put
-              deleteOmDirectoryInfoOnNamespaceDB(oldDirectoryInfo);
+              handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
             } else {
               LOG.warn("Update event does not have the old dirInfo for {}.",
                   updatedKey);
             }
-            writeOmDirectoryInfoOnNamespaceDB(updatedDirectoryInfo);
+            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
             break;
 
           default:
@@ -151,12 +157,22 @@ public class FSONSSummaryTask extends NSSummaryTask {
         return new ImmutablePair<>(getTaskName(), false);
       }
     }
+
+    try {
+      writeNSSummariesToDB(nsSummaryMap);
+    } catch (IOException e) {
+      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+      return new ImmutablePair<>(getTaskName(), false);
+    }
+
     LOG.info("Completed a process run of FSONSSummaryTask");
     return new ImmutablePair<>(getTaskName(), true);
   }
 
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+    Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
+
     try {
       // reinit Recon RocksDB's namespace CF.
       getReconNamespaceSummaryManager().clearNSSummaryTable();
@@ -168,7 +184,7 @@ public class FSONSSummaryTask extends NSSummaryTask {
       while (dirTableIter.hasNext()) {
         Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();
         OmDirectoryInfo directoryInfo = kv.getValue();
-        writeOmDirectoryInfoOnNamespaceDB(directoryInfo);
+        handlePutDirEvent(directoryInfo, nsSummaryMap);
       }
 
       // Get fileTable used by FSO
@@ -180,7 +196,7 @@ public class FSONSSummaryTask extends NSSummaryTask {
       while (keyTableIter.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
         OmKeyInfo keyInfo = kv.getValue();
-        writeOmKeyInfoOnNamespaceDB(keyInfo);
+        handlePutKeyEvent(keyInfo, nsSummaryMap);
       }
 
     } catch (IOException ioEx) {
@@ -189,6 +205,12 @@ public class FSONSSummaryTask extends NSSummaryTask {
       return new ImmutablePair<>(getTaskName(), false);
     }
 
+    try {
+      writeNSSummariesToDB(nsSummaryMap);
+    } catch (IOException e) {
+      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+      return new ImmutablePair<>(getTaskName(), false);
+    }
     LOG.info("Completed a reprocess run of FSONSSummaryTask");
     return new ImmutablePair<>(getTaskName(), true);
   }

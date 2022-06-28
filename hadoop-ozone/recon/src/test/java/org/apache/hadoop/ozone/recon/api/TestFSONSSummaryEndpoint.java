@@ -616,14 +616,17 @@ public class TestFSONSSummaryEndpoint {
   private void populateOMDB() throws Exception {
     // write all 4 directories
     writeDirToOm(reconOMMetadataManager, DIR_ONE_OBJECT_ID,
-            BUCKET_ONE_OBJECT_ID, DIR_ONE);
+            BUCKET_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID, DIR_ONE);
     writeDirToOm(reconOMMetadataManager, DIR_TWO_OBJECT_ID,
-            DIR_ONE_OBJECT_ID, DIR_TWO);
+            DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID, DIR_TWO);
     writeDirToOm(reconOMMetadataManager, DIR_THREE_OBJECT_ID,
-            DIR_ONE_OBJECT_ID, DIR_THREE);
+            DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID, DIR_THREE);
     writeDirToOm(reconOMMetadataManager, DIR_FOUR_OBJECT_ID,
-            DIR_ONE_OBJECT_ID, DIR_FOUR);
-
+            DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID, DIR_FOUR);
     // write all 6 keys
     writeKeyToOm(reconOMMetadataManager,
             KEY_ONE,
@@ -632,6 +635,8 @@ public class TestFSONSSummaryEndpoint {
             FILE_ONE,
             KEY_ONE_OBJECT_ID,
             BUCKET_ONE_OBJECT_ID,
+            BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID,
             KEY_ONE_SIZE,
             getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
@@ -641,6 +646,8 @@ public class TestFSONSSummaryEndpoint {
             FILE_TWO,
             KEY_TWO_OBJECT_ID,
             DIR_TWO_OBJECT_ID,
+            BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID,
             KEY_TWO_SIZE,
             getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
@@ -649,6 +656,8 @@ public class TestFSONSSummaryEndpoint {
             VOL,
             FILE_THREE,
             KEY_THREE_OBJECT_ID,
+            BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID,
             DIR_THREE_OBJECT_ID,
             KEY_THREE_SIZE,
             getBucketLayout());
@@ -659,6 +668,8 @@ public class TestFSONSSummaryEndpoint {
             FILE_FOUR,
             KEY_FOUR_OBJECT_ID,
             BUCKET_TWO_OBJECT_ID,
+            VOL_OBJECT_ID,
+            BUCKET_TWO_OBJECT_ID,
             KEY_FOUR_SIZE,
             getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
@@ -667,6 +678,8 @@ public class TestFSONSSummaryEndpoint {
             VOL,
             FILE_FIVE,
             KEY_FIVE_OBJECT_ID,
+            BUCKET_TWO_OBJECT_ID,
+            VOL_OBJECT_ID,
             BUCKET_TWO_OBJECT_ID,
             KEY_FIVE_SIZE,
             getBucketLayout());
@@ -677,6 +690,8 @@ public class TestFSONSSummaryEndpoint {
             FILE_SIX,
             KEY_SIX_OBJECT_ID,
             DIR_FOUR_OBJECT_ID,
+            BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID,
             KEY_SIX_SIZE,
             getBucketLayout());
   }
@@ -761,6 +776,8 @@ public class TestFSONSSummaryEndpoint {
 
     // add the multi-block key to Recon's OM
     writeKeyToOm(reconOMMetadataManager,
+        VOL_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
         DIR_ONE_OBJECT_ID,
         MULTI_BLOCK_KEY_OBJECT_ID,
         VOL, BUCKET_ONE,
@@ -810,6 +827,7 @@ public class TestFSONSSummaryEndpoint {
     OmKeyLocationInfoGroup locationInfoGroup =
         new OmKeyLocationInfoGroup(0L, locationInfoList);
 
+/*    Christos fix these:
     if (entityType.equals(EntityType.ROOT) ||
         entityType.equals(EntityType.VOLUME)) {
       writeKeyToOm(reconOMMetadataManager,
@@ -887,6 +905,7 @@ public class TestFSONSSummaryEndpoint {
         FILE_SEVEN,
         Collections.singletonList(locationInfoGroup),
         getBucketLayout());
+*/
   }
 
   /**

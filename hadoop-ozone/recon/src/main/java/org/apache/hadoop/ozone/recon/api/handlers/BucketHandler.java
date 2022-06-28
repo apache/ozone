@@ -23,11 +23,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -84,7 +80,7 @@ public abstract class BucketHandler {
     return reconSCM;
   }
 
-  public abstract EntityType determineKeyPath(String keyName,
+  public abstract EntityType determineKeyPath(String keyName, long volumeId,
                              long bucketObjectId) throws IOException;
 
   public abstract Table<String, OmKeyInfo> getKeyTable();
@@ -168,6 +164,19 @@ public abstract class BucketHandler {
     String bucketDBKey = omMetadataManager.getBucketKey(volName, bucketName);
     // Check if bucket exists
     return omMetadataManager.getBucketTable().getSkipCache(bucketDBKey) != null;
+  }
+
+  /**
+   * Given a existent path, get the volume object ID.
+   * @param names valid path request
+   * @return volume objectID
+   * @throws IOException
+   */
+  public long getVolumeObjectId(String[] names) throws IOException {
+    String bucketKey = omMetadataManager.getVolumeKey(names[0]);
+    OmVolumeArgs volumeInfo = omMetadataManager
+            .getVolumeTable().getSkipCache(bucketKey);
+    return volumeInfo.getObjectID();
   }
 
   /**

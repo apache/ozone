@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.tasks;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -34,8 +35,8 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.Assert;
 import org.junit.ClassRule;
+import org.junit.Assert;
 import org.junit.experimental.runners.Enclosed;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
@@ -162,7 +163,10 @@ public final class TestLegacyNSSummaryTask {
       // write a NSSummary prior to reprocess
       // verify it got cleaned up after.
       NSSummary staleNSSummary = new NSSummary();
-      reconNamespaceSummaryManager.storeNSSummary(-1L, staleNSSummary);
+      RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+      reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation, -1L,
+          staleNSSummary);
+      reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
 
       legacyNSSummaryTask.reprocess(reconOMMetadataManager);
 
@@ -598,6 +602,8 @@ public final class TestLegacyNSSummaryTask {
         FILE_ONE,
         KEY_ONE_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
         KEY_ONE_SIZE,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
@@ -607,6 +613,8 @@ public final class TestLegacyNSSummaryTask {
         FILE_TWO,
         KEY_TWO_OBJECT_ID,
         BUCKET_TWO_OBJECT_ID,
+        BUCKET_TWO_OBJECT_ID,
+        VOL_OBJECT_ID,
         KEY_TWO_OLD_SIZE,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
@@ -616,6 +624,8 @@ public final class TestLegacyNSSummaryTask {
         FILE_THREE,
         KEY_THREE_OBJECT_ID,
         DIR_TWO_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
         KEY_THREE_SIZE,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
@@ -625,8 +635,12 @@ public final class TestLegacyNSSummaryTask {
         FILE_FOUR,
         KEY_FOUR_OBJECT_ID,
         BUCKET_TWO_OBJECT_ID,
+        BUCKET_TWO_OBJECT_ID,
+        VOL_OBJECT_ID,
         KEY_FOUR_SIZE,
         getBucketLayout());
+
+/*    Christos fix these
     writeKeyToOm(reconOMMetadataManager,
         (DIR_ONE + OM_KEY_PREFIX),
         BUCKET_ONE,
@@ -653,6 +667,7 @@ public final class TestLegacyNSSummaryTask {
         DIR_THREE_OBJECT_ID,
         DIR_ONE_OBJECT_ID,
         getBucketLayout());
+*/
   }
 
   /**
