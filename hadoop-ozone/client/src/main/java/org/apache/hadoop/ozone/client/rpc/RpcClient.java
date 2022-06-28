@@ -202,7 +202,6 @@ public class RpcClient implements ClientProtocol {
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final OzoneManagerVersion omVersion;
   private volatile ExecutorService ecReconstructExecutor;
-  private final String defaultBucketLayout;
 
   /**
    * Creates RpcClient instance with the given configuration.
@@ -309,9 +308,6 @@ public class RpcClient implements ClientProtocol {
     getLatestVersionLocation = conf.getBoolean(
         OzoneConfigKeys.OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION,
         OzoneConfigKeys.OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION_DEFAULT);
-    defaultBucketLayout = conf.getTrimmed(
-        OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT);
 
     long keyProviderCacheExpiryMs = conf.getTimeDuration(
         OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY,
@@ -667,20 +663,13 @@ public class RpcClient implements ClientProtocol {
       builder.setDefaultReplicationConfig(defaultReplicationConfig);
     }
 
-    if (bucketLayout != null) {
-      LOG.info("Creating Bucket: {}/{}, with the Bucket Layout {}, {} as " +
-              "owner, Versioning {}, Storage Type set to {} and Encryption " +
-              "set to {} ",
-          volumeName, bucketName, bucketLayout, owner, isVersionEnabled,
-          storageType, bek != null);
-    } else {
-      LOG.info("Creating Bucket: {}/{}, with the Bucket Layout {} - set to" +
-              "OM server default using the configuration: " +
-              "ozone.default.bucket.layout, {} as owner, Versioning {}, " +
-              "Storage Type set to {} and Encryption set to {} ",
-          volumeName, bucketName, defaultBucketLayout, owner, isVersionEnabled,
-          storageType, bek != null);
-    }
+    String layoutMsg = bucketLayout != null
+        ? "with bucket layout " + bucketLayout
+        : "with server-side default bucket layout";
+    LOG.info("Creating Bucket: {}/{}, {}, {} as owner, Versioning {}, " +
+            "Storage Type set to {} and Encryption set to {} ",
+        volumeName, bucketName, layoutMsg, owner, isVersionEnabled,
+        storageType, bek != null);
     ozoneManagerClient.createBucket(builder.build());
   }
 
