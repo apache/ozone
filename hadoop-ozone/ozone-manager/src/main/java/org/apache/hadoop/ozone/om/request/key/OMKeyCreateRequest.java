@@ -72,7 +72,6 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.UniqueId;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.KEY_PATH_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 
@@ -223,7 +222,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
       acquireLock = ozoneLockStrategy.acquireWriteLock(omMetadataManager,
-          KEY_PATH_LOCK, volumeName, bucketName, keyName);
+          volumeName, bucketName, keyName);
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       //TODO: We can optimize this get here, if getKmsProvider is null, then
       // bucket encryptionInfo will be not set. If this assumption holds
@@ -344,8 +343,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           omDoubleBufferHelper);
       if (acquireLock) {
         try {
-          ozoneLockStrategy.releaseWriteLock(omMetadataManager, KEY_PATH_LOCK,
-              volumeName, bucketName, keyName);
+          ozoneLockStrategy.releaseWriteLock(omMetadataManager, volumeName,
+              bucketName, keyName);
         } catch (IOException e) {
           e.printStackTrace();
         }

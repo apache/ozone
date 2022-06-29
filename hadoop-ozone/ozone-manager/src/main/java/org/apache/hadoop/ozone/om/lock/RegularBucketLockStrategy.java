@@ -32,7 +32,6 @@ public class RegularBucketLockStrategy implements OzoneLockStrategy {
 
   @Override
   public boolean acquireWriteLock(OMMetadataManager omMetadataManager,
-                                  OzoneManagerLock.Resource resource,
                                   String volumeName, String bucketName,
                                   String keyName) throws IOException {
     boolean acquiredLock;
@@ -46,7 +45,6 @@ public class RegularBucketLockStrategy implements OzoneLockStrategy {
 
   @Override
   public void releaseWriteLock(OMMetadataManager omMetadataManager,
-                               OzoneManagerLock.Resource resource,
                                String volumeName, String bucketName,
                                String keyName) throws IOException {
     omMetadataManager.getLock()
@@ -57,7 +55,6 @@ public class RegularBucketLockStrategy implements OzoneLockStrategy {
 
   @Override
   public boolean acquireReadLock(OMMetadataManager omMetadataManager,
-                                 OzoneManagerLock.Resource resource,
                                  String volumeName, String bucketName,
                                  String keyName) throws IOException {
     boolean acquiredLock;
@@ -71,7 +68,6 @@ public class RegularBucketLockStrategy implements OzoneLockStrategy {
 
   @Override
   public void releaseReadLock(OMMetadataManager omMetadataManager,
-                              OzoneManagerLock.Resource resource,
                               String volumeName, String bucketName,
                               String keyName) throws IOException {
     omMetadataManager.getLock()

@@ -31,19 +31,16 @@ import java.io.IOException;
  */
 public interface OzoneLockStrategy {
   boolean acquireWriteLock(OMMetadataManager omMetadataManager,
-                           OzoneManagerLock.Resource resource,
                            String volumeName, String bucketName, String keyName)
       throws IOException;
 
-  void releaseWriteLock(OMMetadataManager omMetadataManager,
-                        OzoneManagerLock.Resource resource, String volumeName,
+  void releaseWriteLock(OMMetadataManager omMetadataManager, String volumeName,
                         String bucketName, String keyName) throws IOException;
 
   boolean acquireReadLock(OMMetadataManager omMetadataManager,
-                          OzoneManagerLock.Resource resource, String volumeName,
-                          String bucketName, String keyName) throws IOException;
+                          String volumeName, String bucketName, String keyName)
+      throws IOException;
 
-  void releaseReadLock(OMMetadataManager omMetadataManager,
-                       OzoneManagerLock.Resource resource, String volumeName,
+  void releaseReadLock(OMMetadataManager omMetadataManager, String volumeName,
                        String bucketName, String keyName) throws IOException;
 }
