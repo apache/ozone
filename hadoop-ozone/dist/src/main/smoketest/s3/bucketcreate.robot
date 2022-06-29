@@ -40,3 +40,7 @@ Create bucket with invalid bucket name
     ${randStr} =        Generate Ozone String
     ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket invalid_bucket_${randStr}   255
                         Should contain              ${result}         InvalidBucketName
+Create new bucket and check no group ACL
+    ${bucket} =         Create bucket
+    ${acl} =            Execute     ozone sh bucket getacl s3v/${bucket}
+    Should not contain  ${acl}      \"type\" : \"GROUP\"
