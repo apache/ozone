@@ -126,7 +126,7 @@ public class FSOBucketHandler extends BucketHandler {
     return result;
   }
 
-  // FileTable's key is in the format of "parentId/fileName"
+  // FileTable's key is in the format of "volumeId/bucketId/parentId/fileName"
   // Make use of RocksDB's order to seek to the prefix and avoid full iteration
   @Override
   public long calculateDUUnderObject(long volumeId, long bucketId,

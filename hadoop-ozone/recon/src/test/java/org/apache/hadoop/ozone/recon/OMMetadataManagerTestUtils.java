@@ -201,7 +201,7 @@ public final class OMMetadataManagerTestUtils {
                                     long dataSize,
                                     BucketLayout bucketLayout)
           throws IOException {
-    // DB key in FileTable => "parentId/filename"
+    // DB key in FileTable => "volumeId/bucketId/parentId/fileName"
     // DB key in KeyTable => "/volume/bucket/key"
     String omKey;
     if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
@@ -240,7 +240,7 @@ public final class OMMetadataManagerTestUtils {
                                   long parentObjectId,
                                   BucketLayout bucketLayout)
       throws IOException {
-    // DB key in FileTable => "parentId/filename"
+    // DB key in FileTable => "volumeId/bucketId/parentId/fileName"
     // DB key in KeyTable => "/volume/bucket/key"
     String omKey;
     if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
