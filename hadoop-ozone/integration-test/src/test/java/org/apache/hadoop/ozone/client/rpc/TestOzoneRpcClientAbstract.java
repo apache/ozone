@@ -149,11 +149,13 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.slf4j.event.Level.DEBUG;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * This is an abstract class to test all the public facing APIs of Ozone
@@ -863,6 +865,27 @@ public abstract class TestOzoneRpcClientAbstract {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"rs-3-3-1024k", "xor-3-5-2048k"})
+  public void testPutKeyWithInvalidReplicationConfig(
+          String replicationValue) throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    String value = "dummy";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    String keyName = UUID.randomUUID().toString();
+    ReplicationConfig replicationConfig =
+            new ECReplicationConfig(replicationValue);
+    Assertions.assertThrows(IllegalArgumentException.class,
+            () -> bucket.createKey(keyName,
+            value.getBytes(UTF_8).length, replicationConfig, new HashMap<>()));
+  }
+
   @Test
   public void testPutKey() throws IOException {
     String volumeName = UUID.randomUUID().toString();
@@ -870,6 +893,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Instant testStartTime = Instant.now();
 
     String value = "sample value";
+
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
