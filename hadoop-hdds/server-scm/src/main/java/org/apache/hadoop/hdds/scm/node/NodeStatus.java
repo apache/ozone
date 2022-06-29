@@ -153,23 +153,14 @@ public class NodeStatus {
   }
 
   /**
-   * Returns true if the nodeStatus is healthy (ie not stale or dead) and false
-   * otherwise.
+   * Returns true if the nodeStatus is healthy or healthy_readonly (ie not stale
+   * or dead) and false otherwise.
    *
-   * @return True if the node is Healthy, false otherwise
+   * @return True if the node is healthy or healthy_readonly, false otherwise.
    */
   public boolean isHealthy() {
-    return health == HddsProtos.NodeState.HEALTHY;
-  }
-
-  /**
-   * Returns true if the nodeStatus is healthy read only (ie not stale or dead)
-   * and false otherwise.
-   *
-   * @return True if the node is healthy read only, false otherwise
-   */
-  public boolean isHealthyReadOnly() {
-    return health == HddsProtos.NodeState.HEALTHY_READONLY;
+    return health == HddsProtos.NodeState.HEALTHY
+        || health == HddsProtos.NodeState.HEALTHY_READONLY;
   }
 
   /**

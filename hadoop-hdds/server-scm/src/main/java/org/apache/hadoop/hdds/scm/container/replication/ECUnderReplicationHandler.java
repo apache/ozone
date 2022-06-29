@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ECContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -144,11 +143,9 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
             // Exclude stale and dead nodes. This is particularly important for
             // maintenance nodes, as the replicas will remain present in the
             // container manager, even when they go dead.
-            .filter((r) -> {
-              NodeStatus nodeStatus = ReplicationManager
-                  .getNodeStatus(r.getDatanodeDetails(), nodeManager);
-              return nodeStatus.isHealthy() || nodeStatus.isHealthyReadOnly();
-            }).filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
+            .filter(r -> ReplicationManager
+                .getNodeStatus(r.getDatanodeDetails(), nodeManager).isHealthy())
+            .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
             .collect(
                 Collectors.toMap(ContainerReplica::getReplicaIndex, x -> x));
         LOG.debug("Missing indexes detected for the container {}." +
