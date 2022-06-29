@@ -29,14 +29,14 @@ The current configuration in the robot files (hostnames, ports) are adjusted for
 
 # Run tests in docker environment
 
-In the ./compose folder there are additional test scripts to make it easy to run all tests or run a specific test in a docker environment.
+In the [compose](../compose) folder there are additional test scripts to make it easy to run all tests or run a specific test in a docker environment.
 
 ## Test one environment
 
 Go to the compose directory and execute the test.sh directly from there:
 
 ```
-cd compose/ozone
+cd ../compose/ozone
 ./test.sh
 ```
 
@@ -45,7 +45,7 @@ The results will be saved to the `compose/ozone/results`
 ## Run all the tests
 
 ```
-cd compose
+cd ../compose
 ./test-all.sh
 ```
 
@@ -56,7 +56,7 @@ The results will be combined to the `compose/results` folder.
 Start the compose environment and execute test:
 
 ```
-cd compose/ozone
+cd ../compose/ozone
 docker-compose up -d
 #wait....
 ../test-single.sh scm basic/basic.robot
