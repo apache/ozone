@@ -39,6 +39,8 @@ public class TestReservedVolumeSpace {
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
+  @Rule
+  public TemporaryFolder temp = new TemporaryFolder();
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private HddsVolume.Builder volumeBuilder;
 
@@ -78,12 +80,12 @@ public class TestReservedVolumeSpace {
   }
 
   /**
-   * Either hdds.datanode.volume.reserved or hdds.datanode.dir.du.reserved
-   * should be set. But not both.
+   * When both configs are set, hdds.datanode.dir.du.reserved is set
+   * if the volume matches with volume in config parameter.
    * @throws Exception
    */
   @Test
-  public void testReservedToZeroWhenBothConfigSet() throws Exception {
+  public void testReservedWhenBothConfigSet() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT, "0.3");
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
@@ -91,9 +93,7 @@ public class TestReservedVolumeSpace {
     HddsVolume hddsVolume = volumeBuilder.conf(conf).build();
 
     long reservedFromVolume = hddsVolume.getVolumeInfo().getReservedInBytes();
-    //When both the configs hdds.datanode.volume.reserved and
-    //hdds.datanode.dir.du.reserved are set. We set reserved to 0
-    Assert.assertEquals(reservedFromVolume, 0);
+    Assert.assertEquals(reservedFromVolume, 500);
   }
 
   @Test
@@ -103,5 +103,47 @@ public class TestReservedVolumeSpace {
 
     long reservedFromVolume = hddsVolume.getVolumeInfo().getReservedInBytes();
     Assert.assertEquals(reservedFromVolume, 0);
+  }
+
+  @Test
+  public void testFallbackToPercentConfig() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT, "0.3");
+    //Setting config for different volume, hence fallback happens
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
+        temp.getRoot() + ":500B");
+    HddsVolume hddsVolume = volumeBuilder.conf(conf).build();
+
+    long reservedFromVolume = hddsVolume.getVolumeInfo().getReservedInBytes();
+    Assert.assertNotEquals(reservedFromVolume, 0);
+
+    long totalCapacity = hddsVolume.getVolumeInfo()
+        .getUsageForTesting().getCapacity();
+    float percentage = conf.getFloat(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT,
+        HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
+    long reservedCalculated = (long) Math.ceil(totalCapacity * percentage);
+    Assert.assertEquals(reservedFromVolume, reservedCalculated);
+  }
+
+  @Test
+  public void testInvalidConfig() throws Exception {
+    OzoneConfiguration conf1 = new OzoneConfiguration();
+
+    // 500C doesn't match with any Storage Unit
+    conf1.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
+        folder.getRoot() + ":500C");
+    HddsVolume hddsVolume1 = volumeBuilder.conf(conf1).build();
+
+    long reservedFromVolume1 = hddsVolume1.getVolumeInfo().getReservedInBytes();
+    Assert.assertEquals(reservedFromVolume1, 0);
+
+    OzoneConfiguration conf2 = new OzoneConfiguration();
+
+    //Should be between 0-1.
+    conf2.set(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT, "20");
+    HddsVolume hddsVolume2 = volumeBuilder.conf(conf2).build();
+
+    long reservedFromVolume2 = hddsVolume2.getVolumeInfo().getReservedInBytes();
+    Assert.assertEquals(reservedFromVolume2, 0);
   }
 }
