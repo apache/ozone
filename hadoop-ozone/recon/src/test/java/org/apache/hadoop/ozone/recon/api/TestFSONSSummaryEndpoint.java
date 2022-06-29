@@ -656,9 +656,9 @@ public class TestFSONSSummaryEndpoint {
             VOL,
             FILE_THREE,
             KEY_THREE_OBJECT_ID,
+            DIR_THREE_OBJECT_ID,
             BUCKET_ONE_OBJECT_ID,
             VOL_OBJECT_ID,
-            DIR_THREE_OBJECT_ID,
             KEY_THREE_SIZE,
             getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
@@ -668,8 +668,8 @@ public class TestFSONSSummaryEndpoint {
             FILE_FOUR,
             KEY_FOUR_OBJECT_ID,
             BUCKET_TWO_OBJECT_ID,
-            VOL_OBJECT_ID,
             BUCKET_TWO_OBJECT_ID,
+            VOL_OBJECT_ID,
             KEY_FOUR_SIZE,
             getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
@@ -679,8 +679,8 @@ public class TestFSONSSummaryEndpoint {
             FILE_FIVE,
             KEY_FIVE_OBJECT_ID,
             BUCKET_TWO_OBJECT_ID,
-            VOL_OBJECT_ID,
             BUCKET_TWO_OBJECT_ID,
+            VOL_OBJECT_ID,
             KEY_FIVE_SIZE,
             getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
