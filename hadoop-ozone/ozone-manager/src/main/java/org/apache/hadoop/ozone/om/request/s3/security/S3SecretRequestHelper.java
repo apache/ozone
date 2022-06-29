@@ -49,7 +49,7 @@ public final class S3SecretRequestHelper {
       OzoneManager ozoneManager, UserGroupInformation ugi, String accessId)
       throws IOException {
 
-    final String username = ugi.getUserName();
+    final String username = ugi.getShortUserName();
 
     // Flag indicating whether the accessId is assigned to a tenant
     // (under S3 Multi-Tenancy feature) or not.
