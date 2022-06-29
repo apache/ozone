@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ECContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -136,17 +137,20 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
       List<Integer> missingIndexes = replicaCount.unavailableIndexes(true);
       // We got the missing indexes, this is excluded any decommissioning
       // indexes. Find the good source nodes.
-      if (missingIndexes.size() > 0 && !replicaCount.unRecoverable()) {
-        List<ContainerReplica> sources = replicas.stream().filter(r -> r
+      if (missingIndexes.size() > 0) {
+        Map<Integer, ContainerReplica> sources = replicas.stream().filter(r -> r
             .getState() == StorageContainerDatanodeProtocolProtos
             .ContainerReplicaProto.State.CLOSED)
             // Exclude stale and dead nodes. This is particularly important for
             // maintenance nodes, as the replicas will remain present in the
             // container manager, even when they go dead.
-            .filter(r -> ReplicationManager
-                .getNodeStatus(r.getDatanodeDetails(), nodeManager).isHealthy())
-            .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
-            .collect(Collectors.toList());
+            .filter((r) -> {
+              NodeStatus nodeStatus = ReplicationManager
+                  .getNodeStatus(r.getDatanodeDetails(), nodeManager);
+              return nodeStatus.isHealthy() || nodeStatus.isHealthyReadOnly();
+            }).filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
+            .collect(
+                Collectors.toMap(ContainerReplica::getReplicaIndex, x -> x));
         LOG.debug("Missing indexes detected for the container {}." +
                 " The missing indexes are {}", id, missingIndexes);
         // We have source nodes.
@@ -156,7 +160,7 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
 
           List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
               sourceDatanodesWithIndex = new ArrayList<>();
-          for (ContainerReplica srcReplica : sources) {
+          for (ContainerReplica srcReplica : sources.values()) {
             sourceDatanodesWithIndex.add(
                 new ReconstructECContainersCommand
                     .DatanodeDetailsAndReplicaIndex(
