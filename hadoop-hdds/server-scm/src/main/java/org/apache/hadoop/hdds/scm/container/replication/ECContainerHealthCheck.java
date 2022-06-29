@@ -21,7 +21,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ECContainerReplicaCount;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -49,9 +48,9 @@ public class ECContainerHealthCheck implements ContainerHealthCheck {
       Set<ContainerReplica> replicas,
       List<ContainerReplicaOp> replicaPendingOps,
       int remainingRedundancyForMaintenance) {
-    ECContainerReplicaCount replicaCount = getReplicaCountWithPending(container,
-          replicas, replicaPendingOps,
-          remainingRedundancyForMaintenance);
+    ECContainerReplicaCount replicaCount =
+        new ECContainerReplicaCount(container, replicas, replicaPendingOps,
+            remainingRedundancyForMaintenance);
 
     ECReplicationConfig repConfig =
         (ECReplicationConfig) container.getReplicationConfig();
@@ -85,22 +84,4 @@ public class ECContainerHealthCheck implements ContainerHealthCheck {
     // No issues detected, so return healthy.
     return new ContainerHealthResult.HealthyResult(container);
   }
-
-  private ECContainerReplicaCount getReplicaCountWithPending(
-      ContainerInfo container, Set<ContainerReplica> replicas,
-      List<ContainerReplicaOp> replicaPendingOps,
-      int remainingRedundancyForMaintenance) {
-    List<Integer> pendingAdd = new ArrayList<>();
-    List<Integer> pendingDelete = new ArrayList<>();
-    for (ContainerReplicaOp op : replicaPendingOps) {
-      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
-        pendingAdd.add(op.getReplicaIndex());
-      } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
-        pendingDelete.add(op.getReplicaIndex());
-      }
-    }
-    return new ECContainerReplicaCount(container, replicas, pendingAdd,
-        pendingDelete, remainingRedundancyForMaintenance);
-  }
-
 }

@@ -96,4 +96,20 @@ public final class ReplicationTestUtil {
     return builder.build();
   }
 
+  public static ContainerInfo createContainer(HddsProtos.LifeCycleState state,
+      ReplicationConfig replicationConfig) {
+    return new ContainerInfo.Builder()
+        .setContainerID(ContainerID.valueOf(1).getId()).setState(state)
+        .setReplicationConfig(replicationConfig).build();
+  }
+
+  public static Set<ContainerReplica> createReplicas(
+      Pair<HddsProtos.NodeOperationalState, Integer>... states) {
+    Set<ContainerReplica> replica = new HashSet<>();
+    for (Pair<HddsProtos.NodeOperationalState, Integer> s : states) {
+      replica.add(createContainerReplica(ContainerID.valueOf(1), s.getRight(),
+          s.getLeft()));
+    }
+    return replica;
+  }
 }
