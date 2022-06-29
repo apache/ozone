@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -1063,10 +1064,16 @@ public class ContainerBalancer extends StatefulService {
       balancingThread.interrupt();
       try {
         if (lock.isHeldByCurrentThread()) {
+          // warn for possible deadlock
+          String stackTrace =
+              Arrays.toString(Thread.currentThread().getStackTrace())
+                  .replace(',', '\n');
           LOG.warn("Waiting for balancing thread \"{}\" to join while current" +
-                  " thread holds lock. This could result in a deadlock if" +
-                  " balancing thread is also waiting to acquire the lock.",
-              balancingThread.getName());
+                  " thread \"{}\" holds lock. This could result in a deadlock" +
+                  " if balancing thread is also waiting to acquire the lock. " +
+                  "\n{}",
+              balancingThread.getName(), Thread.currentThread().getName(),
+              stackTrace);
         }
         balancingThread.join();
       } catch (InterruptedException exception) {
