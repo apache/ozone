@@ -125,6 +125,7 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
       return emptyMap();
     }
     final ContainerID id = container.containerID();
+    final Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
     try {
      // State is UNDER_REPLICATED
       final List<DatanodeDetails> deletionInFlight = new ArrayList<>();
@@ -170,8 +171,7 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
                   int2byte(missingIndexes),
                   repConfig);
           // Keeping the first target node as coordinator.
-          return ImmutableMap.of(selectedDatanodes.get(0),
-              reconstructionCommand);
+          commands.put(selectedDatanodes.get(0), reconstructionCommand);
         } else {
           LOG.warn("Cannot proceed for EC container reconstruction for {}, due"
               + "to insufficient source replicas found. Number of source "
@@ -183,7 +183,6 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
 
       Set<Integer> decomIndexes = replicaCount.decommissioningOnlyIndexes(true);
       if (decomIndexes.size() > 0) {
-        Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
         final List<DatanodeDetails> selectedDatanodes =
             getTargetDatanodes(replicas, container, decomIndexes.size());
         Iterator<DatanodeDetails> iterator = selectedDatanodes.iterator();
@@ -205,14 +204,13 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
             commands.put(target, replicateCommand);
           }
         }
-        return commands;
       }
     } catch (IOException | IllegalStateException ex) {
       LOG.warn("Exception while processing for creating the EC reconstruction" +
               " container commands for {}.",
           id, ex);
     }
-    return emptyMap();
+    return commands;
   }
 
   private List<DatanodeDetails> getTargetDatanodes(

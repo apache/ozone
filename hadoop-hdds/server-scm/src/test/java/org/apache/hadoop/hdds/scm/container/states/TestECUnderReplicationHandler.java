@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.assertj.core.util.Lists;
 import org.junit.Assert;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -114,7 +113,7 @@ public class TestECUnderReplicationHandler {
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
-        availableReplicas, false);
+        availableReplicas, 0);
   }
 
   @Test
@@ -123,7 +122,7 @@ public class TestECUnderReplicationHandler {
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 5));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(3, 4),
-        availableReplicas, false);
+        availableReplicas, 0);
   }
 
   @Test
@@ -131,14 +130,14 @@ public class TestECUnderReplicationHandler {
     Set<ContainerReplica> availableReplicas =
         ReplicationTestUtil.createReplicas(Pair.of(IN_SERVICE, 1));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(2, 3, 4, 5),
-        availableReplicas, false);
+        availableReplicas, 0);
   }
 
   @Test
   public void testUnderReplicationWithMissingIndex12345() {
     Set<ContainerReplica> availableReplicas = new HashSet<>();
     testUnderReplicationWithMissingIndexes(ImmutableList.of(1, 2, 3, 4, 5),
-        availableReplicas, false);
+        availableReplicas, 0);
   }
 
   @Test
@@ -148,7 +147,7 @@ public class TestECUnderReplicationHandler {
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5));
     testUnderReplicationWithMissingIndexes(Lists.emptyList(), availableReplicas,
-        true);
+        1);
   }
 
   @Test
@@ -158,7 +157,7 @@ public class TestECUnderReplicationHandler {
             Pair.of(DECOMMISSIONING, 2), Pair.of(IN_SERVICE, 3),
             Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
     testUnderReplicationWithMissingIndexes(Lists.emptyList(), availableReplicas,
-        true);
+        2);
   }
 
   @Test
@@ -168,56 +167,48 @@ public class TestECUnderReplicationHandler {
             Pair.of(DECOMMISSIONING, 2), Pair.of(IN_SERVICE, 3),
             Pair.of(IN_SERVICE, 4));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
-        availableReplicas, false);
+        availableReplicas, 2);
   }
 
   public void testUnderReplicationWithMissingIndexes(
       List<Integer> missingIndexes, Set<ContainerReplica> availableReplicas,
-      boolean decom) {
+      int decomIndexes) {
     ECUnderReplicationHandler ecURH =
         new ECUnderReplicationHandler(policy, conf, nodeManager);
     ContainerHealthResult.UnderReplicatedHealthResult result =
         Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
-    Mockito.when(result.underReplicatedDueToDecommission()).thenReturn(decom);
     Mockito.when(result.isUnrecoverable()).thenReturn(false);
     Mockito.when(result.getContainerInfo()).thenReturn(container);
 
     Map<DatanodeDetails, SCMCommand<?>> datanodeDetailsSCMCommandMap = ecURH
         .processAndCreateCommands(availableReplicas, ImmutableList.of(),
             result, 1);
-    if (!decom) {
-      if (missingIndexes.size() <= repConfig.getParity()) {
-        Assertions.assertEquals(1, datanodeDetailsSCMCommandMap.size());
-        Map.Entry<DatanodeDetails, SCMCommand<?>> dnVsCommand =
-            datanodeDetailsSCMCommandMap.entrySet().iterator().next();
-        Assert.assertTrue(
-            dnVsCommand.getValue() instanceof ReconstructECContainersCommand);
-        byte[] missingIndexesByteArr = new byte[missingIndexes.size()];
-        for (int i = 0; i < missingIndexes.size(); i++) {
-          missingIndexesByteArr[i] = (byte) (int) missingIndexes.get(i);
+    Set<Map.Entry<DatanodeDetails, SCMCommand<?>>> entries =
+        datanodeDetailsSCMCommandMap.entrySet();
+    int replicateCommand = 0;
+    int reconstructCommand = 0;
+    byte[] missingIndexesByteArr = new byte[missingIndexes.size()];
+    for (int i = 0; i < missingIndexes.size(); i++) {
+      missingIndexesByteArr[i] = missingIndexes.get(i).byteValue();
+    }
+    boolean shouldReconstructCommandExist =
+        missingIndexes.size() > 0 && missingIndexes.size() <= repConfig
+            .getParity();
+    for (Map.Entry<DatanodeDetails, SCMCommand<?>> dnCommand : entries) {
+      if (dnCommand.getValue() instanceof ReplicateContainerCommand) {
+        replicateCommand++;
+      } else if (dnCommand
+          .getValue() instanceof ReconstructECContainersCommand) {
+        if (shouldReconstructCommandExist) {
+          Assert.assertArrayEquals(missingIndexesByteArr,
+              ((ReconstructECContainersCommand) dnCommand.getValue())
+                  .getMissingContainerIndexes());
         }
-        Assert.assertArrayEquals(missingIndexesByteArr,
-            ((ReconstructECContainersCommand) dnVsCommand.getValue())
-                .getMissingContainerIndexes());
-      } else {
-        Assert.assertEquals(0, datanodeDetailsSCMCommandMap.size());
-      }
-    } else {
-      int numDecomIndexes = 0;
-      for (ContainerReplica repl : availableReplicas) {
-        if (repl.getDatanodeDetails()
-            .getPersistedOpState() == DECOMMISSIONING) {
-          numDecomIndexes++;
-        }
-      }
-      Assertions
-          .assertEquals(numDecomIndexes, datanodeDetailsSCMCommandMap.size());
-      Set<Map.Entry<DatanodeDetails, SCMCommand<?>>> entries =
-          datanodeDetailsSCMCommandMap.entrySet();
-      for (Map.Entry<DatanodeDetails, SCMCommand<?>> dnCommand : entries) {
-        Assert.assertTrue(
-            dnCommand.getValue() instanceof ReplicateContainerCommand);
+        reconstructCommand++;
       }
     }
+    Assert.assertEquals(decomIndexes, replicateCommand);
+    Assert.assertEquals(shouldReconstructCommandExist ? 1 : 0,
+        reconstructCommand);
   }
 }
