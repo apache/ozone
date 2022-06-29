@@ -476,7 +476,13 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       return omRequest;
     }
 
-    long bucketId = metadataManager.getBucketId(volumeName, bucketName);
+    long bucketId;
+    try {
+      bucketId = metadataManager.getBucketId(volumeName, bucketName);
+    } catch (OMException oe) {
+      // Ignore exceptions at this stage, let respective classes handle them.
+      return omRequest;
+    }
 
     return OMRequest.newBuilder(omRequest)
         .setAssociatedBucketId(bucketId)
