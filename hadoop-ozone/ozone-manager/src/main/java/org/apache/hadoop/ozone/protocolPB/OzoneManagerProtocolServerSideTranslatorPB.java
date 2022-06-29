@@ -25,12 +25,14 @@ import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
@@ -141,6 +143,17 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       OMRequest request) throws ServiceException {
     OMRequest validatedRequest;
     try {
+      // Note:
+      // We need to call associateBucketIdWithRequest before we run any
+      // decision-making / validation logic. This is because we do not
+      // yet hold any locks on any buckets, and if we perform validation
+      // before bucket ID association - we might end up with a situation
+      // where we have validated a bucket's properties, which end up changing
+      // before we enter validateAndUpdateCache. This would case false
+      // positive validations.
+      // We want to associate a bucket ID before we do any of this, so that
+      // even if the underlying bucket changes, we catch that change
+      // inside the validateAndUpdateCache method.
       OMRequest requestWithBucketId = associateBucketIdWithRequest(request);
       validatedRequest =
           requestValidations.validateRequest(requestWithBucketId);
@@ -340,6 +353,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
    * @return OMRequest with bucket ID associated.
    * @throws IOException
    */
+  @SuppressWarnings("checkstyle:MethodLength")
   private OMRequest associateBucketIdWithRequest(OMRequest omRequest)
       throws IOException {
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
@@ -478,7 +492,24 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
 
     long bucketId;
     try {
-      bucketId = metadataManager.getBucketId(volumeName, bucketName);
+      // Note: Even though this block of code is not executing under a bucket
+      // lock - it is still safe.
+      // For instance, consider the following link bucket chain:
+      // l1 -> l2 -> l3 -> abc (ID: 1000)
+      // Let's say we fetch the resolved bucket name for l1. This would mean
+      // the source bucket is resolved as 'abc'.
+      // Now, let's assume that before the next line of code (to fetch bucket
+      // ID) executes, the link structure changes as follows:
+      // l1- > l2 -> l3 -> xyz (ID: 1001)
+      // And we end up associating the bucket ID for l1 with abc (1000) even
+      // though the actual link has changed.
+      // This is not a problem, since we will anyway be validating this bucket
+      // ID inside validateAndUpdateCache method - and it will be caught there.
+      // This is a fail-slow approach.
+      ResolvedBucket resolvedBucket =
+          ozoneManager.resolveBucketLink(Pair.of(volumeName, bucketName));
+      bucketId = metadataManager.getBucketId(resolvedBucket.realVolume(),
+          resolvedBucket.realBucket());
     } catch (OMException oe) {
       // Ignore exceptions at this stage, let respective classes handle them.
       return omRequest;
