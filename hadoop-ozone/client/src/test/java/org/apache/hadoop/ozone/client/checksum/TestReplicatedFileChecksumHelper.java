@@ -55,7 +55,6 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.internal.Checks;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 
