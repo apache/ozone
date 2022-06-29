@@ -60,10 +60,10 @@ public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
   @NotNull
   @Override
   protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
-      OmBucketInfo bucketInfo, OMResponse response) {
+      OmBucketInfo bucketInfo, OMResponse response) throws IOException {
 
     return new OMKeyCreateResponseWithFSO(response, keyInfo, new ArrayList<>(),
-        clientID, bucketInfo);
+        clientID, bucketInfo, getVolumeId());
   }
 
   @Override

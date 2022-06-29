@@ -90,10 +90,11 @@ public class TestS3GetSecretRequest {
 
   // Multi-tenant related vars
   private static final String USER_ALICE = "alice@EXAMPLE.COM";
+  private static final String USER_ALICE_SHORT = "alice";
   private static final String TENANT_ID = "finance";
-  private static final String USER_BOB = "bob@EXAMPLE.COM";
+  private static final String USER_BOB_SHORT = "bob";
   private static final String ACCESS_ID_BOB =
-      OMMultiTenantManager.getDefaultAccessId(TENANT_ID, USER_BOB);
+      OMMultiTenantManager.getDefaultAccessId(TENANT_ID, USER_BOB_SHORT);
 
   private UserGroupInformation ugiAlice;
 
@@ -246,7 +247,7 @@ public class TestS3GetSecretRequest {
     S3GetSecretRequest s3GetSecretRequest1 =
         new S3GetSecretRequest(
             new S3GetSecretRequest(
-                s3GetSecretRequest(USER_ALICE)
+                s3GetSecretRequest(USER_ALICE_SHORT)
             ).preExecute(ozoneManager)
         );
 
@@ -262,7 +263,7 @@ public class TestS3GetSecretRequest {
 
     // Check response
     final S3SecretValue s3SecretValue = s3GetSecretResponse.getS3SecretValue();
-    Assert.assertEquals(USER_ALICE, s3SecretValue.getKerberosID());
+    Assert.assertEquals(USER_ALICE_SHORT, s3SecretValue.getKerberosID());
     final String awsSecret1 = s3SecretValue.getAwsSecret();
     Assert.assertNotNull(awsSecret1);
 
@@ -270,7 +271,7 @@ public class TestS3GetSecretRequest {
         s3GetSecretResponse.getOMResponse().getGetS3SecretResponse();
     // The secret inside should be the same.
     final S3Secret s3Secret1 = getS3SecretResponse.getS3Secret();
-    Assert.assertEquals(USER_ALICE, s3Secret1.getKerberosID());
+    Assert.assertEquals(USER_ALICE_SHORT, s3Secret1.getKerberosID());
     Assert.assertEquals(awsSecret1, s3Secret1.getAwsSecret());
 
 
@@ -281,7 +282,7 @@ public class TestS3GetSecretRequest {
     S3GetSecretRequest s3GetSecretRequest2 =
         new S3GetSecretRequest(
             new S3GetSecretRequest(
-                s3GetSecretRequest(USER_ALICE)
+                s3GetSecretRequest(USER_ALICE_SHORT)
             ).preExecute(ozoneManager)
         );
 
@@ -302,7 +303,7 @@ public class TestS3GetSecretRequest {
         s3GetSecretResponse2.getOMResponse().getGetS3SecretResponse();
     // The secret inside should be the same.
     final S3Secret s3Secret2 = getS3SecretResponse2.getS3Secret();
-    Assert.assertEquals(USER_ALICE, s3Secret2.getKerberosID());
+    Assert.assertEquals(USER_ALICE_SHORT, s3Secret2.getKerberosID());
 
     // Should get the same secret as the first request's.
     Assert.assertEquals(awsSecret1, s3Secret2.getAwsSecret());
@@ -376,7 +377,8 @@ public class TestS3GetSecretRequest {
     OMTenantAssignUserAccessIdRequest omTenantAssignUserAccessIdRequest =
         new OMTenantAssignUserAccessIdRequest(
             new OMTenantAssignUserAccessIdRequest(
-                assignUserToTenantRequest(TENANT_ID, USER_BOB, ACCESS_ID_BOB)
+                assignUserToTenantRequest(TENANT_ID,
+                    USER_BOB_SHORT, ACCESS_ID_BOB)
             ).preExecute(ozoneManager)
         );
 

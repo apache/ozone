@@ -64,7 +64,8 @@ public class TestS3MultipartUploadAbortResponseWithFSO
   @Override
   protected S3InitiateMultipartUploadResponse getS3InitiateMultipartUploadResp(
       OmMultipartKeyInfo multipartKeyInfo, OmKeyInfo omKeyInfo,
-      OzoneManagerProtocolProtos.OMResponse omResponse) {
+      OzoneManagerProtocolProtos.OMResponse omResponse, long volumeId,
+      long bucketId) {
 
     String mpuDBKey =
         omMetadataManager.getMultipartKey(omKeyInfo.getVolumeName(),
@@ -73,17 +74,17 @@ public class TestS3MultipartUploadAbortResponseWithFSO
 
     return new S3InitiateMultipartUploadResponseWithFSO(omResponse,
         multipartKeyInfo, omKeyInfo, mpuDBKey, new ArrayList<>(),
-        getBucketLayout());
+        getBucketLayout(), volumeId, bucketId);
   }
 
   @Override
   protected S3InitiateMultipartUploadResponse
       getS3InitiateMultipartUploadResponse(
       String volumeName, String bucketName, String keyName,
-      String multipartUploadID) {
+      String multipartUploadID, long volumeId, long bucketId) {
     return createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
         keyName,
-        multipartUploadID, new ArrayList<>());
+        multipartUploadID, new ArrayList<>(), volumeId, bucketId);
   }
 
   @Override

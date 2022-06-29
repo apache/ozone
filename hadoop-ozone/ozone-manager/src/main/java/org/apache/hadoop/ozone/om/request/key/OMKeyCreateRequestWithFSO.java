@@ -212,7 +212,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               .setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponseWithFSO(omResponse.build(),
               omFileInfo, missingParentInfos, clientID,
-              omBucketInfo.copyObject());
+              omBucketInfo.copyObject(), volumeId);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

@@ -769,6 +769,15 @@ public class TestContainerBalancer {
         .getNumContainerMovesTimeoutInLatestIteration() > 0);
     stopBalancer();
   }
+  
+  @Test
+  public void testStartAndImmediateStopForDeadlock()
+      throws IllegalContainerBalancerStateException, IOException,
+      InvalidContainerBalancerConfigurationException {
+    startBalancer(balancerConfiguration);
+    stopBalancer();
+    Assertions.assertFalse(containerBalancer.isBalancerRunning());
+  }
 
   /**
    * Determines unBalanced nodes, that is, over and under utilized nodes,

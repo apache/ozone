@@ -733,9 +733,13 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   @Override
   public void deletePolicyByName(String policyName) throws IOException {
     AccessPolicy policy = getAccessPolicyByName(policyName);
-    String policyID = policy.getPolicyID();
-    LOG.debug("policyID is: {}", policyID);
-    deletePolicyById(policyID);
+    if (policy != null) {
+      String policyID = policy.getPolicyID();
+      LOG.debug("policyID is: {}", policyID);
+      deletePolicyById(policyID);
+    } else {
+      LOG.error("No such policy: {} was found!", policyName);
+    }
   }
 
   public void deletePolicyById(String policyId) throws IOException {

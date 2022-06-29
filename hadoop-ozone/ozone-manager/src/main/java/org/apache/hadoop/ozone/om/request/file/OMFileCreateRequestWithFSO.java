@@ -226,7 +226,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
           .setCmdType(Type.CreateFile);
       omClientResponse = new OMFileCreateResponseWithFSO(omResponse.build(),
               omFileInfo, missingParentInfos, clientID,
-              omBucketInfo.copyObject());
+              omBucketInfo.copyObject(), volumeId);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

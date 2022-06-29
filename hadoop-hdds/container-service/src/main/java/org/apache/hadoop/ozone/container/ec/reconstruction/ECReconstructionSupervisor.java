@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -38,6 +39,11 @@ public class ECReconstructionSupervisor implements Closeable {
   private final StateContext context;
   private final ExecutorService executor;
   private final ECReconstructionCoordinator reconstructionCoordinator;
+  /**
+   * how many coordinator tasks currently being running.
+   */
+  private final ConcurrentHashMap.KeySetView<Object, Boolean>
+      inProgressReconstrucionCoordinatorCounter;
 
   public ECReconstructionSupervisor(ContainerSet containerSet,
       StateContext context, ExecutorService executor,
@@ -46,6 +52,8 @@ public class ECReconstructionSupervisor implements Closeable {
     this.context = context;
     this.executor = executor;
     this.reconstructionCoordinator = coordinator;
+    this.inProgressReconstrucionCoordinatorCounter =
+        ConcurrentHashMap.newKeySet();
   }
 
   public ECReconstructionSupervisor(ContainerSet containerSet,
@@ -73,8 +81,13 @@ public class ECReconstructionSupervisor implements Closeable {
     }
   }
 
-  public void addTask(ECReconstructionCoordinatorTask task) {
-    executor.execute(task);
+  public void addTask(ECReconstructionCommandInfo taskInfo) {
+    if (inProgressReconstrucionCoordinatorCounter
+        .add(taskInfo.getContainerID())) {
+      executor.execute(
+          new ECReconstructionCoordinatorTask(getReconstructionCoordinator(),
+              taskInfo, inProgressReconstrucionCoordinatorCounter));
+    }
   }
 
   @Override
@@ -87,5 +100,9 @@ public class ECReconstructionSupervisor implements Closeable {
 
   public ECReconstructionCoordinator getReconstructionCoordinator() {
     return reconstructionCoordinator;
+  }
+
+  public int getInFlightReplications() {
+    return this.inProgressReconstrucionCoordinatorCounter.size();
   }
 }

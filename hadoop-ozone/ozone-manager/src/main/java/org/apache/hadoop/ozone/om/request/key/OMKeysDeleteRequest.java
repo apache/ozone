@@ -177,9 +177,10 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       omBucketInfo.incrUsedBytes(-quotaReleased);
       omBucketInfo.incrUsedNamespace(-1L * omKeyInfoList.size());
 
+      final long volumeId = omMetadataManager.getVolumeId(volumeName);
       omClientResponse =
           getOmClientResponse(ozoneManager, omKeyInfoList, dirList, omResponse,
-              unDeletedKeys, deleteStatus, omBucketInfo);
+              unDeletedKeys, deleteStatus, omBucketInfo, volumeId);
 
       result = Result.SUCCESS;
 
@@ -248,11 +249,12 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
   }
 
   @NotNull
+  @SuppressWarnings("parameternumber")
   protected OMClientResponse getOmClientResponse(OzoneManager ozoneManager,
       List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
       OMResponse.Builder omResponse,
       OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys,
-      boolean deleteStatus, OmBucketInfo omBucketInfo) {
+      boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId) {
     OMClientResponse omClientResponse;
     omClientResponse = new OMKeysDeleteResponse(omResponse
         .setDeleteKeysResponse(
