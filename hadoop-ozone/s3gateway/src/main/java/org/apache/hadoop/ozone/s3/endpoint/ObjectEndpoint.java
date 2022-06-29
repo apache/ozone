@@ -845,7 +845,7 @@ public class ObjectEndpoint extends EndpointBase {
   static void copy(InputStream src, long srcKeyLen,
       String destKey, OzoneBucket destBucket,
       ReplicationConfig replication) throws IOException {
-    try(OzoneOutputStream dest = destBucket.createKey(
+    try (OzoneOutputStream dest = destBucket.createKey(
         destKey, srcKeyLen, replication, new HashMap<>())) {
       IOUtils.copy(src, dest);
     }
@@ -896,7 +896,7 @@ public class ObjectEndpoint extends EndpointBase {
       OzoneKeyDetails sourceKeyDetails = sourceOzoneBucket.getKey(sourceKey);
       long sourceKeyLen = sourceKeyDetails.getDataSize();
 
-      try(OzoneInputStream src = sourceOzoneBucket.readKey(sourceKey)) {
+      try (OzoneInputStream src = sourceOzoneBucket.readKey(sourceKey)) {
         copy(src, sourceKeyLen, destkey, destBucket, replicationConfig);
       }
 
