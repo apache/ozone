@@ -69,6 +69,8 @@ public class DirectoryEntityHandler extends EntityHandler {
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
+    long volObjectId = getBucketHandler().getVolumeObjectId(getNames());
+    long buckObjectId = getBucketHandler().getBucketObjectId(getNames());
     long dirObjectId = getBucketHandler().getDirObjectId(getNames());
     NSSummary dirNSSummary =
             getReconNamespaceSummaryManager().getNSSummary(dirObjectId);
@@ -107,7 +109,8 @@ public class DirectoryEntityHandler extends EntityHandler {
 
       if (withReplica) {
         long subdirDU = getBucketHandler()
-                .calculateDUUnderObject(subdirObjectId);
+                .calculateDUUnderObject(volObjectId,
+                    buckObjectId, subdirObjectId);
         diskUsage.setSizeWithReplica(subdirDU);
         dirDataSizeWithReplica += subdirDU;
       }
@@ -119,8 +122,9 @@ public class DirectoryEntityHandler extends EntityHandler {
     // handle direct keys under directory
     if (listFile || withReplica) {
       dirDataSizeWithReplica += getBucketHandler()
-              .handleDirectKeys(dirObjectId, withReplica,
-              listFile, subdirDUData, getNormalizedPath());
+              .handleDirectKeys(volObjectId, buckObjectId,
+                  dirObjectId, withReplica,
+                  listFile, subdirDUData, getNormalizedPath());
     }
 
     if (withReplica) {

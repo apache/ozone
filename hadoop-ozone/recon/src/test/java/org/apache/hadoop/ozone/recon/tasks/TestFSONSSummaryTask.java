@@ -595,13 +595,13 @@ public final class TestFSONSSummaryTask {
         VOL_OBJECT_ID,
         KEY_FOUR_SIZE,
         getBucketLayout());
-      writeDirToOm(reconOMMetadataManager, DIR_ONE_OBJECT_ID,
+    writeDirToOm(reconOMMetadataManager, DIR_ONE_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID, DIR_ONE);
-      writeDirToOm(reconOMMetadataManager, DIR_TWO_OBJECT_ID,
+    writeDirToOm(reconOMMetadataManager, DIR_TWO_OBJECT_ID,
         DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID, DIR_TWO);
-      writeDirToOm(reconOMMetadataManager, DIR_THREE_OBJECT_ID,
+    writeDirToOm(reconOMMetadataManager, DIR_THREE_OBJECT_ID,
         DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID, DIR_THREE);
   }

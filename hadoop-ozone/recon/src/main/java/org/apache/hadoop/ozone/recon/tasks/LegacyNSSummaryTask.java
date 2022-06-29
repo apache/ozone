@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.recon.tasks;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -28,7 +27,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
-import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -37,8 +35,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -148,22 +144,22 @@ public class LegacyNSSummaryTask extends NSSummaryTask {
 
             switch (action) {
             case PUT:
-            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+              handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
               break;
 
             case DELETE:
-            handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
+              handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
               break;
 
             case UPDATE:
               if (oldDirectoryInfo != null) {
                 // delete first, then put
-              handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
+                handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
               } else {
                 LOG.warn("Update event does not have the old dirInfo for {}.",
                     updatedKey);
               }
-            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+              handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
               break;
 
             default:

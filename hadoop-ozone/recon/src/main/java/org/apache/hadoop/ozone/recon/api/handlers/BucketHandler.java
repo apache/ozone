@@ -93,10 +93,11 @@ public abstract class BucketHandler {
   public abstract long calculateDUForVolume(String volumeName)
       throws IOException;
 
-  public abstract long calculateDUUnderObject(long parentId)
-      throws IOException;
+  public abstract long calculateDUUnderObject(long volumeId, long bucketId,
+                                              long parentId) throws IOException;
 
-  public abstract long handleDirectKeys(long parentId,
+  public abstract long handleDirectKeys(long volumeId,
+                       long bucketId, long parentId,
                        boolean withReplica, boolean listFile,
                        List<DUResponse.DiskUsage> duData,
                        String normalizedPath) throws IOException;

@@ -92,6 +92,7 @@ public class VolumeEntityHandler extends EntityHandler {
                       getReconNamespaceSummaryManager(),
                       getOmMetadataManager(), getReconSCM(), bucket);
       String bucketName = bucket.getBucketName();
+      long volumeObjectId = bucketHandler.getVolumeObjectId(names);
       long bucketObjectID = bucket.getObjectID();
       String subpath = getOmMetadataManager().getBucketKey(volName, bucketName);
       DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
@@ -100,7 +101,8 @@ public class VolumeEntityHandler extends EntityHandler {
       volDataSize += dataSize;
       if (withReplica) {
         long bucketDU = bucketHandler
-            .calculateDUUnderObject(bucketObjectID);
+            .calculateDUUnderObject(volumeObjectId,
+                bucketObjectID, bucketObjectID);
         diskUsage.setSizeWithReplica(bucketDU);
         volDataSizeWithReplica += bucketDU;
       }

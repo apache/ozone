@@ -58,8 +58,9 @@ public class FSOBucketHandler extends BucketHandler {
    * @throws IOException
    */
   @Override
-  public EntityType determineKeyPath(String keyName, long volumeId, long bucketObjectId)
-          throws IOException {
+  public EntityType determineKeyPath(String keyName,
+                                     long volumeId, long bucketObjectId)
+                                     throws IOException {
     Path keyPath = Paths.get(keyName);
     Iterator<Path> elements = keyPath.iterator();
 
@@ -128,14 +129,24 @@ public class FSOBucketHandler extends BucketHandler {
   // FileTable's key is in the format of "parentId/fileName"
   // Make use of RocksDB's order to seek to the prefix and avoid full iteration
   @Override
-  public long calculateDUUnderObject(long parentId)
-      throws IOException {
+  public long calculateDUUnderObject(long volumeId, long bucketId,
+                                     long parentId) throws IOException {
     Table keyTable = getKeyTable();
 
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
             iterator = keyTable.iterator();
 
-    String seekPrefix = parentId + OM_KEY_PREFIX;
+    StringBuilder builder = new StringBuilder();
+
+    builder.append(OM_KEY_PREFIX)
+        .append(volumeId)
+        .append(OM_KEY_PREFIX)
+        .append(bucketId)
+        .append(OM_KEY_PREFIX)
+        .append(parentId)
+        .append(OM_KEY_PREFIX);
+
+    String seekPrefix = builder.toString();
     iterator.seek(seekPrefix);
     long totalDU = 0L;
     // handle direct keys
@@ -162,7 +173,8 @@ public class FSOBucketHandler extends BucketHandler {
 
     Set<Long> subDirIds = nsSummary.getChildDir();
     for (long subDirId: subDirIds) {
-      totalDU += calculateDUUnderObject(subDirId);
+      totalDU += calculateDUUnderObject(volumeId,
+          bucketId, subDirId);
     }
     return totalDU;
   }
@@ -179,7 +191,8 @@ public class FSOBucketHandler extends BucketHandler {
    * @throws IOException IOE
    */
   @Override
-  public long handleDirectKeys(long parentId, boolean withReplica,
+  public long handleDirectKeys(long volumeId, long bucketId,
+                               long parentId, boolean withReplica,
                                boolean listFile,
                                List<DUResponse.DiskUsage> duData,
                                String normalizedPath) throws IOException {
@@ -188,7 +201,17 @@ public class FSOBucketHandler extends BucketHandler {
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
             iterator = keyTable.iterator();
 
-    String seekPrefix = parentId + OM_KEY_PREFIX;
+    StringBuilder builder = new StringBuilder();
+
+    builder.append(OM_KEY_PREFIX)
+        .append(volumeId)
+        .append(OM_KEY_PREFIX)
+        .append(bucketId)
+        .append(OM_KEY_PREFIX)
+        .append(parentId)
+        .append(OM_KEY_PREFIX);
+
+    String seekPrefix = builder.toString();
     iterator.seek(seekPrefix);
 
     long keyDataSizeWithReplica = 0L;
