@@ -106,8 +106,9 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       }
 
       omPrefixInfo = operationResult.getOmPrefixInfo();
-      if(omPrefixInfo == null) {
-        throw new OMException("No prefix info for the prefix path: " + prefixPath,
+      if (omPrefixInfo == null) {
+        throw new OMException(
+            "No prefix info for the prefix path: " + prefixPath,
             OMException.ResultCodes.PREFIX_NOT_FOUND);
       }
       omPrefixInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());

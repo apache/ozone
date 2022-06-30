@@ -38,7 +38,7 @@ import java.util.UUID;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests Prefix ACL requests.
+ * Tests Remove Prefix ACL requests.
  */
 public class TestOMPrefixRemoveAclRequest extends TestOMKeyRequest {
 
