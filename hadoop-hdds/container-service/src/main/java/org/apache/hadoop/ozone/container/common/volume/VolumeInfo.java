@@ -161,9 +161,8 @@ public final class VolumeInfo {
           StorageSize size = StorageSize.parse(words[1].trim());
           return (long) size.getUnit().toBytes(size.getValue());
         } catch (Exception e) {
-          LOG.error("Failed to parse StorageSize: {} ,Setting reserved " +
-              "space to zero", words[1].trim(), e);
-          return 0;
+          LOG.error("Failed to parse StorageSize: {}", words[1].trim(), e);
+          break;
         }
       }
     }

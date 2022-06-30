@@ -149,11 +149,7 @@ public interface ConfigurationSource {
    * @return true if the value is set else false.
    */
   default boolean isConfigured(String key) {
-    String configValue = get(key);
-    if (configValue != null) {
-      return true;
-    }
-    return false;
+    return get(key) != null;
   }
   /**
    * Create a Configuration object and inject the required configuration values.
