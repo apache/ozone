@@ -39,12 +39,5 @@ public class OzoneConfigurationHolder {
   public static void setConfiguration(
       OzoneConfiguration conf) {
     OzoneConfigurationHolder.configuration = conf;
-    applyOzoneS3Configs();
-  }
-
-  private static void applyOzoneS3Configs() {
-    OzoneConfigurationHolder
-        .configuration
-        .setIfUnset("ozone.om.group.rights", "NONE");
   }
 }

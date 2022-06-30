@@ -43,4 +43,10 @@ Create bucket with invalid bucket name
 Create new bucket and check no group ACL
     ${bucket} =         Create bucket
     ${acl} =            Execute     ozone sh bucket getacl s3v/${bucket}
-    Should not contain  ${acl}      \"type\" : \"GROUP\"
+    ${group} =          Get Regexp Matches   ${acl}     "GROUP"
+    IF      '${group}' is not '[]'
+        ${json} =           Evaluate    json.loads('''${acl}''')    json
+        # make sure this check is for group acl
+        Should contain      ${json}[1][type]       GROUP
+        Should contain      ${json}[1][aclList]    NONE
+    END
