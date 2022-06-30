@@ -59,7 +59,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
  *   * Maintenance copies are not considered until they are back to IN_SERVICE
  */
 
-public class ECContainerReplicaCount {
+public class ECContainerReplicaCount implements ContainerReplicaCount {
 
   private final ContainerInfo containerInfo;
   private final ECReplicationConfig repConfig;
@@ -128,8 +128,24 @@ public class ECContainerReplicaCount {
     }
   }
 
+  @Override
+  public ContainerInfo getContainer() {
+    return containerInfo;
+  }
+
+  @Override
   public Set<ContainerReplica> getReplicas() {
     return replicas;
+  }
+
+  @Override
+  public int getDecommissionCount() {
+    return decommissionIndexes.size();
+  }
+
+  @Override
+  public int getMaintenanceCount() {
+    return maintenanceIndexes.size();
   }
 
   /**
@@ -292,6 +308,16 @@ public class ECContainerReplicaCount {
     return false;
   }
 
+  @Override
+  public boolean isOverReplicated() {
+    return isOverReplicated(false);
+  }
+
+  @Override
+  public int additionalReplicaNeeded() {
+    return 0;
+  }
+
   /**
    * Return an unsorted list of any replica indexes which have more than one
    * replica and are therefore over-replicated. Maintenance replicas are ignored
@@ -363,6 +389,11 @@ public class ECContainerReplicaCount {
     maintenanceIndexes.forEach((k, v) -> healthy.merge(k, v, Integer::sum));
     return hasFullSetOfIndexes(healthy) && onlineIndexes.size()
         >= repConfig.getData() + remainingMaintenanceRedundancy;
+  }
+
+  @Override
+  public boolean isSufficientlyReplicated() {
+    return isSufficientlyReplicated(false);
   }
 
   /**
