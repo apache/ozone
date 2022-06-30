@@ -458,7 +458,7 @@ public class ReplicationManager implements SCMService {
 
 
   /**
-  * following functions will be refactored in a seperate jira.
+  * following functions will be refactored in a separate jira.
   */
   public CompletableFuture<LegacyReplicationManager.MoveResult> move(
       ContainerID cid, DatanodeDetails src, DatanodeDetails tgt)
