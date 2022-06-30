@@ -635,6 +635,8 @@ public class ContainerBalancer extends StatefulService {
       future = replicationManager
           .move(containerID, source, moveSelection.getTargetNode())
           .whenComplete((result, ex) -> {
+
+            metrics.incrementCurrentIterationContainerMoveMetric(result, 1);
             if (ex != null) {
               LOG.info("Container move for container {} from source {} to " +
                       "target {} failed with exceptions {}",
@@ -645,7 +647,6 @@ public class ContainerBalancer extends StatefulService {
               if (result == LegacyReplicationManager.MoveResult.COMPLETED) {
                 metrics.incrementDataSizeMovedGBInLatestIteration(
                     containerInfo.getUsedBytes() / OzoneConsts.GB);
-                metrics.incrementNumContainerMovesCompletedInLatestIteration(1);
                 if (LOG.isDebugEnabled()) {
                   LOG.debug(
                       "Container move completed for container {} to target {}",
