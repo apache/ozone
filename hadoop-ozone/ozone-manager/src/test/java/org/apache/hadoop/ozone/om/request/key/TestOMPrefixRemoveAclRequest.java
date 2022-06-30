@@ -62,8 +62,7 @@ public class TestOMPrefixRemoveAclRequest extends TestOMKeyRequest {
     OMPrefixAddAclRequest omKeyPrefixAclRequest = new OMPrefixAddAclRequest(
         originalRequest);
     omKeyPrefixAclRequest.preExecute(ozoneManager);
-    OMClientResponse omClientResponse = omKeyPrefixAclRequest
-        .validateAndUpdateCache(ozoneManager, 2,
+    omKeyPrefixAclRequest.validateAndUpdateCache(ozoneManager, 2,
             ozoneManagerDoubleBufferHelper);
 
     // Remove existing prefix acl.
