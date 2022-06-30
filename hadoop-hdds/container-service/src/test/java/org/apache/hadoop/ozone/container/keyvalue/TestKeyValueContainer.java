@@ -603,4 +603,31 @@ public class TestKeyValueContainer {
     Assert.assertNotEquals(outProfile1.getDBOptions().compactionReadaheadSize(),
         outProfile2.getDBOptions().compactionReadaheadSize());
   }
+
+  @Test
+  public void testKeyValueDataProtoBufMsg() throws Exception {
+    createContainer();
+    populate(10);
+    closeContainer();
+    ContainerProtos.ContainerDataProto proto =
+        keyValueContainerData.getProtoBufMessage();
+
+    assertEquals(keyValueContainerData.getContainerID(),
+        proto.getContainerID());
+    assertEquals(keyValueContainerData.getContainerType(),
+        proto.getContainerType());
+    assertEquals(keyValueContainerData.getContainerPath(),
+        proto.getContainerPath());
+    assertEquals(keyValueContainerData.getBlockCount(),
+        proto.getBlockCount());
+    assertEquals(keyValueContainerData.getBytesUsed(),
+        proto.getBytesUsed());
+    assertEquals(keyValueContainerData.getState(),
+        proto.getState());
+
+    for (ContainerProtos.KeyValue kv : proto.getMetadataList()) {
+      assertEquals(keyValueContainerData.getMetadata().get(kv.getKey()),
+          kv.getValue());
+    }
+  }
 }
