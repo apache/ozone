@@ -42,7 +42,6 @@ import java.util.HashMap;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateAssociatedBucketId;
 
 /**
  * Handles requests to move open keys from the open key table to the delete
@@ -150,12 +149,6 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     try {
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
               volumeName, bucketName);
-
-      final long bucketId =
-          omMetadataManager.getBucketId(volumeName, bucketName);
-
-      // Bucket ID verification for in-flight requests.
-      validateAssociatedBucketId(bucketId, getOmRequest());
 
       for (OpenKey key: keysPerBucket.getKeysList()) {
         String fullKeyName = key.getName();

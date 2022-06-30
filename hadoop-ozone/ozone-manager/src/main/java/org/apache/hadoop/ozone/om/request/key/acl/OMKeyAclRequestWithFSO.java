@@ -42,6 +42,7 @@ import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateAssociatedBucketId;
 
 
 /**
@@ -95,6 +96,9 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
       omKeyInfo = keyStatus.getKeyInfo();
       final long volumeId = omMetadataManager.getVolumeId(volume);
       final long bucketId = omMetadataManager.getBucketId(volume, bucket);
+
+      validateAssociatedBucketId(bucketId, getOmRequest());
+
       final String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
               omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
       boolean isDirectory = keyStatus.isDirectory();

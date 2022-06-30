@@ -46,6 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateAssociatedBucketId;
 
 /**
  * Base class for Bucket acl request.
@@ -103,6 +104,9 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       if (omKeyInfo == null) {
         throw new OMException(OMException.ResultCodes.KEY_NOT_FOUND);
       }
+
+      long bucketId = omMetadataManager.getBucketId(volume, bucket);
+      validateAssociatedBucketId(bucketId, getOmRequest());
 
       operationResult = apply(omKeyInfo, trxnLogIndex);
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
