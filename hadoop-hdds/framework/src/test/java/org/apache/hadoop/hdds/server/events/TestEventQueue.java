@@ -17,10 +17,10 @@
  */
 package org.apache.hadoop.hdds.server.events;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 
@@ -40,13 +40,13 @@ public class TestEventQueue {
 
   private AtomicLong eventTotal = new AtomicLong();
 
-  @Before
+  @BeforeEach
   public void startEventQueue() {
     DefaultMetricsSystem.initialize(getClass().getSimpleName());
     queue = new EventQueue();
   }
 
-  @After
+  @AfterEach
   public void stopEventQueue() {
     DefaultMetricsSystem.shutdown();
     queue.close();
@@ -61,7 +61,7 @@ public class TestEventQueue {
 
     queue.fireEvent(EVENT1, 11L);
     queue.processAll(1000);
-    Assert.assertEquals(11, result[0]);
+    Assertions.assertEquals(11, result[0]);
 
   }
 
@@ -70,35 +70,43 @@ public class TestEventQueue {
 
     TestHandler testHandler = new TestHandler();
 
-    queue.addHandler(EVENT1, new FixedThreadPoolExecutor<>(EVENT1.getName(),
-            EventQueue.getExecutorName(EVENT1, testHandler)), testHandler);
+    queue.addHandler(EVENT1,
+        new FixedThreadPoolWithAffinityExecutor<>(
+            EventQueue.getExecutorName(EVENT1, testHandler),
+            FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(
+                EVENT1.getName())),
+        testHandler);
 
     queue.fireEvent(EVENT1, 11L);
     queue.fireEvent(EVENT1, 11L);
-    queue.fireEvent(EVENT1, 11L);
-    queue.fireEvent(EVENT1, 11L);
-    queue.fireEvent(EVENT1, 11L);
-    queue.fireEvent(EVENT1, 11L);
-    queue.fireEvent(EVENT1, 11L);
-    queue.fireEvent(EVENT1, 11L);
-    queue.fireEvent(EVENT1, 11L);
-    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 12L);
+    queue.fireEvent(EVENT1, 13L);
+    queue.fireEvent(EVENT1, 14L);
+    queue.fireEvent(EVENT1, 15L);
+    queue.fireEvent(EVENT1, 16L);
+    queue.fireEvent(EVENT1, 17L);
+    queue.fireEvent(EVENT1, 18L);
+    queue.fireEvent(EVENT1, 19L);
+    queue.fireEvent(EVENT1, 20L);
 
     EventExecutor eventExecutor =
         queue.getExecutorAndHandler(EVENT1).keySet().iterator().next();
 
     // As it is fixed threadpool executor with 10 threads, all should be
     // scheduled.
-    Assert.assertEquals(10, eventExecutor.queuedEvents());
+    Assertions.assertEquals(11, eventExecutor.queuedEvents());
 
     // As we don't see all 10 events scheduled.
-    Assert.assertTrue(eventExecutor.scheduledEvents() > 1 &&
+    Assertions.assertTrue(eventExecutor.scheduledEvents() > 1 &&
         eventExecutor.scheduledEvents() <= 10);
 
     queue.processAll(60000);
-    Assert.assertEquals(110, eventTotal.intValue());
 
-    Assert.assertEquals(10, eventExecutor.successfulEvents());
+    Assertions.assertEquals(11, eventExecutor.scheduledEvents());
+
+    Assertions.assertEquals(166, eventTotal.intValue());
+
+    Assertions.assertEquals(11, eventExecutor.successfulEvents());
     eventTotal.set(0);
 
   }
@@ -127,9 +135,8 @@ public class TestEventQueue {
 
     queue.fireEvent(EVENT2, 23L);
     queue.processAll(1000);
-    Assert.assertEquals(23, result[0]);
-    Assert.assertEquals(23, result[1]);
+    Assertions.assertEquals(23, result[0]);
+    Assertions.assertEquals(23, result[1]);
 
   }
-
 }

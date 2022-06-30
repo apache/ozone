@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
@@ -31,8 +32,10 @@ import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.CrcUtil;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -46,9 +49,19 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
 
   public ReplicatedFileChecksumHelper(
       OzoneVolume volume, OzoneBucket bucket, String keyName, long length,
+      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
       ClientProtocol rpcClient) throws IOException {
-    super(volume, bucket, keyName, length, rpcClient);
+    super(volume, bucket, keyName, length, checksumCombineMode, rpcClient);
   }
+
+  public ReplicatedFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
+      String keyName, long length,
+      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
+      ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
+    super(volume, bucket, keyName, length, checksumCombineMode, rpcClient,
+        keyInfo);
+  }
+
 
   @Override
   protected void checksumBlocks() throws IOException {
@@ -64,8 +77,8 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
       }
 
       if (!checksumBlock(keyLocationInfo)) {
-        throw new PathIOException(
-            getSrc(), "Fail to get block MD5 for " + keyLocationInfo);
+        throw new PathIOException(getSrc(),
+            "Fail to get block MD5 for " + keyLocationInfo);
       }
     }
   }
@@ -117,7 +130,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
     BlockID blockID = keyLocationInfo.getBlockID();
     if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE) {
       pipeline = Pipeline.newBuilder(pipeline)
-          .setReplicationConfig(new StandaloneReplicationConfig(
+          .setReplicationConfig(StandaloneReplicationConfig.getInstance(
               ReplicationConfig
                   .getLegacyFactor(pipeline.getReplicationConfig())))
           .build();
@@ -175,11 +188,33 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
   String populateBlockChecksumBuf(ByteBuffer checksumData)
       throws IOException {
     String blockChecksumForDebug = null;
-    //read md5
-    final MD5Hash md5 = new MD5Hash(checksumData.array());
-    md5.write(getBlockChecksumBuf());
-    if (LOG.isDebugEnabled()) {
-      blockChecksumForDebug = md5.toString();
+    switch (getCombineMode()) {
+    case MD5MD5CRC:
+      //read md5
+      final MD5Hash md5 = new MD5Hash(checksumData.array());
+      md5.write(getBlockChecksumBuf());
+      if (LOG.isDebugEnabled()) {
+        blockChecksumForDebug = md5.toString();
+      }
+      break;
+    case COMPOSITE_CRC:
+      // TODO: abort if chunk checksum type is not CRC32/CRC32C
+      //BlockChecksumType returnedType = PBHelperClient.convert(
+      //    checksumData.getBlockChecksumOptions().getBlockChecksumType());
+      /*if (returnedType != BlockChecksumType.COMPOSITE_CRC) {
+        throw new IOException(String.format(
+            "Unexpected blockChecksumType '%s', expecting COMPOSITE_CRC",
+            returnedType));
+      }*/
+      byte[] crcBytes = checksumData.array();
+      if (LOG.isDebugEnabled()) {
+        blockChecksumForDebug = CrcUtil.toSingleCrcString(crcBytes);
+      }
+      getBlockChecksumBuf().write(crcBytes);
+      break;
+    default:
+      throw new IOException(
+          "Unknown combine mode: " + getCombineMode());
     }
 
     return blockChecksumForDebug;

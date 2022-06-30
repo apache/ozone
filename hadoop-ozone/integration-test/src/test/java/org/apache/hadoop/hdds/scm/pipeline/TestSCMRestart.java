@@ -82,12 +82,12 @@ public class TestSCMRestart {
     pipelineManager = scm.getPipelineManager();
     ratisPipeline1 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            new RatisReplicationConfig(
+            RatisReplicationConfig.getInstance(
                 ReplicationFactor.THREE), "Owner1").getPipelineID());
     pipelineManager.openPipeline(ratisPipeline1.getId());
     ratisPipeline2 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            new RatisReplicationConfig(
+            RatisReplicationConfig.getInstance(
                 ReplicationFactor.ONE), "Owner2").getPipelineID());
     pipelineManager.openPipeline(ratisPipeline2.getId());
     // At this stage, there should be 2 pipeline one with 1 open container
@@ -124,7 +124,7 @@ public class TestSCMRestart {
     // Try creating a new container, it should be from the same pipeline
     // as was before restart
     ContainerInfo containerInfo = newContainerManager
-        .allocateContainer(new RatisReplicationConfig(
+        .allocateContainer(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "Owner1");
     Assert.assertEquals(containerInfo.getPipelineID(), ratisPipeline1.getId());
   }

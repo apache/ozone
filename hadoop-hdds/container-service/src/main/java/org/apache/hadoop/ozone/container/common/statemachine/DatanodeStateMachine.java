@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -29,6 +30,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -47,9 +49,12 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Crea
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.FinalizeNewLayoutVersionCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconstructECContainersCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.RefreshVolumeUsageCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionSupervisor;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
@@ -94,6 +99,7 @@ public class DatanodeStateMachine implements Closeable {
   private volatile Thread stateMachineThread = null;
   private Thread cmdProcessThread = null;
   private final ReplicationSupervisor supervisor;
+  private final ECReconstructionSupervisor ecReconstructionSupervisor;
 
   private JvmPauseMonitor jvmPauseMonitor;
   private CertificateClient dnCertClient;
@@ -176,6 +182,13 @@ public class DatanodeStateMachine implements Closeable {
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);
 
+    ECReconstructionCoordinator ecReconstructionCoordinator =
+        new ECReconstructionCoordinator(conf, certClient);
+    ecReconstructionSupervisor =
+        new ECReconstructionSupervisor(container.getContainerSet(), context,
+            replicationConfig.getReplicationMaxStreams(),
+            ecReconstructionCoordinator);
+
 
     // When we add new handlers just adding a new handler here should do the
     // trick.
@@ -185,6 +198,8 @@ public class DatanodeStateMachine implements Closeable {
             conf, dnConf.getBlockDeleteThreads(),
             dnConf.getBlockDeleteQueueLimit()))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor))
+        .addHandler(new ReconstructECContainersCommandHandler(conf,
+            ecReconstructionSupervisor))
         .addHandler(new DeleteContainerCommandHandler(
             dnConf.getContainerDeleteThreads()))
         .addHandler(new ClosePipelineCommandHandler())
@@ -261,7 +276,7 @@ public class DatanodeStateMachine implements Closeable {
   /**
    * Runs the state machine at a fixed frequency.
    */
-  private void start() throws IOException {
+  private void startStateMachineThread() throws IOException {
     long now = 0;
 
     reportManager.init();
@@ -283,7 +298,7 @@ public class DatanodeStateMachine implements Closeable {
         context.execute(executorService, heartbeatFrequency,
             TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
-        // Some one has sent interrupt signal, this could be because
+        // Someone has sent interrupt signal, this could be because
         // 1. Trigger heartbeat immediately
         // 2. Shutdown has be initiated.
         Thread.currentThread().interrupt();
@@ -297,8 +312,8 @@ public class DatanodeStateMachine implements Closeable {
           try {
             Thread.sleep(nextHB.get() - now);
           } catch (InterruptedException e) {
-            //triggerHeartbeat is called during the sleep
-            Thread.currentThread().interrupt();
+            // TriggerHeartbeat is called during the sleep. Don't need to set
+            // the interrupted state to true.
           }
         }
       }
@@ -316,8 +331,8 @@ public class DatanodeStateMachine implements Closeable {
   public void handleFatalVolumeFailures() {
     LOG.error("DatanodeStateMachine Shutdown due to too many bad volumes, "
         + "check " + DatanodeConfiguration.FAILED_DATA_VOLUMES_TOLERATED_KEY
-        + " and "
-        + DatanodeConfiguration.FAILED_METADATA_VOLUMES_TOLERATED_KEY);
+        + " and " + DatanodeConfiguration.FAILED_METADATA_VOLUMES_TOLERATED_KEY
+        + " and " + DatanodeConfiguration.FAILED_DB_VOLUMES_TOLERATED_KEY);
     hddsDatanodeStopService.stopService();
   }
 
@@ -358,6 +373,9 @@ public class DatanodeStateMachine implements Closeable {
     if (cmdProcessThread != null) {
       cmdProcessThread.interrupt();
     }
+    if (layoutVersionManager != null) {
+      layoutVersionManager.close();
+    }
     context.setState(DatanodeStates.getLastState());
     replicationSupervisorMetrics.unRegister();
     executorService.shutdown();
@@ -373,6 +391,10 @@ public class DatanodeStateMachine implements Closeable {
       LOG.error("Error attempting to shutdown.", e);
       executorService.shutdownNow();
       Thread.currentThread().interrupt();
+    }
+
+    if (ecReconstructionSupervisor != null) {
+      ecReconstructionSupervisor.close();
     }
 
     if (connectionManager != null) {
@@ -468,7 +490,7 @@ public class DatanodeStateMachine implements Closeable {
     Runnable startStateMachineTask = () -> {
       try {
         LOG.info("Ozone container server started.");
-        start();
+        startStateMachineThread();
       } catch (Exception ex) {
         LOG.error("Unable to start the DatanodeState Machine", ex);
       }
@@ -509,6 +531,35 @@ public class DatanodeStateMachine implements Closeable {
     if (cmdProcessThread != null) {
       cmdProcessThread.join();
     }
+  }
+
+  /**
+   * Returns a summary of the commands queued in the datanode. Commands are
+   * queued in two places. In the CommandQueue inside the StateContext object.
+   * A single thread picks commands from there and hands the command to the
+   * CommandDispatcher. This finds the handler for the command based on its
+   * command type and either executes the command immediately in the current
+   * (single) thread, or queues it in the handler where a thread pool executor
+   * will process it. The total commands queued in the datanode is therefore
+   * the sum those in the CommandQueue and the dispatcher queues.
+   * @return A map containing a count for each known command.
+   */
+  public Map<SCMCommandProto.Type, Integer> getQueuedCommandCount() {
+    // This is a "sparse map" - there is not guaranteed to be an entry for
+    // every command type
+    Map<SCMCommandProto.Type, Integer> commandQSummary =
+        context.getCommandQueueSummary();
+    // This map will contain an entry for every command type which is registered
+    // with the dispatcher, and that should be all command types the DN knows
+    // about. Any commands with nothing in the queue will return a count of
+    // zero.
+    Map<SCMCommandProto.Type, Integer> dispatcherQSummary =
+        commandDispatcher.getQueuedCommandCount();
+    // Merge the "sparse" map into the fully populated one returning a count
+    // for all known command types.
+    commandQSummary.forEach((k, v)
+        -> dispatcherQSummary.merge(k, v, Integer::sum));
+    return dispatcherQSummary;
   }
 
   /**
@@ -648,5 +699,9 @@ public class DatanodeStateMachine implements Closeable {
   }
   public UpgradeFinalizer<DatanodeStateMachine> getUpgradeFinalizer() {
     return upgradeFinalizer;
+  }
+
+  public ConfigurationSource getConf() {
+    return conf;
   }
 }

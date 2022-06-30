@@ -40,7 +40,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.security.acl.*;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +64,7 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMClientRequest.class);
+
   private OMRequest omRequest;
 
   private UserGroupInformation userGroupInformation;
@@ -103,6 +107,15 @@ public abstract class OMClientRequest implements RequestAuditor {
   }
 
   /**
+   * Performs any request specific failure handling during request
+   * submission. An example of this would be an undo of any steps
+   * taken during pre-execute.
+   */
+  public void handleRequestFailure(OzoneManager ozoneManager) {
+    // Most requests would not have any un-do processing.
+  }
+
+  /**
    * Validate the OMRequest and update the cache.
    * This step should verify that the request can be executed, perform
    * any authorization steps and update the in-memory cache.
@@ -124,18 +137,25 @@ public abstract class OMClientRequest implements RequestAuditor {
    * Get User information which needs to be set in the OMRequest object.
    * @return User Info.
    */
-  public OzoneManagerProtocolProtos.UserInfo getUserInfo() {
+  public OzoneManagerProtocolProtos.UserInfo getUserInfo() throws IOException {
     UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
     InetAddress remoteAddress = ProtobufRpcEngine.Server.getRemoteIp();
     OzoneManagerProtocolProtos.UserInfo.Builder userInfo =
         OzoneManagerProtocolProtos.UserInfo.newBuilder();
 
-    // If S3 Authentication is set, use AccessId as user.
+    // If S3 Authentication is set, determine user based on access ID.
     if (omRequest.hasS3Authentication()) {
-      userInfo.setUserName(omRequest.getS3Authentication().getAccessId());
+      String principal = OzoneAclUtils.accessIdToUserPrincipal(
+          omRequest.getS3Authentication().getAccessId());
+      userInfo.setUserName(principal);
     } else if (user != null) {
       // Added not null checks, as in UT's these values might be null.
       userInfo.setUserName(user.getUserName());
+    }
+
+    // for gRPC s3g omRequests that contain user name
+    if (user == null && omRequest.hasUserInfo()) {
+      userInfo.setUserName(omRequest.getUserInfo().getUserName());
     }
 
     if (remoteAddress != null) {
@@ -153,7 +173,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @return User Info.
    */
   public OzoneManagerProtocolProtos.UserInfo getUserIfNotExists(
-      OzoneManager ozoneManager) {
+      OzoneManager ozoneManager) throws IOException {
     OzoneManagerProtocolProtos.UserInfo userInfo = getUserInfo();
     if (!userInfo.hasRemoteAddress() || !userInfo.hasUserName()) {
       OzoneManagerProtocolProtos.UserInfo.Builder newuserInfo =
@@ -205,8 +225,9 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @param keyName
    * @throws IOException
    */
-  protected void checkACLs(OzoneManager ozoneManager, String volumeName,
-      String bucketName, String keyName, IAccessAuthorizer.ACLType aclType)
+  protected void checkACLsWithFSO(OzoneManager ozoneManager, String volumeName,
+                                  String bucketName, String keyName,
+                                  IAccessAuthorizer.ACLType aclType)
       throws IOException {
 
     // TODO: Presently not populating sub-paths under a single bucket
@@ -223,11 +244,10 @@ public abstract class OMClientRequest implements RequestAuditor {
         .setKeyName(keyName)
         .setOzonePrefixPath(pathViewer).build();
 
-    boolean isDirectory = pathViewer.getOzoneFileStatus().isDirectory();
-
     RequestContext.Builder contextBuilder = RequestContext.newBuilder()
         .setAclRights(aclType)
-        .setRecursiveAccessCheck(isDirectory); // recursive checks for a dir
+        // recursive checks for a dir with sub-directories or sub-files
+        .setRecursiveAccessCheck(pathViewer.isCheckRecursiveAccess());
 
     // check Acl
     if (ozoneManager.getAclsEnabled()) {
@@ -353,7 +373,6 @@ public abstract class OMClientRequest implements RequestAuditor {
     if (userGroupInformation != null) {
       return userGroupInformation;
     }
-
     if (omRequest.hasUserInfo() &&
         !StringUtils.isBlank(omRequest.getUserInfo().getUserName())) {
       userGroupInformation = UserGroupInformation.createRemoteUser(

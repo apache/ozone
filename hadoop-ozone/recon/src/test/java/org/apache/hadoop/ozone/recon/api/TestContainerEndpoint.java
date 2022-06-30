@@ -469,7 +469,7 @@ public class TestContainerEndpoint {
     return new ContainerInfo.Builder()
         .setContainerID(containerId)
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(HddsProtos.LifeCycleState.OPEN)
         .setOwner("owner1")
         .setNumberOfKeys(keyCount)

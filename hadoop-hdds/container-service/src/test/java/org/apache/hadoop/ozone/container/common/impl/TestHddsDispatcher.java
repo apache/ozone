@@ -36,13 +36,14 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerAction;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
@@ -67,7 +68,6 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -82,8 +82,8 @@ import static org.mockito.Mockito.verify;
 @RunWith(Parameterized.class)
 public class TestHddsDispatcher {
 
-  public static final Consumer<ContainerReplicaProto> NO_OP_ICR_SENDER =
-      c -> { };
+  public static final IncrementalReportSender<Container>
+      NO_OP_ICR_SENDER = c -> { };
 
   private final ContainerLayoutVersion layout;
 
@@ -188,6 +188,25 @@ public class TestHddsDispatcher {
           response.getReadChunk().getDataBuffers().getBuffersList());
       Assert.assertEquals(writeChunkRequest.getWriteChunk().getData(),
           responseData);
+      // put block
+      ContainerCommandRequestProto putBlockRequest =
+          ContainerTestHelper.getPutBlockRequest(writeChunkRequest);
+      response =  hddsDispatcher.dispatch(putBlockRequest, null);
+      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      // send list block request
+      ContainerCommandRequestProto listBlockRequest =
+          ContainerTestHelper.getListBlockRequest(writeChunkRequest);
+      response =  hddsDispatcher.dispatch(listBlockRequest, null);
+      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      Assert.assertEquals(1, response.getListBlock().getBlockDataList().size());
+      for (ContainerProtos.BlockData blockData :
+          response.getListBlock().getBlockDataList()) {
+        Assert.assertEquals(writeChunkRequest.getWriteChunk().getBlockID(),
+            blockData.getBlockID());
+        Assert.assertEquals(writeChunkRequest.getWriteChunk().getChunkData()
+            .getLen(), blockData.getSize());
+        Assert.assertEquals(1, blockData.getChunksCount());
+      }
     } finally {
       ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));

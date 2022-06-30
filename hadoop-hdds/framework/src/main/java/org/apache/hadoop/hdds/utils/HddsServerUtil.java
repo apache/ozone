@@ -70,6 +70,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -90,6 +92,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR;
 
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -253,6 +256,18 @@ public final class HddsServerUtil {
   }
 
   /**
+   * Heartbeat Interval - Defines the heartbeat frequency from a datanode to
+   * Recon.
+   *
+   * @param conf - Ozone Config
+   * @return - HB interval in milli seconds.
+   */
+  public static long getReconHeartbeatInterval(ConfigurationSource conf) {
+    return conf.getTimeDuration(HDDS_RECON_HEARTBEAT_INTERVAL,
+        HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+  }
+
+  /**
    * Get the Stale Node interval, which is used by SCM to flag a datanode as
    * stale, if the heartbeat from that node has been missing for this duration.
    *
@@ -388,6 +403,12 @@ public final class HddsServerUtil {
           + HDDS_DATANODE_DIR_KEY + " or " + DFS_DATANODE_DATA_DIR_KEY);
     }
     return rawLocations;
+  }
+
+  public static Collection<String> getDatanodeDbDirs(
+      ConfigurationSource conf) {
+    // No fallback here, since this config is optional.
+    return conf.getTrimmedStringCollection(HDDS_DATANODE_CONTAINER_DB_DIR);
   }
 
   /**

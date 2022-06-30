@@ -23,6 +23,11 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -32,6 +37,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Creates pipeline based on replication type.
@@ -50,6 +56,18 @@ public class PipelineFactory {
         new RatisPipelineProvider(nodeManager,
             stateManager, conf,
             eventPublisher, scmContext));
+    PlacementPolicy ecPlacementPolicy;
+    try {
+      ecPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(conf,
+          nodeManager, nodeManager.getClusterNetworkTopologyMap(), true,
+          SCMContainerPlacementMetrics.create());
+    } catch (SCMException e) {
+      throw new RuntimeException("Unable to get the container placement policy",
+          e);
+    }
+    providers.put(ReplicationType.EC,
+        new ECPipelineProvider(nodeManager, stateManager, conf,
+            ecPlacementPolicy));
   }
 
   protected PipelineFactory() {
@@ -64,12 +82,30 @@ public class PipelineFactory {
   }
 
   public Pipeline create(
-      ReplicationConfig replicationConfig
-  )
+      ReplicationConfig replicationConfig, List<DatanodeDetails> excludedNodes,
+      List<DatanodeDetails> favoredNodes)
       throws IOException {
-    return providers
-        .get(replicationConfig.getReplicationType())
-        .create(replicationConfig);
+    Pipeline pipeline = providers.get(replicationConfig.getReplicationType())
+        .create(replicationConfig, excludedNodes, favoredNodes);
+    checkPipeline(pipeline);
+    return pipeline;
+  }
+
+  private void checkPipeline(Pipeline pipeline) throws IOException {
+    // In case in case if provided pipeline provider returns null.
+    if (pipeline == null) {
+      throw new SCMException("Pipeline cannot be null",
+          SCMException.ResultCodes.INTERNAL_ERROR);
+    }
+    // In case if provided pipeline returns less number of nodes than
+    // required.
+    if (pipeline.getNodes().size() != pipeline.getReplicationConfig()
+        .getRequiredNodes()) {
+      throw new SCMException("Nodes size= " + pipeline.getNodes()
+          .size() + ", replication factor= " + pipeline.getReplicationConfig()
+          .getRequiredNodes() + " do not match",
+          SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
+    }
   }
 
   public Pipeline create(ReplicationConfig replicationConfig,
@@ -77,6 +113,12 @@ public class PipelineFactory {
   ) {
     return providers.get(replicationConfig.getReplicationType())
         .create(replicationConfig, nodes);
+  }
+
+  public Pipeline createForRead(ReplicationConfig replicationConfig,
+      Set<ContainerReplica> replicas) {
+    return providers.get(replicationConfig.getReplicationType())
+        .createForRead(replicationConfig, replicas);
   }
 
   public void close(ReplicationType type, Pipeline pipeline)

@@ -22,8 +22,11 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBalancerConfigurationProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,9 +100,8 @@ public final class ContainerBalancerConfiguration {
   private long moveTimeout = Duration.ofMinutes(30).toMillis();
 
   @Config(key = "balancing.iteration.interval", type = ConfigType.TIME,
-      defaultValue = "70m", tags = {
-      ConfigTag.BALANCER}, description = "The interval period between each " +
-      "iteration of Container Balancer.")
+      defaultValue = "70m", tags = {ConfigTag.BALANCER}, description =
+      "The interval period between each iteration of Container Balancer.")
   private long balancingInterval = Duration.ofMinutes(70).toMillis();
 
   @Config(key = "include.datanodes", type = ConfigType.STRING, defaultValue =
@@ -122,6 +124,15 @@ public final class ContainerBalancerConfiguration {
           "selecting a target for a source. " +
           "This configuration is false by default.")
   private boolean networkTopologyEnable = false;
+
+  @Config(key = "trigger.du.before.move.enable", type = ConfigType.BOOLEAN,
+      defaultValue = "false", tags = {ConfigTag.BALANCER},
+      description = "whether to send command to all the healthy and " +
+          "in-service data nodes to run du immediately before starting" +
+          "a balance iteration. note that running du is very time " +
+          "consuming , especially when the disk usage rate of a " +
+          "data node is very high")
+  private boolean triggerDuEnable = false;
 
   /**
    * Gets the threshold value for Container Balancer.
@@ -190,6 +201,19 @@ public final class ContainerBalancerConfiguration {
    */
   public Boolean getNetworkTopologyEnable() {
     return networkTopologyEnable;
+  }
+
+  /**
+   * Get the triggerDuEnable value for Container Balancer.
+   *
+   * @return the boolean value of triggerDuEnable
+   */
+  public Boolean getTriggerDuEnable() {
+    return triggerDuEnable;
+  }
+
+  public void setTriggerDuEnable(boolean enable) {
+    triggerDuEnable = enable;
   }
 
   /**
@@ -298,12 +322,20 @@ public final class ContainerBalancerConfiguration {
     this.moveTimeout = duration.toMillis();
   }
 
+  public void setMoveTimeout(long millis) {
+    this.moveTimeout = millis;
+  }
+
   public Duration getBalancingInterval() {
     return Duration.ofMillis(balancingInterval);
   }
 
   public void setBalancingInterval(Duration balancingInterval) {
     this.balancingInterval = balancingInterval.toMillis();
+  }
+
+  public void setBalancingInterval(long millis) {
+    this.balancingInterval = millis;
   }
 
   /**
@@ -372,5 +404,74 @@ public final class ContainerBalancerConfiguration {
         maxSizeEnteringTarget / OzoneConsts.GB,
         "Max Size Leaving Source per Iteration",
         maxSizeLeavingSource / OzoneConsts.GB);
+  }
+
+  ContainerBalancerConfigurationProto.Builder toProtobufBuilder() {
+    ContainerBalancerConfigurationProto.Builder builder =
+        ContainerBalancerConfigurationProto.newBuilder();
+
+    builder.setUtilizationThreshold(threshold)
+        .setDatanodesInvolvedMaxPercentagePerIteration(
+            maxDatanodesPercentageToInvolvePerIteration)
+        .setSizeMovedMaxPerIteration(maxSizeToMovePerIteration)
+        .setSizeEnteringTargetMax(maxSizeEnteringTarget)
+        .setSizeLeavingSourceMax(maxSizeLeavingSource)
+        .setIterations(iterations)
+        .setExcludeContainers(excludeContainers)
+        .setMoveTimeout(moveTimeout)
+        .setBalancingIterationInterval(balancingInterval)
+        .setIncludeDatanodes(includeNodes)
+        .setExcludeDatanodes(excludeNodes)
+        .setMoveNetworkTopologyEnable(networkTopologyEnable)
+        .setTriggerDuBeforeMoveEnable(triggerDuEnable);
+    return builder;
+  }
+
+  static ContainerBalancerConfiguration fromProtobuf(
+      @NotNull ContainerBalancerConfigurationProto proto,
+      @NotNull OzoneConfiguration ozoneConfiguration) {
+    ContainerBalancerConfiguration config =
+        ozoneConfiguration.getObject(ContainerBalancerConfiguration.class);
+    if (proto.hasUtilizationThreshold()) {
+      config.setThreshold(Double.parseDouble(proto.getUtilizationThreshold()));
+    }
+    if (proto.hasDatanodesInvolvedMaxPercentagePerIteration()) {
+      config.setMaxDatanodesPercentageToInvolvePerIteration(
+          proto.getDatanodesInvolvedMaxPercentagePerIteration());
+    }
+    if (proto.hasSizeMovedMaxPerIteration()) {
+      config.setMaxSizeToMovePerIteration(proto.getSizeMovedMaxPerIteration());
+    }
+    if (proto.hasSizeEnteringTargetMax()) {
+      config.setMaxSizeEnteringTarget(proto.getSizeEnteringTargetMax());
+    }
+    if (proto.hasSizeLeavingSourceMax()) {
+      config.setMaxSizeLeavingSource(proto.getSizeLeavingSourceMax());
+    }
+    if (proto.hasIterations()) {
+      config.setIterations(proto.getIterations());
+    }
+    if (proto.hasExcludeContainers()) {
+      config.setExcludeContainers(proto.getExcludeContainers());
+    }
+    if (proto.hasMoveTimeout()) {
+      config.setMoveTimeout(proto.getMoveTimeout());
+    }
+    if (proto.hasBalancingIterationInterval()) {
+      config.setBalancingInterval(proto.getBalancingIterationInterval());
+    }
+    if (proto.hasIncludeDatanodes()) {
+      config.setIncludeNodes(proto.getIncludeDatanodes());
+    }
+    if (proto.hasExcludeDatanodes()) {
+      config.setExcludeNodes(proto.getExcludeDatanodes());
+    }
+    if (proto.hasMoveNetworkTopologyEnable()) {
+      config.setNetworkTopologyEnable(proto.getMoveNetworkTopologyEnable());
+    }
+    if (proto.hasTriggerDuBeforeMoveEnable()) {
+      config.setTriggerDuEnable(proto.getTriggerDuBeforeMoveEnable());
+    }
+    return config;
   }
 }

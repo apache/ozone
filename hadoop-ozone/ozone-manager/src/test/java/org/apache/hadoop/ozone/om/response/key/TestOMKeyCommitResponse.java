@@ -19,9 +19,7 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
@@ -29,6 +27,8 @@ import org.junit.Test;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+
+import java.io.IOException;
 
 /**
  * Tests OMKeyCommitResponse.
@@ -38,10 +38,6 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
   @Test
   public void testAddToDBBatch() throws Exception {
-
-    omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
 
     OmKeyInfo omKeyInfo = getOmKeyInfo();
 
@@ -81,9 +77,6 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
-    omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder().setCommitKeyResponse(
@@ -121,9 +114,6 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
   @Test
   public void testAddToDBBatchOnOverwrite() throws Exception {
-    omBucketInfo = OmBucketInfo.newBuilder()
-            .setVolumeName(volumeName).setBucketName(bucketName)
-            .setCreationTime(Time.now()).build();
     OmKeyInfo omKeyInfo = getOmKeyInfo();
     keysToDelete =
             OmUtils.prepareKeyForDelete(omKeyInfo, null, 100, false);
@@ -144,7 +134,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
   }
 
   @NotNull
-  protected String getOzoneKey() {
+  protected String getOzoneKey() throws IOException {
     Assert.assertNotNull(omBucketInfo);
     return omMetadataManager.getOzoneKey(volumeName,
             omBucketInfo.getBucketName(), keyName);
@@ -153,7 +143,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
   @NotNull
   protected OMKeyCommitResponse getOmKeyCommitResponse(OmKeyInfo omKeyInfo,
           OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
-          String ozoneKey, RepeatedOmKeyInfo deleteKeys) {
+          String ozoneKey, RepeatedOmKeyInfo deleteKeys) throws IOException {
     Assert.assertNotNull(omBucketInfo);
     return new OMKeyCommitResponse(omResponse, omKeyInfo, ozoneKey, openKey,
             omBucketInfo, deleteKeys);

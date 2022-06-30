@@ -17,10 +17,9 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.apache.hadoop.hdds.scm.ha.SCMService.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -71,7 +70,11 @@ public final class SCMServiceManager {
   public synchronized void start() {
     for (SCMService service : services) {
       LOG.debug("Stopping service:{}.", service.getServiceName());
-      service.start();
+      try {
+        service.start();
+      } catch (SCMServiceException e) {
+        LOG.warn("Could not start " + service.getServiceName(), e);
+      }
     }
   }
 

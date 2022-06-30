@@ -20,7 +20,11 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.*;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -30,6 +34,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTINFO_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
@@ -45,7 +50,7 @@ import javax.annotation.Nullable;
  * Response for S3MultipartUploadCommitPart request.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, DELETED_TABLE,
-    MULTIPARTINFO_TABLE})
+    MULTIPARTINFO_TABLE, BUCKET_TABLE})
 public class S3MultipartUploadCommitPartResponse extends OmKeyResponse {
 
   private String multipartKey;

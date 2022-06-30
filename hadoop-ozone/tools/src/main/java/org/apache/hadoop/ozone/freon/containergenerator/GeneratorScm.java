@@ -78,8 +78,8 @@ public class GeneratorScm extends BaseGenerator {
           new ContainerInfo.Builder()
               .setContainerID(containerId)
               .setState(LifeCycleState.CLOSED)
-              .setReplicationConfig(
-                  new StandaloneReplicationConfig(ReplicationFactor.THREE))
+              .setReplicationConfig(StandaloneReplicationConfig
+                  .getInstance(ReplicationFactor.THREE))
               .setOwner(getUserId())
               .build();
 

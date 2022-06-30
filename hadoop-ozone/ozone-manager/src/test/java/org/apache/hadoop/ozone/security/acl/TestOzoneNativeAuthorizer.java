@@ -75,7 +75,9 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.PREFIX;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Test class for {@link OzoneNativeAuthorizer}.
@@ -170,8 +172,8 @@ public class TestOzoneNativeAuthorizer {
         .setVolumeName(volume)
         .setBucketName(bucket)
         .setKeyName(keyName)
-        .setReplicationConfig(
-            new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE))
+        .setReplicationConfig(StandaloneReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.ONE))
         .setDataSize(0)
         .setAcls(OzoneAclUtil.getAclList(testUgi.getUserName(),
             testUgi.getGroupNames(), ALL, ALL))

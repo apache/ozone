@@ -22,9 +22,15 @@ import java.io.IOException;
 import java.util.Map;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +47,7 @@ import org.apache.hadoop.ozone.om.response.bucket.OMBucketDeleteResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .DeleteBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -114,7 +121,10 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // with out volume creation. Check if bucket exists
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
 
-      if (!omMetadataManager.getBucketTable().isExist(bucketKey)) {
+      OmBucketInfo omBucketInfo =
+          omMetadataManager.getBucketTable().get(bucketKey);
+
+      if (omBucketInfo == null) {
         LOG.debug("bucket: {} not found ", bucketName);
         throw new OMException("Bucket not exists", BUCKET_NOT_FOUND);
       }
@@ -124,6 +134,9 @@ public class OMBucketDeleteRequest extends OMClientRequest {
         LOG.debug("bucket: {} is not empty ", bucketName);
         throw new OMException("Bucket is not empty",
             OMException.ResultCodes.BUCKET_NOT_EMPTY);
+      }
+      if (omBucketInfo.getBucketLayout().isFileSystemOptimized()) {
+        omMetrics.incNumFSOBucketDeletes();
       }
       omMetrics.decNumBuckets();
 
@@ -185,4 +198,32 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     }
   }
 
+  /**
+   * Validates bucket delete requests.
+   * Handles the cases where an older client attempts to delete a bucket
+   * a new bucket layout.
+   * We do not want to allow this to happen, since this would cause the client
+   * to be able to delete buckets it cannot understand.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.DeleteBucket
+  )
+  public static OMRequest blockBucketDeleteWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    DeleteBucketRequest request = req.getDeleteBucketRequest();
+
+    if (request.hasBucketName() && request.hasVolumeName()) {
+      BucketLayout bucketLayout = ctx.getBucketLayout(
+          request.getVolumeName(), request.getBucketName());
+      bucketLayout.validateSupportedOperation();
+    }
+    return req;
+  }
 }

@@ -18,22 +18,53 @@
 
 package org.apache.hadoop.hdds.client;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 
 import java.util.Objects;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+
 /**
  * Replication configuration for STANDALONE replication.
  */
-public class StandaloneReplicationConfig implements
+public final class StandaloneReplicationConfig implements
     ReplicatedReplicationConfig {
 
   private final ReplicationFactor replicationFactor;
   private static final String REPLICATION_TYPE = "STANDALONE";
 
-  public StandaloneReplicationConfig(ReplicationFactor replicationFactor) {
+  private static final StandaloneReplicationConfig STANDALONE_ONE_CONFIG =
+      new StandaloneReplicationConfig(ONE);
+
+  private static final StandaloneReplicationConfig STANDALONE_THREE_CONFIG =
+      new StandaloneReplicationConfig(THREE);
+
+  /**
+   * Get an instance of Standalone Replication Config with the requested factor.
+   * The same static instance will be returned for all requests for the same
+   * factor.
+   * @param factor Replication Factor requested
+   * @return StandaloneReplicationConfig object of the requested factor
+   */
+  public static StandaloneReplicationConfig getInstance(
+      ReplicationFactor factor) {
+    if (factor == ONE) {
+      return STANDALONE_ONE_CONFIG;
+    } else if (factor == THREE) {
+      return STANDALONE_THREE_CONFIG;
+    }
+    return new StandaloneReplicationConfig(factor);
+  }
+
+  /**
+   * Use the static getInstance method instead of the private constructor.
+   * @param replicationFactor
+   */
+  private StandaloneReplicationConfig(ReplicationFactor replicationFactor) {
     this.replicationFactor = replicationFactor;
   }
 
@@ -45,6 +76,12 @@ public class StandaloneReplicationConfig implements
   @Override
   public int getRequiredNodes() {
     return replicationFactor.getNumber();
+  }
+
+  @Override
+  @JsonIgnore
+  public String getReplication() {
+    return String.valueOf(this.replicationFactor);
   }
 
   @Override
@@ -83,5 +120,10 @@ public class StandaloneReplicationConfig implements
   @Override
   public String toString() {
     return REPLICATION_TYPE + "/" + replicationFactor;
+  }
+
+  @Override
+  public String configFormat() {
+    return toString();
   }
 }

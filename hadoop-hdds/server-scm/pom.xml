@@ -69,7 +69,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <dependency>
       <groupId>com.github.spotbugs</groupId>
-      <artifactId>spotbugs</artifactId>
+      <artifactId>spotbugs-annotations</artifactId>
       <scope>provided</scope>
     </dependency>
 
@@ -148,6 +148,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.junit.platform</groupId>
       <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

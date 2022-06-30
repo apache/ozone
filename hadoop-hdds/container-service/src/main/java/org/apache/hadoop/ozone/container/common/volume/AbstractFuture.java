@@ -284,13 +284,12 @@ public abstract class AbstractFuture<V> implements ListenableFuture<V> {
   private static final class Failure {
     static final Failure FALLBACK_INSTANCE =
         new Failure(
-          new Throwable("Failure occurred while trying to finish a future" +
-              ".") {
-            @Override
-            public synchronized Throwable fillInStackTrace() {
-              return this; // no stack trace
-            }
-          });
+            new Throwable("Failure occurred while trying to finish a future.") {
+                @Override
+                public synchronized Throwable fillInStackTrace() {
+                  return this; // no stack trace
+                }
+            });
     final Throwable exception;
 
     Failure(Throwable exception) {

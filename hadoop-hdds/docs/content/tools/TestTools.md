@@ -59,7 +59,7 @@ cd compose/ozone
 Blockade tests are implemented with the help of tests and can be started from the `./blockade` directory of the distribution.
 
 ```
-cd blocakde
+cd blockade
 pip install pytest==2.8.7,blockade
 python -m pytest -s .
 ```

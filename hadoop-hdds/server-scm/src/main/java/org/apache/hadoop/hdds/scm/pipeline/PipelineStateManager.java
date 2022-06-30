@@ -95,6 +95,11 @@ public interface PipelineStateManager {
       Collection<PipelineID> excludePipelines
   );
 
+  int getPipelineCount(
+      ReplicationConfig replicationConfig,
+      Pipeline.PipelineState state
+  );
+
   NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
       throws IOException;
 

@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.container.common.helpers;
 
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion;
-import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.Before;
@@ -32,7 +32,9 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * This class tests {@link DatanodeVersionFile}.
@@ -75,15 +77,15 @@ public class TestDatanodeVersionFile {
     //Check VersionFile exists
     assertTrue(versionFile.exists());
 
-    assertEquals(storageID, HddsVolumeUtil.getStorageID(
+    assertEquals(storageID, StorageVolumeUtil.getStorageID(
         properties, versionFile));
-    assertEquals(clusterID, HddsVolumeUtil.getClusterID(
+    assertEquals(clusterID, StorageVolumeUtil.getClusterID(
         properties, versionFile, clusterID));
-    assertEquals(datanodeUUID, HddsVolumeUtil.getDatanodeUUID(
+    assertEquals(datanodeUUID, StorageVolumeUtil.getDatanodeUUID(
         properties, versionFile, datanodeUUID));
-    assertEquals(cTime, HddsVolumeUtil.getCreationTime(
+    assertEquals(cTime, StorageVolumeUtil.getCreationTime(
         properties, versionFile));
-    assertEquals(lv, HddsVolumeUtil.getLayOutVersion(
+    assertEquals(lv, StorageVolumeUtil.getLayOutVersion(
         properties, versionFile));
   }
 
@@ -91,7 +93,7 @@ public class TestDatanodeVersionFile {
   public void testIncorrectClusterId() throws IOException {
     try {
       String randomClusterID = UUID.randomUUID().toString();
-      HddsVolumeUtil.getClusterID(properties, versionFile,
+      StorageVolumeUtil.getClusterID(properties, versionFile,
           randomClusterID);
       fail("Test failure in testIncorrectClusterId");
     } catch (InconsistentStorageStateException ex) {
@@ -108,7 +110,7 @@ public class TestDatanodeVersionFile {
     properties = dnVersionFile.readFrom(versionFile);
 
     try {
-      HddsVolumeUtil.getCreationTime(properties, versionFile);
+      StorageVolumeUtil.getCreationTime(properties, versionFile);
       fail("Test failure in testVerifyCTime");
     } catch (InconsistentStorageStateException ex) {
       GenericTestUtils.assertExceptionContains("Invalid Creation time in " +
@@ -125,7 +127,7 @@ public class TestDatanodeVersionFile {
     Properties props = dnVersionFile.readFrom(versionFile);
 
     try {
-      HddsVolumeUtil.getLayOutVersion(props, versionFile);
+      StorageVolumeUtil.getLayOutVersion(props, versionFile);
       fail("Test failure in testVerifyLayOut");
     } catch (InconsistentStorageStateException ex) {
       GenericTestUtils.assertExceptionContains("Invalid layOutVersion.", ex);

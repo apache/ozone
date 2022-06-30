@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -159,6 +160,8 @@ public interface MiniOzoneCluster {
    * @return List of {@link HddsDatanodeService}
    */
   List<HddsDatanodeService> getHddsDatanodes();
+
+  HddsDatanodeService getHddsDatanode(DatanodeDetails dn) throws IOException;
 
   /**
    * Returns a {@link ReconServer} instance.
@@ -294,7 +297,7 @@ public interface MiniOzoneCluster {
     protected static final int DEFAULT_HB_PROCESSOR_INTERVAL_MS = 100;
     protected static final int ACTIVE_OMS_NOT_SET = -1;
     protected static final int ACTIVE_SCMS_NOT_SET = -1;
-    protected static final int DEFAULT_PIPELIME_LIMIT = 3;
+    protected static final int DEFAULT_PIPELINE_LIMIT = 3;
     protected static final int DEFAULT_RATIS_RPC_TIMEOUT_SEC = 1;
 
     protected OzoneConfiguration conf;
@@ -308,6 +311,7 @@ public interface MiniOzoneCluster {
     protected String scmServiceId;
     protected int numOfSCMs;
     protected int numOfActiveSCMs = ACTIVE_SCMS_NOT_SET;
+    protected SCMConfigurator scmConfigurator;
 
     protected Optional<Boolean> enableTrace = Optional.of(false);
     protected Optional<Integer> hbInterval = Optional.empty();
@@ -337,16 +341,23 @@ public interface MiniOzoneCluster {
     protected int numDataVolumes = 1;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
-    protected int pipelineNumLimit = DEFAULT_PIPELIME_LIMIT;
+    protected int pipelineNumLimit = DEFAULT_PIPELINE_LIMIT;
 
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
       setClusterId(UUID.randomUUID().toString());
+      // Use default SCM configurations if no override is provided.
+      setSCMConfigurator(new SCMConfigurator());
       ExitUtils.disableSystemExit();
     }
 
     public Builder setConf(OzoneConfiguration config) {
       this.conf = config;
+      return this;
+    }
+
+    public Builder setSCMConfigurator(SCMConfigurator configurator) {
+      this.scmConfigurator = configurator;
       return this;
     }
 

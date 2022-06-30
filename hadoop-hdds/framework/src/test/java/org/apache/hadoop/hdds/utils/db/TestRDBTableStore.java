@@ -22,21 +22,26 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.StringUtils;
-
 import org.apache.commons.lang3.RandomStringUtils;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
 import org.rocksdb.RocksDB;
@@ -54,23 +59,37 @@ public class TestRDBTableStore {
           "Fourth", "Fifth",
           "Sixth", "Seventh",
           "Eighth");
+  private final List<String> prefixedFamilies = Arrays.asList(
+      "PrefixFirst",
+      "PrefixTwo", "PrefixThree",
+      "PrefixFour", "PrefixFifth"
+  );
+  private static final int PREFIX_LENGTH = 9;
   @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
   private RDBStore rdbStore = null;
   private DBOptions options = null;
+  private static byte[][] bytesOf;
+
+  @BeforeAll
+  public static void initConstants() {
+    bytesOf = new byte[4][];
+    for (int i = 1; i <= 3; i++) {
+      bytesOf[i] = Integer.toString(i).getBytes(StandardCharsets.UTF_8);
+    }
+  }
 
   private static boolean consume(Table.KeyValue keyValue)  {
     count++;
     try {
-      Assert.assertNotNull(keyValue.getKey());
+      Assertions.assertNotNull(keyValue.getKey());
     } catch (IOException ex) {
-      Assert.fail("Unexpected Exception " + ex.toString());
+      Assertions.fail("Unexpected Exception " + ex);
     }
     return true;
   }
 
-  @Before
-  public void setUp() throws Exception {
+  @BeforeEach
+  public void setUp(@TempDir File tempDir) throws Exception {
     options = new DBOptions();
     options.setCreateIfMissing(true);
     options.setCreateMissingColumnFamilies(true);
@@ -84,10 +103,17 @@ public class TestRDBTableStore {
       TableConfig newConfig = new TableConfig(name, new ColumnFamilyOptions());
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(folder.newFolder(), options, configSet);
+    for (String name : prefixedFamilies) {
+      ColumnFamilyOptions cfOptions = new ColumnFamilyOptions();
+      cfOptions.useFixedLengthPrefixExtractor(PREFIX_LENGTH);
+
+      TableConfig newConfig = new TableConfig(name, cfOptions);
+      configSet.add(newConfig);
+    }
+    rdbStore = new RDBStore(tempDir, options, configSet);
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     if (rdbStore != null) {
       rdbStore.close();
@@ -97,8 +123,8 @@ public class TestRDBTableStore {
   @Test
   public void getHandle() throws Exception {
     try (Table testTable = rdbStore.getTable("First")) {
-      Assert.assertNotNull(testTable);
-      Assert.assertNotNull(((RDBTable) testTable).getHandle());
+      Assertions.assertNotNull(testTable);
+      Assertions.assertNotNull(((RDBTable) testTable).getColumnFamily());
     }
   }
 
@@ -110,12 +136,12 @@ public class TestRDBTableStore {
       byte[] value =
           RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
       testTable.put(key, value);
-      Assert.assertFalse(testTable.isEmpty());
+      Assertions.assertFalse(testTable.isEmpty());
       byte[] readValue = testTable.get(key);
-      Assert.assertArrayEquals(value, readValue);
+      Assertions.assertArrayEquals(value, readValue);
     }
     try (Table secondTable = rdbStore.getTable("Second")) {
-      Assert.assertTrue(secondTable.isEmpty());
+      Assertions.assertTrue(secondTable.isEmpty());
     }
   }
 
@@ -148,11 +174,11 @@ public class TestRDBTableStore {
       }
 
       for (int x = 0; x < validKeys.size(); x++) {
-        Assert.assertNotNull(testTable.get(validKeys.get(0)));
+        Assertions.assertNotNull(testTable.get(validKeys.get(0)));
       }
 
       for (int x = 0; x < deletedKeys.size(); x++) {
-        Assert.assertNull(testTable.get(deletedKeys.get(0)));
+        Assertions.assertNull(testTable.get(deletedKeys.get(0)));
       }
     }
   }
@@ -166,14 +192,14 @@ public class TestRDBTableStore {
           RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
       byte[] value =
           RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
-      Assert.assertNull(testTable.get(key));
+      Assertions.assertNull(testTable.get(key));
 
       //when
       testTable.putWithBatch(batch, key, value);
       rdbStore.commitBatchOperation(batch);
 
       //then
-      Assert.assertNotNull(testTable.get(key));
+      Assertions.assertNotNull(testTable.get(key));
     }
   }
 
@@ -188,7 +214,7 @@ public class TestRDBTableStore {
       byte[] value =
           RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
       testTable.put(key, value);
-      Assert.assertNotNull(testTable.get(key));
+      Assertions.assertNotNull(testTable.get(key));
 
 
       //when
@@ -196,7 +222,7 @@ public class TestRDBTableStore {
       rdbStore.commitBatchOperation(batch);
 
       //then
-      Assert.assertNull(testTable.get(key));
+      Assertions.assertNull(testTable.get(key));
     }
   }
 
@@ -218,17 +244,17 @@ public class TestRDBTableStore {
           localCount++;
         }
 
-        Assert.assertEquals(iterCount, localCount);
+        Assertions.assertEquals(iterCount, localCount);
         iter.seekToFirst();
         iter.forEachRemaining(TestRDBTableStore::consume);
-        Assert.assertEquals(iterCount, count);
+        Assertions.assertEquals(iterCount, count);
 
       }
     }
   }
 
   @Test
-  public void testIsExist() throws Exception {
+  public void testIsExist(@TempDir File rdbLocation) throws Exception {
     DBOptions rocksDBOptions = new DBOptions();
     rocksDBOptions.setCreateIfMissing(true);
     rocksDBOptions.setCreateMissingColumnFamilies(true);
@@ -240,7 +266,7 @@ public class TestRDBTableStore {
         new ColumnFamilyOptions());
     configSet.add(newConfig);
 
-    File rdbLocation = folder.newFolder();
+    rdbStore.close(); // TODO: HDDS-6773
     RDBStore dbStore = new RDBStore(rdbLocation, rocksDBOptions, configSet);
 
     byte[] key = RandomStringUtils.random(10, true, false)
@@ -252,20 +278,20 @@ public class TestRDBTableStore {
       testTable.put(key, value);
 
       // Test if isExist returns true for a key that definitely exists.
-      Assert.assertTrue(testTable.isExist(key));
+      Assertions.assertTrue(testTable.isExist(key));
 
       // Test if isExist returns false for a key that has been deleted.
       testTable.delete(key);
-      Assert.assertFalse(testTable.isExist(key));
+      Assertions.assertFalse(testTable.isExist(key));
 
       byte[] invalidKey =
           RandomStringUtils.random(5).getBytes(StandardCharsets.UTF_8);
       // Test if isExist returns false for a key that is definitely not present.
-      Assert.assertFalse(testTable.isExist(invalidKey));
+      Assertions.assertFalse(testTable.isExist(invalidKey));
 
       RDBMetrics rdbMetrics = dbStore.getMetrics();
-      Assert.assertEquals(3, rdbMetrics.getNumDBKeyMayExistChecks());
-      Assert.assertTrue(rdbMetrics.getNumDBKeyMayExistMisses() == 0);
+      Assertions.assertEquals(3, rdbMetrics.getNumDBKeyMayExistChecks());
+      Assertions.assertEquals(0, rdbMetrics.getNumDBKeyMayExistMisses());
 
       // Reinsert key for further testing.
       testTable.put(key, value);
@@ -278,7 +304,7 @@ public class TestRDBTableStore {
     dbStore = new RDBStore(rdbLocation, rocksDBOptions, configSet);
     try (Table<byte[], byte[]> testTable = dbStore.getTable(tableName)) {
       // Verify isExist works with key not in block cache.
-      Assert.assertTrue(testTable.isExist(key));
+      Assertions.assertTrue(testTable.isExist(key));
     } finally {
       dbStore.close();
     }
@@ -286,7 +312,7 @@ public class TestRDBTableStore {
 
 
   @Test
-  public void testGetIfExist() throws Exception {
+  public void testGetIfExist(@TempDir File rdbLocation) throws Exception {
     DBOptions rocksDBOptions = new DBOptions();
     rocksDBOptions.setCreateIfMissing(true);
     rocksDBOptions.setCreateMissingColumnFamilies(true);
@@ -298,7 +324,7 @@ public class TestRDBTableStore {
         new ColumnFamilyOptions());
     configSet.add(newConfig);
 
-    File rdbLocation = folder.newFolder();
+    rdbStore.close(); // TODO: HDDS-6773
     RDBStore dbStore = new RDBStore(rdbLocation, rocksDBOptions, configSet);
 
     byte[] key = RandomStringUtils.random(10, true, false)
@@ -310,24 +336,23 @@ public class TestRDBTableStore {
       testTable.put(key, value);
 
       // Test if isExist returns value for a key that definitely exists.
-      Assert.assertNotNull(testTable.getIfExist(key));
+      Assertions.assertNotNull(testTable.getIfExist(key));
 
       // Test if isExist returns null for a key that has been deleted.
       testTable.delete(key);
-      Assert.assertNull(testTable.getIfExist(key));
+      Assertions.assertNull(testTable.getIfExist(key));
 
       byte[] invalidKey =
           RandomStringUtils.random(5).getBytes(StandardCharsets.UTF_8);
       // Test if isExist returns null for a key that is definitely not present.
-      Assert.assertNull(testTable.getIfExist(invalidKey));
+      Assertions.assertNull(testTable.getIfExist(invalidKey));
 
       RDBMetrics rdbMetrics = dbStore.getMetrics();
-      Assert.assertEquals(3, rdbMetrics.getNumDBKeyGetIfExistChecks());
+      Assertions.assertEquals(3, rdbMetrics.getNumDBKeyGetIfExistChecks());
 
+      Assertions.assertEquals(0, rdbMetrics.getNumDBKeyGetIfExistMisses());
 
-      Assert.assertEquals(0, rdbMetrics.getNumDBKeyGetIfExistMisses());
-
-      Assert.assertEquals(1, rdbMetrics.getNumDBKeyGetIfExistGets());
+      Assertions.assertEquals(1, rdbMetrics.getNumDBKeyGetIfExistGets());
 
       // Reinsert key for further testing.
       testTable.put(key, value);
@@ -340,7 +365,7 @@ public class TestRDBTableStore {
     dbStore = new RDBStore(rdbLocation, rocksDBOptions, configSet);
     try (Table<byte[], byte[]> testTable = dbStore.getTable(tableName)) {
       // Verify getIfExists works with key not in block cache.
-      Assert.assertNotNull(testTable.getIfExist(key));
+      Assertions.assertNotNull(testTable.getIfExist(key));
     } finally {
       dbStore.close();
     }
@@ -361,7 +386,7 @@ public class TestRDBTableStore {
       }
       long keyCount = testTable.getEstimatedKeyCount();
       // The result should be larger than zero but not exceed(?) numKeys
-      Assert.assertTrue(keyCount > 0 && keyCount <= numKeys);
+      Assertions.assertTrue(keyCount > 0 && keyCount <= numKeys);
     }
   }
 
@@ -374,9 +399,9 @@ public class TestRDBTableStore {
       TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
           testTable.iterator();
       iterator.removeFromDB();
-      Assert.assertNull(testTable.get("1".getBytes(StandardCharsets.UTF_8)));
-      Assert.assertNotNull(testTable.get("2".getBytes(StandardCharsets.UTF_8)));
-      Assert.assertNotNull(testTable.get("3".getBytes(StandardCharsets.UTF_8)));
+      Assertions.assertNull(testTable.get(bytesOf[1]));
+      Assertions.assertNotNull(testTable.get(bytesOf[2]));
+      Assertions.assertNotNull(testTable.get(bytesOf[3]));
     }
 
     // Remove after seekToLast removes lastEntry
@@ -386,9 +411,9 @@ public class TestRDBTableStore {
           testTable.iterator();
       iterator.seekToLast();
       iterator.removeFromDB();
-      Assert.assertNotNull(testTable.get("1".getBytes(StandardCharsets.UTF_8)));
-      Assert.assertNotNull(testTable.get("2".getBytes(StandardCharsets.UTF_8)));
-      Assert.assertNull(testTable.get("3".getBytes(StandardCharsets.UTF_8)));
+      Assertions.assertNotNull(testTable.get(bytesOf[1]));
+      Assertions.assertNotNull(testTable.get(bytesOf[2]));
+      Assertions.assertNull(testTable.get(bytesOf[3]));
     }
 
     // Remove after seek deletes that entry.
@@ -396,11 +421,11 @@ public class TestRDBTableStore {
       writeToTable(testTable, 3);
       TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
           testTable.iterator();
-      iterator.seek("3".getBytes(StandardCharsets.UTF_8));
+      iterator.seek(bytesOf[3]);
       iterator.removeFromDB();
-      Assert.assertNotNull(testTable.get("1".getBytes(StandardCharsets.UTF_8)));
-      Assert.assertNotNull(testTable.get("2".getBytes(StandardCharsets.UTF_8)));
-      Assert.assertNull(testTable.get("3".getBytes(StandardCharsets.UTF_8)));
+      Assertions.assertNotNull(testTable.get(bytesOf[1]));
+      Assertions.assertNotNull(testTable.get(bytesOf[2]));
+      Assertions.assertNull(testTable.get(bytesOf[3]));
     }
 
     // Remove after next() deletes entry that was returned by next.
@@ -408,21 +433,227 @@ public class TestRDBTableStore {
       writeToTable(testTable, 3);
       TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
           testTable.iterator();
-      iterator.seek("2".getBytes(StandardCharsets.UTF_8));
+      iterator.seek(bytesOf[2]);
       iterator.next();
       iterator.removeFromDB();
-      Assert.assertNotNull(testTable.get("1".getBytes(StandardCharsets.UTF_8)));
-      Assert.assertNull(testTable.get("2".getBytes(StandardCharsets.UTF_8)));
-      Assert.assertNotNull(testTable.get("3".getBytes(StandardCharsets.UTF_8)));
+      Assertions.assertNotNull(testTable.get(bytesOf[1]));
+      Assertions.assertNull(testTable.get(bytesOf[2]));
+      Assertions.assertNotNull(testTable.get(bytesOf[3]));
     }
   }
 
   private void writeToTable(Table testTable, int num) throws IOException {
     for (int i = 1; i <= num; i++) {
-      byte[] key = (i + "").getBytes(StandardCharsets.UTF_8);
+      byte[] key = bytesOf[i];
       byte[] value =
           RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
       testTable.put(key, value);
+    }
+  }
+
+  @Test
+  public void testPrefixedIterator() throws Exception {
+    int containerCount = 3;
+    int blockCount = 5;
+    List<String> testPrefixes = generatePrefixes(containerCount);
+    List<Map<String, String>> testData = generateKVs(testPrefixes, blockCount);
+
+    try (Table<byte[], byte[]> testTable = rdbStore.getTable("PrefixFirst")) {
+      // write data
+      populatePrefixedTable(testTable, testData);
+
+      // iterator should seek to right pos in the middle
+      byte[] samplePrefix = testPrefixes.get(2).getBytes(
+          StandardCharsets.UTF_8);
+      try (TableIterator<byte[],
+          ? extends Table.KeyValue<byte[], byte[]>> iter = testTable.iterator(
+              samplePrefix)) {
+        int keyCount = 0;
+        while (iter.hasNext()) {
+          // iterator should only meet keys with samplePrefix
+          Assert.assertTrue(Arrays.equals(
+              Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
+              samplePrefix));
+          keyCount++;
+        }
+
+        // iterator should end at right pos
+        Assert.assertEquals(blockCount, keyCount);
+
+        // iterator should be able to seekToFirst
+        iter.seekToFirst();
+        Assert.assertTrue(iter.hasNext());
+        Assert.assertTrue(Arrays.equals(
+            Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
+            samplePrefix));
+      }
+    }
+  }
+
+  @Test
+  public void testPrefixedRangeKVs() throws Exception {
+    int containerCount = 3;
+    int blockCount = 5;
+    List<String> testPrefixes = generatePrefixes(containerCount);
+    List<Map<String, String>> testData = generateKVs(testPrefixes, blockCount);
+
+    try (Table<byte[], byte[]> testTable = rdbStore.getTable("PrefixFirst")) {
+
+      // write data
+      populatePrefixedTable(testTable, testData);
+
+      byte[] samplePrefix = testPrefixes.get(2).getBytes(
+          StandardCharsets.UTF_8);
+
+      // test start at first
+      byte[] startKey = samplePrefix;
+      List<? extends Table.KeyValue<byte[], byte[]>> rangeKVs = testTable
+          .getRangeKVs(startKey, 3, samplePrefix);
+      Assert.assertEquals(3, rangeKVs.size());
+
+      // test start with a middle key
+      startKey = StringUtils.string2Bytes(
+          StringUtils.bytes2String(samplePrefix) + "3");
+      rangeKVs = testTable.getRangeKVs(startKey, blockCount, samplePrefix);
+      Assert.assertEquals(2, rangeKVs.size());
+
+      // test with a filter
+      MetadataKeyFilters.KeyPrefixFilter filter1 = new MetadataKeyFilters
+          .KeyPrefixFilter()
+          .addFilter(StringUtils.bytes2String(samplePrefix) + "1");
+      startKey = StringUtils.string2Bytes(
+          StringUtils.bytes2String(samplePrefix));
+      rangeKVs = testTable.getRangeKVs(startKey, blockCount,
+          samplePrefix, filter1);
+      Assert.assertEquals(1, rangeKVs.size());
+
+      // test start with a non-exist key
+      startKey = StringUtils.string2Bytes(
+          StringUtils.bytes2String(samplePrefix) + 123);
+      rangeKVs = testTable.getRangeKVs(startKey, 10, samplePrefix);
+      Assert.assertEquals(0, rangeKVs.size());
+    }
+  }
+
+  @Test
+  public void testDumpAndLoadBasic(@TempDir Path tempDir) throws Exception {
+    int containerCount = 3;
+    int blockCount = 5;
+    List<String> testPrefixes = generatePrefixes(containerCount);
+    List<Map<String, String>> testData = generateKVs(testPrefixes, blockCount);
+    File dumpFile = new File(tempDir.toString() + "/PrefixTwo.dump");
+    byte[] samplePrefix = testPrefixes.get(2).getBytes(StandardCharsets.UTF_8);
+
+    try (Table<byte[], byte[]> testTable1 = rdbStore.getTable("PrefixTwo")) {
+      // write data
+      populatePrefixedTable(testTable1, testData);
+
+      // dump to external file
+      testTable1.dumpToFileWithPrefix(dumpFile, samplePrefix);
+
+      // check dump file exist
+      Assert.assertTrue(dumpFile.exists());
+      Assert.assertTrue(dumpFile.length() != 0);
+    }
+
+    // load dump file into another table
+    try (Table<byte[], byte[]> testTable2 = rdbStore.getTable("PrefixThree")) {
+      testTable2.loadFromFile(dumpFile);
+
+      // check loaded keys
+      try (TableIterator<byte[],
+          ? extends Table.KeyValue<byte[], byte[]>> iter = testTable2.iterator(
+          samplePrefix)) {
+        int keyCount = 0;
+        while (iter.hasNext()) {
+          // check prefix
+          Assert.assertTrue(Arrays.equals(
+              Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
+              samplePrefix));
+          keyCount++;
+        }
+
+        // check block count
+        Assert.assertEquals(blockCount, keyCount);
+      }
+    }
+  }
+
+  @Test
+  public void testDumpAndLoadEmpty(@TempDir Path tempDir) throws Exception {
+    int containerCount = 3;
+    List<String> testPrefixes = generatePrefixes(containerCount);
+
+    File dumpFile = new File(tempDir.toString() + "/PrefixFour.dump");
+    byte[] samplePrefix = testPrefixes.get(2).getBytes(StandardCharsets.UTF_8);
+
+    try (Table<byte[], byte[]> testTable1 = rdbStore.getTable("PrefixFour")) {
+      // no data
+
+      // dump to external file
+      testTable1.dumpToFileWithPrefix(dumpFile, samplePrefix);
+
+      // check dump file exist
+      Assert.assertTrue(dumpFile.exists());
+      // empty dump file
+      Assert.assertTrue(dumpFile.length() == 0);
+    }
+
+    // load dump file into another table
+    try (Table<byte[], byte[]> testTable2 = rdbStore.getTable("PrefixFifth")) {
+      testTable2.loadFromFile(dumpFile);
+
+      // check loaded keys
+      try (TableIterator<byte[],
+          ? extends Table.KeyValue<byte[], byte[]>> iter = testTable2.iterator(
+          samplePrefix)) {
+        int keyCount = 0;
+        while (iter.hasNext()) {
+          // check prefix
+          Assert.assertTrue(Arrays.equals(
+              Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
+              samplePrefix));
+          keyCount++;
+        }
+
+        // check block count
+        Assert.assertEquals(0, keyCount);
+      }
+    }
+  }
+
+  private List<String> generatePrefixes(int prefixCount) {
+    List<String> prefixes = new ArrayList<>();
+    for (int i = 0; i < prefixCount; i++) {
+      // use alphabetic chars so we get fixed length prefix when
+      // convert to byte[]
+      prefixes.add(RandomStringUtils.randomAlphabetic(PREFIX_LENGTH));
+    }
+    return prefixes;
+  }
+
+  private List<Map<String, String>> generateKVs(List<String> prefixes,
+      int keyCount) {
+    List<Map<String, String>> data = new ArrayList<>();
+    for (String prefix : prefixes) {
+      Map<String, String> kvs = new HashMap<>();
+      for (int i = 0; i < keyCount; i++) {
+        String key = prefix + i;
+        String val = RandomStringUtils.random(10);
+        kvs.put(key, val);
+      }
+      data.add(kvs);
+    }
+    return data;
+  }
+
+  private void populatePrefixedTable(Table<byte[], byte[]> table,
+      List<Map<String, String>> testData) throws IOException {
+    for (Map<String, String> segment : testData) {
+      for (Map.Entry<String, String> entry : segment.entrySet()) {
+        table.put(entry.getKey().getBytes(StandardCharsets.UTF_8),
+            entry.getValue().getBytes(StandardCharsets.UTF_8));
+      }
     }
   }
 }
