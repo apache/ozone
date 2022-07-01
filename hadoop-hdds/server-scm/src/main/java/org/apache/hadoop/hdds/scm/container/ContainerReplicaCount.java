@@ -42,18 +42,6 @@ public interface ContainerReplicaCount {
   int getMaintenanceCount();
 
   /**
-   * Calculates the delta of replicas which need to be created or removed
-   * to ensure the container is correctly replicated when considered inflight
-   * adds and deletes.
-   *
-   * @return Delta of replicas needed. Negative indicates over replication and
-   *         containers should be removed. Positive indicates over replication
-   *         and zero indicates the containers has replicationFactor healthy
-   *         replica
-   */
-  int additionalReplicaNeeded();
-
-  /**
    * Returns true if the container is healthy, meaning all replica which are not
    * in a decommission or maintenance state are in the same state as the
    * container and in QUASI_CLOSED or in CLOSED state.
@@ -72,12 +60,9 @@ public interface ContainerReplicaCount {
   }
 
   /**
-   * Returns true is there are no replicas of the container available, ie the
-   * set of container replicas has zero entries.
+   * Return true if there are insufficient replicas to recover this container.
    *
-   * @return true if there are no replicas, false otherwise.
+   * @return true if there are insufficient replicas, false otherwise.
    */
-  default boolean isMissing() {
-    return getReplicas().isEmpty();
-  }
+  boolean isMissing();
 }

@@ -33,7 +33,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
  * information can be used to determine if the container is over or under
  * replicated and also how many additional replicas need created or removed.
  */
-public class ContainerIdenticalReplicaCount implements ContainerReplicaCount {
+public class RatisContainerReplicaCount implements ContainerReplicaCount {
 
   private int healthyCount;
   private int decommissionCount;
@@ -45,7 +45,7 @@ public class ContainerIdenticalReplicaCount implements ContainerReplicaCount {
   private final ContainerInfo container;
   private final Set<ContainerReplica> replica;
 
-  public ContainerIdenticalReplicaCount(ContainerInfo container,
+  public RatisContainerReplicaCount(ContainerInfo container,
                                Set<ContainerReplica> replica, int inFlightAdd,
                                int inFlightDelete, int replicationFactor,
                                int minHealthyForMaintenance) {
@@ -259,4 +259,14 @@ public class ContainerIdenticalReplicaCount implements ContainerReplicaCount {
     return missingReplicas() + inFlightDel < 0;
   }
 
+  /**
+   * Returns true is there are no replicas of the container available, ie the
+   * set of container replicas has zero entries.
+   *
+   * @return true if there are no replicas, false otherwise.
+   */
+  @Override
+  public boolean isMissing() {
+    return getReplicas().isEmpty();
+  }
 }

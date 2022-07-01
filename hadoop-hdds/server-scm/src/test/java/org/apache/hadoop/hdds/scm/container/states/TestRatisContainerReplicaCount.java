@@ -21,10 +21,9 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerIdenticalReplicaCount;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.RatisContainerReplicaCount;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -49,9 +48,9 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
- * Class used to test the ContainerReplicaCount class.
+ * Class used to test the RatisContainerReplicaCount class.
  */
-public class TestContainerReplicaCount {
+public class TestRatisContainerReplicaCount {
 
   @BeforeEach
   public void setup() {
@@ -62,8 +61,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica =
         registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     validate(rcnt, true, 0, false);
   }
 
@@ -71,8 +70,8 @@ public class TestContainerReplicaCount {
   public void testTwoHealthyReplica() {
     Set<ContainerReplica> replica = registerNodes(IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     validate(rcnt, false, 1, false);
   }
 
@@ -80,8 +79,8 @@ public class TestContainerReplicaCount {
   public void testOneHealthyReplica() {
     Set<ContainerReplica> replica = registerNodes(IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     validate(rcnt, false, 2, false);
   }
 
@@ -90,8 +89,8 @@ public class TestContainerReplicaCount {
 
     Set<ContainerReplica> replica = registerNodes(IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 1, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
     validate(rcnt, false, 0, false);
   }
 
@@ -105,8 +104,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica =
         registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 1, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
     validate(rcnt, true, 0, false);
   }
 
@@ -119,8 +118,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica =
         registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 1, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 1, 3, 2);
     validate(rcnt, false, 1, false);
   }
 
@@ -133,8 +132,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica =
         registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 1, 1, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 1, 1, 3, 2);
     validate(rcnt, false, 0, false);
   }
 
@@ -143,8 +142,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica =
         registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     validate(rcnt, true, -1, true);
   }
 
@@ -153,8 +152,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica =
         registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 1, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 1, 3, 2);
     validate(rcnt, true, 0, false);
   }
 
@@ -163,8 +162,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica =
         registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 2, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 2, 3, 2);
     validate(rcnt, false, 1, false);
   }
 
@@ -172,8 +171,8 @@ public class TestContainerReplicaCount {
   public void testOneHealthyReplicaRepFactorOne() {
     Set<ContainerReplica> replica = registerNodes(IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 1, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 1, 2);
     validate(rcnt, true, 0, false);
   }
 
@@ -181,8 +180,8 @@ public class TestContainerReplicaCount {
   public void testOneHealthyReplicaRepFactorOneInFlightDelete() {
     Set<ContainerReplica> replica = registerNodes(IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 1, 1, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 1, 1, 2);
     validate(rcnt, false, 1, false);
   }
 
@@ -190,8 +189,8 @@ public class TestContainerReplicaCount {
   public void testTwoHealthyReplicaTwoInflightAdd() {
     Set<ContainerReplica> replica = registerNodes(IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 2, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 2, 0, 3, 2);
     validate(rcnt, false, 0, false);
   }
 
@@ -204,8 +203,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica = registerNodes(IN_SERVICE, IN_SERVICE,
         IN_SERVICE, DECOMMISSIONING, DECOMMISSIONING);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     validate(rcnt, true, 0, false);
   }
 
@@ -214,8 +213,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica =
         registerNodes(IN_SERVICE, IN_SERVICE, DECOMMISSIONING);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     validate(rcnt, false, 1, false);
   }
 
@@ -224,8 +223,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica =
         registerNodes(IN_SERVICE, IN_SERVICE, DECOMMISSIONED);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 1, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
     validate(rcnt, false, 0, false);
   }
 
@@ -234,8 +233,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica =
         registerNodes(DECOMMISSIONED, DECOMMISSIONED, DECOMMISSIONED);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     validate(rcnt, false, 3, false);
   }
 
@@ -243,8 +242,8 @@ public class TestContainerReplicaCount {
   public void testAllDecommissionedRepFactorOne() {
     Set<ContainerReplica> replica = registerNodes(DECOMMISSIONED);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 1, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 1, 2);
     validate(rcnt, false, 1, false);
 
   }
@@ -253,8 +252,8 @@ public class TestContainerReplicaCount {
   public void testAllDecommissionedRepFactorOneInFlightAdd() {
     Set<ContainerReplica> replica = registerNodes(DECOMMISSIONED);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 1, 0, 1, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 1, 0, 1, 2);
     validate(rcnt, false, 0, false);
   }
 
@@ -262,8 +261,8 @@ public class TestContainerReplicaCount {
   public void testOneHealthyOneDecommissioningRepFactorOne() {
     Set<ContainerReplica> replica = registerNodes(DECOMMISSIONED, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 1, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 1, 2);
     validate(rcnt, true, 0, false);
   }
 
@@ -276,8 +275,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica =
         registerNodes(IN_SERVICE, IN_MAINTENANCE, IN_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     validate(rcnt, false, 1, false);
   }
 
@@ -286,8 +285,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica = registerNodes(IN_SERVICE,
         IN_MAINTENANCE, IN_MAINTENANCE, ENTERING_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     validate(rcnt, false, 1, false);
   }
 
@@ -296,8 +295,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica =
         registerNodes(IN_SERVICE, IN_MAINTENANCE, ENTERING_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 3, 1);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 1);
     validate(rcnt, true, 0, false);
   }
 
@@ -306,8 +305,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica = registerNodes(IN_SERVICE,
         IN_MAINTENANCE, ENTERING_MAINTENANCE, IN_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 1, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
     validate(rcnt, false, 0, false);
   }
 
@@ -316,8 +315,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica =
         registerNodes(IN_MAINTENANCE, ENTERING_MAINTENANCE, IN_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     validate(rcnt, false, 2, false);
   }
 
@@ -331,8 +330,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica = registerNodes(IN_SERVICE, IN_SERVICE,
         IN_SERVICE, IN_MAINTENANCE, ENTERING_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     validate(rcnt, true, 0, false);
   }
 
@@ -347,8 +346,8 @@ public class TestContainerReplicaCount {
         registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE, IN_SERVICE,
             IN_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     validate(rcnt, true, -1, true);
   }
 
@@ -356,8 +355,8 @@ public class TestContainerReplicaCount {
   public void testOneMaintenanceMinRepOfTwoRepFactorOne() {
     Set<ContainerReplica> replica = registerNodes(IN_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 1, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 1, 2);
     validate(rcnt, false, 1, false);
   }
 
@@ -365,8 +364,8 @@ public class TestContainerReplicaCount {
   public void testOneMaintenanceMinRepOfTwoRepFactorOneInFlightAdd() {
     Set<ContainerReplica> replica = registerNodes(IN_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 1, 0, 1, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 1, 0, 1, 2);
     validate(rcnt, false, 0, false);
   }
 
@@ -374,8 +373,8 @@ public class TestContainerReplicaCount {
   public void testOneHealthyOneMaintenanceRepFactorOne() {
     Set<ContainerReplica> replica = registerNodes(IN_MAINTENANCE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 1, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 1, 2);
     validate(rcnt, true, 0, false);
   }
 
@@ -385,8 +384,8 @@ public class TestContainerReplicaCount {
         registerNodes(DECOMMISSIONED, DECOMMISSIONING,
             IN_MAINTENANCE, ENTERING_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 1, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
     validate(rcnt, false, 1, false);
   }
 
@@ -395,8 +394,8 @@ public class TestContainerReplicaCount {
     Set<ContainerReplica> replica =
         registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     assertTrue(rcnt.isHealthy());
   }
 
@@ -419,8 +418,8 @@ public class TestContainerReplicaCount {
       break;
     }
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     assertFalse(rcnt.isHealthy());
   }
 
@@ -430,8 +429,8 @@ public class TestContainerReplicaCount {
         registerNodes(IN_SERVICE, IN_SERVICE, IN_MAINTENANCE,
             ENTERING_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     assertTrue(rcnt.isHealthy());
   }
 
@@ -439,13 +438,13 @@ public class TestContainerReplicaCount {
   public void testContainerWithNoReplicasIsMissing() {
     Set<ContainerReplica> replica = new HashSet<>();
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerIdenticalReplicaCount(container, replica, 0, 0, 3, 2);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     assertTrue(rcnt.isMissing());
     assertFalse(rcnt.isSufficientlyReplicated());
   }
 
-  private void validate(ContainerReplicaCount rcnt,
+  private void validate(RatisContainerReplicaCount rcnt,
       boolean sufficientlyReplicated, int replicaDelta,
       boolean overReplicated) {
     assertEquals(sufficientlyReplicated, rcnt.isSufficientlyReplicated());

@@ -148,6 +148,11 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     return maintenanceIndexes.size();
   }
 
+  @Override
+  public boolean isMissing() {
+    return unRecoverable();
+  }
+
   /**
    * Get a set containing all decommissioning indexes, or an empty set if none
    * are decommissioning. Note it is possible for an index to be
@@ -311,11 +316,6 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   @Override
   public boolean isOverReplicated() {
     return isOverReplicated(false);
-  }
-
-  @Override
-  public int additionalReplicaNeeded() {
-    return 0;
   }
 
   /**

@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerIdenticalReplicaCount;
+import org.apache.hadoop.hdds.scm.container.RatisContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -493,7 +493,7 @@ public class LegacyReplicationManager {
           return;
         }
 
-        ContainerIdenticalReplicaCount replicaSet =
+        RatisContainerReplicaCount replicaSet =
             getContainerReplicaCount(container, replicas);
         ContainerPlacementStatus placementStatus = getPlacementStatus(
             replicas, container.getReplicationConfig().getRequiredNodes());
@@ -991,9 +991,9 @@ public class LegacyReplicationManager {
    * @return ContainerReplicaCount representing the current state of the
    *         container
    */
-  private ContainerIdenticalReplicaCount getContainerReplicaCount(
+  private RatisContainerReplicaCount getContainerReplicaCount(
       ContainerInfo container, Set<ContainerReplica> replica) {
-    return new ContainerIdenticalReplicaCount(
+    return new RatisContainerReplicaCount(
         container,
         replica,
         getInflightAdd(container.containerID()),
@@ -1123,7 +1123,7 @@ public class LegacyReplicationManager {
    *                   current replica count and inflight adds and deletes
    */
   private void handleUnderReplicatedContainer(final ContainerInfo container,
-      final ContainerIdenticalReplicaCount replicaSet,
+      final RatisContainerReplicaCount replicaSet,
       final ContainerPlacementStatus placementStatus) {
     LOG.debug("Handling under-replicated container: {}", container);
     Set<ContainerReplica> replicas = replicaSet.getReplicas();
@@ -1237,7 +1237,7 @@ public class LegacyReplicationManager {
    *                   current replica count and inflight adds and deletes
    */
   private void handleOverReplicatedContainer(final ContainerInfo container,
-      final ContainerIdenticalReplicaCount replicaSet) {
+      final RatisContainerReplicaCount replicaSet) {
 
     final Set<ContainerReplica> replicas = replicaSet.getReplicas();
     final ContainerID id = container.containerID();
