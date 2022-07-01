@@ -504,6 +504,7 @@ public class ReplicationManager implements SCMService {
         containerInfo.containerID());
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
+    // TODO: define maintenance redundancy for EC
     return new ECContainerReplicaCount(containerInfo, replicas, pendingOps, 0);
   }
 
