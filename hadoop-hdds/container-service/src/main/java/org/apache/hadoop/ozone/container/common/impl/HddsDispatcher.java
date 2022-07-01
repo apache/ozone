@@ -247,9 +247,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
 
     if (cmdType != Type.CreateContainer) {
-      int replicaIndexFromPutBlock = msg.hasPutBlock() ?
-          msg.getPutBlock().getBlockData().getBlockID().getReplicaIndex() :
-          0;
       /**
        * Create Container should happen only as part of Write_Data phase of
        * writeChunk.
@@ -260,7 +257,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
        */
       if (container == null && ((isWriteStage || isCombinedStage)
           || cmdType == Type.PutSmallFile
-          || (cmdType == Type.PutBlock && replicaIndexFromPutBlock > 0))) {
+          || cmdType == Type.PutBlock)) {
         // If container does not exist, create one for WriteChunk and
         // PutSmallFile request
         responseProto = createContainer(msg);
@@ -272,8 +269,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           return ContainerUtils.logAndReturnError(LOG, sce, msg);
         }
         Preconditions.checkArgument(isWriteStage && container2BCSIDMap != null
-            || dispatcherContext == null ||
-            (cmdType == Type.PutBlock && replicaIndexFromPutBlock > 0));
+            || dispatcherContext == null
+            || cmdType == Type.PutBlock);
         if (container2BCSIDMap != null) {
           // adds this container to list of containers created in the pipeline
           // with initial BCSID recorded as 0.

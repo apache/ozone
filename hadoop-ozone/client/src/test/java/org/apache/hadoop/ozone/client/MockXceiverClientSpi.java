@@ -94,10 +94,6 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
               return r.setResult(Result.IO_EXCEPTION);
             }
           });
-    case CreateContainer:
-      return result(request,
-          r -> r.setCreateContainer(
-              ContainerProtos.CreateContainerResponseProto.newBuilder().build()));
     case ReadChunk:
       return result(request,
           r -> r.setReadChunk(readChunk(request.getReadChunk())));
