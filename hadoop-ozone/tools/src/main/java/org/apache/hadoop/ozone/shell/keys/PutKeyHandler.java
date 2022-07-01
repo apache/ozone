@@ -101,44 +101,58 @@ public class PutKeyHandler extends KeyHandler {
         OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
 
     if (stream) {
-      if (isVerbose()) {
-        out().println("API: streaming");
-      }
-      // In streaming mode, always resolve replication config at client side,
-      // because streaming is not compatible for writing EC keys.
-      if (replicationConfig == null) {
-        replicationConfig = bucket.getReplicationConfig();
-      }
-      if (replicationConfig == null) {
-        replicationConfig = ReplicationConfig.parse(null, null, getConf());
-      }
-      Preconditions.checkArgument(
-          !(replicationConfig instanceof ECReplicationConfig),
-          "Can not put EC key by streaming");
-      try (RandomAccessFile raf = new RandomAccessFile(dataFile, "r");
-           OzoneDataStreamOutput out = bucket.createStreamKey(keyName,
-               dataFile.length(), replicationConfig, keyMetadata)) {
-        FileChannel ch = raf.getChannel();
-        long len = raf.length();
-        long off = 0;
-        while (len > 0) {
-          long writeLen = Math.min(len, chunkSize);
-          ByteBuffer bb = ch.map(FileChannel.MapMode.READ_ONLY, off, writeLen);
-          out.write(bb);
-          off += writeLen;
-          len -= writeLen;
-        }
-      }
+      stream(dataFile, bucket, keyName, keyMetadata,
+          replicationConfig, chunkSize);
     } else {
-      if (isVerbose()) {
-        out().println("API: async");
-      }
-      try (InputStream input = new FileInputStream(dataFile);
-           OutputStream output = bucket.createKey(keyName, dataFile.length(),
-               replicationConfig, keyMetadata)) {
-        IOUtils.copyBytes(input, output, chunkSize);
-      }
+      async(dataFile, bucket, keyName, keyMetadata,
+          replicationConfig, chunkSize);
     }
   }
 
+  void async(
+      File dataFile, OzoneBucket bucket,
+      String keyName, Map<String, String> keyMetadata,
+      ReplicationConfig replicationConfig, int chunkSize)
+      throws IOException {
+    if (isVerbose()) {
+      out().println("API: async");
+    }
+    try (InputStream input = new FileInputStream(dataFile);
+         OutputStream output = bucket.createKey(keyName, dataFile.length(),
+             replicationConfig, keyMetadata)) {
+      IOUtils.copyBytes(input, output, chunkSize);
+    }
+  }
+
+  void stream(
+      File dataFile, OzoneBucket bucket,
+      String keyName, Map<String, String> keyMetadata,
+      ReplicationConfig replicationConfig, int chunkSize)
+      throws IOException {
+    if (isVerbose()) {
+      out().println("API: streaming");
+    }
+    // In streaming mode, always resolve replication config at client side,
+    // because streaming is not compatible for writing EC keys.
+    replicationConfig = ReplicationConfig.resolve(replicationConfig,
+        bucket.getReplicationConfig(), getConf());
+    Preconditions.checkArgument(
+        !(replicationConfig instanceof ECReplicationConfig),
+        "Can not put EC key by streaming");
+
+    try (RandomAccessFile raf = new RandomAccessFile(dataFile, "r");
+         OzoneDataStreamOutput out = bucket.createStreamKey(keyName,
+             dataFile.length(), replicationConfig, keyMetadata)) {
+      FileChannel ch = raf.getChannel();
+      long len = raf.length();
+      long off = 0;
+      while (len > 0) {
+        long writeLen = Math.min(len, chunkSize);
+        ByteBuffer bb = ch.map(FileChannel.MapMode.READ_ONLY, off, writeLen);
+        out.write(bb);
+        off += writeLen;
+        len -= writeLen;
+      }
+    }
+  }
 }
