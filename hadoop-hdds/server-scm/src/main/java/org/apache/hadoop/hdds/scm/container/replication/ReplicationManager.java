@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.ECContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -337,7 +338,11 @@ public class ReplicationManager implements SCMService {
    */
   public ContainerReplicaCount getContainerReplicaCount(ContainerID containerID)
       throws ContainerNotFoundException {
-    return legacyReplicationManager.getContainerReplicaCount(containerID);
+    ContainerInfo container = containerManager.getContainer(containerID);
+    if (container.getReplicationType() == EC) {
+      return getECContainerReplicaCount(container);
+    }
+    return legacyReplicationManager.getContainerReplicaCount(container);
   }
 
   /**
@@ -491,6 +496,16 @@ public class ReplicationManager implements SCMService {
   public boolean isContainerReplicatingOrDeleting(ContainerID containerID) {
     return legacyReplicationManager
         .isContainerReplicatingOrDeleting(containerID);
+  }
+
+  private ECContainerReplicaCount getECContainerReplicaCount(
+      ContainerInfo containerInfo) throws ContainerNotFoundException {
+    Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
+        containerInfo.containerID());
+    List<ContainerReplicaOp> pendingOps =
+        containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
+    // TODO: define maintenance redundancy for EC (HDDS-6975)
+    return new ECContainerReplicaCount(containerInfo, replicas, pendingOps, 0);
   }
 
   /**

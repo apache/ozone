@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.RatisContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -453,7 +454,7 @@ public class TestDatanodeAdminMonitor {
         .setState(containerState)
         .build();
 
-    return new ContainerReplicaCount(container, replicas, 0, 0, 3, 2);
+    return new RatisContainerReplicaCount(container, replicas, 0, 0, 3, 2);
   }
 
   /**
