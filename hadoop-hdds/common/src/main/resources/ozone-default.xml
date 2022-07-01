@@ -1934,18 +1934,19 @@
   </property>
   <property>
     <name>ozone.om.kerberos.keytab.file</name>
-    <value>/etc/security/keytabs/OM.keytab</value>
+    <value/>
     <tag>OZONE, SECURITY, KERBEROS</tag>
-    <description> The keytab file used by OzoneManager daemon to login as its
+    <description>The keytab file used by OzoneManager daemon to login as its
       service principal. The principal name is configured with
-      ozone.om.kerberos.principal.
+      ozone.om.kerberos.principal. e.g. /etc/security/keytabs/om.keytab
     </description>
   </property>
   <property>
     <name>ozone.om.kerberos.principal</name>
-    <value>OM/_HOST@REALM</value>
+    <value/>
     <tag>OZONE, SECURITY, KERBEROS</tag>
-    <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
+    <description>The OzoneManager service principal. e.g. om/_HOST@REALM.COM
+    </description>
   </property>
   <property>
     <name>ozone.om.http.auth.kerberos.principal</name>
