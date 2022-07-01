@@ -263,39 +263,6 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void testUnderReplicatedOrderingInQueue()
-      throws ContainerNotFoundException {
-    ContainerInfo decomContainer = createContainerInfo(repConfig, 1,
-        HddsProtos.LifeCycleState.CLOSED);
-    addReplicas(decomContainer, Pair.of(DECOMMISSIONING, 1),
-        Pair.of(DECOMMISSIONING, 2), Pair.of(DECOMMISSIONING, 3),
-        Pair.of(DECOMMISSIONING, 4), Pair.of(DECOMMISSIONING, 5));
-
-    ContainerInfo underRep1 = createContainerInfo(repConfig, 2,
-        HddsProtos.LifeCycleState.CLOSED);
-    addReplicas(underRep1, 1, 2, 3, 4);
-    ContainerInfo underRep0 = createContainerInfo(repConfig, 3,
-        HddsProtos.LifeCycleState.CLOSED);
-    addReplicas(underRep0, 1, 2, 3);
-
-    replicationManager.processContainer(decomContainer, underRep, overRep,
-        repReport);
-    replicationManager.processContainer(underRep1, underRep, overRep,
-        repReport);
-    replicationManager.processContainer(underRep0, underRep, overRep,
-        repReport);
-    // We expect 3 messages on the queue. They should be in the reverse order
-    // to which they were added, putting the lowest remaining redundancy first.
-    Assert.assertEquals(3, underRep.size());
-    ContainerHealthResult.UnderReplicatedHealthResult res = underRep.poll();
-    Assert.assertEquals(underRep0, res.getContainerInfo());
-    res = underRep.poll();
-    Assert.assertEquals(underRep1, res.getContainerInfo());
-    res = underRep.poll();
-    Assert.assertEquals(decomContainer, res.getContainerInfo());
-  }
-
-  @Test
   public void testUnderReplicationQueuePopulated() {
     ContainerInfo decomContainer = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
@@ -321,7 +288,7 @@ public class TestReplicationManager {
     replicationManager.requeueUnderReplicatedContainer(res);
 
     // Now get the next message. It should be underRep1, as it has remaining
-    // redundancy 1 + zero retries. UnderRep1 will have remaining redundancy 0
+    // redundancy 1 + zero retries. UnderRep0 will have remaining redundancy 0
     // and 1 retry. They will have the same weighted redundancy so lesser
     // retries should come first
     res = replicationManager.dequeueUnderReplicatedContainer();

@@ -48,6 +48,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -362,24 +363,10 @@ public class ReplicationManager implements SCMService {
    */
   protected PriorityQueue<ContainerHealthResult.UnderReplicatedHealthResult>
       createUnderReplicatedQueue() {
-    return new PriorityQueue<>(
-        (o1, o2) -> {
-          if (o1.getWeightedRedundancy() < o2.getWeightedRedundancy()) {
-            return -1;
-          } else if (o1.getWeightedRedundancy() > o2.getWeightedRedundancy()) {
-            return 1;
-          } else {
-            // Equal weighted redundancy. Put the one with the lesser retries
-            // first
-            if (o1.getRequeueCount() < o2.getRequeueCount()) {
-              return -1;
-            } else if (o1.getRequeueCount() > o2.getRequeueCount()) {
-              return 1;
-            } else {
-              return 0;
-            }
-          }
-        });
+    return new PriorityQueue<>(Comparator.comparing(ContainerHealthResult
+            .UnderReplicatedHealthResult::getWeightedRedundancy)
+        .thenComparing(ContainerHealthResult
+            .UnderReplicatedHealthResult::getRequeueCount));
   }
 
   public ReplicationManagerReport getContainerReport() {
