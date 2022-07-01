@@ -663,10 +663,12 @@ public class RpcClient implements ClientProtocol {
       builder.setDefaultReplicationConfig(defaultReplicationConfig);
     }
 
-    LOG.info("Creating Bucket: {}/{}, with the Bucket Layout {}, {} as " +
-            "owner, Versioning {}, Storage Type set to {} and Encryption set " +
-            "to {} ",
-        volumeName, bucketName, bucketLayout, owner, isVersionEnabled,
+    String layoutMsg = bucketLayout != null
+        ? "with bucket layout " + bucketLayout
+        : "with server-side default bucket layout";
+    LOG.info("Creating Bucket: {}/{}, {}, {} as owner, Versioning {}, " +
+            "Storage Type set to {} and Encryption set to {} ",
+        volumeName, bucketName, layoutMsg, owner, isVersionEnabled,
         storageType, bek != null);
     ozoneManagerClient.createBucket(builder.build());
   }
