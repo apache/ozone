@@ -935,6 +935,44 @@ public class TestNetworkTopologyImpl {
   }
 
   @Test
+  public void testUpdateNode() {
+    List<NodeSchema> schemas = new ArrayList<>();
+    schemas.add(ROOT_SCHEMA);
+    schemas.add(DATACENTER_SCHEMA);
+    schemas.add(RACK_SCHEMA);
+    schemas.add(LEAF_SCHEMA);
+
+    NodeSchemaManager manager = NodeSchemaManager.getInstance();
+    manager.init(schemas.toArray(new NodeSchema[0]), true);
+    NetworkTopology newCluster =
+            new NetworkTopologyImpl(manager);
+    Node node = createDatanode("1.1.1.1", "/d1/r1");
+    newCluster.add(node);
+    assertTrue(newCluster.contains(node));
+
+    // update
+    Node newNode = createDatanode("1.1.1.2", "/d1/r1");
+    assertFalse(newCluster.contains(newNode));
+    newCluster.update(node, newNode);
+    assertFalse(newCluster.contains(node));
+    assertTrue(newCluster.contains(newNode));
+
+    // update a non-existing node
+    Node nodeExisting = createDatanode("1.1.1.3", "/d1/r1");
+    Node newNode2 = createDatanode("1.1.1.4", "/d1/r1");
+    assertFalse(newCluster.contains(nodeExisting));
+    assertFalse(newCluster.contains(newNode2));
+
+    newCluster.update(nodeExisting, newNode2);
+    assertFalse(newCluster.contains(nodeExisting));
+    assertTrue(newCluster.contains(newNode2));
+
+    // old node is null
+    Node newNode3 = createDatanode("1.1.1.5", "/d1/r1");
+    assertFalse(newCluster.contains(newNode3));
+    newCluster.update(null, newNode3);
+    assertTrue(newCluster.contains(newNode3));
+  }
   public void testIsAncestor() {
     NodeImpl r1 = new NodeImpl("r1", "/", NODE_COST_DEFAULT);
     NodeImpl r12 = new NodeImpl("r12", "/", NODE_COST_DEFAULT);

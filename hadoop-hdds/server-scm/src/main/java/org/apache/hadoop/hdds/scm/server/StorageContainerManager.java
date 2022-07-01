@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.crl.CRLStatusReportHandler;
 import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
@@ -57,6 +58,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.node.NodeAddressUpdateHandler;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManagerImpl;
 import org.apache.hadoop.hdds.scm.node.CommandQueueReportHandler;
@@ -422,6 +424,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     NewNodeHandler newNodeHandler = new NewNodeHandler(pipelineManager,
         scmDecommissionManager, configuration, serviceManager);
+    NodeAddressUpdateHandler nodeAddressUpdateHandler =
+            new NodeAddressUpdateHandler(pipelineManager,
+                    scmDecommissionManager, serviceManager);
     StaleNodeHandler staleNodeHandler =
         new StaleNodeHandler(scmNodeManager, pipelineManager, configuration);
     DeadNodeHandler deadNodeHandler = new DeadNodeHandler(scmNodeManager,
@@ -485,6 +490,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.CONTAINER_ACTIONS, actionsHandler);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
     eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
+    eventQueue.addHandler(SCMEvents.NODE_ADDRESS_UPDATE,
+            nodeAddressUpdateHandler);
     eventQueue.addHandler(SCMEvents.STALE_NODE, staleNodeHandler);
     eventQueue.addHandler(SCMEvents.HEALTHY_READONLY_TO_HEALTHY_NODE,
         readOnlyHealthyToHealthyNodeHandler);
@@ -702,19 +709,22 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getReplicationManager() != null) {
       replicationManager = configurator.getReplicationManager();
     }  else {
+      LegacyReplicationManager legacyRM = new LegacyReplicationManager(
+          conf, containerManager, containerPlacementPolicy, eventQueue,
+          scmContext, scmNodeManager, scmHAManager, clock,
+          getScmMetadataStore().getMoveTable());
       replicationManager = new ReplicationManager(
           conf,
           containerManager,
           containerPlacementPolicy,
           eventQueue,
           scmContext,
-          serviceManager,
           scmNodeManager,
           clock,
-          scmHAManager,
-          getScmMetadataStore().getMoveTable(),
+          legacyRM,
           containerReplicaPendingOps);
     }
+    serviceManager.register(replicationManager);
     if (configurator.getScmSafeModeManager() != null) {
       scmSafeModeManager = configurator.getScmSafeModeManager();
     } else {

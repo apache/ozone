@@ -16,8 +16,6 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
@@ -32,7 +30,6 @@ public interface ContainerHealthCheck {
 
   ContainerHealthResult checkHealth(
       ContainerInfo container, Set<ContainerReplica> replicas,
-      List<Pair<Integer, DatanodeDetails>> indexesPendingAdd,
-      List<Pair<Integer, DatanodeDetails>> indexesPendingDelete,
+      List<ContainerReplicaOp> replicaPendingOps,
       int remainingRedundancyForMaintenance);
 }

@@ -74,7 +74,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     List<OmDirectoryInfo> parentDirInfos = new ArrayList<>();
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponseFSO =
         createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
-            keyName, multipartUploadID, parentDirInfos);
+            keyName, multipartUploadID, parentDirInfos, volumeId, bucketId);
 
     s3InitiateMultipartUploadResponseFSO.addToDBBatch(omMetadataManager,
         batchOperation);
@@ -206,7 +206,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
 
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponseFSO =
             addS3InitiateMultipartUpload(volumeName, bucketName, keyName,
-                    multipartUploadID);
+                    multipartUploadID, volumeId, bucketId);
 
     // Add some dummy parts for testing.
     // Not added any key locations, as this just test is to see entries are
@@ -313,11 +313,13 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
 
   private S3InitiateMultipartUploadResponse addS3InitiateMultipartUpload(
           String volumeName, String bucketName, String keyName,
-          String multipartUploadID) throws IOException {
+          String multipartUploadID, long volumeId,
+          long bucketId) throws IOException {
 
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponseFSO =
-            createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
-                    keyName, multipartUploadID, new ArrayList<>());
+        createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
+            keyName, multipartUploadID, new ArrayList<>(), volumeId,
+            bucketId);
 
     s3InitiateMultipartUploadResponseFSO.addToDBBatch(omMetadataManager,
             batchOperation);

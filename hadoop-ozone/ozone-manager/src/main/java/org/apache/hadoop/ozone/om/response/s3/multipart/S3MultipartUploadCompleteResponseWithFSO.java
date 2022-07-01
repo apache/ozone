@@ -50,6 +50,8 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 public class S3MultipartUploadCompleteResponseWithFSO
         extends S3MultipartUploadCompleteResponse {
 
+  private long volumeId;
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadCompleteResponseWithFSO(
       @Nonnull OMResponse omResponse,
@@ -59,9 +61,10 @@ public class S3MultipartUploadCompleteResponseWithFSO
       @Nonnull List<OmKeyInfo> unUsedParts,
       @Nonnull BucketLayout bucketLayout,
       @Nonnull OmBucketInfo omBucketInfo,
-      RepeatedOmKeyInfo keysToDelete) {
+      RepeatedOmKeyInfo keysToDelete, @Nonnull long volumeId) {
     super(omResponse, multipartKey, multipartOpenKey, omKeyInfo, unUsedParts,
         bucketLayout, omBucketInfo, keysToDelete);
+    this.volumeId = volumeId;
   }
 
   /**
@@ -83,7 +86,8 @@ public class S3MultipartUploadCompleteResponseWithFSO
             getOmKeyInfo().getBucketName(), getOmKeyInfo().getKeyName());
 
     OMFileRequest
-        .addToFileTable(omMetadataManager, batchOperation, getOmKeyInfo());
+        .addToFileTable(omMetadataManager, batchOperation, getOmKeyInfo(),
+            volumeId, getOmBucketInfo().getObjectID());
 
     return ozoneKey;
 

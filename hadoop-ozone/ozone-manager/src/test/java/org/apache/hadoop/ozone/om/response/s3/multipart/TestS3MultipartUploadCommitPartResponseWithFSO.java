@@ -100,10 +100,13 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     String fileName = OzoneFSUtils.getFileName(keyName);
     String multipartKey = omMetadataManager
         .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+        bucketName);
 
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponseFSO =
-            createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
-                    keyName, multipartUploadID, new ArrayList<>());
+        createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
+            keyName, multipartUploadID, new ArrayList<>(), volumeId, bucketId);
 
     s3InitiateMultipartUploadResponseFSO.addToDBBatch(omMetadataManager,
             batchOperation);
@@ -120,9 +123,7 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     addPart(1, part1, omMultipartKeyInfo);
 
     long clientId = Time.now();
-    final long volumeId = omMetadataManager.getVolumeId(volumeName);
-    final long bucketId = omMetadataManager.getBucketId(volumeName,
-            bucketName);
+
     String openKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
             parentID, fileName, clientId);
 
@@ -181,8 +182,8 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
             parentID, fileName, multipartUploadID);
 
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponseFSO =
-            createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
-                    keyName, multipartUploadID, new ArrayList<>());
+        createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
+            keyName, multipartUploadID, new ArrayList<>(), volumeId, bucketId);
 
     s3InitiateMultipartUploadResponseFSO.addToDBBatch(omMetadataManager,
             batchOperation);
