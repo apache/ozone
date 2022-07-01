@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCommandInfo;
-import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinatorTask;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionSupervisor;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
@@ -53,9 +52,7 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
             ecContainersCommand.getMissingContainerIndexes(),
             ecContainersCommand.getSources(),
             ecContainersCommand.getTargetDatanodes());
-    this.supervisor.addTask(new ECReconstructionCoordinatorTask(
-        this.supervisor.getReconstructionCoordinator(),
-        reconstructionCommandInfo));
+    this.supervisor.addTask(reconstructionCommandInfo);
   }
 
   @Override
@@ -71,6 +68,11 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
   @Override
   public long getAverageRunTime() {
     return 0;
+  }
+
+  @Override
+  public int getQueuedCount() {
+    return supervisor.getInFlightReplications();
   }
 
   public ConfigurationSource getConf() {

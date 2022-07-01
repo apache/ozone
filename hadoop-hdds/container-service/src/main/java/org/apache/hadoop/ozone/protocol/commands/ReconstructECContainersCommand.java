@@ -142,7 +142,7 @@ public class ReconstructECContainersCommand
     private DatanodeDetails dnDetails;
     private int replicaIndex;
 
-    DatanodeDetailsAndReplicaIndex(DatanodeDetails dnDetails,
+    public DatanodeDetailsAndReplicaIndex(DatanodeDetails dnDetails,
         int replicaIndex) {
       this.dnDetails = dnDetails;
       this.replicaIndex = replicaIndex;

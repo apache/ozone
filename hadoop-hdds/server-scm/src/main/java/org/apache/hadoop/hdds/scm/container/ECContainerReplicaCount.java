@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.container;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -68,16 +69,27 @@ public class ECContainerReplicaCount {
   private final Map<Integer, Integer> healthyIndexes = new HashMap<>();
   private final Map<Integer, Integer> decommissionIndexes = new HashMap<>();
   private final Map<Integer, Integer> maintenanceIndexes = new HashMap<>();
+  private final Set<ContainerReplica> replicas;
 
   public ECContainerReplicaCount(ContainerInfo containerInfo,
-      Set<ContainerReplica> replicas, List<Integer> indexesPendingAdd,
-      List<Integer> indexesPendingDelete, int remainingMaintenanceRedundancy) {
+      Set<ContainerReplica> replicas,
+      List<ContainerReplicaOp> replicaPendingOps,
+      int remainingMaintenanceRedundancy) {
     this.containerInfo = containerInfo;
+    this.replicas = replicas;
     this.repConfig = (ECReplicationConfig)containerInfo.getReplicationConfig();
-    this.pendingAdd = indexesPendingAdd;
-    this.pendingDelete = indexesPendingDelete;
+    this.pendingAdd = new ArrayList<>();
+    this.pendingDelete = new ArrayList<>();
     this.remainingMaintenanceRedundancy
         = Math.min(repConfig.getParity(), remainingMaintenanceRedundancy);
+
+    for (ContainerReplicaOp op : replicaPendingOps) {
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+        pendingAdd.add(op.getReplicaIndex());
+      } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+        pendingDelete.add(op.getReplicaIndex());
+      }
+    }
 
     for (ContainerReplica replica : replicas) {
       HddsProtos.NodeOperationalState state =
@@ -98,7 +110,7 @@ public class ECContainerReplicaCount {
     // Remove the pending delete replicas from the healthy set as we assume they
     // will eventually be removed and reduce the count for this replica. If the
     // count goes to zero, remove it from the map.
-    for (Integer i : indexesPendingDelete) {
+    for (Integer i : pendingDelete) {
       ensureIndexWithinBounds(i, "pendingDelete");
       Integer count = healthyIndexes.get(i);
       if (count != null) {
@@ -116,6 +128,10 @@ public class ECContainerReplicaCount {
     }
   }
 
+  public Set<ContainerReplica> getReplicas() {
+    return replicas;
+  }
+
   /**
    * Get a set containing all decommissioning indexes, or an empty set if none
    * are decommissioning. Note it is possible for an index to be
@@ -125,6 +141,31 @@ public class ECContainerReplicaCount {
    */
   public Set<Integer> decommissioningIndexes() {
     return decommissionIndexes.keySet();
+  }
+
+  /**
+   * Get a set containing all decommissioning only indexes, or an empty set if
+   * none are decommissioning.
+   * @param includePendingAdd - removes the indexes from
+   *                         decommissioningOnlyIndexes if we already scheduled
+   *                         for reconstruction before.
+   * @return Set of indexes in decommission only.
+   */
+  public Set<Integer> decommissioningOnlyIndexes(boolean includePendingAdd) {
+    Set<Integer> decommissioningOnlyIndexes = new HashSet<>();
+    for (Integer i : decommissionIndexes.keySet()) {
+      if (!healthyIndexes.containsKey(i)) {
+        decommissioningOnlyIndexes.add(i);
+      }
+    }
+    // Now we have a list of decommissionIndexes. Remove any pending add as they
+    // should eventually recover.
+    if (includePendingAdd) {
+      for (Integer i : pendingAdd) {
+        decommissioningOnlyIndexes.remove(i);
+      }
+    }
+    return decommissioningOnlyIndexes;
   }
 
   /**
@@ -267,8 +308,8 @@ public class ECContainerReplicaCount {
    * @return List of indexes which are over-replicated.
    */
   public List<Integer> overReplicatedIndexes(boolean includePendingDelete) {
-    final Map<Integer, Integer> availableIndexes
-        = getHealthyWithDelete(includePendingDelete);
+    final Map<Integer, Integer> availableIndexes =
+        getHealthyWithDelete(includePendingDelete);
     List<Integer> indexes = new ArrayList<>();
     for (Map.Entry<Integer, Integer> entry : availableIndexes.entrySet()) {
       if (entry.getValue() > 1) {

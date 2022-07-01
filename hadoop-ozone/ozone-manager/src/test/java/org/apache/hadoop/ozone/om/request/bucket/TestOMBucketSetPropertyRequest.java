@@ -23,6 +23,7 @@ import java.util.UUID;
 
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
@@ -199,5 +200,40 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     Assert.assertTrue(omClientResponse.getOMResponse().getMessage().
         contains("Total buckets quota in this volume " +
             "should not be greater than volume quota"));
+  }
+
+  @Test
+  public void rejectsSettingQuotaOnLink() throws Exception {
+    // GIVEN
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String linkName = UUID.randomUUID().toString();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
+    OmBucketInfo.Builder link = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(linkName)
+        .setSourceVolume(volumeName)
+        .setSourceBucket(bucketName);
+    OMRequestTestUtils.addBucketToDB(omMetadataManager, link);
+    OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
+        linkName, false, 20 * GB);
+
+    OMBucketSetPropertyRequest omBucketSetPropertyRequest =
+        new OMBucketSetPropertyRequest(omRequest);
+
+    // WHEN
+    OMClientResponse omClientResponse = omBucketSetPropertyRequest
+        .validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+
+    // THEN
+    Assert.assertFalse(omClientResponse.getOMResponse().getSuccess());
+    Assert.assertEquals(
+        OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION,
+        omClientResponse.getOMResponse().getStatus());
+    String message = omClientResponse.getOMResponse().getMessage();
+    Assert.assertTrue(message, message.contains("Cannot set property on link"));
   }
 }

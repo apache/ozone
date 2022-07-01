@@ -262,9 +262,11 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
                 .setKey(keyName)
                 .setHash(DigestUtils.sha256Hex(keyName)));
 
+        long volumeId = omMetadataManager.getVolumeId(volumeName);
         omClientResponse =
             getOmClientResponse(multipartKey, omResponse, dbMultipartOpenKey,
-                omKeyInfo, unUsedParts, omBucketInfo, oldKeyVersionsToDelete);
+                omKeyInfo, unUsedParts, omBucketInfo, oldKeyVersionsToDelete,
+                volumeId);
 
         result = Result.SUCCESS;
       } else {
@@ -299,10 +301,12 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         createErrorOMResponse(omResponse, exception), getBucketLayout());
   }
 
+  @SuppressWarnings("parameternumber")
   protected OMClientResponse getOmClientResponse(String multipartKey,
       OMResponse.Builder omResponse, String dbMultipartOpenKey,
       OmKeyInfo omKeyInfo,  List<OmKeyInfo> unUsedParts,
-      OmBucketInfo omBucketInfo, RepeatedOmKeyInfo oldKeyVersionsToDelete) {
+      OmBucketInfo omBucketInfo, RepeatedOmKeyInfo oldKeyVersionsToDelete,
+      long volumeId) {
 
     return new S3MultipartUploadCompleteResponse(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts,
