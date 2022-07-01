@@ -22,7 +22,6 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -503,12 +502,12 @@ public class TestRDBTableStore {
   }
 
   @Test
-  public void testDumpAndLoadBasic(@TempDir Path tempDir) throws Exception {
+  public void testDumpAndLoadBasic() throws Exception {
     int containerCount = 3;
     int blockCount = 5;
     List<String> testPrefixes = generatePrefixes(containerCount);
     List<Map<String, String>> testData = generateKVs(testPrefixes, blockCount);
-    File dumpFile = new File(tempDir.toString() + "/PrefixTwo.dump");
+    File dumpFile = new File(tempDir, "PrefixTwo.dump");
     byte[] samplePrefix = testPrefixes.get(2).getBytes(StandardCharsets.UTF_8);
 
     try (Table<byte[], byte[]> testTable1 = rdbStore.getTable("PrefixTwo")) {
@@ -547,11 +546,11 @@ public class TestRDBTableStore {
   }
 
   @Test
-  public void testDumpAndLoadEmpty(@TempDir Path tempDir) throws Exception {
+  public void testDumpAndLoadEmpty() throws Exception {
     int containerCount = 3;
     List<String> testPrefixes = generatePrefixes(containerCount);
 
-    File dumpFile = new File(tempDir.toString() + "/PrefixFour.dump");
+    File dumpFile = new File(tempDir, "PrefixFour.dump");
     byte[] samplePrefix = testPrefixes.get(2).getBytes(StandardCharsets.UTF_8);
 
     try (Table<byte[], byte[]> testTable1 = rdbStore.getTable("PrefixFour")) {
