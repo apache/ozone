@@ -118,7 +118,7 @@ public class ECUnderReplicationHandler implements UnderReplicationHandler {
           container.getContainerID(), replicaCount.getReplicas());
       return emptyMap();
     }
-    if (replicaCount.unRecoverable()) {
+    if (replicaCount.isUnrecoverable()) {
       LOG.warn("The container {} is unrecoverable. The available replicas" +
           " are: {}.", container.containerID(), replicaCount.getReplicas());
       return emptyMap();

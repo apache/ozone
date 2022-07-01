@@ -70,7 +70,7 @@ public class TestECContainerReplicaCount {
         new ECContainerReplicaCount(container, replica,
             Collections.emptyList(), 1);
     Assertions.assertTrue(rcnt.isSufficientlyReplicated(false));
-    Assertions.assertFalse(rcnt.unRecoverable());
+    Assertions.assertFalse(rcnt.isUnrecoverable());
   }
 
   @Test
@@ -467,14 +467,14 @@ public class TestECContainerReplicaCount {
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, new HashSet<>(),
             Collections.emptyList(), 1);
-    Assertions.assertTrue(rcnt.unRecoverable());
+    Assertions.assertTrue(rcnt.isUnrecoverable());
     Assertions.assertEquals(5, rcnt.unavailableIndexes(true).size());
 
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_MAINTENANCE, 2));
     rcnt = new ECContainerReplicaCount(container, replica,
         Collections.emptyList(), 1);
-    Assertions.assertTrue(rcnt.unRecoverable());
+    Assertions.assertTrue(rcnt.isUnrecoverable());
     Assertions.assertEquals(3, rcnt.unavailableIndexes(true).size());
     Assertions.assertEquals(0, rcnt.additionalMaintenanceCopiesNeeded());
 
@@ -485,7 +485,7 @@ public class TestECContainerReplicaCount {
     rcnt = new ECContainerReplicaCount(container, replica,
         Collections.emptyList(), 1);
     // Not missing as the decommission replicas are still online
-    Assertions.assertFalse(rcnt.unRecoverable());
+    Assertions.assertFalse(rcnt.isUnrecoverable());
     Assertions.assertEquals(0, rcnt.unavailableIndexes(true).size());
   }
 
