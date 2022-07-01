@@ -22,11 +22,13 @@ package org.apache.hadoop.ozone.om.request.bucket;
 import java.util.UUID;
 
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
@@ -80,7 +82,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         bucketName, true, Long.MAX_VALUE);
 
     // Create with default BucketInfo values
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     OMBucketSetPropertyRequest omBucketSetPropertyRequest =
@@ -94,6 +96,35 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         omMetadataManager.getBucketTable().get(
             omMetadataManager.getBucketKey(volumeName, bucketName))
             .getIsVersionEnabled());
+
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+  }
+
+  @Test
+  public void testNonDefaultLayout() throws Exception {
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
+        bucketName, true, Long.MAX_VALUE);
+
+    // Create FSO Bucket
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    OMBucketSetPropertyRequest omBucketSetPropertyRequest =
+        new OMBucketSetPropertyRequest(omRequest);
+
+    OMClientResponse omClientResponse =
+        omBucketSetPropertyRequest.validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        omMetadataManager.getBucketTable().get(
+            omMetadataManager.getBucketKey(volumeName, bucketName))
+            .getBucketLayout());
 
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
@@ -142,9 +173,9 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    TestOMRequestUtils.addVolumeToDB(
+    OMRequestTestUtils.addVolumeToDB(
         volumeName, omMetadataManager, 10 * GB);
-    TestOMRequestUtils.addBucketToDB(
+    OMRequestTestUtils.addBucketToDB(
         volumeName, bucketName, omMetadataManager, 8 * GB);
     OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
         bucketName, true, 20 * GB);
@@ -169,5 +200,40 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     Assert.assertTrue(omClientResponse.getOMResponse().getMessage().
         contains("Total buckets quota in this volume " +
             "should not be greater than volume quota"));
+  }
+
+  @Test
+  public void rejectsSettingQuotaOnLink() throws Exception {
+    // GIVEN
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String linkName = UUID.randomUUID().toString();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
+    OmBucketInfo.Builder link = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(linkName)
+        .setSourceVolume(volumeName)
+        .setSourceBucket(bucketName);
+    OMRequestTestUtils.addBucketToDB(omMetadataManager, link);
+    OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
+        linkName, false, 20 * GB);
+
+    OMBucketSetPropertyRequest omBucketSetPropertyRequest =
+        new OMBucketSetPropertyRequest(omRequest);
+
+    // WHEN
+    OMClientResponse omClientResponse = omBucketSetPropertyRequest
+        .validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+
+    // THEN
+    Assert.assertFalse(omClientResponse.getOMResponse().getSuccess());
+    Assert.assertEquals(
+        OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION,
+        omClientResponse.getOMResponse().getStatus());
+    String message = omClientResponse.getOMResponse().getMessage();
+    Assert.assertTrue(message, message.contains("Cannot set property on link"));
   }
 }

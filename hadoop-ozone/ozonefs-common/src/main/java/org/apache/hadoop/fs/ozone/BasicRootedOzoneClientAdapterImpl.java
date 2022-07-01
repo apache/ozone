@@ -36,6 +36,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -47,12 +48,12 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -61,6 +62,7 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -99,7 +101,7 @@ public class BasicRootedOzoneClientAdapterImpl
   private OzoneClient ozoneClient;
   private ObjectStore objectStore;
   private ClientProtocol proxy;
-  private ReplicationConfig replicationConfig;
+  private ReplicationConfig clientConfiguredReplicationConfig;
   private boolean securityEnabled;
   private int configuredDnPort;
   private BucketLayout defaultOFSBucketLayout;
@@ -169,7 +171,8 @@ public class BasicRootedOzoneClientAdapterImpl
         this.securityEnabled = true;
       }
 
-      replicationConfig = ReplicationConfig.getDefault(conf);
+      clientConfiguredReplicationConfig =
+          OzoneClientUtils.getClientConfiguredReplicationConfig(conf);
 
       if (OmUtils.isOmHAServiceId(conf, omHost)) {
         // omHost is listed as one of the service ids in the config,
@@ -191,12 +194,42 @@ public class BasicRootedOzoneClientAdapterImpl
           OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
 
       // Fetches the bucket layout to be used by OFS.
-      this.defaultOFSBucketLayout = BucketLayout.fromString(
-          conf.get(OzoneConfigKeys.OZONE_CLIENT_TEST_OFS_DEFAULT_BUCKET_LAYOUT,
-              OzoneConfigKeys.OZONE_CLIENT_TEST_OFS_BUCKET_LAYOUT_DEFAULT));
+      initDefaultFsBucketLayout(conf);
+
       config = conf;
     } finally {
       Thread.currentThread().setContextClassLoader(contextClassLoader);
+    }
+  }
+
+  /**
+   * Initialize the default bucket layout to be used by OFS.
+   *
+   * @param conf OzoneConfiguration
+   * @throws OMException In case of unsupported value provided in the config.
+   */
+  private void initDefaultFsBucketLayout(OzoneConfiguration conf)
+      throws OMException {
+    try {
+      this.defaultOFSBucketLayout = BucketLayout.fromString(
+          conf.get(OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT,
+              OzoneConfigKeys.OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT));
+    } catch (IllegalArgumentException iae) {
+      throw new OMException("Unsupported value provided for " +
+          OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT +
+          ". Supported values are " + BucketLayout.FILE_SYSTEM_OPTIMIZED +
+          " and " + BucketLayout.LEGACY + ".",
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
+
+    // Bucket Layout for buckets created with OFS cannot be OBJECT_STORE.
+    if (defaultOFSBucketLayout.equals(BucketLayout.OBJECT_STORE)) {
+      throw new OMException(
+          "Buckets created with OBJECT_STORE layout do not support file " +
+              "system semantics. Supported values for config " +
+              OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT +
+              " include " + BucketLayout.FILE_SYSTEM_OPTIMIZED + " and " +
+              BucketLayout.LEGACY, OMException.ResultCodes.INVALID_REQUEST);
     }
   }
 
@@ -286,9 +319,20 @@ public class BasicRootedOzoneClientAdapterImpl
     return bucket;
   }
 
+  /**
+   * This API returns the value what is configured at client side only. It could
+   * differ from the server side default values. If no replication config
+   * configured at client, it will return 3.
+   */
   @Override
   public short getDefaultReplication() {
-    return (short) replicationConfig.getRequiredNodes();
+    if (clientConfiguredReplicationConfig == null) {
+      // to provide backward compatibility, we are just retuning 3;
+      // However we need to handle with the correct behavior.
+      // TODO: Please see HDDS-5646
+      return (short) ReplicationFactor.THREE.getValue();
+    }
+    return (short) clientConfiguredReplicationConfig.getRequiredNodes();
   }
 
   @Override
@@ -331,18 +375,10 @@ public class BasicRootedOzoneClientAdapterImpl
     try {
       // Hadoop CopyCommands class always sets recursive to true
       OzoneBucket bucket = getBucket(ofsPath, recursive);
-      OzoneOutputStream ozoneOutputStream = null;
-      if (replication == ReplicationFactor.ONE.getValue()
-          || replication == ReplicationFactor.THREE.getValue()) {
-
-        ozoneOutputStream = bucket.createFile(key, 0,
-            ReplicationConfig.adjustReplication(
-                replicationConfig, replication, config),
-            overWrite, recursive);
-      } else {
-        ozoneOutputStream =
-            bucket.createFile(key, 0, replicationConfig, overWrite, recursive);
-      }
+      OzoneOutputStream ozoneOutputStream = bucket.createFile(key, 0,
+          OzoneClientUtils.resolveClientSideReplicationConfig(replication,
+              this.clientConfiguredReplicationConfig,
+              bucket.getReplicationConfig(), config), overWrite, recursive);
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
@@ -1065,5 +1101,21 @@ public class BasicRootedOzoneClientAdapterImpl
   public boolean isFSOptimizedBucket() {
     // TODO: Need to refine this part.
     return false;
+  }
+
+  @Override
+  public FileChecksum getFileChecksum(String keyName, long length)
+      throws IOException {
+    OzoneClientConfig.ChecksumCombineMode combineMode =
+        config.getObject(OzoneClientConfig.class).getChecksumCombineMode();
+
+    OFSPath ofsPath = new OFSPath(keyName);
+
+    OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
+    OzoneBucket bucket = getBucket(ofsPath, false);
+    return OzoneClientUtils.getFileChecksumWithCombineMode(
+        volume, bucket, ofsPath.getKeyName(),
+        length, combineMode, ozoneClient.getObjectStore().getClientProxy());
+
   }
 }

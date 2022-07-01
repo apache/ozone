@@ -40,11 +40,12 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -129,6 +130,7 @@ public class TestParentAcl {
   // LIST        LIST         READ      (V1 LIST=>READ)
   // READ_ACL    READ_ACL     READ      (V1 READ_ACL=>READ)
   @Test
+  @Flaky("HDDS-6335")
   public void testKeyAcl()
       throws IOException {
     OzoneObj keyObj;
@@ -357,7 +359,7 @@ public class TestParentAcl {
         .setAdminName(adminUgi.getUserName())
         .setOwnerName(testUgi.getUserName())
         .build();
-    TestOMRequestUtils.addVolumeToOM(metadataManager, volumeArgs);
+    OMRequestTestUtils.addVolumeToOM(metadataManager, volumeArgs);
     return new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
         .setResType(VOLUME)
@@ -371,7 +373,7 @@ public class TestParentAcl {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .build();
-    TestOMRequestUtils.addBucketToOM(metadataManager, bucketInfo);
+    OMRequestTestUtils.addBucketToOM(metadataManager, bucketInfo);
     return new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -386,7 +388,7 @@ public class TestParentAcl {
         .setVolumeName(volume)
         .setBucketName(bucket)
         .setKeyName(keyName)
-        .setReplicationConfig(new StandaloneReplicationConfig(
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .setDataSize(0)
         // here we give test ugi full access

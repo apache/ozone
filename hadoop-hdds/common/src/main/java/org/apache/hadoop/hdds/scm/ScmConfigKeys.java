@@ -341,6 +341,8 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY =
       "ozone.scm.container.placement.impl";
+  public static final String OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY =
+      "ozone.scm.container.placement.ec.impl";
 
   public static final String OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT =
       "ozone.scm.pipeline.owner.container.count";
@@ -356,6 +358,17 @@ public final class ScmConfigKeys {
       "ozone.scm.datanode.disallow.same.peers";
   public static final boolean OZONE_SCM_DATANODE_DISALLOW_SAME_PEERS_DEFAULT =
       false;
+
+  public static final String
+      OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL =
+      "ozone.scm.expired.container.replica.op.scrub.interval";
+  public static final String
+      OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL_DEFAULT =
+      "5m";
+  public static final String OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT =
+      "ozone.scm.expired.container.replica.op.time.out";
+  public static final String
+      OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT_DEFAULT = "30m";
 
   // Upper limit for how many pipelines can be created
   // across the cluster nodes managed by SCM.
@@ -401,6 +414,12 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT =
       "120s";
 
+  public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL =
+      "ozone.scm.pipeline.scrub.interval";
+  public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT =
+      "5m";
+
+
   // Allow SCM to auto create factor ONE ratis pipeline.
   public static final String OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE =
       "ozone.scm.pipeline.creation.auto.factor.one";
@@ -434,6 +453,9 @@ public final class ScmConfigKeys {
   // SCM Ratis related
   public static final String OZONE_SCM_HA_ENABLE_KEY
       = "ozone.scm.ratis.enable";
+  /** Default Value would be Overriden based on the current state of Ratis.
+   {@link org.apache.hadoop.hdds.conf.DefaultConfigManager}
+   */
   public static final boolean OZONE_SCM_HA_ENABLE_DEFAULT
       = true;
   public static final String OZONE_SCM_RATIS_PORT_KEY
@@ -525,7 +547,7 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_HA_RAFT_LOG_PURGE_GAP =
           "ozone.scm.ha.ratis.log.purge.gap";
-  public static final int OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT =1000000;
+  public static final int OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT = 1000000;
 
   public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD =
           "ozone.scm.ha.ratis.snapshot.threshold";
@@ -550,6 +572,8 @@ public final class ScmConfigKeys {
   public static final boolean
       OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = false;
 
+  public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_SCMAUDIT =
+      "ozone.audit.log.debug.cmd.list.scmaudit";
   /**
    * Never constructed.
    */

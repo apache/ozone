@@ -30,8 +30,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.ratis.util.ExitUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -66,6 +67,7 @@ public class TestTrashService {
 
   @Before
   public void setup() throws IOException, AuthenticationException {
+    ExitUtils.disableSystemExit();
     OzoneConfiguration configuration = new OzoneConfiguration();
 
     File folder = tempFolder.newFolder();
@@ -102,14 +104,14 @@ public class TestTrashService {
 
   private void createAndDeleteKey(String keyName) throws IOException {
 
-    TestOMRequestUtils.addVolumeToOM(keyManager.getMetadataManager(),
+    OMRequestTestUtils.addVolumeToOM(keyManager.getMetadataManager(),
         OmVolumeArgs.newBuilder()
             .setOwnerName("owner")
             .setAdminName("admin")
             .setVolume(volumeName)
             .build());
 
-    TestOMRequestUtils.addBucketToOM(keyManager.getMetadataManager(),
+    OMRequestTestUtils.addBucketToOM(keyManager.getMetadataManager(),
         OmBucketInfo.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
@@ -121,8 +123,8 @@ public class TestTrashService {
         .setKeyName(keyName)
         .setAcls(Collections.emptyList())
         .setLocationInfoList(new ArrayList<>())
-        .setReplicationConfig(
-            new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE))
+        .setReplicationConfig(StandaloneReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.ONE))
         .build();
 
     /* Create and delete key in the Key Manager. */

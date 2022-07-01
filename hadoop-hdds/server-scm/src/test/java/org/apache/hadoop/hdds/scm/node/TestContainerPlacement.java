@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.node;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,7 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -42,8 +43,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
@@ -56,6 +58,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.test.PathUtils;
@@ -64,16 +67,14 @@ import org.apache.commons.io.IOUtils;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
-import static org.junit.Assert.assertEquals;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 /**
@@ -89,10 +90,7 @@ public class TestContainerPlacement {
   private PipelineManager pipelineManager;
   private NodeManager nodeManager;
 
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
-
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     conf = getConf();
     testDir = GenericTestUtils.getTestDir(
@@ -100,17 +98,17 @@ public class TestContainerPlacement {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
-    scmhaManager = MockSCMHAManager.getInstance(true);
+    scmhaManager = SCMHAManagerStub.getInstance(true);
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
     nodeManager = new MockNodeManager(true, 10);
     pipelineManager = new MockPipelineManager(dbStore,
         scmhaManager, nodeManager);
-    pipelineManager.createPipeline(new RatisReplicationConfig(
+    pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE));
   }
 
-  @After
+  @AfterEach
   public void cleanup() throws Exception {
     if (dbStore != null) {
       dbStore.close();
@@ -162,7 +160,9 @@ public class TestContainerPlacement {
       throws IOException {
     return new ContainerManagerImpl(conf,
         scmhaManager, sequenceIdGen, pipelineManager,
-        SCMDBDefinition.CONTAINERS.getTable(dbStore));
+        SCMDBDefinition.CONTAINERS.getTable(dbStore),
+        new ContainerReplicaPendingOps(
+            conf, new MonotonicClock(ZoneId.systemDefault())));
   }
 
   /**
@@ -172,7 +172,7 @@ public class TestContainerPlacement {
    * @throws InterruptedException
    */
   @Test
-  @Ignore
+  @Disabled
   public void testContainerPlacementCapacity() throws IOException,
       InterruptedException {
     final int nodeCount = 4;
@@ -189,8 +189,8 @@ public class TestContainerPlacement {
 
     SCMNodeManager scmNodeManager = createNodeManager(conf);
     containerManager = createContainerManager();
-    List<DatanodeDetails> datanodes =
-        TestUtils.getListOfRegisteredDatanodeDetails(scmNodeManager, nodeCount);
+    List<DatanodeDetails> datanodes = HddsTestUtils
+        .getListOfRegisteredDatanodeDetails(scmNodeManager, nodeCount);
     XceiverClientManager xceiverClientManager = null;
     LayoutVersionManager versionManager =
         scmNodeManager.getLayoutVersionManager();
@@ -212,7 +212,7 @@ public class TestContainerPlacement {
       assertEquals(remaining * nodeCount,
           (long) scmNodeManager.getStats().getRemaining().get());
 
-      xceiverClientManager= new XceiverClientManager(conf);
+      xceiverClientManager = new XceiverClientManager(conf);
 
       ContainerInfo container = containerManager
           .allocateContainer(

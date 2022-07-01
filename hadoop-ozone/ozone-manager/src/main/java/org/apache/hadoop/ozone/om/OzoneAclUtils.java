@@ -32,7 +32,32 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
  */
 public final class OzoneAclUtils {
 
+  private static OMMultiTenantManager multiTenantManager;
+
   private OzoneAclUtils() {
+  }
+
+  public static void setOMMultiTenantManager(
+      OMMultiTenantManager tenantManager) {
+    multiTenantManager = tenantManager;
+  }
+
+  /**
+   * Converts the given access ID to a kerberos principal.
+   * If the access ID does not belong to a tenant, the access ID is returned
+   * as is to be used as the principal.
+   */
+  public static String accessIdToUserPrincipal(String accessID) {
+    if (multiTenantManager == null) {
+      return accessID;
+    }
+
+    String principal = multiTenantManager.getUserNameGivenAccessId(accessID);
+    if (principal == null) {
+      principal = accessID;
+    }
+
+    return principal;
   }
 
   /**
@@ -63,7 +88,7 @@ public final class OzoneAclUtils {
     //OzoneNativeAuthorizer differs from Ranger Authorizer as Ranger requires
     // only READ access on parent level access. OzoneNativeAuthorizer has
     // different parent level access based on the child level access type
-    if(ozoneManager.isNativeAuthorizerEnabled()) {
+    if (ozoneManager.isNativeAuthorizerEnabled()) {
       if (aclType == IAccessAuthorizer.ACLType.CREATE ||
           aclType == IAccessAuthorizer.ACLType.DELETE ||
           aclType == IAccessAuthorizer.ACLType.WRITE_ACL) {

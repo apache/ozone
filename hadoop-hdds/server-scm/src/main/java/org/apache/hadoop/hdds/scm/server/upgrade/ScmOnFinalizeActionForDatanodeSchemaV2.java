@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATANODE_SCHEMA_V
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.SCM;
 
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
 import org.slf4j.Logger;
@@ -34,12 +33,12 @@ import org.slf4j.LoggerFactory;
 @UpgradeActionHdds(feature = DATANODE_SCHEMA_V2, component = SCM, type =
     ON_FINALIZE)
 public class ScmOnFinalizeActionForDatanodeSchemaV2 implements
-    HDDSUpgradeAction<StorageContainerManager> {
+    HDDSUpgradeAction<SCMUpgradeFinalizationContext> {
   public static final Logger LOG =
       LoggerFactory.getLogger(ScmOnFinalizeActionForDatanodeSchemaV2.class);
 
   @Override
-  public void execute(StorageContainerManager arg) throws Exception {
+  public void execute(SCMUpgradeFinalizationContext context) throws Exception {
     LOG.info("Executing SCM On Finalize action for layout feature {}",
         DATANODE_SCHEMA_V2);
   }

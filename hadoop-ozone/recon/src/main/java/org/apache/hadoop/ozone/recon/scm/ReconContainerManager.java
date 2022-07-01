@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -93,9 +94,11 @@ public class ReconContainerManager extends ContainerManagerImpl {
       ContainerHealthSchemaManager containerHealthSchemaManager,
       ReconContainerMetadataManager reconContainerMetadataManager,
       SCMHAManager scmhaManager,
-      SequenceIdGenerator sequenceIdGen)
+      SequenceIdGenerator sequenceIdGen,
+      ContainerReplicaPendingOps pendingOps)
       throws IOException {
-    super(conf, scmhaManager, sequenceIdGen, pipelineManager, containerStore);
+    super(conf, scmhaManager, sequenceIdGen, pipelineManager, containerStore,
+        pendingOps);
     this.scmClient = scm;
     this.pipelineManager = pipelineManager;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
@@ -150,7 +153,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
       existContainers = containers.get(true);
     }
     List<Long> noExistContainers = null;
-    if (containers.containsKey(false)){
+    if (containers.containsKey(false)) {
       noExistContainers = containers.get(false).parallelStream().
           map(ContainerReplicaProto::getContainerID)
           .collect(Collectors.toList());
@@ -178,7 +181,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
         ContainerReplicaProto.State crpState = crp.getState();
         try {
           checkContainerStateAndUpdate(cID, crpState);
-        } catch (Exception ioe){
+        } catch (Exception ioe) {
           LOG.error("Exception while " +
               "checkContainerStateAndUpdate container", ioe);
         }

@@ -43,7 +43,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.NON
  */
 public final class OzoneAclUtil {
 
-  private OzoneAclUtil(){
+  private OzoneAclUtil() {
   }
 
   /**
@@ -60,7 +60,7 @@ public final class OzoneAclUtil {
 
     // User ACL.
     listOfAcls.add(new OzoneAcl(USER, userName, userRights, ACCESS));
-    if(userGroups != null) {
+    if (userGroups != null) {
       // Group ACLs of the User.
       Arrays.asList(userGroups).forEach((group) -> listOfAcls.add(
           new OzoneAcl(GROUP, group, groupRights, ACCESS)));

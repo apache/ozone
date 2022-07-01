@@ -88,11 +88,11 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
     try {
       UpgradeFinalizer.StatusAndMessages finalizationResponse =
           client.finalizeUpgrade(upgradeClientID);
-      if (isFinalized(finalizationResponse.status())){
+      if (isFinalized(finalizationResponse.status())) {
         System.out.println("Upgrade has already been finalized.");
         emitExitMsg();
         return null;
-      } else if (!isStarting(finalizationResponse.status())){
+      } else if (!isStarting(finalizationResponse.status())) {
         System.err.println("Invalid response from Ozone Manager.");
         System.err.println(
             "Current finalization status is: " + finalizationResponse.status()
@@ -116,7 +116,7 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
       emitFinishedMsg("Ozone Manager");
     } catch (CancellationException e) {
       emitCancellationMsg("Ozone Manager");
-    } catch (InterruptedException e){
+    } catch (InterruptedException e) {
       emitCancellationMsg("Ozone Manager");
       Thread.currentThread().interrupt();
     } catch (ExecutionException e) {

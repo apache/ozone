@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -36,8 +37,10 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunk
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -82,7 +85,15 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
     switch (request.getCmdType()) {
     case WriteChunk:
       return result(request,
-          r -> r.setWriteChunk(writeChunk(request.getWriteChunk())));
+          r -> {
+            try {
+              return r.setWriteChunk(writeChunk(request.getWriteChunk()));
+            } catch (ContainerNotOpenException e) {
+              return r.setResult(Result.CLOSED_CONTAINER_IO);
+            } catch (IOException e) {
+              return r.setResult(Result.IO_EXCEPTION);
+            }
+          });
     case ReadChunk:
       return result(request,
           r -> r.setReadChunk(readChunk(request.getReadChunk())));
@@ -92,6 +103,9 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
     case GetBlock:
       return result(request,
           r -> r.setGetBlock(getBlock(request.getGetBlock())));
+    case ListBlock:
+      return result(request,
+          r -> r.setListBlock(listBlock(request.getContainerID())));
     default:
       throw new IllegalArgumentException(
           "Mock version of datanode call " + request.getCmdType()
@@ -113,6 +127,11 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
     return GetBlockResponseProto.newBuilder()
         .setBlockData(datanodeStorage.getBlock(getBlock.getBlockID()))
         .build();
+  }
+
+  private ContainerProtos.ListBlockResponseProto listBlock(long containerID) {
+    return ContainerProtos.ListBlockResponseProto.newBuilder()
+        .addAllBlockData(datanodeStorage.listBlock(containerID)).build();
   }
 
   private PutBlockResponseProto putBlock(PutBlockRequestProto putBlock) {
@@ -149,7 +168,7 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
   }
 
   private WriteChunkResponseProto writeChunk(
-      WriteChunkRequestProto writeChunk) {
+      WriteChunkRequestProto writeChunk) throws IOException {
     datanodeStorage
         .writeChunk(writeChunk.getBlockID(), writeChunk.getChunkData(),
             writeChunk.getData());

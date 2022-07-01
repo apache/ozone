@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Client to read container data from gRPC.
  */
-public class GrpcReplicationClient implements AutoCloseable{
+public class GrpcReplicationClient implements AutoCloseable {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(GrpcReplicationClient.class);

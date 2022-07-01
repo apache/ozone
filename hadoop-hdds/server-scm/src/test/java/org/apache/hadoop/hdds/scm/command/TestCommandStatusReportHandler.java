@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .CommandStatusReportFromDatanode;
@@ -34,8 +34,8 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,8 +43,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Unit test for command status report handler.
@@ -55,7 +55,7 @@ public class TestCommandStatusReportHandler implements EventPublisher {
       .getLogger(TestCommandStatusReportHandler.class);
   private CommandStatusReportHandler cmdStatusReportHandler;
 
-  @Before
+  @BeforeEach
   public void setup() {
     cmdStatusReportHandler = new CommandStatusReportHandler();
   }
@@ -82,7 +82,7 @@ public class TestCommandStatusReportHandler implements EventPublisher {
 
   private CommandStatusReportFromDatanode getStatusReport(
       List<CommandStatus> reports) {
-    CommandStatusReportsProto report = TestUtils.createCommandStatusReport(
+    CommandStatusReportsProto report = HddsTestUtils.createCommandStatusReport(
         reports);
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     return new SCMDatanodeHeartbeatDispatcher.CommandStatusReportFromDatanode(

@@ -89,6 +89,14 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     return cachedValue.get();
   }
 
+  public void incrementUsedSpace(long usedSpace) {
+    cachedValue.addAndGet(usedSpace);
+  }
+
+  public void decrementUsedSpace(long reclaimedSpace) {
+    cachedValue.addAndGet(-1 * reclaimedSpace);
+  }
+
   public void start() {
     if (executor != null) {
       long initialDelay = cachedValue.get() > 0 ? refresh.toMillis() : 0;
@@ -127,7 +135,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
 
   private void refresh() {
     //only one `refresh` can be running at a certain moment
-    if(isRefreshRunning.compareAndSet(false, true)) {
+    if (isRefreshRunning.compareAndSet(false, true)) {
       try {
         cachedValue.set(source.getUsedSpace());
       } catch (RuntimeException e) {

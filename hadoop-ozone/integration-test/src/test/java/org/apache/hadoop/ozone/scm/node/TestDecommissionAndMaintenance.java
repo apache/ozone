@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -41,11 +41,12 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,13 +76,16 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.*;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.junit.Assert.fail;
 
 /**
  * Test from the scmclient for decommission and maintenance.
  */
-
+@Flaky({"HDDS-6028", "HDDS-6049"})
 public class TestDecommissionAndMaintenance {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDecommissionAndMaintenance.class);
@@ -100,7 +104,7 @@ public class TestDecommissionAndMaintenance {
 
   private static MiniOzoneClusterProvider clusterProvider;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() {
     OzoneConfiguration conf = new OzoneConfiguration();
     final int interval = 100;
@@ -108,7 +112,6 @@ public class TestDecommissionAndMaintenance {
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         interval, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
-    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, false);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1, SECONDS);
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 1, SECONDS);
@@ -130,14 +133,14 @@ public class TestDecommissionAndMaintenance {
     clusterProvider = new MiniOzoneClusterProvider(conf, builder, 8);
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() throws InterruptedException {
     if (clusterProvider != null) {
       clusterProvider.shutdown();
     }
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     cluster = clusterProvider.provide();
     setManagers();
@@ -145,7 +148,7 @@ public class TestDecommissionAndMaintenance {
     scmClient = new ContainerOperationClient(cluster.getConf());
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws InterruptedException, IOException {
     if (cluster != null) {
       clusterProvider.destroy(cluster);
@@ -358,14 +361,14 @@ public class TestDecommissionAndMaintenance {
     Set<ContainerReplica> replicas = getContainerReplicas(container);
 
     List<DatanodeDetails> forMaintenance = new ArrayList<>();
-    replicas.forEach(r ->forMaintenance.add(r.getDatanodeDetails()));
+    replicas.forEach(r -> forMaintenance.add(r.getDatanodeDetails()));
 
     scmClient.startMaintenanceNodes(forMaintenance.stream()
         .map(d -> getDNHostAndPort(d))
         .collect(Collectors.toList()), 0);
 
     // Ensure all 3 DNs go to maintenance
-    for(DatanodeDetails dn : forMaintenance) {
+    for (DatanodeDetails dn : forMaintenance) {
       waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
     }
 
@@ -379,7 +382,7 @@ public class TestDecommissionAndMaintenance {
         .collect(Collectors.toList()));
 
     // Ensure all 3 DNs go to maintenance
-    for(DatanodeDetails dn : forMaintenance) {
+    for (DatanodeDetails dn : forMaintenance) {
       waitForDnToReachOpState(dn, IN_SERVICE);
     }
 
@@ -400,26 +403,26 @@ public class TestDecommissionAndMaintenance {
     Set<ContainerReplica> replicas = getContainerReplicas(container);
 
     List<DatanodeDetails> forMaintenance = new ArrayList<>();
-    replicas.forEach(r ->forMaintenance.add(r.getDatanodeDetails()));
+    replicas.forEach(r -> forMaintenance.add(r.getDatanodeDetails()));
 
     scmClient.startMaintenanceNodes(forMaintenance.stream()
         .map(d -> getDNHostAndPort(d))
         .collect(Collectors.toList()), 0);
 
     // Ensure all 3 DNs go to entering_maintenance
-    for(DatanodeDetails dn : forMaintenance) {
+    for (DatanodeDetails dn : forMaintenance) {
       waitForDnToReachPersistedOpState(dn, ENTERING_MAINTENANCE);
     }
     cluster.restartStorageContainerManager(true);
     setManagers();
 
     List<DatanodeDetails> newDns = new ArrayList<>();
-    for(DatanodeDetails dn : forMaintenance) {
+    for (DatanodeDetails dn : forMaintenance) {
       newDns.add(nm.getNodeByUuid(dn.getUuid().toString()));
     }
 
     // Ensure all 3 DNs go to maintenance
-    for(DatanodeDetails dn : newDns) {
+    for (DatanodeDetails dn : newDns) {
       waitForDnToReachOpState(dn, IN_MAINTENANCE);
     }
 
@@ -550,7 +553,7 @@ public class TestDecommissionAndMaintenance {
    */
   private void generateData(int keyCount, String keyPrefix,
       ReplicationFactor repFactor, ReplicationType repType) throws IOException {
-    for (int i=0; i<keyCount; i++) {
+    for (int i = 0; i < keyCount; i++) {
       TestDataUtil.createKey(bucket, keyPrefix + i, repFactor, repType,
           "this is the content");
     }
@@ -610,7 +613,7 @@ public class TestDecommissionAndMaintenance {
    * @return host:port for the given DN.
    */
   private String getDNHostAndPort(DatanodeDetails dn) {
-    return dn.getHostName()+":"+dn.getPorts().get(0).getValue();
+    return dn.getHostName() + ":" + dn.getPorts().get(0).getValue();
   }
 
   /**

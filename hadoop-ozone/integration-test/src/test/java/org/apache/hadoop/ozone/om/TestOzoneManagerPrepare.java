@@ -46,17 +46,22 @@ import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Slow;
+import org.apache.ratis.util.ExitUtils;
 import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Before;
-import org.junit.Test;
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Test OM prepare against actual mini cluster.
  */
+@Flaky("HDDS-5990")
 public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   private static final String BUCKET = "bucket";
   private static final String VOLUME = "volume";
@@ -84,9 +89,12 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    * Make sure OM is out of Prepare state before executing individual tests.
    * @throws Exception
    */
-  @Before
+  @BeforeEach
   public void initOM() throws Exception {
     setup();
+    LOG.info("Waiting for OM leader election");
+    GenericTestUtils.waitFor(() -> cluster.getOMLeader() != null,
+        1000, 120_000);
     submitCancelPrepareRequest();
     assertClusterNotPrepared();
   }
@@ -129,6 +137,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    * @throws Exception
    */
   @Test
+  @Disabled("RATIS-1481") // until upgrade to Ratis 2.3.0
   public void testPrepareDownedOM() throws Exception {
     // Index of the OM that will be shut down during this test.
     final int shutdownOMIndex = 2;
@@ -160,6 +169,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     // it missed once it receives the prepare transaction.
     cluster.restartOzoneManager(downedOM, true);
     runningOms.add(shutdownOMIndex, downedOM);
+    ExitUtils.assertNotTerminated();
 
     // Make sure all OMs are prepared and still have data.
     assertClusterPrepared(prepareIndex, runningOms);
@@ -204,7 +214,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     assertClusterPrepared(prepareIndex);
   }
 
-  @Ignore("Saving on CI time since this is a pessimistic test. We should not " +
+  @Slow("Saving on CI time since this is a pessimistic test. We should not " +
       "be able to do anything with 2 OMs down.")
   @Test
   public void testPrepareFailsWhenTwoOmsAreDown() throws Exception {
@@ -373,7 +383,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     byte[] data = ContainerTestHelper.getFixedLengthString(
         keyString, 100).getBytes(UTF_8);
     OzoneOutputStream keyStream = TestHelper.createKey(
-        keyName, ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
+        keyName, ReplicationType.RATIS, ReplicationFactor.ONE,
         100, store, volumeName, bucketName);
     keyStream.write(data);
     keyStream.close();

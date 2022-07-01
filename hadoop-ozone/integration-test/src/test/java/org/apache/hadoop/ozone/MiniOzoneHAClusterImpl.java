@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.hdds.conf.ConfigurationTarget;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.CheckedConsumer;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -260,7 +260,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     OzoneConfiguration scmConf = scm.getConfiguration();
     shutdownStorageContainerManager(scm);
     scm.join();
-    scm = TestUtils.getScmSimple(scmConf);
+    scm = HddsTestUtils.getScmSimple(scmConf);
     scmhaService.activate(scm);
     scm.start();
     if (waitForSCM) {
@@ -490,7 +490,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         try {
           initOMHAConfig();
 
-          for (int i = 1; i<= numOfOMs; i++) {
+          for (int i = 1; i <= numOfOMs; i++) {
             // Set nodeId
             String nodeId = OM_NODE_ID_PREFIX + i;
             OzoneConfiguration config = new OzoneConfiguration(conf);
@@ -564,7 +564,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         try {
           initSCMHAConfig();
 
-          for (int i = 1; i<= numOfSCMs; i++) {
+          for (int i = 1; i <= numOfSCMs; i++) {
             // Set nodeId
             String nodeId = SCM_NODE_ID_PREFIX + i;
             String metaDirPath = path + "/" + nodeId;
@@ -583,7 +583,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             } else {
               StorageContainerManager.scmBootstrap(scmConfig);
             }
-            StorageContainerManager scm = TestUtils.getScmSimple(scmConfig);
+            StorageContainerManager scm = HddsTestUtils.getScmSimple(scmConfig);
             HealthyPipelineSafeModeRule rule =
                 scm.getScmSafeModeManager().getHealthyPipelineSafeModeRule();
             if (rule != null) {

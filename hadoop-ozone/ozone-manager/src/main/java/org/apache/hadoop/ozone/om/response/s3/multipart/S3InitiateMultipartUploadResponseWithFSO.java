@@ -46,16 +46,22 @@ public class S3InitiateMultipartUploadResponseWithFSO extends
         S3InitiateMultipartUploadResponse {
   private List<OmDirectoryInfo> parentDirInfos;
   private String mpuDBKey;
+  private long volumeId;
+  private long bucketId;
 
+  @SuppressWarnings("parameternumber")
   public S3InitiateMultipartUploadResponseWithFSO(
       @Nonnull OMResponse omResponse,
       @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
       @Nonnull OmKeyInfo omKeyInfo, @Nonnull String mpuDBKey,
       @Nonnull List<OmDirectoryInfo> parentDirInfos,
-      @Nonnull BucketLayout bucketLayout) {
+      @Nonnull BucketLayout bucketLayout, @Nonnull long volumeId,
+      @Nonnull long bucketId) {
     super(omResponse, omMultipartKeyInfo, omKeyInfo, bucketLayout);
     this.parentDirInfos = parentDirInfos;
     this.mpuDBKey = mpuDBKey;
+    this.volumeId = volumeId;
+    this.bucketId = bucketId;
   }
 
   /**
@@ -77,14 +83,17 @@ public class S3InitiateMultipartUploadResponseWithFSO extends
      */
     if (parentDirInfos != null) {
       for (OmDirectoryInfo parentDirInfo : parentDirInfos) {
-        String parentKey = parentDirInfo.getPath();
+        final String parentKey = omMetadataManager.getOzonePathKey(
+                volumeId, bucketId, parentDirInfo.getParentObjectID(),
+                parentDirInfo.getName());
         omMetadataManager.getDirectoryTable().putWithBatch(batchOperation,
                 parentKey, parentDirInfo);
       }
     }
 
     OMFileRequest.addToOpenFileTable(omMetadataManager, batchOperation,
-        getOmKeyInfo(), getOmMultipartKeyInfo().getUploadID());
+        getOmKeyInfo(), getOmMultipartKeyInfo().getUploadID(), volumeId,
+        bucketId);
 
     omMetadataManager.getMultipartInfoTable().putWithBatch(batchOperation,
         mpuDBKey, getOmMultipartKeyInfo());

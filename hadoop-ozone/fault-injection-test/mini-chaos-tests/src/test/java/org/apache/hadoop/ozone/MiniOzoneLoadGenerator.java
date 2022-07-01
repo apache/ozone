@@ -58,7 +58,7 @@ public class MiniOzoneLoadGenerator {
     this.conf = conf;
     this.omServiceID = omServiceId;
 
-    for(Class<? extends LoadGenerator> clazz : loadGeneratorClazzes) {
+    for (Class<? extends LoadGenerator> clazz : loadGeneratorClazzes) {
       addLoads(clazz, buffer);
     }
 

@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -30,6 +30,7 @@ import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.UUID;
 
 /**
@@ -54,8 +55,8 @@ public class TestS3MultipartUploadCommitPartRequest
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
 
     createParentPath(volumeName, bucketName);
 
@@ -116,8 +117,8 @@ public class TestS3MultipartUploadCommitPartRequest
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
 
     createParentPath(volumeName, bucketName);
 
@@ -155,8 +156,8 @@ public class TestS3MultipartUploadCommitPartRequest
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
 
 
     long clientID = Time.now();
@@ -193,7 +194,7 @@ public class TestS3MultipartUploadCommitPartRequest
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
 
     long clientID = Time.now();
@@ -220,7 +221,7 @@ public class TestS3MultipartUploadCommitPartRequest
 
   protected void addKeyToOpenKeyTable(String volumeName, String bucketName,
       String keyName, long clientID) throws Exception {
-    TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(true, volumeName, bucketName,
             keyName, clientID, HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE, omMetadataManager);
   }
@@ -230,13 +231,13 @@ public class TestS3MultipartUploadCommitPartRequest
   }
 
   protected String getMultipartOpenKey(String volumeName, String bucketName,
-      String keyName, String multipartUploadID) {
+      String keyName, String multipartUploadID) throws IOException {
     return omMetadataManager
         .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
   }
 
   protected String getOpenKey(String volumeName, String bucketName,
-      String keyName, long clientID) {
+      String keyName, long clientID) throws IOException {
     return omMetadataManager.getOpenKey(volumeName, bucketName,
         keyName, clientID);
   }

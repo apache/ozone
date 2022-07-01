@@ -21,10 +21,10 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import java.io.IOException;
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -52,8 +52,8 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
 
     createParentPath(volumeName, bucketName);
 
@@ -104,8 +104,8 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
 
     String multipartUploadID = "randomMPU";
 
@@ -162,7 +162,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
     String keyName = UUID.randomUUID().toString();
 
 
-    TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
     String multipartUploadID = "randomMPU";
 
@@ -194,7 +194,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
   }
 
   protected String getMultipartOpenKey(String volumeName, String bucketName,
-      String keyName, String multipartUploadID) {
+      String keyName, String multipartUploadID) throws IOException {
     return omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
   }

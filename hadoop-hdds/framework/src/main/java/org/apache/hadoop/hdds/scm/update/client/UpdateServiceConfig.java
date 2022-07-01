@@ -27,9 +27,8 @@ import org.apache.hadoop.hdds.conf.ConfigTag;
 @ConfigGroup(prefix = "ozone.scm.update.service")
 public final class UpdateServiceConfig {
 
-  @Config(key = "port", defaultValue = "9893", description = "Port used for"
-      + " the SCM grpc update service for CRL.", tags = {
-      ConfigTag.SECURITY})
+  @Config(key = "port", defaultValue = "9893", tags = {ConfigTag.SECURITY},
+      description = "Port used for the SCM grpc update service for CRL.")
   private int port;
 
   public int getPort() {

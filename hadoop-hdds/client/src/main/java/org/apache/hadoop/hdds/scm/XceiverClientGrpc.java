@@ -169,7 +169,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   private synchronized void connectToDatanode(DatanodeDetails dn)
       throws IOException {
-    if (isConnected(dn)){
+    if (isConnected(dn)) {
       return;
     }
     // read port from the data node, on failure use default configured
@@ -288,10 +288,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         Thread.currentThread().interrupt();
       }
     }
-    try{
+    try {
       for (Map.Entry<DatanodeDetails,
               CompletableFuture<ContainerCommandResponseProto> >
-              entry : futureHashMap.entrySet()){
+              entry : futureHashMap.entrySet()) {
         responseProtoHashMap.put(entry.getKey(), entry.getValue().get());
       }
     } catch (InterruptedException e) {
@@ -299,7 +299,13 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       // Re-interrupt the thread while catching InterruptedException
       Thread.currentThread().interrupt();
     } catch (ExecutionException e) {
-      LOG.error("Failed to execute command {}", processForDebug(request), e);
+      String message = "Failed to execute command {}.";
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(message, processForDebug(request), e);
+      } else {
+        LOG.error(message + " Exception Class: {}, Exception Message: {}",
+                request.getCmdType(), e.getClass().getName(), e.getMessage());
+      }
     }
     return responseProtoHashMap;
   }
@@ -456,7 +462,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
               .build();
       XceiverClientReply asyncReply =
           sendCommandAsync(finalPayload, pipeline.getFirstNode());
-      if (!HddsUtils.isReadOnly(request)) {
+      if (shouldBlockAndWaitAsyncReply(request)) {
         asyncReply.getResponse().get();
       }
       return asyncReply;
@@ -464,6 +470,21 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     } finally {
       span.finish();
     }
+  }
+
+  /**
+   * During data writes the ordering of WriteChunk and PutBlock is not ensured
+   * by any outside logic, therefore in this original implementation, all reads
+   * and writes are synchronized.
+   * This method is providing the possibility for subclasses to override this
+   * behaviour.
+   *
+   * @param request the request we need the decision about
+   * @return true if the request is a write request.
+   */
+  protected boolean shouldBlockAndWaitAsyncReply(
+      ContainerCommandRequestProto request) {
+    return !HddsUtils.isReadOnly(request);
   }
 
   @VisibleForTesting
@@ -531,7 +552,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   }
 
   private synchronized void checkOpen(DatanodeDetails dn)
-      throws IOException{
+      throws IOException {
     if (closed) {
       throw new IOException("This channel is not connected.");
     }

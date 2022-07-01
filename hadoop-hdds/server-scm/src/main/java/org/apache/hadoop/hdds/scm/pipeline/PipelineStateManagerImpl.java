@@ -188,6 +188,26 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
     }
   }
 
+
+  /**
+   * Returns the count of pipelines meeting the given ReplicationConfig and
+   * state.
+   * @param replicationConfig The ReplicationConfig of the pipelines to count
+   * @param state The current state of the pipelines to count
+   * @return The count of pipelines meeting the above criteria
+   */
+  @Override
+  public int getPipelineCount(
+      ReplicationConfig replicationConfig,
+      Pipeline.PipelineState state) {
+    lock.readLock().lock();
+    try {
+      return pipelineStateMap.getPipelineCount(replicationConfig, state);
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
   @Override
   public NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
       throws IOException {
@@ -258,10 +278,8 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       HddsProtos.PipelineID pipelineIDProto, HddsProtos.PipelineState newState)
       throws IOException {
     PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);
-    Pipeline.PipelineState oldState = null;
     lock.writeLock().lock();
     try {
-      oldState = getPipeline(pipelineID).getPipelineState();
       // null check is here to prevent the case where SCM store
       // is closed but the staleNode handlers/pipeline creations
       // still try to access it.
@@ -275,9 +293,8 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       LOG.warn("Pipeline {} is not found in the pipeline Map. Pipeline"
           + " may have been deleted already.", pipelineID);
     } catch (IOException ex) {
-      LOG.warn("Pipeline {} state update failed", pipelineID);
-      // revert back to old state in memory
-      pipelineStateMap.updatePipelineState(pipelineID, oldState);
+      LOG.error("Pipeline {} state update failed", pipelineID);
+      throw ex;
     } finally {
       lock.writeLock().unlock();
     }

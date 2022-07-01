@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -197,7 +198,11 @@ public class ContainerStateMachine extends BaseStateMachine {
     applyTransactionSemaphore = new Semaphore(maxPendingApplyTransactions);
     stateMachineHealthy = new AtomicBoolean(true);
 
-    this.executor = Executors.newFixedThreadPool(numContainerOpExecutors);
+    this.executor = Executors.newFixedThreadPool(numContainerOpExecutors,
+        new ThreadFactoryBuilder()
+            .setNameFormat("ContainerOp-" + gid.getUuid() + "-%d")
+            .build());
+
     this.containerTaskQueues = new ConcurrentHashMap<>();
     this.waitOnBothFollowers = conf.getObject(
         DatanodeConfiguration.class).waitOnAllFollowers();
@@ -689,7 +694,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   private synchronized void updateLastApplied() {
     Long appliedTerm = null;
     long appliedIndex = -1;
-    for(long i = getLastAppliedTermIndex().getIndex() + 1;; i++) {
+    for (long i = getLastAppliedTermIndex().getIndex() + 1;; i++) {
       final Long removed = applyTransactionCompletionMap.remove(i);
       if (removed == null) {
         break;
@@ -740,7 +745,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         = queue.submit(task, executor);
     // after the task is completed, remove the queue if the queue is empty.
     f.thenAccept(dummy -> containerTaskQueues.computeIfPresent(containerId,
-        (id, q) -> q.isEmpty()? null: q));
+        (id, q) -> q.isEmpty() ? null : q));
     return f;
   }
 
@@ -848,11 +853,11 @@ public class ContainerStateMachine extends BaseStateMachine {
                     + "{} Container Result: {}", gid, r.getCmdType(), index,
                 r.getMessage(), r.getResult());
           }
-          applyTransactionFuture.complete(r::toByteString);
           if (cmdType == Type.WriteChunk || cmdType == Type.PutSmallFile) {
             metrics.incNumBytesCommittedCount(
                 requestProto.getWriteChunk().getChunkData().getLen());
           }
+          applyTransactionFuture.complete(r::toByteString);
           // add the entry to the applyTransactionCompletionMap only if the
           // stateMachine is healthy i.e, there has been no applyTransaction
           // failures before.

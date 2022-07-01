@@ -20,6 +20,9 @@ package org.apache.hadoop.ozone.om.request.security;
 
 import com.google.common.base.Optional;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -42,6 +45,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import static org.apache.hadoop.ozone.om.OzoneManagerUtils.buildTokenAuditMap;
 
 /**
  * Handle GetDelegationToken Request.
@@ -57,12 +64,25 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    GetDelegationTokenRequestProto getDelegationTokenRequest =
-        getOmRequest().getGetDelegationTokenRequest();
+    // We need to populate user info in our request object.
+    OMRequest request = super.preExecute(ozoneManager);
 
-    // Call OM to create token
-    Token<OzoneTokenIdentifier> token = ozoneManager
-        .getDelegationToken(new Text(getDelegationTokenRequest.getRenewer()));
+    GetDelegationTokenRequestProto getDelegationTokenRequest =
+        request.getGetDelegationTokenRequest();
+
+    AuditLogger auditLogger = ozoneManager.getAuditLogger();
+
+    Token<OzoneTokenIdentifier> token;
+    try {
+      // Call OM to create token
+      token = ozoneManager
+          .getDelegationToken(new Text(getDelegationTokenRequest.getRenewer()));
+    } catch (IOException ioe) {
+      auditLog(auditLogger,
+          buildAuditMessage(OMAction.GET_DELEGATION_TOKEN,
+              new LinkedHashMap<>(), ioe, request.getUserInfo()));
+      throw ioe;
+    }
 
     // Client issues GetDelegationToken request, when received by OM leader
     // it will generate a token. Original GetDelegationToken request is
@@ -88,8 +108,8 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
                           .build())
                   .setTokenRenewInterval(ozoneManager.getDelegationTokenMgr()
                       .getTokenRenewInterval()))
-          .setCmdType(getOmRequest().getCmdType())
-          .setClientId(getOmRequest().getClientId());
+          .setCmdType(request.getCmdType())
+          .setClientId(request.getClientId());
 
 
     } else {
@@ -99,11 +119,11 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
               UpdateGetDelegationTokenRequest.newBuilder()
                   .setGetDelegationTokenResponse(
                       GetDelegationTokenResponseProto.newBuilder()))
-          .setCmdType(getOmRequest().getCmdType())
-          .setClientId(getOmRequest().getClientId());
+          .setCmdType(request.getCmdType())
+          .setClientId(request.getClientId());
     }
-    if (getOmRequest().hasTraceID()) {
-      omRequest.setTraceID(getOmRequest().getTraceID());
+    if (request.hasTraceID()) {
+      omRequest.setTraceID(request.getTraceID());
     }
     return omRequest.build();
   }
@@ -140,11 +160,20 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
     Token<OzoneTokenIdentifier> ozoneTokenIdentifierToken =
         OMPBHelper.convertToDelegationToken(tokenProto);
 
+    AuditLogger auditLogger = ozoneManager.getAuditLogger();
+    Map<String, String> auditMap =
+        buildTokenAuditMap(ozoneTokenIdentifierToken);
+
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
+    IOException exception = null;
 
     try {
       OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.
           readProtoBuf(ozoneTokenIdentifierToken.getIdentifier());
+      auditMap.put(OzoneConsts.DELEGATION_TOKEN_RENEWER,
+          ozoneTokenIdentifier.getRenewer() == null ? "" :
+              ozoneTokenIdentifier.getRenewer().toString());
 
       // Update in memory map of token.
       long tokenRenewInterval = updateGetDelegationTokenRequest
@@ -166,12 +195,17 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
     } catch (IOException ex) {
       LOG.error("Error in Updating DelegationToken {}",
           ozoneTokenIdentifierToken, ex);
+      exception = ex;
       omClientResponse = new OMGetDelegationTokenResponse(null, -1L,
           createErrorOMResponse(omResponse, ex));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
     }
+
+    auditLog(auditLogger,
+        buildAuditMessage(OMAction.GET_DELEGATION_TOKEN, auditMap, exception,
+            getOmRequest().getUserInfo()));
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Updated delegation token in-memory map: {}",

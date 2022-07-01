@@ -317,7 +317,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
       ContainerInfo c = mock(ContainerInfo.class);
       when(c.getContainerID()).thenReturn((long)i);
       when(c.getReplicationConfig())
-          .thenReturn(new RatisReplicationConfig(
+          .thenReturn(RatisReplicationConfig.getInstance(
               HddsProtos.ReplicationFactor.THREE));
       when(c.containerID()).thenReturn(ContainerID.valueOf(i));
       containers.add(c);
@@ -329,8 +329,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     ContainerInfo c = mock(ContainerInfo.class);
     when(c.getContainerID()).thenReturn((long)containerID);
     when(c.getReplicationConfig())
-        .thenReturn(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE));
+        .thenReturn(RatisReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.THREE));
     when(c.containerID()).thenReturn(ContainerID.valueOf(containerID));
     when(c.getState()).thenReturn(HddsProtos.LifeCycleState.DELETED);
     return c;
@@ -370,7 +370,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     }
 
     private boolean isDnPresent(List<DatanodeDetails> dns) {
-      for(DatanodeDetails dn : dns) {
+      for (DatanodeDetails dn : dns) {
         if (misRepWhenDnPresent != null
             && dn.getUuid().equals(misRepWhenDnPresent)) {
           return true;

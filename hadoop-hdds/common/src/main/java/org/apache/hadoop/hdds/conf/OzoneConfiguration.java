@@ -283,20 +283,21 @@ public class OzoneConfiguration extends Configuration
   }
 
   @Override
-  public Map<String, String> getPropsWithPrefix(String confPrefix) {
+  public Map<String, String> getPropsMatchPrefixAndTrimPrefix(
+      String keyPrefix) {
     Properties props = getProps();
     Map<String, String> configMap = new HashMap<>();
     for (String name : props.stringPropertyNames()) {
-      if (name.startsWith(confPrefix)) {
+      if (name.startsWith(keyPrefix)) {
         String value = get(name);
-        String keyName = name.substring(confPrefix.length());
+        String keyName = name.substring(keyPrefix.length());
         configMap.put(keyName, value);
       }
     }
     return configMap;
   }
 
-  private static void addDeprecatedKeys(){
+  private static void addDeprecatedKeys() {
     Configuration.addDeprecations(new DeprecationDelta[]{
         new DeprecationDelta("ozone.datanode.pipeline.limit",
             ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT),

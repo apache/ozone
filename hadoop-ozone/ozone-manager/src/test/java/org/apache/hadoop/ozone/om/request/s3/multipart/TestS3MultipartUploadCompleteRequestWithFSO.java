@@ -20,12 +20,11 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
@@ -54,7 +53,7 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
   @Override
   protected void addVolumeAndBucket(String volumeName, String bucketName)
       throws Exception {
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
@@ -71,7 +70,7 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
     long objectId = parentID + 1;
 
     OmKeyInfo omKeyInfoFSO =
-            TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
                     Time.now());
@@ -79,7 +78,7 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
     // add key to openFileTable
     String fileName = OzoneFSUtils.getFileName(keyName);
     omKeyInfoFSO.setKeyName(fileName);
-    TestOMRequestUtils.addFileToKeyTable(true, false,
+    OMRequestTestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfoFSO, clientID, omKeyInfoFSO.getObjectID(),
             omMetadataManager);
   }
@@ -92,21 +91,22 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
             bucketName, keyName, 0);
 
     Assert.assertNotNull("key not found in DB!", keyStatus);
-
-    return omMetadataManager.getMultipartKey(keyStatus.getKeyInfo()
-                    .getParentObjectID(), keyStatus.getTrimmedName(),
-            multipartUploadID);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getMultipartKey(volumeId, bucketId,
+            keyStatus.getKeyInfo().getParentObjectID(),
+            keyStatus.getTrimmedName(), multipartUploadID);
   }
 
   private long getParentID(String volumeName, String bucketName,
                            String keyName) throws IOException {
     Path keyPath = Paths.get(keyName);
     Iterator<Path> elements = keyPath.iterator();
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-            omMetadataManager.getBucketTable().get(bucketKey);
-
-    return OMFileRequest.getParentID(omBucketInfo.getObjectID(),
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return OMFileRequest.getParentID(volumeId, bucketId,
             elements, keyName, omMetadataManager);
   }
 
@@ -115,7 +115,11 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
                                  String keyName) throws IOException {
     long parentID = getParentID(volumeName, bucketName, keyName);
     String fileName = OzoneFSUtils.getFileName(keyName);
-    return omMetadataManager.getOzonePathKey(parentID, fileName);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getOzonePathKey(volumeId, bucketId,
+            parentID, fileName);
   }
 
   @Override
@@ -139,5 +143,8 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
 }
-

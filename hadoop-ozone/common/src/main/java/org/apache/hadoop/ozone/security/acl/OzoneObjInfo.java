@@ -111,7 +111,7 @@ public final class OzoneObjInfo extends OzoneObj {
         .setStoreType(StoreType.valueOf(proto.getStoreType().name()));
     String[] tokens = StringUtils.split(proto.getPath(),
         OZONE_URI_DELIMITER, 3);
-    if(tokens == null) {
+    if (tokens == null) {
       throw new IllegalArgumentException("Unexpected path:" + proto.getPath());
     }
     // Set volume name.

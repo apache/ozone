@@ -23,6 +23,10 @@
   <modelVersion>4.0.0</modelVersion>
   <artifactId>ozone-reconcodegen</artifactId>
   <name>Apache Ozone Recon CodeGen</name>
+  <properties>
+    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.apache.ozone</groupId>

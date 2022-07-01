@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -48,7 +48,7 @@ public class TestOMKeysRenameRequest extends TestOMKeyRequest {
     OMRequest modifiedOmRequest = createRenameKeyRequest(false);
 
     OMKeysRenameRequest omKeysRenameRequest =
-        new OMKeysRenameRequest(modifiedOmRequest);
+        new OMKeysRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeysRenameResponse =
         omKeysRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -78,7 +78,7 @@ public class TestOMKeysRenameRequest extends TestOMKeyRequest {
     OMRequest modifiedOmRequest = createRenameKeyRequest(true);
 
     OMKeysRenameRequest omKeysRenameRequest =
-        new OMKeysRenameRequest(modifiedOmRequest);
+        new OMKeysRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeysRenameResponse =
         omKeysRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -116,7 +116,7 @@ public class TestOMKeysRenameRequest extends TestOMKeyRequest {
   private OMRequest createRenameKeyRequest(Boolean isIllegal) throws Exception {
 
     // Add volume, bucket and key entries to OM DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     List<RenameKeysMap> renameKeyList  = new ArrayList<>();
@@ -124,7 +124,7 @@ public class TestOMKeysRenameRequest extends TestOMKeyRequest {
     for (int i = 0; i < count; i++) {
       String key = parentDir.concat("/key" + i);
       String toKey = parentDir.concat("/newKey" + i);
-      TestOMRequestUtils.addKeyToTableCache(volumeName, bucketName,
+      OMRequestTestUtils.addKeyToTableCache(volumeName, bucketName,
           parentDir.concat("/key" + i), HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.THREE, omMetadataManager);
 

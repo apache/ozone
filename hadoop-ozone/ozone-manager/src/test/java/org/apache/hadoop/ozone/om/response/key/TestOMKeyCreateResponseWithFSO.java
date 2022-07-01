@@ -21,12 +21,13 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 
+import java.io.IOException;
 import java.util.ArrayList;
 
 /**
@@ -36,9 +37,12 @@ public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
 
   @NotNull
   @Override
-  protected String getOpenKeyName() {
+  protected String getOpenKeyName() throws IOException {
     Assert.assertNotNull(omBucketInfo);
-    return omMetadataManager.getOpenFileName(
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getOpenFileName(volumeId, bucketId,
             omBucketInfo.getObjectID(), keyName, clientID);
   }
 
@@ -46,7 +50,7 @@ public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
   @Override
   protected OmKeyInfo getOmKeyInfo() {
     Assert.assertNotNull(omBucketInfo);
-    return TestOMRequestUtils.createOmKeyInfo(volumeName,
+    return OMRequestTestUtils.createOmKeyInfo(volumeName,
             omBucketInfo.getBucketName(), keyName, replicationType,
             replicationFactor,
             omBucketInfo.getObjectID() + 1,
@@ -56,10 +60,10 @@ public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
   @NotNull
   @Override
   protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
-      OmBucketInfo bucketInfo, OMResponse response) {
+      OmBucketInfo bucketInfo, OMResponse response) throws IOException {
 
     return new OMKeyCreateResponseWithFSO(response, keyInfo, new ArrayList<>(),
-        clientID, bucketInfo);
+        clientID, bucketInfo, getVolumeId());
   }
 
   @Override

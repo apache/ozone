@@ -16,7 +16,7 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
-import static org.apache.hadoop.hdds.scm.TestUtils.getContainer;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
@@ -52,9 +52,9 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 /**
@@ -72,7 +72,7 @@ public class TestUnknownContainerReport {
   private DBStore dbStore;
   private SCMHAManager scmhaManager;
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     final OzoneConfiguration conf = SCMTestUtils.getConf();
     this.nodeManager = new MockNodeManager(true, 10);
@@ -82,7 +82,7 @@ public class TestUnknownContainerReport {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
-    scmhaManager = MockSCMHAManager.getInstance(true);
+    scmhaManager = SCMHAManagerStub.getInstance(true);
     pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
     containerStateManager = ContainerStateManagerImpl.newBuilder()
@@ -98,7 +98,7 @@ public class TestUnknownContainerReport {
         .thenThrow(new ContainerNotFoundException());
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     containerStateManager.close();
     if (dbStore != null) {

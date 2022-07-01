@@ -88,7 +88,7 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
 
       // check Acl
       if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+        checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
             volume, bucket, key);
       }
@@ -112,7 +112,8 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       if (getOmRequest().getAddAclRequest().hasObj() && operationResult) {
         modificationTime = getOmRequest().getAddAclRequest()
             .getModificationTime();
-      } else if (getOmRequest().getSetAclRequest().hasObj() && operationResult){
+      } else if (getOmRequest().getSetAclRequest().hasObj()
+          && operationResult) {
         modificationTime = getOmRequest().getSetAclRequest()
             .getModificationTime();
       } else if (getOmRequest().getRemoveAclRequest().hasObj()

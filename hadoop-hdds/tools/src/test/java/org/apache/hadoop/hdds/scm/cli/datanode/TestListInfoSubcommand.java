@@ -19,9 +19,9 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -34,12 +34,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.mockito.Mockito;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.any;
 
 /**
- * Unit tests to validate the the TestListInfoSubCommand class includes the
+ * Unit tests to validate the TestListInfoSubCommand class includes the
  * correct output when executed against a mock client.
  */
 public class TestListInfoSubcommand {
@@ -51,14 +51,14 @@ public class TestListInfoSubcommand {
   private final PrintStream originalErr = System.err;
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
-  @Before
+  @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     cmd = new ListInfoSubcommand();
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     System.setOut(originalOut);
     System.setErr(originalErr);
@@ -90,7 +90,7 @@ public class TestListInfoSubcommand {
     assertTrue(m.find());
     for (HddsProtos.NodeState state : HddsProtos.NodeState.values()) {
       p = Pattern.compile(
-          "^Health State:\\s+"+state+"$", Pattern.MULTILINE);
+          "^Health State:\\s+" + state + "$", Pattern.MULTILINE);
       m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
     }
@@ -106,11 +106,11 @@ public class TestListInfoSubcommand {
   private List<HddsProtos.Node> getNodeDetails() {
     List<HddsProtos.Node> nodes = new ArrayList<>();
 
-    for (int i=0; i<4; i++) {
+    for (int i = 0; i < 4; i++) {
       HddsProtos.DatanodeDetailsProto.Builder dnd =
           HddsProtos.DatanodeDetailsProto.newBuilder();
       dnd.setHostName("host" + i);
-      dnd.setIpAddress("1.2.3." + i+1);
+      dnd.setIpAddress("1.2.3." + i + 1);
       dnd.setNetworkLocation("/default");
       dnd.setNetworkName("host" + i);
       dnd.addPorts(HddsProtos.Port.newBuilder()

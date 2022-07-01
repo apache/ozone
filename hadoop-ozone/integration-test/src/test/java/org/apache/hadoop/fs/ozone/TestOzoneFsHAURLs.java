@@ -188,7 +188,7 @@ public class TestOzoneFsHAURLs {
    */
   private String getHostFromAddress(String addr) {
     Optional<String> hostOptional = getHostName(addr);
-    assert(hostOptional.isPresent());
+    assert (hostOptional.isPresent());
     return hostOptional.get();
   }
 
@@ -199,7 +199,7 @@ public class TestOzoneFsHAURLs {
    */
   private int getPortFromAddress(String addr) {
     OptionalInt portOptional = getHostPort(addr);
-    assert(portOptional.isPresent());
+    assert (portOptional.isPresent());
     return portOptional.getAsInt();
   }
 

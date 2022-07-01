@@ -45,3 +45,4 @@ import:
     destination: pv-test
 transformations:
   - type: Namespace
+  - type: kustomize

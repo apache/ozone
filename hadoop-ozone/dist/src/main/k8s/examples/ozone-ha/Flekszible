@@ -26,5 +26,8 @@ import:
     transformations:
     - type: Image
       image: "@docker.image@"
+    - type: kustomize
 transformations:
   - type: Namespace
+  - type: kustomize
+

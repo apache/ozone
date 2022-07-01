@@ -26,9 +26,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_COMPLETE_FINALIZATION;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_POST_FINALIZE_UPGRADE;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_PRE_FINALIZE_UPGRADE;
@@ -67,7 +65,9 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -78,6 +78,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints;
@@ -85,31 +86,33 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.After;
-import org.junit.AfterClass;
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.apache.ozone.test.tag.Slow;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Test SCM and DataNode Upgrade sequence.
  */
+@Timeout(11000)
+@Flaky({"HDDS-6028", "HDDS-6049"})
+@Slow
 public class TestHDDSUpgrade {
 
   /**
    * Set a timeout for each test.
    */
-  @Rule
-  public Timeout timeout = new Timeout(11000000);
   private static final Logger LOG =
       LoggerFactory.getLogger(TestHDDSUpgrade.class);
   private static final int NUM_DATA_NODES = 3;
+  private static final int NUM_SCMS = 3;
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -119,6 +122,9 @@ public class TestHDDSUpgrade {
   private final int numContainersCreated = 1;
   private HDDSLayoutVersionManager scmVersionManager;
   private AtomicBoolean testPassed = new AtomicBoolean(true);
+  private static
+      InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
+      scmFinalizationExecutor;
 
   private static final ReplicationConfig RATIS_THREE =
       ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
@@ -131,32 +137,38 @@ public class TestHDDSUpgrade {
    *
    * @throws IOException
    */
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     init();
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     shutdown();
   }
 
-  @BeforeClass
+  @BeforeAll
   public static void initClass() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1000,
         TimeUnit.MILLISECONDS);
     conf.set(OZONE_DATANODE_PIPELINE_LIMIT, "1");
-    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, false);
+
+    scmFinalizationExecutor = new InjectedUpgradeFinalizationExecutor<>();
+    SCMConfigurator scmConfigurator = new SCMConfigurator();
+    scmConfigurator.setUpgradeFinalizationExecutor(scmFinalizationExecutor);
 
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(NUM_DATA_NODES)
+        .setNumOfStorageContainerManagers(NUM_SCMS)
+        .setSCMConfigurator(scmConfigurator)
         // allow only one FACTOR THREE pipeline.
         .setTotalPipelineNumLimit(NUM_DATA_NODES + 1)
         .setHbInterval(500)
         .setHbProcessorInterval(500)
-        .setScmLayoutVersion(INITIAL_VERSION.layoutVersion())
-        .setDnLayoutVersion(INITIAL_VERSION.layoutVersion());
+        .setOmLayoutVersion(OMLayoutFeature.INITIAL_VERSION.layoutVersion())
+        .setScmLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
+        .setDnLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
 
     // Setting the provider to a max of 100 clusters. Some of the tests here
     // use multiple clusters, so its hard to know exactly how many will be
@@ -165,7 +177,7 @@ public class TestHDDSUpgrade {
     clusterProvider = new MiniOzoneClusterProvider(conf, builder, 100);
   }
 
-  @AfterClass
+  @AfterAll
   public static void afterClass() throws InterruptedException {
     clusterProvider.shutdown();
   }
@@ -189,7 +201,7 @@ public class TestHDDSUpgrade {
    * Some tests repeatedly modify the cluster. Helper function to reload the
    * latest SCM state.
    */
-  private void loadSCMState(){
+  private void loadSCMState() {
     scm = cluster.getStorageContainerManager();
     scmContainerManager = scm.getContainerManager();
     scmPipelineManager = scm.getPipelineManager();
@@ -219,7 +231,7 @@ public class TestHDDSUpgrade {
    * Helper function to test Pre-Upgrade conditions on the SCM
    */
   private void testPreUpgradeConditionsSCM() {
-    Assert.assertEquals(INITIAL_VERSION.layoutVersion(),
+    Assert.assertEquals(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(),
         scmVersionManager.getMetadataLayoutVersion());
     for (ContainerInfo ci : scmContainerManager.getContainers()) {
       Assert.assertEquals(HddsProtos.LifeCycleState.OPEN, ci.getState());
@@ -440,12 +452,15 @@ public class TestHDDSUpgrade {
             .collect(Collectors.toSet());
 
     // Trigger Finalization on the SCM
-    StatusAndMessages status = scm.finalizeUpgrade("xyz");
+    StatusAndMessages status = scm.getFinalizationManager().finalizeUpgrade(
+        "xyz");
     Assert.assertEquals(STARTING_FINALIZATION, status.status());
 
     // Wait for the Finalization to complete on the SCM.
     while (status.status() != FINALIZATION_DONE) {
-      status = scm.queryUpgradeFinalizationProgress("xyz", false, false);
+      status = scm.getFinalizationManager()
+          .queryUpgradeFinalizationProgress("xyz",
+          false, false);
     }
 
     Set<PipelineID> postUpgradeOpenPipelines =
@@ -503,7 +518,7 @@ public class TestHDDSUpgrade {
       IOException {
     // For some tests this could get called in a different thread context.
     // We need to guard concurrent updates to the cluster.
-    synchronized(cluster) {
+    synchronized (cluster) {
       cluster.restartStorageContainerManager(true);
       loadSCMState();
     }
@@ -514,7 +529,7 @@ public class TestHDDSUpgrade {
       public void run() {
         try {
           loadSCMState();
-          scm.finalizeUpgrade("xyz");
+          scm.getFinalizationManager().finalizeUpgrade("xyz");
         } catch (IOException e) {
           e.printStackTrace();
           testPassed.set(false);
@@ -657,15 +672,9 @@ public class TestHDDSUpgrade {
   public void testScmFailuresBeforeScmPreFinalizeUpgrade()
       throws Exception {
     testPassed.set(true);
-    InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
-        new InjectedUpgradeFinalizationExecutor();
-    ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
-        .setFinalizationExecutor(scmFinalizationExecutor);
     scmFinalizationExecutor.configureTestInjectionFunction(
         BEFORE_PRE_FINALIZE_UPGRADE,
-        () -> {
-          return this.injectSCMFailureDuringSCMUpgrade();
-        });
+        this::injectSCMFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
@@ -682,15 +691,9 @@ public class TestHDDSUpgrade {
   public void testScmFailuresAfterScmPreFinalizeUpgrade()
       throws Exception {
     testPassed.set(true);
-    InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
-        new InjectedUpgradeFinalizationExecutor();
-    ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
-        .setFinalizationExecutor(scmFinalizationExecutor);
     scmFinalizationExecutor.configureTestInjectionFunction(
         AFTER_PRE_FINALIZE_UPGRADE,
-        () -> {
-          return this.injectSCMFailureDuringSCMUpgrade();
-        });
+        this::injectSCMFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
@@ -707,15 +710,9 @@ public class TestHDDSUpgrade {
   public void testScmFailuresAfterScmCompleteFinalization()
       throws Exception {
     testPassed.set(true);
-    InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
-        new InjectedUpgradeFinalizationExecutor();
-    ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
-        .setFinalizationExecutor(scmFinalizationExecutor);
     scmFinalizationExecutor.configureTestInjectionFunction(
         AFTER_COMPLETE_FINALIZATION,
-        () -> {
-          return this.injectSCMFailureDuringSCMUpgrade();
-        });
+        () -> this.injectSCMFailureDuringSCMUpgrade());
     testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
@@ -732,15 +729,9 @@ public class TestHDDSUpgrade {
   public void testScmFailuresAfterScmPostFinalizeUpgrade()
       throws Exception {
     testPassed.set(true);
-    InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
-        new InjectedUpgradeFinalizationExecutor();
-    ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
-        .setFinalizationExecutor(scmFinalizationExecutor);
     scmFinalizationExecutor.configureTestInjectionFunction(
         AFTER_POST_FINALIZE_UPGRADE,
-        () -> {
-          return this.injectSCMFailureDuringSCMUpgrade();
-        });
+        () -> this.injectSCMFailureDuringSCMUpgrade());
     testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
@@ -757,15 +748,9 @@ public class TestHDDSUpgrade {
   public void testAllDataNodeFailuresBeforeScmPreFinalizeUpgrade()
       throws Exception {
     testPassed.set(true);
-    InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
-        new InjectedUpgradeFinalizationExecutor();
-    ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
-        .setFinalizationExecutor(scmFinalizationExecutor);
     scmFinalizationExecutor.configureTestInjectionFunction(
         BEFORE_PRE_FINALIZE_UPGRADE,
-        () -> {
-          return injectDataNodeFailureDuringSCMUpgrade();
-        });
+        this::injectDataNodeFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
@@ -782,15 +767,9 @@ public class TestHDDSUpgrade {
   public void testAllDataNodeFailuresAfterScmPreFinalizeUpgrade()
       throws Exception {
     testPassed.set(true);
-    InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
-        new InjectedUpgradeFinalizationExecutor();
-    ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
-        .setFinalizationExecutor(scmFinalizationExecutor);
     scmFinalizationExecutor.configureTestInjectionFunction(
         AFTER_PRE_FINALIZE_UPGRADE,
-        () -> {
-          return injectDataNodeFailureDuringSCMUpgrade();
-        });
+        this::injectDataNodeFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
@@ -807,15 +786,9 @@ public class TestHDDSUpgrade {
   public void testAllDataNodeFailuresAfterScmCompleteFinalization()
       throws Exception {
     testPassed.set(true);
-    InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
-        new InjectedUpgradeFinalizationExecutor();
-    ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
-        .setFinalizationExecutor(scmFinalizationExecutor);
     scmFinalizationExecutor.configureTestInjectionFunction(
         AFTER_COMPLETE_FINALIZATION,
-        () -> {
-          return injectDataNodeFailureDuringSCMUpgrade();
-        });
+        this::injectDataNodeFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
@@ -832,15 +805,9 @@ public class TestHDDSUpgrade {
   public void testAllDataNodeFailuresAfterScmPostFinalizeUpgrade()
       throws Exception {
     testPassed.set(true);
-    InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
-        new InjectedUpgradeFinalizationExecutor();
-    ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
-        .setFinalizationExecutor(scmFinalizationExecutor);
     scmFinalizationExecutor.configureTestInjectionFunction(
         AFTER_POST_FINALIZE_UPGRADE,
-        () -> {
-          return injectDataNodeFailureDuringSCMUpgrade();
-        });
+        this::injectDataNodeFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
     Assert.assertTrue(testPassed.get());
   }
@@ -854,7 +821,6 @@ public class TestHDDSUpgrade {
    * Upgrade execution points as defined in
    * UpgradeFinalizer:UpgradeTestInjectionPoints.
    */
-  @Ignore
   @Test
   public void testDataNodeFailuresDuringDataNodeUpgrade()
       throws Exception {
@@ -899,7 +865,6 @@ public class TestHDDSUpgrade {
    * through upgrade-finalization. This test covers all the combinations of
    * SCM-Upgrade-execution points and DataNode-Upgrade-execution points.
    */
-  @Ignore
   @Test
   public void testAllPossibleDataNodeFailuresAndSCMFailures()
       throws Exception {
@@ -908,15 +873,11 @@ public class TestHDDSUpgrade {
     // execution.
     for (UpgradeTestInjectionPoints scmInjectionPoint :
         UpgradeTestInjectionPoints.values()) {
-      InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
-          new InjectedUpgradeFinalizationExecutor();
       scmFinalizationExecutor.configureTestInjectionFunction(
           scmInjectionPoint,
           () -> {
             return this.injectSCMFailureDuringSCMUpgrade();
           });
-      ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
-          .setFinalizationExecutor(scmFinalizationExecutor);
 
       for (UpgradeTestInjectionPoints datanodeInjectionPoint :
           UpgradeTestInjectionPoints.values()) {
@@ -959,7 +920,6 @@ public class TestHDDSUpgrade {
    * through upgrade. This test covers all the combinations of
    * SCM-Upgrade-execution points.
    */
-  @Ignore
   @Test
   public void testDataNodeAndSCMFailuresTogetherDuringSCMUpgrade()
       throws Exception {
@@ -968,15 +928,15 @@ public class TestHDDSUpgrade {
       testPassed.set(true);
       Thread helpingFailureInjectionThread =
           injectSCMAndDataNodeFailureTogetherAtTheSameTime();
-      InjectedUpgradeFinalizationExecutor scmFinalizationExecutor =
+      InjectedUpgradeFinalizationExecutor finalizationExecutor =
           new InjectedUpgradeFinalizationExecutor();
-      scmFinalizationExecutor.configureTestInjectionFunction(
+      finalizationExecutor.configureTestInjectionFunction(
           injectionPoint, () -> {
             helpingFailureInjectionThread.start();
             return true;
           });
-      ((BasicUpgradeFinalizer)scm.getUpgradeFinalizer())
-          .setFinalizationExecutor(scmFinalizationExecutor);
+      scm.getFinalizationManager().getUpgradeFinalizer()
+          .setFinalizationExecutor(finalizationExecutor);
       testFinalizationWithFailureInjectionHelper(helpingFailureInjectionThread);
       Assert.assertTrue(testPassed.get());
       synchronized (cluster) {
@@ -998,7 +958,6 @@ public class TestHDDSUpgrade {
    * through upgrade. This test covers all the combinations of
    * DataNode-Upgrade-execution points.
    */
-  @Ignore
   @Test
   public void testDataNodeAndSCMFailuresTogetherDuringDataNodeUpgrade()
       throws Exception {
@@ -1041,7 +1000,8 @@ public class TestHDDSUpgrade {
     testPreUpgradeConditionsDataNodes();
 
     // Trigger Finalization on the SCM
-    StatusAndMessages status = scm.finalizeUpgrade("xyz");
+    StatusAndMessages status =
+        scm.getFinalizationManager().finalizeUpgrade("xyz");
     Assert.assertEquals(STARTING_FINALIZATION, status.status());
 
     // Make sure that any outstanding thread created by failure injection
@@ -1056,9 +1016,11 @@ public class TestHDDSUpgrade {
     while ((status.status() != FINALIZATION_DONE) &&
         (status.status() != ALREADY_FINALIZED)) {
       loadSCMState();
-      status = scm.queryUpgradeFinalizationProgress("xyz", true, false);
+      status = scm.getFinalizationManager().queryUpgradeFinalizationProgress(
+          "xyz",
+          true, false);
       if (status.status() == FINALIZATION_REQUIRED) {
-        status = scm.finalizeUpgrade("xyz");
+        status = scm.getFinalizationManager().finalizeUpgrade("xyz");
       }
     }
 
@@ -1090,7 +1052,7 @@ public class TestHDDSUpgrade {
     // Verify that new pipeline can be created with upgraded datanodes.
     try {
       testPostUpgradePipelineCreation();
-    } catch(SCMException e) {
+    } catch (SCMException e) {
       // If pipeline creation fails, make sure that there is a valid reason
       // for this i.e. all datanodes are already part of some pipeline.
       for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {

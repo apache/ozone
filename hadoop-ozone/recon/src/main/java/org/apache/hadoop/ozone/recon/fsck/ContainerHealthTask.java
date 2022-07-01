@@ -144,7 +144,7 @@ public class ContainerHealthTask extends ReconScmTask {
              containerHealthSchemaManager.getAllUnhealthyRecordsCursor()) {
       ContainerHealthStatus currentContainer = null;
       Set<String> existingRecords = new HashSet<>();
-      while(cursor.hasNext()) {
+      while (cursor.hasNext()) {
         recordCount++;
         UnhealthyContainersRecord rec = cursor.fetchNext();
         try {
@@ -259,7 +259,7 @@ public class ContainerHealthTask extends ReconScmTask {
     public static boolean retainOrUpdateRecord(
         ContainerHealthStatus container, UnhealthyContainersRecord rec) {
       boolean returnValue = false;
-      switch(UnHealthyContainerStates.valueOf(rec.getContainerState())) {
+      switch (UnHealthyContainerStates.valueOf(rec.getContainerState())) {
       case MISSING:
         returnValue = container.isMissing();
         break;

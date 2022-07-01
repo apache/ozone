@@ -191,7 +191,7 @@ public class TestOzoneRpcClientWithKeyLatestVersion {
   }
 
   private void testListStatus(String volumeName, String bucketName,
-      String keyName, boolean versioning) throws Exception{
+      String keyName, boolean versioning) throws Exception {
     OzoneVolume volume = objectStore.getVolume(volumeName);
     OzoneBucket ozoneBucket = volume.getBucket(bucketName);
     List<OzoneFileStatus> ozoneFileStatusList = ozoneBucket.listStatus(keyName,

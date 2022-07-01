@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -177,7 +178,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   }
 
   private void constructColumnFamilyMap(DBDefinition dbDefinition) {
-    if (dbDefinition == null){
+    if (dbDefinition == null) {
       System.out.println("Incorrect Db Path");
       return;
     }
@@ -216,8 +217,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);
     this.constructColumnFamilyMap(DBDefinitionFactory.
-            getDefinition(Paths.get(dbPath)));
-    if (this.columnFamilyMap !=null) {
+            getDefinition(Paths.get(dbPath), new OzoneConfiguration()));
+    if (this.columnFamilyMap != null) {
       if (!this.columnFamilyMap.containsKey(tableName)) {
         System.out.print("Table with name:" + tableName + " does not exist");
       } else {
@@ -239,8 +240,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   }
 
   private String removeTrailingSlashIfNeeded(String dbPath) {
-    if(dbPath.endsWith(OzoneConsts.OZONE_URI_DELIMITER)){
-      dbPath = dbPath.substring(0, dbPath.length()-1);
+    if (dbPath.endsWith(OzoneConsts.OZONE_URI_DELIMITER)) {
+      dbPath = dbPath.substring(0, dbPath.length() - 1);
     }
     return dbPath;
   }
