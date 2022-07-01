@@ -1060,7 +1060,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     final Tenant tenantObj = new OzoneTenant(tenantState.getTenantId());
 
     tenantObj.addTenantAccessPolicy(tenantState.getBucketNamespacePolicyName());
-    tenantObj.addTenantAccessPolicy(tenantState.getBucketNamespaceName());
+    tenantObj.addTenantAccessPolicy(tenantState.getBucketPolicyName());
 
     tenantObj.addTenantAccessRole(tenantState.getUserRoleName());
     tenantObj.addTenantAccessRole(tenantState.getAdminRoleName());
