@@ -36,7 +36,7 @@ In the [compose](../compose) folder there are additional test scripts to make it
 Go to the compose directory and execute the test.sh directly from there:
 
 ```
-cd ../compose/ozone
+cd compose/ozone
 ./test.sh
 ```
 
@@ -45,7 +45,7 @@ The results will be saved to the `compose/ozone/results`
 ## Run all the tests
 
 ```
-cd ../compose
+cd compose
 ./test-all.sh
 ```
 
@@ -56,7 +56,7 @@ The results will be combined to the `compose/results` folder.
 Start the compose environment and execute test:
 
 ```
-cd ../compose/ozone
+cd compose/ozone
 docker-compose up -d
 #wait....
 ../test-single.sh scm basic/basic.robot
