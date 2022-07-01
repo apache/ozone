@@ -148,11 +148,6 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     return maintenanceIndexes.size();
   }
 
-  @Override
-  public boolean isMissing() {
-    return unRecoverable();
-  }
-
   /**
    * Get a set containing all decommissioning indexes, or an empty set if none
    * are decommissioning. Note it is possible for an index to be
@@ -205,7 +200,8 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
    * Ie, less than EC Datanum containers are present.
    * @return True if the container cannot be recovered, false otherwise.
    */
-  public boolean unRecoverable() {
+  @Override
+  public boolean isUnrecoverable() {
     Set<Integer> distinct = new HashSet<>();
     distinct.addAll(healthyIndexes.keySet());
     distinct.addAll(decommissionIndexes.keySet());

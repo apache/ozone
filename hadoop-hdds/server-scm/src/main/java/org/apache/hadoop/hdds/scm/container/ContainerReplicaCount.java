@@ -64,5 +64,5 @@ public interface ContainerReplicaCount {
    *
    * @return true if there are insufficient replicas, false otherwise.
    */
-  boolean isMissing();
+  boolean isUnrecoverable();
 }

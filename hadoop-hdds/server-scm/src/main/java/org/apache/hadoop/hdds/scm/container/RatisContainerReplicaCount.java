@@ -266,7 +266,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    * @return true if there are no replicas, false otherwise.
    */
   @Override
-  public boolean isMissing() {
+  public boolean isUnrecoverable() {
     return getReplicas().isEmpty();
   }
 }

@@ -525,7 +525,7 @@ public class LegacyReplicationManager {
           if (!sufficientlyReplicated) {
             report.incrementAndSample(
                 HealthState.UNDER_REPLICATED, container.containerID());
-            if (replicaSet.isMissing()) {
+            if (replicaSet.isUnrecoverable()) {
               report.incrementAndSample(HealthState.MISSING,
                   container.containerID());
             }

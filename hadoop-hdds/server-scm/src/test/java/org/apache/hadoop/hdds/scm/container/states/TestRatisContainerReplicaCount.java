@@ -435,7 +435,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    assertTrue(rcnt.isMissing());
+    assertTrue(rcnt.isUnrecoverable());
     assertFalse(rcnt.isSufficientlyReplicated());
   }
 
