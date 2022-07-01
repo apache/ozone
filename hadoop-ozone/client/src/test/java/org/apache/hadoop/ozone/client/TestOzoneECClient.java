@@ -560,6 +560,9 @@ public class TestOzoneECClient {
         OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT);
     int dataBlks = 10;
     int parityBlks = 4;
+    MultiNodePipelineBlockAllocator blkAllocator =
+        new MultiNodePipelineBlockAllocator(conf, dataBlks + parityBlks, 14);
+    createNewClient(conf, blkAllocator);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);

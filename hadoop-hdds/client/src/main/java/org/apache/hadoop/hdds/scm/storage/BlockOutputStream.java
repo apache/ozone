@@ -140,16 +140,18 @@ public class BlockOutputStream extends OutputStream {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
     this.blockID = new AtomicReference<>(blockID);
+    replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
-    this.containerBlockData =
-        BlockData.newBuilder().setBlockID(blockID.getDatanodeBlockIDProtobuf())
-            .addMetadata(keyValue);
+    this.containerBlockData = BlockData.newBuilder().setBlockID(
+        ContainerProtos.DatanodeBlockID.newBuilder()
+            .setContainerID(blockID.getContainerID())
+            .setLocalID(blockID.getLocalID())
+            .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId())
+            .setReplicaIndex(replicationIndex).build()).addMetadata(keyValue);
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
     this.bufferPool = bufferPool;
     this.token = token;
-
-    replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
 
     //number of buffers used before doing a flush
     refreshCurrentBuffer();
@@ -615,6 +617,7 @@ public class BlockOutputStream extends OutputStream {
     if (ioe == null) {
       IOException exception =  new IOException(EXCEPTION_MSG + e.toString(), e);
       ioException.compareAndSet(null, exception);
+      LOG.debug("Exception: for block ID: " + blockID,  e);
     } else {
       LOG.debug("Previous request had already failed with {} " +
               "so subsequent request also encounters " +

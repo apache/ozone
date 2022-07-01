@@ -261,7 +261,7 @@ public class KeyValueHandler extends Handler {
    * ContainerSet and sends an ICR to the SCM.
    */
   ContainerCommandResponseProto handleCreateContainer(
-      ContainerCommandRequestProto request, KeyValueContainer kvContainer){
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
     if (!request.hasCreateContainer()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Malformed Create Container request. trace ID: {}",
@@ -271,11 +271,7 @@ public class KeyValueHandler extends Handler {
     }
     // Create Container request should be passed a null container as the
     // container would be created here.
-    if (kvContainer != null) {
-      return getSuccessResponseBuilder(request)
-          .setMessage("Container already exist.").build();
-    }
-    //Preconditions.checkArgument(kvContainer == null);
+    Preconditions.checkArgument(kvContainer == null);
 
     long containerID = request.getContainerID();
 
@@ -472,7 +468,11 @@ public class KeyValueHandler extends Handler {
 
       boolean endOfBlock = false;
       if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
-        chunkManager.finishWriteChunks(kvContainer, blockData);
+        // in EC, we will be doing empty put block. So, there may not be dat
+        // a available. So, let's flush only when data size is > 0.
+        if (request.getPutBlock().getBlockData().getSize() > 0) {
+          chunkManager.finishWriteChunks(kvContainer, blockData);
+        }
         endOfBlock = true;
       }
 

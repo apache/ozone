@@ -52,6 +52,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
 
   private CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
       putBlkRspFuture = null;
+  private int replicaIndex = 0;
   /**
    * Creates a new ECBlockOutputStream.
    *
@@ -72,6 +73,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
         pipeline, bufferPool, config, token);
     // In EC stream, there will be only one node in pipeline.
     this.datanodeDetails = pipeline.getClosestNode();
+    this.replicaIndex = pipeline.getReplicaIndex(this.datanodeDetails);
   }
 
   @Override

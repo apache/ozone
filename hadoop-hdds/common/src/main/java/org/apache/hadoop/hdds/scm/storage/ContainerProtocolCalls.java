@@ -229,8 +229,8 @@ public final class ContainerProtocolCalls  {
    * @throws InterruptedException
    * @throws ExecutionException
    */
-  public static XceiverClientReply putBlockAsync(
-      XceiverClientSpi xceiverClient, BlockData containerBlockData, boolean eof,
+  public static XceiverClientReply putBlockAsync(XceiverClientSpi xceiverClient,
+      BlockData containerBlockData, boolean eof,
       Token<? extends TokenIdentifier> token)
       throws IOException, InterruptedException, ExecutionException {
     PutBlockRequestProto.Builder createBlockRequest =
@@ -456,7 +456,7 @@ public final class ContainerProtocolCalls  {
    * @param replicaIndex - index position of the container replica
    * @throws IOException
    */
-  public static void createContainerInternal(XceiverClientSpi client,
+  private static void createContainerInternal(XceiverClientSpi client,
       long containerID, String encodedToken,
       ContainerProtos.ContainerDataProto.State state, int replicaIndex)
       throws IOException {
