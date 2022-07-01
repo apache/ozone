@@ -17,7 +17,7 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -328,8 +328,13 @@ public interface OMMultiTenantManager {
   }
 
   String OZONE_TENANT_RANGER_POLICY_DESCRIPTION =
-      "Created by Ozone Manager. WARNING: "
+      "Created by Ozone. WARNING: "
           + "Changes will be lost when this tenant is deleted.";
+
+  String OZONE_TENANT_RANGER_ROLE_DESCRIPTION =
+      "Managed by Ozone. WARNING: "
+          + "Changes will be overridden. "
+          + "Use Ozone tenant CLI to manage users in this tenant role instead.";
 
   /**
    * Returns default VolumeAccess policy given tenant and role names.
@@ -350,13 +355,8 @@ public interface OMMultiTenantManager {
 //        .addKey("vol1/bucket1/key1")
         .setDescription(OZONE_TENANT_RANGER_POLICY_DESCRIPTION)
         .addLabel(OZONE_TENANT_RANGER_POLICY_LABEL)
-        .addRoleAcl(userRoleName, new ArrayList<Acl>() {
-          {
-            add(Acl.allow(READ));
-            add(Acl.allow(LIST));
-            add(Acl.allow(READ_ACL));
-          }
-        })
+        .addRoleAcl(userRoleName, Arrays.asList(
+            Acl.allow(READ), Acl.allow(LIST), Acl.allow(READ_ACL)))
         .addRoleAcl(adminRoleName, Collections.singletonList(Acl.allow(ALL)))
         .build();
 
@@ -382,7 +382,7 @@ public interface OMMultiTenantManager {
         .addLabel(OZONE_TENANT_RANGER_POLICY_LABEL)
         .addRoleAcl(userRoleName,
             Collections.singletonList(Acl.allow(CREATE)))
-        .addRoleAcl(new OzoneOwnerPrincipal().getName(),
+        .addUserAcl(new OzoneOwnerPrincipal().getName(),
             Collections.singletonList(Acl.allow(ALL)))
         .build();
 

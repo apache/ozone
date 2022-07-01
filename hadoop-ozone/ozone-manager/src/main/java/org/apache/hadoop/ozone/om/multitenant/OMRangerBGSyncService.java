@@ -62,6 +62,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGER_ROLE_DESCRIPTION;
 
 /**
  * Background Sync thread that reads Multi-Tenancy state from OM DB
@@ -465,8 +466,6 @@ public class OMRangerBGSyncService extends BackgroundService {
     }
 
     for (Policy policy : allPolicies) {
-//      JsonObject policy = policies.get(i).getAsJsonObject();
-//      JsonArray policyLabels = policy.getAsJsonArray("policyLabels");
 
       // Verify that the policy has the OzoneTenant label
       if (!policy.getLabels().contains(OZONE_TENANT_RANGER_POLICY_LABEL)) {
@@ -483,6 +482,9 @@ public class OMRangerBGSyncService extends BackgroundService {
       mtRangerPoliciesToBeDeleted.put(policy.getName(),
           String.valueOf(policy.getId()));
 
+      // We don't need to care about policy.getUserAcls() in the sync as
+      // we only uses special {OWNER} user, at least for now.
+
       // Iterate through all the roles in this policy
       policy.getRoleAcls().keySet().forEach(roleName -> {
         if (!mtRangerRoles.containsKey(roleName)) {
@@ -490,18 +492,6 @@ public class OMRangerBGSyncService extends BackgroundService {
           mtRangerRoles.put(roleName, new BGRole(roleName));
         }
       });
-
-//      final JsonArray policyItems = policy.getAsJsonArray("policyItems");
-//      for (int j = 0; j < policyItems.size(); ++j) {
-//        JsonObject policyItem = policyItems.get(j).getAsJsonObject();
-//        JsonArray roles = policyItem.getAsJsonArray("roles");
-//        for (int k = 0; k < roles.size(); ++k) {
-//          final String roleName = roles.get(k).getAsString();
-//          if (!mtRangerRoles.containsKey(roleName)) {
-//            mtRangerRoles.put(roleName, new BGRole(roleName));
-//          }
-//        }
-//      }
     }
 
   }
@@ -793,6 +783,7 @@ public class OMRangerBGSyncService extends BackgroundService {
           try {
             Role role = new Role.Builder()
                 .setName(roleName)
+                .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
                 .build();
             accessController.createRole(role);
           } catch (IOException e) {

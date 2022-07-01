@@ -322,7 +322,7 @@ public interface MultiTenantAccessController {
     private final Set<String> buckets;
     private final Set<String> keys;
     private final String description;
-    private final Map<String, Collection<Acl>> roleAcls;
+    private final Map<String, Collection<Acl>> userAcls, roleAcls;
     private final Set<String> labels;
     private final boolean isEnabled;
 
@@ -333,6 +333,7 @@ public interface MultiTenantAccessController {
       this.buckets = builder.buckets;
       this.keys = builder.keys;
       this.description = builder.description;
+      this.userAcls = builder.userAcls;
       this.roleAcls = builder.roleAcls;
       this.labels = builder.labels;
       this.isEnabled = builder.isEnabled;
@@ -366,6 +367,10 @@ public interface MultiTenantAccessController {
       return (labels);
     }
 
+    public Map<String, Collection<Acl>> getUserAcls() {
+      return userAcls;
+    }
+
     public Map<String, Collection<Acl>> getRoleAcls() {
       return roleAcls;
     }
@@ -389,6 +394,7 @@ public interface MultiTenantAccessController {
           Objects.equals(getBuckets(), policy.getBuckets()) &&
           Objects.equals(getKeys(), policy.getKeys()) &&
           Objects.equals(getDescription(), policy.getDescription()) &&
+          Objects.equals(getUserAcls(), policy.getUserAcls()) &&
           Objects.equals(getRoleAcls(), policy.getRoleAcls()) &&
           Objects.equals(getLabels(), policy.getLabels());
     }
@@ -407,7 +413,7 @@ public interface MultiTenantAccessController {
       private final Set<String> buckets;
       private final Set<String> keys;
       private String description;
-      private final Map<String, Collection<Acl>> roleAcls;
+      private final Map<String, Collection<Acl>> userAcls, roleAcls;
       private final Set<String> labels;
       private boolean isEnabled;
 
@@ -415,6 +421,7 @@ public interface MultiTenantAccessController {
         this.volumes = new HashSet<>();
         this.buckets = new HashSet<>();
         this.keys = new HashSet<>();
+        this.userAcls = new HashMap<>();
         this.roleAcls = new HashMap<>();
         this.labels = new HashSet<>();
       }
@@ -466,6 +473,11 @@ public interface MultiTenantAccessController {
 
       public Builder setDescription(String policyDescription) {
         this.description = policyDescription;
+        return this;
+      }
+
+      public Builder addUserAcl(String userName, Collection<Acl> acls) {
+        this.userAcls.put(userName, new ArrayList<>(acls));
         return this;
       }
 

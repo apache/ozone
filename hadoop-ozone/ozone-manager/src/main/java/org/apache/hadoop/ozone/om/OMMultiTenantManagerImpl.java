@@ -290,6 +290,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         // Create empty admin role first
         Role adminRole = new Role.Builder()
             .setName(adminRoleName)
+            .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
             .build();
         adminRole = accessController.createRole(adminRole);
         // Sanity check. Response role name should be equal to the one we sent.
@@ -300,6 +301,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         Role userRole = new Role.Builder()
             .setName(userRoleName)
             .addRole(adminRoleName, true)
+            .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
             .build();
         userRole = accessController.createRole(userRole);
         // Sanity check. Response role name should be equal to the one we sent.

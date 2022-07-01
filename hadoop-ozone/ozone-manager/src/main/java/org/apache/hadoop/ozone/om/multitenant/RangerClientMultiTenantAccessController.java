@@ -124,9 +124,7 @@ public class RangerClientMultiTenantAccessController implements
       passwordOrKeytab = keytabPath;
     }
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("authType = {}, username = {}", authType, usernameOrPrincipal);
-    }
+    LOG.info("authType = {}, login user = {}", authType, usernameOrPrincipal);
 
     client = new RangerClient(rangerHttpsAddress,
         authType, usernameOrPrincipal, passwordOrKeytab,
@@ -414,6 +412,23 @@ public class RangerClientMultiTenantAccessController implements
     rangerPolicy.setResources(resource);
     if (policy.getDescription().isPresent()) {
       rangerPolicy.setDescription(policy.getDescription().get());
+    }
+
+    // Add users to the policy.
+    for (Map.Entry<String, Collection<Acl>> userAcls:
+        policy.getUserAcls().entrySet()) {
+      RangerPolicy.RangerPolicyItem item = new RangerPolicy.RangerPolicyItem();
+      item.setUsers(Collections.singletonList(userAcls.getKey()));
+
+      for (Acl acl: userAcls.getValue()) {
+        RangerPolicy.RangerPolicyItemAccess access =
+            new RangerPolicy.RangerPolicyItemAccess();
+        access.setIsAllowed(acl.isAllowed());
+        access.setType(aclToString.get(acl.getAclType()));
+        item.getAccesses().add(access);
+      }
+
+      rangerPolicy.getPolicyItems().add(item);
     }
 
     // Add roles to the policy.

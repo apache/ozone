@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerRangerPlugin;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignUserAccessIdRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.shell.tenant.TenantShell;
@@ -197,8 +196,6 @@ public class TestOzoneTenantShell {
     GenericTestUtils.setLogLevel(OMTenantCreateRequest.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(
         OMTenantAssignUserAccessIdRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(
-        MultiTenantAccessAuthorizerRangerPlugin.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(AuthorizerLockImpl.LOG, Level.DEBUG);
   }
 

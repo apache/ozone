@@ -44,6 +44,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGER_ROLE_DESCRIPTION;
 
 /**
  * To test MultiTenantAccessController with Ranger Client.
@@ -110,6 +111,8 @@ public class TestMultiTenantAccessController {
         "/path/to/ozone.keytab");
 
     // TODO: Test with clear text username and password as well.
+//    conf.set(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER, "rangeruser");
+//    conf.set(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD, "passwd");
 
     // (Optional) Enable RangerClient debug log
     GenericTestUtils.setLogLevel(
@@ -351,6 +354,7 @@ public class TestMultiTenantAccessController {
         new Role.Builder()
             .setName(roleName)
             .addUsers(users)
+            .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
             .build();
 
     // create in ranger.
@@ -377,6 +381,7 @@ public class TestMultiTenantAccessController {
     final String roleName = "test-role";
     Role originalRole = new Role.Builder()
             .setName(roleName)
+            .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
             .build();
     // create in Ranger.
     controller.createRole(originalRole);
@@ -385,6 +390,7 @@ public class TestMultiTenantAccessController {
     // Create a role with the same name and check for error.
     Role sameNameRole = new Role.Builder()
             .setName(roleName)
+            .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
             .build();
     try {
       controller.createRole(sameNameRole);
@@ -403,6 +409,7 @@ public class TestMultiTenantAccessController {
     Role originalRole = new Role.Builder()
         .setName(roleName)
         .addUsers(users)
+        .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
         .build();
     // create in Ranger.
     controller.createRole(originalRole);
