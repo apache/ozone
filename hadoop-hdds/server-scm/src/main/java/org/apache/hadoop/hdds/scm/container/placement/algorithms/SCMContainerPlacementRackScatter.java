@@ -107,6 +107,8 @@ public final class SCMContainerPlacementRackScatter
     int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
     List<Node> availableNodes = networkTopology.getNodes(
         networkTopology.getMaxLevel());
+
+
     int totalNodesCount = availableNodes.size();
     if (excludedNodes != null) {
       availableNodes.removeAll(excludedNodes);

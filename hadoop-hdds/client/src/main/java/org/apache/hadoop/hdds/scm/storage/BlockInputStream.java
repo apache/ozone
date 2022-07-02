@@ -31,6 +31,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
@@ -228,9 +229,13 @@ public class BlockInputStream extends BlockExtendedInputStream {
         LOG.debug("Initializing BlockInputStream for get key to access {}",
             blockID.getContainerID());
       }
-
-      DatanodeBlockID datanodeBlockID = blockID
-          .getDatanodeBlockIDProtobuf();
+      DatanodeBlockID datanodeBlockID =
+          ContainerProtos.DatanodeBlockID.newBuilder()
+              .setContainerID(blockID.getContainerID())
+              .setLocalID(blockID.getLocalID())
+              .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId())
+              .setReplicaIndex(
+                  pipeline.getReplicaIndex(pipeline.getClosestNode())).build();
       GetBlockResponseProto response = ContainerProtocolCalls
           .getBlock(xceiverClient, datanodeBlockID, token);
 

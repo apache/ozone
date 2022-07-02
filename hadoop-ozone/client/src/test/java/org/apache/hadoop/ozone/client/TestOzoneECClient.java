@@ -384,7 +384,9 @@ public class TestOzoneECClient {
                 keyDetails.getOzoneKeyLocations().get(0).getContainerID())
                 .setLocalID(
                     keyDetails.getOzoneKeyLocations().get(0).getLocalID())
-                .setBlockCommitSequenceId(1).build());
+                .setBlockCommitSequenceId(1).setReplicaIndex(
+                blockList.getKeyLocations(0).getPipeline()
+                    .getMemberReplicaIndexes(i)).build());
 
         List<ContainerProtos.KeyValue> metadataList =
             block.getMetadataList().stream().filter(kv -> kv.getKey()
