@@ -77,10 +77,24 @@ public class ContainerHealthResult {
   public static class UnderReplicatedHealthResult
       extends ContainerHealthResult {
 
+    // For under replicated containers, the best remaining redundancy we can
+    // have is 3 for EC-10-4, 2 for EC-6-3, 1 for EC-3-2 and 2 for Ratis.
+    // A container which is under-replicated due to decommission will have one
+    // more, ie 4, 3, 2, 3 respectively. Ideally we want to sort decommission
+    // only under-replication after all other under-replicated containers.
+    // It may also make sense to allow under-replicated containers a chance to
+    // retry once before processing the decommission only under replication.
+    // Therefore we should adjust the weighted remaining redundancy of
+    // decommission only under-replicated containers to a floor of 5 so they
+    // sort after an under-replicated container with 3 remaining replicas (
+    // EC-10-4) and plus one retry.
+    private static final int DECOMMISSION_REDUNDANCY = 5;
+
     private final int remainingRedundancy;
     private final boolean dueToDecommission;
     private final boolean sufficientlyReplicatedAfterPending;
     private final boolean unrecoverable;
+    private int requeueCount = 0;
 
     UnderReplicatedHealthResult(ContainerInfo containerInfo,
         int remainingRedundancy, boolean dueToDecommission,
@@ -93,7 +107,7 @@ public class ContainerHealthResult {
     }
 
     /**
-     * How many more replicas can be lost before the the container is
+     * How many more replicas can be lost before the container is
      * unreadable. For containers which are under-replicated due to decommission
      * or maintenance only, the remaining redundancy will include those
      * decommissioning or maintenance replicas, as they are technically still
@@ -102,6 +116,41 @@ public class ContainerHealthResult {
      */
     public int getRemainingRedundancy() {
       return remainingRedundancy;
+    }
+
+    /**
+     * The weightedRedundancy, is the remaining redundancy + the requeue count.
+     * When this value is used for ordering in a priority queue it ensures the
+     * priority is reduced each time it is requeued, to prevent it from blocking
+     * other containers from being processed.
+     * Additionally, so that decommission and maintenance replicas are not
+     * ordered ahead of under-replicated replicas, a redundancy of
+     * DECOMMISSION_REDUNDANCY is used for the decommission redundancy rather
+     * than its real redundancy.
+     * @return The weightedRedundancy of this result.
+     */
+    public int getWeightedRedundancy() {
+      int result = requeueCount;
+      if (dueToDecommission) {
+        result += DECOMMISSION_REDUNDANCY;
+      } else {
+        result += remainingRedundancy;
+      }
+      return result;
+    }
+
+    /**
+     * If there is an attempt to process this under-replicated result, and it
+     * fails and has to be requeued, this method should be called to increment
+     * the requeue count to ensure the result is not placed back at the head
+     * of the queue.
+     */
+    public void incrementRequeueCount() {
+      ++requeueCount;
+    }
+
+    public int getRequeueCount() {
+      return requeueCount;
     }
 
     /**

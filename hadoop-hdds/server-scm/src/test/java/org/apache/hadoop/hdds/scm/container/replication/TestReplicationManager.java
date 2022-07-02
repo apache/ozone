@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.ozone.test.TestClock;
@@ -43,11 +45,14 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 
@@ -68,9 +73,10 @@ public class TestReplicationManager {
   private ContainerReplicaPendingOps containerReplicaPendingOps;
 
   private Map<ContainerID, Set<ContainerReplica>> containerReplicaMap;
+  private Set<ContainerInfo> containerInfoSet;
   private ReplicationConfig repConfig;
   private ReplicationManagerReport repReport;
-  private List<ContainerHealthResult.UnderReplicatedHealthResult> underRep;
+  private Queue<ContainerHealthResult.UnderReplicatedHealthResult> underRep;
   private List<ContainerHealthResult.OverReplicatedHealthResult> overRep;
 
   @Before
@@ -94,6 +100,9 @@ public class TestReplicationManager {
             return containerReplicaMap.get(cid);
           });
 
+    Mockito.when(containerManager.getContainers()).thenAnswer(
+        invocation -> new ArrayList<>(containerInfoSet));
+
     replicationManager = new ReplicationManager(
         configuration,
         containerManager,
@@ -105,10 +114,18 @@ public class TestReplicationManager {
         legacyReplicationManager,
         containerReplicaPendingOps);
     containerReplicaMap = new HashMap<>();
+    containerInfoSet = new HashSet<>();
     repConfig = new ECReplicationConfig(3, 2);
     repReport = new ReplicationManagerReport();
-    underRep = new ArrayList<>();
+    underRep = replicationManager.createUnderReplicatedQueue();
     overRep = new ArrayList<>();
+
+    // Ensure that RM will run when asked.
+    Mockito.when(scmContext.isLeaderReady()).thenReturn(true);
+    Mockito.when(scmContext.isInSafeMode()).thenReturn(false);
+    SCMServiceManager serviceManager = new SCMServiceManager();
+    serviceManager.register(replicationManager);
+    serviceManager.notifyStatusChanged();
   }
 
   @Test
@@ -245,12 +262,78 @@ public class TestReplicationManager {
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
   }
 
+  @Test
+  public void testUnderReplicationQueuePopulated() {
+    ContainerInfo decomContainer = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    addReplicas(decomContainer, Pair.of(DECOMMISSIONING, 1),
+        Pair.of(DECOMMISSIONING, 2), Pair.of(DECOMMISSIONING, 3),
+        Pair.of(DECOMMISSIONING, 4), Pair.of(DECOMMISSIONING, 5));
+
+    ContainerInfo underRep1 = createContainerInfo(repConfig, 2,
+        HddsProtos.LifeCycleState.CLOSED);
+    addReplicas(underRep1, 1, 2, 3, 4);
+    ContainerInfo underRep0 = createContainerInfo(repConfig, 3,
+        HddsProtos.LifeCycleState.CLOSED);
+    addReplicas(underRep0, 1, 2, 3);
+
+    replicationManager.processAll();
+
+    // Get the first message off the queue - it should be underRep0.
+    ContainerHealthResult.UnderReplicatedHealthResult res
+        = replicationManager.dequeueUnderReplicatedContainer();
+    Assert.assertEquals(underRep0, res.getContainerInfo());
+
+    // Now requeue it
+    replicationManager.requeueUnderReplicatedContainer(res);
+
+    // Now get the next message. It should be underRep1, as it has remaining
+    // redundancy 1 + zero retries. UnderRep0 will have remaining redundancy 0
+    // and 1 retry. They will have the same weighted redundancy so lesser
+    // retries should come first
+    res = replicationManager.dequeueUnderReplicatedContainer();
+    Assert.assertEquals(underRep1, res.getContainerInfo());
+
+    // Next message is underRep0. It starts with a weighted redundancy of 0 + 1
+    // retry. The other message on the queue is a decommission only with a
+    // weighted redundancy of 5 + 0. So lets dequeue and requeue the message 4
+    // times. Then the weighted redundancy will be equal and the decommission
+    // one will be next due to having less retries.
+    for (int i = 0; i < 4; i++) {
+      res = replicationManager.dequeueUnderReplicatedContainer();
+      Assert.assertEquals(underRep0, res.getContainerInfo());
+      replicationManager.requeueUnderReplicatedContainer(res);
+    }
+    res = replicationManager.dequeueUnderReplicatedContainer();
+    Assert.assertEquals(decomContainer, res.getContainerInfo());
+
+    res = replicationManager.dequeueUnderReplicatedContainer();
+    Assert.assertEquals(underRep0, res.getContainerInfo());
+
+    res = replicationManager.dequeueUnderReplicatedContainer();
+    Assert.assertNull(res);
+  }
+
+  private Set<ContainerReplica>  addReplicas(ContainerInfo container,
+      Pair<HddsProtos.NodeOperationalState, Integer>... nodes) {
+    final Set<ContainerReplica> replicas =
+        createReplicas(container.containerID(), nodes);
+    storeContainerAndReplicas(container, replicas);
+    return replicas;
+  }
+
   private Set<ContainerReplica> addReplicas(ContainerInfo container,
       int... indexes) {
     final Set<ContainerReplica> replicas =
         createReplicas(container.containerID(), indexes);
-    containerReplicaMap.put(container.containerID(), replicas);
+    storeContainerAndReplicas(container, replicas);
     return replicas;
+  }
+
+  private void storeContainerAndReplicas(ContainerInfo container,
+      Set<ContainerReplica> replicas) {
+    containerReplicaMap.put(container.containerID(), replicas);
+    containerInfoSet.add(container);
   }
 
 }
