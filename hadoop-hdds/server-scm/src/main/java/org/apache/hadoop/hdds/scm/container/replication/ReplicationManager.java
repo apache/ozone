@@ -49,8 +49,11 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -131,6 +134,9 @@ public class ReplicationManager implements SCMService {
   private final ContainerReplicaPendingOps containerReplicaPendingOps;
   private final ContainerHealthCheck ecContainerHealthCheck;
   private final EventPublisher eventPublisher;
+  private final ReentrantLock lock = new ReentrantLock();
+  private Queue<ContainerHealthResult.UnderReplicatedHealthResult>
+      underRepQueue;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -167,6 +173,7 @@ public class ReplicationManager implements SCMService {
     this.legacyReplicationManager = legacyReplicationManager;
     this.ecContainerHealthCheck = new ECContainerHealthCheck();
     this.nodeManager = nodeManager;
+    this.underRepQueue = createUnderReplicatedQueue();
     start();
   }
 
@@ -233,8 +240,8 @@ public class ReplicationManager implements SCMService {
     final List<ContainerInfo> containers =
         containerManager.getContainers();
     ReplicationManagerReport report = new ReplicationManagerReport();
-    List<ContainerHealthResult.UnderReplicatedHealthResult> underReplicated =
-        new ArrayList<>();
+    Queue<ContainerHealthResult.UnderReplicatedHealthResult>
+        underReplicated = createUnderReplicatedQueue();
     List<ContainerHealthResult.OverReplicatedHealthResult> overReplicated =
         new ArrayList<>();
 
@@ -255,16 +262,61 @@ public class ReplicationManager implements SCMService {
       }
     }
     report.setComplete();
-    // TODO - Sort the pending lists by priority and assign to the main queue,
-    //        which is yet to be defined.
+    lock.lock();
+    try {
+      underRepQueue = underReplicated;
+    } finally {
+      lock.unlock();
+    }
     this.containerReport = report;
     LOG.info("Replication Monitor Thread took {} milliseconds for" +
             " processing {} containers.", clock.millis() - start,
         containers.size());
   }
 
+  /**
+   * Retrieve the new highest priority container to be replicated from the
+   * under replicated queue.
+   * @return The new underReplicated container to be processed, or null if the
+   *         queue is empty.
+   */
+  public ContainerHealthResult.UnderReplicatedHealthResult
+      dequeueUnderReplicatedContainer() {
+    lock.lock();
+    try {
+      return underRepQueue.poll();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /**
+   * Add an under replicated container back to the queue if it was unable to
+   * be processed. Its retry count will be incremented before it is re-queued,
+   * reducing its priority.
+   * Note that the queue could have been rebuilt and replaced after this
+   * message was removed but before it is added back. This will result in a
+   * duplicate entry on the queue. However, when it is processed again, the
+   * result of the processing will end up with pending replicas scheduled. If
+   * instance 1 is processed and creates the pending replicas, when instance 2
+   * is processed, it will find the pending containers and know it has no work
+   * to do, and be discarded. Additionally, the queue will be refreshed
+   * periodically removing any duplicates.
+   * @param underReplicatedHealthResult
+   */
+  public void requeueUnderReplicatedContainer(ContainerHealthResult
+      .UnderReplicatedHealthResult underReplicatedHealthResult) {
+    underReplicatedHealthResult.incrementRequeueCount();
+    lock.lock();
+    try {
+      underRepQueue.add(underReplicatedHealthResult);
+    } finally {
+      lock.unlock();
+    }
+  }
+
   protected ContainerHealthResult processContainer(ContainerInfo containerInfo,
-      List<ContainerHealthResult.UnderReplicatedHealthResult> underRep,
+      Queue<ContainerHealthResult.UnderReplicatedHealthResult> underRep,
       List<ContainerHealthResult.OverReplicatedHealthResult> overRep,
       ReplicationManagerReport report) throws ContainerNotFoundException {
     Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
@@ -301,6 +353,21 @@ public class ReplicationManager implements SCMService {
       }
     }
     return health;
+  }
+
+  /**
+   * Creates a priority queue of UnderReplicatedHealthResult, where the elements
+   * are ordered by the weighted redundancy of the container. This means that
+   * containers with the least remaining redundancy are at the front of the
+   * queue, and will be processed first.
+   * @return An empty instance of a PriorityQueue.
+   */
+  protected PriorityQueue<ContainerHealthResult.UnderReplicatedHealthResult>
+      createUnderReplicatedQueue() {
+    return new PriorityQueue<>(Comparator.comparing(ContainerHealthResult
+            .UnderReplicatedHealthResult::getWeightedRedundancy)
+        .thenComparing(ContainerHealthResult
+            .UnderReplicatedHealthResult::getRequeueCount));
   }
 
   public ReplicationManagerReport getContainerReport() {
