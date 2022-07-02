@@ -29,6 +29,7 @@ import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.utils.BackgroundService;
@@ -63,6 +64,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL;
 import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGER_ROLE_DESCRIPTION;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
 
 /**
  * Background Sync thread that reads Multi-Tenancy state from OM DB
@@ -287,7 +289,8 @@ public class OMRangerBGSyncService extends BackgroundService {
     }
   }
 
-  private void triggerRangerSyncOnce() {
+  @VisibleForTesting
+  public void triggerRangerSyncOnce() {
     try {
       long dbOzoneServiceVersion = getOMDBRangerServiceVersion();
       long rangerOzoneServiceVersion = getRangerOzoneServicePolicyVersion();
@@ -504,6 +507,13 @@ public class OMRangerBGSyncService extends BackgroundService {
    * Note: EACH Ranger request can take 3-7 seconds as tested in UT.
    */
   private void checkLeader() throws IOException {
+    if (ozoneManager.getConfiguration().getBoolean(
+        OZONE_OM_TENANT_DEV_SKIP_RANGER, false)) {
+      // Skip leader check if the test flag is set, used in TestOzoneTenantShell
+      // TODO: Find a proper fix in MiniOzoneCluster to pass
+      //  ozoneManager.isLeaderReady() check?
+      return;
+    }
     if (!ozoneManager.isLeaderReady()) {
       throw new OMNotLeaderException("This OM is no longer the leader. Abort");
     }
@@ -514,16 +524,8 @@ public class OMRangerBGSyncService extends BackgroundService {
       final String roleName = entry.getKey();
       checkLeader();
       final Role role = accessController.getRole(roleName);
-//      final JsonObject roleObject =
-//          new JsonParser().parse(roleDataString).getAsJsonObject();
       final BGRole bgRole = entry.getValue();
-//      bgRole.setId(roleObject.get("id").getAsString());
-//      bgRole.setId(role.getRoleId().get());
       bgRole.setId(role.getName());
-//      for (int i = 0; i < userArray.size(); ++i) {
-//        bgRole.addUserPrincipal(userArray.get(i).getAsJsonObject().get("name")
-//            .getAsString());
-//      }
       for (String username : role.getUsersMap().keySet()) {
         bgRole.addUserPrincipal(username);
       }

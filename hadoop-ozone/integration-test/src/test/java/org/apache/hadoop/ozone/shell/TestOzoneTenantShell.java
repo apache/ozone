@@ -26,12 +26,13 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.retry.RetryInvocationHandler;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.multitenant.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignUserAccessIdRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.shell.tenant.TenantShell;
@@ -65,6 +66,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENAB
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
 import static org.junit.Assert.fail;
 
 /**
@@ -96,6 +98,7 @@ public class TestOzoneTenantShell {
 
   private static OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster = null;
+  private static MiniOzoneHAClusterImpl haCluster = null;
   private static OzoneShell ozoneSh = null;
   private static TenantShell tenantShell = null;
 
@@ -125,8 +128,7 @@ public class TestOzoneTenantShell {
     }
 
     conf = new OzoneConfiguration();
-    conf.setBoolean(
-        OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
+    conf.setBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
     conf.setBoolean(OZONE_OM_MULTITENANCY_ENABLED, true);
 
     if (USE_ACTUAL_RANGER) {
@@ -136,8 +138,7 @@ public class TestOzoneTenantShell {
       conf.set(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD,
           System.getenv("RANGER_PASSWD"));
     } else {
-      conf.setBoolean(OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER,
-          true);
+      conf.setBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
     }
 
     String path = GenericTestUtils.getTempPath(
@@ -164,6 +165,7 @@ public class TestOzoneTenantShell {
         .setNumOfOzoneManagers(numOfOMs)
         .withoutDatanodes()  // Remove this once we are actually writing data
         .build();
+    haCluster = (MiniOzoneHAClusterImpl) cluster;
     cluster.waitForClusterToBeReady();
   }
 
@@ -197,6 +199,8 @@ public class TestOzoneTenantShell {
     GenericTestUtils.setLogLevel(
         OMTenantAssignUserAccessIdRequest.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(AuthorizerLockImpl.LOG, Level.DEBUG);
+
+    GenericTestUtils.setLogLevel(OMRangerBGSyncService.LOG, Level.DEBUG);
   }
 
   @After
@@ -646,6 +650,18 @@ public class TestOzoneTenantShell {
     checkOutput(err, "Tenant 'dev' is not empty. All accessIds associated "
         + "to this tenant must be revoked before the tenant can be deleted. "
         + "See `ozone tenant user revoke`\n", true);
+
+    // Trigger BG sync on OMs to recover roles and policies deleted
+    // by previous tenant delete attempt.
+    // Note: Potential source of flakiness if triggered only on leader OM
+    // in this case.
+    // Because InMemoryMultiTenantAccessController is used in OMs for this
+    // integration test, we need to trigger BG sync on all OMs just
+    // in case a leader changed right after the last operation.
+    haCluster.getOzoneManagersList().forEach(om -> om.getMultiTenantManager()
+        .getOMRangerBGSyncService().triggerRangerSyncOnce());
+//    haCluster.getOMLeader().getMultiTenantManager()
+//        .getOMRangerBGSyncService().triggerRangerSyncOnce();
 
     // Delete dev volume should fail because the volume reference count > 0L
     exitCode = execute(ozoneSh, new String[] {"volume", "delete", "dev"});

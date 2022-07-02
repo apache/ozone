@@ -48,6 +48,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENAB
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
 import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
@@ -317,6 +318,12 @@ public interface OMMultiTenantManager {
         logger.error("{} is required to enable S3 Multi-Tenancy but not set",
             OZONE_OM_KERBEROS_KEYTAB_FILE_KEY);
       }
+    }
+
+    if (conf.get(OZONE_RANGER_SERVICE) == null) {
+      isS3MultiTenancyEnabled = false;
+      logger.error("{} is required to enable S3 Multi-Tenancy but not set",
+          OZONE_RANGER_SERVICE);
     }
 
     if (!isS3MultiTenancyEnabled) {

@@ -134,6 +134,7 @@ no_proxy=om,scm,recon,s3g,kdc,localhost,127.0.0.1
 
 OZONE-SITE.XML_ozone.om.multitenancy.enabled=true
 OZONE-SITE.XML_ozone.om.ranger.https-address=http://ranger:6080
+OZONE-SITE.XML_ozone.om.ranger.service=cm_ozone
 
 OZONE-SITE.XML_ozone.om.ranger.https.admin.api.user=admin
 OZONE-SITE.XML_ozone.om.ranger.https.admin.api.passwd=passwd
@@ -144,3 +145,6 @@ OZONE-SITE.XML_ozone.om.ranger.https.admin.api.passwd=passwd
 
 OZONE-SITE.XML_ozone.om.multitenancy.ranger.sync.interval=30s
 OZONE-SITE.XML_ozone.om.multitenancy.ranger.sync.timeout=10s
+
+# Use InMemoryMultiTenantAccessController - this works with single OM
+OZONE-SITE.XML_ozone.om.tenant.dev.skip.ranger=true

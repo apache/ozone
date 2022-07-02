@@ -127,30 +127,12 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
     boolean devSkipRanger = conf.getBoolean(
         OZONE_OM_TENANT_DEV_SKIP_RANGER, false);
-    // TODO: REMOVE
-//    if (devSkipRanger) {
-//      this.authorizer = new MultiTenantAccessAuthorizerDummyPlugin();
-//    } else {
-//      this.authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
-//    }
-//    try {
-//      this.authorizer.init(conf);
-//    } catch (OMException ex) {
-//      if (ex.getResult().equals(INTERNAL_ERROR)) {
-//        LOG.error("Failed to initialize {}, falling back to dummy authorizer",
-//            authorizer.getClass().getSimpleName());
-//        this.authorizer = new MultiTenantAccessAuthorizerDummyPlugin();
-//      } else {
-//        throw ex;
-//      }
-//    }
 
     if (devSkipRanger) {
       this.accessController = new InMemoryMultiTenantAccessController();
     } else {
       this.accessController = new RangerClientMultiTenantAccessController(conf);
     }
-    // TODO: Call accessController#init ?
 
     cacheOp = new CacheOp(tenantCache, tenantCacheLock);
     authorizerOp = new AuthorizerOp(accessController,
