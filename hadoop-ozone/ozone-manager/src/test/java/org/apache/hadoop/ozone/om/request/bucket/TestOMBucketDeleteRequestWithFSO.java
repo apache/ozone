@@ -39,8 +39,7 @@ public class TestOMBucketDeleteRequestWithFSO
 
   @Test
   public void testValidateAndUpdateCacheWithFSO() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
 
     Assert.assertEquals(0, omMetrics.getNumFSOBucketDeletes());
 

@@ -139,6 +139,12 @@ public class TestCleanupTableInfo {
     when(om.getAuditLogger()).thenReturn(mock(AuditLogger.class));
     when(om.getDefaultReplicationConfig()).thenReturn(ReplicationConfig
         .getDefault(new OzoneConfiguration()));
+
+    Pair<String, String> volumeAndBucket =
+        Pair.of(TEST_VOLUME_NAME, TEST_BUCKET_NAME);
+    when(om.resolveBucketLink(any(Pair.class))).thenReturn(
+        new ResolvedBucket(volumeAndBucket, volumeAndBucket));
+
     addVolumeToMetaTable(aVolumeArgs());
     addBucketToMetaTable(aBucketInfo());
   }

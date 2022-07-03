@@ -24,6 +24,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -32,6 +33,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
@@ -115,6 +117,11 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
         .setIndexToTerm((i) -> term)
         .build();
     ozoneManagerDoubleBufferHelper = doubleBuffer::add;
+
+    when(ozoneManager.resolveBucketLink(any(Pair.class)))
+        .thenAnswer(
+            i -> new ResolvedBucket((Pair<String, String>) i.getArguments()[0],
+                (Pair<String, String>) i.getArguments()[0]));
   }
 
   @After

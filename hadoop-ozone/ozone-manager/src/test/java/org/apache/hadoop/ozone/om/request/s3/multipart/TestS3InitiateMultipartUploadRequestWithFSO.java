@@ -43,8 +43,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String prefix = "a/b/c/";
     List<String> dirs = new ArrayList<String>();
     dirs.add("a");

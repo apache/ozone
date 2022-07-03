@@ -82,6 +82,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
           ((response, transactionIndex) -> {
             return null;
           });
+  private final String volumeName = "vol1";
+  private final String bucketName = "bucket1";
 
   @Before
   public void setup() throws Exception {
@@ -100,6 +102,10 @@ public class TestOMDirectoryCreateRequestWithFSO {
     when(ozoneManager.resolveBucketLink(any(KeyArgs.class),
             any(OMClientRequest.class)))
             .thenReturn(new ResolvedBucket(Pair.of("", ""), Pair.of("", "")));
+
+    Pair<String, String> volumeAndBucket = Pair.of(volumeName, bucketName);
+    when(ozoneManager.resolveBucketLink(any(Pair.class)))
+        .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
   }
 
   @After
@@ -110,8 +116,6 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
   @Test
   public void testPreExecute() throws Exception {
-    String volumeName = "vol1";
-    String bucketName = "bucket1";
     String keyName = "a/b/c";
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -132,8 +136,6 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
-    String volumeName = "vol1";
-    String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
     String keyName = createDirKey(dirs, 3);
 
@@ -169,8 +171,6 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
   @Test
   public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
-    String volumeName = "vol1";
-    String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
     String keyName = createDirKey(dirs, 3);
 
@@ -202,8 +202,6 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
   @Test
   public void testValidateAndUpdateCacheWithBucketNotFound() throws Exception {
-    String volumeName = "vol1";
-    String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
     String keyName = createDirKey(dirs, 3);
 
@@ -234,8 +232,6 @@ public class TestOMDirectoryCreateRequestWithFSO {
   @Test
   public void testValidateAndUpdateCacheWithSubDirectoryInPath()
           throws Exception {
-    String volumeName = "vol1";
-    String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
     String keyName = createDirKey(dirs, 3);
 
@@ -287,8 +283,6 @@ public class TestOMDirectoryCreateRequestWithFSO {
   @Test
   public void testValidateAndUpdateCacheWithDirectoryAlreadyExists()
           throws Exception {
-    String volumeName = "vol1";
-    String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
     String keyName = createDirKey(dirs, 3);
 
@@ -349,8 +343,6 @@ public class TestOMDirectoryCreateRequestWithFSO {
    */
   @Test
   public void testValidateAndUpdateCacheWithFilesInPath() throws Exception {
-    String volumeName = "vol1";
-    String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
     String keyName = createDirKey(dirs, 3);
 
@@ -434,8 +426,6 @@ public class TestOMDirectoryCreateRequestWithFSO {
   @Test
   public void testValidateAndUpdateCacheWithFileExistsInGivenPath()
           throws Exception {
-    String volumeName = "vol1";
-    String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
     String keyName = createDirKey(dirs, 3);
 
@@ -507,8 +497,6 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
   @Test
   public void testCreateDirectoryUptoLimitOfMaxLevels255() throws Exception {
-    String volumeName = "vol1";
-    String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
     String keyName = createDirKey(dirs, 255);
 
@@ -545,8 +533,6 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
   @Test
   public void testCreateDirectoryExceedLimitOfMaxLevels255() throws Exception {
-    String volumeName = "vol1";
-    String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
     String keyName = createDirKey(dirs, 256);
 
@@ -581,8 +567,6 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
   @Test
   public void testCreateDirectoryOMMetric() throws Exception {
-    String volumeName = "vol1";
-    String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
     String keyName = createDirKey(dirs, 3);
 
@@ -674,17 +658,17 @@ public class TestOMDirectoryCreateRequestWithFSO {
   /**
    * Create OMRequest which encapsulates CreateDirectory request.
    *
-   * @param volumeName
-   * @param bucketName
+   * @param volume
+   * @param bucket
    * @param keyName
    * @return OMRequest
    */
-  private OMRequest createDirectoryRequest(String volumeName, String bucketName,
+  private OMRequest createDirectoryRequest(String volume, String bucket,
                                            String keyName) {
     return OMRequest.newBuilder().setCreateDirectoryRequest(
             CreateDirectoryRequest.newBuilder().setKeyArgs(
-                    KeyArgs.newBuilder().setVolumeName(volumeName)
-                            .setBucketName(bucketName).setKeyName(keyName)))
+                    KeyArgs.newBuilder().setVolumeName(volume)
+                            .setBucketName(bucket).setKeyName(keyName)))
             .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
             .setClientId(UUID.randomUUID().toString()).build();
   }
