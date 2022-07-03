@@ -57,8 +57,7 @@ public class TestS3MultipartUploadCompleteRequest
 
   @Test
   public void testValidateAndUpdateCacheSuccess() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String keyName = getKeyName();
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
@@ -166,8 +165,7 @@ public class TestS3MultipartUploadCompleteRequest
 
   @Test
   public void testInvalidPartOrderError() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String keyName = getKeyName();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -228,8 +226,7 @@ public class TestS3MultipartUploadCompleteRequest
 
   @Test
   public void testValidateAndUpdateCacheVolumeNotFound() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String keyName = UUID.randomUUID().toString();
 
     List<Part> partList = new ArrayList<>();
@@ -251,8 +248,7 @@ public class TestS3MultipartUploadCompleteRequest
 
   @Test
   public void testValidateAndUpdateCacheBucketNotFound() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String keyName = UUID.randomUUID().toString();
 
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
@@ -276,8 +272,7 @@ public class TestS3MultipartUploadCompleteRequest
   @Test
   public void testValidateAndUpdateCacheNoSuchMultipartUploadError()
       throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String keyName = UUID.randomUUID().toString();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,

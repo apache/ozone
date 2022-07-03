@@ -97,10 +97,11 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
   }
 
   @Override
-  protected OMRequest doPreExecuteInitiateMPU(String volumeName,
-      String bucketName, String keyName) throws Exception {
+  protected OMRequest doPreExecuteInitiateMPU(String volume,
+                                              String bucket, String keyName)
+      throws Exception {
     OMRequest omRequest =
-            OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName,
+            OMRequestTestUtils.createInitiateMPURequest(volume, bucket,
                     keyName);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =

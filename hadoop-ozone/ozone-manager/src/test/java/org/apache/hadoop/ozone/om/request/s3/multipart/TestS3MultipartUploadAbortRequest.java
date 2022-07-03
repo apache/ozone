@@ -48,8 +48,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String keyName = getKeyName();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -100,8 +99,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
 
   @Test
   public void testValidateAndUpdateCacheMultipartNotFound() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String keyName = UUID.randomUUID().toString();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -130,8 +128,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
 
   @Test
   public void testValidateAndUpdateCacheVolumeNotFound() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String keyName = UUID.randomUUID().toString();
 
 
@@ -157,8 +154,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
 
   @Test
   public void testValidateAndUpdateCacheBucketNotFound() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String keyName = UUID.randomUUID().toString();
 
 

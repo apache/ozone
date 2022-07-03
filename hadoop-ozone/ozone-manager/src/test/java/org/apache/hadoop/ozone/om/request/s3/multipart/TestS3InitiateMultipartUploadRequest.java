@@ -44,8 +44,7 @@ public class TestS3InitiateMultipartUploadRequest
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String keyName = UUID.randomUUID().toString();
 
     // Add volume and bucket to DB.
@@ -96,8 +95,7 @@ public class TestS3InitiateMultipartUploadRequest
 
   @Test
   public void testValidateAndUpdateCacheWithBucketNotFound() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String keyName = UUID.randomUUID().toString();
 
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
@@ -128,8 +126,7 @@ public class TestS3InitiateMultipartUploadRequest
 
   @Test
   public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String keyName = UUID.randomUUID().toString();
 
     OMRequest modifiedRequest = doPreExecuteInitiateMPU(volumeName, bucketName,

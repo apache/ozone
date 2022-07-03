@@ -51,8 +51,7 @@ public class TestS3MultipartUploadCommitPartRequest
 
   @Test
   public void testValidateAndUpdateCacheSuccess() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String keyName = getKeyName();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -113,8 +112,7 @@ public class TestS3MultipartUploadCommitPartRequest
 
   @Test
   public void testValidateAndUpdateCacheMultipartNotFound() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String keyName = getKeyName();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -152,8 +150,7 @@ public class TestS3MultipartUploadCommitPartRequest
 
   @Test
   public void testValidateAndUpdateCacheKeyNotFound() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String keyName = getKeyName();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -190,8 +187,7 @@ public class TestS3MultipartUploadCommitPartRequest
 
   @Test
   public void testValidateAndUpdateCacheBucketFound() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String keyName = getKeyName();
 
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
