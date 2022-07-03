@@ -76,8 +76,8 @@ public class TestOMDirectoryCreateRequest {
       ((response, transactionIndex) -> {
         return null;
       });
-  private final String volumeName = "vol1";
-  private final String bucketName = "bucket1";
+  private static final String volumeName = "vol1";
+  private static final String bucketName = "bucket1";
 
   @Before
   public void setup() throws Exception {
