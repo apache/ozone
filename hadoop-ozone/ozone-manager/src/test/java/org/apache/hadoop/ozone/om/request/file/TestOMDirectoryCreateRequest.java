@@ -76,8 +76,8 @@ public class TestOMDirectoryCreateRequest {
       ((response, transactionIndex) -> {
         return null;
       });
-  private static final String volumeName = "vol1";
-  private static final String bucketName = "bucket1";
+  private static final String VOLUME_NAME = "vol1";
+  private static final String BUCKET_NAME = "bucket1";
 
   @Before
   public void setup() throws Exception {
@@ -96,7 +96,7 @@ public class TestOMDirectoryCreateRequest {
         any(OMClientRequest.class)))
         .thenReturn(new ResolvedBucket(Pair.of("", ""), Pair.of("", "")));
 
-    Pair<String, String> volumeAndBucket = Pair.of(volumeName, bucketName);
+    Pair<String, String> volumeAndBucket = Pair.of(VOLUME_NAME, BUCKET_NAME);
     when(ozoneManager.resolveBucketLink(any(Pair.class)))
         .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
   }
@@ -111,10 +111,10 @@ public class TestOMDirectoryCreateRequest {
   public void testPreExecute() throws Exception {
     String keyName = "a/b/c";
 
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(VOLUME_NAME, BUCKET_NAME,
         omMetadataManager);
 
-    OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
+    OMRequest omRequest = createDirectoryRequest(VOLUME_NAME, BUCKET_NAME,
         keyName);
     OMDirectoryCreateRequest omDirectoryCreateRequest =
         new OMDirectoryCreateRequest(omRequest, getBucketLayout());
@@ -133,10 +133,10 @@ public class TestOMDirectoryCreateRequest {
     String keyName = genRandomKeyName();
 
     // Add volume and bucket entries to DB.
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(VOLUME_NAME, BUCKET_NAME,
         omMetadataManager);
 
-    OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
+    OMRequest omRequest = createDirectoryRequest(VOLUME_NAME, BUCKET_NAME,
         keyName);
     OMDirectoryCreateRequest omDirectoryCreateRequest =
         new OMDirectoryCreateRequest(omRequest, getBucketLayout());
@@ -154,16 +154,16 @@ public class TestOMDirectoryCreateRequest {
     Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
         == OzoneManagerProtocolProtos.Status.OK);
     Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
-        .get(omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName))
+        .get(
+            omMetadataManager.getOzoneDirKey(VOLUME_NAME, BUCKET_NAME, keyName))
         != null);
-
   }
 
   @Test
   public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
     String keyName = genRandomKeyName();
 
-    OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
+    OMRequest omRequest = createDirectoryRequest(VOLUME_NAME, BUCKET_NAME,
         keyName);
     OMDirectoryCreateRequest omDirectoryCreateRequest =
         new OMDirectoryCreateRequest(omRequest, getBucketLayout());
@@ -183,7 +183,8 @@ public class TestOMDirectoryCreateRequest {
 
     // Key should not exist in DB
     Assert.assertNull(omMetadataManager.getKeyTable(getBucketLayout()).
-        get(omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)));
+        get(omMetadataManager.getOzoneDirKey(VOLUME_NAME, BUCKET_NAME,
+            keyName)));
 
   }
 
@@ -191,7 +192,7 @@ public class TestOMDirectoryCreateRequest {
   public void testValidateAndUpdateCacheWithBucketNotFound() throws Exception {
     String keyName = genRandomKeyName();
 
-    OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
+    OMRequest omRequest = createDirectoryRequest(VOLUME_NAME, BUCKET_NAME,
         keyName);
     OMDirectoryCreateRequest omDirectoryCreateRequest =
         new OMDirectoryCreateRequest(omRequest, getBucketLayout());
@@ -201,7 +202,7 @@ public class TestOMDirectoryCreateRequest {
 
     omDirectoryCreateRequest =
         new OMDirectoryCreateRequest(modifiedOmRequest, getBucketLayout());
-    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(VOLUME_NAME, omMetadataManager);
 
     OMClientResponse omClientResponse =
         omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -212,7 +213,8 @@ public class TestOMDirectoryCreateRequest {
 
     // Key should not exist in DB
     Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
-        .get(omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName))
+        .get(
+            omMetadataManager.getOzoneDirKey(VOLUME_NAME, BUCKET_NAME, keyName))
         == null);
   }
 
@@ -222,13 +224,13 @@ public class TestOMDirectoryCreateRequest {
     String keyName = genRandomKeyName();
 
     // Add volume and bucket entries to DB.
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(VOLUME_NAME, BUCKET_NAME,
         omMetadataManager);
 
-    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, VOLUME_NAME, BUCKET_NAME,
         keyName.substring(0, 12), 1L, HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
-    OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
+    OMRequest omRequest = createDirectoryRequest(VOLUME_NAME, BUCKET_NAME,
         keyName);
     OMDirectoryCreateRequest omDirectoryCreateRequest =
         new OMDirectoryCreateRequest(omRequest, getBucketLayout());
@@ -248,11 +250,13 @@ public class TestOMDirectoryCreateRequest {
 
     // Key should exist in DB and cache.
     Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
-        .get(omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName))
+        .get(
+            omMetadataManager.getOzoneDirKey(VOLUME_NAME, BUCKET_NAME, keyName))
         != null);
     Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
         .getCacheValue(new CacheKey<>(
-            omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)))
+            omMetadataManager.getOzoneDirKey(VOLUME_NAME, BUCKET_NAME,
+                keyName)))
         != null);
 
   }
@@ -263,14 +267,14 @@ public class TestOMDirectoryCreateRequest {
     String keyName = genRandomKeyName();
 
     // Add volume and bucket entries to DB.
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(VOLUME_NAME, BUCKET_NAME,
         omMetadataManager);
 
-    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, VOLUME_NAME, BUCKET_NAME,
         OzoneFSUtils.addTrailingSlashIfNeeded(keyName), 1L,
         HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
         omMetadataManager);
-    OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
+    OMRequest omRequest = createDirectoryRequest(VOLUME_NAME, BUCKET_NAME,
         keyName);
     OMDirectoryCreateRequest omDirectoryCreateRequest =
         new OMDirectoryCreateRequest(omRequest, getBucketLayout());
@@ -290,15 +294,16 @@ public class TestOMDirectoryCreateRequest {
 
     // Key should exist in DB
     Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
-        .get(omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName))
+        .get(
+            omMetadataManager.getOzoneDirKey(VOLUME_NAME, BUCKET_NAME, keyName))
         != null);
 
     // As it already exists, it should not be in cache.
     Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
         .getCacheValue(new CacheKey<>(
-            omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)))
+            omMetadataManager.getOzoneDirKey(VOLUME_NAME, BUCKET_NAME,
+                keyName)))
         == null);
-
   }
 
   @Test
@@ -306,13 +311,13 @@ public class TestOMDirectoryCreateRequest {
     String keyName = genRandomKeyName();
 
     // Add volume and bucket entries to DB.
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(VOLUME_NAME, BUCKET_NAME,
         omMetadataManager);
     // Add a key with first two levels.
-    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, VOLUME_NAME, BUCKET_NAME,
         keyName.substring(0, 11), 1L, HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
-    OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
+    OMRequest omRequest = createDirectoryRequest(VOLUME_NAME, BUCKET_NAME,
         keyName);
     OMDirectoryCreateRequest omDirectoryCreateRequest =
         new OMDirectoryCreateRequest(omRequest, getBucketLayout());
@@ -332,7 +337,8 @@ public class TestOMDirectoryCreateRequest {
 
     // Key should not exist in DB
     Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
-        .get(omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName))
+        .get(
+            omMetadataManager.getOzoneDirKey(VOLUME_NAME, BUCKET_NAME, keyName))
         == null);
 
   }
@@ -343,10 +349,10 @@ public class TestOMDirectoryCreateRequest {
     String keyName = genRandomKeyName();
 
     // Add volume and bucket entries to DB.
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(VOLUME_NAME, BUCKET_NAME,
         omMetadataManager);
 
-    OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
+    OMRequest omRequest = createDirectoryRequest(VOLUME_NAME, BUCKET_NAME,
         OzoneFSUtils.addTrailingSlashIfNeeded(keyName));
     OMDirectoryCreateRequest omDirectoryCreateRequest =
         new OMDirectoryCreateRequest(omRequest, getBucketLayout());
@@ -366,7 +372,7 @@ public class TestOMDirectoryCreateRequest {
         omClientResponse.getOMResponse().getStatus());
 
     Assert.assertNotNull(omMetadataManager.getKeyTable(getBucketLayout()).get(
-        omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)));
+        omMetadataManager.getOzoneDirKey(VOLUME_NAME, BUCKET_NAME, keyName)));
 
     Assert.assertEquals(4L, omMetrics.getNumKeys());
   }
@@ -374,18 +380,17 @@ public class TestOMDirectoryCreateRequest {
 
   /**
    * Create OMRequest which encapsulates CreateDirectory request.
-   *
-   * @param volume
-   * @param bucket
+   * @param volumeName
+   * @param bucketName
    * @param keyName
    * @return OMRequest
    */
-  private OMRequest createDirectoryRequest(String volume, String bucket,
+  private OMRequest createDirectoryRequest(String volumeName, String bucketName,
                                            String keyName) {
     return OMRequest.newBuilder().setCreateDirectoryRequest(
-        CreateDirectoryRequest.newBuilder().setKeyArgs(
-            KeyArgs.newBuilder().setVolumeName(volume)
-                .setBucketName(bucket).setKeyName(keyName)))
+            CreateDirectoryRequest.newBuilder().setKeyArgs(
+                KeyArgs.newBuilder().setVolumeName(volumeName)
+                    .setBucketName(bucketName).setKeyName(keyName)))
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
         .setClientId(UUID.randomUUID().toString()).build();
   }
