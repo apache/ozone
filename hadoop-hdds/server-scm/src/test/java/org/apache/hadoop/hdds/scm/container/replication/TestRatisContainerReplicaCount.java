@@ -23,11 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-<<<<<<< HEAD:hadoop-hdds/server-scm/src/test/java/org/apache/hadoop/hdds/scm/container/replication/TestContainerReplicaCount.java
-import org.junit.jupiter.api.BeforeEach;
-=======
 import org.apache.hadoop.hdds.scm.container.RatisContainerReplicaCount;
->>>>>>> origin/master:hadoop-hdds/server-scm/src/test/java/org/apache/hadoop/hdds/scm/container/states/TestRatisContainerReplicaCount.java
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
