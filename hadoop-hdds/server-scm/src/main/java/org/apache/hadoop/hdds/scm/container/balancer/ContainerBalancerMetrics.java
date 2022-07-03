@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager.MoveResult;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -119,6 +120,42 @@ public final class ContainerBalancerMetrics {
   public void incrementNumContainerMovesCompletedInLatestIteration(
       long valueToAdd) {
     this.numContainerMovesCompletedInLatestIteration.incr(valueToAdd);
+  }
+
+  public void incrementCurrentIterationContainerMoveMetric(
+      MoveResult result,
+      long valueToAdd) {
+    if (result == null) {
+      return;
+    }
+    switch (result) {
+    case COMPLETED:
+      this.numContainerMovesCompletedInLatestIteration.incr(valueToAdd);
+      break;
+    case REPLICATION_FAIL_TIME_OUT:
+    case DELETION_FAIL_TIME_OUT:
+      this.numContainerMovesTimeoutInLatestIteration.incr(valueToAdd);
+      break;
+    // TODO: Add metrics for other errors that need to be tracked.
+    case FAIL_NOT_RUNNING:
+    case REPLICATION_FAIL_INFLIGHT_REPLICATION:
+    case FAIL_NOT_LEADER:
+    case REPLICATION_FAIL_NOT_EXIST_IN_SOURCE:
+    case REPLICATION_FAIL_EXIST_IN_TARGET:
+    case REPLICATION_FAIL_CONTAINER_NOT_CLOSED:
+    case REPLICATION_FAIL_INFLIGHT_DELETION:
+    case REPLICATION_FAIL_NODE_NOT_IN_SERVICE:
+    case DELETION_FAIL_NODE_NOT_IN_SERVICE:
+    case REPLICATION_FAIL_NODE_UNHEALTHY:
+    case DELETION_FAIL_NODE_UNHEALTHY:
+    case DELETE_FAIL_POLICY:
+    case PLACEMENT_POLICY_NOT_SATISFIED:
+    case UNEXPECTED_REMOVE_SOURCE_AT_INFLIGHT_REPLICATION:
+    case UNEXPECTED_REMOVE_TARGET_AT_INFLIGHT_DELETION:
+    case FAIL_CAN_NOT_RECORD_TO_DB:
+    default:
+      break;
+    }
   }
 
   public void resetNumContainerMovesCompletedInLatestIteration() {

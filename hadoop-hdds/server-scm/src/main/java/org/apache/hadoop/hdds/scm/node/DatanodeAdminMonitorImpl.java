@@ -304,7 +304,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           if (underReplicated < CONTAINER_DETAILS_LOGGING_LIMIT
               || LOG.isDebugEnabled()) {
             LOG.info("Under Replicated Container {} {}; {}",
-                cid, replicaSet, replicaDetails(replicaSet.getReplica()));
+                cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
           }
           underReplicated++;
         }
@@ -315,7 +315,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           if (unhealthy < CONTAINER_DETAILS_LOGGING_LIMIT
               || LOG.isDebugEnabled()) {
             LOG.info("Unhealthy Container {} {}; {}",
-                cid, replicaSet, replicaDetails(replicaSet.getReplica()));
+                cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
           }
           unhealthy++;
         }

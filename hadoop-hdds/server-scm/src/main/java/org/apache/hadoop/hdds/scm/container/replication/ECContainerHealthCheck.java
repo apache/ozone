@@ -70,7 +70,7 @@ public class ECContainerHealthCheck implements ContainerHealthCheck {
       return new ContainerHealthResult.UnderReplicatedHealthResult(
           container, remainingRedundancy, dueToDecommission,
           replicaCount.isSufficientlyReplicated(true),
-          replicaCount.unRecoverable());
+          replicaCount.isUnrecoverable());
     }
 
     if (replicaCount.isOverReplicated(false)) {
