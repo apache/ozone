@@ -43,8 +43,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.PREFIX_LOCK;
-import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateAssociatedBucketId;
-import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.getResolvedBucketId;
 
 /**
  * Base class for Prefix acl request.
@@ -95,11 +93,6 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
           omMetadataManager.getLock().acquireWriteLock(PREFIX_LOCK, prefixPath);
 
       omPrefixInfo = omMetadataManager.getPrefixTable().get(prefixPath);
-
-      // Bucket ID validation for in-flight requests.
-      long resolvedBucketId =
-          getResolvedBucketId(ozoneManager, volume, bucket);
-      validateAssociatedBucketId(resolvedBucketId, getOmRequest());
 
       try {
         operationResult = apply(prefixManager, omPrefixInfo, trxnLogIndex);
