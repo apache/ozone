@@ -52,8 +52,7 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     OMRequest omRequest =
         createDeleteBucketRequest(volumeName, bucketName);
 
@@ -73,8 +72,7 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
 
   @Test
   public void testValidateAndUpdateCacheFailure() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
 
     OMRequest omRequest =
         createDeleteBucketRequest(volumeName, bucketName);

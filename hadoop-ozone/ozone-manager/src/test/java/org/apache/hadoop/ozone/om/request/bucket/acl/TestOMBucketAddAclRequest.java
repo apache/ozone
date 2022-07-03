@@ -62,8 +62,7 @@ public class TestOMBucketAddAclRequest extends TestBucketRequest {
 
   @Test
   public void testValidateAndUpdateCacheSuccess() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String ownerName = "testUser";
 
     OMRequestTestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
@@ -97,8 +96,7 @@ public class TestOMBucketAddAclRequest extends TestBucketRequest {
 
   @Test
   public void testValidateAndUpdateCacheWithBucketNotFound() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     OzoneAcl acl = OzoneAcl.parseAcl("user:newUser:rw");
 
     OMRequest originalRequest = OMRequestTestUtils

@@ -59,8 +59,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
 
     OMBucketCreateRequest omBucketCreateRequest = doPreExecute(volumeName,
         bucketName);
@@ -72,8 +71,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
 
   @Test
   public void testValidateAndUpdateCacheWithNoVolume() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
 
     OMRequest originalRequest = OMRequestTestUtils.createBucketRequest(
         bucketName, volumeName, false, StorageTypeProto.SSD);
@@ -104,8 +102,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
   @Test
   public void testValidateAndUpdateCacheWithBucketAlreadyExists()
       throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
 
     OMBucketCreateRequest omBucketCreateRequest =
         doPreExecute(volumeName, bucketName);
@@ -126,8 +123,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
 
   @Test
   public void testValidateAndUpdateCacheVerifyBucketLayout() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
 
     OMBucketCreateRequest omBucketCreateRequest = doPreExecute(volumeName,

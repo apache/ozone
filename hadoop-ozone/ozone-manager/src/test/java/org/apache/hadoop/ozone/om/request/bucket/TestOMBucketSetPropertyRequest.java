@@ -74,9 +74,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
-
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
 
     OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
         bucketName, true, Long.MAX_VALUE);
@@ -103,9 +101,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
 
   @Test
   public void testNonDefaultLayout() throws Exception {
-
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
 
     OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
         bucketName, true, Long.MAX_VALUE);
@@ -132,10 +128,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
 
   @Test
   public void testValidateAndUpdateCacheFails() throws Exception {
-
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-
+    setupVolumeAndBucketName();
     OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
         bucketName, true, Long.MAX_VALUE);
 
@@ -169,10 +162,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
 
   @Test
   public void testValidateAndUpdateCacheWithQuota() throws Exception {
-
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-
+    setupVolumeAndBucketName();
     OMRequestTestUtils.addVolumeToDB(
         volumeName, omMetadataManager, 10 * GB);
     OMRequestTestUtils.addBucketToDB(
@@ -207,8 +197,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
   @Test
   public void rejectsSettingQuotaOnLink() throws Exception {
     // GIVEN
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+    setupVolumeAndBucketName();
     String linkName = UUID.randomUUID().toString();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
