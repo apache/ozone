@@ -91,6 +91,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.getResolvedBucketId;
 import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateAssociatedBucketId;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
@@ -182,14 +183,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   /**
    * Validate bucket and volume exists or not.
-   * @param omMetadataManager
+   * @param ozoneManager
    * @param volumeName
    * @param bucketName
    * @throws IOException
    */
-  public void validateBucketAndVolume(OMMetadataManager omMetadataManager,
-      String volumeName, String bucketName)
+  public void validateBucketAndVolume(OzoneManager ozoneManager,
+                                      String volumeName, String bucketName)
       throws IOException {
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     // Check if bucket exists
     if (!omMetadataManager.getBucketTable().isExist(bucketKey)) {
@@ -207,8 +209,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
 
     // Bucket ID verification for in-flight requests.
-    validateAssociatedBucketId(
-        omMetadataManager.getBucketId(volumeName, bucketName), getOmRequest());
+    long resolvedBucketId = getResolvedBucketId(ozoneManager, volumeName,
+        bucketName);
+    validateAssociatedBucketId(resolvedBucketId, getOmRequest());
 
     // Make sure associated bucket's layout matches the one associated with
     // the request.

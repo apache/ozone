@@ -17,11 +17,16 @@
 
 package org.apache.hadoop.ozone.om.request;
 
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 
 /**
  * Utility class for OMClientRequest. Validates that the bucket layout expected
@@ -70,5 +75,28 @@ public final class OMClientRequestUtils {
             OMException.ResultCodes.BUCKET_ID_MISMATCH);
       }
     }
+  }
+
+  /**
+   * Returns bucket ID of the given bucket. In case the given bucket is a link -
+   * returns the bucket ID of the source bucket.
+   *
+   * @param ozoneManager - Ozone Manager instance.
+   * @param volume       - volume name.
+   * @param bucket       - bucket name.
+   * @return bucket ID of the resolved bucket.
+   * @throws IOException
+   */
+  public static long getResolvedBucketId(OzoneManager ozoneManager,
+                                  String volume,
+                                  String bucket) throws IOException {
+    // Fetch the bucket ID for request validation.
+    // We fetch source bucket ID in case of link buckets.
+    ResolvedBucket resolvedBucket =
+        ozoneManager.resolveBucketLink(Pair.of(volume, bucket));
+    long bucketId = ozoneManager.getMetadataManager()
+        .getBucketId(resolvedBucket.realVolume(),
+            resolvedBucket.realBucket());
+    return bucketId;
   }
 }

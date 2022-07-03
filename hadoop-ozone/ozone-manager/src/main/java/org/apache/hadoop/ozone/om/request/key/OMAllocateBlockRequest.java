@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.getResolvedBucketId;
 import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateAssociatedBucketId;
 
 /**
@@ -191,8 +192,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.WRITE, allocateBlockRequest.getClientID());
 
-      validateBucketAndVolume(omMetadataManager, volumeName,
-          bucketName);
+      validateBucketAndVolume(ozoneManager, volumeName, bucketName);
 
       // Here we don't acquire bucket/volume lock because for a single client
       // allocateBlock is called in serial fashion.
@@ -213,10 +213,11 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
           volumeName, bucketName);
 
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
-      final long bucketId = omBucketInfo.getObjectID();
 
-      // Bucket ID verification for in-flight requests.
-      validateAssociatedBucketId(bucketId, getOmRequest());
+      // Bucket ID validation for in-flight requests.
+      long resolvedBucketId =
+          getResolvedBucketId(ozoneManager, volumeName, bucketName);
+      validateAssociatedBucketId(resolvedBucketId, getOmRequest());
 
       // check bucket and volume quota
       long preAllocatedKeySize = newLocationList.size()

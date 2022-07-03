@@ -101,8 +101,8 @@ public class OMTrashRecoverRequest extends OMKeyRequest {
           .acquireWriteLock(BUCKET_LOCK, volumeName, destinationBucket);
 
       // Validate.
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-      validateBucketAndVolume(omMetadataManager, volumeName, destinationBucket);
+      validateBucketAndVolume(ozoneManager, volumeName, bucketName);
+      validateBucketAndVolume(ozoneManager, volumeName, destinationBucket);
 
 
       /** TODO: HDDS-2425. HDDS-2426.

@@ -107,7 +107,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
           volumeName, bucketName);
 
       // Validate bucket and volume exists or not.
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(ozoneManager, volumeName, bucketName);
 
       OzoneFileStatus keyStatus =
               OMFileRequest.getOMKeyInfoIfExists(omMetadataManager, volumeName,

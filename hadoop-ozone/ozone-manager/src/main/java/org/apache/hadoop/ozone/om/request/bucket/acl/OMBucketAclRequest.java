@@ -48,6 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.getResolvedBucketId;
 import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateAssociatedBucketId;
 
 /**
@@ -106,11 +107,10 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
 
       String dbBucketKey = omMetadataManager.getBucketKey(volume, bucket);
 
-      final long bucketId =
-          omMetadataManager.getBucketId(volume, bucket);
-
-      // Bucket ID verification for in-flight requests.
-      validateAssociatedBucketId(bucketId, getOmRequest());
+      // Bucket ID validation for in-flight requests.
+      long resolvedBucketId =
+          getResolvedBucketId(ozoneManager, volume, bucket);
+      validateAssociatedBucketId(resolvedBucketId, getOmRequest());
 
       omBucketInfo = omMetadataManager.getBucketTable().get(dbBucketKey);
       if (omBucketInfo == null) {
