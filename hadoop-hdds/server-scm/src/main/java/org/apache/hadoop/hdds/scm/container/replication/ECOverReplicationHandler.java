@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -60,7 +59,7 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
   }
 
   /**
-   * Identify a new set of datanode(s) to replicate/reconstruct the container
+   * Identify a new set of datanode(s) to delete the container
    * and form the SCM commands to send it to DN.
    *
    * @param replicas - Set of available container replicas.
@@ -100,11 +99,10 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
     }
 
     // we don`t support hybrid state(both under and over replicated) for
-    // EC container , and we always handle under-replicated first now. it
+    // EC container and we always handle under-replicated first now. it
     // means when reaching here, we have all the replica indexes and some
     // of them are more than 1.
     // TODO: support hybrid state if needed.
-
     final ECContainerReplicaCount replicaCount =
         new ECContainerReplicaCount(container, replicas, pendingOps,
             remainingMaintenanceRedundancy);
@@ -135,9 +133,7 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
         .filter(r -> {
           DatanodeDetails dd = r.getDatanodeDetails();
           try {
-            //the command target node should be in-service and healthy
-            return nodeManager.getNodeStatus(dd)
-                .equals(NodeStatus.inServiceHealthy());
+            return nodeManager.getNodeStatus(dd).isHealthy();
           } catch (NodeNotFoundException nnfe) {
             //nothing to do, just skip;
             LOG.warn("can not find node when getting NodeStatus, {}", dd);
@@ -156,9 +152,8 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
           container.getReplicationConfig().getRequiredNodes();
       index2replicas.values().forEach(l -> {
         Iterator<ContainerReplica> it = l.iterator();
-        Set<ContainerReplica> tempReplicaSet = new HashSet<>();
-        tempReplicaSet.addAll(replicas);
-        for (; it.hasNext() && l.size() > 1;) {
+        Set<ContainerReplica> tempReplicaSet = new HashSet<>(replicas);
+        while (it.hasNext() && l.size() > 1) {
           ContainerReplica r = it.next();
           if (isPlacementStatusActuallyEqualAfterRemove(
               tempReplicaSet, r, replicationFactor)) {

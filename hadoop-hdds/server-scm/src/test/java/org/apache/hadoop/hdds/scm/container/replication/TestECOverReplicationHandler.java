@@ -23,14 +23,11 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
-import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -43,10 +40,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -79,25 +74,8 @@ public class TestECOverReplicationHandler {
     repConfig = new ECReplicationConfig(3, 2);
     container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
-    policy = new SCMCommonPlacementPolicy(nodeManager, conf) {
-      @Override
-      public List<DatanodeDetails> chooseDatanodes(
-          List<DatanodeDetails> excludedNodes,
-          List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
-          long metadataSizeRequired, long dataSizeRequired)
-          throws SCMException {
-        List<DatanodeDetails> dns = new ArrayList<>();
-        for (int i = 0; i < nodesRequiredToChoose; i++) {
-          dns.add(MockDatanodeDetails.randomDatanodeDetails());
-        }
-        return dns;
-      }
-
-      @Override
-      public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes) {
-        return null;
-      }
-    };
+    policy = ReplicationTestUtil
+        .getSimpleTestPlacementPolicy(nodeManager, conf);
     NodeSchema[] schemas =
         new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
@@ -177,7 +155,5 @@ public class TestECOverReplicationHandler {
       Assert.assertTrue(index2excessNum.containsKey(i));
       Assert.assertEquals(index2commandNum.get(i), index2excessNum.get(i));
     });
-
-
   }
 }
