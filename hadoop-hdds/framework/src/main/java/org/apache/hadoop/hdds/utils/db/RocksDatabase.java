@@ -73,12 +73,11 @@ public final class RocksDatabase {
    * Read DB and return existing column families.
    *
    * @return a list of column families.
-   * @see RocksDB#listColumnFamilies(Options, String)
    */
   private static List<TableConfig> getColumnFamilies(File file)
       throws RocksDBException {
-    final List<TableConfig> columnFamilies = RocksDB.listColumnFamilies(
-            new Options(), file.getAbsolutePath())
+    final List<TableConfig> columnFamilies = listColumnFamiliesEmptyOptions(
+        file.getAbsolutePath())
         .stream()
         .map(TableConfig::newTableConfig)
         .collect(Collectors.toList());
@@ -86,6 +85,21 @@ public final class RocksDatabase {
       LOG.debug("Found column families in DB {}: {}", file, columnFamilies);
     }
     return columnFamilies;
+  }
+
+  /**
+   * Read DB column families without Options.
+   * @param path
+   * @return A list of column family names
+   * @throws RocksDBException
+   *
+   * @see RocksDB#listColumnFamilies(Options, String)
+   */
+  public static List<byte[]> listColumnFamiliesEmptyOptions(final String path)
+      throws RocksDBException {
+    try (Options emptyOptions = new Options()) {
+      return RocksDB.listColumnFamilies(emptyOptions, path);
+    }
   }
 
   static RocksDatabase open(File dbFile, DBOptions dbOptions,
