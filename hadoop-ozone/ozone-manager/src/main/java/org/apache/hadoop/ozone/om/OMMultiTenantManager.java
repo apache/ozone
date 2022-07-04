@@ -294,6 +294,13 @@ public interface OMMultiTenantManager {
           OZONE_RANGER_HTTPS_ADDRESS_KEY);
     }
 
+    final String rangerService = conf.get(OZONE_RANGER_SERVICE);
+    if (StringUtils.isBlank(rangerService)) {
+      isS3MultiTenancyEnabled = false;
+      logger.error("{} is required to enable S3 Multi-Tenancy but not set",
+          OZONE_RANGER_SERVICE);
+    }
+
     String fallbackUsername = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER);
     String fallbackPassword = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD);
 
@@ -318,12 +325,6 @@ public interface OMMultiTenantManager {
         logger.error("{} is required to enable S3 Multi-Tenancy but not set",
             OZONE_OM_KERBEROS_KEYTAB_FILE_KEY);
       }
-    }
-
-    if (conf.get(OZONE_RANGER_SERVICE) == null) {
-      isS3MultiTenancyEnabled = false;
-      logger.error("{} is required to enable S3 Multi-Tenancy but not set",
-          OZONE_RANGER_SERVICE);
     }
 
     if (!isS3MultiTenancyEnabled) {

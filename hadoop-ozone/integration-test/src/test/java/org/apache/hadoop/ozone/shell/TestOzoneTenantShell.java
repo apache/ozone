@@ -660,8 +660,6 @@ public class TestOzoneTenantShell {
     // in case a leader changed right after the last operation.
     haCluster.getOzoneManagersList().forEach(om -> om.getMultiTenantManager()
         .getOMRangerBGSyncService().triggerRangerSyncOnce());
-//    haCluster.getOMLeader().getMultiTenantManager()
-//        .getOMRangerBGSyncService().triggerRangerSyncOnce();
 
     // Delete dev volume should fail because the volume reference count > 0L
     exitCode = execute(ozoneSh, new String[] {"volume", "delete", "dev"});
