@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
@@ -130,16 +129,9 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
         .filter(r -> r
             .getState() == StorageContainerDatanodeProtocolProtos
             .ContainerReplicaProto.State.CLOSED)
-        .filter(r -> {
-          DatanodeDetails dd = r.getDatanodeDetails();
-          try {
-            return nodeManager.getNodeStatus(dd).isHealthy();
-          } catch (NodeNotFoundException nnfe) {
-            //nothing to do, just skip;
-            LOG.warn("can not find node when getting NodeStatus, {}", dd);
-            return false;
-          }
-        }).filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
+        .filter(r -> ReplicationManager
+            .getNodeStatus(r.getDatanodeDetails(), nodeManager).isHealthy())
+        .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
         .forEach(r -> {
           int index = r.getReplicaIndex();
           index2replicas.computeIfAbsent(index, k -> new LinkedList<>());
