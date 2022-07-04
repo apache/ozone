@@ -30,8 +30,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * this class holds some common methods that will be shared among
- * different kinds of Implementation of OverReplicationHandler.
+ * This class holds some common methods that will be shared among
+ * different kinds of implementation of OverReplicationHandler.
  * */
 public abstract class AbstractOverReplicationHandler
     implements UnhealthyReplicationHandler {
@@ -40,8 +40,9 @@ public abstract class AbstractOverReplicationHandler
   protected AbstractOverReplicationHandler(PlacementPolicy placementPolicy) {
     this.placementPolicy = placementPolicy;
   }
+
   /**
-   * Identify a new set of datanode(s) to replicate/reconstruct the container
+   * Identify a new set of datanode(s) to delete the container
    * and form the SCM commands to send it to DN.
    *
    * @param replicas - Set of available container replicas.
