@@ -92,11 +92,10 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
           new ECBlockOutputStream[replicationConfig.getRequiredNodes()];
       for (int i = currentStreamIdx; i < replicationConfig
           .getRequiredNodes(); i++) {
-        Pipeline ecPipeline = getPipeline();
         List<DatanodeDetails> nodes = getPipeline().getNodes();
         blockOutputStreams[i] =
             new ECBlockOutputStream(getBlockID(), getXceiverClientManager(),
-                createSingleECBlockPipeline(ecPipeline, nodes.get(i), i + 1),
+                createSingleECBlockPipeline(getPipeline(), nodes.get(i), i + 1),
                 getBufferPool(), getConf(), getToken());
       }
     }
@@ -310,9 +309,11 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     List<ECBlockOutputStream> failedStreams = new ArrayList<>();
     while (iter.hasNext()) {
       final ECBlockOutputStream stream = iter.next();
-      if (stream.getWrittenDataLength() <= 0) {
+      if (!forPutBlock && stream.getWrittenDataLength() <= 0) {
         // If we did not write any data to this stream yet, let's not consider
-        // for failure checking.
+        // for failure checking. But we should do failure checking for putBlock
+        // though. In the case of padding stripes, we do send empty put blocks
+        // for creating empty containers at DNs ( Refer: HDDS-6794).
         continue;
       }
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto>

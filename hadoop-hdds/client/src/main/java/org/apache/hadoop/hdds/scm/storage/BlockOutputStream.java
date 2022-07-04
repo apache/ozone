@@ -143,12 +143,17 @@ public class BlockOutputStream extends OutputStream {
     replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
-    this.containerBlockData = BlockData.newBuilder().setBlockID(
+
+    ContainerProtos.DatanodeBlockID.Builder blkIDBuilder =
         ContainerProtos.DatanodeBlockID.newBuilder()
             .setContainerID(blockID.getContainerID())
             .setLocalID(blockID.getLocalID())
-            .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId())
-            .setReplicaIndex(replicationIndex).build()).addMetadata(keyValue);
+            .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
+    if (replicationIndex > 0) {
+      blkIDBuilder.setReplicaIndex(replicationIndex);
+    }
+    this.containerBlockData = BlockData.newBuilder().setBlockID(
+        blkIDBuilder.build()).addMetadata(keyValue);
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
     this.bufferPool = bufferPool;
     this.token = token;
