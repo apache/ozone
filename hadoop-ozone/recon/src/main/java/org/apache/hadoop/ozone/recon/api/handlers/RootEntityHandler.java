@@ -40,10 +40,9 @@ public class RootEntityHandler extends EntityHandler {
   public RootEntityHandler(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
-      OzoneStorageContainerManager reconSCM,
-      BucketHandler bucketHandler) {
+      OzoneStorageContainerManager reconSCM) {
     super(reconNamespaceSummaryManager, omMetadataManager,
-            reconSCM, bucketHandler);
+            reconSCM, null);
   }
 
   @Override
@@ -59,8 +58,11 @@ public class RootEntityHandler extends EntityHandler {
     long totalNumKey = 0L;
     for (OmBucketInfo bucket : allBuckets) {
       long bucketObjectId = bucket.getObjectID();
-      initBucketHandler(bucket);
-      totalNumDir += getTotalDirCount(bucketObjectId);
+      BucketHandler bucketHandler =
+          BucketHandler.getBucketHandler(
+              getReconNamespaceSummaryManager(),
+              getOmMetadataManager(), getReconSCM(), bucket);
+      totalNumDir += bucketHandler.getTotalDirCount(bucketObjectId);
       totalNumKey += getTotalKeyCount(bucketObjectId);
     }
 
@@ -89,18 +91,22 @@ public class RootEntityHandler extends EntityHandler {
       DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
       long dataSize = 0;
       diskUsage.setSubpath(subpath);
+      BucketHandler bucketHandler = null;
       // iterate all buckets per volume to get total data size
       for (OmBucketInfo bucket: listBucketsUnderVolume(volumeName)) {
         long bucketObjectID = bucket.getObjectID();
-        initBucketHandler(bucket);
         dataSize += getTotalSize(bucketObjectID);
+        bucketHandler =
+            BucketHandler.getBucketHandler(
+                getReconNamespaceSummaryManager(),
+                getOmMetadataManager(), getReconSCM(), bucket);
       }
       totalDataSize += dataSize;
 
       // count replicas
       // TODO: to be dropped or optimized in the future
       if (withReplica) {
-        long volumeDU = getBucketHandler().calculateDUForVolume(volumeName);
+        long volumeDU = bucketHandler.calculateDUForVolume(volumeName);
         totalDataSizeWithReplica += volumeDU;
         diskUsage.setSizeWithReplica(volumeDU);
       }

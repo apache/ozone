@@ -42,7 +42,7 @@ public enum EntityType {
         OzoneStorageContainerManager reconSCM,
         BucketHandler bucketHandler) {
       return new RootEntityHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, bucketHandler);
+              omMetadataManager, reconSCM);
     }
   },
   VOLUME {
@@ -52,7 +52,7 @@ public enum EntityType {
         OzoneStorageContainerManager reconSCM,
         BucketHandler bucketHandler) {
       return new VolumeEntityHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, bucketHandler);
+              omMetadataManager, reconSCM);
     }
   },
   BUCKET {

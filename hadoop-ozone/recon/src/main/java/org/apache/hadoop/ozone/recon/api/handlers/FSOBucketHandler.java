@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -43,12 +44,16 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  */
 public class FSOBucketHandler extends BucketHandler {
 
+  private OmBucketInfo omBucketInfo;
+
   public FSOBucketHandler(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
-      OzoneStorageContainerManager reconSCM) {
+      OzoneStorageContainerManager reconSCM,
+      OmBucketInfo bucketInfo) {
     super(reconNamespaceSummaryManager, omMetadataManager,
         reconSCM);
+    this.omBucketInfo = bucketInfo;
   }
 
   /**
@@ -129,12 +134,20 @@ public class FSOBucketHandler extends BucketHandler {
   // FileTable's key is in the format of "volumeId/bucketId/parentId/fileName"
   // Make use of RocksDB's order to seek to the prefix and avoid full iteration
   @Override
-  public long calculateDUUnderObject(long volumeId, long bucketId,
-                                     long parentId) throws IOException {
+  public long calculateDUUnderObject(long parentId)
+      throws IOException {
     Table keyTable = getKeyTable();
 
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
             iterator = keyTable.iterator();
+
+    String vol = omBucketInfo.getVolumeName();
+    String bucket = omBucketInfo.getBucketName();
+
+    String[] names = {vol, bucket};
+
+    long volumeId = getVolumeObjectId(names);
+    long bucketId = getBucketObjectId(names);
 
     StringBuilder builder = new StringBuilder();
 
@@ -173,8 +186,7 @@ public class FSOBucketHandler extends BucketHandler {
 
     Set<Long> subDirIds = nsSummary.getChildDir();
     for (long subDirId: subDirIds) {
-      totalDU += calculateDUUnderObject(volumeId,
-          bucketId, subDirId);
+      totalDU += calculateDUUnderObject(subDirId);
     }
     return totalDU;
   }
@@ -191,8 +203,7 @@ public class FSOBucketHandler extends BucketHandler {
    * @throws IOException IOE
    */
   @Override
-  public long handleDirectKeys(long volumeId, long bucketId,
-                               long parentId, boolean withReplica,
+  public long handleDirectKeys(long parentId, boolean withReplica,
                                boolean listFile,
                                List<DUResponse.DiskUsage> duData,
                                String normalizedPath) throws IOException {
@@ -200,6 +211,14 @@ public class FSOBucketHandler extends BucketHandler {
     Table keyTable = getKeyTable();
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
             iterator = keyTable.iterator();
+
+    String vol = omBucketInfo.getVolumeName();
+    String bucket = omBucketInfo.getBucketName();
+
+    String[] names = {vol, bucket};
+
+    long volumeId = getVolumeObjectId(names);
+    long bucketId = getBucketObjectId(names);
 
     StringBuilder builder = new StringBuilder();
 
@@ -243,6 +262,7 @@ public class FSOBucketHandler extends BucketHandler {
         }
       }
     }
+
     return keyDataSizeWithReplica;
   }
 
@@ -292,7 +312,6 @@ public class FSOBucketHandler extends BucketHandler {
     if (nsSummary == null) {
       return 0;
     }
-
     Set<Long> subdirs = nsSummary.getChildDir();
     int totalCnt = subdirs.size();
     for (long subdir : subdirs) {

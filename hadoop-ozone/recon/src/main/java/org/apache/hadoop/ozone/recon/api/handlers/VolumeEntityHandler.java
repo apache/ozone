@@ -40,10 +40,9 @@ public class VolumeEntityHandler extends EntityHandler {
   public VolumeEntityHandler(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
-      OzoneStorageContainerManager reconSCM,
-      BucketHandler bucketHandler) {
+      OzoneStorageContainerManager reconSCM) {
     super(reconNamespaceSummaryManager, omMetadataManager,
-            reconSCM, bucketHandler);
+            reconSCM, null);
   }
 
   @Override
@@ -60,8 +59,11 @@ public class VolumeEntityHandler extends EntityHandler {
     // iterate all buckets to collect the total object count.
     for (OmBucketInfo bucket : buckets) {
       long bucketObjectId = bucket.getObjectID();
-      initBucketHandler(bucket);
-      totalDir += getTotalDirCount(bucketObjectId);
+      BucketHandler bucketHandler =
+          BucketHandler.getBucketHandler(
+              getReconNamespaceSummaryManager(),
+              getOmMetadataManager(), getReconSCM(), bucket);
+      totalDir += bucketHandler.getTotalDirCount(bucketObjectId);
       totalKey += getTotalKeyCount(bucketObjectId);
     }
 
@@ -92,7 +94,6 @@ public class VolumeEntityHandler extends EntityHandler {
                       getReconNamespaceSummaryManager(),
                       getOmMetadataManager(), getReconSCM(), bucket);
       String bucketName = bucket.getBucketName();
-      long volumeObjectId = bucketHandler.getVolumeObjectId(names);
       long bucketObjectID = bucket.getObjectID();
       String subpath = getOmMetadataManager().getBucketKey(volName, bucketName);
       DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
@@ -101,8 +102,7 @@ public class VolumeEntityHandler extends EntityHandler {
       volDataSize += dataSize;
       if (withReplica) {
         long bucketDU = bucketHandler
-            .calculateDUUnderObject(volumeObjectId,
-                bucketObjectID, bucketObjectID);
+            .calculateDUUnderObject(bucketObjectID);
         diskUsage.setSizeWithReplica(bucketDU);
         volDataSizeWithReplica += bucketDU;
       }

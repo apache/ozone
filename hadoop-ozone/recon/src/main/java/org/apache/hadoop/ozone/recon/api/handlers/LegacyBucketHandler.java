@@ -126,8 +126,8 @@ public class LegacyBucketHandler extends BucketHandler {
   // KeyTable's key is in the format of "vol/bucket/keyName"
   // Make use of RocksDB's order to seek to the prefix and avoid full iteration
   @Override
-  public long calculateDUUnderObject(long volumeId, long bucketId,
-                                     long parentId) throws IOException {
+  public long calculateDUUnderObject(long parentId)
+      throws IOException {
     Table keyTable = getKeyTable();
 
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
@@ -181,8 +181,7 @@ public class LegacyBucketHandler extends BucketHandler {
 
     Set<Long> subDirIds = nsSummary.getChildDir();
     for (long subDirId: subDirIds) {
-      totalDU += calculateDUUnderObject(volumeId,
-          bucketId, subDirId);
+      totalDU += calculateDUUnderObject(subDirId);
     }
     return totalDU;
   }
@@ -199,8 +198,7 @@ public class LegacyBucketHandler extends BucketHandler {
    * @throws IOException IOE
    */
   @Override
-  public long handleDirectKeys(long volumeId, long bucketId,
-                               long parentId, boolean withReplica,
+  public long handleDirectKeys(long parentId, boolean withReplica,
                                boolean listFile,
                                List<DUResponse.DiskUsage> duData,
                                String normalizedPath) throws IOException {
@@ -269,6 +267,7 @@ public class LegacyBucketHandler extends BucketHandler {
         }
       }
     }
+
     return keyDataSizeWithReplica;
   }
 
@@ -322,7 +321,6 @@ public class LegacyBucketHandler extends BucketHandler {
     if (nsSummary == null) {
       return 0;
     }
-
     Set<Long> subdirs = nsSummary.getChildDir();
     int totalCnt = subdirs.size();
     for (long subdir : subdirs) {

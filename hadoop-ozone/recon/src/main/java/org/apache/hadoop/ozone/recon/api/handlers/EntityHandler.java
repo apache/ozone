@@ -21,7 +21,6 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
@@ -97,11 +96,6 @@ public abstract class EntityHandler {
     return bucketHandler;
   }
 
-  public void initBucketHandler(OmBucketInfo omBucketInfo) {
-    bucketHandler = BucketHandler.getBucketHandler(
-        getReconNamespaceSummaryManager(), getOmMetadataManager(),
-        getReconSCM(), omBucketInfo);
-  }
   public String getNormalizedPath() {
     return normalizedPath;
   }
@@ -148,16 +142,14 @@ public abstract class EntityHandler {
     } else if (names.length == 2) { // bucket level check
       String volName = names[0];
       String bucketName = names[1];
-      OmBucketInfo omBucketInfo = OzoneManagerUtils
-          .getOmBucketInfo(omMetadataManager, volName, bucketName);
-      if (omBucketInfo == null) {
-        return EntityType.UNKNOWN.create(reconNamespaceSummaryManager,
-            omMetadataManager, reconSCM, null);
-      }
+
       bucketHandler = BucketHandler.getBucketHandler(
               reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, omBucketInfo);
-      if (!bucketHandler.bucketExists(volName, bucketName)) {
+              omMetadataManager, reconSCM,
+              volName, bucketName);
+
+      if (bucketHandler == null
+          || !bucketHandler.bucketExists(volName, bucketName)) {
         return EntityType.UNKNOWN.create(reconNamespaceSummaryManager,
                 omMetadataManager, reconSCM, null);
       }
@@ -166,24 +158,17 @@ public abstract class EntityHandler {
     } else { // length > 3. check dir or key existence
       String volName = names[0];
       String bucketName = names[1];
-      OmBucketInfo omBucketInfo = OzoneManagerUtils
-          .getOmBucketInfo(omMetadataManager, volName, bucketName);
-      if (omBucketInfo == null) {
-        return EntityType.UNKNOWN.create(reconNamespaceSummaryManager,
-            omMetadataManager, reconSCM, null);
-      }
 
       String keyName = BucketHandler.getKeyName(names);
 
-      if (path.endsWith(OM_KEY_PREFIX)) {
-        keyName += OM_KEY_PREFIX;
-      }
-
       bucketHandler = BucketHandler.getBucketHandler(
               reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, omBucketInfo);
+              omMetadataManager, reconSCM,
+              volName, bucketName);
+
       // check if either volume or bucket doesn't exist
-      if (!volumeExists(omMetadataManager, volName)
+      if (bucketHandler == null
+          || !volumeExists(omMetadataManager, volName)
           || !bucketHandler.bucketExists(volName, bucketName)) {
         return EntityType.UNKNOWN.create(reconNamespaceSummaryManager,
                 omMetadataManager, reconSCM, null);
@@ -301,17 +286,6 @@ public abstract class EntityHandler {
     for (long childId: nsSummary.getChildDir()) {
       totalCnt += getTotalKeyCount(childId);
     }
-    return totalCnt;
-  }
-
-  /**
-   * Given an object ID, return total count of directories under this object.
-   * @param objectId the object's ID
-   * @return count of directories
-   * @throws IOException ioEx
-   */
-  protected int getTotalDirCount(long objectId) throws IOException {
-    int totalCnt = bucketHandler.getTotalDirCount(objectId);
     return totalCnt;
   }
 

@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -93,11 +94,10 @@ public abstract class BucketHandler {
   public abstract long calculateDUForVolume(String volumeName)
       throws IOException;
 
-  public abstract long calculateDUUnderObject(long volumeId, long bucketId,
-                                              long parentId) throws IOException;
+  public abstract long calculateDUUnderObject(long parentId)
+      throws IOException;
 
-  public abstract long handleDirectKeys(long volumeId,
-                       long bucketId, long parentId,
+  public abstract long handleDirectKeys(long parentId,
                        boolean withReplica, boolean listFile,
                        List<DUResponse.DiskUsage> duData,
                        String normalizedPath) throws IOException;
@@ -207,10 +207,33 @@ public abstract class BucketHandler {
     if (bucketInfo.getBucketLayout()
             .equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
       return new FSOBucketHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM);
+              omMetadataManager, reconSCM, bucketInfo);
     } else {
       return new LegacyBucketHandler(reconNamespaceSummaryManager,
               omMetadataManager, reconSCM, bucketInfo);
+    }
+  }
+
+  public static BucketHandler getBucketHandler(
+      ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+      ReconOMMetadataManager omMetadataManager,
+      OzoneStorageContainerManager reconSCM,
+      String volumeName, String bucketName) throws IOException {
+
+    OmBucketInfo bucketInfo = OzoneManagerUtils
+          .getOmBucketInfo(omMetadataManager, volumeName, bucketName);
+
+    if (bucketInfo == null) {
+      return null;
+    }
+
+    if (bucketInfo.getBucketLayout()
+        .equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      return new FSOBucketHandler(reconNamespaceSummaryManager,
+          omMetadataManager, reconSCM, bucketInfo);
+    } else {
+      return new LegacyBucketHandler(reconNamespaceSummaryManager,
+          omMetadataManager, reconSCM, bucketInfo);
     }
   }
 

@@ -56,7 +56,8 @@ public class BucketEntityHandler extends EntityHandler {
     String[] names = getNames();
     assert (names.length == 2);
     long bucketObjectId = getBucketHandler().getBucketObjectId(names);
-    namespaceSummaryResponse.setNumTotalDir(getTotalDirCount(bucketObjectId));
+    namespaceSummaryResponse
+        .setNumTotalDir(getBucketHandler().getTotalDirCount(bucketObjectId));
     namespaceSummaryResponse.setNumTotalKey(getTotalKeyCount(bucketObjectId));
 
     return namespaceSummaryResponse;
@@ -68,7 +69,6 @@ public class BucketEntityHandler extends EntityHandler {
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
-    long volumeObjectId = getBucketHandler().getVolumeObjectId(getNames());
     long bucketObjectId = getBucketHandler().getBucketObjectId(getNames());
     NSSummary bucketNSSummary =
             getReconNamespaceSummaryManager().getNSSummary(bucketObjectId);
@@ -107,8 +107,7 @@ public class BucketEntityHandler extends EntityHandler {
 
       if (withReplica) {
         long dirDU = getBucketHandler()
-            .calculateDUUnderObject(volumeObjectId,
-                bucketObjectId, subdirObjectId);
+            .calculateDUUnderObject(subdirObjectId);
         diskUsage.setSizeWithReplica(dirDU);
         bucketDataSizeWithReplica += dirDU;
       }
@@ -118,8 +117,7 @@ public class BucketEntityHandler extends EntityHandler {
     // Either listFile or withReplica is enabled, we need the directKeys info
     if (listFile || withReplica) {
       bucketDataSizeWithReplica += getBucketHandler()
-              .handleDirectKeys(volumeObjectId, bucketObjectId,
-                  bucketObjectId, withReplica,
+              .handleDirectKeys(bucketObjectId, withReplica,
                   listFile, dirDUData, getNormalizedPath());
     }
     if (withReplica) {
