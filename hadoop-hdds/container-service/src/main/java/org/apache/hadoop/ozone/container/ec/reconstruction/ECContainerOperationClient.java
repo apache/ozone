@@ -111,6 +111,18 @@ public class ECContainerOperationClient implements Closeable {
     }
   }
 
+  public void deleteRecoveringContainer(long containerID, DatanodeDetails dn,
+      ECReplicationConfig repConfig, String encodedToken) throws IOException {
+    XceiverClientSpi xceiverClient = this.xceiverClientManager
+        .acquireClient(singleNodePipeline(dn, repConfig));
+    try {
+      ContainerProtocolCalls
+          .deleteContainer(xceiverClient, containerID, true, encodedToken);
+    } finally {
+      this.xceiverClientManager.releaseClient(xceiverClient, false);
+    }
+  }
+
   public void createRecoveringContainer(long containerID, DatanodeDetails dn,
       ECReplicationConfig repConfig, String encodedToken, int replicaIndex)
       throws IOException {
