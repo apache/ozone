@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ECContainerReplicaCount;
 
 import java.util.List;
 import java.util.Set;

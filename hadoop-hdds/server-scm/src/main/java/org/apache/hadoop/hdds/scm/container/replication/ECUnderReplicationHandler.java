@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ECContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -51,7 +50,7 @@ import static java.util.Collections.emptyMap;
  * Handles the EC Under replication processing and forming the respective SCM
  * commands.
  */
-public class ECUnderReplicationHandler implements UnderReplicationHandler {
+public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ECUnderReplicationHandler.class);

@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 
 import java.util.Set;
 
