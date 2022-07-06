@@ -82,7 +82,7 @@ public class TestSnapshotInfo {
     Table<String, SnapshotInfo> snapshotInfo =
         omMetadataManager.getSnapshotInfoTable();
     snapshotInfo.put(EXPECTED_SNAPSHOT_KEY, createSnapshotInfo());
-    Assert.assertEquals(EXPECTED_PREVIOUS_SNAPSHOT_ID,
+    Assert.assertEquals(EXPECTED_SNAPSHOT_ID,
         snapshotInfo.get(EXPECTED_SNAPSHOT_KEY).getSnapshotID());
   }
 
