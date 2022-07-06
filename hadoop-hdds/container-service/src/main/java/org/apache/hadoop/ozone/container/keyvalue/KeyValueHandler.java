@@ -84,6 +84,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DELETE_ON_NON_EMPTY_CONTAINER;
@@ -268,7 +269,12 @@ public class KeyValueHandler extends Handler {
     }
     // Create Container request should be passed a null container as the
     // container would be created here.
-    Preconditions.checkArgument(kvContainer == null);
+    if (kvContainer != null) {
+      return ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException(
+              "Container creation failed because " + "key value container" +
+                  " already exists", null, CONTAINER_ALREADY_EXISTS), request);
+    }
 
     long containerID = request.getContainerID();
 
