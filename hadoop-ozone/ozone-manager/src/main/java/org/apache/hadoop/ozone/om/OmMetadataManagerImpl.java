@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.om.codec.OmDBTenantStateCodec;
 import org.apache.hadoop.ozone.om.codec.OmVolumeArgsCodec;
 import org.apache.hadoop.ozone.om.codec.RepeatedOmKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.S3SecretValueCodec;
+import org.apache.hadoop.ozone.om.codec.OmDBSnapshotInfoCodec;
 import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
 import org.apache.hadoop.ozone.om.codec.UserVolumeInfoCodec;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -76,6 +77,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -192,6 +194,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String PRINCIPAL_TO_ACCESS_IDS_TABLE =
       "principalToAccessIdsTable";
   public static final String TENANT_STATE_TABLE = "tenantStateTable";
+  public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
 
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,
@@ -212,7 +215,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       META_TABLE,
       TENANT_ACCESS_ID_TABLE,
       PRINCIPAL_TO_ACCESS_IDS_TABLE,
-      TENANT_STATE_TABLE
+      TENANT_STATE_TABLE,
+      SNAPSHOT_INFO_TABLE
   };
 
   private DBStore store;
@@ -239,6 +243,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table tenantAccessIdTable;
   private Table principalToAccessIdsTable;
   private Table tenantStateTable;
+  private Table snapshotInfoTable;
 
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
@@ -441,6 +446,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(TENANT_ACCESS_ID_TABLE)
         .addTable(PRINCIPAL_TO_ACCESS_IDS_TABLE)
         .addTable(TENANT_STATE_TABLE)
+        .addTable(SNAPSHOT_INFO_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
         .addCodec(RepeatedOmKeyInfo.class,
@@ -456,7 +462,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addCodec(OmDBTenantState.class, new OmDBTenantStateCodec())
         .addCodec(OmDBAccessIdInfo.class, new OmDBAccessIdInfoCodec())
         .addCodec(OmDBUserPrincipalInfo.class,
-            new OmDBUserPrincipalInfoCodec());
+            new OmDBUserPrincipalInfoCodec())
+        .addCodec(SnapshotInfo.class,
+            new OmDBSnapshotInfoCodec());
   }
 
   /**
@@ -548,6 +556,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     tenantStateTable = this.store.getTable(TENANT_STATE_TABLE,
         String.class, OmDBTenantState.class);
     checkTableStatus(tenantStateTable, TENANT_STATE_TABLE);
+
+    // path -> snapshotInfo (snapshot info for snapshot)
+    snapshotInfoTable = this.store.getTable(SNAPSHOT_INFO_TABLE,
+        String.class, SnapshotInfo.class);
+    checkTableStatus(snapshotInfoTable, SNAPSHOT_INFO_TABLE);
+
   }
 
   /**
@@ -1396,6 +1410,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Table<String, OmDBTenantState> getTenantStateTable() {
     return tenantStateTable;
+  }
+
+  @Override
+  public Table<String, SnapshotInfo> getSnapshotInfoTable() {
+    return snapshotInfoTable;
   }
 
   /**
