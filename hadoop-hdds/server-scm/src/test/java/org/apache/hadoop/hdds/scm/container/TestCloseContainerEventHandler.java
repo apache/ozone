@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -113,19 +114,19 @@ public class TestCloseContainerEventHandler {
 
   @Test
   public void testCloseContainerEventWithRatisContainers()
-      throws IOException, InvalidStateTransitionException {
+      throws IOException, InvalidStateTransitionException, TimeoutException {
     closeContainerForValidContainer(RATIS_REP_CONFIG, 3, false);
   }
 
   @Test
   public void testCloseContainerEventECContainer()
-      throws InvalidStateTransitionException, IOException {
+      throws InvalidStateTransitionException, IOException, TimeoutException {
     closeContainerForValidContainer(EC_REP_CONFIG, 5, true);
   }
 
   private void closeContainerForValidContainer(ReplicationConfig repConfig,
       int nodeCount, boolean forceClose)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException, InvalidStateTransitionException, TimeoutException {
     final Pipeline pipeline = createPipeline(repConfig, nodeCount);
     final ContainerInfo container =
         createContainer(repConfig, pipeline.getId());

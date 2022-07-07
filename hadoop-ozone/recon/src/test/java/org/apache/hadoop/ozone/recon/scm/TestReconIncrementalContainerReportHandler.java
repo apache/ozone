@@ -32,6 +32,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -112,7 +113,8 @@ public class TestReconIncrementalContainerReportHandler
   }
 
   @Test
-  public void testProcessICRStateMismatch() throws IOException {
+  public void testProcessICRStateMismatch()
+      throws IOException, TimeoutException {
 
     // Recon container state is "OPEN".
     // Replica state could be any Non OPEN state.

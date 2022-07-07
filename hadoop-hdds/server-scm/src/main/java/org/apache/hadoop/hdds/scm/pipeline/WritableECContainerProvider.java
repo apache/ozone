@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.NavigableSet;
+import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
 
@@ -91,7 +92,7 @@ public class WritableECContainerProvider
   @Override
   public ContainerInfo getContainer(final long size,
       ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
-      throws IOException {
+      throws IOException, TimeoutException {
     // Bound this at a minimum of 1 byte in case a request is made for a very
     // small size, which when divided by EC DataNum is zero.
     long requiredSpace = Math.max(1, size / repConfig.getData());
@@ -162,7 +163,8 @@ public class WritableECContainerProvider
   }
 
   private ContainerInfo allocateContainer(ReplicationConfig repConfig,
-      long size, String owner, ExcludeList excludeList) throws IOException {
+      long size, String owner, ExcludeList excludeList)
+      throws IOException, TimeoutException {
 
     List<DatanodeDetails> excludedNodes = Collections.emptyList();
     if (excludeList.getDatanodes().size() > 0) {

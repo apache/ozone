@@ -77,7 +77,7 @@ public class TestStatefulServiceStateManagerImpl {
    * @throws IOException on failure
    */
   @Test
-  public void testSaveConfiguration() throws IOException {
+  public void testSaveConfiguration() throws Exception {
     String serviceName = "test";
     String message = "message_string";
     stateManager.saveConfiguration(serviceName,
