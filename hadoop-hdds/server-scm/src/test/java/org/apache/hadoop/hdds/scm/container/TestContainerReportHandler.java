@@ -59,6 +59,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -82,7 +83,8 @@ public class TestContainerReportHandler {
   private PipelineManager pipelineManager;
 
   @BeforeEach
-  public void setup() throws IOException, InvalidStateTransitionException {
+  public void setup() throws IOException, InvalidStateTransitionException,
+      TimeoutException {
     final OzoneConfiguration conf = SCMTestUtils.getConf();
     nodeManager = new MockNodeManager(true, 10);
     containerManager = Mockito.mock(ContainerManager.class);
@@ -155,7 +157,7 @@ public class TestContainerReportHandler {
 
   @Test
   public void testUnderReplicatedContainer()
-      throws NodeNotFoundException, IOException {
+      throws NodeNotFoundException, IOException, TimeoutException {
     final ContainerReportHandler reportHandler = new ContainerReportHandler(
         nodeManager, containerManager);
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
@@ -210,7 +212,7 @@ public class TestContainerReportHandler {
 
   @Test
   public void testOverReplicatedContainer() throws NodeNotFoundException,
-      IOException {
+      IOException, TimeoutException {
 
     final ContainerReportHandler reportHandler = new ContainerReportHandler(
         nodeManager, containerManager);
@@ -269,7 +271,8 @@ public class TestContainerReportHandler {
 
 
   @Test
-  public void testClosingToClosed() throws NodeNotFoundException, IOException {
+  public void testClosingToClosed() throws NodeNotFoundException, IOException,
+      TimeoutException {
     /*
      * The container is in CLOSING state and all the replicas are in
      * OPEN/CLOSING state.
@@ -339,7 +342,7 @@ public class TestContainerReportHandler {
 
   @Test
   public void testClosingToQuasiClosed()
-      throws NodeNotFoundException, IOException {
+      throws NodeNotFoundException, IOException, TimeoutException {
     /*
      * The container is in CLOSING state and all the replicas are in
      * OPEN/CLOSING state.
@@ -407,7 +410,7 @@ public class TestContainerReportHandler {
 
   @Test
   public void testQuasiClosedToClosed()
-      throws NodeNotFoundException, IOException {
+      throws NodeNotFoundException, IOException, TimeoutException {
     /*
      * The container is in QUASI_CLOSED state.
      *  - One of the replica is in QUASI_CLOSED state
@@ -479,7 +482,7 @@ public class TestContainerReportHandler {
 
   @Test
   public void openContainerKeyAndBytesUsedUpdatedToMinimumOfAllReplicas()
-      throws IOException {
+      throws IOException, TimeoutException {
     final ContainerReportHandler reportHandler = new ContainerReportHandler(
         nodeManager, containerManager);
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
@@ -561,7 +564,7 @@ public class TestContainerReportHandler {
 
   @Test
   public void notOpenContainerKeyAndBytesUsedUpdatedToMaximumOfAllReplicas()
-      throws IOException {
+      throws IOException, TimeoutException {
     final ContainerReportHandler reportHandler = new ContainerReportHandler(
         nodeManager, containerManager);
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
@@ -637,7 +640,7 @@ public class TestContainerReportHandler {
 
   @Test
   public void openECContainerKeyAndBytesUsedUpdatedToMinimumOfAllReplicas()
-      throws IOException {
+      throws IOException, TimeoutException {
     final ECReplicationConfig repConfig = new ECReplicationConfig(3, 2);
     final ContainerReportHandler reportHandler = new ContainerReportHandler(
         nodeManager, containerManager);
@@ -713,7 +716,7 @@ public class TestContainerReportHandler {
 
   @Test
   public void closedECContainerKeyAndBytesUsedUpdatedToMinimumOfAllReplicas()
-      throws IOException {
+      throws IOException, TimeoutException {
     final ECReplicationConfig repConfig = new ECReplicationConfig(3, 2);
     final ContainerReportHandler reportHandler = new ContainerReportHandler(
         nodeManager, containerManager);
@@ -789,7 +792,7 @@ public class TestContainerReportHandler {
 
   @Test
   public void testStaleReplicaOfDeletedContainer() throws NodeNotFoundException,
-      IOException {
+      IOException, TimeoutException {
 
     final ContainerReportHandler reportHandler = new ContainerReportHandler(
         nodeManager, containerManager);

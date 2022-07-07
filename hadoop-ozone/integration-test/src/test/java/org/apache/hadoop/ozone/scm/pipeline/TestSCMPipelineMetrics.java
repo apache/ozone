@@ -37,6 +37,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.concurrent.TimeoutException;
 
 import org.junit.Rule;
 import org.junit.rules.Timeout;
@@ -95,7 +96,7 @@ public class TestSCMPipelineMetrics {
       cluster.getStorageContainerManager()
           .getPipelineManager()
           .closePipeline(pipeline.get(), false);
-    } catch (IOException e) {
+    } catch (IOException | TimeoutException e) {
       e.printStackTrace();
       Assert.fail();
     }
@@ -105,7 +106,7 @@ public class TestSCMPipelineMetrics {
   }
 
   @Test
-  public void testNumBlocksAllocated() throws IOException {
+  public void testNumBlocksAllocated() throws IOException, TimeoutException {
     AllocatedBlock block =
         cluster.getStorageContainerManager().getScmBlockManager()
             .allocateBlock(5,
