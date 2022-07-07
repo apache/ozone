@@ -135,6 +135,7 @@ public class ECReconstructionCoordinator implements Closeable {
 
     // 1. create target recovering containers.
     String containerToken = encode(tokenHelper.getContainerToken(cid));
+    List<DatanodeDetails> recoveringContainersCreatedDNs = new ArrayList<>();
     try {
       for (Map.Entry<Integer, DatanodeDetails> indexDnPair : targetNodeMap
           .entrySet()) {
@@ -143,6 +144,7 @@ public class ECReconstructionCoordinator implements Closeable {
         containerOperationClient
             .createRecoveringContainer(containerID, dn, repConfig,
                 containerToken, index);
+        recoveringContainersCreatedDNs.add(dn);
       }
 
       // 2. Reconstruct and transfer to targets
@@ -152,20 +154,19 @@ public class ECReconstructionCoordinator implements Closeable {
       }
 
       // 3. Close containers
-      for (Map.Entry<Integer, DatanodeDetails> indexDnPair : targetNodeMap
-          .entrySet()) {
-        DatanodeDetails dn = indexDnPair.getValue();
+      for (DatanodeDetails dn: recoveringContainersCreatedDNs) {
         containerOperationClient
             .closeContainer(containerID, dn, repConfig, containerToken);
       }
     } catch (Exception e) {
       // Any exception let's delete the recovering containers.
-      LOG.warn("Exception while reconstructing the container {}. Cleaning up"
-              + " all the recovering containers in the reconstruction process."
-          , containerID, e);
-      for (Map.Entry<Integer, DatanodeDetails> indexDnPair : targetNodeMap
-          .entrySet()) {
-        DatanodeDetails dn = indexDnPair.getValue();
+      LOG.warn(
+          "Exception while reconstructing the container {}. Cleaning up"
+              + " all the recovering containers in the reconstruction process.",
+          containerID, e);
+      // Delete only the current thread successfully created recovering
+      // containers.
+      for (DatanodeDetails dn : recoveringContainersCreatedDNs) {
         try {
           containerOperationClient
               .deleteRecoveringContainer(containerID, dn, repConfig,
@@ -178,6 +179,7 @@ public class ECReconstructionCoordinator implements Closeable {
           LOG.error("Exception while deleting the container {} at target: {}",
               containerID, dn, ioe);
         }
+        throw e;
       }
     }
 

@@ -116,8 +116,21 @@ public class ECContainerOperationClient implements Closeable {
     XceiverClientSpi xceiverClient = this.xceiverClientManager
         .acquireClient(singleNodePipeline(dn, repConfig));
     try {
-      ContainerProtocolCalls
-          .deleteContainer(xceiverClient, containerID, true, encodedToken);
+      // Before deleting the recovering container, just make sure that state is
+      // Recovering. There will be still race condition, but that will avoid
+      // most usual case.
+      ContainerProtos.ReadContainerResponseProto readContainerResponseProto =
+          ContainerProtocolCalls
+              .readContainer(xceiverClient, containerID, encodedToken);
+      if (readContainerResponseProto
+          .getContainerData()
+          .getState() == ContainerProtos.ContainerDataProto.State.RECOVERING) {
+        ContainerProtocolCalls
+            .deleteContainer(xceiverClient, containerID, true, encodedToken);
+      } else {
+        LOG.warn("Container will not be deleted as it is not a recovering"
+            + " container {}", containerID);
+      }
     } finally {
       this.xceiverClientManager.releaseClient(xceiverClient, false);
     }
