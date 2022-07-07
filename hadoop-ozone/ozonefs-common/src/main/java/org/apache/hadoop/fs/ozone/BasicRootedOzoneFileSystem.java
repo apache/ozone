@@ -642,7 +642,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       if (!isBucketLink) {
         result = innerDelete(f, recursive);
       } else {
-        result = true;
+        throw new IOException("george was here");
       }
 
       // Handle delete bucket
