@@ -33,6 +33,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import org.junit.Rule;
@@ -110,7 +111,8 @@ public class TestSCMRestart {
   }
 
   @Test
-  public void testPipelineWithScmRestart() throws IOException {
+  public void testPipelineWithScmRestart()
+      throws IOException, TimeoutException {
     // After restart make sure that the pipeline are still present
     Pipeline ratisPipeline1AfterRestart =
         pipelineManager.getPipeline(ratisPipeline1.getId());

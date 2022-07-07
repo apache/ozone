@@ -82,7 +82,7 @@ public class TestSCMContainerManagerMetrics {
   }
 
   @Test
-  public void testContainerOpsMetrics() throws IOException {
+  public void testContainerOpsMetrics() throws Exception {
     MetricsRecordBuilder metrics;
     ContainerManager containerManager = scm.getContainerManager();
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());

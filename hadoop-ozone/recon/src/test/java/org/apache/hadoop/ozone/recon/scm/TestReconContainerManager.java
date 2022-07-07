@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -55,7 +56,7 @@ import org.junit.Test;
 public class TestReconContainerManager
     extends AbstractReconContainerManagerTest {
   @Test
-  public void testAddNewOpenContainer() throws IOException {
+  public void testAddNewOpenContainer() throws IOException, TimeoutException {
     ContainerWithPipeline containerWithPipeline =
         getTestContainer(LifeCycleState.OPEN);
     ContainerID containerID =
@@ -87,7 +88,8 @@ public class TestReconContainerManager
   }
 
   @Test
-  public void testAddNewClosedContainer() throws IOException {
+  public void testAddNewClosedContainer()
+      throws IOException, TimeoutException {
     ContainerWithPipeline containerWithPipeline = getTestContainer(CLOSED);
     ContainerID containerID =
         containerWithPipeline.getContainerInfo().containerID();
@@ -195,7 +197,8 @@ public class TestReconContainerManager
   }
 
   @Test
-  public void testUpdateAndRemoveContainerReplica() throws IOException {
+  public void testUpdateAndRemoveContainerReplica()
+      throws IOException, TimeoutException {
     // Sanity checking updateContainerReplica and ContainerReplicaHistory
 
     // Init Container 1

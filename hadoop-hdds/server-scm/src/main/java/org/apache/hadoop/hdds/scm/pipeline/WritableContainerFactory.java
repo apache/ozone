@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Factory class to obtain a container to which a block can be allocated for
@@ -48,7 +49,7 @@ public class WritableContainerFactory {
 
   public ContainerInfo getContainer(final long size,
       ReplicationConfig repConfig, String owner, ExcludeList excludeList)
-      throws IOException {
+      throws IOException, TimeoutException {
     switch (repConfig.getReplicationType()) {
     case STAND_ALONE:
       return standaloneProvider

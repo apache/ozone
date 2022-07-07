@@ -217,7 +217,7 @@ public class ContainerBalancer extends StatefulService {
       if (iR == IterationResult.ITERATION_COMPLETED) {
         try {
           saveConfiguration(config, true, i + 1);
-        } catch (IOException e) {
+        } catch (IOException | TimeoutException e) {
           LOG.warn("Could not persist next iteration index value for " +
               "ContainerBalancer after completing an iteration", e);
         }
@@ -665,7 +665,7 @@ public class ContainerBalancer extends StatefulService {
       LOG.warn("Could not find Container {} for container move",
           containerID, e);
       return false;
-    } catch (NodeNotFoundException e) {
+    } catch (NodeNotFoundException | TimeoutException e) {
       LOG.warn("Container move failed for container {}", containerID, e);
       return false;
     }
@@ -981,7 +981,8 @@ public class ContainerBalancer extends StatefulService {
    */
   public void startBalancer(ContainerBalancerConfiguration configuration)
       throws IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException, IOException {
+      InvalidContainerBalancerConfigurationException, IOException,
+      TimeoutException {
     lock.lock();
     try {
       // validates state, config, and then saves config
@@ -1090,7 +1091,8 @@ public class ContainerBalancer extends StatefulService {
    * "stop" command.
    */
   public void stopBalancer()
-      throws IOException, IllegalContainerBalancerStateException {
+      throws IOException, IllegalContainerBalancerStateException,
+      TimeoutException {
     lock.lock();
     try {
       // should be leader, out of safe mode, and currently running
@@ -1113,7 +1115,8 @@ public class ContainerBalancer extends StatefulService {
       LOG.info("Stopping ContainerBalancer. Reason for stopping: {}",
           stopReason);
       stopBalancer();
-    } catch (IllegalContainerBalancerStateException | IOException e) {
+    } catch (IllegalContainerBalancerStateException | IOException |
+        TimeoutException e) {
       LOG.warn("Tried to stop ContainerBalancer but failed. Reason for " +
           "stopping: {}", stopReason, e);
     }
@@ -1121,7 +1124,7 @@ public class ContainerBalancer extends StatefulService {
 
   private void saveConfiguration(ContainerBalancerConfiguration configuration,
                                  boolean shouldRun, int index)
-      throws IOException {
+      throws IOException, TimeoutException {
     lock.lock();
     try {
       saveConfiguration(configuration.toProtobufBuilder()
@@ -1201,7 +1204,7 @@ public class ContainerBalancer extends StatefulService {
   private void setBalancerConfigOnStartBalancer(
       ContainerBalancerConfiguration configuration)
       throws InvalidContainerBalancerConfigurationException,
-      IllegalContainerBalancerStateException, IOException {
+      IllegalContainerBalancerStateException, IOException, TimeoutException {
     validateState(false);
     validateConfiguration(configuration);
     saveConfiguration(configuration, true, 0);

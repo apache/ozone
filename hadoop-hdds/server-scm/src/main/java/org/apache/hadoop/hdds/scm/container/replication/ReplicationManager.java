@@ -56,6 +56,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -533,7 +534,8 @@ public class ReplicationManager implements SCMService {
   */
   public CompletableFuture<LegacyReplicationManager.MoveResult> move(
       ContainerID cid, DatanodeDetails src, DatanodeDetails tgt)
-      throws NodeNotFoundException, ContainerNotFoundException {
+      throws NodeNotFoundException, ContainerNotFoundException,
+      TimeoutException {
     CompletableFuture<LegacyReplicationManager.MoveResult> ret =
         new CompletableFuture<>();
     if (!isRunning()) {
