@@ -29,6 +29,8 @@ import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -44,8 +46,14 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  */
 public class FSOBucketHandler extends BucketHandler {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(FSOBucketHandler.class);
   private OmBucketInfo omBucketInfo;
 
+  private long volumeId;
+  
+  private long bucketId;
+  
   public FSOBucketHandler(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
@@ -54,6 +62,18 @@ public class FSOBucketHandler extends BucketHandler {
     super(reconNamespaceSummaryManager, omMetadataManager,
         reconSCM);
     this.omBucketInfo = bucketInfo;
+
+    String vol = omBucketInfo.getVolumeName();
+    String bucket = omBucketInfo.getBucketName();
+
+    String[] names = {vol, bucket};
+
+    try {
+      this.volumeId = getVolumeObjectId(names);
+      this.bucketId = getBucketObjectId(names);  
+    } catch (Exception e) {
+      LOG.error("Failed to get volume or bucket object Id ", e);
+    }
   }
 
   /**
@@ -63,13 +83,12 @@ public class FSOBucketHandler extends BucketHandler {
    * @throws IOException
    */
   @Override
-  public EntityType determineKeyPath(String keyName,
-                                     long volumeId, long bucketObjectId)
+  public EntityType determineKeyPath(String keyName)
                                      throws IOException {
     Path keyPath = Paths.get(keyName);
     Iterator<Path> elements = keyPath.iterator();
 
-    long lastKnownParentId = bucketObjectId;
+    long lastKnownParentId = bucketId;
     OmDirectoryInfo omDirInfo = null;
     while (elements.hasNext()) {
       String fileName = elements.next().toString();
@@ -80,7 +99,7 @@ public class FSOBucketHandler extends BucketHandler {
       // 2. If there is no dir exists for the leaf node component 'file1.txt'
       // then do look it on fileTable.
       String dbNodeName = getOmMetadataManager().getOzonePathKey(volumeId,
-              bucketObjectId, lastKnownParentId, fileName);
+          bucketId, lastKnownParentId, fileName);
       omDirInfo = getOmMetadataManager().getDirectoryTable()
               .getSkipCache(dbNodeName);
 
@@ -140,14 +159,6 @@ public class FSOBucketHandler extends BucketHandler {
 
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
             iterator = keyTable.iterator();
-
-    String vol = omBucketInfo.getVolumeName();
-    String bucket = omBucketInfo.getBucketName();
-
-    String[] names = {vol, bucket};
-
-    long volumeId = getVolumeObjectId(names);
-    long bucketId = getBucketObjectId(names);
 
     StringBuilder builder = new StringBuilder();
 
@@ -211,14 +222,6 @@ public class FSOBucketHandler extends BucketHandler {
     Table keyTable = getKeyTable();
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
             iterator = keyTable.iterator();
-
-    String vol = omBucketInfo.getVolumeName();
-    String bucket = omBucketInfo.getBucketName();
-
-    String[] names = {vol, bucket};
-
-    long volumeId = getVolumeObjectId(names);
-    long bucketId = getBucketObjectId(names);
 
     StringBuilder builder = new StringBuilder();
 
@@ -323,8 +326,6 @@ public class FSOBucketHandler extends BucketHandler {
   @Override
   public OmKeyInfo getKeyInfo(String[] names) throws IOException {
     // The object ID for the directory that the key is directly in
-    final long volumeId = getVolumeObjectId(names);
-    final long bucketId = getBucketObjectId(names);
     long parentObjectId = getDirObjectId(names,
         names.length - 1);
     String fileName = names[names.length - 1];

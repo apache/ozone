@@ -86,8 +86,8 @@ public abstract class BucketHandler {
     return reconSCM;
   }
 
-  public abstract EntityType determineKeyPath(String keyName, long volumeId,
-                             long bucketObjectId) throws IOException;
+  public abstract EntityType determineKeyPath(String keyName)
+      throws IOException;
 
   public abstract Table<String, OmKeyInfo> getKeyTable();
 
@@ -225,16 +225,9 @@ public abstract class BucketHandler {
 
     if (bucketInfo == null) {
       return null;
-    }
-
-    if (bucketInfo.getBucketLayout()
-        .equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-      return new FSOBucketHandler(reconNamespaceSummaryManager,
-          omMetadataManager, reconSCM, bucketInfo);
     } else {
-      return new LegacyBucketHandler(reconNamespaceSummaryManager,
+      return getBucketHandler(reconNamespaceSummaryManager,
           omMetadataManager, reconSCM, bucketInfo);
     }
   }
-
 }
