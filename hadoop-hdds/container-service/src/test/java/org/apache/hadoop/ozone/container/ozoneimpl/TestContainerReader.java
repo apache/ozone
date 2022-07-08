@@ -217,7 +217,7 @@ public class TestContainerReader {
   @Test
   public void testContainerReader() throws Exception {
     ContainerReader containerReader = new ContainerReader(volumeSet,
-        hddsVolume, containerSet, conf);
+        hddsVolume, containerSet, conf, true);
 
     Thread thread = new Thread(containerReader);
     thread.start();
@@ -284,7 +284,7 @@ public class TestContainerReader {
     ContainerCache.getInstance(conf).shutdownCache();
 
     ContainerReader containerReader = new ContainerReader(volumeSet1,
-        hddsVolume1, containerSet1, conf);
+        hddsVolume1, containerSet1, conf, true);
     containerReader.readVolume(hddsVolume1.getHddsRootDir());
     Assert.assertEquals(containerCount - 1, containerSet1.containerCount());
   }
@@ -346,7 +346,7 @@ public class TestContainerReader {
     Thread[] threads = new Thread[volumeNum];
     for (int i = 0; i < volumeNum; i++) {
       containerReaders[i] = new ContainerReader(volumeSets,
-          (HddsVolume) volumes.get(i), containerSet, conf);
+          (HddsVolume) volumes.get(i), containerSet, conf, true);
       threads[i] = new Thread(containerReaders[i]);
     }
     long startTime = System.currentTimeMillis();
