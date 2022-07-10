@@ -135,25 +135,52 @@ public class ECReconstructionCoordinator implements Closeable {
 
     // 1. create target recovering containers.
     String containerToken = encode(tokenHelper.getContainerToken(cid));
-    for (Map.Entry<Integer, DatanodeDetails> indexDnPair : targetNodeMap
-        .entrySet()) {
-      DatanodeDetails dn = indexDnPair.getValue();
-      Integer index = indexDnPair.getKey();
-      containerOperationClient.createRecoveringContainer(containerID, dn,
-          repConfig, containerToken, index);
-    }
+    List<DatanodeDetails> recoveringContainersCreatedDNs = new ArrayList<>();
+    try {
+      for (Map.Entry<Integer, DatanodeDetails> indexDnPair : targetNodeMap
+          .entrySet()) {
+        DatanodeDetails dn = indexDnPair.getValue();
+        Integer index = indexDnPair.getKey();
+        containerOperationClient
+            .createRecoveringContainer(containerID, dn, repConfig,
+                containerToken, index);
+        recoveringContainersCreatedDNs.add(dn);
+      }
 
-    // 2. Reconstruct and transfer to targets
-    for (BlockLocationInfo blockLocationInfo : blockLocationInfoMap.values()) {
-      reconstructECBlockGroup(blockLocationInfo, repConfig, targetNodeMap);
-    }
+      // 2. Reconstruct and transfer to targets
+      for (BlockLocationInfo blockLocationInfo : blockLocationInfoMap
+          .values()) {
+        reconstructECBlockGroup(blockLocationInfo, repConfig, targetNodeMap);
+      }
 
-    // 3. Close containers
-    for (Map.Entry<Integer, DatanodeDetails> indexDnPair : targetNodeMap
-        .entrySet()) {
-      DatanodeDetails dn = indexDnPair.getValue();
-      containerOperationClient.closeContainer(containerID, dn, repConfig,
-          containerToken);
+      // 3. Close containers
+      for (DatanodeDetails dn: recoveringContainersCreatedDNs) {
+        containerOperationClient
+            .closeContainer(containerID, dn, repConfig, containerToken);
+      }
+    } catch (Exception e) {
+      // Any exception let's delete the recovering containers.
+      LOG.warn(
+          "Exception while reconstructing the container {}. Cleaning up"
+              + " all the recovering containers in the reconstruction process.",
+          containerID, e);
+      // Delete only the current thread successfully created recovering
+      // containers.
+      for (DatanodeDetails dn : recoveringContainersCreatedDNs) {
+        try {
+          containerOperationClient
+              .deleteRecoveringContainer(containerID, dn, repConfig,
+                  containerToken);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Deleted the container {}, at the target: {}",
+                containerID, dn);
+          }
+        } catch (IOException ioe) {
+          LOG.error("Exception while deleting the container {} at target: {}",
+              containerID, dn, ioe);
+        }
+        throw e;
+      }
     }
 
   }
