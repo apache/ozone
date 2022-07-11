@@ -54,8 +54,8 @@ public class ReplicationConfigValidator {
       if (!validationRegexp.matcher(
           replicationConfig.configFormat()).matches()) {
         String replication = replicationConfig.getReplication();
-        if (HddsProtos.ReplicationType.EC.equals(
-                replicationConfig.getReplicationType())) {
+        if (HddsProtos.ReplicationType.EC ==
+                replicationConfig.getReplicationType()) {
           ECReplicationConfig ecConfig =
               (ECReplicationConfig) replicationConfig;
           replication =  ecConfig.getCodec() + "-" + ecConfig.getData() +
