@@ -60,8 +60,7 @@ public class TestStringToSignProducer {
     final SignatureInfo signatureInfo =
         new AuthorizationV4HeaderParser(authHeader, "123") {
           @Override
-          public void validateDateRange(Credential credentialObj)
-              throws OS3Exception {
+          public void validateDateRange(Credential credentialObj) {
             //NOOP
           }
         }.parseSignature();

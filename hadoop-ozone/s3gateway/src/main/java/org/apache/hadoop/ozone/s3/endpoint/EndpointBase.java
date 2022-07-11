@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -252,7 +253,7 @@ public abstract class EndpointBase implements Auditor {
       builder.setUser(s3Auth.getAccessID());
     }
     if (context != null) {
-      builder.atIp(getClientIpAddress());
+      builder.atIp(AuditUtils.getClientIpAddress(context));
     }
     return builder;
   }
@@ -289,24 +290,8 @@ public abstract class EndpointBase implements Auditor {
     return S3GatewayMetrics.create();
   }
 
-  public String getClientIpAddress() {
-    return context.getHeaderString(CLIENT_IP_HEADER);
-  }
-
   protected Map<String, String> getAuditParameters() {
-    Map<String, String> res = new HashMap<>();
-    if (context != null) {
-      for (Map.Entry<String, List<String>> entry :
-          context.getUriInfo().getPathParameters().entrySet()) {
-        res.put(entry.getKey(), entry.getValue().toString());
-
-      }
-      for (Map.Entry<String, List<String>> entry :
-          context.getUriInfo().getQueryParameters().entrySet()) {
-        res.put(entry.getKey(), entry.getValue().toString());
-      }
-    }
-    return res;
+    return AuditUtils.getAuditParameters(context);
   }
 
   protected void auditWriteFailure(AuditAction action, Throwable ex) {

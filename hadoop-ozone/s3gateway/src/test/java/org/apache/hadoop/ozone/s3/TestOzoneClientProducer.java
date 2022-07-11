@@ -47,6 +47,7 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.mockito.Mock;
 import org.mockito.Mockito;
 
 /**
@@ -58,6 +59,7 @@ public class TestOzoneClientProducer {
   private OzoneClientProducer producer;
   private MultivaluedMap<String, String> headerMap;
   private MultivaluedMap<String, String> queryMap;
+  private MultivaluedMap<String, String> pathParamsMap;
   private String authHeader;
   private String contentMd5;
   private String host;
@@ -81,6 +83,7 @@ public class TestOzoneClientProducer {
     producer = new OzoneClientProducer();
     headerMap = new MultivaluedHashMap<>();
     queryMap = new MultivaluedHashMap<>();
+    pathParamsMap = new MultivaluedHashMap<>();
     uriInfo = Mockito.mock(UriInfo.class);
     context = Mockito.mock(ContainerRequestContext.class);
     OzoneConfiguration config = new OzoneConfiguration();
@@ -219,6 +222,8 @@ public class TestOzoneClientProducer {
         .thenReturn(authHeader);
     Mockito.when(context.getUriInfo().getQueryParameters())
         .thenReturn(queryMap);
+    Mockito.when(context.getUriInfo().getPathParameters())
+        .thenReturn(pathParamsMap);
 
     AWSSignatureProcessor awsSignatureProcessor = new AWSSignatureProcessor();
     awsSignatureProcessor.setContext(context);
