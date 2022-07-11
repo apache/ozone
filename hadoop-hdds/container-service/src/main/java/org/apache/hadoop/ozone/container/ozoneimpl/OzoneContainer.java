@@ -245,7 +245,7 @@ public class OzoneContainer {
     while (volumeSetIterator.hasNext()) {
       StorageVolume volume = volumeSetIterator.next();
       Thread thread = new Thread(new ContainerReader(volumeSet,
-          (HddsVolume) volume, containerSet, config));
+          (HddsVolume) volume, containerSet, config, true));
       thread.start();
       volumeThreads.add(thread);
     }
