@@ -44,6 +44,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -103,8 +104,9 @@ public class TestScmHAFinalization {
         () -> {
           try {
             scmClient.finalizeScmUpgrade(CLIENT_ID);
-          } catch (Exception ex) {
-            LOG.info("finalization client failed.", ex);
+          } catch (IOException ex) {
+            LOG.info("finalization client failed. This may be expected if the" +
+                " test injected failures.", ex);
           }
         });
   }
@@ -160,8 +162,7 @@ public class TestScmHAFinalization {
     // Restart actually creates a new SCM.
     // Since this SCM will be a follower, the implementation of its upgrade
     // finalization executor does not matter for this test.
-    StorageContainerManager oldLeaderScmRestarted =
-        cluster.restartStorageContainerManager(oldLeaderScm, true);
+    cluster.restartStorageContainerManager(oldLeaderScm, true);
 
     // Make sure the original SCM leader is not the leader anymore.
     StorageContainerManager newLeaderScm  = cluster.getActiveSCM();

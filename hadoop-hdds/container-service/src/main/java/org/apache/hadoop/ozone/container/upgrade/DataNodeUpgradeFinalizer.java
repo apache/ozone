@@ -55,9 +55,8 @@ public class DataNodeUpgradeFinalizer extends
       String msg = "Pre Finalization checks failed on the DataNode.";
       logAndEmit(msg);
       throw new UpgradeException(msg, PREFINALIZE_VALIDATION_FAILED);
-    } else {
-      getVersionManager().setUpgradeState(FINALIZATION_IN_PROGRESS);
     }
+    getVersionManager().setUpgradeState(FINALIZATION_IN_PROGRESS);
   }
 
   private boolean canFinalizeDataNode(DatanodeStateMachine dsm) {

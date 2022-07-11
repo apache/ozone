@@ -50,7 +50,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 /**
- * UpgradeFinalizer implementation for the Storage Container Manager service.
+ * Base UpgradeFinalizer implementation to be extended by services.
  */
 public abstract class BasicUpgradeFinalizer
     <T, V extends AbstractLayoutVersionManager> implements UpgradeFinalizer<T> {
@@ -100,7 +100,8 @@ public abstract class BasicUpgradeFinalizer
         // correct.
       } catch (NotLeaderException e) {
         LOG.info("Leader change encountered during finalization. This " +
-            "component will continue to finalize as a follower.", e);
+            "component will continue finalization as directed by the new " +
+            "leader.", e);
       } finally {
         finalizationLock.unlock();
       }

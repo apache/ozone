@@ -63,10 +63,7 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     // Javadoc for InvocationHandler#invoke specifies that args will be null
     // if the method takes no arguments. Convert this to an empty array for
     // easier handling.
-    Object[] convertedArgs = args;
-    if (args == null) {
-      convertedArgs = new Object[]{};
-    }
+    Object[] convertedArgs = (args == null) ? new Object[]{} : args;
     try {
       long startTime = Time.monotonicNow();
       final Object result =
