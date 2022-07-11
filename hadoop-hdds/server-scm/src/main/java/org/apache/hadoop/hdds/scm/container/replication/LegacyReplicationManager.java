@@ -1940,19 +1940,20 @@ public class LegacyReplicationManager {
     }
 
     private void initialize() throws IOException {
-      TableIterator<ContainerID,
-          ? extends Table.KeyValue<ContainerID, MoveDataNodePair>>
-          iterator = moveTable.iterator();
+      try (TableIterator<ContainerID,
+          ? extends Table.KeyValue<ContainerID, MoveDataNodePair>> iterator =
+               moveTable.iterator()) {
 
-      while (iterator.hasNext()) {
-        Table.KeyValue<ContainerID, MoveDataNodePair> kv = iterator.next();
-        final ContainerID cid = kv.getKey();
-        final MoveDataNodePair mp = kv.getValue();
-        Preconditions.assertNotNull(cid,
-            "moved container id should not be null");
-        Preconditions.assertNotNull(mp,
-            "MoveDataNodePair container id should not be null");
-        inflightMove.put(cid, mp);
+        while (iterator.hasNext()) {
+          Table.KeyValue<ContainerID, MoveDataNodePair> kv = iterator.next();
+          final ContainerID cid = kv.getKey();
+          final MoveDataNodePair mp = kv.getValue();
+          Preconditions.assertNotNull(cid,
+              "moved container id should not be null");
+          Preconditions.assertNotNull(mp,
+              "MoveDataNodePair container id should not be null");
+          inflightMove.put(cid, mp);
+        }
       }
     }
 
