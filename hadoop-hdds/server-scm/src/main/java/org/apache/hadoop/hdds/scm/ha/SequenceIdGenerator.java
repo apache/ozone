@@ -264,19 +264,19 @@ public class SequenceIdGenerator {
     }
 
     private void initialize() throws IOException {
-      TableIterator<String,
-          ? extends Table.KeyValue<String, Long>>
-          iterator = sequenceIdTable.iterator();
+      try (TableIterator<String, ? extends Table.KeyValue<String, Long>>
+          iterator = sequenceIdTable.iterator()) {
 
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, Long> kv = iterator.next();
-        final String sequenceIdName = kv.getKey();
-        final Long lastId = kv.getValue();
-        Preconditions.checkNotNull(sequenceIdName,
-            "sequenceIdName should not be null");
-        Preconditions.checkNotNull(lastId,
-            "lastId should not be null");
-        sequenceIdToLastIdMap.put(sequenceIdName, lastId);
+        while (iterator.hasNext()) {
+          Table.KeyValue<String, Long> kv = iterator.next();
+          final String sequenceIdName = kv.getKey();
+          final Long lastId = kv.getValue();
+          Preconditions.checkNotNull(sequenceIdName,
+              "sequenceIdName should not be null");
+          Preconditions.checkNotNull(lastId,
+              "lastId should not be null");
+          sequenceIdToLastIdMap.put(sequenceIdName, lastId);
+        }
       }
     }
 
