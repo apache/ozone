@@ -386,6 +386,7 @@ public class TestContainerStateMachineFailures {
   }
 
   @Test
+  @Flaky("HDDS-6935")
   public void testApplyTransactionFailure() throws Exception {
     OzoneOutputStream key =
             objectStore.getVolume(volumeName).getBucket(bucketName)

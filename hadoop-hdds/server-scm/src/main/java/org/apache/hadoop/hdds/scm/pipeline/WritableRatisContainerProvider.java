@@ -34,6 +34,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 /**
  * Class to obtain a writable container for Ratis and Standalone pipelines.
@@ -63,7 +65,7 @@ public class WritableRatisContainerProvider
   @Override
   public ContainerInfo getContainer(final long size,
       ReplicationConfig repConfig, String owner, ExcludeList excludeList)
-      throws IOException {
+      throws IOException, TimeoutException {
     /*
       Here is the high level logic.
 
@@ -92,15 +94,10 @@ public class WritableRatisContainerProvider
       // mentioned in HDDS-5655.
       pipelineManager.acquireReadLock();
       try {
-        availablePipelines = pipelineManager.getPipelines(repConfig,
-            Pipeline.PipelineState.OPEN, excludeList.getDatanodes(),
-            excludeList.getPipelineIds());
-        if (availablePipelines.size() == 0 && !excludeList.isEmpty()) {
-          // if no pipelines can be found, try finding pipeline without
-          // exclusion
-          availablePipelines = pipelineManager
-              .getPipelines(repConfig, Pipeline.PipelineState.OPEN);
-        }
+        availablePipelines =
+                findPipelinesByState(repConfig,
+                        excludeList,
+                        Pipeline.PipelineState.OPEN);
         if (availablePipelines.size() != 0) {
           containerInfo = selectContainer(availablePipelines, size, owner,
               excludeList);
@@ -123,8 +120,25 @@ public class WritableRatisContainerProvider
 
         } catch (SCMException se) {
           LOG.warn("Pipeline creation failed for repConfig {} " +
-              "Datanodes may be used up.", repConfig, se);
-          break;
+              "Datanodes may be used up. Try to see if any pipeline is in " +
+                  "ALLOCATED state, and then will wait for it to be OPEN",
+                  repConfig, se);
+          List<Pipeline> allocatedPipelines = findPipelinesByState(repConfig,
+                  excludeList,
+                  Pipeline.PipelineState.ALLOCATED);
+          if (!allocatedPipelines.isEmpty()) {
+            List<PipelineID> allocatedPipelineIDs =
+                    allocatedPipelines.stream()
+                            .map(p -> p.getId())
+                            .collect(Collectors.toList());
+            try {
+              pipelineManager
+                      .waitOnePipelineReady(allocatedPipelineIDs, 0);
+            } catch (IOException e) {
+              LOG.warn("Waiting for one of pipelines {} to be OPEN failed. ",
+                      allocatedPipelineIDs, e);
+            }
+          }
         } catch (IOException e) {
           LOG.warn("Pipeline creation failed for repConfig: {}. "
               + "Retrying get pipelines call once.", repConfig, e);
@@ -134,15 +148,9 @@ public class WritableRatisContainerProvider
         try {
           // If Exception occurred or successful creation of pipeline do one
           // final try to fetch pipelines.
-          availablePipelines = pipelineManager
-              .getPipelines(repConfig, Pipeline.PipelineState.OPEN,
-                  excludeList.getDatanodes(), excludeList.getPipelineIds());
-          if (availablePipelines.size() == 0 && !excludeList.isEmpty()) {
-            // if no pipelines can be found, try finding pipeline without
-            // exclusion
-            availablePipelines = pipelineManager
-                .getPipelines(repConfig, Pipeline.PipelineState.OPEN);
-          }
+          availablePipelines = findPipelinesByState(repConfig,
+                  excludeList,
+                  Pipeline.PipelineState.OPEN);
           if (availablePipelines.size() == 0) {
             LOG.info("Could not find available pipeline of repConfig: {} "
                 + "even after retrying", repConfig);
@@ -165,6 +173,21 @@ public class WritableRatisContainerProvider
         "Unable to allocate a block for the size: {}, repConfig: {}",
         size, repConfig);
     return null;
+  }
+
+  private List<Pipeline> findPipelinesByState(
+          final ReplicationConfig repConfig,
+          final ExcludeList excludeList,
+          final Pipeline.PipelineState pipelineState) {
+    List<Pipeline> pipelines = pipelineManager.getPipelines(repConfig,
+            pipelineState, excludeList.getDatanodes(),
+            excludeList.getPipelineIds());
+    if (pipelines.size() == 0 && !excludeList.isEmpty()) {
+      // if no pipelines can be found, try finding pipeline without
+      // exclusion
+      pipelines = pipelineManager.getPipelines(repConfig, pipelineState);
+    }
+    return pipelines;
   }
 
   private ContainerInfo selectContainer(List<Pipeline> availablePipelines,

@@ -91,9 +91,9 @@ public class TestS3GetSecretRequest {
   // Multi-tenant related vars
   private static final String USER_ALICE = "alice@EXAMPLE.COM";
   private static final String TENANT_ID = "finance";
-  private static final String USER_BOB = "bob@EXAMPLE.COM";
+  private static final String USER_BOB_SHORT = "bob";
   private static final String ACCESS_ID_BOB =
-      OMMultiTenantManager.getDefaultAccessId(TENANT_ID, USER_BOB);
+      OMMultiTenantManager.getDefaultAccessId(TENANT_ID, USER_BOB_SHORT);
 
   private UserGroupInformation ugiAlice;
 
@@ -376,7 +376,8 @@ public class TestS3GetSecretRequest {
     OMTenantAssignUserAccessIdRequest omTenantAssignUserAccessIdRequest =
         new OMTenantAssignUserAccessIdRequest(
             new OMTenantAssignUserAccessIdRequest(
-                assignUserToTenantRequest(TENANT_ID, USER_BOB, ACCESS_ID_BOB)
+                assignUserToTenantRequest(TENANT_ID,
+                    USER_BOB_SHORT, ACCESS_ID_BOB)
             ).preExecute(ozoneManager)
         );
 

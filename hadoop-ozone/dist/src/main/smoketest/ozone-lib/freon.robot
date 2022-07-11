@@ -16,6 +16,10 @@
 *** Settings ***
 Resource            ../lib/os.robot
 
+*** Variables ***
+${OM_HA_PARAM}         ${EMPTY}
+${SECURITY_ENABLED}    false
+
 *** Keywords ***
 Freon DCG
     [arguments]    ${prefix}=dcg    ${n}=1    ${threads}=1    ${args}=${EMPTY}

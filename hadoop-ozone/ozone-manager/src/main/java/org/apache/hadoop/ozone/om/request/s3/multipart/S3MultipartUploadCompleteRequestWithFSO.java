@@ -163,11 +163,11 @@ public class S3MultipartUploadCompleteRequestWithFSO
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       String dbMultipartOpenKey, OmKeyInfo omKeyInfo,
       List<OmKeyInfo> unUsedParts, OmBucketInfo omBucketInfo,
-      RepeatedOmKeyInfo oldKeyVersionsToDelete) {
+      RepeatedOmKeyInfo oldKeyVersionsToDelete, long volumeId) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts,
-        getBucketLayout(), omBucketInfo, oldKeyVersionsToDelete);
+        getBucketLayout(), omBucketInfo, oldKeyVersionsToDelete, volumeId);
   }
 
   @Override

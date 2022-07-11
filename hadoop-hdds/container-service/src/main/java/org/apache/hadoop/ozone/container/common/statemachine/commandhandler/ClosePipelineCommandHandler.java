@@ -121,4 +121,9 @@ public class ClosePipelineCommandHandler implements CommandHandler {
     }
     return 0;
   }
+
+  @Override
+  public int getQueuedCount() {
+    return 0;
+  }
 }

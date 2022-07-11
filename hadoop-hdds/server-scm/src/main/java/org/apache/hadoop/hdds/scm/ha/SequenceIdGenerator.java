@@ -38,6 +38,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -104,7 +105,7 @@ public class SequenceIdGenerator {
    * @param sequenceIdName : name of the sequenceId
    * @return : next id of this sequenceId.
    */
-  public long getNextId(String sequenceIdName) {
+  public long getNextId(String sequenceIdName) throws TimeoutException {
     lock.lock();
     try {
       Batch batch = sequenceIdToBatchMap.computeIfAbsent(
@@ -186,7 +187,8 @@ public class SequenceIdGenerator {
      */
     @Replicate
     Boolean allocateBatch(String sequenceIdName,
-                          Long expectedLastId, Long newLastId);
+                          Long expectedLastId, Long newLastId)
+        throws TimeoutException;
 
     /**
      * @param sequenceIdName : name of the sequence id.

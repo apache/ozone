@@ -79,6 +79,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -762,7 +763,7 @@ public final class SCMThroughputBenchmark implements Callable<Void> {
           try {
             datanode.sendHeartbeat();
             succReportSendCounter.incrementAndGet();
-          } catch (IOException e) {
+          } catch (IOException | TimeoutException e) {
             LOG.error("{}", e);
             failReportSendCounter.incrementAndGet();
           }
@@ -802,7 +803,7 @@ public final class SCMThroughputBenchmark implements Callable<Void> {
       }
     }
 
-    public void sendHeartbeat() throws IOException {
+    public void sendHeartbeat() throws IOException, TimeoutException {
       SCMHeartbeatRequestProto heartbeatRequest = SCMHeartbeatRequestProto
           .newBuilder()
           .setDatanodeDetails(datanodeDetails.getProtoBufMessage())

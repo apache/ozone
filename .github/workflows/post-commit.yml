@@ -163,7 +163,7 @@ jobs:
     needs:
       - build-info
     runs-on: ubuntu-18.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     if: needs.build-info.outputs.needs-basic-checks == 'true'
     strategy:
       matrix:

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.security;
+package org.apache.hadoop.hdds.security.token;
 
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getBlockRequest;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getPutBlockRequest;
@@ -34,10 +34,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.security.token.BlockTokenException;
-import org.apache.hadoop.hdds.security.token.BlockTokenVerifier;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.OMCertificateClient;
