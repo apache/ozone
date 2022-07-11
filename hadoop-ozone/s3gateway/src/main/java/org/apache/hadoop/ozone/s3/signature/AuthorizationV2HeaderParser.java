@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.s3.signature;
 
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;

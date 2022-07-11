@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-
 import org.junit.Assert;
 
 import static org.junit.Assert.assertEquals;

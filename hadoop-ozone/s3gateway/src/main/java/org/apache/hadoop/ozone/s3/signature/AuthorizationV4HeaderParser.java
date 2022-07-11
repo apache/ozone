@@ -32,7 +32,6 @@ import org.apache.commons.codec.binary.Hex;
 
 import static org.apache.commons.lang3.StringUtils.isEmpty;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.AWS4_SIGNING_ALGORITHM;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
 
@@ -179,7 +178,8 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
     }
     if (credentialObj.getAwsRequest().isEmpty()) {
       throw new MalformedResourceException(
-          "AWS request shouldn't be empty. credential:{}", credential);
+          "AWS request shouldn't be empty. credential:" + credential,
+          authHeader);
     }
     if (credentialObj.getAwsService().isEmpty()) {
       throw new MalformedResourceException(
