@@ -214,6 +214,9 @@ public final class ScmConfigKeys {
   public static final String HDDS_DATANODE_DIR_KEY = "hdds.datanode.dir";
   public static final String HDDS_DATANODE_DIR_DU_RESERVED =
       "hdds.datanode.dir.du.reserved";
+  public static final String HDDS_DATANODE_DIR_DU_RESERVED_PERCENT =
+      "hdds.datanode.dir.du.reserved.percent";
+  public static final float HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT = 0;
   public static final String HDDS_REST_CSRF_ENABLED_KEY =
       "hdds.rest.rest-csrf.enabled";
   public static final boolean HDDS_REST_CSRF_ENABLED_DEFAULT = false;
