@@ -39,7 +39,7 @@ public final class BlockDeletingServiceMetrics {
   @Metric(about = "The number of successful delete blocks")
   private MutableCounterLong successCount;
 
-  @Metric(about = "The number of success deleted block bytes.")
+  @Metric(about = "The total bytes for blocks successfully deleted.")
   private MutableCounterLong successBytes;
 
   @Metric(about = "The number of failure delete block counts.")
