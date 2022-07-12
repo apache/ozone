@@ -51,7 +51,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   private volatile int metadataLayoutVersion; // MLV.
   private volatile int softwareLayoutVersion; // SLV.
   @VisibleForTesting
-  protected final TreeMap<Integer, LayoutFeature> features = new TreeMap<>();
+  protected final TreeMap<Integer, T> features = new TreeMap<>();
   @VisibleForTesting
   protected final Map<String, LayoutFeature> featureMap = new HashMap<>();
   private volatile Status currentUpgradeState;
@@ -210,7 +210,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   }
 
   @Override
-  public Iterable<LayoutFeature> unfinalizedFeatures() {
+  public Iterable<T> unfinalizedFeatures() {
     lock.readLock().lock();
     try {
       return new ArrayList<>(features

@@ -238,11 +238,11 @@ public class TestOMUpgradeFinalizer {
   }
 
   private void setupVersionManagerMockToFinalize(
-      Iterable<? extends LayoutFeature> lfs
+      Iterable<OMLayoutFeature> lfs
   ) {
     when(versionManager.getUpgradeState()).thenReturn(FINALIZATION_REQUIRED);
     when(versionManager.needsFinalization()).thenReturn(true);
-    List<LayoutFeature> lfIter = new ArrayList<>();
+    List<OMLayoutFeature> lfIter = new ArrayList<>();
     lfs.forEach(lfIter::add);
     when(versionManager.unfinalizedFeatures()).thenReturn(lfIter);
   }

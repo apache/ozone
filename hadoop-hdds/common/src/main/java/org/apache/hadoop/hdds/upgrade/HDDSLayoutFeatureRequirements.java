@@ -46,12 +46,14 @@ public class HDDSLayoutFeatureRequirements {
    */
   public HDDSLayoutFeatureRequirements(
       Collection<HDDSLayoutFeatureRequirements> requirements) {
-    int currentMinFinalizedDatanodes = 0;
+    int currentMinFinalizedDatanodes = REQUIRED_MIN_FINALIZED_DATANODES;
     PipelineRequirements currentPipelineRequirements =
         PipelineRequirements.NONE;
 
     for (HDDSLayoutFeatureRequirements req: requirements) {
-      currentMinFinalizedDatanodes = Math.min(currentMinFinalizedDatanodes,
+      // The minimum number of datanodes we must wait to finalize is the
+      // largest of the minimums of all layout features.
+      currentMinFinalizedDatanodes = Math.max(currentMinFinalizedDatanodes,
           req.minFinalizedDatanodes);
 
       if (req.pipelineRequirements == PipelineRequirements.CLOSE_ALL_PIPELINES) {
@@ -70,6 +72,12 @@ public class HDDSLayoutFeatureRequirements {
 
   public PipelineRequirements getPipelineRequirements() {
     return pipelineRequirements;
+  }
+
+  @Override
+  public String toString() {
+    return String.format("Pipeline requirements: %s\nMinimum number of " +
+        "finalized datanodes: %s", pipelineRequirements, minFinalizedDatanodes);
   }
 
   private void checkMinFinalizedDatanodes() {

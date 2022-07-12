@@ -19,12 +19,14 @@
 package org.apache.hadoop.hdds.scm.upgrade;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
@@ -119,7 +121,7 @@ public class TestScmFinalization {
         .setLayoutVersionManager(versionManager)
         .setSCMContext(scmContext)
         .setPipelineManager(pipelineManager)
-        .setNodeManager(Mockito.mock(NodeManager.class))
+        .setNodeManager(getMockNodeManager())
         .build();
     stateManager.setUpgradeContext(context);
 
@@ -197,7 +199,7 @@ public class TestScmFinalization {
     SCMHAManager haManager = Mockito.mock(SCMHAManager.class);
     DBTransactionBuffer buffer = Mockito.mock(DBTransactionBuffer.class);
     Mockito.when(haManager.getDBTransactionBuffer()).thenReturn(buffer);
-    NodeManager nodeManager = Mockito.mock(NodeManager.class);
+    NodeManager nodeManager = getMockNodeManager();
     SCMStorageConfig storage = Mockito.mock(SCMStorageConfig.class);
     SCMContext scmContext = SCMContext.emptyContext();
     scmContext.setFinalizationCheckpoint(initialCheckpoint);
@@ -334,6 +336,14 @@ public class TestScmFinalization {
     } else {
       return UpgradeFinalizer.STARTING_MSG;
     }
+  }
+
+  private NodeManager getMockNodeManager() {
+    NodeManager nodeManager = Mockito.mock(NodeManager.class);
+    // In this mocked test, all datanodes will finalize immediately.
+    Mockito.when(nodeManager.getNodeCount(NodeStatus.inServiceHealthy()))
+        .thenReturn(Integer.MAX_VALUE);
+    return nodeManager;
   }
 
   private PipelineManager getMockPipelineManager(

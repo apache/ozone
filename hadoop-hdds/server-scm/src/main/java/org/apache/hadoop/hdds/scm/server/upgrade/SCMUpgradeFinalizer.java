@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureRequirements.PipelineRequirements.CLOSE_ALL_PIPELINES;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
@@ -26,12 +27,15 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
@@ -49,12 +53,13 @@ public class SCMUpgradeFinalizer extends
         HDDSLayoutVersionManager> {
 
   public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
-    super(versionManager);
+    this(versionManager, new DefaultUpgradeFinalizationExecutor<>());
   }
 
   public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager,
       UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor) {
     super(versionManager, executor);
+
   }
 
   private void logCheckpointCrossed(FinalizationCheckpoint checkpoint) {
@@ -64,6 +69,10 @@ public class SCMUpgradeFinalizer extends
   @Override
   public void preFinalizeUpgrade(SCMUpgradeFinalizationContext context)
       throws IOException {
+    LOG.info("SCM will enforce the following requirements during " +
+            "finalization:\n{}",
+        context.getFinalizationRequirements());
+
     try {
       FinalizationStateManager stateManager =
           context.getFinalizationStateManager();
@@ -74,7 +83,9 @@ public class SCMUpgradeFinalizer extends
       logCheckpointCrossed(FinalizationCheckpoint.FINALIZATION_STARTED);
 
       if (!stateManager.crossedCheckpoint(
-          FinalizationCheckpoint.MLV_EQUALS_SLV)) {
+          FinalizationCheckpoint.MLV_EQUALS_SLV) &&
+          context.getFinalizationRequirements().getPipelineRequirements() ==
+              CLOSE_ALL_PIPELINES) {
         closePipelinesBeforeFinalization(context.getPipelineManager());
       }
     } catch (TimeoutException ex) {
@@ -123,7 +134,11 @@ public class SCMUpgradeFinalizer extends
         context.getFinalizationStateManager();
     if (!stateManager.crossedCheckpoint(
         FinalizationCheckpoint.FINALIZATION_COMPLETE)) {
+      // If no pipeline closes were required as part of this finalization,
+      // this is call will be a no-op.
       createPipelinesAfterFinalization(context);
+      waitForRequiredNodeCountToFinalize(context);
+
       // @Replicate methods are required to throw TimeoutException.
       try {
         stateManager.removeFinalizingMark();
@@ -220,5 +235,30 @@ public class SCMUpgradeFinalizer extends
         LOG.info("Open pipeline found after SCM finalization");
       }
     }
+  }
+
+  private void waitForRequiredNodeCountToFinalize(
+      SCMUpgradeFinalizationContext context) {
+    NodeManager nodeManager = context.getNodeManager();
+    final int minRequiredFinalizedNodes =
+        context.getFinalizationRequirements().getMinFinalizedDatanodes();
+    int numFinalizedNodes =
+        nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
+    while (numFinalizedNodes < minRequiredFinalizedNodes) {
+      LOG.info("Waiting for at least {} datanodes to finalize after SCM " +
+          "finalization. Currently have {} finalized datanodes",
+          minRequiredFinalizedNodes, numFinalizedNodes);
+      try {
+        Thread.sleep(5000);
+      } catch (InterruptedException e) {
+        // Try again on next loop iteration.
+        Thread.currentThread().interrupt();
+      }
+      numFinalizedNodes = nodeManager.getNodeCount(
+          NodeStatus.inServiceHealthy());
+    }
+
+    LOG.info("{} finalized datanodes have been found after SCM finalization.",
+        numFinalizedNodes);
   }
 }

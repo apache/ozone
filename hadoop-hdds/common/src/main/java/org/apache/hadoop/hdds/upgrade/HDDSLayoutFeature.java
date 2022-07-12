@@ -102,4 +102,8 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   public Optional<HDDSUpgradeAction> datanodeAction(UpgradeActionType type) {
     return Optional.ofNullable(datanodeActions.get(type));
   }
+
+  public HDDSLayoutFeatureRequirements getRequirements() {
+    return requirements;
+  }
 }
