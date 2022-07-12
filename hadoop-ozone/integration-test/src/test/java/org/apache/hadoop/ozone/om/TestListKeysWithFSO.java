@@ -369,6 +369,16 @@ public class TestListKeysWithFSO {
     checkKeyList("a1/b", "a1/b1/e/", expectedKeys, fsoOzoneBucket);
 
     // case-18: Partial prefixKey and seek till prefixKey.
+    expectedKeys =
+        getExpectedKeyList("a1/b1/c", "a1/b1/01/f/g/h", legacyOzoneBucket);
+    checkKeyList("a1/b1/c", "a1/b1/01/f/g/h", expectedKeys, fsoOzoneBucket);
+
+    // case-19: Partial prefixKey and seek till prefixKey.
+    expectedKeys =
+        getExpectedKeyList("a1/b1", "a1/01/e/f/g/h", legacyOzoneBucket);
+    checkKeyList("a1/b1", "a1/01/e/f/g/h", expectedKeys, fsoOzoneBucket);
+
+    // case-20: Partial prefixKey and seek till prefixKey.
     expectedKeys = getExpectedKeyList("a", "a1/b1/e/", legacyOzoneBucket);
     checkKeyList("a", "a1/b1/e/", expectedKeys, fsoOzoneBucket);
   }
