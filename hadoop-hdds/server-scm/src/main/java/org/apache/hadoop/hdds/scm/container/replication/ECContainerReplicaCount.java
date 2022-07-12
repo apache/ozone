@@ -15,11 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.container;
+package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -59,7 +60,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
  *   * Maintenance copies are not considered until they are back to IN_SERVICE
  */
 
-public class ECContainerReplicaCount {
+public class ECContainerReplicaCount implements ContainerReplicaCount {
 
   private final ContainerInfo containerInfo;
   private final ECReplicationConfig repConfig;
@@ -128,8 +129,24 @@ public class ECContainerReplicaCount {
     }
   }
 
+  @Override
+  public ContainerInfo getContainer() {
+    return containerInfo;
+  }
+
+  @Override
   public Set<ContainerReplica> getReplicas() {
     return replicas;
+  }
+
+  @Override
+  public int getDecommissionCount() {
+    return decommissionIndexes.size();
+  }
+
+  @Override
+  public int getMaintenanceCount() {
+    return maintenanceIndexes.size();
   }
 
   /**
@@ -184,7 +201,8 @@ public class ECContainerReplicaCount {
    * Ie, less than EC Datanum containers are present.
    * @return True if the container cannot be recovered, false otherwise.
    */
-  public boolean unRecoverable() {
+  @Override
+  public boolean isUnrecoverable() {
     Set<Integer> distinct = new HashSet<>();
     distinct.addAll(healthyIndexes.keySet());
     distinct.addAll(decommissionIndexes.keySet());
@@ -292,6 +310,11 @@ public class ECContainerReplicaCount {
     return false;
   }
 
+  @Override
+  public boolean isOverReplicated() {
+    return isOverReplicated(false);
+  }
+
   /**
    * Return an unsorted list of any replica indexes which have more than one
    * replica and are therefore over-replicated. Maintenance replicas are ignored
@@ -365,6 +388,11 @@ public class ECContainerReplicaCount {
         >= repConfig.getData() + remainingMaintenanceRedundancy;
   }
 
+  @Override
+  public boolean isSufficientlyReplicated() {
+    return isSufficientlyReplicated(false);
+  }
+
   /**
    * Check if there is an entry in the map for all expected replica indexes,
    * and also that the count against each index is greater than zero.
@@ -395,7 +423,8 @@ public class ECContainerReplicaCount {
     if (index < 1 || index > repConfig.getRequiredNodes()) {
       throw new IllegalArgumentException("Replica Index in " + setName
           + " for containerID " + containerInfo.getContainerID()
-          + "must be between 1 and " + repConfig.getRequiredNodes());
+          + "must be between 1 and " + repConfig.getRequiredNodes()
+          + ". But the given index is: " + index);
     }
   }
 }

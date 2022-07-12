@@ -887,16 +887,19 @@ public final class OMFileRequest {
     // Check dirTable entries for any sub paths.
     String seekDirInDB = metaMgr.getOzonePathKey(volumeId, bucketId,
             omKeyInfo.getObjectID(), "");
-    TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
-            iterator = dirTable.iterator();
+    try (TableIterator<String, ? extends
+        Table.KeyValue<String, OmDirectoryInfo>>
+            iterator = dirTable.iterator()) {
 
-    iterator.seek(seekDirInDB);
+      iterator.seek(seekDirInDB);
 
-    if (iterator.hasNext()) {
-      Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
-      OmDirectoryInfo dirInfo = entry.getValue();
-      return isImmediateChild(dirInfo.getParentObjectID(),
-              omKeyInfo.getObjectID());
+      if (iterator.hasNext()) {
+        Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
+        OmDirectoryInfo dirInfo = entry.getValue();
+        return isImmediateChild(dirInfo.getParentObjectID(),
+            omKeyInfo.getObjectID());
+      }
+
     }
     return false; // no sub paths found
   }
@@ -931,16 +934,17 @@ public final class OMFileRequest {
     // Check fileTable entries for any sub paths.
     String seekFileInDB = metaMgr.getOzonePathKey(volumeId, bucketId,
             omKeyInfo.getObjectID(), "");
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            iterator = fileTable.iterator();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+            iterator = fileTable.iterator()) {
 
-    iterator.seek(seekFileInDB);
+      iterator.seek(seekFileInDB);
 
-    if (iterator.hasNext()) {
-      Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
-      OmKeyInfo fileInfo = entry.getValue();
-      return isImmediateChild(fileInfo.getParentObjectID(),
-              omKeyInfo.getObjectID()); // found a sub path file
+      if (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
+        OmKeyInfo fileInfo = entry.getValue();
+        return isImmediateChild(fileInfo.getParentObjectID(),
+            omKeyInfo.getObjectID()); // found a sub path file
+      }
     }
     return false; // no sub paths found
   }

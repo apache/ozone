@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
@@ -169,7 +170,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
       for (ContainerWithPipeline cwp : verifiedContainerPipeline) {
         try {
           addNewContainer(cwp);
-        } catch (IOException ioe) {
+        } catch (IOException | TimeoutException ioe) {
           LOG.error("Exception while checking and adding new container.", ioe);
         }
       }
@@ -233,7 +234,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
    * @throws IOException on Error.
    */
   public void addNewContainer(ContainerWithPipeline containerWithPipeline)
-      throws IOException {
+      throws IOException, TimeoutException {
     ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
     try {
       if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)) {
@@ -260,7 +261,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
         LOG.info("Successfully added no open container {} to Recon.",
             containerInfo.containerID());
       }
-    } catch (IOException ex) {
+    } catch (IOException | TimeoutException ex) {
       LOG.info("Exception while adding container {} .",
           containerInfo.containerID(), ex);
       pipelineManager.removeContainerFromPipeline(

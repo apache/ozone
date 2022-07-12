@@ -87,7 +87,7 @@ public class TestSimplePipelineProvider {
   }
 
   @Test
-  public void testCreatePipelineWithFactor() throws IOException {
+  public void testCreatePipelineWithFactor() throws Exception {
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
     Pipeline pipeline =
         provider.create(StandaloneReplicationConfig.getInstance(factor));

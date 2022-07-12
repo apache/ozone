@@ -151,7 +151,7 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
       HddsVolume volume = volumeSetIterator.next();
       LOG.info("Loading container metadata from volume " + volume.toString());
       final ContainerReader reader =
-          new ContainerReader(volumeSet, volume, containerSet, conf);
+          new ContainerReader(volumeSet, volume, containerSet, conf, false);
       reader.run();
     }
 
