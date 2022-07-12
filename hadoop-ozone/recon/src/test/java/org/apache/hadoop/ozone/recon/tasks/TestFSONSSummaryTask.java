@@ -166,12 +166,13 @@ public final class TestFSONSSummaryTask {
       reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
 
       fsoNSSummaryTask.reprocess(reconOMMetadataManager);
+      Assert.assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
 
       nsSummaryForBucket1 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
-      Assert.assertNotNull(nsSummaryForBucket1);
       nsSummaryForBucket2 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_TWO_OBJECT_ID);
+      Assert.assertNotNull(nsSummaryForBucket1);
       Assert.assertNotNull(nsSummaryForBucket2);
     }
 
@@ -264,31 +265,20 @@ public final class TestFSONSSummaryTask {
    */
   public static class TestProcess {
 
-    private static NSSummary nsSummaryForBucket1;
-    private static NSSummary nsSummaryForBucket2;
-
-    private static OMDBUpdateEvent keyEvent1;
-    private static OMDBUpdateEvent keyEvent2;
-    private static OMDBUpdateEvent keyEvent3;
-    private static OMDBUpdateEvent keyEvent4;
-    private static OMDBUpdateEvent keyEvent5;
-    private static OMDBUpdateEvent keyEvent6;
-    private static OMDBUpdateEvent keyEvent7;
-
     @BeforeClass
     public static void setUp() throws IOException {
       fsoNSSummaryTask.reprocess(reconOMMetadataManager);
       fsoNSSummaryTask.process(processEventBatch());
-
-      nsSummaryForBucket1 =
-          reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
-      Assert.assertNotNull(nsSummaryForBucket1);
-      nsSummaryForBucket2 =
-          reconNamespaceSummaryManager.getNSSummary(BUCKET_TWO_OBJECT_ID);
-      Assert.assertNotNull(nsSummaryForBucket2);
     }
 
     private static OMUpdateEventBatch processEventBatch() throws IOException {
+      OMDBUpdateEvent keyEvent1;
+      OMDBUpdateEvent keyEvent2;
+      OMDBUpdateEvent keyEvent3;
+      OMDBUpdateEvent keyEvent4;
+      OMDBUpdateEvent keyEvent5;
+      OMDBUpdateEvent keyEvent6;
+      OMDBUpdateEvent keyEvent7;
       // Events for keyTable change:
       // put file5 under bucket 2
       String omPutKey = BUCKET_TWO_OBJECT_ID + OM_KEY_PREFIX + FILE_FIVE;
@@ -403,6 +393,9 @@ public final class TestFSONSSummaryTask {
 
     @Test
     public void testProcessUpdateFileSize() throws IOException {
+      NSSummary nsSummaryForBucket1 =
+          reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
+      Assert.assertNotNull(nsSummaryForBucket1);
       // file 1 is gone, so bucket 1 is empty now
       Assert.assertNotNull(nsSummaryForBucket1);
       Assert.assertEquals(0, nsSummaryForBucket1.getNumOfFiles());
@@ -418,6 +411,9 @@ public final class TestFSONSSummaryTask {
 
     @Test
     public void testProcessBucket() throws IOException {
+      NSSummary nsSummaryForBucket2 =
+          reconNamespaceSummaryManager.getNSSummary(BUCKET_TWO_OBJECT_ID);
+      Assert.assertNotNull(nsSummaryForBucket2);
       // file 5 is added under bucket 2, so bucket 2 has 3 keys now
       // file 2 is updated with new datasize,
       // so file size dist for bucket 2 should be updated
@@ -449,7 +445,6 @@ public final class TestFSONSSummaryTask {
 
     @Test
     public void testProcessDirDeleteRename() throws IOException {
-
       // after delete dir 3, dir 1 now has only one dir: dir2
       NSSummary nsSummaryForDir1 = reconNamespaceSummaryManager
           .getNSSummary(DIR_ONE_OBJECT_ID);

@@ -50,15 +50,14 @@ public class FSOBucketHandler extends BucketHandler {
       LoggerFactory.getLogger(FSOBucketHandler.class);
   private OmBucketInfo omBucketInfo;
 
-  private long volumeId;
-  
-  private long bucketId;
+  private final long volumeId;
+  private final long bucketId;
   
   public FSOBucketHandler(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
       OzoneStorageContainerManager reconSCM,
-      OmBucketInfo bucketInfo) {
+      OmBucketInfo bucketInfo) throws IOException {
     super(reconNamespaceSummaryManager, omMetadataManager,
         reconSCM);
     this.omBucketInfo = bucketInfo;
@@ -68,12 +67,8 @@ public class FSOBucketHandler extends BucketHandler {
 
     String[] names = {vol, bucket};
 
-    try {
-      this.volumeId = getVolumeObjectId(names);
-      this.bucketId = getBucketObjectId(names);  
-    } catch (Exception e) {
-      LOG.error("Failed to get volume or bucket object Id ", e);
-    }
+    this.volumeId = getVolumeObjectId(names);
+    this.bucketId = getBucketObjectId(names);
   }
 
   /**

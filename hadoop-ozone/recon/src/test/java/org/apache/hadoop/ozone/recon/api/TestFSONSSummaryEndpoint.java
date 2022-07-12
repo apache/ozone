@@ -90,6 +90,14 @@ import static org.mockito.Mockito.when;
  *        dir2  dir3  dir4
  *         /     \      \
  *       file2   file3  file6
+ *  ----------------------------------------
+ *                  vol2
+ *              /         \
+ *      bucket3          bucket4
+ *      /      \           /
+ *   file8     dir5      file11
+ *            /    \
+ *        file9    file10
  * This is a test for the Rest APIs only. We have tested NSSummaryTask before,
  * so there is no need to test process() on DB's updates
  */
@@ -112,8 +120,11 @@ public class TestFSONSSummaryEndpoint {
 
   // Object names in FSO-enabled format
   private static final String VOL = "vol";
+  private static final String VOL_TWO = "vol2";
   private static final String BUCKET_ONE = "bucket1";
   private static final String BUCKET_TWO = "bucket2";
+  private static final String BUCKET_THREE = "bucket3";
+  private static final String BUCKET_FOUR = "bucket4";
   private static final String KEY_ONE = "file1";
   private static final String KEY_TWO = "dir1/dir2/file2";
   private static final String KEY_THREE = "dir1/dir3/file3";
@@ -121,6 +132,10 @@ public class TestFSONSSummaryEndpoint {
   private static final String KEY_FIVE = "file5";
   private static final String KEY_SIX = "dir1/dir4/file6";
   private static final String KEY_SEVEN = "dir1/file7";
+  private static final String KEY_EIGHT = "file8";
+  private static final String KEY_NINE = "dir5/file9";
+  private static final String KEY_TEN = "dir5/file10";
+  private static final String KEY_ELEVEN = "file11";
   private static final String MULTI_BLOCK_KEY = "dir1/file7";
   private static final String MULTI_BLOCK_FILE = "file7";
 
@@ -131,12 +146,16 @@ public class TestFSONSSummaryEndpoint {
   private static final String FILE_FIVE = "file5";
   private static final String FILE_SIX = "file6";
   private static final String FILE_SEVEN = "file7";
+  private static final String FILE_EIGHT = "file8";
+  private static final String FILE_NINE = "file9";
+  private static final String FILE_TEN = "file10";
+  private static final String FILE_ELEVEN = "file11";
 
   private static final String DIR_ONE = "dir1";
   private static final String DIR_TWO = "dir2";
   private static final String DIR_THREE = "dir3";
   private static final String DIR_FOUR = "dir4";
-
+  private static final String DIR_FIVE = "dir5";
   // objects IDs
   private static final long VOL_OBJECT_ID = 0L;
   private static final long BUCKET_ONE_OBJECT_ID = 1L;
@@ -149,10 +168,18 @@ public class TestFSONSSummaryEndpoint {
   private static final long KEY_THREE_OBJECT_ID = 8L;
   private static final long KEY_FIVE_OBJECT_ID = 9L;
   private static final long KEY_SIX_OBJECT_ID = 10L;
-  private static final long KEY_SEVEN_OBJECT_ID = 13L;
   private static final long DIR_THREE_OBJECT_ID = 11L;
   private static final long DIR_FOUR_OBJECT_ID = 12L;
   private static final long MULTI_BLOCK_KEY_OBJECT_ID = 13L;
+  private static final long KEY_SEVEN_OBJECT_ID = 13L;
+  private static final long VOL_TWO_OBJECT_ID = 14L;
+  private static final long BUCKET_THREE_OBJECT_ID = 15L;
+  private static final long BUCKET_FOUR_OBJECT_ID = 16L;
+  private static final long KEY_EIGHT_OBJECT_ID = 17L;
+  private static final long DIR_FIVE_OBJECT_ID = 18L;
+  private static final long KEY_NINE_OBJECT_ID = 19L;
+  private static final long KEY_TEN_OBJECT_ID = 20L;
+  private static final long KEY_ELEVEN_OBJECT_ID = 21L;
 
   // container IDs
   private static final long CONTAINER_ONE_ID = 1L;
@@ -163,10 +190,12 @@ public class TestFSONSSummaryEndpoint {
   private static final long CONTAINER_SIX_ID = 6L;
 
   // replication factors
-  private static final int THREE = 3;
-  private static final int TWO = 2;
-  private static final int FOUR = 4;
-  private static final int FIVE = 5;
+  private static final int CONTAINER_ONE_REPLICA_COUNT  = 3;
+  private static final int CONTAINER_TWO_REPLICA_COUNT  = 2;
+  private static final int CONTAINER_THREE_REPLICA_COUNT  = 4;
+  private static final int CONTAINER_FOUR_REPLICA_COUNT  = 5;
+  private static final int CONTAINER_FIVE_REPLICA_COUNT  = 2;
+  private static final int CONTAINER_SIX_REPLICA_COUNT  = 3;
 
   // block lengths
   private static final long BLOCK_ONE_LENGTH = 1000L;
@@ -183,15 +212,19 @@ public class TestFSONSSummaryEndpoint {
   private static final long KEY_FOUR_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_FIVE_SIZE = 100L; // bin 0
   private static final long KEY_SIX_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_EIGHT_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long KEY_NINE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_TEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_ELEVEN_SIZE = OzoneConsts.KB + 1; // bin 1
   private static final long MULTI_BLOCK_KEY_SIZE_WITH_REPLICA
-          = THREE * BLOCK_ONE_LENGTH
-          + TWO * BLOCK_TWO_LENGTH
-          + FOUR * BLOCK_THREE_LENGTH;
+          = CONTAINER_ONE_REPLICA_COUNT * BLOCK_ONE_LENGTH
+          + CONTAINER_TWO_REPLICA_COUNT * BLOCK_TWO_LENGTH
+          + CONTAINER_THREE_REPLICA_COUNT * BLOCK_THREE_LENGTH;
 
   private static final long MULTI_BLOCK_OBJECT_SIZE_WITH_REPLICA
-      = FIVE * BLOCK_FOUR_LENGTH
-      + TWO * BLOCK_FIVE_LENGTH
-      + THREE * BLOCK_SIX_LENGTH;
+      = CONTAINER_FOUR_REPLICA_COUNT * BLOCK_FOUR_LENGTH
+      + CONTAINER_FIVE_REPLICA_COUNT * BLOCK_FIVE_LENGTH
+      + CONTAINER_SIX_REPLICA_COUNT * BLOCK_SIX_LENGTH;
 
   private static final long FILE1_SIZE_WITH_REPLICA =
       MULTI_BLOCK_OBJECT_SIZE_WITH_REPLICA;
@@ -207,33 +240,45 @@ public class TestFSONSSummaryEndpoint {
       MULTI_BLOCK_OBJECT_SIZE_WITH_REPLICA;
   private static final long FILE7_SIZE_WITH_REPLICA =
       MULTI_BLOCK_OBJECT_SIZE_WITH_REPLICA;
+  private static final long FILE8_SIZE_WITH_REPLICA =
+      MULTI_BLOCK_OBJECT_SIZE_WITH_REPLICA;
+  private static final long FILE9_SIZE_WITH_REPLICA =
+      MULTI_BLOCK_OBJECT_SIZE_WITH_REPLICA;
+  private static final long FILE10_SIZE_WITH_REPLICA =
+      MULTI_BLOCK_OBJECT_SIZE_WITH_REPLICA;
+  private static final long FILE11_SIZE_WITH_REPLICA =
+      MULTI_BLOCK_OBJECT_SIZE_WITH_REPLICA;
 
   private static final long
       MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_ROOT
       = FILE1_SIZE_WITH_REPLICA
       + FILE2_SIZE_WITH_REPLICA
       + FILE3_SIZE_WITH_REPLICA
+      + FILE4_SIZE_WITH_REPLICA
+      + FILE5_SIZE_WITH_REPLICA
       + FILE6_SIZE_WITH_REPLICA
       + FILE7_SIZE_WITH_REPLICA
-      + FILE4_SIZE_WITH_REPLICA
-      + FILE5_SIZE_WITH_REPLICA;
+      + FILE8_SIZE_WITH_REPLICA
+      + FILE9_SIZE_WITH_REPLICA
+      + FILE10_SIZE_WITH_REPLICA
+      + FILE11_SIZE_WITH_REPLICA;
 
   private static final long
       MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_VOL
       = FILE1_SIZE_WITH_REPLICA
       + FILE2_SIZE_WITH_REPLICA
       + FILE3_SIZE_WITH_REPLICA
-      + FILE6_SIZE_WITH_REPLICA
-      + FILE7_SIZE_WITH_REPLICA
       + FILE4_SIZE_WITH_REPLICA
-      + FILE5_SIZE_WITH_REPLICA;
+      + FILE5_SIZE_WITH_REPLICA
+      + FILE6_SIZE_WITH_REPLICA
+      + FILE7_SIZE_WITH_REPLICA;
 
   private static final long
       MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_BUCKET1
-      = FILE2_SIZE_WITH_REPLICA
+      = FILE1_SIZE_WITH_REPLICA
+      + FILE2_SIZE_WITH_REPLICA
       + FILE3_SIZE_WITH_REPLICA
       + FILE6_SIZE_WITH_REPLICA
-      + FILE1_SIZE_WITH_REPLICA
       + FILE7_SIZE_WITH_REPLICA;
 
   private static final long
@@ -241,18 +286,22 @@ public class TestFSONSSummaryEndpoint {
       = FILE2_SIZE_WITH_REPLICA
       + FILE3_SIZE_WITH_REPLICA
       + FILE6_SIZE_WITH_REPLICA
-      + FILE1_SIZE_WITH_REPLICA;
+      + FILE7_SIZE_WITH_REPLICA;
 
   // quota in bytes
-  private static final long ROOT_QUOTA = 2 * OzoneConsts.MB;
+  private static final long ROOT_QUOTA = 2 * (2 * OzoneConsts.MB);
   private static final long VOL_QUOTA = 2 * OzoneConsts.MB;
+  private static final long VOL_TWO_QUOTA = 2 * OzoneConsts.MB;
   private static final long BUCKET_ONE_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_TWO_QUOTA = OzoneConsts.MB;
+  private static final long BUCKET_THREE_QUOTA = OzoneConsts.MB;
+  private static final long BUCKET_FOUR_QUOTA = OzoneConsts.MB;
 
   // mock client's path requests
   private static final String TEST_USER = "TestUser";
   private static final String ROOT_PATH = "/";
   private static final String VOL_PATH = "/vol";
+  private static final String VOL_TWO_PATH = "/vol2";
   private static final String BUCKET_ONE_PATH = "/vol/bucket1";
   private static final String BUCKET_TWO_PATH = "/vol/bucket2";
   private static final String DIR_ONE_PATH = "/vol/bucket1/dir1";
@@ -264,8 +313,14 @@ public class TestFSONSSummaryEndpoint {
   private static final String INVALID_PATH = "/vol/path/not/found";
 
   // some expected answers
-  private static final long TOTAL_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
+  private static final long ROOT_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
+      KEY_THREE_SIZE + KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE +
+      KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE + KEY_ELEVEN_SIZE;
+  private static final long VOL_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
           KEY_THREE_SIZE + KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE;
+
+  private static final long VOL_TWO_DATA_SIZE =
+      KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE + KEY_ELEVEN_SIZE;
 
   private static final long BUCKET_ONE_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
           KEY_THREE_SIZE + KEY_SIX_SIZE;
@@ -325,10 +380,10 @@ public class TestFSONSSummaryEndpoint {
     NamespaceSummaryResponse rootResponseObj =
         (NamespaceSummaryResponse) rootResponse.getEntity();
     Assert.assertEquals(EntityType.ROOT, rootResponseObj.getEntityType());
-    Assert.assertEquals(1, rootResponseObj.getNumVolume());
-    Assert.assertEquals(2, rootResponseObj.getNumBucket());
-    Assert.assertEquals(4, rootResponseObj.getNumTotalDir());
-    Assert.assertEquals(6, rootResponseObj.getNumTotalKey());
+    Assert.assertEquals(2, rootResponseObj.getNumVolume());
+    Assert.assertEquals(4, rootResponseObj.getNumBucket());
+    Assert.assertEquals(5, rootResponseObj.getNumTotalDir());
+    Assert.assertEquals(10, rootResponseObj.getNumTotalKey());
   }
 
   @Test
@@ -403,7 +458,17 @@ public class TestFSONSSummaryEndpoint {
     Response rootResponse = nsSummaryEndpoint.getDiskUsage(ROOT_PATH,
         false, false);
     DUResponse duRootRes = (DUResponse) rootResponse.getEntity();
-    Assert.assertEquals(1, duRootRes.getCount());
+    Assert.assertEquals(2, duRootRes.getCount());
+    List<DUResponse.DiskUsage> duRootData = duRootRes.getDuData();
+    // sort based on subpath
+    Collections.sort(duRootData,
+        Comparator.comparing(DUResponse.DiskUsage::getSubpath));
+    DUResponse.DiskUsage duVol1 = duRootData.get(0);
+    DUResponse.DiskUsage duVol2 = duRootData.get(1);
+    Assert.assertEquals(VOL_PATH, duVol1.getSubpath());
+    Assert.assertEquals(VOL_TWO_PATH, duVol2.getSubpath());
+    Assert.assertEquals(VOL_DATA_SIZE, duVol1.getSize());
+    Assert.assertEquals(VOL_TWO_DATA_SIZE, duVol2.getSize());
 
     // volume level DU
     Response volResponse = nsSummaryEndpoint.getDiskUsage(VOL_PATH,
@@ -478,13 +543,13 @@ public class TestFSONSSummaryEndpoint {
 
   /**
    * Testing RootEntityHandler.getDUResponse()
-   * withReplica condition true.
-   * Testing EntityHandler.CalculateDUForVolume()
+   * when withReplica parameter is true to
+   * test EntityHandler.CalculateDUForVolume().
    * @throws IOException
    */
   @Test
   public void testDataSizeUnderRootWithReplication() throws IOException {
-    setUpMultiBlockKeys(EntityType.ROOT);
+    setUpMultiBlockReplicatedKeys();
     Response rootResponse = nsSummaryEndpoint.getDiskUsage(ROOT_PATH,
         false, true);
     DUResponse replicaDUResponse = (DUResponse) rootResponse.getEntity();
@@ -495,7 +560,7 @@ public class TestFSONSSummaryEndpoint {
 
   @Test
   public void testDataSizeUnderVolWithReplication() throws IOException {
-    setUpMultiBlockKeys(EntityType.VOLUME);
+    setUpMultiBlockReplicatedKeys();
     Response volResponse = nsSummaryEndpoint.getDiskUsage(VOL_PATH,
         false, true);
     DUResponse replicaDUResponse = (DUResponse) volResponse.getEntity();
@@ -506,7 +571,7 @@ public class TestFSONSSummaryEndpoint {
 
   @Test
   public void testDataSizeUnderBucketWithReplication() throws IOException {
-    setUpMultiBlockKeys(EntityType.BUCKET);
+    setUpMultiBlockReplicatedKeys();
     Response bucketResponse = nsSummaryEndpoint.getDiskUsage(BUCKET_ONE_PATH,
         false, true);
     DUResponse replicaDUResponse = (DUResponse) bucketResponse.getEntity();
@@ -523,7 +588,7 @@ public class TestFSONSSummaryEndpoint {
    */
   @Test
   public void testDataSizeUnderDirWithReplication() throws IOException {
-    setUpMultiBlockKeys(EntityType.DIRECTORY);
+    setUpMultiBlockReplicatedKeys();
     Response dir1Response = nsSummaryEndpoint.getDiskUsage(DIR_ONE_PATH,
         false, true);
     DUResponse replicaDUResponse = (DUResponse) dir1Response.getEntity();
@@ -539,14 +604,14 @@ public class TestFSONSSummaryEndpoint {
     QuotaUsageResponse quRootRes =
         (QuotaUsageResponse) rootResponse.getEntity();
     Assert.assertEquals(ROOT_QUOTA, quRootRes.getQuota());
-    Assert.assertEquals(TOTAL_DATA_SIZE, quRootRes.getQuotaUsed());
+    Assert.assertEquals(ROOT_DATA_SIZE, quRootRes.getQuotaUsed());
 
     // volume level quota usage
     Response volResponse = nsSummaryEndpoint.getQuotaUsage(VOL_PATH);
     QuotaUsageResponse quVolRes =
         (QuotaUsageResponse) volResponse.getEntity();
     Assert.assertEquals(VOL_QUOTA, quVolRes.getQuota());
-    Assert.assertEquals(TOTAL_DATA_SIZE, quVolRes.getQuotaUsed());
+    Assert.assertEquals(VOL_DATA_SIZE, quVolRes.getQuotaUsed());
 
     // bucket level quota usage
     Response bucketRes = nsSummaryEndpoint.getQuotaUsage(BUCKET_ONE_PATH);
@@ -616,84 +681,132 @@ public class TestFSONSSummaryEndpoint {
   private void populateOMDB() throws Exception {
     // write all 4 directories
     writeDirToOm(reconOMMetadataManager, DIR_ONE_OBJECT_ID,
-            BUCKET_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
-            VOL_OBJECT_ID, DIR_ONE);
+          BUCKET_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
+          VOL_OBJECT_ID, DIR_ONE);
     writeDirToOm(reconOMMetadataManager, DIR_TWO_OBJECT_ID,
-            DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
-            VOL_OBJECT_ID, DIR_TWO);
+          DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
+          VOL_OBJECT_ID, DIR_TWO);
     writeDirToOm(reconOMMetadataManager, DIR_THREE_OBJECT_ID,
-            DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
-            VOL_OBJECT_ID, DIR_THREE);
+          DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
+          VOL_OBJECT_ID, DIR_THREE);
     writeDirToOm(reconOMMetadataManager, DIR_FOUR_OBJECT_ID,
-            DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
-            VOL_OBJECT_ID, DIR_FOUR);
-    // write all 6 keys
+          DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
+          VOL_OBJECT_ID, DIR_FOUR);
+    writeDirToOm(reconOMMetadataManager, DIR_FIVE_OBJECT_ID,
+          BUCKET_THREE_OBJECT_ID, BUCKET_THREE_OBJECT_ID,
+          VOL_TWO_OBJECT_ID, DIR_FIVE);
+
+    // write all keys
     writeKeyToOm(reconOMMetadataManager,
-            KEY_ONE,
-            BUCKET_ONE,
-            VOL,
-            FILE_ONE,
-            KEY_ONE_OBJECT_ID,
-            BUCKET_ONE_OBJECT_ID,
-            BUCKET_ONE_OBJECT_ID,
-            VOL_OBJECT_ID,
-            KEY_ONE_SIZE,
-            getBucketLayout());
+          KEY_ONE,
+          BUCKET_ONE,
+          VOL,
+          FILE_ONE,
+          KEY_ONE_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
+          VOL_OBJECT_ID,
+          KEY_ONE_SIZE,
+          getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-            KEY_TWO,
-            BUCKET_ONE,
-            VOL,
-            FILE_TWO,
-            KEY_TWO_OBJECT_ID,
-            DIR_TWO_OBJECT_ID,
-            BUCKET_ONE_OBJECT_ID,
-            VOL_OBJECT_ID,
-            KEY_TWO_SIZE,
-            getBucketLayout());
+          KEY_TWO,
+          BUCKET_ONE,
+          VOL,
+          FILE_TWO,
+          KEY_TWO_OBJECT_ID,
+          DIR_TWO_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
+          VOL_OBJECT_ID,
+          KEY_TWO_SIZE,
+          getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-            KEY_THREE,
-            BUCKET_ONE,
-            VOL,
-            FILE_THREE,
-            KEY_THREE_OBJECT_ID,
-            DIR_THREE_OBJECT_ID,
-            BUCKET_ONE_OBJECT_ID,
-            VOL_OBJECT_ID,
-            KEY_THREE_SIZE,
-            getBucketLayout());
+          KEY_THREE,
+          BUCKET_ONE,
+          VOL,
+          FILE_THREE,
+          KEY_THREE_OBJECT_ID,
+          DIR_THREE_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
+          VOL_OBJECT_ID,
+          KEY_THREE_SIZE,
+          getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-            KEY_FOUR,
-            BUCKET_TWO,
-            VOL,
-            FILE_FOUR,
-            KEY_FOUR_OBJECT_ID,
-            BUCKET_TWO_OBJECT_ID,
-            BUCKET_TWO_OBJECT_ID,
-            VOL_OBJECT_ID,
-            KEY_FOUR_SIZE,
-            getBucketLayout());
+          KEY_FOUR,
+          BUCKET_TWO,
+          VOL,
+          FILE_FOUR,
+          KEY_FOUR_OBJECT_ID,
+          BUCKET_TWO_OBJECT_ID,
+          BUCKET_TWO_OBJECT_ID,
+          VOL_OBJECT_ID,
+          KEY_FOUR_SIZE,
+          getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-            KEY_FIVE,
-            BUCKET_TWO,
-            VOL,
-            FILE_FIVE,
-            KEY_FIVE_OBJECT_ID,
-            BUCKET_TWO_OBJECT_ID,
-            BUCKET_TWO_OBJECT_ID,
-            VOL_OBJECT_ID,
-            KEY_FIVE_SIZE,
-            getBucketLayout());
+          KEY_FIVE,
+          BUCKET_TWO,
+          VOL,
+          FILE_FIVE,
+          KEY_FIVE_OBJECT_ID,
+          BUCKET_TWO_OBJECT_ID,
+          BUCKET_TWO_OBJECT_ID,
+          VOL_OBJECT_ID,
+          KEY_FIVE_SIZE,
+          getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-            KEY_SIX,
-            BUCKET_ONE,
-            VOL,
-            FILE_SIX,
-            KEY_SIX_OBJECT_ID,
-            DIR_FOUR_OBJECT_ID,
-            BUCKET_ONE_OBJECT_ID,
-            VOL_OBJECT_ID,
-            KEY_SIX_SIZE,
-            getBucketLayout());
+          KEY_SIX,
+          BUCKET_ONE,
+          VOL,
+          FILE_SIX,
+          KEY_SIX_OBJECT_ID,
+          DIR_FOUR_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
+          VOL_OBJECT_ID,
+          KEY_SIX_SIZE,
+          getBucketLayout());
+    writeKeyToOm(reconOMMetadataManager,
+          KEY_EIGHT,
+          BUCKET_THREE,
+          VOL_TWO,
+          FILE_EIGHT,
+          KEY_EIGHT_OBJECT_ID,
+          BUCKET_THREE_OBJECT_ID,
+          BUCKET_THREE_OBJECT_ID,
+          VOL_TWO_OBJECT_ID,
+          KEY_EIGHT_SIZE,
+          getBucketLayout());
+    writeKeyToOm(reconOMMetadataManager,
+          KEY_NINE,
+          BUCKET_THREE,
+          VOL_TWO,
+          FILE_NINE,
+          KEY_NINE_OBJECT_ID,
+          DIR_FIVE_OBJECT_ID,
+          BUCKET_THREE_OBJECT_ID,
+          VOL_TWO_OBJECT_ID,
+          KEY_NINE_SIZE,
+          getBucketLayout());
+    writeKeyToOm(reconOMMetadataManager,
+          KEY_TEN,
+          BUCKET_THREE,
+          VOL_TWO,
+          FILE_TEN,
+          KEY_TEN_OBJECT_ID,
+          DIR_FIVE_OBJECT_ID,
+          BUCKET_THREE_OBJECT_ID,
+          VOL_TWO_OBJECT_ID,
+          KEY_TEN_SIZE,
+          getBucketLayout());
+    writeKeyToOm(reconOMMetadataManager,
+          KEY_ELEVEN,
+          BUCKET_FOUR,
+          VOL_TWO,
+          FILE_ELEVEN,
+          KEY_ELEVEN_OBJECT_ID,
+          BUCKET_FOUR_OBJECT_ID,
+          BUCKET_FOUR_OBJECT_ID,
+          VOL_TWO_OBJECT_ID,
+          KEY_ELEVEN_SIZE,
+          getBucketLayout());
   }
 
 
@@ -720,7 +833,19 @@ public class TestFSONSSummaryEndpoint {
             .setOwnerName(TEST_USER)
             .setQuotaInBytes(VOL_QUOTA)
             .build();
+
+    String volume2Key = omMetadataManager.getVolumeKey(VOL_TWO);
+    OmVolumeArgs args2 =
+        OmVolumeArgs.newBuilder()
+            .setObjectID(VOL_TWO_OBJECT_ID)
+            .setVolume(VOL_TWO)
+            .setAdminName(TEST_USER)
+            .setOwnerName(TEST_USER)
+            .setQuotaInBytes(VOL_TWO_QUOTA)
+            .build();
+
     omMetadataManager.getVolumeTable().put(volumeKey, args);
+    omMetadataManager.getVolumeTable().put(volume2Key, args2);
 
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(VOL)
@@ -738,13 +863,35 @@ public class TestFSONSSummaryEndpoint {
         .setBucketLayout(getBucketLayout())
         .build();
 
+    OmBucketInfo bucketInfo3 = OmBucketInfo.newBuilder()
+        .setVolumeName(VOL_TWO)
+        .setBucketName(BUCKET_THREE)
+        .setObjectID(BUCKET_THREE_OBJECT_ID)
+        .setQuotaInBytes(BUCKET_THREE_QUOTA)
+        .setBucketLayout(getBucketLayout())
+        .build();
+
+    OmBucketInfo bucketInfo4 = OmBucketInfo.newBuilder()
+        .setVolumeName(VOL_TWO)
+        .setBucketName(BUCKET_FOUR)
+        .setObjectID(BUCKET_FOUR_OBJECT_ID)
+        .setQuotaInBytes(BUCKET_FOUR_QUOTA)
+        .setBucketLayout(getBucketLayout())
+        .build();
+
     String bucketKey = omMetadataManager.getBucketKey(
         bucketInfo.getVolumeName(), bucketInfo.getBucketName());
     String bucketKey2 = omMetadataManager.getBucketKey(
         bucketInfo2.getVolumeName(), bucketInfo2.getBucketName());
+    String bucketKey3 = omMetadataManager.getBucketKey(
+        bucketInfo3.getVolumeName(), bucketInfo3.getBucketName());
+    String bucketKey4 = omMetadataManager.getBucketKey(
+        bucketInfo4.getVolumeName(), bucketInfo4.getBucketName());
 
     omMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
     omMetadataManager.getBucketTable().put(bucketKey2, bucketInfo2);
+    omMetadataManager.getBucketTable().put(bucketKey3, bucketInfo3);
+    omMetadataManager.getBucketTable().put(bucketKey4, bucketInfo4);
 
     return omMetadataManager;
   }
@@ -798,11 +945,20 @@ public class TestFSONSSummaryEndpoint {
    *        dir2  dir3  dir4  file7
    *         /     \      \
    *       file2   file3  file6
+   *  ----------------------------------------
+   *                  vol2
+   *              /         \
+   *      bucket3          bucket4
+   *      /      \           /
+   *   file8     dir5      file11
+   *            /    \
+   *        file9    file10
    * Write these keys to OM and
    * replicate them.
    * @throws IOException
    */
-  private void setUpMultiBlockKeys(EntityType entityType) throws IOException {
+  @SuppressWarnings("checkstyle:MethodLength")
+  private void setUpMultiBlockReplicatedKeys() throws IOException {
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
     BlockID block4 = new BlockID(CONTAINER_FOUR_ID, 0L);
     BlockID block5 = new BlockID(CONTAINER_FIVE_ID, 0L);
@@ -827,56 +983,43 @@ public class TestFSONSSummaryEndpoint {
     OmKeyLocationInfoGroup locationInfoGroup =
         new OmKeyLocationInfoGroup(0L, locationInfoList);
 
-    if (entityType.equals(EntityType.ROOT) ||
-        entityType.equals(EntityType.VOLUME)) {
-      writeKeyToOm(reconOMMetadataManager,
-          VOL_OBJECT_ID,
-          BUCKET_TWO_OBJECT_ID,
-          BUCKET_TWO_OBJECT_ID,
-          KEY_FOUR_OBJECT_ID,
-          VOL, BUCKET_TWO,
-          KEY_FOUR,
-          FILE_FOUR,
-          Collections.singletonList(locationInfoGroup),
-          getBucketLayout());
+    //vol/bucket2/file4
+    writeKeyToOm(reconOMMetadataManager,
+        VOL_OBJECT_ID,
+        BUCKET_TWO_OBJECT_ID,
+        BUCKET_TWO_OBJECT_ID,
+        KEY_FOUR_OBJECT_ID,
+        VOL, BUCKET_TWO,
+        KEY_FOUR,
+        FILE_FOUR,
+        Collections.singletonList(locationInfoGroup),
+        getBucketLayout());
 
-      writeKeyToOm(reconOMMetadataManager,
-          VOL_OBJECT_ID,
-          BUCKET_TWO_OBJECT_ID,
-          BUCKET_TWO_OBJECT_ID,
-          KEY_FIVE_OBJECT_ID,
-          VOL, BUCKET_TWO,
-          KEY_FIVE,
-          FILE_FIVE,
-          Collections.singletonList(locationInfoGroup),
-          getBucketLayout());
+    //vol/bucket2/file5
+    writeKeyToOm(reconOMMetadataManager,
+        VOL_OBJECT_ID,
+        BUCKET_TWO_OBJECT_ID,
+        BUCKET_TWO_OBJECT_ID,
+        KEY_FIVE_OBJECT_ID,
+        VOL, BUCKET_TWO,
+        KEY_FIVE,
+        FILE_FIVE,
+        Collections.singletonList(locationInfoGroup),
+        getBucketLayout());
 
-      writeKeyToOm(reconOMMetadataManager,
-          VOL_OBJECT_ID,
-          BUCKET_ONE_OBJECT_ID,
-          BUCKET_ONE_OBJECT_ID,
-          KEY_ONE_OBJECT_ID,
-          VOL, BUCKET_ONE,
-          KEY_ONE,
-          FILE_ONE,
-          Collections.singletonList(locationInfoGroup),
-          getBucketLayout());
-    }
+    //vol/bucket1/file1
+    writeKeyToOm(reconOMMetadataManager,
+        VOL_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
+        KEY_ONE_OBJECT_ID,
+        VOL, BUCKET_ONE,
+        KEY_ONE,
+        FILE_ONE,
+        Collections.singletonList(locationInfoGroup),
+        getBucketLayout());
 
-    if (entityType.equals(EntityType.BUCKET)) {
-      writeKeyToOm(reconOMMetadataManager,
-          VOL_OBJECT_ID,
-          BUCKET_ONE_OBJECT_ID,
-          BUCKET_ONE_OBJECT_ID,
-          KEY_ONE_OBJECT_ID,
-          VOL, BUCKET_ONE,
-          KEY_ONE,
-          FILE_ONE,
-          Collections.singletonList(locationInfoGroup),
-          getBucketLayout());
-    }
-
-    // add the keys to Recon's OM
+    //vol/bucket1/dir1/dir2/file2
     writeKeyToOm(reconOMMetadataManager,
         VOL_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
@@ -888,6 +1031,7 @@ public class TestFSONSSummaryEndpoint {
         Collections.singletonList(locationInfoGroup),
         getBucketLayout());
 
+    //vol/bucket1/dir1/dir3/file3
     writeKeyToOm(reconOMMetadataManager,
         VOL_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
@@ -899,6 +1043,7 @@ public class TestFSONSSummaryEndpoint {
         Collections.singletonList(locationInfoGroup),
         getBucketLayout());
 
+    //vol/bucket1/dir1/dir4/file6
     writeKeyToOm(reconOMMetadataManager,
         VOL_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
@@ -910,6 +1055,7 @@ public class TestFSONSSummaryEndpoint {
         Collections.singletonList(locationInfoGroup),
         getBucketLayout());
 
+    //vol/bucket1/dir1/file7
     writeKeyToOm(reconOMMetadataManager,
         VOL_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
@@ -918,6 +1064,54 @@ public class TestFSONSSummaryEndpoint {
         VOL, BUCKET_ONE,
         KEY_SEVEN,
         FILE_SEVEN,
+        Collections.singletonList(locationInfoGroup),
+        getBucketLayout());
+
+    //vol2/bucket3/file8
+    writeKeyToOm(reconOMMetadataManager,
+        VOL_TWO_OBJECT_ID,
+        BUCKET_THREE_OBJECT_ID,
+        BUCKET_THREE_OBJECT_ID,
+        KEY_EIGHT_OBJECT_ID,
+        VOL_TWO, BUCKET_THREE,
+        KEY_EIGHT,
+        FILE_EIGHT,
+        Collections.singletonList(locationInfoGroup),
+        getBucketLayout());
+
+    //vol2/bucket3/dir5/file9
+    writeKeyToOm(reconOMMetadataManager,
+        VOL_TWO_OBJECT_ID,
+        BUCKET_THREE_OBJECT_ID,
+        DIR_FIVE_OBJECT_ID,
+        KEY_NINE_OBJECT_ID,
+        VOL_TWO, BUCKET_THREE,
+        KEY_NINE,
+        FILE_NINE,
+        Collections.singletonList(locationInfoGroup),
+        getBucketLayout());
+
+    //vol2/bucket3/dir5/file10
+    writeKeyToOm(reconOMMetadataManager,
+        VOL_TWO_OBJECT_ID,
+        BUCKET_THREE_OBJECT_ID,
+        DIR_FIVE_OBJECT_ID,
+        KEY_TEN_OBJECT_ID,
+        VOL_TWO, BUCKET_THREE,
+        KEY_TEN,
+        FILE_TEN,
+        Collections.singletonList(locationInfoGroup),
+        getBucketLayout());
+
+    //vol2/bucket4/file11
+    writeKeyToOm(reconOMMetadataManager,
+        VOL_TWO_OBJECT_ID,
+        BUCKET_FOUR_OBJECT_ID,
+        BUCKET_FOUR_OBJECT_ID,
+        KEY_ELEVEN_OBJECT_ID,
+        VOL_TWO, BUCKET_FOUR,
+        KEY_ELEVEN,
+        FILE_ELEVEN,
         Collections.singletonList(locationInfoGroup),
         getBucketLayout());
   }
@@ -953,42 +1147,42 @@ public class TestFSONSSummaryEndpoint {
     // Container 1 is 3-way replicated
     ContainerID containerID1 = new ContainerID(CONTAINER_ONE_ID);
     Set<ContainerReplica> containerReplicas1 = generateMockContainerReplicas(
-        THREE, containerID1);
+        CONTAINER_ONE_REPLICA_COUNT, containerID1);
     when(containerManager.getContainerReplicas(containerID1))
         .thenReturn(containerReplicas1);
 
     // Container 2 is under replicated with 2 replica
     ContainerID containerID2 = new ContainerID(CONTAINER_TWO_ID);
     Set<ContainerReplica> containerReplicas2 = generateMockContainerReplicas(
-        TWO, containerID2);
+        CONTAINER_TWO_REPLICA_COUNT, containerID2);
     when(containerManager.getContainerReplicas(containerID2))
         .thenReturn(containerReplicas2);
 
     // Container 3 is over replicated with 4 replica
     ContainerID containerID3 = new ContainerID(CONTAINER_THREE_ID);
     Set<ContainerReplica> containerReplicas3 = generateMockContainerReplicas(
-        FOUR, containerID3);
+        CONTAINER_THREE_REPLICA_COUNT, containerID3);
     when(containerManager.getContainerReplicas(containerID3))
         .thenReturn(containerReplicas3);
 
     // Container 4 is replicated with 5 replica
     ContainerID containerID4 = new ContainerID(CONTAINER_FOUR_ID);
     Set<ContainerReplica> containerReplicas4 = generateMockContainerReplicas(
-        FIVE, containerID4);
+        CONTAINER_FOUR_REPLICA_COUNT, containerID4);
     when(containerManager.getContainerReplicas(containerID4))
         .thenReturn(containerReplicas4);
 
     // Container 5 is replicated with 2 replica
     ContainerID containerID5 = new ContainerID(CONTAINER_FIVE_ID);
     Set<ContainerReplica> containerReplicas5 = generateMockContainerReplicas(
-        TWO, containerID5);
+        CONTAINER_FIVE_REPLICA_COUNT, containerID5);
     when(containerManager.getContainerReplicas(containerID5))
         .thenReturn(containerReplicas5);
 
     // Container 6 is replicated with 3 replica
     ContainerID containerID6 = new ContainerID(CONTAINER_SIX_ID);
     Set<ContainerReplica> containerReplicas6 = generateMockContainerReplicas(
-        THREE, containerID6);
+        CONTAINER_SIX_REPLICA_COUNT, containerID6);
     when(containerManager.getContainerReplicas(containerID6))
         .thenReturn(containerReplicas6);
 

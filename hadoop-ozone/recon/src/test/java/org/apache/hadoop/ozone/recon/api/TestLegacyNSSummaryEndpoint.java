@@ -479,8 +479,8 @@ public class TestLegacyNSSummaryEndpoint {
 
   /**
    * Testing RootEntityHandler.getDUResponse()
-   * withReplica condition true.
-   * Testing EntityHandler.CalculateDUForVolume()
+   * when withReplica parameter is true to
+   * test EntityHandler.CalculateDUForVolume().
    * @throws IOException
    */
   @Test

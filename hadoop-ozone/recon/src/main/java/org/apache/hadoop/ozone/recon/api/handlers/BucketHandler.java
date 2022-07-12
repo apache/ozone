@@ -202,7 +202,7 @@ public abstract class BucketHandler {
                 ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                 ReconOMMetadataManager omMetadataManager,
                 OzoneStorageContainerManager reconSCM,
-                OmBucketInfo bucketInfo) {
+                OmBucketInfo bucketInfo) throws IOException {
 
     if (bucketInfo.getBucketLayout()
             .equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
