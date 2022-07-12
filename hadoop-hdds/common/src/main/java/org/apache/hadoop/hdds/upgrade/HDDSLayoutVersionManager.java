@@ -22,6 +22,8 @@ package org.apache.hadoop.hdds.upgrade;
 import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.SCM;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Set;
 
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
@@ -45,10 +47,21 @@ public class HDDSLayoutVersionManager extends
   private static final String[] HDDS_CLASS_UPGRADE_PACKAGES = new String[]{
       "org.apache.hadoop.hdds.scm.server",
       "org.apache.hadoop.ozone.container"};
+  private final HDDSFinalizationRequirements finalizationRequirements;
 
   public HDDSLayoutVersionManager(int layoutVersion) throws IOException {
     init(layoutVersion, HDDSLayoutFeature.values());
     registerUpgradeActions(HDDS_CLASS_UPGRADE_PACKAGES);
+
+    Collection<HDDSFinalizationRequirements> requirements = new ArrayList<>();
+    for (HDDSLayoutFeature lv: unfinalizedFeatures()) {
+      requirements.add(lv.getRequirements());
+    }
+    finalizationRequirements = new HDDSFinalizationRequirements(requirements);
+  }
+
+  public HDDSFinalizationRequirements getFinalizationRequirements() {
+    return finalizationRequirements;
   }
 
   public static int maxLayoutVersion() {

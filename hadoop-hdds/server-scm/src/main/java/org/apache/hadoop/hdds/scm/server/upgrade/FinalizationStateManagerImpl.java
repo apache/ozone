@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.upgrade.HDDSFinalizationRequirements;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -90,11 +91,15 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
     // Check whether this checkpoint change requires us to freeze pipeline
     // creation. These are idempotent operations.
+    // TODO: update this to not close pipelines.
     PipelineManager pipelineManager = upgradeContext.getPipelineManager();
-    if (FinalizationManager.shouldCreateNewPipelines(checkpoint) &&
+    HDDSFinalizationRequirements requirements =
+        versionManager.getFinalizationRequirements();
+    if (FinalizationManager.shouldCreateNewPipelines(checkpoint, requirements) &&
         pipelineManager.isPipelineCreationFrozen()) {
       pipelineManager.resumePipelineCreation();
-    } else if (!FinalizationManager.shouldCreateNewPipelines(checkpoint) &&
+    } else if (!FinalizationManager.shouldCreateNewPipelines(checkpoint,
+        requirements) &&
           !pipelineManager.isPipelineCreationFrozen()) {
       pipelineManager.freezePipelineCreation();
     }

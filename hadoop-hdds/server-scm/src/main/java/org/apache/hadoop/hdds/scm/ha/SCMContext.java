@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
+import org.apache.hadoop.hdds.upgrade.HDDSFinalizationRequirements;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,15 +77,18 @@ public final class SCMContext {
    * Tracks the last crossed SCM upgrade finalization checkpoint.
    */
   private volatile FinalizationCheckpoint finalizationCheckpoint;
+  private final HDDSFinalizationRequirements finalizationRequirements;
 
   private SCMContext(boolean isLeader, long term,
       final SafeModeStatus safeModeStatus,
       final FinalizationCheckpoint finalizationCheckpoint,
+      final HDDSFinalizationRequirements finalizationRequirements,
       final OzoneStorageContainerManager scm) {
     this.isLeader = isLeader;
     this.term = term;
     this.safeModeStatus = safeModeStatus;
     this.finalizationCheckpoint = finalizationCheckpoint;
+    this.finalizationRequirements = finalizationRequirements;
     this.scm = scm;
     this.isLeaderReady = false;
   }
@@ -259,6 +263,11 @@ public final class SCMContext {
     }
   }
 
+  public HDDSFinalizationRequirements getFinalizationRequirements() {
+    // Final field containing an immutable object does not require locking.
+    return finalizationRequirements;
+  }
+
   /**
    * @return StorageContainerManager
    */
@@ -280,6 +289,7 @@ public final class SCMContext {
     private boolean isPreCheckComplete = true;
     private OzoneStorageContainerManager scm = null;
     private FinalizationCheckpoint finalizationCheckpoint;
+    private HDDSFinalizationRequirements finalizationRequirements;
 
     public Builder setLeader(boolean leader) {
       this.isLeader = leader;
@@ -313,8 +323,16 @@ public final class SCMContext {
       return this;
     }
 
+    public Builder setFinalizationRequirements(
+        HDDSFinalizationRequirements requirements) {
+      this.finalizationRequirements = requirements;
+      return this;
+    }
+
     public SCMContext build() {
       Preconditions.checkNotNull(scm, "scm == null");
+      Preconditions.checkNotNull(finalizationCheckpoint);
+      Preconditions.checkNotNull(finalizationRequirements);
       return buildMaybeInvalid();
     }
 
@@ -329,6 +347,7 @@ public final class SCMContext {
           new SafeModeStatus(isInSafeMode, isPreCheckComplete),
           Optional.ofNullable(finalizationCheckpoint).orElse(
               FinalizationCheckpoint.FINALIZATION_COMPLETE),
+          finalizationRequirements,
           scm);
     }
   }

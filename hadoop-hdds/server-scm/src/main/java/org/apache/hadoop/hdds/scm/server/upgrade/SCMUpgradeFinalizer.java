@@ -19,7 +19,7 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureRequirements.PipelineRequirements.CLOSE_ALL_PIPELINES;
+import static org.apache.hadoop.hdds.upgrade.HDDSFinalizationRequirements.PipelineRequirements.CLOSE_ALL_PIPELINES;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.upgrade.HDDSFinalizationRequirements;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
@@ -69,9 +70,10 @@ public class SCMUpgradeFinalizer extends
   @Override
   public void preFinalizeUpgrade(SCMUpgradeFinalizationContext context)
       throws IOException {
+    HDDSFinalizationRequirements requirements =
+        getVersionManager().getFinalizationRequirements();
     LOG.info("SCM will enforce the following requirements during " +
-            "finalization:\n{}",
-        context.getFinalizationRequirements());
+            "finalization:\n{}", requirements);
 
     try {
       FinalizationStateManager stateManager =
@@ -84,8 +86,7 @@ public class SCMUpgradeFinalizer extends
 
       if (!stateManager.crossedCheckpoint(
           FinalizationCheckpoint.MLV_EQUALS_SLV) &&
-          context.getFinalizationRequirements().getPipelineRequirements() ==
-              CLOSE_ALL_PIPELINES) {
+          requirements.getPipelineRequirements() == CLOSE_ALL_PIPELINES) {
         closePipelinesBeforeFinalization(context.getPipelineManager());
       }
     } catch (TimeoutException ex) {
@@ -240,8 +241,8 @@ public class SCMUpgradeFinalizer extends
   private void waitForRequiredNodeCountToFinalize(
       SCMUpgradeFinalizationContext context) {
     NodeManager nodeManager = context.getNodeManager();
-    final int minRequiredFinalizedNodes =
-        context.getFinalizationRequirements().getMinFinalizedDatanodes();
+    final int minRequiredFinalizedNodes = getVersionManager()
+        .getFinalizationRequirements().getMinFinalizedDatanodes();
     int numFinalizedNodes =
         nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
     while (numFinalizedNodes < minRequiredFinalizedNodes) {

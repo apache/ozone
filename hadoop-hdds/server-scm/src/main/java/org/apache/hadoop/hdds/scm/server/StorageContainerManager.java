@@ -622,6 +622,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           .setIsPreCheckComplete(false)
           .setSCM(this)
           .setFinalizationCheckpoint(finalizationManager.getCheckpoint())
+          .setFinalizationRequirements(
+              scmLayoutVersionManager.getFinalizationRequirements())
           .build();
     }
 

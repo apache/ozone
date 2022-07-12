@@ -22,7 +22,7 @@ import java.util.EnumMap;
 import java.util.Optional;
 
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureRequirements.PipelineRequirements;
+import org.apache.hadoop.hdds.upgrade.HDDSFinalizationRequirements.PipelineRequirements;
 
 /**
  * List of HDDS Features.
@@ -33,26 +33,26 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   // TODO: After HDDS-6887 schema version changes will not require closing
   //  pipelines.
   INITIAL_VERSION(0,
-      new HDDSLayoutFeatureRequirements.Builder().build(),
+      new HDDSFinalizationRequirements.Builder().build(),
       "Initial Layout Version"),
   DATANODE_SCHEMA_V2(1,
-      new HDDSLayoutFeatureRequirements.Builder()
+      new HDDSFinalizationRequirements.Builder()
           .setPipelineRequirements(PipelineRequirements.CLOSE_ALL_PIPELINES)
           .build(),
       "Datanode RocksDB Schema Version 2 (with column " +
       "families)"),
   SCM_HA(2,
-      new HDDSLayoutFeatureRequirements.Builder().build(),
+      new HDDSFinalizationRequirements.Builder().build(),
       "Storage Container Manager HA"),
   ERASURE_CODED_STORAGE_SUPPORT(3,
-      new HDDSLayoutFeatureRequirements.Builder()
+      new HDDSFinalizationRequirements.Builder()
           // At least 5 datanodes are required for an EC pipeline.
           .setMinFinalizedDatanodes(5)
           .build(),
       "Ozone version with built in support for"
       + " Erasure Coded block data storage."),
   DATANODE_SCHEMA_V3(4,
-      new HDDSLayoutFeatureRequirements.Builder()
+      new HDDSFinalizationRequirements.Builder()
           .setPipelineRequirements(PipelineRequirements.CLOSE_ALL_PIPELINES)
           .build(),
       "Datanode RocksDB Schema Version 3 (one rocksdb " +
@@ -62,14 +62,14 @@ public enum HDDSLayoutFeature implements LayoutFeature {
 
   private final int layoutVersion;
   private final String description;
-  private final HDDSLayoutFeatureRequirements requirements;
+  private final HDDSFinalizationRequirements requirements;
   private EnumMap<UpgradeActionType, HDDSUpgradeAction> scmActions =
       new EnumMap<>(UpgradeActionType.class);
   private EnumMap<UpgradeActionType, HDDSUpgradeAction> datanodeActions =
       new EnumMap<>(UpgradeActionType.class);
 
   HDDSLayoutFeature(final int layoutVersion,
-                    HDDSLayoutFeatureRequirements requirements,
+                    HDDSFinalizationRequirements requirements,
                     String description) {
     this.layoutVersion = layoutVersion;
     this.requirements = requirements;
@@ -103,7 +103,7 @@ public enum HDDSLayoutFeature implements LayoutFeature {
     return Optional.ofNullable(datanodeActions.get(type));
   }
 
-  public HDDSLayoutFeatureRequirements getRequirements() {
+  public HDDSFinalizationRequirements getRequirements() {
     return requirements;
   }
 }

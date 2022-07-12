@@ -20,12 +20,15 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.upgrade.HDDSFinalizationRequirements;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 
 import java.io.IOException;
+
+import static org.apache.hadoop.hdds.upgrade.HDDSFinalizationRequirements.PipelineRequirements.CLOSE_ALL_PIPELINES;
 
 /**
  * Class to initiate SCM finalization and query its progress.
@@ -57,7 +60,11 @@ public interface FinalizationManager {
 
   void onLeaderReady();
 
-  static boolean shouldCreateNewPipelines(FinalizationCheckpoint checkpoint) {
+  static boolean shouldCreateNewPipelines(FinalizationCheckpoint checkpoint,
+      HDDSFinalizationRequirements requirements) {
+    if (requirements.getPipelineRequirements() != CLOSE_ALL_PIPELINES) {
+      return true;
+    }
     return !checkpoint.hasCrossed(FinalizationCheckpoint.FINALIZATION_STARTED)
         || checkpoint.hasCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV);
   }

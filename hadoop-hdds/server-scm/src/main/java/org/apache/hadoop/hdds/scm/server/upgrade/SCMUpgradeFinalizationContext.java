@@ -24,13 +24,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureRequirements;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.stream.Collectors;
 
 /**
  * Provided to methods in the {@link SCMUpgradeFinalizer} to supply objects
@@ -44,7 +38,6 @@ public final class SCMUpgradeFinalizationContext {
   private final HDDSLayoutVersionManager versionManager;
   private final OzoneConfiguration conf;
   private final SCMContext scmContext;
-  private final HDDSLayoutFeatureRequirements finalizationRequirements;
 
   private SCMUpgradeFinalizationContext(Builder builder) {
     pipelineManager = builder.pipelineManager;
@@ -54,12 +47,6 @@ public final class SCMUpgradeFinalizationContext {
     conf = builder.conf;
     scmContext = builder.scmContext;
     versionManager = builder.versionManager;
-
-    Collection<HDDSLayoutFeatureRequirements> requirements = new ArrayList<>();
-    for (HDDSLayoutFeature lv: versionManager.unfinalizedFeatures()) {
-      requirements.add(lv.getRequirements());
-    }
-    finalizationRequirements = new HDDSLayoutFeatureRequirements(requirements);
   }
 
   public NodeManager getNodeManager() {
@@ -88,10 +75,6 @@ public final class SCMUpgradeFinalizationContext {
 
   public SCMStorageConfig getStorage() {
     return storage;
-  }
-
-  public HDDSLayoutFeatureRequirements getFinalizationRequirements() {
-    return finalizationRequirements;
   }
 
   /**

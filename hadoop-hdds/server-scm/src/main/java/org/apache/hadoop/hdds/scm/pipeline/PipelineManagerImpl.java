@@ -160,7 +160,8 @@ public class PipelineManagerImpl implements PipelineManager {
     serviceManager.register(backgroundPipelineCreator);
 
     if (FinalizationManager.shouldCreateNewPipelines(
-        scmContext.getFinalizationCheckpoint())) {
+        scmContext.getFinalizationCheckpoint(),
+        scmContext.getFinalizationRequirements())) {
       pipelineManager.resumePipelineCreation();
     } else {
       pipelineManager.freezePipelineCreation();

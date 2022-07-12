@@ -97,7 +97,8 @@ public class TestScmFinalization {
         new HDDSLayoutVersionManager(
             HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
     PipelineManager pipelineManager =
-        getMockPipelineManager(FinalizationCheckpoint.FINALIZATION_REQUIRED);
+        getMockPipelineManager(FinalizationCheckpoint.FINALIZATION_REQUIRED,
+            versionManager);
     // State manager keeps upgrade information in memory as well as writing
     // it to disk, so we can mock the classes that handle disk ops for this
     // test.
@@ -204,7 +205,7 @@ public class TestScmFinalization {
     SCMContext scmContext = SCMContext.emptyContext();
     scmContext.setFinalizationCheckpoint(initialCheckpoint);
     PipelineManager pipelineManager =
-        getMockPipelineManager(initialCheckpoint);
+        getMockPipelineManager(initialCheckpoint, versionManager);
 
     FinalizationStateManager stateManager =
         new FinalizationStateManagerTestImpl.Builder()
@@ -347,7 +348,8 @@ public class TestScmFinalization {
   }
 
   private PipelineManager getMockPipelineManager(
-      FinalizationCheckpoint inititalCheckpoint) {
+      FinalizationCheckpoint initialCheckpoint,
+      HDDSLayoutVersionManager versionManager) {
     PipelineManager pipelineManager = Mockito.mock(PipelineManager.class);
     // After finalization, SCM will wait for at least one pipeline to be
     // created. It does not care about the contents of the pipeline list, so
@@ -359,7 +361,8 @@ public class TestScmFinalization {
     // In a real cluster, this would be set on startup of the
     // PipelineManagerImpl.
     pipelineCreationFrozen =
-        !FinalizationManager.shouldCreateNewPipelines(inititalCheckpoint);
+        !FinalizationManager.shouldCreateNewPipelines(initialCheckpoint,
+            versionManager.getFinalizationRequirements());
     Mockito.doAnswer(args -> pipelineCreationFrozen = true)
         .when(pipelineManager).freezePipelineCreation();
     Mockito.doAnswer(args -> pipelineCreationFrozen = false)

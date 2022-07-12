@@ -22,7 +22,7 @@ import com.google.common.base.Preconditions;
 
 import java.util.Collection;
 
-public class HDDSLayoutFeatureRequirements {
+public class HDDSFinalizationRequirements {
   public enum PipelineRequirements {
     CLOSE_ALL_PIPELINES,
     NONE
@@ -35,7 +35,7 @@ public class HDDSLayoutFeatureRequirements {
   private final int minFinalizedDatanodes;
   private final PipelineRequirements pipelineRequirements;
 
-  private HDDSLayoutFeatureRequirements(Builder builder) {
+  private HDDSFinalizationRequirements(Builder builder) {
     minFinalizedDatanodes = builder.minFinalizedDatanodes;
     pipelineRequirements = builder.pipelineRequirements;
     checkMinFinalizedDatanodes();
@@ -44,13 +44,13 @@ public class HDDSLayoutFeatureRequirements {
   /**
    * Generates one requirements object by aggregating multiple requirements.
    */
-  public HDDSLayoutFeatureRequirements(
-      Collection<HDDSLayoutFeatureRequirements> requirements) {
+  public HDDSFinalizationRequirements(
+      Collection<HDDSFinalizationRequirements> requirements) {
     int currentMinFinalizedDatanodes = REQUIRED_MIN_FINALIZED_DATANODES;
     PipelineRequirements currentPipelineRequirements =
         PipelineRequirements.NONE;
 
-    for (HDDSLayoutFeatureRequirements req: requirements) {
+    for (HDDSFinalizationRequirements req: requirements) {
       // The minimum number of datanodes we must wait to finalize is the
       // largest of the minimums of all layout features.
       currentMinFinalizedDatanodes = Math.max(currentMinFinalizedDatanodes,
@@ -105,8 +105,8 @@ public class HDDSLayoutFeatureRequirements {
       return this;
     }
 
-    public HDDSLayoutFeatureRequirements build() {
-      return new HDDSLayoutFeatureRequirements(this);
+    public HDDSFinalizationRequirements build() {
+      return new HDDSFinalizationRequirements(this);
     }
   }
 }
