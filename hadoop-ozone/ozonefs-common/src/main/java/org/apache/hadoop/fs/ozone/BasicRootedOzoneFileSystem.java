@@ -631,19 +631,15 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         }
       }
 
-      boolean isBucketLink = false;
-      // Handle delete bucket link
-      if (ofsPath.isBucket()) {
-        isBucketLink = adapterImpl.getBucket(ofsPath, false)
-            .isLink();
+      // Do not allow deletion of bucket link
+      if (ofsPath.isBucket() &&
+          adapterImpl.getBucket(ofsPath, false).isLink()) {
+        throw new IOException("Bucket links can not be deleted through " +
+            "the HDFS interface.  Please use the 'ozone sh bucket delete' " +
+            "command instead.");
       }
 
-      // if link, don't delete contents
-      if (!isBucketLink) {
-        result = innerDelete(f, recursive);
-      } else {
-        throw new IOException("george was here");
-      }
+      result = innerDelete(f, recursive);
 
       // Handle delete bucket
       if (ofsPath.isBucket()) {

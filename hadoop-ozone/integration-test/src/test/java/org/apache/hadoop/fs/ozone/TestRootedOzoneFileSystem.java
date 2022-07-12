@@ -1096,6 +1096,8 @@ public class TestRootedOzoneFileSystem {
     Assert.assertFalse(volumeExist(volumeStr2));
   }
 
+
+
   @Test
   public void testDeleteVolumeBucketAndKey() throws IOException {
     // Create test volume, bucket and key
@@ -1123,6 +1125,31 @@ public class TestRootedOzoneFileSystem {
     Assert.assertTrue(fs.delete(volumePath3, true));
     // Verify the volume is deleted
     Assert.assertFalse(volumeExist(volumeStr3));
+  }
+
+  @Test
+  public void testDeleteBucketLink() throws Exception {
+    // Create test volume, bucket and key
+    String volumeStr = getRandomNonExistVolumeName();
+    Path volumePath = new Path(OZONE_URI_DELIMITER + volumeStr);
+    String bucketStr = "bucket";
+    Path bucketPath = new Path(volumePath, bucketStr);
+    String linkStr = "link";
+    Path linkPath = new Path(volumePath, linkStr);
+    fs.mkdirs(bucketPath);
+
+    OzoneVolume ozoneVolume = objectStore.getVolume(volumeStr);
+    createLinkBucket(ozoneVolume, bucketStr, linkStr);
+
+    // confirm deletes fail
+    LambdaTestUtils.intercept(IOException.class,
+        "Bucket links can not be deleted through the HDFS interface.",
+        () -> fs.delete(linkPath, false));
+
+    LambdaTestUtils.intercept(IOException.class,
+        "Bucket links can not be deleted through the HDFS interface.",
+        () -> fs.delete(linkPath, true));
+
   }
 
   @Test
@@ -1717,5 +1744,14 @@ public class TestRootedOzoneFileSystem {
     // Clean up
     proxy.deleteBucket(volume, bucket);
     proxy.deleteVolume(volume);
+  }
+
+  private void createLinkBucket(OzoneVolume sourceVolume, String sourceBucket,
+                                String linkBucket) throws IOException {
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setBucketLayout(BucketLayout.DEFAULT)
+        .setSourceVolume(sourceVolume.getName())
+        .setSourceBucket(sourceBucket);
+    sourceVolume.createBucket(linkBucket, builder.build());
   }
 }
