@@ -1153,24 +1153,25 @@ public class OzoneBucket extends WithMetadata {
             List<Pair<String, String>> seekPaths = new ArrayList<>();
 
             if (StringUtils.isNotBlank(getKeyPrefix())) {
+              // If the prev key is a dir then seek its sub-paths
+              // Say, prevKey="a1/b2/d2"
+              addPrevDirectoryToSeekPath(prevKey, seekPaths);
+
               String parentStartKeyPath = OzoneFSUtils.getParentDir(prevKey);
               if (StringUtils.compare(parentStartKeyPath, getKeyPrefix()) >=
                   0) {
                 // Add the leaf node to the seek path. The idea is to search for
                 // sub-paths if the given start key is a directory.
-                seekPaths.add(new ImmutablePair<>(prevKey, ""));
                 removeStartKey = prevKey;
                 getSeekPathsBetweenKeyPrefixAndStartKey(getKeyPrefix(), prevKey,
                     seekPaths);
               } else if (StringUtils.compare(prevKey, getKeyPrefix()) >= 0) {
                 // Add the leaf node to the seek path. The idea is to search for
                 // sub-paths if the given start key is a directory.
-                seekPaths.add(new ImmutablePair<>(prevKey, ""));
                 removeStartKey = prevKey;
               }
             } else {
               // Key Prefix is Blank. The seek all the keys with startKey.
-              seekPaths.add(new ImmutablePair<>(prevKey, ""));
               removeStartKey = prevKey;
               getSeekPathsBetweenKeyPrefixAndStartKey(getKeyPrefix(), prevKey,
                   seekPaths);
@@ -1201,15 +1202,39 @@ public class OzoneBucket extends WithMetadata {
       List<OzoneKey> keysResultList = new ArrayList<>();
       if (stack.isEmpty()) {
         // case: startKey is empty
-        getChildrenKeys(getKeyPrefix(), prevKey, keysResultList);
-      } else {
-        // case: startKey is non-empty
-        Pair<String, String> keyPrefixPath = stack.pop();
-        getChildrenKeys(keyPrefixPath.getLeft(), keyPrefixPath.getRight(),
-            keysResultList);
+        if (getChildrenKeys(getKeyPrefix(), prevKey, keysResultList)) {
+          return keysResultList;
+        }
       }
 
+      // 7. Pop element and seek for its sub-child path(s). Basically moving
+      // seek pointer to next level(depth) in FS tree.
+      // case: startKey is non-empty
+      while (!stack.isEmpty()) {
+        Pair<String, String> keyPrefixPath = stack.pop();
+        if (getChildrenKeys(keyPrefixPath.getLeft(), keyPrefixPath.getRight(),
+            keysResultList)) {
+          // reached limit batch size.
+          break;
+        }
+      }
       return keysResultList;
+    }
+
+    private void addPrevDirectoryToSeekPath(String prevKey,
+        List<Pair<String, String>> seekPaths)
+        throws IOException {
+      try {
+        OzoneFileStatus prevStatus =
+            proxy.getOzoneFileStatus(volumeName, name, prevKey);
+        if (prevStatus != null) {
+          if (prevStatus.isDirectory()) {
+            seekPaths.add(new ImmutablePair<>(prevKey, ""));
+          }
+        }
+      } catch (OMException ome) {
+        // ignore exception
+      }
     }
 
     /**
@@ -1281,8 +1306,6 @@ public class OzoneBucket extends WithMetadata {
       removeStartKeyIfExistsInStatusList(startKey, statuses);
 
       boolean reachedLimitCacheSize = false;
-      // This dirList is used to store paths elements in left-to-right order.
-      List<String> dirList = new ArrayList<>();
 
       // 5. Iterating over the resultStatuses list and add each key to the
       // resultList. If the listCacheSize reaches then it will add the rest
@@ -1292,50 +1315,34 @@ public class OzoneBucket extends WithMetadata {
         OmKeyInfo keyInfo = status.getKeyInfo();
         String keyName = keyInfo.getKeyName();
 
+        OzoneKey ozoneKey;
         // Add dir to the dirList
         if (status.isDirectory()) {
-          dirList.add(keyInfo.getKeyName());
           // add trailing slash to represent directory
           keyName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
         }
+        ozoneKey = new OzoneKey(keyInfo.getVolumeName(),
+            keyInfo.getBucketName(), keyName,
+            keyInfo.getDataSize(), keyInfo.getCreationTime(),
+            keyInfo.getModificationTime(),
+            keyInfo.getReplicationConfig());
 
-        OzoneKey ozoneKey = new OzoneKey(keyInfo.getVolumeName(),
-                keyInfo.getBucketName(), keyName,
-                keyInfo.getDataSize(), keyInfo.getCreationTime(),
-                keyInfo.getModificationTime(),
-                keyInfo.getReplicationConfig());
-
-        // 5.1) Add to the resultList till it reaches limit batch size.
-        // Once it reaches limit, then add rest of the items to
-        // pendingItemsToBeBatched and this will picked in next batch iteration
-        if (!reachedLimitCacheSize && listCacheSize > keysResultList.size()) {
+        if (!reachedLimitCacheSize) {
           keysResultList.add(ozoneKey);
-          reachedLimitCacheSize = listCacheSize <= keysResultList.size();
+          if (status.isDirectory()) {
+            reachedLimitCacheSize = getChildrenKeys(keyInfo.getKeyName(), "",
+                keysResultList);
+          }
         } else {
+          // 5.1) Add to the resultList till it reaches limit batch size.
+          // Once it reaches limit, then add rest of the items to
+          // pendingItemsToBeBatched and will be picked up in next iteration
           pendingItemsToBeBatched.add(ozoneKey);
         }
       }
 
-      // 6. Push elements in reverse order so that the FS tree traversal will
-      // occur in left-to-right fashion.
-      for (int indx = dirList.size() - 1; indx >= 0; indx--) {
-        String dirPathComponent = dirList.get(indx);
-        stack.push(new ImmutablePair<>(dirPathComponent, ""));
-      }
-
       if (reachedLimitCacheSize) {
         return true;
-      }
-
-      // 7. Pop element and seek for its sub-child path(s). Basically moving
-      // seek pointer to next level(depth) in FS tree.
-      while (!stack.isEmpty()) {
-        Pair<String, String> keyPrefixPath = stack.pop();
-        if (getChildrenKeys(keyPrefixPath.getLeft(), keyPrefixPath.getRight(),
-            keysResultList)) {
-          // reached limit batch size.
-          return true;
-        }
       }
 
       return false;
