@@ -63,7 +63,7 @@ And you can start your first cluster:
 
 ```
 cd hadoop-ozone/dist/target/ozone-*-SNAPSHOT/compose/ozone
-docker-compose up -d --scale datanode=3
+OZONE_REPLICATION_FACTOR=3 ./run.sh -d
 ```
 
 ### Helper scripts
