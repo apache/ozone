@@ -25,6 +25,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
@@ -34,6 +35,7 @@ import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 /**
  * UpgradeFinalizer for the Storage Container Manager service.
@@ -57,19 +59,6 @@ public class SCMUpgradeFinalizer extends
 
   private void logCheckpointCrossed(FinalizationCheckpoint checkpoint) {
     LOG.info("SCM Finalization has crossed checkpoint {}", checkpoint);
-  }
-
-  @Override
-  protected boolean componentFinishedFinalizationSteps(
-      SCMUpgradeFinalizationContext context) {
-    // By default, the parent class will mark finalization as complete when
-    // MLV == SLV. However, for SCM, there are a few extra steps that need to
-    // be done after this point (see postFinalizeUpgrade). If there is a
-    // leader change or restart after MLV == SLV but before running these
-    // post finalize steps, we must tell the parent to run finalization
-    // even though MLV == SLV.
-    return context.getFinalizationStateManager()
-        .crossedCheckpoint(FinalizationCheckpoint.FINALIZATION_COMPLETE);
   }
 
   @Override
@@ -123,33 +112,24 @@ public class SCMUpgradeFinalizer extends
     super.finalizeLayoutFeature(lf,
         lf.scmAction(LayoutFeature.UpgradeActionType.ON_FINALIZE),
         context.getStorage());
-
-    if (!getVersionManager().needsFinalization()) {
-      // If we just finalized the last layout feature, don 't wait for next
-      // heartbeat from datanodes in order to move them to
-      // Healthy - Readonly state. Force them to Healthy ReadOnly state so that
-      // we can resume pipeline creation right away.
-      context.getNodeManager().forceNodesToHealthyReadOnly();
-    }
   }
 
   public void postFinalizeUpgrade(SCMUpgradeFinalizationContext context)
       throws IOException {
-    try {
-      // If we reached this phase of finalization, all layout features should
-      // be finalized.
-      logCheckpointCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV);
-      FinalizationStateManager stateManager =
-          context.getFinalizationStateManager();
-      if (!stateManager.crossedCheckpoint(
-          FinalizationCheckpoint.FINALIZATION_COMPLETE)) {
-        createPipelinesAfterFinalization(context.getPipelineManager());
+    // If we reached this phase of finalization, all layout features should
+    // be finalized.
+    logCheckpointCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV);
+    FinalizationStateManager stateManager =
+        context.getFinalizationStateManager();
+    if (!stateManager.crossedCheckpoint(
+        FinalizationCheckpoint.FINALIZATION_COMPLETE)) {
+      createPipelinesAfterFinalization(context);
+      // @Replicate methods are required to throw TimeoutException.
+      try {
         stateManager.removeFinalizingMark();
+      } catch (TimeoutException ex) {
+        throw new IOException(ex);
       }
-      logCheckpointCrossed(FinalizationCheckpoint.FINALIZATION_COMPLETE);
-    } catch (TimeoutException ex) {
-      LOG.error("TimeoutException during postFinalizeUpgrade", ex);
-      throw new IOException(ex);
     }
   }
 
@@ -172,8 +152,13 @@ public class SCMUpgradeFinalizer extends
     msg += "\n  New pipelines creation will remain frozen until Upgrade " +
         "is finalized.";
 
-    // Pipeline creation will remain frozen until postFinalizeUpgrade()
-    pipelineManager.freezePipelineCreation();
+    // Pipeline creation should already be frozen when the finalization state
+    // manager set the checkpoint.
+    if (!pipelineManager.isPipelineCreationFrozen()) {
+      throw new SCMException("Error during finalization. Pipeline creation" +
+          "should have been frozen before closing existing pipelines.",
+          SCMException.ResultCodes.INTERNAL_ERROR);
+    }
 
     for (Pipeline pipeline : pipelineManager.getPipelines()) {
       if (pipeline.getPipelineState() != CLOSED) {
@@ -194,13 +179,25 @@ public class SCMUpgradeFinalizer extends
   }
 
   private void createPipelinesAfterFinalization(
-      PipelineManager pipelineManager) {
-    pipelineManager.resumePipelineCreation();
+      SCMUpgradeFinalizationContext context) throws SCMException,
+      NotLeaderException {
+    // Pipeline creation should already be resumed when the finalization state
+    // manager set the checkpoint.
+    PipelineManager pipelineManager = context.getPipelineManager();
+    if (pipelineManager.isPipelineCreationFrozen()) {
+      throw new SCMException("Error during finalization. Pipeline creation " +
+          "should have been resumed before waiting for new pipelines.",
+          SCMException.ResultCodes.INTERNAL_ERROR);
+    }
 
     // Wait for at least one pipeline to be created before finishing
     // finalization, so clients can write.
     boolean hasPipeline = false;
     while (!hasPipeline) {
+      // Break out of the wait and step down from driving finalization if this
+      // SCM is no longer the leader by throwing NotLeaderException.
+      context.getSCMContext().getTermOfLeader();
+
       ReplicationConfig ratisThree =
           ReplicationConfig.fromProtoTypeAndFactor(
               HddsProtos.ReplicationType.RATIS,

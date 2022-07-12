@@ -50,7 +50,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ipc.Server;
@@ -655,8 +655,8 @@ public class SCMNodeManager implements NodeManager {
           datanodeDetails.getHostName(), dnSlv, scmSlv);
     }
 
-    if (scmContext.isFinalizationCheckpointCrossed(
-        FinalizationCheckpoint.MLV_EQUALS_SLV)) {
+    if (FinalizationManager.shouldTellDatanodesToFinalize(
+        scmContext.getFinalizationCheckpoint())) {
       // Because we have crossed the MLV_EQUALS_SLV checkpoint, SCM metadata
       // layout version will not change. We can now compare it to the
       // datanodes' metadata layout versions to tell them to finalize.
@@ -675,16 +675,19 @@ public class SCMNodeManager implements NodeManager {
                 LayoutVersionProto.newBuilder()
                     .setSoftwareLayoutVersion(dnSlv)
                     .setMetadataLayoutVersion(dnSlv).build());
-        try {
-          finalizeCmd.setTerm(scmContext.getTermOfLeader());
+        if (scmContext.isLeader()) {
+          try {
+            finalizeCmd.setTerm(scmContext.getTermOfLeader());
 
-          // Send Finalize command to the data node. Its OK to
-          // send Finalize command multiple times.
-          scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-              new CommandForDatanode<>(datanodeDetails.getUuid(), finalizeCmd));
-        } catch (NotLeaderException ex) {
-          LOG.warn("Skip sending finalize upgrade command since current SCM" +
-              "is not leader.", ex);
+            // Send Finalize command to the data node. Its OK to
+            // send Finalize command multiple times.
+            scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
+                new CommandForDatanode<>(datanodeDetails.getUuid(),
+                    finalizeCmd));
+          } catch (NotLeaderException ex) {
+            LOG.warn("Skip sending finalize upgrade command since current SCM" +
+                " is not leader.", ex);
+          }
         }
       }
     }
