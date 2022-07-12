@@ -36,7 +36,7 @@ public final class BlockDeletingServiceMetrics {
   public static final String SOURCE_NAME =
       BlockDeletingService.class.getSimpleName();
 
-  @Metric(about = "The number of success delete block counts.")
+  @Metric(about = "The number of successful delete blocks")
   private MutableCounterLong successCount;
 
   @Metric(about = "The number of success deleted block bytes.")
