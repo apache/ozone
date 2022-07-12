@@ -1148,6 +1148,8 @@ public class TestRootedOzoneFileSystem {
     LambdaTestUtils.intercept(IOException.class,
         "Bucket links can not be deleted through the HDFS interface.",
         () -> fs.delete(linkPath, true));
+    // Cleanup
+    ozoneVolume.deleteBucket(linkStr);
 
   }
 
