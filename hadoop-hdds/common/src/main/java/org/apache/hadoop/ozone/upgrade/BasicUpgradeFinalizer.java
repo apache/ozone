@@ -86,7 +86,8 @@ public abstract class BasicUpgradeFinalizer
     // running at a time.
     if (isFinalized(versionManager.getUpgradeState())) {
       return FINALIZED_MSG;
-    } else if (finalizationLock.tryLock()) {
+    }
+    if (finalizationLock.tryLock()) {
       try {
         StatusAndMessages response = initFinalize(upgradeClientID, service);
         // If we were able to enter the lock and finalization status is "in
