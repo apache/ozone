@@ -1129,12 +1129,12 @@ public class TestRootedOzoneFileSystem {
   public void testDeleteBucketLinkFails() throws Exception {
     // Create test volume, bucket and bucket link
     String volumeStr = getRandomNonExistVolumeName();
-    Path volumePath = new Path(OZONE_URI_DELIMITER + volumeStr);
+    Path volumePath1 = new Path(OZONE_URI_DELIMITER + volumeStr);
     String bucketStr = "bucket";
-    Path bucketPath = new Path(volumePath, bucketStr);
+    Path bucketPath1 = new Path(volumePath1, bucketStr);
     String linkStr = "link";
-    Path linkPath = new Path(volumePath, linkStr);
-    fs.mkdirs(bucketPath);
+    Path linkPath = new Path(volumePath1, linkStr);
+    fs.mkdirs(bucketPath1);
 
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeStr);
     createLinkBucket(ozoneVolume, bucketStr, linkStr);
