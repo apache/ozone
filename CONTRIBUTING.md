@@ -40,7 +40,7 @@ Requirements to compile the code:
 
 * Unix System
 * JDK 1.8 or higher
-* Maven 3.5 or later
+* Maven 3.6 or later
 * Internet connection for first build (to fetch all Maven and Ozone dependencies)
 
 Additional requirements to run your first pseudo cluster:
