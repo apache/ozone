@@ -77,8 +77,14 @@ public class TestOMMultiTenantManager {
         StringUtils.toLowerCase(AuthenticationMethod.KERBEROS.toString()));
     expectConfigCheckToFail(ozoneManager, conf);
 
+    // Deliberately set ozone.om.kerberos.principal and
+    // ozone.om.kerberos.keytab.file to empty values in order to
+    // test the config checker, since the default values aren't empty.
+    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "");
+    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, "");
+
     // Set essential Ranger conf one by one
-    conf.set(OZONE_RANGER_HTTPS_ADDRESS_KEY, "http://ranger:6080");
+    conf.set(OZONE_RANGER_HTTPS_ADDRESS_KEY, "https://ranger:6182");
     expectConfigCheckToFail(ozoneManager, conf);
     conf.set(OZONE_RANGER_SERVICE, "cm_ozone");
     expectConfigCheckToFail(ozoneManager, conf);
