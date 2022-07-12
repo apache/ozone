@@ -43,15 +43,11 @@ Requirements to compile the code:
 * Maven 3.6 or later
 * Internet connection for first build (to fetch all Maven and Ozone dependencies)
 
-Additional requirements to run your first pseudo cluster:
+Additional requirements for running Ozone in pseudo cluster (including acceptance tests):
 
 * docker
 * docker-compose
-
-Additional requirements to execute different type of tests:
-
-* docker-compose (to start pseudo cluster, also used for blockade and acceptance tests)
-* [jq](https://stedolan.github.io/jq/) (for executing acceptance tests)
+* [jq](https://stedolan.github.io/jq/) (utility used heavily by acceptance tests)
 
 (Standard development tools such as make, gcc, etc. are required.)
 
