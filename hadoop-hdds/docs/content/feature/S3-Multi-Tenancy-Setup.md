@@ -53,7 +53,13 @@ Add the following configs to all Ozone Managers' `ozone-site.xml`:
 	<name>ozone.om.ranger.https-address</name>
 	<value>https://RANGER_HOST:6182</value>
 </property>
+<property>
+	<name>ozone.om.ranger.service</name>
+	<value>RANGER_OZONE_SERVICE_NAME</value>
+</property>
 ```
+
+The value of `ozone.om.ranger.service` should match Ozone's "Service Name" as configured under "Service Manager" page in Ranger Admin Server Web UI. e.g. `cm_ozone`.
 
 To authenticate to Apache Ranger Admin Server, `ozone.om.kerberos.principal` and `ozone.om.kerberos.keytab.file` will be picked up from the existing configs used for Kerberos security setup.
 

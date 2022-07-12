@@ -251,6 +251,8 @@ public class TestRangerBGSyncService {
 
     conf.set(OZONE_RANGER_SERVICE, "cm_ozone");
 
+    // Helper to create and delete users from Ranger for the test.
+    // RangerClient hasn't implemented these yet so we had to roll our own.
     rangerUserRequest = new RangerUserRequest(
         conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY),
         conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER),

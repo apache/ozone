@@ -413,6 +413,9 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         }
 
       } catch (IOException e) {
+        // If the user name doesn't exist in Ranger, it throws 400 Bad Request
+        // with message: user with name: USERNAME does not exist
+
         // Expect the sync thread to restore the user role later if op succeeds
         throw new OMException(e, TENANT_AUTHORIZER_ERROR);
       } finally {

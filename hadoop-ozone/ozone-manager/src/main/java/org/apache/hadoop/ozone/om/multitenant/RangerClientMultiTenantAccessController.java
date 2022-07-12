@@ -60,6 +60,9 @@ public class RangerClientMultiTenantAccessController implements
   private static final Logger LOG = LoggerFactory
       .getLogger(RangerClientMultiTenantAccessController.class);
 
+  private static final int HTTP_STATUS_CODE_UNAUTHORIZED = 401;
+  private static final int HTTP_STATUS_CODE_BAD_REQUEST = 400;
+
   private final RangerClient client;
   private final String rangerServiceName;
   private final Map<IAccessAuthorizer.ACLType, String> aclToString;
@@ -129,6 +132,32 @@ public class RangerClientMultiTenantAccessController implements
     client = new RangerClient(rangerHttpsAddress,
         authType, usernameOrPrincipal, passwordOrKeytab,
         rangerServiceName, OzoneConsts.OZONE);
+
+    // Whether or not the Ranger credentials are valid is unknown right after
+    // RangerClient initialization here. Because RangerClient does not perform
+    // any authentication at this point just yet.
+    //
+    // If the credentials are invalid, RangerClient later throws 401 in every
+    // single request to Ranger.
+  }
+
+  /**
+   * Check StatusCode from RangerServiceException and try to log helpful,
+   * actionable messages.
+   *
+   * @param rse RangerServiceException
+   */
+  private void decodeRSEStatusCodes(RangerServiceException rse) {
+
+    switch (rse.getStatus().getStatusCode()) {
+    case HTTP_STATUS_CODE_UNAUTHORIZED:
+      LOG.error("Auth failure. Please double check Ranger-related configs");
+      break;
+    case HTTP_STATUS_CODE_BAD_REQUEST:
+      LOG.error("Request failure. If this is an assign-user operation, "
+          + "check if the user name exists in Ranger.");
+    default:
+    }
   }
 
   @Override
@@ -141,6 +170,7 @@ public class RangerClientMultiTenantAccessController implements
     try {
       rangerPolicy = client.createPolicy(toRangerPolicy(policy));
     } catch (RangerServiceException e) {
+      decodeRSEStatusCodes(e);
       throw new IOException(e);
     }
     return fromRangerPolicy(rangerPolicy);
@@ -156,6 +186,7 @@ public class RangerClientMultiTenantAccessController implements
     try {
       rangerPolicy = client.getPolicy(rangerServiceName, policyName);
     } catch (RangerServiceException e) {
+      decodeRSEStatusCodes(e);
       throw new IOException(e);
     }
     return fromRangerPolicy(rangerPolicy);
@@ -175,6 +206,7 @@ public class RangerClientMultiTenantAccessController implements
           .map(this::fromRangerPolicy)
           .collect(Collectors.toList());
     } catch (RangerServiceException e) {
+      decodeRSEStatusCodes(e);
       throw new IOException(e);
     }
   }
@@ -190,6 +222,7 @@ public class RangerClientMultiTenantAccessController implements
       rangerPolicy = client.updatePolicy(rangerServiceName,
           policy.getName(), toRangerPolicy(policy));
     } catch (RangerServiceException e) {
+      decodeRSEStatusCodes(e);
       throw new IOException(e);
     }
     return fromRangerPolicy(rangerPolicy);
@@ -204,6 +237,7 @@ public class RangerClientMultiTenantAccessController implements
     try {
       client.deletePolicy(rangerServiceName, policyName);
     } catch (RangerServiceException e) {
+      decodeRSEStatusCodes(e);
       throw new IOException(e);
     }
   }
@@ -219,6 +253,7 @@ public class RangerClientMultiTenantAccessController implements
       rangerRole = client.createRole(rangerServiceName,
           toRangerRole(role, shortName));
     } catch (RangerServiceException e) {
+      decodeRSEStatusCodes(e);
       throw new IOException(e);
     }
     return fromRangerRole(rangerRole);
@@ -234,6 +269,7 @@ public class RangerClientMultiTenantAccessController implements
     try {
       rangerRole = client.getRole(roleName, shortName, rangerServiceName);
     } catch (RangerServiceException e) {
+      decodeRSEStatusCodes(e);
       throw new IOException(e);
     }
     return fromRangerRole(rangerRole);
@@ -251,6 +287,7 @@ public class RangerClientMultiTenantAccessController implements
     try {
       rangerRole = client.updateRole(roleId, toRangerRole(role, shortName));
     } catch (RangerServiceException e) {
+      decodeRSEStatusCodes(e);
       throw new IOException(e);
     }
     return fromRangerRole(rangerRole);
@@ -265,6 +302,7 @@ public class RangerClientMultiTenantAccessController implements
     try {
       client.deleteRole(roleName, shortName, rangerServiceName);
     } catch (RangerServiceException e) {
+      decodeRSEStatusCodes(e);
       throw new IOException(e);
     }
   }
@@ -275,8 +313,7 @@ public class RangerClientMultiTenantAccessController implements
     try {
       rangerOzoneService = client.getService(rangerServiceName);
     } catch (RangerServiceException e) {
-      // TODO: Check e.getStatus()
-      LOG.error("Error getting service: {}", e.getStatus());
+      decodeRSEStatusCodes(e);
       throw new IOException(e);
     }
     // If the login user doesn't have sufficient privilege, policyVersion
