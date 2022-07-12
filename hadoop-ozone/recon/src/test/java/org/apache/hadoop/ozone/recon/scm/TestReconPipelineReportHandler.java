@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Class to test handling of known and new pipelines by Recon's pipeline

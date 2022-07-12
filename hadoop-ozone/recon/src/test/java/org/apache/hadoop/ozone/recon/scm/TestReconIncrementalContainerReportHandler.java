@@ -21,8 +21,8 @@ package org.apache.hadoop.ozone.recon.scm;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -55,7 +55,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 /**
@@ -153,9 +153,9 @@ public class TestReconIncrementalContainerReportHandler
       LifeCycleState expectedState = getContainerStateFromReplicaState(state);
       LifeCycleState actualState =
           containerManager.getContainer(containerID).getState();
-      assertEquals(String.format("Expecting %s in " +
-              "container state for replica state %s", expectedState,
-          state), expectedState, actualState);
+      assertEquals(expectedState, actualState,
+          String.format("Expecting %s in container state for replica state %s",
+              expectedState, state));
     }
   }
 
