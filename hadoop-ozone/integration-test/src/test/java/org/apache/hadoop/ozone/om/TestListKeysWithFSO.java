@@ -82,6 +82,9 @@ public class TestListKeysWithFSO {
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
     omId = UUID.randomUUID().toString();
+    // Set the number of keys to be processed during batch operate.
+    conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 3);
+    conf.setInt(OZONE_CLIENT_LIST_CACHE_SIZE, 3);
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
         .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
@@ -116,10 +119,6 @@ public class TestListKeysWithFSO {
     String legacyBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
     ozoneVolume.createBucket(legacyBucketName, omBucketArgs);
     legacyOzoneBucket2 = ozoneVolume.getBucket(legacyBucketName);
-
-    // Set the number of keys to be processed during batch operate.
-    conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 3);
-    conf.setInt(OZONE_CLIENT_LIST_CACHE_SIZE, 3);
 
     initFSNameSpace();
   }

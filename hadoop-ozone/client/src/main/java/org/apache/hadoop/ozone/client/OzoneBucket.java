@@ -1283,7 +1283,8 @@ public class OzoneBucket extends WithMetadata {
 
       // 2. Get immediate children of keyPrefix, starting with startKey
       List<OzoneFileStatus> statuses = proxy.listStatus(volumeName, name,
-              keyPrefix, false, startKey, listCacheSize, true);
+          keyPrefix, false, startKey, listCacheSize, true);
+      boolean reachedLimitCacheSize = statuses.size() == listCacheSize;
 
       // 3. Special case: ListKey expects keyPrefix element should present in
       // the resultList, only if startKey is blank. If startKey is not blank
@@ -1296,8 +1297,6 @@ public class OzoneBucket extends WithMetadata {
       // resultList. Since proxy#listStatus API returns startKey element to
       // the returnList, this function is to remove the startKey element.
       removeStartKeyIfExistsInStatusList(startKey, statuses);
-
-      boolean reachedLimitCacheSize = false;
 
       // 5. Iterating over the resultStatuses list and add each key to the
       // resultList. If the listCacheSize reaches then it will add the rest
@@ -1319,22 +1318,21 @@ public class OzoneBucket extends WithMetadata {
             keyInfo.getModificationTime(),
             keyInfo.getReplicationConfig());
 
-        if (!reachedLimitCacheSize) {
-          keysResultList.add(ozoneKey);
-          if (status.isDirectory()) {
-            reachedLimitCacheSize = getChildrenKeys(keyInfo.getKeyName(), "",
-                keysResultList);
-          }
-        } else {
-          // 5.1) Add to the resultList till it reaches limit batch size.
-          // Once it reaches limit, then add rest of the items to
-          // pendingItemsToBeBatched and will be picked up in next iteration
-          pendingItemsToBeBatched.add(ozoneKey);
-        }
-      }
+        keysResultList.add(ozoneKey);
 
-      if (reachedLimitCacheSize) {
-        return true;
+        if (status.isDirectory()) {
+          // Adding in-progress keyPath back to the stack to make sure
+          // all the siblings will be fetched.
+          stack.push(new ImmutablePair<>(keyPrefix, keyInfo.getKeyName()));
+          // Adding current directory to the stack, so that this dir will be
+          // the top element. Moving seek pointer to fetch sub-paths
+          stack.push(new ImmutablePair<>(keyInfo.getKeyName(), ""));
+          return true;
+        } else if (reachedLimitCacheSize && indx == statuses.size() - 1) {
+          // The last element is a FILE and reaches the listCacheSize.
+          // Now, sets next seek key to this element
+          stack.push(new ImmutablePair<>(keyPrefix, keyInfo.getKeyName()));
+        }
       }
 
       return false;
