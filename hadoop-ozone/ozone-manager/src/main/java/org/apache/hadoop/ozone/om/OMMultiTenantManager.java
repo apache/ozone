@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -324,6 +325,10 @@ public interface OMMultiTenantManager {
         isS3MultiTenancyEnabled = false;
         logger.error("{} is required to enable S3 Multi-Tenancy but not set",
             OZONE_OM_KERBEROS_KEYTAB_FILE_KEY);
+      }
+      if (!(new File(rangerPw).isFile())) {
+        logger.error("{} = '{}' file path doesn't exist or is not a file",
+            OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, rangerPw);
       }
     }
 
