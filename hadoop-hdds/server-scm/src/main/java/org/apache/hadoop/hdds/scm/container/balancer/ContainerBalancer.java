@@ -108,13 +108,11 @@ public class ContainerBalancer extends StatefulService {
   Since a container can be selected only once during an iteration, these maps
    use it as a primary key to track source to target pairings.
   */
-  private final Map<ContainerID, DatanodeDetails> containerFromSourceMap;
+  private final Map<ContainerID, DatanodeDetails> containerToSourceMap;
   private final Map<ContainerID, DatanodeDetails> containerToTargetMap;
 
   private Set<DatanodeDetails> selectedTargets;
   private Set<DatanodeDetails> selectedSources;
-  // maintaining a list of containers for testing
-  private final List<ContainerID> selectedContainersList;
   private FindTargetStrategy findTargetStrategy;
   private FindSourceStrategy findSourceStrategy;
   private Map<ContainerMoveSelection,
@@ -147,9 +145,8 @@ public class ContainerBalancer extends StatefulService {
     this.placementPolicy = scm.getContainerPlacementPolicy();
     this.networkTopology = scm.getClusterMap();
     this.nextIterationIndex = 0;
-    this.containerFromSourceMap = new HashMap<>();
+    this.containerToSourceMap = new HashMap<>();
     this.containerToTargetMap = new HashMap<>();
-    this.selectedContainersList = new ArrayList<>();
 
     this.lock = new ReentrantLock();
     findSourceStrategy = new FindSourceGreedy(nodeManager);
@@ -420,7 +417,7 @@ public class ContainerBalancer extends StatefulService {
     selectedTargets = new HashSet<>(potentialTargets.size());
     selectedSources = new HashSet<>(getPotentialSources().size());
     moveSelectionToFutureMap = new HashMap<>(unBalancedNodes.size());
-    boolean isMoveGenerated = false;
+    boolean isMoveGeneratedInThisIteration = false;
     iterationResult = IterationResult.ITERATION_COMPLETED;
 
     // match each source node with a target
@@ -446,33 +443,44 @@ public class ContainerBalancer extends StatefulService {
 
       ContainerMoveSelection moveSelection = matchSourceWithTarget(source);
       if (moveSelection != null) {
-        isMoveGenerated = true;
-        processMoveSelection(source, moveSelection);
+        if (processMoveSelection(source, moveSelection)) {
+          isMoveGeneratedInThisIteration = true;
+        }
       } else {
         // can not find any target for this source
         findSourceStrategy.removeCandidateSourceDataNode(source);
       }
     }
 
-    checkIterationResults(isMoveGenerated);
+    checkIterationResults(isMoveGeneratedInThisIteration);
     return iterationResult;
   }
 
-  private void processMoveSelection(DatanodeDetails source,
-                                    ContainerMoveSelection moveSelection) {
+  private boolean processMoveSelection(DatanodeDetails source,
+                                       ContainerMoveSelection moveSelection) {
+    ContainerID containerID = moveSelection.getContainerID();
+    if (containerToSourceMap.containsKey(containerID) ||
+        containerToTargetMap.containsKey(containerID)) {
+      LOG.warn("Container {} has already been selected for move from source " +
+              "{} to target {} earlier. Not moving this container again.",
+          containerID,
+          containerToSourceMap.get(containerID),
+          containerToTargetMap.get(containerID));
+      return false;
+    }
+
     ContainerInfo containerInfo;
     try {
       containerInfo =
-          containerManager.getContainer(moveSelection.getContainerID());
+          containerManager.getContainer(containerID);
     } catch (ContainerNotFoundException e) {
       LOG.warn("Could not get container {} from Container Manager before " +
-          "starting a container move", moveSelection.getContainerID(),
-          e);
-      return;
+          "starting a container move", containerID, e);
+      return false;
     }
     LOG.info("ContainerBalancer is trying to move container {} with size " +
             "{}B from source datanode {} to target datanode {}",
-        moveSelection.getContainerID().toString(),
+        containerID.toString(),
         containerInfo.getUsedBytes(),
         source.getUuidString(),
         moveSelection.getTargetNode().getUuidString());
@@ -481,6 +489,7 @@ public class ContainerBalancer extends StatefulService {
       // consider move successful for now, and update selection criteria
       updateTargetsAndSelectionCriteria(moveSelection, source);
     }
+    return true;
   }
 
   /**
@@ -489,10 +498,11 @@ public class ContainerBalancer extends StatefulService {
    * <p>CAN_NOT_BALANCE_ANY_MORE if no move was generated during this iteration
    * </p>
    * <p>ITERATION_COMPLETED</p>
-   * @param isMoveGenerated whether a move was generated during the iteration
+   * @param isMoveGeneratedInThisIteration whether a move was generated during
+   *                                       the iteration
    */
-  private void checkIterationResults(boolean isMoveGenerated) {
-    if (!isMoveGenerated) {
+  private void checkIterationResults(boolean isMoveGeneratedInThisIteration) {
+    if (!isMoveGeneratedInThisIteration) {
       /*
        If no move was generated during this iteration then we don't need to
        check the move results
@@ -523,7 +533,7 @@ public class ContainerBalancer extends StatefulService {
             LOG.warn("Container move canceled for container {} from source {}" +
                     " to target {} due to timeout.",
                 entry.getKey().getContainerID(),
-                containerFromSourceMap.get(entry.getKey().getContainerID())
+                containerToSourceMap.get(entry.getKey().getContainerID())
                     .getUuidString(),
                 entry.getKey().getTargetNode().getUuidString());
             entry.getValue().cancel(true);
@@ -694,29 +704,30 @@ public class ContainerBalancer extends StatefulService {
   /**
    * Update targets, sources, and selection criteria after a move.
    *
-   * @param moveSelection the target datanode and container that has been
-   *                      just selected
+   * @param moveSelection latest selected target datanode and container
    * @param source        the source datanode
    */
   private void updateTargetsAndSelectionCriteria(
       ContainerMoveSelection moveSelection, DatanodeDetails source) {
+    ContainerID containerID = moveSelection.getContainerID();
+    DatanodeDetails target = moveSelection.getTargetNode();
+
     // count source if it has not been involved in move earlier
     if (!selectedSources.contains(source)) {
       countDatanodesInvolvedPerIteration += 1;
     }
     // count target if it has not been involved in move earlier
-    if (!selectedTargets.contains(moveSelection.getTargetNode())) {
+    if (!selectedTargets.contains(target)) {
       countDatanodesInvolvedPerIteration += 1;
     }
+
     incSizeSelectedForMoving(source, moveSelection);
-    selectedContainersList.add(moveSelection.getContainerID());
-    containerFromSourceMap.put(moveSelection.getContainerID(), source);
-    containerToTargetMap.put(moveSelection.getContainerID(),
-        moveSelection.getTargetNode());
-    selectedTargets.add(moveSelection.getTargetNode());
+    containerToSourceMap.put(containerID, source);
+    containerToTargetMap.put(containerID, target);
+    selectedTargets.add(target);
     selectedSources.add(source);
     selectionCriteria.setSelectedContainers(
-        new HashSet<>(containerFromSourceMap.keySet()));
+        new HashSet<>(containerToSourceMap.keySet()));
   }
 
   /**
@@ -838,9 +849,8 @@ public class ContainerBalancer extends StatefulService {
     this.overUtilizedNodes.clear();
     this.underUtilizedNodes.clear();
     this.unBalancedNodes.clear();
-    this.containerFromSourceMap.clear();
+    this.containerToSourceMap.clear();
     this.containerToTargetMap.clear();
-    this.selectedContainersList.clear();
     this.countDatanodesInvolvedPerIteration = 0;
     this.sizeMovedPerIteration = 0;
     metrics.resetDataSizeMovedGBInLatestIteration();
@@ -1256,8 +1266,8 @@ public class ContainerBalancer extends StatefulService {
    * {@link DatanodeDetails}
    */
   @VisibleForTesting
-  Map<ContainerID, DatanodeDetails> getContainerFromSourceMap() {
-    return containerFromSourceMap;
+  Map<ContainerID, DatanodeDetails> getContainerToSourceMap() {
+    return containerToSourceMap;
   }
 
   /**
@@ -1273,11 +1283,6 @@ public class ContainerBalancer extends StatefulService {
   @VisibleForTesting
   Set<DatanodeDetails> getSelectedTargets() {
     return selectedTargets;
-  }
-
-  @VisibleForTesting
-  List<ContainerID> getSelectedContainersList() {
-    return selectedContainersList;
   }
 
   @VisibleForTesting

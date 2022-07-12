@@ -70,7 +70,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 /**
@@ -314,7 +316,7 @@ public class TestContainerBalancer {
     // balancer should have identified unbalanced nodes
     Assertions.assertFalse(containerBalancer.getUnBalancedNodes().isEmpty());
     // no container should have been selected
-    Assertions.assertTrue(containerBalancer.getContainerFromSourceMap()
+    Assertions.assertTrue(containerBalancer.getContainerToSourceMap()
         .isEmpty());
     /*
     Iteration result should be CAN_NOT_BALANCE_ANY_MORE because no container
@@ -334,7 +336,7 @@ public class TestContainerBalancer {
 
     // check whether all selected containers are closed
     for (ContainerID cid:
-         containerBalancer.getContainerFromSourceMap().keySet()) {
+         containerBalancer.getContainerToSourceMap().keySet()) {
       Assertions.assertSame(
           cidToInfoMap.get(cid).getState(), HddsProtos.LifeCycleState.CLOSED);
     }
@@ -400,7 +402,7 @@ public class TestContainerBalancer {
 
     stopBalancer();
     Map<ContainerID, DatanodeDetails> containerFromSourceMap =
-        containerBalancer.getContainerFromSourceMap();
+        containerBalancer.getContainerToSourceMap();
     Map<ContainerID, DatanodeDetails> containerToTargetMap =
         containerBalancer.getContainerToTargetMap();
 
@@ -452,7 +454,7 @@ public class TestContainerBalancer {
   @Test
   public void selectedContainerShouldNotAlreadyHaveBeenSelected()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException, NodeNotFoundException {
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
@@ -463,10 +465,18 @@ public class TestContainerBalancer {
     sleepWhileBalancing(500);
 
     stopBalancer();
-    // all containers should be unique, so the list size should equal map size
-    Assertions.assertEquals(
-        containerBalancer.getContainerFromSourceMap().size(),
-        containerBalancer.getSelectedContainersList().size());
+
+    int numContainers = containerBalancer.getContainerToTargetMap().size();
+
+    /*
+    Assuming move is called exactly once for each unique container, number of
+     calls to move should equal number of unique containers. If number of
+     calls to move is more than number of unique containers, at least one
+     container has been re-selected.
+     */
+    Mockito.verify(replicationManager, times(numContainers))
+        .move(any(ContainerID.class), any(DatanodeDetails.class),
+            any(DatanodeDetails.class));
   }
 
   @Test
@@ -487,7 +497,7 @@ public class TestContainerBalancer {
     Set<ContainerID> excludeContainers =
         balancerConfiguration.getExcludeContainers();
     for (ContainerID container :
-        containerBalancer.getContainerFromSourceMap().keySet()) {
+        containerBalancer.getContainerToSourceMap().keySet()) {
       Assertions.assertFalse(excludeContainers.contains(container));
     }
   }
@@ -509,7 +519,7 @@ public class TestContainerBalancer {
     sleepWhileBalancing(500);
 
     Assertions.assertFalse(containerBalancer.getUnBalancedNodes().isEmpty());
-    Assertions.assertTrue(containerBalancer.getContainerFromSourceMap()
+    Assertions.assertTrue(containerBalancer.getContainerToSourceMap()
         .isEmpty());
     stopBalancer();
 
@@ -524,7 +534,7 @@ public class TestContainerBalancer {
     stopBalancer();
     // balancer should have identified unbalanced nodes
     Assertions.assertFalse(containerBalancer.getUnBalancedNodes().isEmpty());
-    Assertions.assertFalse(containerBalancer.getContainerFromSourceMap()
+    Assertions.assertFalse(containerBalancer.getContainerToSourceMap()
         .isEmpty());
   }
 
@@ -607,7 +617,7 @@ public class TestContainerBalancer {
     DatanodeDetails dn2 =
         nodesInCluster.get(thirdIncludeIndex).getDatanodeDetails();
     Map<ContainerID, DatanodeDetails> containerFromSourceMap =
-        containerBalancer.getContainerFromSourceMap();
+        containerBalancer.getContainerToSourceMap();
     Map<ContainerID, DatanodeDetails> containerToTargetMap =
         containerBalancer.getContainerToTargetMap();
     for (Map.Entry<ContainerID, DatanodeDetails> entry :
