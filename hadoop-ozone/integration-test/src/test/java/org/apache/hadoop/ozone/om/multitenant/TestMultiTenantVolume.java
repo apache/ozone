@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
 import com.google.protobuf.ServiceException;
+import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -205,6 +206,7 @@ public class TestMultiTenantVolume {
 
     store.tenantRevokeUserAccessId(ACCESS_ID);
     store.deleteTenant(TENANT_ID);
+    store.deleteVolume(TENANT_ID);
   }
 
   /**
@@ -260,5 +262,32 @@ public class TestMultiTenantVolume {
     long readBackVersion = Long.parseLong(readBackVersionStr);
 
     Assert.assertEquals(writtenVersion, readBackVersion);
+  }
+
+  @Test
+  public void testTenantVolumeQuota() throws Exception {
+
+    ObjectStore store = getStoreForAccessID(ACCESS_ID);
+
+    // Create Tenant and check default quota
+    store.createTenant(TENANT_ID);
+    OzoneVolume volume;
+    volume = store.getVolume(TENANT_ID);
+    Assert.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInNamespace());
+    Assert.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInBytes());
+
+    long spaceQuota = 10;
+    long namespaceQuota = 20;
+    OzoneQuota quota = OzoneQuota.getOzoneQuota(spaceQuota, namespaceQuota);
+    volume.setQuota(quota);
+
+    // Check quota
+    volume = store.getVolume(TENANT_ID);
+    Assert.assertEquals(namespaceQuota, volume.getQuotaInNamespace());
+    Assert.assertEquals(spaceQuota, volume.getQuotaInBytes());
+
+    // Delete tenant and volume
+    store.deleteTenant(TENANT_ID);
+    store.deleteVolume(TENANT_ID);
   }
 }
