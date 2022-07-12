@@ -899,8 +899,6 @@ public abstract class TestOzoneRpcClientAbstract {
               () -> bucket.createKey(keyName, "dummy".getBytes(UTF_8).length,
                       replicationConfig, new HashMap<>()));
     }
-
-
   }
 
   @Test
