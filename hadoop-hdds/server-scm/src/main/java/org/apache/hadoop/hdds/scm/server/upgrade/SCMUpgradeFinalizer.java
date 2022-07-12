@@ -124,7 +124,12 @@ public class SCMUpgradeFinalizer extends
     if (!stateManager.crossedCheckpoint(
         FinalizationCheckpoint.FINALIZATION_COMPLETE)) {
       createPipelinesAfterFinalization(context);
-      stateManager.removeFinalizingMark();
+      // @Replicate methods are required to throw TimeoutException.
+      try {
+        stateManager.removeFinalizingMark();
+      } catch (TimeoutException ex) {
+        throw new IOException(ex);
+      }
     }
   }
 

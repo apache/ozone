@@ -84,9 +84,11 @@ public abstract class BasicUpgradeFinalizer
     // sets the finalization status to FINALIZATION_IN_PROGRESS.
     // Therefore, a lock is used to make sure only one finalization thread is
     // running at a time.
-    StatusAndMessages response = initFinalize(upgradeClientID, service);
-    if (finalizationLock.tryLock()) {
+    if (isFinalized(versionManager.getUpgradeState())) {
+      return FINALIZED_MSG;
+    } else if (finalizationLock.tryLock()) {
       try {
+        StatusAndMessages response = initFinalize(upgradeClientID, service);
         // If we were able to enter the lock and finalization status is "in
         // progress", we should resume finalization because the last attempt
         // was interrupted. If an attempt was currently ongoing, the lock
@@ -94,26 +96,24 @@ public abstract class BasicUpgradeFinalizer
         if (response.status() == FINALIZATION_REQUIRED ||
             response.status() == FINALIZATION_IN_PROGRESS) {
           finalizationExecutor.execute(service, this);
-          response = STARTING_MSG;
+          return STARTING_MSG;
         }
-        // Else, the initial response we got from initFinalize was still
-        // correct.
+        // Else, the initial response we got from initFinalize can be used,
+        // since we do not need to start/resume finalization.
+        return response;
       } catch (NotLeaderException e) {
         LOG.info("Leader change encountered during finalization. This " +
             "component will continue finalization as directed by the new " +
             "leader.", e);
+        return FINALIZATION_IN_PROGRESS_MSG;
       } finally {
         finalizationLock.unlock();
       }
     } else {
-      // We could not acquire the lock, so either finalization is ongoing, or
-      // it already finished but we received multiple requests to
-      // run it at the same time.
-      if (!isFinalized(response.status())) {
-        response = FINALIZATION_IN_PROGRESS_MSG;
-      }
+      // Finalization has not completed, but another thread holds the lock to
+      // run finalization.
+      return FINALIZATION_IN_PROGRESS_MSG;
     }
-    return response;
   }
 
   public synchronized StatusAndMessages reportStatus(

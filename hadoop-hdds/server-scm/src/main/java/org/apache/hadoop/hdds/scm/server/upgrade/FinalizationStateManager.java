@@ -31,7 +31,7 @@ public interface FinalizationStateManager {
   void addFinalizingMark() throws IOException, TimeoutException;
 
   @Replicate
-  void removeFinalizingMark() throws IOException;
+  void removeFinalizingMark() throws IOException, TimeoutException;
 
   @Replicate
   void finalizeLayoutFeature(Integer layoutVersion)
