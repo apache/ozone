@@ -1076,7 +1076,6 @@ public class OzoneBucket extends WithMetadata {
   private class KeyIteratorWithFSO extends KeyIterator {
 
     private Stack<Pair<String, String>> stack;
-    private List<OzoneKey> pendingItemsToBeBatched;
     private boolean addedKeyPrefix;
     private String removeStartKey = "";
 
@@ -1127,7 +1126,6 @@ public class OzoneBucket extends WithMetadata {
     List<OzoneKey> getNextListOfKeys(String prevKey) throws IOException {
       if (stack == null) {
         stack = new Stack();
-        pendingItemsToBeBatched = new ArrayList<>();
       }
 
       // normalize paths
@@ -1275,32 +1273,25 @@ public class OzoneBucket extends WithMetadata {
       // listStatus API expects a not null 'startKey' value
       startKey = startKey == null ? "" : startKey;
 
-      // 1. Add pending items to the user key resultList
-      if (addAllPendingItemsToResultList(keysResultList)) {
-        // reached limit batch size.
-        return true;
-      }
-
-      // 2. Get immediate children of keyPrefix, starting with startKey
+      // 1. Get immediate children of keyPrefix, starting with startKey
       List<OzoneFileStatus> statuses = proxy.listStatus(volumeName, name,
           keyPrefix, false, startKey, listCacheSize, true);
       boolean reachedLimitCacheSize = statuses.size() == listCacheSize;
 
-      // 3. Special case: ListKey expects keyPrefix element should present in
+      // 2. Special case: ListKey expects keyPrefix element should present in
       // the resultList, only if startKey is blank. If startKey is not blank
       // then resultList shouldn't contain the startKey element.
       // Since proxy#listStatus API won't return keyPrefix element in the
       // resultList. So, this is to add user given keyPrefix to the return list.
       addKeyPrefixInfoToResultList(keyPrefix, startKey, keysResultList);
 
-      // 4. Special case: ListKey expects startKey shouldn't present in the
+      // 3. Special case: ListKey expects startKey shouldn't present in the
       // resultList. Since proxy#listStatus API returns startKey element to
       // the returnList, this function is to remove the startKey element.
       removeStartKeyIfExistsInStatusList(startKey, statuses);
 
-      // 5. Iterating over the resultStatuses list and add each key to the
-      // resultList. If the listCacheSize reaches then it will add the rest
-      // of the statuses to pendingItemsToBeBatched
+      // 4. Iterating over the resultStatuses list and add each key to the
+      // resultList.
       for (int indx = 0; indx < statuses.size(); indx++) {
         OzoneFileStatus status = statuses.get(indx);
         OmKeyInfo keyInfo = status.getKeyInfo();
@@ -1327,11 +1318,16 @@ public class OzoneBucket extends WithMetadata {
           // Adding current directory to the stack, so that this dir will be
           // the top element. Moving seek pointer to fetch sub-paths
           stack.push(new ImmutablePair<>(keyInfo.getKeyName(), ""));
+          // Return it so that the next iteration will be
+          // started using the stacked items.
           return true;
         } else if (reachedLimitCacheSize && indx == statuses.size() - 1) {
           // The last element is a FILE and reaches the listCacheSize.
           // Now, sets next seek key to this element
           stack.push(new ImmutablePair<>(keyPrefix, keyInfo.getKeyName()));
+          // Return it so that the next iteration will be
+          // started using the stacked items.
+          return true;
         }
       }
 
@@ -1359,20 +1355,6 @@ public class OzoneBucket extends WithMetadata {
           statuses.remove(0);
         }
       }
-    }
-
-    private boolean addAllPendingItemsToResultList(List<OzoneKey> keys) {
-
-      Iterator<OzoneKey> ozoneKeyItr = pendingItemsToBeBatched.iterator();
-      while (ozoneKeyItr.hasNext()) {
-        if (listCacheSize <= keys.size()) {
-          // reached limit batch size.
-          return true;
-        }
-        keys.add(ozoneKeyItr.next());
-        ozoneKeyItr.remove();
-      }
-      return false;
     }
 
     private void addKeyPrefixInfoToResultList(String keyPrefix,
