@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -284,7 +285,7 @@ public class TestSCMInstallSnapshotWithHA {
 
   private List<ContainerInfo> writeToIncreaseLogIndex(
       StorageContainerManager scm, long targetLogIndex)
-      throws IOException, InterruptedException {
+      throws IOException, InterruptedException, TimeoutException {
     List<ContainerInfo> containers = new ArrayList<>();
     SCMStateMachine stateMachine =
         scm.getScmHAManager().getRatisServer().getSCMStateMachine();

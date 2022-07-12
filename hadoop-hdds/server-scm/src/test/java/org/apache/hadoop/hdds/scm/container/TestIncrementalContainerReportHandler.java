@@ -66,6 +66,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
@@ -90,7 +91,8 @@ public class TestIncrementalContainerReportHandler {
   private SCMHAManager scmhaManager;
 
   @BeforeEach
-  public void setup() throws IOException, InvalidStateTransitionException {
+  public void setup() throws IOException, InvalidStateTransitionException,
+      TimeoutException {
     final OzoneConfiguration conf = new OzoneConfiguration();
     final String path =
         GenericTestUtils.getTempPath(UUID.randomUUID().toString());
@@ -183,7 +185,7 @@ public class TestIncrementalContainerReportHandler {
 
 
   @Test
-  public void testClosingToClosed() throws IOException {
+  public void testClosingToClosed() throws IOException, TimeoutException {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(
             nodeManager, containerManager, scmContext);
@@ -216,7 +218,7 @@ public class TestIncrementalContainerReportHandler {
   }
 
   @Test
-  public void testClosingToQuasiClosed() throws IOException {
+  public void testClosingToQuasiClosed() throws IOException, TimeoutException {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(
             nodeManager, containerManager, scmContext);
@@ -250,7 +252,7 @@ public class TestIncrementalContainerReportHandler {
   }
 
   @Test
-  public void testQuasiClosedToClosed() throws IOException {
+  public void testQuasiClosedToClosed() throws IOException, TimeoutException {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(
             nodeManager, containerManager, scmContext);
@@ -287,7 +289,7 @@ public class TestIncrementalContainerReportHandler {
   }
 
   @Test
-  public void testDeleteContainer() throws IOException {
+  public void testDeleteContainer() throws IOException, TimeoutException {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(
             nodeManager, containerManager, scmContext);
@@ -324,7 +326,7 @@ public class TestIncrementalContainerReportHandler {
   // HDDS-5249 - This test reproduces the race condition mentioned in the Jira
   // until the code was changed to fix the race condition.
   public void testICRFCRRace() throws IOException, NodeNotFoundException,
-      ExecutionException, InterruptedException {
+      ExecutionException, InterruptedException, TimeoutException {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(
             nodeManager, containerManager, scmContext);

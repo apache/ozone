@@ -367,7 +367,8 @@ public class TestHDDSUpgrade {
   /*
    * Helper function to test that we can create new pipelines Post-Upgrade.
    */
-  private void testPostUpgradePipelineCreation() throws IOException {
+  private void testPostUpgradePipelineCreation()
+      throws IOException, TimeoutException {
     Pipeline ratisPipeline1 = scmPipelineManager.createPipeline(RATIS_THREE);
     scmPipelineManager.openPipeline(ratisPipeline1.getId());
     Assert.assertEquals(0,
@@ -417,7 +418,7 @@ public class TestHDDSUpgrade {
   /*
    * Helper function for container creation.
    */
-  private void createTestContainers() throws IOException {
+  private void createTestContainers() throws IOException, TimeoutException {
     XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
     ContainerInfo ci1 = scmContainerManager.allocateContainer(
         RATIS_THREE, "Owner1");

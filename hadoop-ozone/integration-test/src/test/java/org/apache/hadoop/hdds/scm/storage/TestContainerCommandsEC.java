@@ -230,9 +230,12 @@ public class TestContainerCommandsEC {
         continue;
       }
       ListBlockResponseProto response = ContainerProtocolCalls
-          .listBlock(clients.get(i), containerID, null, numExpectedBlocks + 1,
+          .listBlock(clients.get(i), containerID, null, Integer.MAX_VALUE,
               containerToken);
-      Assertions.assertEquals(numExpectedBlocks, response.getBlockDataCount(),
+      Assertions.assertEquals(numExpectedBlocks,
+          response.getBlockDataList().stream().filter(
+              k -> k.getChunksCount() > 0 && k.getChunks(0).getLen() > 0)
+              .collect(Collectors.toList()).size(),
           "blocks count doesn't match on DN " + i);
       Assertions.assertEquals(numExpectedChunks,
           response.getBlockDataList().stream()

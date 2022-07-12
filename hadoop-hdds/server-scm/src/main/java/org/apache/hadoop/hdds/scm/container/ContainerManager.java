@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -103,7 +104,8 @@ public interface ContainerManager extends Closeable {
    * @throws IOException
    */
   ContainerInfo allocateContainer(ReplicationConfig replicationConfig,
-                                  String owner) throws IOException;
+                                  String owner)
+      throws IOException, TimeoutException;
 
   /**
    * Update container state.
@@ -114,7 +116,7 @@ public interface ContainerManager extends Closeable {
    */
   void updateContainerState(ContainerID containerID,
                             LifeCycleEvent event)
-      throws IOException, InvalidStateTransitionException;
+      throws IOException, InvalidStateTransitionException, TimeoutException;
 
   /**
    * Returns the latest list of replicas for given containerId.
@@ -187,7 +189,7 @@ public interface ContainerManager extends Closeable {
    * @throws IOException
    */
   void deleteContainer(ContainerID containerID)
-      throws IOException;
+      throws IOException, TimeoutException;
 
   /**
    * Returns the list of containersIDs.

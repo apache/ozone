@@ -28,6 +28,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
@@ -202,7 +203,7 @@ public class ContainerManagerImpl implements ContainerManager {
   @Override
   public ContainerInfo allocateContainer(
       final ReplicationConfig replicationConfig, final String owner)
-      throws IOException {
+      throws IOException, TimeoutException {
     // Acquire pipeline manager lock, to avoid any updates to pipeline
     // while allocate container happens. This is to avoid scenario like
     // mentioned in HDDS-5655.
@@ -255,7 +256,7 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   private ContainerInfo createContainer(Pipeline pipeline, String owner)
-      throws IOException {
+      throws IOException, TimeoutException {
     final ContainerInfo containerInfo = allocateContainer(pipeline, owner);
     if (LOG.isTraceEnabled()) {
       LOG.trace("New container allocated: {}", containerInfo);
@@ -265,7 +266,7 @@ public class ContainerManagerImpl implements ContainerManager {
 
   private ContainerInfo allocateContainer(final Pipeline pipeline,
                                           final String owner)
-      throws IOException {
+      throws IOException, TimeoutException {
     final long uniqueId = sequenceIdGen.getNextId(CONTAINER_ID);
     Preconditions.checkState(uniqueId > 0,
         "Cannot allocate container, negative container id" +
@@ -299,7 +300,7 @@ public class ContainerManagerImpl implements ContainerManager {
   @Override
   public void updateContainerState(final ContainerID cid,
                                    final LifeCycleEvent event)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException, InvalidStateTransitionException, TimeoutException {
     HddsProtos.ContainerID protoId = cid.getProtobuf();
     lock.lock();
     try {
@@ -435,7 +436,7 @@ public class ContainerManagerImpl implements ContainerManager {
 
   @Override
   public void deleteContainer(final ContainerID cid)
-      throws IOException {
+      throws IOException, TimeoutException {
     HddsProtos.ContainerID protoId = cid.getProtobuf();
     lock.lock();
     try {

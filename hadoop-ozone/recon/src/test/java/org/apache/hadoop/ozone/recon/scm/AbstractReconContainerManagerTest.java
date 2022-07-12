@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.time.ZoneId;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -150,7 +151,7 @@ public class AbstractReconContainerManagerTest {
   }
 
   private StorageContainerServiceProvider getScmServiceProvider()
-      throws IOException {
+      throws IOException, TimeoutException {
     Pipeline pipeline = getRandomPipeline();
     getPipelineManager().addPipeline(pipeline);
 
@@ -206,7 +207,7 @@ public class AbstractReconContainerManagerTest {
   }
 
   protected ContainerWithPipeline getTestContainer(LifeCycleState state)
-      throws IOException {
+      throws IOException, TimeoutException {
     ContainerID containerID = ContainerID.valueOf(100L);
     Pipeline pipeline = getRandomPipeline();
     pipelineManager.addPipeline(pipeline);
@@ -224,7 +225,7 @@ public class AbstractReconContainerManagerTest {
 
   protected ContainerWithPipeline getTestContainer(long id,
                                                    LifeCycleState state)
-      throws IOException {
+      throws IOException, TimeoutException {
     ContainerID containerID = ContainerID.valueOf(id);
     Pipeline pipeline = getRandomPipeline();
     pipelineManager.addPipeline(pipeline);
