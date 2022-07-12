@@ -291,36 +291,17 @@ public class TestListKeysWithFSO {
     // startKey=a1/b123Invalid is lexographically before prefixKey=a1/b2
     expectedKeys =
         getExpectedKeyList("a1/b2", "a1/b123Invalid", legacyOzoneBucket);
-    /**
-     * a1/b2/
-     * a1/b2/d1/
-     * .....
-     * a1/b2/d3/
-     * a1/b2/d3/d31.tx
-     */
     checkKeyList("a1/b2", "a1/b123Invalid", expectedKeys, fsoOzoneBucket);
 
     // case-5: StartKey LeafNode is a sub-directory of prefixKey.
     // So will fetch and return all the sub-paths after d0.
     expectedKeys = getExpectedKeyList("a1/b2", "a1/b2/d0", legacyOzoneBucket);
-    /**
-     a1/b2/d1/
-     a1/b2/d1/d11.tx
-     .....
-     a1/b2/d3/
-     a1/b2/d3/d31.tx
-     */
     checkKeyList("a1/b2", "a1/b2/d0", expectedKeys, fsoOzoneBucket);
 
     // case-6: StartKey LeafNode is a sub-file of prefixKey.
     // So will fetch and return all the sub-paths after d111.txt.
     expectedKeys =
         getExpectedKeyList("a1/b2", "a1/b2/d111.txt", legacyOzoneBucket);
-    /**
-     * a1/b2/d2/
-     * ....
-     * a1/b2/d3/d31.tx
-     */
     checkKeyList("a1/b2", "a1/b2/d111.txt", expectedKeys, fsoOzoneBucket);
 
     // case-7: StartKey LeafNode is a sub-file of prefixKey.
@@ -333,13 +314,6 @@ public class TestListKeysWithFSO {
     // case-8: StartKey LeafNode is a sub-dir of prefixKey.
     // So will fetch and return all the sub-paths after "d311111".
     expectedKeys = getExpectedKeyList("a1", "a1/b2/d311111", legacyOzoneBucket);
-    /**
-     *  a1/b3/
-     *  a1/b3/e1/
-     *  ....
-     *  a1/b3/e3/
-     *  a1/b3/e3/e31.tx
-     */
     checkKeyList("a1", "a1/b2/d311111", expectedKeys, fsoOzoneBucket);
 
     // case-9:
@@ -348,14 +322,6 @@ public class TestListKeysWithFSO {
     // which is "a1/b2"
     expectedKeys =
         getExpectedKeyList("a1", "a1/b11111/d311111", legacyOzoneBucket);
-    /**
-     0 = "a1/b2/"
-     1 = "a1/b2/d1/"
-     2 = "a1/b2/d1/d11.tx"
-     3 = "a1/b2/d2/"
-     ........
-     14 = "a1/b3/e3/e31.tx"
-     */
     checkKeyList("a1", "a1/b11111/d311111", expectedKeys, fsoOzoneBucket);
 
     // case-10:
@@ -363,12 +329,6 @@ public class TestListKeysWithFSO {
     // greater than "a1/b2/d2/d11111".
     expectedKeys =
         getExpectedKeyList("a1", "a1/b2/d2/d21111", legacyOzoneBucket);
-    /**
-     0 = "a1/b2/d2/d22.tx"
-     ......
-     7 = "a1/b3/e3/"
-     8 = "a1/b3/e3/e31.tx"
-     */
     checkKeyList("a1", "a1/b2/d2/d21111", expectedKeys, fsoOzoneBucket);
 
     // case-11: StartKey is a sub-path of prefixKey.
@@ -400,10 +360,17 @@ public class TestListKeysWithFSO {
     expectedKeys = getExpectedKeyList("", "a1/b2/d2/d21111", legacyOzoneBucket);
     checkKeyList("", "a1/b2/d2/d21111", expectedKeys, fsoOzoneBucket);
 
-    // case-16:
-    // PrefixKey is empty and search should consider startKey.
+    // case-16: PrefixKey is empty and search should consider startKey.
     expectedKeys = getExpectedKeyList("", "a0/b2/d2/d21111", legacyOzoneBucket);
     checkKeyList("", "a0/b2/d2/d21111", expectedKeys, fsoOzoneBucket);
+
+    // case-17: Partial prefixKey and seek till prefixKey.
+    expectedKeys = getExpectedKeyList("a1/b", "a1/b1/e/", legacyOzoneBucket);
+    checkKeyList("a1/b", "a1/b1/e/", expectedKeys, fsoOzoneBucket);
+
+    // case-18: Partial prefixKey and seek till prefixKey.
+    expectedKeys = getExpectedKeyList("a", "a1/b1/e/", legacyOzoneBucket);
+    checkKeyList("a", "a1/b1/e/", expectedKeys, fsoOzoneBucket);
   }
 
   @Test
@@ -419,6 +386,9 @@ public class TestListKeysWithFSO {
 
     expectedKeys = getExpectedKeyList("a", "a", legacyOzoneBucket2);
     checkKeyList("a", "a", expectedKeys, fsoOzoneBucket2);
+
+    expectedKeys = getExpectedKeyList("a", "a1", legacyOzoneBucket2);
+    checkKeyList("a", "a1", expectedKeys, fsoOzoneBucket2);
   }
 
   /**
