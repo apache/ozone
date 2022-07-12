@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOU
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PREFINALIZE_ACTION_VALIDATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
 
@@ -46,9 +47,10 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType;
 import org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 /**
- * UpgradeFinalizer implementation for the Storage Container Manager service.
+ * Base UpgradeFinalizer implementation to be extended by services.
  */
 public abstract class BasicUpgradeFinalizer
     <T, V extends AbstractLayoutVersionManager> implements UpgradeFinalizer<T> {
@@ -82,29 +84,37 @@ public abstract class BasicUpgradeFinalizer
     // sets the finalization status to FINALIZATION_IN_PROGRESS.
     // Therefore, a lock is used to make sure only one finalization thread is
     // running at a time.
-    StatusAndMessages response = initFinalize(upgradeClientID, service);
+    if (isFinalized(versionManager.getUpgradeState())) {
+      return FINALIZED_MSG;
+    }
     if (finalizationLock.tryLock()) {
       try {
-        // Even if the status indicates finalization completed, the component
-        // may not have finished all its specific steps if finalization was
-        // interrupted, so we should re-invoke them here.
+        StatusAndMessages response = initFinalize(upgradeClientID, service);
+        // If we were able to enter the lock and finalization status is "in
+        // progress", we should resume finalization because the last attempt
+        // was interrupted. If an attempt was currently ongoing, the lock
+        // would have been held.
         if (response.status() == FINALIZATION_REQUIRED ||
-            !componentFinishedFinalizationSteps(service)) {
+            response.status() == FINALIZATION_IN_PROGRESS) {
           finalizationExecutor.execute(service, this);
-          response = STARTING_MSG;
+          return STARTING_MSG;
         }
+        // Else, the initial response we got from initFinalize can be used,
+        // since we do not need to start/resume finalization.
+        return response;
+      } catch (NotLeaderException e) {
+        LOG.info("Leader change encountered during finalization. This " +
+            "component will continue finalization as directed by the new " +
+            "leader.", e);
+        return FINALIZATION_IN_PROGRESS_MSG;
       } finally {
         finalizationLock.unlock();
       }
     } else {
-      // We could not acquire the lock, so either finalization is ongoing, or
-      // it already finished but we received multiple requests to
-      // run it at the same time.
-      if (!isFinalized(response.status())) {
-        response = FINALIZATION_IN_PROGRESS_MSG;
-      }
+      // Finalization has not completed, but another thread holds the lock to
+      // run finalization.
+      return FINALIZATION_IN_PROGRESS_MSG;
     }
-    return response;
   }
 
   public synchronized StatusAndMessages reportStatus(
@@ -126,12 +136,20 @@ public abstract class BasicUpgradeFinalizer
     return versionManager.getUpgradeState();
   }
 
+  /**
+   * Child classes may override this method to set when finalization has
+   * begun progress.
+   */
   protected void preFinalizeUpgrade(T service) throws IOException {
-    // No Op by default.
+    versionManager.setUpgradeState(FINALIZATION_IN_PROGRESS);
   }
 
+  /**
+   * Child classes may override this method to delay finalization being
+   * marked done until a set of post finalize actions complete.
+   */
   protected void postFinalizeUpgrade(T service) throws IOException {
-    // No Op by default.
+    versionManager.setUpgradeState(FINALIZATION_DONE);
   }
 
   @Override
@@ -224,15 +242,6 @@ public abstract class BasicUpgradeFinalizer
   private static boolean isFinalized(Status status) {
     return status.equals(Status.ALREADY_FINALIZED)
         || status.equals(FINALIZATION_DONE);
-  }
-
-  /**
-   * Child classes that have additional finalization steps can override this
-   * method to check component specific state to determine whether
-   * finalization still needs to be run.
-   */
-  protected boolean componentFinishedFinalizationSteps(T service) {
-    return true;
   }
 
   public abstract void finalizeLayoutFeature(LayoutFeature lf, T context)
