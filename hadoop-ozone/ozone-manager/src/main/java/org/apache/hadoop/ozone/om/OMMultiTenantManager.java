@@ -312,6 +312,8 @@ public interface OMMultiTenantManager {
       // Check Kerberos principal and keytab file path configs if not both
       // clear text username and password overrides are set.
       final String omKerbPrinc = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
+      // Note: ozone.om.kerberos.keytab.file and ozone.om.kerberos.principal
+      //  are not empty by default. The default values may or may not be valid.
       if (StringUtils.isBlank(omKerbPrinc)) {
         isS3MultiTenancyEnabled = false;
         logger.error("{} is required to enable S3 Multi-Tenancy but not set",
@@ -353,20 +355,15 @@ public interface OMMultiTenantManager {
     final String volumePolicyName = OMMultiTenantManager
         .getDefaultBucketNamespacePolicyName(tenantId);
 
-    Policy policy = new Policy.Builder()
+    return new Policy.Builder()
         .setName(volumePolicyName)
         .addVolume(volumeName)
-        // TODO: Double check bucket/key field when policy is created in Ranger
-//        .addBucket("vol1/bucket1")
-//        .addKey("vol1/bucket1/key1")
         .setDescription(OZONE_TENANT_RANGER_POLICY_DESCRIPTION)
         .addLabel(OZONE_TENANT_RANGER_POLICY_LABEL)
         .addRoleAcl(userRoleName, Arrays.asList(
             Acl.allow(READ), Acl.allow(LIST), Acl.allow(READ_ACL)))
         .addRoleAcl(adminRoleName, Collections.singletonList(Acl.allow(ALL)))
         .build();
-
-    return policy;
   }
 
   /**
@@ -378,12 +375,10 @@ public interface OMMultiTenantManager {
     final String bucketPolicyName = OMMultiTenantManager
         .getDefaultBucketPolicyName(tenantId);
 
-    Policy policy = new Policy.Builder()
+    return new Policy.Builder()
         .setName(bucketPolicyName)
         .addVolume(volumeName)
-        // TODO: Double check bucket/key field when policy is created in Ranger
         .addBucket("*")
-//        .addKey("vol1/bucket1/key1")
         .setDescription(OZONE_TENANT_RANGER_POLICY_DESCRIPTION)
         .addLabel(OZONE_TENANT_RANGER_POLICY_LABEL)
         .addRoleAcl(userRoleName,
@@ -391,8 +386,6 @@ public interface OMMultiTenantManager {
         .addUserAcl(new OzoneOwnerPrincipal().getName(),
             Collections.singletonList(Acl.allow(ALL)))
         .build();
-
-    return policy;
   }
 
   AuthorizerLock getAuthorizerLock();
