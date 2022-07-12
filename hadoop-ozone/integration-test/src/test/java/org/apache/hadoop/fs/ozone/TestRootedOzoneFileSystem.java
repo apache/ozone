@@ -1096,8 +1096,6 @@ public class TestRootedOzoneFileSystem {
     Assert.assertFalse(volumeExist(volumeStr2));
   }
 
-
-
   @Test
   public void testDeleteVolumeBucketAndKey() throws IOException {
     // Create test volume, bucket and key
@@ -1128,8 +1126,8 @@ public class TestRootedOzoneFileSystem {
   }
 
   @Test
-  public void testDeleteBucketLink() throws Exception {
-    // Create test volume, bucket and key
+  public void testDeleteBucketLinkFails() throws Exception {
+    // Create test volume, bucket and bucket link
     String volumeStr = getRandomNonExistVolumeName();
     Path volumePath = new Path(OZONE_URI_DELIMITER + volumeStr);
     String bucketStr = "bucket";
@@ -1141,11 +1139,12 @@ public class TestRootedOzoneFileSystem {
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeStr);
     createLinkBucket(ozoneVolume, bucketStr, linkStr);
 
-    // confirm deletes fail
+    // confirm non recursive delete of bucket link fails
     LambdaTestUtils.intercept(IOException.class,
         "Bucket links can not be deleted through the HDFS interface.",
         () -> fs.delete(linkPath, false));
 
+    // confirm recursive delete of bucket link fails
     LambdaTestUtils.intercept(IOException.class,
         "Bucket links can not be deleted through the HDFS interface.",
         () -> fs.delete(linkPath, true));
