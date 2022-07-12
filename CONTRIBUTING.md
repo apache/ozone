@@ -50,13 +50,8 @@ Additional requirements to run your first pseudo cluster:
 
 Additional requirements to execute different type of tests:
 
-* [Robot framework](https://robotframework.org/) (for executing acceptance tests)
 * docker-compose (to start pseudo cluster, also used for blockade and acceptance tests)
 * [jq](https://stedolan.github.io/jq/) (for executing acceptance tests)
-
-Optional dependencies:
-
-* [hugo](https://gohugo.io/) to include the documentation in the web ui.
 
 (Standard development tools such as make, gcc, etc. are required.)
 
