@@ -121,6 +121,7 @@ enum Type {
   SetS3Secret = 106;
 
   SetRangerServiceVersion = 107;
+  RangerBGSync = 109;
 }
 
 message OMRequest {
@@ -224,6 +225,7 @@ message OMRequest {
   optional SetS3SecretRequest               SetS3SecretRequest             = 106;
 
   optional SetRangerServiceVersionRequest   SetRangerServiceVersionRequest = 107;
+  optional RangerBGSyncRequest              RangerBGSyncRequest            = 109;
 }
 
 message OMResponse {
@@ -320,6 +322,7 @@ message OMResponse {
   optional SetS3SecretResponse               SetS3SecretResponse           = 106;
 
   optional SetRangerServiceVersionResponse   SetRangerServiceVersionResponse = 107;
+  optional RangerBGSyncResponse              RangerBGSyncResponse          = 109;
 }
 
 enum Status {
@@ -1252,6 +1255,14 @@ message DBUpdatesResponse {
     required uint64 sequenceNumber = 1;
     repeated bytes data = 2;
     optional uint64 latestSequenceNumber = 3;
+}
+
+message RangerBGSyncRequest {
+    optional bool noWait = 1;
+}
+
+message RangerBGSyncResponse {
+    optional bool runSuccess = 1;
 }
 
 message FinalizeUpgradeRequest {

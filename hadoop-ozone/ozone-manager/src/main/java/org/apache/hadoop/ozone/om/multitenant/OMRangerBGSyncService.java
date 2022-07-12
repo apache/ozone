@@ -29,7 +29,6 @@ import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.utils.BackgroundService;
@@ -279,8 +278,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       if (shouldRun()) {
         final long count = runCount.incrementAndGet();
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Initiating Ranger Multi-Tenancy Ranger Sync: run # {}",
-              count);
+          LOG.debug("Initiating Multi-Tenancy Ranger Sync: run # {}", count);
         }
         triggerRangerSyncOnce();
       }
@@ -289,8 +287,11 @@ public class OMRangerBGSyncService extends BackgroundService {
     }
   }
 
-  @VisibleForTesting
-  public void triggerRangerSyncOnce() {
+  /**
+   * Trigger the sync once.
+   * @return true if completed successfully, false if any exception is thrown.
+   */
+  public synchronized boolean triggerRangerSyncOnce() {
     try {
       long dbOzoneServiceVersion = getOMDBRangerServiceVersion();
       long rangerOzoneServiceVersion = getRangerOzoneServicePolicyVersion();
@@ -347,8 +348,10 @@ public class OMRangerBGSyncService extends BackgroundService {
       LOG.warn("Exception during Ranger Sync", e);
       // TODO: Check for specific exception once switched to
       //  RangerRestMultiTenantAccessController
+      return false;
     }
 
+    return true;
   }
 
   /**

@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -89,7 +88,6 @@ public interface OMMultiTenantManager {
   /**
    * Returns the instance of OMRangerBGSyncService.
    */
-  @VisibleForTesting
   OMRangerBGSyncService getOMRangerBGSyncService();
 
   /**
