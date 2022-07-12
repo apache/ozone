@@ -457,7 +457,8 @@ public class TestContainerBalancer {
   @Test
   public void selectedContainerShouldNotAlreadyHaveBeenSelected()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, NodeNotFoundException {
+      InvalidContainerBalancerConfigurationException, NodeNotFoundException,
+      TimeoutException {
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
