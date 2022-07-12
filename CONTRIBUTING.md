@@ -53,10 +53,10 @@ Additional requirements for running Ozone in pseudo cluster (including acceptanc
 
 ### Build the project
 
-After installing the requirements (especially maven) the build is as simple as:
+After installing the requirements (especially Maven) build is as simple as:
 
 ```
-mvn clean install -DskipTests
+mvn clean verify -DskipTests
 ```
 
 And you can start your first cluster:
