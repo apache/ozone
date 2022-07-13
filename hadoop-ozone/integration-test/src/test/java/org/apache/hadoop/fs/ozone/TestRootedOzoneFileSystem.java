@@ -1150,6 +1150,8 @@ public class TestRootedOzoneFileSystem {
         () -> fs.delete(linkPath, true));
     // Cleanup
     ozoneVolume.deleteBucket(linkStr);
+    fs.delete(bucketPath1, false);
+    fs.delete(volumePath1, false);
 
   }
 
