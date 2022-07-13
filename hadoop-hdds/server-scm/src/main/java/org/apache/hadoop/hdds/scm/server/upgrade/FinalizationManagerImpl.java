@@ -43,7 +43,7 @@ import java.util.concurrent.Executors;
 /**
  * Class to initiate SCM finalization and query its progress.
  */
-public class FinalizationManagerImpl implements FinalizationManager {
+public final class FinalizationManagerImpl implements FinalizationManager {
   private static final Logger LOG = LoggerFactory
       .getLogger(FinalizationManagerImpl.class);
 

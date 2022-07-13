@@ -43,7 +43,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 /**
  * Manages the state of finalization in SCM.
  */
-public class FinalizationStateManagerImpl implements FinalizationStateManager {
+public final class FinalizationStateManagerImpl
+    implements FinalizationStateManager {
 
   @VisibleForTesting
   public static final Logger LOG =
@@ -91,11 +92,11 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
     // Check whether this checkpoint change requires us to freeze pipeline
     // creation. These are idempotent operations.
-    // TODO: update this to not close pipelines.
     PipelineManager pipelineManager = upgradeContext.getPipelineManager();
     HDDSFinalizationRequirements requirements =
         versionManager.getFinalizationRequirements();
-    if (FinalizationManager.shouldCreateNewPipelines(checkpoint, requirements) &&
+    if (FinalizationManager
+        .shouldCreateNewPipelines(checkpoint, requirements) &&
         pipelineManager.isPipelineCreationFrozen()) {
       pipelineManager.resumePipelineCreation();
     } else if (!FinalizationManager.shouldCreateNewPipelines(checkpoint,

@@ -18,13 +18,28 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
-import com.google.common.base.Preconditions;
-
 import java.util.Collection;
 
+import static org.apache.hadoop.hdds.upgrade.HDDSFinalizationRequirements.PipelineRequirements.CLOSE_ALL_PIPELINES;
+
+/**
+ * Used by layout features in {@link HDDSLayoutFeature} to specify
+ * requirements that SCM must enforce before, during, or after they finalize.
+ */
 public class HDDSFinalizationRequirements {
+  /**
+   * What each layout feature requires for pipelines while it is
+   * finalizing.
+   */
   public enum PipelineRequirements {
+    /**
+     * The layout feature requires all pipelines to be closed while finalizing.
+     */
     CLOSE_ALL_PIPELINES,
+    /**
+     * The layout feature has no special requirements for pipeline handling
+     * while it is finalizing.
+     */
     NONE
   }
 
@@ -38,6 +53,8 @@ public class HDDSFinalizationRequirements {
 
   /**
    * Generates one requirements object by aggregating multiple requirements.
+   * The requirements aggregate will reflect the strictest requirements of
+   * any individual requirements provided.
    */
   public HDDSFinalizationRequirements(
       Collection<HDDSFinalizationRequirements> requirements) {
@@ -51,8 +68,8 @@ public class HDDSFinalizationRequirements {
       currentMinFinalizedDatanodes = Math.max(currentMinFinalizedDatanodes,
           req.minFinalizedDatanodes);
 
-      if (req.pipelineRequirements == PipelineRequirements.CLOSE_ALL_PIPELINES) {
-        currentPipelineRequirements = PipelineRequirements.CLOSE_ALL_PIPELINES;
+      if (req.pipelineRequirements == CLOSE_ALL_PIPELINES) {
+        currentPipelineRequirements = CLOSE_ALL_PIPELINES;
       }
     }
 
@@ -60,6 +77,11 @@ public class HDDSFinalizationRequirements {
     pipelineRequirements = currentPipelineRequirements;
   }
 
+  /**
+   * @return The minimum number of datanodes that SCM must wait to have
+   * finalized before declaring finalization has finished. The remaining
+   * datanodes will finalize asynchronously.
+   */
   public int getMinFinalizedDatanodes() {
     return minFinalizedDatanodes;
   }
@@ -74,7 +96,11 @@ public class HDDSFinalizationRequirements {
         "finalized datanodes: %s", pipelineRequirements, minFinalizedDatanodes);
   }
 
-   public static final class Builder {
+  /**
+   * Builds an {@link HDDSFinalizationRequirements} object, using default
+   * values for unspecified requirements.
+   */
+  public static final class Builder {
     private int minFinalizedDatanodes;
     private PipelineRequirements pipelineRequirements;
 
@@ -89,7 +115,8 @@ public class HDDSFinalizationRequirements {
       return this;
     }
 
-    public Builder setPipelineRequirements(PipelineRequirements pipelineRequirements) {
+    public Builder setPipelineRequirements(
+        PipelineRequirements pipelineRequirements) {
       this.pipelineRequirements = pipelineRequirements;
       return this;
     }

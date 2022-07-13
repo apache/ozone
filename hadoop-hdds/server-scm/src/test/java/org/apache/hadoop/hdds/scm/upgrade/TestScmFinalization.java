@@ -511,10 +511,10 @@ public class TestScmFinalization {
     private int healthyNodeCount;
     private int invocationCount;
 
-   public MockNodeManager(int healthyNodeCount) {
-     this.healthyNodeCount = healthyNodeCount;
-     this.invocationCount = 0;
-   }
+    MockNodeManager(int healthyNodeCount) {
+      this.healthyNodeCount = healthyNodeCount;
+      this.invocationCount = 0;
+    }
 
     @Override
     public int getNodeCount(NodeStatus nodeStatus) {

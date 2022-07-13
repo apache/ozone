@@ -56,7 +56,7 @@ public class HDDSLayoutVersionManager extends
    */
   @VisibleForTesting
   public static HDDSLayoutVersionManager newTestInstance(int layoutVersion,
-                                                         HDDSFinalizationRequirements requirements) throws IOException {
+      HDDSFinalizationRequirements requirements) throws IOException {
     return new HDDSLayoutVersionManager(layoutVersion, requirements);
   }
 

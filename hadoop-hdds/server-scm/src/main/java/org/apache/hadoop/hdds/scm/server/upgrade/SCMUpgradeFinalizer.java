@@ -56,7 +56,7 @@ public class SCMUpgradeFinalizer extends
     BasicUpgradeFinalizer<SCMUpgradeFinalizationContext,
         HDDSLayoutVersionManager> {
 
-  private Duration checkInterval;
+  private Duration testCheckInterval;
 
   public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
     this(versionManager, new DefaultUpgradeFinalizationExecutor<>());
@@ -71,7 +71,7 @@ public class SCMUpgradeFinalizer extends
       UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor,
       Duration checkInterval) {
     super(versionManager, executor);
-    this.checkInterval = checkInterval;
+    this.testCheckInterval = checkInterval;
   }
 
   @VisibleForTesting
@@ -246,7 +246,7 @@ public class SCMUpgradeFinalizer extends
         LOG.info("Waiting for at least one open Ratis 3 pipeline after SCM " +
             "finalization.");
         try {
-          Thread.sleep(checkInterval.toMillis());
+          Thread.sleep(testCheckInterval.toMillis());
         } catch (InterruptedException e) {
           // Try again on next loop iteration.
           Thread.currentThread().interrupt();
@@ -259,7 +259,7 @@ public class SCMUpgradeFinalizer extends
 
   @VisibleForTesting
   public void setCheckIntervalForTesting(Duration checkInterval) {
-    this.checkInterval = checkInterval;
+    this.testCheckInterval = checkInterval;
   }
 
   private void waitForRequiredNodeCountToFinalize(
@@ -274,7 +274,7 @@ public class SCMUpgradeFinalizer extends
           "finalization. Currently have {} finalized datanodes",
           minRequiredFinalizedNodes, numFinalizedNodes);
       try {
-        Thread.sleep(checkInterval.toMillis());
+        Thread.sleep(testCheckInterval.toMillis());
       } catch (InterruptedException e) {
         // Try again on next loop iteration.
         Thread.currentThread().interrupt();
