@@ -83,6 +83,10 @@ public class ContainerBalancerSelectionCriteria {
    * 3. Container size should be closer to 5GB.
    * 4. Container must not be in the configured exclude containers list.
    * 5. Container should be closed.
+   * 6. Container should not be an EC container
+   * //TODO Temporarily not considering EC containers as candidates
+   * @see
+   * <a href="https://issues.apache.org/jira/browse/HDDS-6940">HDDS-6940</a>
    *
    * @param node DatanodeDetails for which to find candidate containers.
    * @return NavigableSet of candidate containers that satisfy the criteria.
@@ -105,37 +109,7 @@ public class ContainerBalancerSelectionCriteria {
       containerIDSet.removeAll(selectedContainers);
     }
 
-    // remove not closed containers
-    containerIDSet.removeIf(containerID -> {
-      try {
-        return containerManager.getContainer(containerID).getState() !=
-            HddsProtos.LifeCycleState.CLOSED;
-      } catch (ContainerNotFoundException e) {
-        LOG.warn("Could not retrieve ContainerInfo for container {} for " +
-            "checking LifecycleState in ContainerBalancer. Excluding this " +
-            "container.", containerID.toString(), e);
-        return true;
-      }
-    });
-
-    //if the utilization of the source data node becomes lower than lowerLimit
-    //after the container is moved out , then the container can not be
-    // a candidate one, and we should remove it from the candidateContainers.
-    containerIDSet.removeIf(c -> {
-      ContainerInfo cInfo;
-      try {
-        cInfo = containerManager.getContainer(c);
-      } catch (ContainerNotFoundException e) {
-        LOG.warn("Could not find container {} when " +
-            "be matched with a move target", c);
-        //remove this not found container
-        return true;
-      }
-      return !findSourceStrategy.canSizeLeaveSource(
-          node, cInfo.getUsedBytes());
-    });
-
-    containerIDSet.removeIf(this::isContainerReplicatingOrDeleting);
+    containerIDSet.removeIf(containerID -> shouldBeExcluded(containerID, node));
     return containerIDSet;
   }
 
@@ -174,6 +148,41 @@ public class ContainerBalancerSelectionCriteria {
    */
   private Comparator<ContainerID> orderContainersByUsedBytes() {
     return this::isContainerMoreUsed;
+  }
+
+  /**
+   * Checks whether a Container has the ReplicationType
+   * {@link HddsProtos.ReplicationType#EC}.
+   * @param container container to check
+   * @return true if the ReplicationType is EC, else false
+   */
+  private boolean isECContainer(ContainerInfo container) {
+    return container.getReplicationType().equals(HddsProtos.ReplicationType.EC);
+  }
+
+  private boolean shouldBeExcluded(ContainerID containerID,
+                                   DatanodeDetails node) {
+    ContainerInfo container;
+    try {
+      container = containerManager.getContainer(containerID);
+    } catch (ContainerNotFoundException e) {
+      LOG.warn("Could not find Container {} to check if it should be a " +
+          "candidate container. Excluding it.", containerID);
+      return true;
+    }
+    return !isContainerClosed(container) || isECContainer(container) ||
+        isContainerReplicatingOrDeleting(containerID) ||
+        !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes());
+  }
+
+  /**
+   * Checks whether specified container is closed.
+   * @param container container to check
+   * @return true if container LifeCycleState is
+   * {@link HddsProtos.LifeCycleState#CLOSED}, else false
+   */
+  private boolean isContainerClosed(ContainerInfo container) {
+    return container.getState().equals(HddsProtos.LifeCycleState.CLOSED);
   }
 
   public void setExcludeContainers(
