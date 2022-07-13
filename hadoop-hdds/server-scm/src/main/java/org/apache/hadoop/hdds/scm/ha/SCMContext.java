@@ -331,8 +331,6 @@ public final class SCMContext {
 
     public SCMContext build() {
       Preconditions.checkNotNull(scm, "scm == null");
-      Preconditions.checkNotNull(finalizationCheckpoint);
-      Preconditions.checkNotNull(finalizationRequirements);
       return buildMaybeInvalid();
     }
 
@@ -347,7 +345,8 @@ public final class SCMContext {
           new SafeModeStatus(isInSafeMode, isPreCheckComplete),
           Optional.ofNullable(finalizationCheckpoint).orElse(
               FinalizationCheckpoint.FINALIZATION_COMPLETE),
-          finalizationRequirements,
+          Optional.ofNullable(finalizationRequirements).orElse(
+              new HDDSFinalizationRequirements.Builder().build()),
           scm);
     }
   }
