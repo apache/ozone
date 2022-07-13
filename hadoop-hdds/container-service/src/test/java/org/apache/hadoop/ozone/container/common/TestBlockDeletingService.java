@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -422,6 +423,7 @@ public class TestBlockDeletingService {
     BlockDeletingServiceTestImpl svc =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
     svc.start();
+    BlockDeletingServiceMetrics deletingServiceMetrics = svc.getMetrics();
     GenericTestUtils.waitFor(svc::isStarted, 100, 3000);
 
     // Ensure 1 container was created
@@ -443,6 +445,8 @@ public class TestBlockDeletingService {
       // Number of deleted blocks in container should be equal to 0 before
       // block delete
 
+      long deleteSuccessCount =
+          deletingServiceMetrics.getSuccessCount();
       Assert.assertEquals(0, transactionId);
 
       // Ensure there are 3 blocks under deletion and 0 deleted blocks
@@ -464,6 +468,9 @@ public class TestBlockDeletingService {
       // used by the container should be less than the space used by the
       // container initially(before running deletion services).
       Assert.assertTrue(containerData.get(0).getBytesUsed() < containerSpace);
+      Assert.assertEquals(2,
+          deletingServiceMetrics.getSuccessCount()
+              - deleteSuccessCount);
 
       deleteAndWait(svc, 2);
 
@@ -479,6 +486,9 @@ public class TestBlockDeletingService {
       Assert.assertEquals(0,
           meta.getStore().getMetadataTable().get(data.blockCountKey())
               .longValue());
+      Assert.assertEquals(3,
+          deletingServiceMetrics.getSuccessCount()
+              - deleteSuccessCount);
     }
 
     svc.shutdown();
