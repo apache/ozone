@@ -57,6 +57,9 @@ public class RangerUserRequest {
   // Value of HTTP auth header
   private String authHeaderValue;
 
+  private int connectionTimeout = 5000;
+  private int connectionRequestTimeout = 5000;
+
   RangerUserRequest(String rangerHttpsAddress, String userName, String passwd) {
 
     // Trim trailing slash
@@ -125,9 +128,9 @@ public class RangerUserRequest {
 
     urlConnection.setRequestMethod(method);
     // Timeout in ms
-    urlConnection.setConnectTimeout(5000);
+    urlConnection.setConnectTimeout(connectionTimeout);
     // Timeout in ms
-    urlConnection.setReadTimeout(5000);
+    urlConnection.setReadTimeout(connectionRequestTimeout);
     urlConnection.setRequestProperty("Accept", "application/json");
     urlConnection.setRequestProperty("Authorization", authHeaderValue);
 
@@ -193,8 +196,8 @@ public class RangerUserRequest {
     final HttpURLConnection urlConnection = openURLConnection(url);
 
     urlConnection.setRequestMethod(method);
-    urlConnection.setConnectTimeout(5000);
-    urlConnection.setReadTimeout(5000);
+    urlConnection.setConnectTimeout(connectionTimeout);
+    urlConnection.setReadTimeout(connectionRequestTimeout);
     urlConnection.setRequestProperty("Accept", "application/json");
     urlConnection.setRequestProperty("Authorization", authHeaderValue);
 

@@ -156,7 +156,9 @@ public class RangerClientMultiTenantAccessController implements
     case HTTP_STATUS_CODE_BAD_REQUEST:
       LOG.error("Request failure. If this is an assign-user operation, "
           + "check if the user name exists in Ranger.");
+      break;
     default:
+      LOG.error("Other request failure: {}", rse.getStatus());
     }
   }
 

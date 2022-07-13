@@ -3112,7 +3112,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Check if Ranger BG sync task is inited
     final OMRangerBGSyncService bgSync = mtManager.getOMRangerBGSyncService();
     if (bgSync == null) {
-      throw new OMException("Background sync task is not initialized",
+      throw new OMException("Ranger background sync service is not initialized",
           FEATURE_NOT_ENABLED);
     }
 
