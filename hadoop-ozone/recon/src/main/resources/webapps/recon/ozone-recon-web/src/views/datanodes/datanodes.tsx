@@ -216,7 +216,7 @@ const COLUMNS = [
       <Icon type='info-circle'/>
     </Tooltip>
   </span>,
-    dataIndex: 'leaderCount',
+    dataIndex: 'leader Count',
     key: 'leaderCount',
     isVisible: true,
     isSearchable: true,
@@ -248,7 +248,7 @@ const COLUMNS = [
     defaultSortOrder: 'ascend' as const
   },
   {
-    title: 'SetupTime',
+    title: 'Setup Time',
     dataIndex: 'setupTime',
     key: 'setupTime',
     isVisible: true,
@@ -267,7 +267,7 @@ const COLUMNS = [
     defaultSortOrder: 'ascend' as const
   },
   {
-    title: 'BuildDate',
+    title: 'Build Date',
     dataIndex: 'buildDate',
     key: 'buildDate',
     isVisible: true,
@@ -276,7 +276,7 @@ const COLUMNS = [
     defaultSortOrder: 'ascend' as const
   },
   {
-    title: 'NetworkLocation',
+    title: 'Network Location',
     dataIndex: 'networkLocation',
     key: 'networkLocation',
     isVisible: true,
