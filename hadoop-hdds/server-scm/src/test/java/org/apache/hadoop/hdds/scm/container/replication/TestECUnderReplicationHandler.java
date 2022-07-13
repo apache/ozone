@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +54,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import static org.junit.Assert.assertThrows;
 
 /**
  * Tests the ECUnderReplicationHandling functionality.
@@ -84,73 +87,88 @@ public class TestECUnderReplicationHandler {
   }
 
   @Test
-  public void testUnderReplicationWithMissingParityIndex5() {
+  public void testUnderReplicationWithMissingParityIndex5() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
-        availableReplicas, 0);
+        availableReplicas, 0, policy);
   }
 
   @Test
-  public void testUnderReplicationWithMissingIndex34() {
+  public void testUnderReplicationWithMissingIndex34() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 5));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(3, 4),
-        availableReplicas, 0);
+        availableReplicas, 0, policy);
   }
 
   @Test
-  public void testUnderReplicationWithMissingIndex2345() {
+  public void testUnderReplicationWithMissingIndex2345() throws IOException {
     Set<ContainerReplica> availableReplicas =
         ReplicationTestUtil.createReplicas(Pair.of(IN_SERVICE, 1));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(2, 3, 4, 5),
-        availableReplicas, 0);
+        availableReplicas, 0, policy);
   }
 
   @Test
-  public void testUnderReplicationWithMissingIndex12345() {
+  public void testUnderReplicationWithMissingIndex12345() throws IOException {
     Set<ContainerReplica> availableReplicas = new HashSet<>();
     testUnderReplicationWithMissingIndexes(ImmutableList.of(1, 2, 3, 4, 5),
-        availableReplicas, 0);
+        availableReplicas, 0, policy);
   }
 
   @Test
-  public void testUnderReplicationWithDecomIndex1() {
+  public void testUnderReplicationWithDecomIndex1() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5));
     testUnderReplicationWithMissingIndexes(Lists.emptyList(), availableReplicas,
-        1);
+        1, policy);
   }
 
   @Test
-  public void testUnderReplicationWithDecomIndex12() {
+  public void testUnderReplicationWithDecomIndex12() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(DECOMMISSIONING, 1),
             Pair.of(DECOMMISSIONING, 2), Pair.of(IN_SERVICE, 3),
             Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
     testUnderReplicationWithMissingIndexes(Lists.emptyList(), availableReplicas,
-        2);
+        2, policy);
   }
 
   @Test
-  public void testUnderReplicationWithMixedDecomAndMissingIndexes() {
+  public void testUnderReplicationWithMixedDecomAndMissingIndexes()
+      throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(DECOMMISSIONING, 1),
             Pair.of(DECOMMISSIONING, 2), Pair.of(IN_SERVICE, 3),
             Pair.of(IN_SERVICE, 4));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
-        availableReplicas, 2);
+        availableReplicas, 2, policy);
+  }
+
+  @Test
+  public void testExceptionIfNoNodesFound() throws IOException {
+    PlacementPolicy noNodesPolicy = ReplicationTestUtil
+        .getNoNodesTestPlacementPolicy(nodeManager, conf);
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1),
+            Pair.of(DECOMMISSIONING, 2), Pair.of(IN_SERVICE, 3),
+            Pair.of(IN_SERVICE, 4));
+    assertThrows(SCMException.class, () ->
+        testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
+            availableReplicas, 2, noNodesPolicy));
+
   }
 
   public void testUnderReplicationWithMissingIndexes(
       List<Integer> missingIndexes, Set<ContainerReplica> availableReplicas,
-      int decomIndexes) {
+      int decomIndexes, PlacementPolicy placementPolicy) throws IOException {
     ECUnderReplicationHandler ecURH =
-        new ECUnderReplicationHandler(policy, conf, nodeManager);
+        new ECUnderReplicationHandler(placementPolicy, conf, nodeManager);
     ContainerHealthResult.UnderReplicatedHealthResult result =
         Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
     Mockito.when(result.isUnrecoverable()).thenReturn(false);

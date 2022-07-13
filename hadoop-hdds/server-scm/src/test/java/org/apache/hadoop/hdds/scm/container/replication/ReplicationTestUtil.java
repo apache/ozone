@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE;
 
 /**
  * Helper class to provide common methods used to test ReplicationManager.
@@ -134,6 +135,26 @@ public final class ReplicationTestUtil {
           dns.add(MockDatanodeDetails.randomDatanodeDetails());
         }
         return dns;
+      }
+
+      @Override
+      public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes) {
+        return null;
+      }
+    };
+  }
+
+  public static PlacementPolicy getNoNodesTestPlacementPolicy(
+      final NodeManager nodeManager, final OzoneConfiguration conf) {
+    return new SCMCommonPlacementPolicy(nodeManager, conf) {
+      @Override
+      public List<DatanodeDetails> chooseDatanodes(
+          List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
+          long metadataSizeRequired, long dataSizeRequired)
+          throws SCMException {
+        throw new SCMException("No nodes available",
+            FAILED_TO_FIND_SUITABLE_NODE);
       }
 
       @Override
