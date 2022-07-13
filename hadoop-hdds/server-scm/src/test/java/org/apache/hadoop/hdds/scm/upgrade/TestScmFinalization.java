@@ -19,7 +19,7 @@
 package org.apache.hadoop.hdds.scm.upgrade;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.SimpleMockNodeManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
@@ -30,23 +30,32 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManagerImpl;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManagerImpl;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizer;
+import org.apache.hadoop.hdds.upgrade.HDDSFinalizationRequirements;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
-import org.junit.Test;
+
+import static org.apache.hadoop.hdds.upgrade.HDDSFinalizationRequirements.PipelineRequirements.CLOSE_ALL_PIPELINES;
+import static org.apache.hadoop.hdds.upgrade.HDDSFinalizationRequirements.PipelineRequirements.NONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentMatchers;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
@@ -54,8 +63,10 @@ import org.mockito.verification.VerificationMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 /**
  * Tests SCM finalization operations on mocked upgrade state.
@@ -67,6 +78,10 @@ public class TestScmFinalization {
   // Indicates the current state of the mock pipeline manager's pipeline
   // creation.
   private boolean pipelineCreationFrozen = false;
+
+  private static final String METHOD_SOURCE =
+      "org.apache.hadoop.hdds.scm.upgrade" +
+          ".TestScmFinalization#finalizationRequirementsToTest";
 
   /**
    * Order of finalization checkpoints within the enum is used to determine
@@ -98,17 +113,17 @@ public class TestScmFinalization {
             HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
     PipelineManager pipelineManager =
         getMockPipelineManager(FinalizationCheckpoint.FINALIZATION_REQUIRED,
-            versionManager);
+            versionManager.getFinalizationRequirements());
     // State manager keeps upgrade information in memory as well as writing
     // it to disk, so we can mock the classes that handle disk ops for this
     // test.
     FinalizationStateManager stateManager =
-        new FinalizationStateManagerTestImpl.Builder()
+        new FinalizationStateManagerImpl.Builder()
             .setFinalizationStore(Mockito.mock(Table.class))
             .setRatisServer(Mockito.mock(SCMRatisServer.class))
             .setTransactionBuffer(Mockito.mock(DBTransactionBuffer.class))
             .setUpgradeFinalizer(new SCMUpgradeFinalizer(versionManager))
-            .build();
+            .buildForTesting();
 
     // In the actual flow, this would be handled by the FinalizationManager.
     SCMContext scmContext = SCMContext.emptyContext();
@@ -122,7 +137,7 @@ public class TestScmFinalization {
         .setLayoutVersionManager(versionManager)
         .setSCMContext(scmContext)
         .setPipelineManager(pipelineManager)
-        .setNodeManager(getMockNodeManager())
+        .setNodeManager(getMockitoNodeManager())
         .build();
     stateManager.setUpgradeContext(context);
 
@@ -200,23 +215,24 @@ public class TestScmFinalization {
     SCMHAManager haManager = Mockito.mock(SCMHAManager.class);
     DBTransactionBuffer buffer = Mockito.mock(DBTransactionBuffer.class);
     Mockito.when(haManager.getDBTransactionBuffer()).thenReturn(buffer);
-    NodeManager nodeManager = getMockNodeManager();
+    NodeManager nodeManager = getMockitoNodeManager();
     SCMStorageConfig storage = Mockito.mock(SCMStorageConfig.class);
     SCMContext scmContext = SCMContext.emptyContext();
     scmContext.setFinalizationCheckpoint(initialCheckpoint);
     PipelineManager pipelineManager =
-        getMockPipelineManager(initialCheckpoint, versionManager);
+        getMockPipelineManager(initialCheckpoint,
+            versionManager.getFinalizationRequirements());
 
     FinalizationStateManager stateManager =
-        new FinalizationStateManagerTestImpl.Builder()
+        new FinalizationStateManagerImpl.Builder()
             .setFinalizationStore(finalizationStore)
             .setRatisServer(Mockito.mock(SCMRatisServer.class))
             .setTransactionBuffer(buffer)
             .setUpgradeFinalizer(new SCMUpgradeFinalizer(versionManager))
-            .build();
+            .buildForTesting();
 
-    FinalizationManager manager = new FinalizationManagerTestImpl.Builder()
-        .setFinalizationStateManager(stateManager)
+    FinalizationManager manager = new FinalizationManagerImpl.Builder()
+        .setStateManagerForTesting(stateManager)
         .setConfiguration(new OzoneConfiguration())
         .setLayoutVersionManager(versionManager)
         .setStorage(storage)
@@ -294,6 +310,123 @@ public class TestScmFinalization {
   }
 
   /**
+   * Argument supplier for parameterized tests.
+   */
+  private static Stream<Arguments> finalizationRequirementsToTest() {
+    HDDSFinalizationRequirements noPipelineClose =
+        new HDDSFinalizationRequirements.Builder()
+            .setPipelineRequirements(NONE)
+            .build();
+    checkFinalizationRequirements(noPipelineClose, 3, NONE);
+
+    HDDSFinalizationRequirements pipelineClose =
+        new HDDSFinalizationRequirements.Builder()
+            .setPipelineRequirements(CLOSE_ALL_PIPELINES)
+            .build();
+    checkFinalizationRequirements(pipelineClose, 3, CLOSE_ALL_PIPELINES);
+
+    HDDSFinalizationRequirements fewerNodesRequired =
+        new HDDSFinalizationRequirements.Builder()
+            .setMinFinalizedDatanodes(1)
+            .build();
+    checkFinalizationRequirements(fewerNodesRequired, 1, NONE);
+
+    HDDSFinalizationRequirements moreNodesRequired =
+        new HDDSFinalizationRequirements.Builder()
+            .setMinFinalizedDatanodes(5)
+            .build();
+    checkFinalizationRequirements(moreNodesRequired, 5, NONE);
+
+    HDDSFinalizationRequirements aggregateRequirements =
+        new HDDSFinalizationRequirements(Arrays.asList(moreNodesRequired,
+            fewerNodesRequired, pipelineClose, noPipelineClose));
+    checkFinalizationRequirements(aggregateRequirements, 5,
+        CLOSE_ALL_PIPELINES);
+
+    return Stream.of(
+        Arguments.of(noPipelineClose),
+        Arguments.of(pipelineClose),
+        Arguments.of(fewerNodesRequired),
+        Arguments.of(moreNodesRequired),
+        Arguments.of(aggregateRequirements)
+    );
+  }
+
+  private static void checkFinalizationRequirements(
+      HDDSFinalizationRequirements requirements, int minFinalizedDNs,
+      HDDSFinalizationRequirements.PipelineRequirements pipelineReqs) {
+    assertEquals(minFinalizedDNs, requirements.getMinFinalizedDatanodes());
+    assertEquals(pipelineReqs, requirements.getPipelineRequirements());
+  }
+
+  @ParameterizedTest
+  @MethodSource(METHOD_SOURCE)
+  public void testFinalizationRequirements(
+      HDDSFinalizationRequirements requirements) throws Exception {
+
+    HDDSLayoutVersionManager versionManager =
+        HDDSLayoutVersionManager.newTestInstance(0,
+        requirements);
+    Table<String, String> finalizationStore = Mockito.mock(Table.class);
+    SCMHAManager haManager = Mockito.mock(SCMHAManager.class);
+    DBTransactionBuffer buffer = Mockito.mock(DBTransactionBuffer.class);
+    Mockito.when(haManager.getDBTransactionBuffer()).thenReturn(buffer);
+    MockNodeManager nodeManager =
+        new MockNodeManager(requirements.getMinFinalizedDatanodes() - 1);
+    SCMStorageConfig storage = Mockito.mock(SCMStorageConfig.class);
+    SCMContext scmContext = SCMContext.emptyContext();
+    PipelineManager pipelineManager = getMockPipelineManager(
+        FinalizationCheckpoint.FINALIZATION_REQUIRED,
+        requirements);
+
+    // Use an upgrade finalizer that does not wait between checks of post
+    // finalize conditions to speed up testing.
+    SCMUpgradeFinalizer finalizer = SCMUpgradeFinalizer.newTestInstance(
+        versionManager, new DefaultUpgradeFinalizationExecutor<>(),
+        Duration.ofMillis(0));
+
+    FinalizationStateManager stateManager =
+        new FinalizationStateManagerImpl.Builder()
+            .setFinalizationStore(finalizationStore)
+            .setRatisServer(Mockito.mock(SCMRatisServer.class))
+            .setTransactionBuffer(buffer)
+            .setUpgradeFinalizer(finalizer)
+            .buildForTesting();
+
+    FinalizationManager manager = new FinalizationManagerImpl.Builder()
+        .setStateManagerForTesting(stateManager)
+        .setConfiguration(new OzoneConfiguration())
+        .setLayoutVersionManager(versionManager)
+        .setStorage(storage)
+        .setHAManager(SCMHAManagerStub.getInstance(true))
+        .setFinalizationStore(finalizationStore)
+        .setUpgradeFinalizerForTesting(finalizer)
+        .build();
+
+    manager.buildUpgradeContext(nodeManager, pipelineManager, scmContext);
+
+    // Execute upgrade finalization then check that the correct operations
+    // were invoked given the finalization requirements.
+    manager.finalizeUpgrade(UUID.randomUUID().toString());
+
+    InOrder inOrder = Mockito.inOrder(pipelineManager);
+    VerificationMode pipelineOpCount;
+    if (requirements.getPipelineRequirements() == CLOSE_ALL_PIPELINES) {
+      pipelineOpCount = Mockito.times(1);
+    } else {
+      pipelineOpCount = Mockito.times(0);
+    }
+
+    inOrder.verify(pipelineManager, pipelineOpCount).freezePipelineCreation();
+    inOrder.verify(pipelineManager, pipelineOpCount).resumePipelineCreation();
+    // Each query of the invocation count should have increased the healthy
+    // node count by one in the mock node manager, so finalization should have
+    // had to wait two iterations before it saw its min required finalized
+    // datanodes.
+    assertEquals(nodeManager.invocationCount, 2);
+  }
+
+  /**
    * On startup, the finalization table will be read to determine the
    * checkpoint we are resuming from. After this, the results will be stored
    * in memory and flushed to the table asynchronously by the buffer, so the
@@ -339,7 +472,7 @@ public class TestScmFinalization {
     }
   }
 
-  private NodeManager getMockNodeManager() {
+  private NodeManager getMockitoNodeManager() {
     NodeManager nodeManager = Mockito.mock(NodeManager.class);
     // In this mocked test, all datanodes will finalize immediately.
     Mockito.when(nodeManager.getNodeCount(NodeStatus.inServiceHealthy()))
@@ -349,7 +482,7 @@ public class TestScmFinalization {
 
   private PipelineManager getMockPipelineManager(
       FinalizationCheckpoint initialCheckpoint,
-      HDDSLayoutVersionManager versionManager) {
+      HDDSFinalizationRequirements requirements) {
     PipelineManager pipelineManager = Mockito.mock(PipelineManager.class);
     // After finalization, SCM will wait for at least one pipeline to be
     // created. It does not care about the contents of the pipeline list, so
@@ -362,7 +495,7 @@ public class TestScmFinalization {
     // PipelineManagerImpl.
     pipelineCreationFrozen =
         !FinalizationManager.shouldCreateNewPipelines(initialCheckpoint,
-            versionManager.getFinalizationRequirements());
+            requirements);
     Mockito.doAnswer(args -> pipelineCreationFrozen = true)
         .when(pipelineManager).freezePipelineCreation();
     Mockito.doAnswer(args -> pipelineCreationFrozen = false)
@@ -372,5 +505,28 @@ public class TestScmFinalization {
         .when(pipelineManager).isPipelineCreationFrozen();
 
     return pipelineManager;
+  }
+
+  private static class MockNodeManager extends SimpleMockNodeManager {
+    private int healthyNodeCount;
+    private int invocationCount;
+
+   public MockNodeManager(int healthyNodeCount) {
+     this.healthyNodeCount = healthyNodeCount;
+     this.invocationCount = 0;
+   }
+
+    @Override
+    public int getNodeCount(NodeStatus nodeStatus) {
+      invocationCount++;
+      // Each query for healthy nodes causes the number of healthy nodes to
+      // increase, simulating all the cluster's datanodes moving towards
+      // finalization.
+      return healthyNodeCount++;
+    }
+
+    public int getInvocationCount() {
+      return invocationCount;
+    }
   }
 }

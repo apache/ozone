@@ -335,17 +335,26 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     }
 
     public FinalizationStateManager build() throws IOException {
-      Preconditions.checkNotNull(finalizationStore);
-      Preconditions.checkNotNull(transactionBuffer);
-      Preconditions.checkNotNull(upgradeFinalizer);
+      checkFields();
       final SCMHAInvocationHandler invocationHandler =
           new SCMHAInvocationHandler(SCMRatisProtocol.RequestType.FINALIZE,
               new FinalizationStateManagerImpl(this),
               scmRatisServer);
-
       return (FinalizationStateManager) Proxy.newProxyInstance(
           SCMHAInvocationHandler.class.getClassLoader(),
           new Class<?>[]{FinalizationStateManager.class}, invocationHandler);
+    }
+
+    @VisibleForTesting
+    public FinalizationStateManager buildForTesting() throws IOException {
+      checkFields();
+      return new FinalizationStateManagerImpl(this);
+    }
+
+    private void checkFields() {
+      Preconditions.checkNotNull(finalizationStore);
+      Preconditions.checkNotNull(transactionBuffer);
+      Preconditions.checkNotNull(upgradeFinalizer);
     }
   }
 }

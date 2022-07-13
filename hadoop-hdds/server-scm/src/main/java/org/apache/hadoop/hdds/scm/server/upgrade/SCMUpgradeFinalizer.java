@@ -22,8 +22,11 @@ import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
 import static org.apache.hadoop.hdds.upgrade.HDDSFinalizationRequirements.PipelineRequirements.CLOSE_ALL_PIPELINES;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.concurrent.TimeoutException;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -53,14 +56,30 @@ public class SCMUpgradeFinalizer extends
     BasicUpgradeFinalizer<SCMUpgradeFinalizationContext,
         HDDSLayoutVersionManager> {
 
+  private Duration checkInterval;
+
   public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
     this(versionManager, new DefaultUpgradeFinalizationExecutor<>());
   }
 
   public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager,
       UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor) {
-    super(versionManager, executor);
+    this(versionManager, executor, Duration.of(5000, ChronoUnit.MILLIS));
+  }
 
+  private SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager,
+      UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor,
+      Duration checkInterval) {
+    super(versionManager, executor);
+    this.checkInterval = checkInterval;
+  }
+
+  @VisibleForTesting
+  public static SCMUpgradeFinalizer newTestInstance(
+      HDDSLayoutVersionManager versionManager,
+      UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor,
+      Duration checkInterval) {
+    return new SCMUpgradeFinalizer(versionManager, executor, checkInterval);
   }
 
   private void logCheckpointCrossed(FinalizationCheckpoint checkpoint) {
@@ -227,7 +246,7 @@ public class SCMUpgradeFinalizer extends
         LOG.info("Waiting for at least one open Ratis 3 pipeline after SCM " +
             "finalization.");
         try {
-          Thread.sleep(5000);
+          Thread.sleep(checkInterval.toMillis());
         } catch (InterruptedException e) {
           // Try again on next loop iteration.
           Thread.currentThread().interrupt();
@@ -236,6 +255,11 @@ public class SCMUpgradeFinalizer extends
         LOG.info("Open pipeline found after SCM finalization");
       }
     }
+  }
+
+  @VisibleForTesting
+  public void setCheckIntervalForTesting(Duration checkInterval) {
+    this.checkInterval = checkInterval;
   }
 
   private void waitForRequiredNodeCountToFinalize(
@@ -250,7 +274,7 @@ public class SCMUpgradeFinalizer extends
           "finalization. Currently have {} finalized datanodes",
           minRequiredFinalizedNodes, numFinalizedNodes);
       try {
-        Thread.sleep(5000);
+        Thread.sleep(checkInterval.toMillis());
       } catch (InterruptedException e) {
         // Try again on next loop iteration.
         Thread.currentThread().interrupt();

@@ -28,17 +28,12 @@ public class HDDSFinalizationRequirements {
     NONE
   }
 
-  // No layout feature can pass SCM finalization with less than 3 datanodes
-  // finalized.
-  public static final int REQUIRED_MIN_FINALIZED_DATANODES = 3;
-
   private final int minFinalizedDatanodes;
   private final PipelineRequirements pipelineRequirements;
 
   private HDDSFinalizationRequirements(Builder builder) {
     minFinalizedDatanodes = builder.minFinalizedDatanodes;
     pipelineRequirements = builder.pipelineRequirements;
-    checkMinFinalizedDatanodes();
   }
 
   /**
@@ -46,7 +41,7 @@ public class HDDSFinalizationRequirements {
    */
   public HDDSFinalizationRequirements(
       Collection<HDDSFinalizationRequirements> requirements) {
-    int currentMinFinalizedDatanodes = REQUIRED_MIN_FINALIZED_DATANODES;
+    int currentMinFinalizedDatanodes = 0;
     PipelineRequirements currentPipelineRequirements =
         PipelineRequirements.NONE;
 
@@ -63,7 +58,6 @@ public class HDDSFinalizationRequirements {
 
     minFinalizedDatanodes = currentMinFinalizedDatanodes;
     pipelineRequirements = currentPipelineRequirements;
-    checkMinFinalizedDatanodes();
   }
 
   public int getMinFinalizedDatanodes() {
@@ -80,18 +74,13 @@ public class HDDSFinalizationRequirements {
         "finalized datanodes: %s", pipelineRequirements, minFinalizedDatanodes);
   }
 
-  private void checkMinFinalizedDatanodes() {
-    Preconditions.checkArgument(
-        minFinalizedDatanodes >= REQUIRED_MIN_FINALIZED_DATANODES);
-  }
-
    public static final class Builder {
     private int minFinalizedDatanodes;
     private PipelineRequirements pipelineRequirements;
 
     public Builder() {
       // Default values.
-      this.minFinalizedDatanodes = REQUIRED_MIN_FINALIZED_DATANODES;
+      this.minFinalizedDatanodes = 3;
       this.pipelineRequirements = PipelineRequirements.NONE;
     }
 

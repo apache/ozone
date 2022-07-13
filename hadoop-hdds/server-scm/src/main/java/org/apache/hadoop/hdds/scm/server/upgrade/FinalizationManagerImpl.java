@@ -54,33 +54,12 @@ public class FinalizationManagerImpl implements FinalizationManager {
   private HDDSLayoutVersionManager versionManager;
   private final FinalizationStateManager finalizationStateManager;
 
-  /**
-   * For test classes to inject their own state manager.
-   */
-  @VisibleForTesting
-  protected FinalizationManagerImpl(Builder builder,
-      FinalizationStateManager stateManager) throws IOException {
-    initCommonFields(builder);
-    this.finalizationStateManager = stateManager;
-
-  }
-
-  private FinalizationManagerImpl(Builder builder) throws IOException {
-    initCommonFields(builder);
-    this.finalizationStateManager = new FinalizationStateManagerImpl.Builder()
-        .setUpgradeFinalizer(this.upgradeFinalizer)
-        .setFinalizationStore(builder.finalizationStore)
-        .setTransactionBuffer(builder.scmHAManager.getDBTransactionBuffer())
-        .setRatisServer(builder.scmHAManager.getRatisServer())
-        .build();
-  }
-
-  private void initCommonFields(Builder builder) {
+  private FinalizationManagerImpl(Builder builder) {
     this.storage = builder.storage;
     this.versionManager = builder.versionManager;
     this.conf = builder.conf;
-    this.upgradeFinalizer = new SCMUpgradeFinalizer(this.versionManager,
-        builder.executor);
+    this.upgradeFinalizer = builder.finalizer;
+    this.finalizationStateManager = builder.stateManager;
   }
 
   @Override
@@ -183,6 +162,8 @@ public class FinalizationManagerImpl implements FinalizationManager {
     private SCMHAManager scmHAManager;
     private Table<String, String> finalizationStore;
     private UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor;
+    private SCMUpgradeFinalizer finalizer;
+    private FinalizationStateManager stateManager;
 
     public Builder() {
       executor = new DefaultUpgradeFinalizationExecutor<>();
@@ -221,6 +202,20 @@ public class FinalizationManagerImpl implements FinalizationManager {
       return this;
     }
 
+    @VisibleForTesting
+    public Builder setUpgradeFinalizerForTesting(
+        SCMUpgradeFinalizer finalizer) {
+      this.finalizer = finalizer;
+      return this;
+    }
+
+    @VisibleForTesting
+    public Builder setStateManagerForTesting(
+        FinalizationStateManager stateManager) {
+      this.stateManager = stateManager;
+      return this;
+    }
+
     public FinalizationManagerImpl build() throws IOException {
       Preconditions.checkNotNull(conf);
       Preconditions.checkNotNull(versionManager);
@@ -228,6 +223,17 @@ public class FinalizationManagerImpl implements FinalizationManager {
       Preconditions.checkNotNull(scmHAManager);
       Preconditions.checkNotNull(finalizationStore);
       Preconditions.checkNotNull(executor);
+      if (finalizer == null) {
+        finalizer = new SCMUpgradeFinalizer(versionManager, executor);
+      }
+      if (stateManager == null) {
+        stateManager = new FinalizationStateManagerImpl.Builder()
+            .setUpgradeFinalizer(finalizer)
+            .setFinalizationStore(finalizationStore)
+            .setTransactionBuffer(scmHAManager.getDBTransactionBuffer())
+            .setRatisServer(scmHAManager.getRatisServer())
+            .build();
+      }
 
       return new FinalizationManagerImpl(this);
     }
