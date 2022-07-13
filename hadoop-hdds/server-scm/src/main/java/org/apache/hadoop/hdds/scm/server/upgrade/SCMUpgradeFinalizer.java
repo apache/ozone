@@ -56,7 +56,7 @@ public class SCMUpgradeFinalizer extends
     BasicUpgradeFinalizer<SCMUpgradeFinalizationContext,
         HDDSLayoutVersionManager> {
 
-  private Duration testCheckInterval;
+  private final Duration testCheckInterval;
 
   public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
     this(versionManager, new DefaultUpgradeFinalizationExecutor<>());
@@ -255,11 +255,6 @@ public class SCMUpgradeFinalizer extends
         LOG.info("Open pipeline found after SCM finalization");
       }
     }
-  }
-
-  @VisibleForTesting
-  public void setCheckIntervalForTesting(Duration checkInterval) {
-    this.testCheckInterval = checkInterval;
   }
 
   private void waitForRequiredNodeCountToFinalize(

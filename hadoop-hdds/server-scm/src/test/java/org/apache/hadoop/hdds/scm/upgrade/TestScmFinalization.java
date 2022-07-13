@@ -474,7 +474,8 @@ public class TestScmFinalization {
 
   private NodeManager getMockitoNodeManager() {
     NodeManager nodeManager = Mockito.mock(NodeManager.class);
-    // In this mocked test, all datanodes will finalize immediately.
+    // In this mockito implementation, all datanodes appear to finalize
+    // immediately to SCM.
     Mockito.when(nodeManager.getNodeCount(NodeStatus.inServiceHealthy()))
         .thenReturn(Integer.MAX_VALUE);
     return nodeManager;

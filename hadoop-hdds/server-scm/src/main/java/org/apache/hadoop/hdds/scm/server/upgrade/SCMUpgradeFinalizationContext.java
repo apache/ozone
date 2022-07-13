@@ -44,9 +44,9 @@ public final class SCMUpgradeFinalizationContext {
     nodeManager = builder.nodeManager;
     finalizationStateManager = builder.finalizationStateManager;
     storage = builder.storage;
+    versionManager = builder.versionManager;
     conf = builder.conf;
     scmContext = builder.scmContext;
-    versionManager = builder.versionManager;
   }
 
   public NodeManager getNodeManager() {
