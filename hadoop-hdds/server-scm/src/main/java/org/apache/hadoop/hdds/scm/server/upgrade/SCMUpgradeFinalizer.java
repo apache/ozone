@@ -260,10 +260,13 @@ public class SCMUpgradeFinalizer extends
   private void waitForRequiredNodeCountToFinalize(
       SCMUpgradeFinalizationContext context) {
     NodeManager nodeManager = context.getNodeManager();
-    final int minRequiredFinalizedNodes = getVersionManager()
-        .getFinalizationRequirements().getMinFinalizedDatanodes();
+    final int totalDatanodeCount = nodeManager.getAllNodes().size();
+    final int minRequiredFinalizedNodes = Math.min(
+        getVersionManager().getFinalizationRequirements()
+            .getMinFinalizedDatanodes(), totalDatanodeCount);
     int numFinalizedNodes =
         nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
+
     while (numFinalizedNodes < minRequiredFinalizedNodes) {
       LOG.info("Waiting for at least {} datanodes to finalize after SCM " +
           "finalization. Currently have {} finalized datanodes",
