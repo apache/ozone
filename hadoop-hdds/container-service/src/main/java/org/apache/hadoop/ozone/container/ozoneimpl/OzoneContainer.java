@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
+import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
@@ -73,6 +74,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS_DEFAULT;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration.VOLUME_BYTES_PER_SECOND_KEY;
 
 import org.apache.hadoop.util.Timer;
@@ -103,6 +108,8 @@ public class OzoneContainer {
   private ContainerMetadataScanner metadataScanner;
   private List<ContainerDataScanner> dataScanners;
   private final BlockDeletingService blockDeletingService;
+  private final StaleRecoveringContainerScrubbingService
+      recoveringContainerScrubbingService;
   private final GrpcTlsConfig tlsClientConfig;
   private final AtomicReference<InitializingStatus> initializingStatus;
   private final ReplicationServer replicationServer;
@@ -194,20 +201,41 @@ public class OzoneContainer {
 
     readChannel = new XceiverServerGrpc(
         datanodeDetails, config, hddsDispatcher, certClient);
-    Duration svcInterval = conf.getObject(
+    Duration blockDeletingSvcInterval = conf.getObject(
         DatanodeConfiguration.class).getBlockDeletionInterval();
 
-    long serviceTimeout = config
+    long blockDeletingServiceTimeout = config
         .getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
             OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
 
-    int serviceWorkerSize = config
+    int blockDeletingServiceWorkerSize = config
         .getInt(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
             OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT);
     blockDeletingService =
-        new BlockDeletingService(this, svcInterval.toMillis(), serviceTimeout,
-            TimeUnit.MILLISECONDS, serviceWorkerSize, config);
+        new BlockDeletingService(this, blockDeletingSvcInterval.toMillis(),
+            blockDeletingServiceTimeout, TimeUnit.MILLISECONDS,
+            blockDeletingServiceWorkerSize, config);
+
+    Duration recoveringContainerScrubbingSvcInterval = conf.getObject(
+        DatanodeConfiguration.class).getRecoveringContainerScrubInterval();
+
+    long recoveringContainerScrubbingServiceTimeout = config
+        .getTimeDuration(OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT,
+            OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT_DEFAULT,
+            TimeUnit.MILLISECONDS);
+
+    int recoveringContainerScrubbingServiceWorkerSize = config
+        .getInt(OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS,
+            OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS_DEFAULT);
+
+    recoveringContainerScrubbingService =
+        new StaleRecoveringContainerScrubbingService(
+            recoveringContainerScrubbingSvcInterval.toMillis(),
+            TimeUnit.MILLISECONDS,
+            recoveringContainerScrubbingServiceWorkerSize,
+            recoveringContainerScrubbingServiceTimeout,
+            containerSet, conf);
 
     if (certClient != null && secConf.isGrpcTlsEnabled()) {
       List<X509Certificate> x509Certificates =
@@ -352,6 +380,7 @@ public class OzoneContainer {
     hddsDispatcher.init();
     hddsDispatcher.setClusterId(clusterId);
     blockDeletingService.start();
+    recoveringContainerScrubbingService.start();
 
     // mark OzoneContainer as INITIALIZED.
     initializingStatus.set(InitializingStatus.INITIALIZED);
@@ -376,6 +405,7 @@ public class OzoneContainer {
       dbVolumeSet.shutdown();
     }
     blockDeletingService.shutdown();
+    recoveringContainerScrubbingService.shutdown();
     ContainerMetrics.remove();
   }
 
