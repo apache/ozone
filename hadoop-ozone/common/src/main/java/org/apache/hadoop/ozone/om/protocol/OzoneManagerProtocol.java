@@ -392,6 +392,18 @@ public interface OzoneManagerProtocol
   ServiceInfoEx getServiceInfo() throws IOException;
 
   /**
+   * Triggers Ranger background sync task immediately.
+   *
+   * Requires Ozone administrator privilege.
+   *
+   * @param noWait set to true if client won't wait for the result.
+   * @return true if noWait is true or when task completed successfully,
+   *         false otherwise.
+   * @throws IOException OMException (e.g. PERMISSION_DENIED)
+   */
+  boolean triggerRangerBGSync(boolean noWait) throws IOException;
+
+  /**
    * Initiate metadata upgrade finalization.
    * This method when called, initiates finalization of Ozone Manager metadata
    * during an upgrade. The status returned contains the status
