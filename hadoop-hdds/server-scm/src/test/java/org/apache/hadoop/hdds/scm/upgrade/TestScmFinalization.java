@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.upgrade;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.SimpleMockNodeManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -65,6 +66,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -524,6 +526,13 @@ public class TestScmFinalization {
       // increase, simulating all the cluster's datanodes moving towards
       // finalization.
       return healthyNodeCount++;
+    }
+
+    @Override
+    public List<DatanodeDetails> getAllNodes() {
+      // Only the size of this list is checked by the test code to determine
+      // the total number of nodes in the cluster.
+      return Arrays.asList(null, null, null, null, null);
     }
 
     public int getInvocationCount() {
