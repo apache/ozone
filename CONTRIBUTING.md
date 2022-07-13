@@ -94,12 +94,12 @@ We use GitHub pull requests for contributing changes to the repository. The main
      * Please include the Jira link, problem description and testing instruction (follow the [template](https://github.com/apache/ozone/blob/master/.github/pull_request_template.md))
   9. Set the Jira issue to "Patch Available" state
   10. Address any review comments if applicable
-     * Create new, incremental commits in your branch.  This makes it easy for reviewers to only review the new changes. The committer will take care to squash all your commits when merging the pull request.
-     * Push your commits in a batch, when no more changes are expected.  This reduces the burden on automated CI checks.
-     * If you need to bring your PR up-to-date with the base branch (usually `master`), e.g. to resolve conflicts, please do so by merge, not rebase: `git merge --no-edit origin/master`.
-     * In general, please try to avoid force-push when updating the PR.  Here are some great articles that explain why:
-       * https://developers.mattermost.com/blog/submitting-great-prs/#4-avoid-force-pushing
-       * https://www.freecodecamp.org/news/optimize-pull-requests-for-reviewer-happiness#request-a-review
+      * Create new, incremental commits in your branch.  This makes it easy for reviewers to only review the new changes. The committer will take care to squash all your commits when merging the pull request.
+      * Push your commits in a batch, when no more changes are expected.  This reduces the burden on automated CI checks.
+      * If you need to bring your PR up-to-date with the base branch (usually `master`), e.g. to resolve conflicts, please do so by merge, not rebase: `git merge --no-edit origin/master`.
+      * In general, please try to avoid force-push when updating the PR.  Here are some great articles that explain why:
+        * https://developers.mattermost.com/blog/submitting-great-prs/#4-avoid-force-pushing
+        * https://www.freecodecamp.org/news/optimize-pull-requests-for-reviewer-happiness#request-a-review
     
 ## Code convention and tests
 
