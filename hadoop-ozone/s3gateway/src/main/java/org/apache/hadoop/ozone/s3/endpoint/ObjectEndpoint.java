@@ -411,7 +411,7 @@ public class ObjectEndpoint extends EndpointBase {
 
     OzoneKey key;
     try {
-      key = getBucket(bucketName).headObject(keyPath);
+      key = getClient().getObjectStore().headS3Object(bucketName, keyPath);
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
       AUDIT.logReadFailure(
@@ -422,6 +422,9 @@ public class ObjectEndpoint extends EndpointBase {
         return Response.status(Status.NOT_FOUND).build();
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
+      } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND ||
+                 ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
+        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
       } else {
         throw ex;
       }

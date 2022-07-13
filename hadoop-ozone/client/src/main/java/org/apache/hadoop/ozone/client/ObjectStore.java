@@ -135,6 +135,12 @@ public class ObjectStore {
     return getS3Volume().getBucket(bucketName);
   }
 
+  public OzoneKey headS3Object(String bucketName, String key)
+      throws IOException {
+    OzoneVolume s3Volume = getS3Volume();
+    return getClientProxy().headObject(s3Volume.getName(), bucketName, key);
+  }
+
   /**
    * Deletes an s3 bucket and removes mapping of Ozone volume/bucket.
    * @param bucketName - S3 Bucket Name.
