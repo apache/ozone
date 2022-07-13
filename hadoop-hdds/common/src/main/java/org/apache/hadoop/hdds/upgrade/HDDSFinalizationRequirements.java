@@ -92,7 +92,7 @@ public class HDDSFinalizationRequirements {
 
   @Override
   public String toString() {
-    return String.format("Pipeline requirements: %s\nMinimum number of " +
+    return String.format("Pipeline requirements: %s%nMinimum number of " +
         "finalized datanodes: %s", pipelineRequirements, minFinalizedDatanodes);
   }
 
