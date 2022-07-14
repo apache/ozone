@@ -23,6 +23,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import com.google.protobuf.ByteString;
+import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -47,13 +48,8 @@ public class ReconstructECContainersCommand
       List<DatanodeDetailsAndReplicaIndex> sources,
       List<DatanodeDetails> targetDatanodes, byte[] missingContainerIndexes,
       ECReplicationConfig ecReplicationConfig) {
-    super();
-    this.containerID = containerID;
-    this.sources = sources;
-    this.targetDatanodes = targetDatanodes;
-    this.missingContainerIndexes =
-        Arrays.copyOf(missingContainerIndexes, missingContainerIndexes.length);
-    this.ecReplicationConfig = ecReplicationConfig;
+    this(containerID, sources, targetDatanodes, missingContainerIndexes,
+        ecReplicationConfig, HddsIdFactory.getLongId());
   }
 
   // Should be called only for protobuf conversion
@@ -68,6 +64,10 @@ public class ReconstructECContainersCommand
     this.missingContainerIndexes =
         Arrays.copyOf(missingContainerIndexes, missingContainerIndexes.length);
     this.ecReplicationConfig = ecReplicationConfig;
+    if (targetDatanodes.size() != missingContainerIndexes.length) {
+      throw new IllegalArgumentException("Number of target datanodes and " +
+          "container indexes should be same");
+    }
   }
 
   @Override
