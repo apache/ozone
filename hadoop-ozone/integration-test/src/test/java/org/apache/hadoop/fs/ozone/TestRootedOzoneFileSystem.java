@@ -1764,7 +1764,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   private void createLinkBucket(String linkVolume, String linkBucket,
-                                String sourceVolume, String sourceBucket) throws IOException {
+      String sourceVolume, String sourceBucket) throws IOException {
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     builder.setSourceVolume(sourceVolume)
         .setSourceBucket(sourceBucket);
