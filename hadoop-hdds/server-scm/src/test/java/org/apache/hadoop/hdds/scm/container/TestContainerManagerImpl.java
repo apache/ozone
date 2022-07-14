@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container;
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -189,7 +190,8 @@ public class TestContainerManagerImpl {
   }
 
   @Test
-  public void testUpdateContainerReplicaInvokesPendingOp() throws IOException {
+  public void testUpdateContainerReplicaInvokesPendingOp()
+      throws IOException, TimeoutException {
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "admin");
@@ -209,7 +211,8 @@ public class TestContainerManagerImpl {
   }
 
   @Test
-  public void testRemoveContainerReplicaInvokesPendingOp() throws IOException {
+  public void testRemoveContainerReplicaInvokesPendingOp()
+      throws IOException, TimeoutException {
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "admin");

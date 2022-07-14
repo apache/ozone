@@ -92,6 +92,8 @@ import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 
 import org.apache.ratis.util.ExitUtils;
 import org.eclipse.jetty.util.StringUtil;
@@ -1474,11 +1476,23 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public long getVolumeId(String volume) throws IOException {
-    return getVolumeTable().get(getVolumeKey(volume)).getObjectID();
+    OmVolumeArgs omVolumeArgs = getVolumeTable().get(getVolumeKey(volume));
+    if (omVolumeArgs == null) {
+      throw new OMException("Volume not found " + volume,
+          VOLUME_NOT_FOUND);
+    }
+    return omVolumeArgs.getObjectID();
   }
 
   @Override
   public long getBucketId(String volume, String bucket) throws IOException {
-    return getBucketTable().get(getBucketKey(volume, bucket)).getObjectID();
+    OmBucketInfo omBucketInfo =
+        getBucketTable().get(getBucketKey(volume, bucket));
+    if (omBucketInfo == null) {
+      throw new OMException(
+          "Bucket not found " + bucket + ", volume name: " + volume,
+          BUCKET_NOT_FOUND);
+    }
+    return omBucketInfo.getObjectID();
   }
 }

@@ -141,6 +141,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclRequest;
@@ -1445,6 +1447,22 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .map(ServiceInfo::getFromProtobuf)
             .collect(Collectors.toList()),
         resp.getCaCertificate(), resp.getCaCertsList());
+  }
+
+  @Override
+  public boolean triggerRangerBGSync(boolean noWait) throws IOException {
+    RangerBGSyncRequest req = RangerBGSyncRequest.newBuilder()
+        .setNoWait(noWait)
+        .build();
+
+    OMRequest omRequest = createOMRequest(Type.RangerBGSync)
+        .setRangerBGSyncRequest(req)
+        .build();
+
+    RangerBGSyncResponse resp = handleError(submitRequest(omRequest))
+        .getRangerBGSyncResponse();
+
+    return resp.getRunSuccess();
   }
 
   @Override

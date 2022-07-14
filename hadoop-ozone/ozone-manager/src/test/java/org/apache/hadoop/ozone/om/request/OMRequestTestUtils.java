@@ -483,13 +483,23 @@ public final class OMRequestTestUtils {
   public static void addBucketToDB(String volumeName, String bucketName,
       OMMetadataManager omMetadataManager, BucketLayout bucketLayout)
       throws Exception {
-
-    OmBucketInfo omBucketInfo =
+    addBucketToDB(omMetadataManager,
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
-                .setBucketName(bucketName)
-                .setObjectID(System.currentTimeMillis())
-                .setCreationTime(Time.now())
-                .setBucketLayout(bucketLayout).build();
+            .setBucketName(bucketName)
+            .setBucketLayout(bucketLayout)
+    );
+  }
+
+  public static void addBucketToDB(OMMetadataManager omMetadataManager,
+      OmBucketInfo.Builder builder) throws Exception {
+
+    OmBucketInfo omBucketInfo = builder
+        .setObjectID(System.currentTimeMillis())
+        .setCreationTime(Time.now())
+        .build();
+
+    String volumeName = omBucketInfo.getVolumeName();
+    String bucketName = omBucketInfo.getBucketName();
 
     // Add to cache.
     omMetadataManager.getBucketTable().addCacheEntry(
@@ -1149,41 +1159,43 @@ public final class OMRequestTestUtils {
    *
    * @throws Exception DB failure
    */
-  public static void addFileToKeyTable(boolean openKeyTable,
+  public static String addFileToKeyTable(boolean openKeyTable,
                                        boolean addToCache, String fileName,
                                        OmKeyInfo omKeyInfo,
                                        long clientID, long trxnLogIndex,
                                        OMMetadataManager omMetadataManager)
           throws Exception {
+    String ozoneDBKey;
     if (openKeyTable) {
       final long volumeId = omMetadataManager.getVolumeId(
               omKeyInfo.getVolumeName());
       final long bucketId = omMetadataManager.getBucketId(
               omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
-      final String ozoneKey = omMetadataManager.getOpenFileName(
+      ozoneDBKey = omMetadataManager.getOpenFileName(
               volumeId, bucketId, omKeyInfo.getParentObjectID(),
               fileName, clientID);
       if (addToCache) {
         omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-            .addCacheEntry(new CacheKey<>(ozoneKey),
+            .addCacheEntry(new CacheKey<>(ozoneDBKey),
                 new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
       omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-          .put(ozoneKey, omKeyInfo);
+          .put(ozoneDBKey, omKeyInfo);
     } else {
-      String ozoneKey = omMetadataManager.getOzonePathKey(
+      ozoneDBKey = omMetadataManager.getOzonePathKey(
               omMetadataManager.getVolumeId(omKeyInfo.getVolumeName()),
               omMetadataManager.getBucketId(omKeyInfo.getVolumeName(),
                       omKeyInfo.getBucketName()),
               omKeyInfo.getParentObjectID(), fileName);
       if (addToCache) {
         omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-            .addCacheEntry(new CacheKey<>(ozoneKey),
+            .addCacheEntry(new CacheKey<>(ozoneDBKey),
                 new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
       omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-          .put(ozoneKey, omKeyInfo);
+          .put(ozoneDBKey, omKeyInfo);
     }
+    return ozoneDBKey;
   }
 
   /**

@@ -33,15 +33,20 @@ fix_data_dir_permissions
 start_docker_env
 execute_robot_test scm -v PREFIX:pre freon/generate.robot
 execute_robot_test scm -v PREFIX:pre freon/validate.robot
+execute_robot_test scm -v PREFIX:pre freon/generate-chunk.robot
+execute_robot_test scm -v PREFIX:pre freon/validate-chunk.robot
 KEEP_RUNNING=false stop_docker_env
 
 # re-start cluster with new version and check after upgrade
 export OZONE_KEEP_RESULTS=true
 start_docker_env
 execute_robot_test scm -v PREFIX:pre freon/validate.robot
+execute_robot_test scm -v PREFIX:pre freon/validate-chunk.robot
 # test write key to old bucket after upgrade
 execute_robot_test scm -v PREFIX:post freon/generate.robot
 execute_robot_test scm -v PREFIX:post freon/validate.robot
+execute_robot_test scm -v PREFIX:post freon/generate-chunk.robot
+execute_robot_test scm -v PREFIX:post freon/validate-chunk.robot
 stop_docker_env
 
 generate_report

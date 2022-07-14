@@ -214,6 +214,9 @@ public final class ScmConfigKeys {
   public static final String HDDS_DATANODE_DIR_KEY = "hdds.datanode.dir";
   public static final String HDDS_DATANODE_DIR_DU_RESERVED =
       "hdds.datanode.dir.du.reserved";
+  public static final String HDDS_DATANODE_DIR_DU_RESERVED_PERCENT =
+      "hdds.datanode.dir.du.reserved.percent";
+  public static final float HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT = 0;
   public static final String HDDS_REST_CSRF_ENABLED_KEY =
       "hdds.rest.rest-csrf.enabled";
   public static final boolean HDDS_REST_CSRF_ENABLED_DEFAULT = false;
@@ -453,8 +456,11 @@ public final class ScmConfigKeys {
   // SCM Ratis related
   public static final String OZONE_SCM_HA_ENABLE_KEY
       = "ozone.scm.ratis.enable";
+  /** Default Value would be Overriden based on the current state of Ratis.
+   {@link org.apache.hadoop.hdds.conf.DefaultConfigManager}
+   */
   public static final boolean OZONE_SCM_HA_ENABLE_DEFAULT
-      = false;
+      = true;
   public static final String OZONE_SCM_RATIS_PORT_KEY
       = "ozone.scm.ratis.port";
   public static final int OZONE_SCM_RATIS_PORT_DEFAULT

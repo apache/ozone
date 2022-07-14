@@ -22,8 +22,8 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -57,6 +57,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -216,13 +217,26 @@ public class TestContainerReader {
 
   @Test
   public void testContainerReader() throws Exception {
+    KeyValueContainerData recoveringContainerData = new KeyValueContainerData(
+        10, layout, (long) StorageUnit.GB.toBytes(5),
+        UUID.randomUUID().toString(), datanodeId.toString());
+    //create a container with recovering state
+    recoveringContainerData.setState(RECOVERING);
+
+    KeyValueContainer recoveringKeyValueContainer =
+        new KeyValueContainer(recoveringContainerData,
+            conf);
+    recoveringKeyValueContainer.create(
+        volumeSet, volumeChoosingPolicy, clusterId);
+
     ContainerReader containerReader = new ContainerReader(volumeSet,
-        hddsVolume, containerSet, conf);
+        hddsVolume, containerSet, conf, true);
 
     Thread thread = new Thread(containerReader);
     thread.start();
     thread.join();
 
+    //recovering container should be deleted, so the count should be 2
     Assert.assertEquals(2, containerSet.containerCount());
 
     for (int i = 0; i < 2; i++) {
@@ -284,7 +298,7 @@ public class TestContainerReader {
     ContainerCache.getInstance(conf).shutdownCache();
 
     ContainerReader containerReader = new ContainerReader(volumeSet1,
-        hddsVolume1, containerSet1, conf);
+        hddsVolume1, containerSet1, conf, true);
     containerReader.readVolume(hddsVolume1.getHddsRootDir());
     Assert.assertEquals(containerCount - 1, containerSet1.containerCount());
   }
@@ -346,7 +360,7 @@ public class TestContainerReader {
     Thread[] threads = new Thread[volumeNum];
     for (int i = 0; i < volumeNum; i++) {
       containerReaders[i] = new ContainerReader(volumeSets,
-          (HddsVolume) volumes.get(i), containerSet, conf);
+          (HddsVolume) volumes.get(i), containerSet, conf, true);
       threads[i] = new Thread(containerReaders[i]);
     }
     long startTime = System.currentTimeMillis();

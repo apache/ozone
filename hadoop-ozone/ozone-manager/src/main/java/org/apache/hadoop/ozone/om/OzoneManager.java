@@ -73,6 +73,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.om.multitenant.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
@@ -167,7 +168,7 @@ import org.apache.hadoop.ozone.protocolPB.OMInterServiceProtocolServerSideImpl;
 import org.apache.hadoop.ozone.protocolPB.OMAdminProtocolServerSideImpl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
-import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -264,6 +265,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
@@ -389,6 +391,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean grpcBlockTokenEnabled;
   private final boolean useRatisForReplication;
   private final String defaultBucketLayout;
+  private ReplicationConfig defaultReplicationConfig;
 
   private boolean isS3MultiTenancyEnabled;
 
@@ -516,6 +519,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               BucketLayout.OBJECT_STORE + ", " + BucketLayout.LEGACY + ".");
     }
 
+    // Validates the default server-side replication configs.
+    this.defaultReplicationConfig = getDefaultReplicationConfig();
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     omRpcAddressTxt = new Text(omNodeDetails.getRpcAddressString());
 
@@ -810,7 +815,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     throw new OMException("S3 multi-tenancy feature is not enabled. Please "
         + "set ozone.om.multitenancy.enabled to true and restart all OMs.",
-        ResultCodes.FEATURE_NOT_ENABLED);
+        FEATURE_NOT_ENABLED);
   }
 
   /**
@@ -2962,6 +2967,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return "" + omRpcAddress.getPort();
   }
 
+  @Override
+  public String getRatisLogDirectory() {
+    return  OzoneManagerRatisUtils.getOMRatisDirectory(configuration);
+  }
+
+  @Override
+  public String getRocksDbDirectory() {
+    return String.valueOf(OMStorage.getOmDbDir(configuration));
+  }
+
   @VisibleForTesting
   public OzoneManagerHttpServer getHttpServer() {
     return httpServer;
@@ -3066,6 +3081,53 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public ServiceInfoEx getServiceInfo() throws IOException {
     return new ServiceInfoEx(getServiceList(), caCertPem, caCertPemList);
+  }
+
+  @Override
+  public boolean triggerRangerBGSync(boolean noWait) throws IOException {
+
+    // OM should be leader and ready.
+    // This check should always pass if called from a client since there
+    // is a leader check somewhere before entering this method.
+    if (!isLeaderReady()) {
+      // And even if we could allow followers to trigger sync, checkLeader()
+      // calls inside the sync would quit the sync anyway.
+      throw new OMException("OM is not leader or not ready", INVALID_REQUEST);
+    }
+
+    final UserGroupInformation ugi = getRemoteUser();
+    // Check Ozone admin privilege
+    if (!isAdmin(ugi)) {
+      throw new OMException("Only Ozone admins are allowed to trigger "
+          + "Ranger background sync manually", PERMISSION_DENIED);
+    }
+
+    // Check if MT manager is inited
+    final OMMultiTenantManager mtManager = getMultiTenantManager();
+    if (mtManager == null) {
+      throw new OMException("S3 Multi-Tenancy is not enabled",
+          FEATURE_NOT_ENABLED);
+    }
+
+    // Check if Ranger BG sync task is inited
+    final OMRangerBGSyncService bgSync = mtManager.getOMRangerBGSyncService();
+    if (bgSync == null) {
+      throw new OMException("Ranger background sync service is not initialized",
+          FEATURE_NOT_ENABLED);
+    }
+
+    // Trigger Ranger BG Sync
+    if (noWait) {
+      final Thread t = new Thread(bgSync::triggerRangerSyncOnce);
+      t.start();
+      LOG.info("User '{}' manually triggered Multi-Tenancy Ranger Sync "
+          + "in a new thread, tid={}", ugi, t.getId());
+      return true;
+    } else {
+      LOG.info("User '{}' manually triggered Multi-Tenancy Ranger Sync", ugi);
+      // Block in the handler thread
+      return bgSync.triggerRangerSyncOnce();
+    }
   }
 
   @Override
@@ -4026,7 +4088,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  public boolean isAdmin(String username) {
+  @VisibleForTesting
+  private boolean isAdmin(String username) {
     if (omAdminUsernames == null) {
       return false;
     } else {
@@ -4172,6 +4235,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public ReplicationConfig getDefaultReplicationConfig() {
+    if (this.defaultReplicationConfig != null) {
+      return this.defaultReplicationConfig;
+    }
+
     final String replication = configuration.getTrimmed(
         OZONE_SERVER_DEFAULT_REPLICATION_KEY,
         OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT);

@@ -292,7 +292,7 @@ public class TestECKeyOutputStream {
   }
 
   @Test
-  public void testECContainerKeysCount()
+  public void testECContainerKeysCountAndNumContainerReplicas()
       throws IOException, InterruptedException, TimeoutException {
     byte[] inputData = getInputBytes(1);
     final OzoneBucket bucket = getOzoneBucket();
@@ -320,8 +320,9 @@ public class TestECKeyOutputStream {
 
     GenericTestUtils.waitFor(() -> {
       try {
-        return containerOperationClient.getContainer(currentKeyContainerID)
-            .getNumberOfKeys() == 1;
+        return (containerOperationClient.getContainer(currentKeyContainerID)
+            .getNumberOfKeys() == 1) && (containerOperationClient
+            .getContainerReplicas(currentKeyContainerID).size() == 5);
       } catch (IOException exception) {
         Assert.fail("Unexpected exception " + exception);
         return false;

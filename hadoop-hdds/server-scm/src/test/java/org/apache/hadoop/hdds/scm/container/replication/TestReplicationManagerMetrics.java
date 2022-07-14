@@ -54,7 +54,13 @@ public class TestReplicationManagerMetrics {
         report.increment(s);
       }
     }
+    final LegacyReplicationManager lrm = Mockito.mock(
+        LegacyReplicationManager.class);
+    Mockito.when(lrm.getInflightCount(Mockito.any(InflightType.class)))
+        .thenReturn(0);
     replicationManager = Mockito.mock(ReplicationManager.class);
+    Mockito.when(replicationManager.getLegacyReplicationManager())
+        .thenReturn(lrm);
     Mockito.when(replicationManager.getContainerReport()).thenReturn(report);
     metrics = ReplicationManagerMetrics.create(replicationManager);
   }

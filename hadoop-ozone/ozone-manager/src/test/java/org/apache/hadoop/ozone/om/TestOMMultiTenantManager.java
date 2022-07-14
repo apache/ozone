@@ -34,10 +34,13 @@ import org.mockito.Mockito;
 import java.io.IOException;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 
 /**
@@ -74,15 +77,34 @@ public class TestOMMultiTenantManager {
         StringUtils.toLowerCase(AuthenticationMethod.KERBEROS.toString()));
     expectConfigCheckToFail(ozoneManager, conf);
 
+    // Deliberately set ozone.om.kerberos.principal and
+    // ozone.om.kerberos.keytab.file to empty values in order to
+    // test the config checker, since the default values aren't empty.
+    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "");
+    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, "");
+
     // Set essential Ranger conf one by one
-    conf.set(OZONE_RANGER_HTTPS_ADDRESS_KEY, "http://ranger:6080");
+    conf.set(OZONE_RANGER_HTTPS_ADDRESS_KEY, "https://ranger:6182");
     expectConfigCheckToFail(ozoneManager, conf);
-    conf.set(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER, "admin");
+    conf.set(OZONE_RANGER_SERVICE, "cm_ozone");
     expectConfigCheckToFail(ozoneManager, conf);
-    conf.set(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD, "passwd");
+
+    // Try Kerberos auth
+    final OzoneConfiguration confKerbAuth = new OzoneConfiguration(conf);
+    confKerbAuth.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "om/_HOST@REALM");
+    expectConfigCheckToFail(ozoneManager, confKerbAuth);
+    confKerbAuth.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, "/path/to/om.keytab");
+    Assert.assertTrue(OMMultiTenantManager.checkAndEnableMultiTenancy(
+        ozoneManager, confKerbAuth));
+
+    // Try basic auth
+    final OzoneConfiguration confBasicAuth = new OzoneConfiguration(conf);
+    confBasicAuth.set(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER, "admin");
+    expectConfigCheckToFail(ozoneManager, confBasicAuth);
+    confBasicAuth.set(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD, "Password1");
     // At this point the config check should pass. Method returns true
-    Assert.assertTrue(
-        OMMultiTenantManager.checkAndEnableMultiTenancy(ozoneManager, conf));
+    Assert.assertTrue(OMMultiTenantManager.checkAndEnableMultiTenancy(
+        ozoneManager, confBasicAuth));
   }
 
   /**

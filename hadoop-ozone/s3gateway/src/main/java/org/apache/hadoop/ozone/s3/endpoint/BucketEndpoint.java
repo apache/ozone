@@ -244,7 +244,10 @@ public class BucketEndpoint extends EndpointBase {
     try {
       if (aclMarker != null) {
         s3GAction = S3GAction.PUT_ACL;
-        return putAcl(bucketName, httpHeaders, body);
+        Response response =  putAcl(bucketName, httpHeaders, body);
+        AUDIT.logWriteSuccess(
+            buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
+        return response;
       }
       String location = createS3Bucket(bucketName);
       LOG.info("Location is {}", location);

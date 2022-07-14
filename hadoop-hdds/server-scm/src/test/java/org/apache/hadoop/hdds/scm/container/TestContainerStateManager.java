@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -65,7 +66,7 @@ public class TestContainerStateManager {
   private Pipeline pipeline;
 
   @BeforeEach
-  public void init() throws IOException {
+  public void init() throws IOException, TimeoutException {
     OzoneConfiguration conf = new OzoneConfiguration();
     scmhaManager = SCMHAManagerStub.getInstance(true);
     testDir = GenericTestUtils.getTestDir(
@@ -106,7 +107,8 @@ public class TestContainerStateManager {
   }
 
   @Test
-  public void checkReplicationStateOK() throws IOException {
+  public void checkReplicationStateOK()
+      throws IOException, TimeoutException {
     //GIVEN
     ContainerInfo c1 = allocateContainer();
 
@@ -127,7 +129,8 @@ public class TestContainerStateManager {
   }
 
   @Test
-  public void checkReplicationStateMissingReplica() throws IOException {
+  public void checkReplicationStateMissingReplica()
+      throws IOException, TimeoutException {
     //GIVEN
 
     ContainerInfo c1 = allocateContainer();
@@ -156,7 +159,8 @@ public class TestContainerStateManager {
         .updateContainerReplica(cont.containerID(), replica);
   }
 
-  private ContainerInfo allocateContainer() throws IOException {
+  private ContainerInfo allocateContainer()
+      throws IOException, TimeoutException {
 
     final ContainerInfo containerInfo = new ContainerInfo.Builder()
         .setState(HddsProtos.LifeCycleState.OPEN)

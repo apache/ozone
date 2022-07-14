@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -67,16 +68,14 @@ import org.apache.commons.io.IOUtils;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
-import static org.junit.Assert.assertEquals;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 /**
@@ -92,10 +91,7 @@ public class TestContainerPlacement {
   private PipelineManager pipelineManager;
   private NodeManager nodeManager;
 
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
-
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     conf = getConf();
     testDir = GenericTestUtils.getTestDir(
@@ -113,7 +109,7 @@ public class TestContainerPlacement {
         HddsProtos.ReplicationFactor.THREE));
   }
 
-  @After
+  @AfterEach
   public void cleanup() throws Exception {
     if (dbStore != null) {
       dbStore.close();
@@ -177,9 +173,9 @@ public class TestContainerPlacement {
    * @throws InterruptedException
    */
   @Test
-  @Ignore
+  @Disabled
   public void testContainerPlacementCapacity() throws IOException,
-      InterruptedException {
+      InterruptedException, TimeoutException {
     final int nodeCount = 4;
     final long capacity = 10L * OzoneConsts.GB;
     final long used = 2L * OzoneConsts.GB;

@@ -53,6 +53,7 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -663,10 +664,12 @@ public class RpcClient implements ClientProtocol {
       builder.setDefaultReplicationConfig(defaultReplicationConfig);
     }
 
-    LOG.info("Creating Bucket: {}/{}, with the Bucket Layout {}, {} as " +
-            "owner, Versioning {}, Storage Type set to {} and Encryption set " +
-            "to {} ",
-        volumeName, bucketName, bucketLayout, owner, isVersionEnabled,
+    String layoutMsg = bucketLayout != null
+        ? "with bucket layout " + bucketLayout
+        : "with server-side default bucket layout";
+    LOG.info("Creating Bucket: {}/{}, {}, {} as owner, Versioning {}, " +
+            "Storage Type set to {} and Encryption set to {} ",
+        volumeName, bucketName, layoutMsg, owner, isVersionEnabled,
         storageType, bek != null);
     ozoneManagerClient.createBucket(builder.build());
   }
@@ -1152,6 +1155,12 @@ public class RpcClient implements ClientProtocol {
             + " Erasure Coded replication, as OzoneManager does not support"
             + " Erasure Coded replication.");
       }
+    }
+
+    if (replicationConfig != null) {
+      ReplicationConfigValidator validator =
+              this.conf.getObject(ReplicationConfigValidator.class);
+      validator.validate(replicationConfig);
     }
     String requestId = UUID.randomUUID().toString();
 

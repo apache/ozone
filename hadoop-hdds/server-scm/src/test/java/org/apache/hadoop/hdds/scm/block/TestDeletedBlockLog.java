@@ -65,6 +65,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -209,14 +210,15 @@ public class TestDeletedBlockLog {
 
   private void addTransactions(Map<Long, List<Long>> containerBlocksMap,
       boolean shouldFlush)
-      throws IOException {
+      throws IOException, TimeoutException {
     deletedBlockLog.addTransactions(containerBlocksMap);
     if (shouldFlush) {
       scmHADBTransactionBuffer.flush();
     }
   }
 
-  private void incrementCount(List<Long> txIDs) throws IOException {
+  private void incrementCount(List<Long> txIDs)
+      throws IOException, TimeoutException {
     deletedBlockLog.incrementCount(txIDs);
     scmHADBTransactionBuffer.flush();
   }
@@ -262,7 +264,7 @@ public class TestDeletedBlockLog {
   }
 
   private List<DeletedBlocksTransaction> getTransactions(
-      int maximumAllowedBlocksNum) throws IOException {
+      int maximumAllowedBlocksNum) throws IOException, TimeoutException {
     DatanodeDeletedBlockTransactions transactions =
         deletedBlockLog.getTransactions(maximumAllowedBlocksNum);
     List<DeletedBlocksTransaction> txns = new LinkedList<>();
@@ -432,7 +434,8 @@ public class TestDeletedBlockLog {
   }
 
   @Test
-  public void testDeletedBlockTransactions() throws IOException {
+  public void testDeletedBlockTransactions()
+      throws IOException, TimeoutException {
     int txNum = 10;
     List<DeletedBlocksTransaction> blocks;
     DatanodeDetails dnId1 = dnList.get(0), dnId2 = dnList.get(1);

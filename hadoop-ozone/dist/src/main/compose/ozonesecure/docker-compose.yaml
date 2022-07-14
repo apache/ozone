@@ -109,17 +109,3 @@ services:
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-1}"
       OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","scm"]
-  ranger:
-    image: mockserver/mockserver:mockserver-5.13.2
-    hostname: ranger
-    volumes:
-      - ./mockserverInitialization.json:/config/mockserverInitialization.json
-    ports:
-      - "6080:6080"
-      - "6182:6182"
-    environment:
-      MOCKSERVER_MAX_EXPECTATIONS: 100
-      MOCKSERVER_MAX_HEADER_SIZE: 8192
-      MOCKSERVER_WATCH_INITIALIZATION_JSON: "true"
-      MOCKSERVER_INITIALIZATION_JSON_PATH: /config/mockserverInitialization.json
-    command: -logLevel DEBUG -serverPort 6080

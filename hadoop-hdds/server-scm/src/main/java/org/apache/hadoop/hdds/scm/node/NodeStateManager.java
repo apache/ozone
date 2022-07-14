@@ -46,7 +46,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.node.states.NodeStateMap;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -216,8 +216,8 @@ public class NodeStateManager implements Runnable, Closeable {
     // to healthy readonly until SCM finishes updating its MLV, hence the
     // checkpoint check here.
     layoutMisMatchCondition = (layout) ->
-        scmContext.isFinalizationCheckpointCrossed(
-                    FinalizationCheckpoint.MLV_EQUALS_SLV) &&
+        FinalizationManager.shouldTellDatanodesToFinalize(
+            scmContext.getFinalizationCheckpoint()) &&
             !layoutMatchCondition.test(layout);
 
     scheduleNextHealthCheck();
@@ -400,6 +400,28 @@ public class NodeStateManager implements Runnable, Closeable {
       throws NodeNotFoundException {
     nodeStateMap.getNodeInfo(datanodeDetails.getUuid())
         .updateLastKnownLayoutVersion(layoutInfo);
+  }
+
+  /**
+   * Update node.
+   *
+   * @param datanodeDetails the datanode details
+   * @param layoutInfo the layoutInfo
+   * @throws NodeNotFoundException the node not found exception
+   */
+  public void updateNode(DatanodeDetails datanodeDetails,
+                         LayoutVersionProto layoutInfo)
+          throws NodeNotFoundException {
+    DatanodeInfo datanodeInfo =
+            nodeStateMap.getNodeInfo(datanodeDetails.getUuid());
+    NodeStatus newNodeStatus = newNodeStatus(datanodeDetails, layoutInfo);
+    LOG.info("updating node {} from {} to {} with status {}",
+            datanodeDetails.getUuidString(),
+            datanodeInfo,
+            datanodeDetails,
+            newNodeStatus);
+    nodeStateMap.updateNode(datanodeDetails, newNodeStatus, layoutInfo);
+    updateLastKnownLayoutVersion(datanodeDetails, layoutInfo);
   }
 
   /**

@@ -140,7 +140,7 @@ public class SCMSafeModeManager implements SafeModeManager {
         HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
             new HealthyPipelineSafeModeRule(HEALTHY_PIPELINE_EXIT_RULE,
                 eventQueue, pipelineManager,
-                this, config);
+                this, config, scmContext);
         OneReplicaPipelineSafeModeRule oneReplicaPipelineSafeModeRule =
             new OneReplicaPipelineSafeModeRule(
                 ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE, eventQueue,

@@ -38,11 +38,13 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,8 +62,10 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 
 /**
  * SCM Pipeline Manager implementation.
@@ -152,6 +156,16 @@ public class PipelineManagerImpl implements PipelineManager {
     BackgroundPipelineCreator backgroundPipelineCreator =
         new BackgroundPipelineCreator(pipelineManager, conf, scmContext, clock);
 
+    pipelineManager.setBackgroundPipelineCreator(backgroundPipelineCreator);
+    serviceManager.register(backgroundPipelineCreator);
+
+    if (FinalizationManager.shouldCreateNewPipelines(
+        scmContext.getFinalizationCheckpoint())) {
+      pipelineManager.resumePipelineCreation();
+    } else {
+      pipelineManager.freezePipelineCreation();
+    }
+
     final long scrubberIntervalInMillis = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL,
         ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT,
@@ -170,24 +184,20 @@ public class PipelineManagerImpl implements PipelineManager {
             .setPeriodicalTask(() -> {
               try {
                 pipelineManager.scrubPipelines();
-              } catch (IOException e) {
+              } catch (IOException | TimeoutException e) {
                 LOG.error("Unexpected error during pipeline scrubbing", e);
               }
             }).build();
 
-    pipelineManager.setBackgroundPipelineCreator(backgroundPipelineCreator);
     pipelineManager.setBackgroundPipelineScrubber(backgroundPipelineScrubber);
-
-    serviceManager.register(backgroundPipelineCreator);
     serviceManager.register(backgroundPipelineScrubber);
 
     return pipelineManager;
   }
 
   @Override
-  public Pipeline createPipeline(
-      ReplicationConfig replicationConfig
-  ) throws IOException {
+  public Pipeline createPipeline(ReplicationConfig replicationConfig)
+      throws IOException, TimeoutException {
     return createPipeline(replicationConfig, Collections.emptyList(),
         Collections.emptyList());
   }
@@ -195,7 +205,7 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public Pipeline createPipeline(ReplicationConfig replicationConfig,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
-      throws IOException {
+      throws IOException, TimeoutException {
     if (!isPipelineCreationAllowed() && !factorOne(replicationConfig)) {
       LOG.debug("Pipeline creation is not allowed until safe mode prechecks " +
           "complete");
@@ -218,7 +228,7 @@ public class PipelineManagerImpl implements PipelineManager {
           ClientVersion.CURRENT_VERSION));
       recordMetricsForPipeline(pipeline);
       return pipeline;
-    } catch (IOException ex) {
+    } catch (IOException | TimeoutException ex) {
       LOG.debug("Failed to create pipeline with replicationConfig {}.",
           replicationConfig, ex);
       metrics.incNumPipelineCreationFailed();
@@ -345,7 +355,8 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
-  public void openPipeline(PipelineID pipelineId) throws IOException {
+  public void openPipeline(PipelineID pipelineId)
+      throws IOException, TimeoutException {
     acquireWriteLock();
     try {
       Pipeline pipeline = stateManager.getPipeline(pipelineId);
@@ -370,7 +381,8 @@ public class PipelineManagerImpl implements PipelineManager {
    * @param pipeline - pipeline to be removed
    * @throws IOException
    */
-  protected void removePipeline(Pipeline pipeline) throws IOException {
+  protected void removePipeline(Pipeline pipeline)
+      throws IOException, TimeoutException {
     pipelineFactory.close(pipeline.getType(), pipeline);
     PipelineID pipelineID = pipeline.getId();
     acquireWriteLock();
@@ -391,7 +403,7 @@ public class PipelineManagerImpl implements PipelineManager {
    * @throws IOException
    */
   protected void closeContainersForPipeline(final PipelineID pipelineId)
-      throws IOException {
+      throws IOException, TimeoutException {
     Set<ContainerID> containerIDs = stateManager.getContainers(pipelineId);
     ContainerManager containerManager = scmContext.getScm()
         .getContainerManager();
@@ -418,7 +430,7 @@ public class PipelineManagerImpl implements PipelineManager {
    */
   @Override
   public void closePipeline(Pipeline pipeline, boolean onTimeout)
-      throws IOException {
+      throws IOException, TimeoutException {
     PipelineID pipelineID = pipeline.getId();
     // close containers.
     closeContainersForPipeline(pipelineID);
@@ -439,11 +451,51 @@ public class PipelineManagerImpl implements PipelineManager {
     }
   }
 
+  /** close the pipelines whose nodes' IPs are stale.
+   *
+   * @param datanodeDetails new datanodeDetails
+   */
+  @Override
+  public void closeStalePipelines(DatanodeDetails datanodeDetails) {
+    List<Pipeline> pipelinesWithStaleIpOrHostname =
+            getStalePipelines(datanodeDetails);
+    if (pipelinesWithStaleIpOrHostname.isEmpty()) {
+      LOG.debug("No stale pipelines for datanode {}",
+              datanodeDetails.getUuidString());
+      return;
+    }
+    LOG.info("Found {} stale pipelines",
+            pipelinesWithStaleIpOrHostname.size());
+    pipelinesWithStaleIpOrHostname.forEach(p -> {
+      try {
+        LOG.info("Closing the stale pipeline: {}", p.getId());
+        closePipeline(p, false);
+        LOG.info("Closed the stale pipeline: {}", p.getId());
+      } catch (IOException | TimeoutException e) {
+        LOG.error("Closing the stale pipeline failed: {}", p, e);
+      }
+    });
+  }
+
+  @VisibleForTesting
+  List<Pipeline> getStalePipelines(DatanodeDetails datanodeDetails) {
+    List<Pipeline> pipelines = getPipelines();
+    return pipelines.stream()
+            .filter(p -> p.getNodes().stream()
+                    .anyMatch(n -> n.getUuid()
+                            .equals(datanodeDetails.getUuid())
+                            && (!n.getIpAddress()
+                            .equals(datanodeDetails.getIpAddress())
+                            || !n.getHostName()
+                            .equals(datanodeDetails.getHostName()))))
+            .collect(Collectors.toList());
+  }
+
   /**
    * Scrub pipelines.
    */
   @Override
-  public void scrubPipelines() throws IOException {
+  public void scrubPipelines() throws IOException, TimeoutException {
     Instant currentTime = clock.instant();
     Long pipelineScrubTimeoutInMills = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
@@ -512,7 +564,7 @@ public class PipelineManagerImpl implements PipelineManager {
    */
   @Override
   public void activatePipeline(PipelineID pipelineID)
-      throws IOException {
+      throws IOException, TimeoutException {
     acquireWriteLock();
     try {
       stateManager.updatePipelineState(pipelineID.getProtobuf(),
@@ -530,7 +582,7 @@ public class PipelineManagerImpl implements PipelineManager {
    */
   @Override
   public void deactivatePipeline(PipelineID pipelineID)
-      throws IOException {
+      throws IOException, TimeoutException {
     acquireWriteLock();
     try {
       stateManager.updatePipelineState(pipelineID.getProtobuf(),
@@ -550,34 +602,57 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public void waitPipelineReady(PipelineID pipelineID, long timeout)
       throws IOException {
+    waitOnePipelineReady(Lists.newArrayList(pipelineID), timeout);
+  }
+
+  @Override
+  public Pipeline waitOnePipelineReady(Collection<PipelineID> pipelineIDs,
+                                   long timeout)
+          throws IOException {
     long st = clock.millis();
     if (timeout == 0) {
       timeout = pipelineWaitDefaultTimeout;
     }
-
-    boolean ready;
-    Pipeline pipeline;
+    List<String> pipelineIDStrs =
+            pipelineIDs.stream()
+                    .map(id -> id.getId().toString())
+                            .collect(Collectors.toList());
+    String piplineIdsStr = String.join(",", pipelineIDStrs);
+    Pipeline pipeline = null;
     do {
-      try {
-        pipeline = stateManager.getPipeline(pipelineID);
-      } catch (PipelineNotFoundException e) {
-        throw new PipelineNotFoundException(String.format(
-            "Pipeline %s cannot be found", pipelineID));
+      boolean found = false;
+      for (PipelineID pipelineID : pipelineIDs) {
+        try {
+          Pipeline tempPipeline = stateManager.getPipeline(pipelineID);
+          found = true;
+          if (tempPipeline.isOpen()) {
+            pipeline = tempPipeline;
+            break;
+          }
+        } catch (PipelineNotFoundException e) {
+          LOG.warn("Pipeline {} cannot be found", pipelineID);
+        }
       }
-      ready = pipeline.isOpen();
-      if (!ready) {
+
+      if (!found) {
+        throw new PipelineNotFoundException("The input pipeline IDs " +
+                piplineIdsStr + " cannot be found");
+      }
+
+      if (pipeline == null) {
         try {
           Thread.sleep((long)100);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
         }
       }
-    } while (!ready && clock.millis() - st < timeout);
+    } while (pipeline == null && clock.millis() - st < timeout);
 
-    if (!ready) {
+    if (pipeline == null) {
       throw new IOException(String.format("Pipeline %s is not ready in %d ms",
-          pipelineID, timeout));
+              piplineIdsStr, timeout));
     }
+    return pipeline;
   }
 
   @Override
@@ -617,6 +692,12 @@ public class PipelineManagerImpl implements PipelineManager {
   public void resumePipelineCreation() {
     freezePipelineCreation.set(false);
     backgroundPipelineCreator.start();
+  }
+
+  @Override
+  public boolean isPipelineCreationFrozen() {
+    return freezePipelineCreation.get() &&
+        !backgroundPipelineCreator.isRunning();
   }
 
   @Override
