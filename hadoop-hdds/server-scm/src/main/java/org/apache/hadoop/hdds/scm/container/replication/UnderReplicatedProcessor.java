@@ -64,6 +64,8 @@ public class UnderReplicatedProcessor {
    * datanode, so they are not assigned too much work.
    */
   public void processAll() {
+    int processed = 0;
+    int failed = 0;
     while (true) {
       ContainerHealthResult.UnderReplicatedHealthResult underRep =
           replicationManager.dequeueUnderReplicatedContainer();
@@ -72,12 +74,16 @@ public class UnderReplicatedProcessor {
       }
       try {
         processContainer(underRep);
+        processed++;
       } catch (IOException e) {
         LOG.error("Error processing under replicated container {}",
             underRep.getContainerInfo(), e);
+        failed++;
         replicationManager.requeueUnderReplicatedContainer(underRep);
       }
     }
+    LOG.info("Processed {} under replicated containers, failed processing {}",
+        processed, failed);
   }
 
   protected void processContainer(ContainerHealthResult

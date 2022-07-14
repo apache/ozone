@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.UnderReplicatedProcessor;
 import org.apache.hadoop.hdds.scm.crl.CRLStatusReportHandler;
 import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
@@ -723,6 +724,21 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           clock,
           legacyRM,
           containerReplicaPendingOps);
+      ReplicationManager.ReplicationManagerConfiguration rmConf = conf
+          .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+
+      UnderReplicatedProcessor underReplicatedProcessor =
+          new UnderReplicatedProcessor(replicationManager,
+              containerReplicaPendingOps, eventQueue);
+
+      BackgroundSCMService underReplicatedQueueThread =
+          new BackgroundSCMService.Builder().setClock(clock)
+              .setScmContext(scmContext)
+              .setServiceName("UnderReplicatedQueueThread")
+              .setIntervalInMillis(rmConf.getUnderReplicatedInterval())
+              .setWaitTimeInMillis(backgroundServiceSafemodeWaitMs)
+              .setPeriodicalTask(underReplicatedProcessor::processAll).build();
+      serviceManager.register(underReplicatedQueueThread);
     }
     serviceManager.register(replicationManager);
     if (configurator.getScmSafeModeManager() != null) {
