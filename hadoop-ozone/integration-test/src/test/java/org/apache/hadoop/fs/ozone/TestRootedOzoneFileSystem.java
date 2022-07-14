@@ -1149,6 +1149,7 @@ public class TestRootedOzoneFileSystem {
 
     // confirm data through link
     FileStatus dirLinkStatus = fs.getFileStatus(dirPathLink);
+    Assert.assertNotNull(dirLinkStatus);
 
     // confirm non recursive delete of volume with link fails
     deleteNonRecursivelyAndFail(linkVolumePath);
