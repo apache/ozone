@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.ExitUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -137,6 +138,7 @@ public class ReplicationManager implements SCMService {
   private final ReentrantLock lock = new ReentrantLock();
   private Queue<ContainerHealthResult.UnderReplicatedHealthResult>
       underRepQueue;
+  private ECUnderReplicationHandler ecUnderReplicationHandler;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -174,6 +176,8 @@ public class ReplicationManager implements SCMService {
     this.ecContainerHealthCheck = new ECContainerHealthCheck();
     this.nodeManager = nodeManager;
     this.underRepQueue = createUnderReplicatedQueue();
+    ecUnderReplicationHandler = new ECUnderReplicationHandler(
+        containerPlacement, conf, nodeManager);
     start();
   }
 
@@ -315,6 +319,17 @@ public class ReplicationManager implements SCMService {
     }
   }
 
+  public Map<DatanodeDetails, SCMCommand<?>> processUnderReplicatedContainer(
+      final ContainerHealthResult result) throws IOException {
+    ContainerID containerID = result.getContainerInfo().containerID();
+    Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
+        containerID);
+    List<ContainerReplicaOp> pendingOps =
+        containerReplicaPendingOps.getPendingOps(containerID);
+    return ecUnderReplicationHandler.processAndCreateCommands(replicas,
+        pendingOps, result, 0);
+  }
+
   protected ContainerHealthResult processContainer(ContainerInfo containerInfo,
       Queue<ContainerHealthResult.UnderReplicatedHealthResult> underRep,
       List<ContainerHealthResult.OverReplicatedHealthResult> overRep,
@@ -432,6 +447,18 @@ public class ReplicationManager implements SCMService {
     private long interval = Duration.ofSeconds(300).toMillis();
 
     /**
+     * The frequency in which the Under Replicated queue is processed.
+     */
+    @Config(key = "under.replicated.interval",
+        type = ConfigType.TIME,
+        defaultValue = "30s",
+        tags = {SCM, OZONE},
+        description = "Hpw frequently to check if there are work to process " +
+            " on the under replicated queue"
+    )
+    private long underReplicatedInterval = Duration.ofSeconds(30).toMillis();
+
+    /**
      * Timeout for container replication & deletion command issued by
      * ReplicationManager.
      */
@@ -472,6 +499,10 @@ public class ReplicationManager implements SCMService {
 
     public long getInterval() {
       return interval;
+    }
+
+    public long getUnderReplicatedInterval() {
+      return underReplicatedInterval;
     }
 
     public long getEventTimeout() {
