@@ -114,7 +114,8 @@ public class UnderReplicatedProcessor {
     } else if (cmd.getType() == StorageContainerDatanodeProtocolProtos
         .SCMCommandProto.Type.replicateContainerCommand) {
       ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
-      pendingOps.scheduleAddReplica(containerID, targetDatanode, 0);
+      pendingOps.scheduleAddReplica(
+          containerID, targetDatanode, rcc.getReplicaIndex());
     } else {
       throw new IOException("Unexpected command type " + cmd.getType());
     }

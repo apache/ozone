@@ -409,6 +409,7 @@ message ReplicateContainerCommandProto {
   required int64 containerID = 1;
   repeated DatanodeDetailsProto sources = 2;
   required int64 cmdId = 3;
+  optional int32 replicaIndex = 4;
 }
 
 /**
