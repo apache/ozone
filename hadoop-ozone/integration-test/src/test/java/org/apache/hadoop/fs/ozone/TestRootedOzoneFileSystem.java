@@ -1126,32 +1126,46 @@ public class TestRootedOzoneFileSystem {
   }
 
   @Test
-  public void testDeleteBucketLinkFails() throws Exception {
-    // Create test volume, bucket and bucket link
-    String volumeStr = getRandomNonExistVolumeName();
-    Path volumePath1 = new Path(OZONE_URI_DELIMITER + volumeStr);
-    String bucketStr = "bucket";
-    Path bucketPath1 = new Path(volumePath1, bucketStr);
+  public void testDeleteBucketLink() throws Exception {
+    // Create test volume, bucket, directory
+    String volumeStr1 = getRandomNonExistVolumeName();
+    Path volumePath1 = new Path(OZONE_URI_DELIMITER + volumeStr1);
+    String bucketStr1 = "bucket";
+    Path bucketPath1 = new Path(volumePath1, bucketStr1);
+    String dirStr1 = "dir1";
+    Path dirPath1 = new Path(bucketPath1, dirStr1);
+    fs.mkdirs(dirPath1);
+    FileStatus dir1Status = fs.getFileStatus(dirPath1);
+
+    // Create volume with link to first
+    String linkVolume = getRandomNonExistVolumeName();
+    Path linkVolumePath = new Path(OZONE_URI_DELIMITER + linkVolume);
+    fs.mkdirs(linkVolumePath);
+
     String linkStr = "link";
-    Path linkPath = new Path(volumePath1, linkStr);
-    fs.mkdirs(bucketPath1);
+    createLinkBucket(linkVolume, linkStr, volumeStr1, bucketStr1);
+    Path linkPath = new Path(linkVolumePath, linkStr);
+    Path dirPathLink = new Path(linkPath, dirStr1);
 
-    OzoneVolume ozoneVolume = objectStore.getVolume(volumeStr);
-    createLinkBucket(ozoneVolume, bucketStr, linkStr);
+    // confirm data through link
+    FileStatus dirLinkStatus = fs.getFileStatus(dirPathLink);
 
-    // confirm non recursive delete of bucket link fails
-    LambdaTestUtils.intercept(IOException.class,
-        "Bucket links can not be deleted through the HDFS interface.",
-        () -> fs.delete(linkPath, false));
+    // confirm non recursive delete of volume with link fails
+    deleteNonRecursivelyAndFail(linkVolumePath);
 
-    // confirm recursive delete of bucket link fails
-    LambdaTestUtils.intercept(IOException.class,
-        "Bucket links can not be deleted through the HDFS interface.",
-        () -> fs.delete(linkPath, true));
+    // confirm recursive delete of volume with link works
+    fs.delete(linkVolumePath, true);
+
+    // confirm vol1 data is unaffected
+    Assert.assertTrue(dir1Status.equals(fs.getFileStatus(dirPath1)));
+
+    // confirm link is gone
+    LambdaTestUtils.intercept(FileNotFoundException.class,
+        "File not found.",
+        () -> fs.getFileStatus(dirPathLink));
+
     // Cleanup
-    ozoneVolume.deleteBucket(linkStr);
-    fs.delete(bucketPath1, false);
-    fs.delete(volumePath1, false);
+    fs.delete(volumePath1, true);
 
   }
 
@@ -1749,12 +1763,12 @@ public class TestRootedOzoneFileSystem {
     proxy.deleteVolume(volume);
   }
 
-  private void createLinkBucket(OzoneVolume sourceVolume, String sourceBucket,
-                                String linkBucket) throws IOException {
+  private void createLinkBucket(String linkVolume, String linkBucket,
+                                String sourceVolume, String sourceBucket) throws IOException {
     BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setBucketLayout(BucketLayout.DEFAULT)
-        .setSourceVolume(sourceVolume.getName())
+    builder.setSourceVolume(sourceVolume)
         .setSourceBucket(sourceBucket);
-    sourceVolume.createBucket(linkBucket, builder.build());
+    OzoneVolume ozoneVolume = objectStore.getVolume(linkVolume);
+    ozoneVolume.createBucket(linkBucket, builder.build());
   }
 }
