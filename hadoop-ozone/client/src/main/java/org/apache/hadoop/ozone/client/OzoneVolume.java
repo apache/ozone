@@ -28,10 +28,14 @@ import java.util.NoSuchElementException;
 
 import org.apache.commons.collections.ListUtils;
 import org.apache.hadoop.hdds.client.OzoneQuota;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.client.io.OzoneInputStream;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -469,6 +473,52 @@ public class OzoneVolume extends WithMetadata {
    */
   public void deleteBucket(String bucketName) throws IOException {
     proxy.deleteBucket(name, bucketName);
+  }
+  public OzoneKey headObject(String bucketName, String key) throws IOException {
+    return proxy.headObject(name, bucketName, key);
+  }
+
+  public OzoneKeyDetails getKey(String bucketName, String key)
+      throws IOException {
+    return proxy.getKeyDetails(name, bucketName, key);
+  }
+
+  public OzoneInputStream readKey(String bucketName, String key)
+      throws IOException {
+    return proxy.getKey(name, bucketName, key);
+  }
+
+  public void abortMultipartUpload(String bucketName, String key,
+                                   String uploadID) throws IOException {
+    proxy.abortMultipartUpload(this.name, bucketName, key, uploadID);
+  }
+
+  public void deleteKey(String bucketName, String key)
+      throws IOException {
+    proxy.deleteKey(name, bucketName, key, false);
+  }
+
+  public OzoneOutputStream createMultipartKey(String bucketName, String key,
+                                              long size, int partNumber,
+                                              String uploadID)
+      throws IOException {
+    return proxy.createMultipartKey(name, bucketName, key, size, partNumber,
+        uploadID);
+  }
+
+  public OzoneOutputStream createKey(String bucketName, String key, long size,
+                                     ReplicationConfig replicationConfig,
+                                     Map<String, String> keyMetadata)
+      throws IOException {
+    return proxy
+        .createKey(name, bucketName, key, size, replicationConfig, keyMetadata);
+  }
+
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(
+      String bucketName, String key, String uploadID,
+      Map<Integer, String> partsMap) throws IOException {
+    return proxy.completeMultipartUpload(name, bucketName, key, uploadID,
+        partsMap);
   }
 
   public long getRefCount() {

@@ -1976,8 +1976,8 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneKey headObject(String volumeName, String bucketName,
       String keyName) throws IOException {
-    Preconditions.checkNotNull(volumeName);
-    Preconditions.checkNotNull(bucketName);
+    verifyBucketName(volumeName);
+    verifyBucketName(bucketName);
     Preconditions.checkNotNull(keyName);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)

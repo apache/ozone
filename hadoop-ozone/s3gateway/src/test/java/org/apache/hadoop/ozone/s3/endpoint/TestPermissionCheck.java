@@ -246,8 +246,8 @@ public class TestPermissionCheck {
    */
   @Test
   public void testGetKey() throws IOException {
-    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).getKey(anyString());
+    Mockito.when(objectStore.getS3Volume()).thenReturn(volume);
+    doThrow(exception).when(volume).getKey(anyString(), anyString());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
@@ -266,9 +266,10 @@ public class TestPermissionCheck {
 
   @Test
   public void testPutKey() throws IOException {
-    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket)
-        .createKey(anyString(), anyLong(), any(), any());
+    Mockito.when(objectStore.getS3Volume()).thenReturn(volume);
+    when(volume.getBucket("bucketName")).thenReturn(bucket);
+    doThrow(exception).when(volume)
+        .createKey(anyString(), anyString(), anyLong(), any(), any());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
@@ -285,8 +286,8 @@ public class TestPermissionCheck {
 
   @Test
   public void testDeleteKey() throws IOException {
-    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).deleteKey(anyString());
+    Mockito.when(objectStore.getS3Volume()).thenReturn(volume);
+    doThrow(exception).when(volume).deleteKey(anyString(), anyString());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
