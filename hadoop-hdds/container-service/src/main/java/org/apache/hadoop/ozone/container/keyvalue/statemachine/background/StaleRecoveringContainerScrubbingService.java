@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,9 +84,8 @@ public class StaleRecoveringContainerScrubbingService
 
     @Override
     public BackgroundTaskResult call() throws Exception {
-      Container<?> container = containerSet.getContainer(containerID);
+      containerSet.getContainer(containerID).delete();
       containerSet.removeContainer(containerID);
-      container.delete();
       LOG.info("Delete stale recovering container {}", containerID);
       return new BackgroundTaskResult.EmptyTaskResult();
     }

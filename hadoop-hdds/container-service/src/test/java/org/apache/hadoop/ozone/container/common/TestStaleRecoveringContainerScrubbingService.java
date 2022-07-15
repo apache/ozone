@@ -100,10 +100,13 @@ public class TestStaleRecoveringContainerScrubbingService {
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, volumeDir.getAbsolutePath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, volumeDir.getAbsolutePath());
     datanodeUuid = UUID.randomUUID().toString();
+    clusterID = UUID.randomUUID().toString();
     hddsVolume = new HddsVolume.Builder(volumeDir.getAbsolutePath())
         .conf(conf).datanodeUuid(datanodeUuid).clusterID(clusterID).build();
+    hddsVolume.format(clusterID);
+    hddsVolume.createWorkingDir(clusterID, null);
     volumeSet = mock(MutableVolumeSet.class);
-    clusterID = UUID.randomUUID().toString();
+
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
     Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume);
@@ -142,7 +145,6 @@ public class TestStaleRecoveringContainerScrubbingService {
   @Test
   public void testScrubbingStaleRecoveringContainers()
       throws Exception {
-
     ContainerSet containerSet = new ContainerSet(10);
     containerSet.setClock(testClock);
     StaleRecoveringContainerScrubbingService srcss =
