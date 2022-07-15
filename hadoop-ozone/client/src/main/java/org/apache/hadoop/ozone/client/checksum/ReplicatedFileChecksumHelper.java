@@ -171,8 +171,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
       throws IOException {
     AbstractBlockChecksumComputer blockChecksumComputer =
         new ReplicatedBlockChecksumComputer(chunkInfoList);
-    // TODO: support composite CRC
-    blockChecksumComputer.compute();
+    blockChecksumComputer.compute(getCombineMode());
 
     return blockChecksumComputer.getOutByteBuffer();
   }
