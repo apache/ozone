@@ -125,8 +125,15 @@ public class TestECUnderReplicationHandler {
         .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5));
-    testUnderReplicationWithMissingIndexes(Lists.emptyList(), availableReplicas,
-        1, policy);
+    Map<DatanodeDetails, SCMCommand<?>> cmds =
+        testUnderReplicationWithMissingIndexes(
+            Lists.emptyList(), availableReplicas, 1, policy);
+    Assert.assertEquals(1, cmds.size());
+    // Check the replicate command has index 1 set
+    ReplicateContainerCommand cmd = (ReplicateContainerCommand) cmds.values()
+        .iterator().next();
+    Assert.assertEquals(1, cmd.getReplicaIndex());
+
   }
 
   @Test
@@ -164,7 +171,8 @@ public class TestECUnderReplicationHandler {
 
   }
 
-  public void testUnderReplicationWithMissingIndexes(
+  public Map<DatanodeDetails, SCMCommand<?>>
+      testUnderReplicationWithMissingIndexes(
       List<Integer> missingIndexes, Set<ContainerReplica> availableReplicas,
       int decomIndexes, PlacementPolicy placementPolicy) throws IOException {
     ECUnderReplicationHandler ecURH =
@@ -204,5 +212,6 @@ public class TestECUnderReplicationHandler {
     Assert.assertEquals(decomIndexes, replicateCommand);
     Assert.assertEquals(shouldReconstructCommandExist ? 1 : 0,
         reconstructCommand);
+    return datanodeDetailsSCMCommandMap;
   }
 }

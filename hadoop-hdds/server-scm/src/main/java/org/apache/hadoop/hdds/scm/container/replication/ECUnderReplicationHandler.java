@@ -202,6 +202,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
             final ReplicateContainerCommand replicateCommand =
                 new ReplicateContainerCommand(id.getProtobuf().getId(),
                     ImmutableList.of(decommissioningSrcNode));
+            // For EC containers, we need to track the replica index which is
+            // to be replicated, so add it to the command.
+            replicateCommand.setReplicaIndex(replica.getReplicaIndex());
             DatanodeDetails target = iterator.next();
             commands.put(target, replicateCommand);
           }
