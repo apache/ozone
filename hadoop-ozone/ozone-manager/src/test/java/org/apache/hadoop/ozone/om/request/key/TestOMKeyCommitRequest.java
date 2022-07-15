@@ -294,10 +294,11 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OmBucketInfo.Builder bucketBuilder = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
+        .setBucketLayout(omKeyCommitRequest.getBucketLayout())
         .setQuotaInBytes(0L);
     OMRequestTestUtils.addBucketToDB(omMetadataManager, bucketBuilder);
 
-    String ozoneKey = addKeyToOpenKeyTable(allocatedLocationList);
+    addKeyToOpenKeyTable(allocatedLocationList);
 
     OMClientResponse omClientResponse =
         omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
