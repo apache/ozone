@@ -105,6 +105,8 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
+    .ContainerDataProto.State.RECOVERING;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
@@ -989,8 +991,14 @@ public class KeyValueHandler extends Handler {
       throws IOException {
     container.writeLock();
     try {
+      ContainerProtos.ContainerDataProto.State state =
+          container.getContainerState();
       // Move the container to CLOSING state only if it's OPEN/RECOVERING
-      if (HddsUtils.isOpenToWriteState(container.getContainerState())) {
+      if (HddsUtils.isOpenToWriteState(state)) {
+        if (state == RECOVERING) {
+          containerSet.removeRecoveringContainer(
+              container.getContainerData().getContainerID());
+        }
         container.markContainerForClose();
         sendICR(container);
       }
