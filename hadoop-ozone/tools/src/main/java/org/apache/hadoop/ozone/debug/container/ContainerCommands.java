@@ -46,8 +46,8 @@ import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Spec;
 
 import java.io.File;
@@ -108,7 +108,7 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
   public void loadContainersFromVolumes() throws IOException {
     OzoneConfiguration conf = parent.getOzoneConf();
 
-    ContainerSet containerSet = new ContainerSet();
+    ContainerSet containerSet = new ContainerSet(1000);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 

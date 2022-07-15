@@ -105,7 +105,7 @@ public class TestContainerReader {
 
     File volumeDir = tempDir.newFolder();
     volumeSet = Mockito.mock(MutableVolumeSet.class);
-    containerSet = new ContainerSet();
+    containerSet = new ContainerSet(1000);
 
     datanodeId = UUID.randomUUID();
     hddsVolume = new HddsVolume.Builder(volumeDir
@@ -261,7 +261,7 @@ public class TestContainerReader {
   public void testContainerReaderWithLoadException() throws Exception {
     MutableVolumeSet volumeSet1;
     HddsVolume hddsVolume1;
-    ContainerSet containerSet1 = new ContainerSet();
+    ContainerSet containerSet1 = new ContainerSet(1000);
     File volumeDir1 = tempDir.newFolder();
     RoundRobinVolumeChoosingPolicy volumeChoosingPolicy1;
 

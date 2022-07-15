@@ -24,15 +24,17 @@ import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -55,8 +57,30 @@ public class ContainerSet {
       ConcurrentSkipListMap<>();
   private final ConcurrentSkipListSet<Long> missingContainerSet =
       new ConcurrentSkipListSet<>();
-  private final ConcurrentSkipListMap<Date, Long> recoveringContainerMap =
+  private final ConcurrentSkipListMap<Long, Long> recoveringContainerMap =
       new ConcurrentSkipListMap<>();
+  private Clock clock;
+  private long recoveringTimeout;
+
+  public ContainerSet(long recoveringTimeout) {
+    this.clock = new MonotonicClock(ZoneOffset.UTC);
+    this.recoveringTimeout = recoveringTimeout;
+  }
+
+  public long getCurrentTime() {
+    return clock.millis();
+  }
+
+  @VisibleForTesting
+  public void setClock(Clock clock) {
+    this.clock = clock;
+  }
+
+  @VisibleForTesting
+  public void setRecoveringTimeout(long recoveringTimeout) {
+    this.recoveringTimeout = recoveringTimeout;
+  }
+
   /**
    * Add Container to container map.
    * @param container container to be added
@@ -76,7 +100,8 @@ public class ContainerSet {
       // wish we could have done this from ContainerData.setState
       container.getContainerData().commitSpace();
       if (container.getContainerData().getState() == RECOVERING) {
-        recoveringContainerMap.put(new Date(), containerId);
+        recoveringContainerMap.put(
+            clock.millis() + recoveringTimeout, containerId);
       }
       return true;
     } else {
@@ -135,9 +160,9 @@ public class ContainerSet {
     // 2 closing container is not a sort of urgent action
     //
     // we can revisit here if any performance problem happens
-    Iterator<Map.Entry<Date, Long>> it = getRecoveringContainerIterator();
+    Iterator<Map.Entry<Long, Long>> it = getRecoveringContainerIterator();
     while (it.hasNext()) {
-      Map.Entry<Date, Long> entry = it.next();
+      Map.Entry<Long, Long> entry = it.next();
       if (entry.getValue() == containerId) {
         it.remove();
         return true;
@@ -185,7 +210,7 @@ public class ContainerSet {
    * {@link ContainerSet#recoveringContainerMap}.
    * @return {@literal Iterator<Container<?>>}
    */
-  public Iterator<Map.Entry<Date, Long>> getRecoveringContainerIterator() {
+  public Iterator<Map.Entry<Long, Long>> getRecoveringContainerIterator() {
     return recoveringContainerMap.entrySet().iterator();
   }
 
@@ -344,6 +369,5 @@ public class ContainerSet {
         }
       }
     });
-
   }
 }

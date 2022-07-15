@@ -172,7 +172,7 @@ public class TestSecureContainerServer {
 
   private static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf) throws IOException {
-    ContainerSet containerSet = new ContainerSet();
+    ContainerSet containerSet = new ContainerSet(1000);
     conf.set(HDDS_DATANODE_DIR_KEY,
         Paths.get(TEST_DIR, "dfs", "data", "hdds",
             RandomStringUtils.randomAlphabetic(4)).toString());
@@ -221,7 +221,7 @@ public class TestSecureContainerServer {
     final ContainerDispatcher dispatcher = createDispatcher(dn,
         UUID.randomUUID(), conf);
     return XceiverServerRatis.newXceiverServerRatis(dn, conf, dispatcher,
-        new ContainerController(new ContainerSet(), Maps.newHashMap()),
+        new ContainerController(new ContainerSet(1000), Maps.newHashMap()),
         caClient, null);
   }
 

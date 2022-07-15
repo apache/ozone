@@ -146,7 +146,7 @@ public class DatanodeConfiguration {
   private long blockDeletionInterval = Duration.ofSeconds(60).toMillis();
 
   @Config(key = "recovering.container.scrubbing.service.interval",
-      defaultValue = "10m",
+      defaultValue = "1m",
       type = ConfigType.TIME,
       tags = { ConfigTag.SCM, ConfigTag.DELETION },
       description =
