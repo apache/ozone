@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
 
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotInfoEntry;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotStatusProto;
 
 import org.apache.hadoop.util.Time;
@@ -37,6 +37,8 @@ public class TestOmSnapshotInfo {
 
   private static final String SNAPSHOT_ID = UUID.randomUUID().toString();
   private static final String NAME = "snapshot1";
+  private static final String VOLUME_NAME = "vol1";
+  private static final String BUCKET_NAME = "bucket1";
   private static final SnapshotStatus SNAPSHOT_STATUS =
       SnapshotStatus.SNAPSHOT_ACTIVE;
   private static final long CREATION_TIME = Time.now();
@@ -52,6 +54,8 @@ public class TestOmSnapshotInfo {
     return new SnapshotInfo.Builder()
         .setSnapshotID(SNAPSHOT_ID)
         .setName(NAME)
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
         .setSnapshotStatus(SNAPSHOT_STATUS)
         .setCreationTime(CREATION_TIME)
         .setDeletionTime(DELETION_TIME)
@@ -62,10 +66,12 @@ public class TestOmSnapshotInfo {
         .build();
   }
 
-  private SnapshotInfoEntry createSnapshotInfoProto() {
-    return SnapshotInfoEntry.newBuilder()
+  private OzoneManagerProtocolProtos.SnapshotInfo createSnapshotInfoProto() {
+    return OzoneManagerProtocolProtos.SnapshotInfo.newBuilder()
         .setSnapshotID(SNAPSHOT_ID)
         .setName(NAME)
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
         .setSnapshotStatus(SnapshotStatusProto.SNAPSHOT_ACTIVE)
         .setCreationTime(CREATION_TIME)
         .setDeletionTime(DELETION_TIME)
@@ -78,7 +84,8 @@ public class TestOmSnapshotInfo {
 
   @Test
   public void testSnapshotStatusProtoToObject() {
-    SnapshotInfoEntry snapshotInfoEntry = createSnapshotInfoProto();
+    OzoneManagerProtocolProtos.SnapshotInfo snapshotInfoEntry =
+        createSnapshotInfoProto();
     Assert.assertEquals(SNAPSHOT_STATUS,
         SnapshotStatus.valueOf(snapshotInfoEntry.getSnapshotStatus()));
   }
@@ -86,13 +93,19 @@ public class TestOmSnapshotInfo {
   @Test
   public void testSnapshotInfoToProto() {
     SnapshotInfo snapshotInfo = createSnapshotInfo();
-    SnapshotInfoEntry snapshotInfoEntryExpected = createSnapshotInfoProto();
+    OzoneManagerProtocolProtos.SnapshotInfo snapshotInfoEntryExpected =
+        createSnapshotInfoProto();
 
-    SnapshotInfoEntry snapshotInfoEntryActual = snapshotInfo.getProtobuf();
+    OzoneManagerProtocolProtos.SnapshotInfo snapshotInfoEntryActual =
+        snapshotInfo.getProtobuf();
     Assert.assertEquals(snapshotInfoEntryExpected.getSnapshotID(),
         snapshotInfoEntryActual.getSnapshotID());
     Assert.assertEquals(snapshotInfoEntryExpected.getName(),
         snapshotInfoEntryActual.getName());
+    Assert.assertEquals(snapshotInfoEntryExpected.getVolumeName(),
+        snapshotInfoEntryActual.getVolumeName());
+    Assert.assertEquals(snapshotInfoEntryExpected.getBucketName(),
+        snapshotInfoEntryActual.getBucketName());
     Assert.assertEquals(snapshotInfoEntryExpected.getSnapshotStatus(),
         snapshotInfoEntryActual.getSnapshotStatus());
 
@@ -101,7 +114,8 @@ public class TestOmSnapshotInfo {
   @Test
   public void testSnapshotInfoProtoToSnapshotInfo() {
     SnapshotInfo snapshotInfoExpected = createSnapshotInfo();
-    SnapshotInfoEntry snapshotInfoEntry = createSnapshotInfoProto();
+    OzoneManagerProtocolProtos.SnapshotInfo snapshotInfoEntry =
+        createSnapshotInfoProto();
 
     SnapshotInfo snapshotInfoActual = SnapshotInfo
         .getFromProtobuf(snapshotInfoEntry);
@@ -109,6 +123,10 @@ public class TestOmSnapshotInfo {
         snapshotInfoActual.getSnapshotID());
     Assert.assertEquals(snapshotInfoExpected.getName(),
         snapshotInfoActual.getName());
+    Assert.assertEquals(snapshotInfoExpected.getVolumeName(),
+        snapshotInfoActual.getVolumeName());
+    Assert.assertEquals(snapshotInfoExpected.getBucketName(),
+        snapshotInfoActual.getBucketName());
     Assert.assertEquals(snapshotInfoExpected.getSnapshotStatus(),
         snapshotInfoActual.getSnapshotStatus());
 

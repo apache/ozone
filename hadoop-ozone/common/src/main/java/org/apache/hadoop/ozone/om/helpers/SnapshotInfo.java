@@ -18,7 +18,7 @@ package org.apache.hadoop.ozone.om.helpers;
  *  limitations under the License.
  */
 
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotInfoEntry;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotStatusProto;
 
 import com.google.common.base.Preconditions;
@@ -75,6 +75,8 @@ public final class SnapshotInfo {
 
   private final String snapshotID;  // UUID
   private String name;
+  private String volumeName;
+  private String bucketName;
   private SnapshotStatus snapshotStatus;
   private final long creationTime;
   private long deletionTime;
@@ -87,6 +89,8 @@ public final class SnapshotInfo {
    * Private constructor, constructed via builder.
    * @param snapshotID - Snapshot UUID.
    * @param name - snapshot name.
+   * @param volumeName - volume name.
+   * @param bucketName - bucket name.
    * @param snapshotStatus - status: SNAPSHOT_ACTIVE, SNAPSHOT_DELETED,
    *                      SNAPSHOT_RECLAIMED
    * @param creationTime - Snapshot creation time.
@@ -99,6 +103,8 @@ public final class SnapshotInfo {
   @SuppressWarnings("checkstyle:ParameterNumber")
   private SnapshotInfo(String snapshotID,
                        String name,
+                       String volumeName,
+                       String bucketName,
                        SnapshotStatus snapshotStatus,
                        long creationTime,
                        long deletionTime,
@@ -108,6 +114,8 @@ public final class SnapshotInfo {
                        String checkpointDir) {
     this.snapshotID = snapshotID;
     this.name = name;
+    this.volumeName = volumeName;
+    this.bucketName = bucketName;
     this.snapshotStatus = snapshotStatus;
     this.creationTime = creationTime;
     this.deletionTime = deletionTime;
@@ -119,6 +127,14 @@ public final class SnapshotInfo {
 
   public void setName(String name) {
     this.name = name;
+  }
+
+  public void setVolumeName(String volumeName) {
+    this.volumeName = volumeName;
+  }
+
+  public void setBucketName(String bucketName) {
+    this.bucketName = bucketName;
   }
 
   public void setSnapshotStatus(SnapshotStatus snapshotStatus) {
@@ -153,6 +169,14 @@ public final class SnapshotInfo {
     return name;
   }
 
+  public String getVolumeName() {
+    return volumeName;
+  }
+
+  public String getBucketName() {
+    return bucketName;
+  }
+
   public SnapshotStatus getSnapshotStatus() {
     return snapshotStatus;
   }
@@ -181,13 +205,17 @@ public final class SnapshotInfo {
     return checkpointDir;
   }
 
-  public static SnapshotInfo.Builder newBuilder() {
-    return new SnapshotInfo.Builder();
+  public static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.Builder
+      newBuilder() {
+    return new org.apache.hadoop.ozone.om.helpers.SnapshotInfo.Builder();
   }
 
   public SnapshotInfo.Builder toBuilder() {
     return new SnapshotInfo.Builder()
         .setSnapshotID(snapshotID)
+        .setName(name)
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
         .setSnapshotStatus(snapshotStatus)
         .setCreationTime(creationTime)
         .setDeletionTime(deletionTime)
@@ -203,6 +231,8 @@ public final class SnapshotInfo {
   public static class Builder {
     private String snapshotID;
     private String name;
+    private String volumeName;
+    private String bucketName;
     private SnapshotStatus snapshotStatus;
     private long creationTime;
     private long deletionTime;
@@ -223,6 +253,16 @@ public final class SnapshotInfo {
 
     public Builder setName(String name) {
       this.name = name;
+      return this;
+    }
+
+    public Builder setVolumeName(String volumeName) {
+      this.volumeName = volumeName;
+      return this;
+    }
+
+    public Builder setBucketName(String bucketName) {
+      this.bucketName = bucketName;
       return this;
     }
 
@@ -267,6 +307,8 @@ public final class SnapshotInfo {
       return new SnapshotInfo(
           snapshotID,
           name,
+          volumeName,
+          bucketName,
           snapshotStatus,
           creationTime,
           deletionTime,
@@ -279,12 +321,15 @@ public final class SnapshotInfo {
   }
 
   /**
-   * Creates SnapshotInfo protobuf from OmBucketInfo.
+   * Creates SnapshotInfo protobuf from SnapshotInfo.
    */
-  public SnapshotInfoEntry getProtobuf() {
-    SnapshotInfoEntry.Builder sib = SnapshotInfoEntry.newBuilder()
+  public OzoneManagerProtocolProtos.SnapshotInfo getProtobuf() {
+    OzoneManagerProtocolProtos.SnapshotInfo.Builder sib =
+        OzoneManagerProtocolProtos.SnapshotInfo.newBuilder()
         .setSnapshotID(snapshotID)
         .setName(name)
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
         .setSnapshotStatus(snapshotStatus.toProto())
         .setCreationTime(creationTime)
         .setDeletionTime(deletionTime)
@@ -296,25 +341,27 @@ public final class SnapshotInfo {
   }
 
   /**
-   * Parses SnapshotInfoEntry protobuf and creates SnapshotInfo.
-   * @param snapshotInfoEntry
+   * Parses SnapshotInfo protobuf and creates SnapshotInfo.
+   * @param snapshotInfo protobuf
    * @return instance of SnapshotInfo
    */
   public static SnapshotInfo getFromProtobuf(
-      SnapshotInfoEntry snapshotInfoEntry) {
+      OzoneManagerProtocolProtos.SnapshotInfo snapshotInfoProto) {
     SnapshotInfo.Builder osib = SnapshotInfo.newBuilder()
-        .setSnapshotID(snapshotInfoEntry.getSnapshotID())
-        .setName(snapshotInfoEntry.getName())
-        .setSnapshotStatus(SnapshotStatus.valueOf(snapshotInfoEntry
+        .setSnapshotID(snapshotInfoProto.getSnapshotID())
+        .setName(snapshotInfoProto.getName())
+        .setVolumeName(snapshotInfoProto.getVolumeName())
+        .setBucketName(snapshotInfoProto.getBucketName())
+        .setSnapshotStatus(SnapshotStatus.valueOf(snapshotInfoProto
             .getSnapshotStatus()))
-        .setCreationTime(snapshotInfoEntry.getCreationTime())
-        .setDeletionTime(snapshotInfoEntry.getDeletionTime())
-        .setPathPreviousSnapshotID(snapshotInfoEntry.
+        .setCreationTime(snapshotInfoProto.getCreationTime())
+        .setDeletionTime(snapshotInfoProto.getDeletionTime())
+        .setPathPreviousSnapshotID(snapshotInfoProto.
             getPathPreviousSnapshotID())
-        .setGlobalPreviousSnapshotID(snapshotInfoEntry.
+        .setGlobalPreviousSnapshotID(snapshotInfoProto.
             getGlobalPreviousSnapshotID())
-        .setSnapshotPath(snapshotInfoEntry.getSnapshotPath())
-        .setCheckpointDir(snapshotInfoEntry.getCheckpointDir());
+        .setSnapshotPath(snapshotInfoProto.getSnapshotPath())
+        .setCheckpointDir(snapshotInfoProto.getCheckpointDir());
 
     return osib.build();
   }

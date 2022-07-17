@@ -60,6 +60,8 @@ public class TestSnapshotInfo {
     return new SnapshotInfo.Builder()
         .setSnapshotID(EXPECTED_SNAPSHOT_ID)
         .setName("snapshot1")
+        .setVolumeName("vol1")
+        .setBucketName("bucket1")
         .setSnapshotStatus(SnapshotStatus.SNAPSHOT_ACTIVE)
         .setCreationTime(Time.now())
         .setDeletionTime(-1L)

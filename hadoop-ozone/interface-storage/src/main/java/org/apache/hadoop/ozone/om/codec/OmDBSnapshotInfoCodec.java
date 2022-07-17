@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.om.codec;
 
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotInfoEntry;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +47,7 @@ public class OmDBSnapshotInfoCodec implements Codec<SnapshotInfo> {
     checkNotNull(rawData, "Null byte array can't be converted to " +
         "real object.");
     return SnapshotInfo.getFromProtobuf(
-        SnapshotInfoEntry.parseFrom(rawData));
+        OzoneManagerProtocolProtos.SnapshotInfo.parseFrom(rawData));
   }
 
   @Override
