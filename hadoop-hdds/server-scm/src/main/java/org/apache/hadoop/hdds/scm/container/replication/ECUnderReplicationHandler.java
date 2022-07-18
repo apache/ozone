@@ -81,14 +81,17 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
    * @param remainingMaintenanceRedundancy - represents that how many nodes go
    *                                      into maintenance.
    * @return Returns the key value pair of destination dn where the command gets
-   * executed and the command itself.
+   * executed and the command itself. If an empty list is returned, it indicates
+   * the container is no longer unhealthy and can be removed from the unhealthy
+   * queue. Any exception indicates that the container is still unhealthy and
+   * should be retried later.
    */
   @Override
   public Map<DatanodeDetails, SCMCommand<?>> processAndCreateCommands(
       final Set<ContainerReplica> replicas,
       final List<ContainerReplicaOp> pendingOps,
       final ContainerHealthResult result,
-      final int remainingMaintenanceRedundancy) {
+      final int remainingMaintenanceRedundancy) throws IOException {
     ContainerInfo container = result.getContainerInfo();
     ECReplicationConfig repConfig =
         (ECReplicationConfig) container.getReplicationConfig();
@@ -199,6 +202,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
             final ReplicateContainerCommand replicateCommand =
                 new ReplicateContainerCommand(id.getProtobuf().getId(),
                     ImmutableList.of(decommissioningSrcNode));
+            // For EC containers, we need to track the replica index which is
+            // to be replicated, so add it to the command.
+            replicateCommand.setReplicaIndex(replica.getReplicaIndex());
             DatanodeDetails target = iterator.next();
             commands.put(target, replicateCommand);
           }
@@ -208,6 +214,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       LOG.warn("Exception while processing for creating the EC reconstruction" +
               " container commands for {}.",
           id, ex);
+      throw ex;
     }
     return commands;
   }
