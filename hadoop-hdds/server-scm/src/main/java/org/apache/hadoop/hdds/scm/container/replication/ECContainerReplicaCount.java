@@ -15,10 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.container;
+package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -58,7 +60,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
  *   * Maintenance copies are not considered until they are back to IN_SERVICE
  */
 
-public class ECContainerReplicaCount {
+public class ECContainerReplicaCount implements ContainerReplicaCount {
 
   private final ContainerInfo containerInfo;
   private final ECReplicationConfig repConfig;
@@ -68,16 +70,27 @@ public class ECContainerReplicaCount {
   private final Map<Integer, Integer> healthyIndexes = new HashMap<>();
   private final Map<Integer, Integer> decommissionIndexes = new HashMap<>();
   private final Map<Integer, Integer> maintenanceIndexes = new HashMap<>();
+  private final Set<ContainerReplica> replicas;
 
   public ECContainerReplicaCount(ContainerInfo containerInfo,
-      Set<ContainerReplica> replicas, List<Integer> indexesPendingAdd,
-      List<Integer> indexesPendingDelete, int remainingMaintenanceRedundancy) {
+      Set<ContainerReplica> replicas,
+      List<ContainerReplicaOp> replicaPendingOps,
+      int remainingMaintenanceRedundancy) {
     this.containerInfo = containerInfo;
+    this.replicas = replicas;
     this.repConfig = (ECReplicationConfig)containerInfo.getReplicationConfig();
-    this.pendingAdd = indexesPendingAdd;
-    this.pendingDelete = indexesPendingDelete;
+    this.pendingAdd = new ArrayList<>();
+    this.pendingDelete = new ArrayList<>();
     this.remainingMaintenanceRedundancy
         = Math.min(repConfig.getParity(), remainingMaintenanceRedundancy);
+
+    for (ContainerReplicaOp op : replicaPendingOps) {
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+        pendingAdd.add(op.getReplicaIndex());
+      } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+        pendingDelete.add(op.getReplicaIndex());
+      }
+    }
 
     for (ContainerReplica replica : replicas) {
       HddsProtos.NodeOperationalState state =
@@ -98,7 +111,7 @@ public class ECContainerReplicaCount {
     // Remove the pending delete replicas from the healthy set as we assume they
     // will eventually be removed and reduce the count for this replica. If the
     // count goes to zero, remove it from the map.
-    for (Integer i : indexesPendingDelete) {
+    for (Integer i : pendingDelete) {
       ensureIndexWithinBounds(i, "pendingDelete");
       Integer count = healthyIndexes.get(i);
       if (count != null) {
@@ -116,6 +129,26 @@ public class ECContainerReplicaCount {
     }
   }
 
+  @Override
+  public ContainerInfo getContainer() {
+    return containerInfo;
+  }
+
+  @Override
+  public Set<ContainerReplica> getReplicas() {
+    return replicas;
+  }
+
+  @Override
+  public int getDecommissionCount() {
+    return decommissionIndexes.size();
+  }
+
+  @Override
+  public int getMaintenanceCount() {
+    return maintenanceIndexes.size();
+  }
+
   /**
    * Get a set containing all decommissioning indexes, or an empty set if none
    * are decommissioning. Note it is possible for an index to be
@@ -125,6 +158,31 @@ public class ECContainerReplicaCount {
    */
   public Set<Integer> decommissioningIndexes() {
     return decommissionIndexes.keySet();
+  }
+
+  /**
+   * Get a set containing all decommissioning only indexes, or an empty set if
+   * none are decommissioning.
+   * @param includePendingAdd - removes the indexes from
+   *                         decommissioningOnlyIndexes if we already scheduled
+   *                         for reconstruction before.
+   * @return Set of indexes in decommission only.
+   */
+  public Set<Integer> decommissioningOnlyIndexes(boolean includePendingAdd) {
+    Set<Integer> decommissioningOnlyIndexes = new HashSet<>();
+    for (Integer i : decommissionIndexes.keySet()) {
+      if (!healthyIndexes.containsKey(i)) {
+        decommissioningOnlyIndexes.add(i);
+      }
+    }
+    // Now we have a list of decommissionIndexes. Remove any pending add as they
+    // should eventually recover.
+    if (includePendingAdd) {
+      for (Integer i : pendingAdd) {
+        decommissioningOnlyIndexes.remove(i);
+      }
+    }
+    return decommissioningOnlyIndexes;
   }
 
   /**
@@ -143,7 +201,8 @@ public class ECContainerReplicaCount {
    * Ie, less than EC Datanum containers are present.
    * @return True if the container cannot be recovered, false otherwise.
    */
-  public boolean unRecoverable() {
+  @Override
+  public boolean isUnrecoverable() {
     Set<Integer> distinct = new HashSet<>();
     distinct.addAll(healthyIndexes.keySet());
     distinct.addAll(decommissionIndexes.keySet());
@@ -251,6 +310,11 @@ public class ECContainerReplicaCount {
     return false;
   }
 
+  @Override
+  public boolean isOverReplicated() {
+    return isOverReplicated(false);
+  }
+
   /**
    * Return an unsorted list of any replica indexes which have more than one
    * replica and are therefore over-replicated. Maintenance replicas are ignored
@@ -267,8 +331,8 @@ public class ECContainerReplicaCount {
    * @return List of indexes which are over-replicated.
    */
   public List<Integer> overReplicatedIndexes(boolean includePendingDelete) {
-    final Map<Integer, Integer> availableIndexes
-        = getHealthyWithDelete(includePendingDelete);
+    final Map<Integer, Integer> availableIndexes =
+        getHealthyWithDelete(includePendingDelete);
     List<Integer> indexes = new ArrayList<>();
     for (Map.Entry<Integer, Integer> entry : availableIndexes.entrySet()) {
       if (entry.getValue() > 1) {
@@ -324,6 +388,11 @@ public class ECContainerReplicaCount {
         >= repConfig.getData() + remainingMaintenanceRedundancy;
   }
 
+  @Override
+  public boolean isSufficientlyReplicated() {
+    return isSufficientlyReplicated(false);
+  }
+
   /**
    * Check if there is an entry in the map for all expected replica indexes,
    * and also that the count against each index is greater than zero.
@@ -354,7 +423,8 @@ public class ECContainerReplicaCount {
     if (index < 1 || index > repConfig.getRequiredNodes()) {
       throw new IllegalArgumentException("Replica Index in " + setName
           + " for containerID " + containerInfo.getContainerID()
-          + "must be between 1 and " + repConfig.getRequiredNodes());
+          + "must be between 1 and " + repConfig.getRequiredNodes()
+          + ". But the given index is: " + index);
     }
   }
 }

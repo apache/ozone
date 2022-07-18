@@ -48,6 +48,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Mock CRL Store impl for test.
@@ -97,7 +98,8 @@ public class MockCRLStore implements CRLStore {
   }
 
   public Optional<Long> revokeCert(List<BigInteger> certs,
-                                   Instant revokeTime) throws IOException {
+                                   Instant revokeTime)
+      throws IOException, TimeoutException {
     log.debug("Revoke certs: {}", certs);
     Optional<Long> crlId = scmCertStore.revokeCertificates(certs,
         caCertificateHolder,

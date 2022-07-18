@@ -15,3 +15,4 @@
 
 org.apache.hadoop.hdds.conf.ConfigFileGenerator
 org.apache.ozone.annotations.RequestFeatureValidatorProcessor
+org.apache.ozone.annotations.ReplicateAnnotationProcessor

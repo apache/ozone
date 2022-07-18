@@ -35,6 +35,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 /**
  * This interface allows the DefaultCA to be portable and use different DB
@@ -61,7 +62,8 @@ public interface CertificateStore {
    */
   @Replicate
   void storeValidCertificate(BigInteger serialID,
-      X509Certificate certificate, NodeType role) throws IOException;
+      X509Certificate certificate, NodeType role)
+      throws IOException, TimeoutException;
 
   void storeValidScmCertificate(BigInteger serialID,
       X509Certificate certificate) throws IOException;
@@ -95,7 +97,7 @@ public interface CertificateStore {
                                     CRLReason reason,
                                     Date revocationTime,
                                     CRLApprover approver)
-      throws IOException;
+      throws IOException, TimeoutException;
 
   /**
    * Deletes an expired certificate from the store. Please note: We don't

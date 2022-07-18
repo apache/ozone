@@ -128,8 +128,8 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
             .addCacheEntry(new CacheKey<>(dbKey),
                 new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
-      omClientResponse =
-          onSuccess(omResponse, omKeyInfo, operationResult, isDirectory);
+      omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult,
+          isDirectory, volumeId, bucketId);
       result = Result.SUCCESS;
     } catch (IOException ex) {
       result = Result.FAILURE;
@@ -169,6 +169,7 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
 
   abstract OMClientResponse onSuccess(
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
-      OmKeyInfo omKeyInfo, boolean operationResult, boolean isDirectory);
+      OmKeyInfo omKeyInfo, boolean operationResult, boolean isDirectory,
+      long volumeId, long bucketId);
 
 }

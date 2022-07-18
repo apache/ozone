@@ -199,14 +199,13 @@ public class ObjectEndpoint extends EndpointBase {
             "Connection", "close").build();
       }
 
-      output =
-          bucket.createKey(keyPath, length, replicationConfig, new HashMap<>());
-
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
         body = new SignedChunksInputStream(body);
       }
 
+      output = bucket.createKey(
+          keyPath, length, replicationConfig, new HashMap<>());
       IOUtils.copy(body, output);
 
       getMetrics().incCreateKeySuccess();
@@ -386,7 +385,7 @@ public class ObjectEndpoint extends EndpointBase {
     }
   }
 
-  private void addLastModifiedDate(
+  static void addLastModifiedDate(
       ResponseBuilder responseBuilder, OzoneKey key) {
 
     ZonedDateTime lastModificationTime = key.getModificationTime()
@@ -594,6 +593,10 @@ public class ObjectEndpoint extends EndpointBase {
 
   private ReplicationConfig getReplicationConfig(OzoneBucket ozoneBucket,
       String storageType) throws OS3Exception {
+    if (StringUtils.isEmpty(storageType)) {
+      storageType = S3StorageType.getDefault(ozoneConfiguration).toString();
+    }
+
     ReplicationConfig clientConfiguredReplicationConfig = null;
     String replication = ozoneConfiguration.get(OZONE_REPLICATION);
     if (replication != null) {
@@ -839,6 +842,15 @@ public class ObjectEndpoint extends EndpointBase {
     this.headers = headers;
   }
 
+  static void copy(InputStream src, long srcKeyLen,
+      String destKey, OzoneBucket destBucket,
+      ReplicationConfig replication) throws IOException {
+    try (OzoneOutputStream dest = destBucket.createKey(
+        destKey, srcKeyLen, replication, new HashMap<>())) {
+      IOUtils.copy(src, dest);
+    }
+  }
+
   private CopyObjectResponse copyObject(String copyHeader,
                                         OzoneBucket destBucket,
                                         String destkey,
@@ -850,9 +862,6 @@ public class ObjectEndpoint extends EndpointBase {
 
     String sourceBucket = result.getLeft();
     String sourceKey = result.getRight();
-    OzoneInputStream sourceInputStream = null;
-    OzoneOutputStream destOutputStream = null;
-    boolean closed = false;
     try {
       // Checking whether we trying to copying to it self.
 
@@ -883,25 +892,15 @@ public class ObjectEndpoint extends EndpointBase {
 
 
       OzoneBucket sourceOzoneBucket = getBucket(sourceBucket);
-      OzoneBucket destOzoneBucket = destBucket;
 
       OzoneKeyDetails sourceKeyDetails = sourceOzoneBucket.getKey(sourceKey);
       long sourceKeyLen = sourceKeyDetails.getDataSize();
 
-      sourceInputStream = sourceOzoneBucket.readKey(sourceKey);
+      try (OzoneInputStream src = sourceOzoneBucket.readKey(sourceKey)) {
+        copy(src, sourceKeyLen, destkey, destBucket, replicationConfig);
+      }
 
-      destOutputStream = destOzoneBucket
-          .createKey(destkey, sourceKeyLen, replicationConfig, new HashMap<>());
-
-      IOUtils.copy(sourceInputStream, destOutputStream);
-
-      // Closing here, as if we don't call close this key will not commit in
-      // OM, and getKey fails.
-      sourceInputStream.close();
-      destOutputStream.close();
-      closed = true;
-
-      OzoneKeyDetails destKeyDetails = destOzoneBucket.getKey(destkey);
+      final OzoneKeyDetails destKeyDetails = destBucket.getKey(destkey);
 
       getMetrics().incCopyObjectSuccess();
       CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
@@ -918,15 +917,6 @@ public class ObjectEndpoint extends EndpointBase {
             destBucket + "/" + destkey, ex);
       }
       throw ex;
-    } finally {
-      if (!closed) {
-        if (sourceInputStream != null) {
-          sourceInputStream.close();
-        }
-        if (destOutputStream != null) {
-          destOutputStream.close();
-        }
-      }
     }
   }
 
@@ -991,7 +981,7 @@ public class ObjectEndpoint extends EndpointBase {
     }
   }
 
-  private boolean checkCopySourceModificationTime(Long lastModificationTime,
+  static boolean checkCopySourceModificationTime(Long lastModificationTime,
       String copySourceIfModifiedSinceStr,
       String copySourceIfUnmodifiedSinceStr) {
     long copySourceIfModifiedSince = Long.MIN_VALUE;

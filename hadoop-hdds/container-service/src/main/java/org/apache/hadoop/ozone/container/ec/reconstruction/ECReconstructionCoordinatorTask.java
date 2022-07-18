@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -34,14 +35,18 @@ import java.util.stream.IntStream;
 public class ECReconstructionCoordinatorTask implements Runnable {
   static final Logger LOG =
       LoggerFactory.getLogger(ECReconstructionCoordinatorTask.class);
+  private final ConcurrentHashMap.KeySetView<Object, Boolean> inprogressCounter;
   private ECReconstructionCoordinator reconstructionCoordinator;
   private ECReconstructionCommandInfo reconstructionCommandInfo;
 
   public ECReconstructionCoordinatorTask(
       ECReconstructionCoordinator coordinator,
-      ECReconstructionCommandInfo reconstructionCommandInfo) {
+      ECReconstructionCommandInfo reconstructionCommandInfo,
+      ConcurrentHashMap.KeySetView<Object, Boolean>
+          inprogressReconstructionCoordinatorCounter) {
     this.reconstructionCoordinator = coordinator;
     this.reconstructionCommandInfo = reconstructionCommandInfo;
+    this.inprogressCounter = inprogressReconstructionCoordinatorCounter;
   }
 
   @Override
@@ -58,20 +63,20 @@ public class ECReconstructionCoordinatorTask implements Runnable {
     // 4. Write the recovered chunks to given targets/write locally to
     // respective container. HDDS-6582
     // 5. Close/finalize the recovered containers.
-
-    SortedMap<Integer, DatanodeDetails> sourceNodeMap =
-        reconstructionCommandInfo.getSources().stream().collect(Collectors
-            .toMap(DatanodeDetailsAndReplicaIndex::getReplicaIndex,
-                DatanodeDetailsAndReplicaIndex::getDnDetails, (v1, v2) -> v1,
-                TreeMap::new));
-    SortedMap<Integer, DatanodeDetails> targetNodeMap = IntStream
-        .range(0, reconstructionCommandInfo.getTargetDatanodes().size()).boxed()
-        .collect(Collectors.toMap(i -> (int) reconstructionCommandInfo
-                .getMissingContainerIndexes()[i],
-            i -> reconstructionCommandInfo.getTargetDatanodes().get(i),
-            (v1, v2) -> v1, TreeMap::new));
-
+    long containerID = this.reconstructionCommandInfo.getContainerID();
     try {
+      SortedMap<Integer, DatanodeDetails> sourceNodeMap =
+          reconstructionCommandInfo.getSources().stream().collect(Collectors
+              .toMap(DatanodeDetailsAndReplicaIndex::getReplicaIndex,
+                  DatanodeDetailsAndReplicaIndex::getDnDetails, (v1, v2) -> v1,
+                  TreeMap::new));
+      SortedMap<Integer, DatanodeDetails> targetNodeMap = IntStream
+          .range(0, reconstructionCommandInfo.getTargetDatanodes().size())
+          .boxed().collect(Collectors.toMap(i -> (int) reconstructionCommandInfo
+                  .getMissingContainerIndexes()[i],
+              i -> reconstructionCommandInfo.getTargetDatanodes().get(i),
+              (v1, v2) -> v1, TreeMap::new));
+
       reconstructionCoordinator.reconstructECContainerGroup(
           reconstructionCommandInfo.getContainerID(),
           reconstructionCommandInfo.getEcReplicationConfig(), sourceNodeMap,
@@ -80,6 +85,8 @@ public class ECReconstructionCoordinatorTask implements Runnable {
       LOG.warn(
           "Failed to complete the reconstruction task for the container: "
               + reconstructionCommandInfo.getContainerID(), e);
+    } finally {
+      this.inprogressCounter.remove(containerID);
     }
   }
 

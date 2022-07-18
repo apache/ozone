@@ -32,7 +32,7 @@ public interface Tenant {
    * A tenant is represented by a globally unique tenant name.
    * @return tenant name.
    */
-  String getTenantId();
+  String getTenantName();
 
   /**
    * Return the AccountNameSpace for the Tenant.
@@ -45,15 +45,15 @@ public interface Tenant {
    */
   BucketNameSpace getTenantBucketNameSpace();
 
-  List<AccessPolicy> getTenantAccessPolicies();
+  List<String> getTenantAccessPolicies();
 
-  void addTenantAccessPolicy(AccessPolicy policy);
+  void addTenantAccessPolicy(String policy);
 
-  void removeTenantAccessPolicy(AccessPolicy policy);
+  void removeTenantAccessPolicy(String policy);
 
-  void addTenantAccessRole(String groupID);
+  void addTenantAccessRole(String roleName);
 
-  void removeTenantAccessRole(String groupID);
+  void removeTenantAccessRole(String roleName);
 
   List<String> getTenantRoles();
 }

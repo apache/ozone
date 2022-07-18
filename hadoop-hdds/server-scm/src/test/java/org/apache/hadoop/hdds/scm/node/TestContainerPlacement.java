@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -174,7 +175,7 @@ public class TestContainerPlacement {
   @Test
   @Disabled
   public void testContainerPlacementCapacity() throws IOException,
-      InterruptedException {
+      InterruptedException, TimeoutException {
     final int nodeCount = 4;
     final long capacity = 10L * OzoneConsts.GB;
     final long used = 2L * OzoneConsts.GB;

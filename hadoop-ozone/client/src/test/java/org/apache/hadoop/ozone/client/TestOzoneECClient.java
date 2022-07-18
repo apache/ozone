@@ -384,7 +384,9 @@ public class TestOzoneECClient {
                 keyDetails.getOzoneKeyLocations().get(0).getContainerID())
                 .setLocalID(
                     keyDetails.getOzoneKeyLocations().get(0).getLocalID())
-                .setBlockCommitSequenceId(1).build());
+                .setBlockCommitSequenceId(1).setReplicaIndex(
+                blockList.getKeyLocations(0).getPipeline()
+                    .getMemberReplicaIndexes(i)).build());
 
         List<ContainerProtos.KeyValue> metadataList =
             block.getMetadataList().stream().filter(kv -> kv.getKey()
@@ -560,6 +562,9 @@ public class TestOzoneECClient {
         OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT);
     int dataBlks = 10;
     int parityBlks = 4;
+    MultiNodePipelineBlockAllocator blkAllocator =
+        new MultiNodePipelineBlockAllocator(conf, dataBlks + parityBlks, 14);
+    createNewClient(conf, blkAllocator);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);

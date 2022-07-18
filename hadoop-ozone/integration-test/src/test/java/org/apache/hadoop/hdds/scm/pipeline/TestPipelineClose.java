@@ -115,7 +115,7 @@ public class TestPipelineClose {
 
   @Test
   public void testPipelineCloseWithClosedContainer() throws IOException,
-      InvalidStateTransitionException {
+      InvalidStateTransitionException, TimeoutException {
     Set<ContainerID> set = pipelineManager
         .getContainersInPipeline(ratisContainer.getPipeline().getId());
 
@@ -199,7 +199,8 @@ public class TestPipelineClose {
 
   @Test
   @Flaky("HDDS-5604")
-  public void testPipelineCloseWithLogFailure() throws IOException {
+  public void testPipelineCloseWithLogFailure()
+      throws IOException, TimeoutException {
 
     EventQueue eventQ = (EventQueue) scm.getEventQueue();
     PipelineActionHandler pipelineActionTest =

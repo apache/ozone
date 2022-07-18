@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 
 import java.util.Set;
 
@@ -26,7 +26,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 
 /**
  * Immutable object that is created with a set of ContainerReplica objects and
@@ -35,19 +34,19 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
  * information can be used to determine if the container is over or under
  * replicated and also how many additional replicas need created or removed.
  */
-public class ContainerReplicaCount {
+public class RatisContainerReplicaCount implements ContainerReplicaCount {
 
-  private int healthyCount = 0;
-  private int decommissionCount = 0;
-  private int maintenanceCount = 0;
-  private int inFlightAdd = 0;
-  private int inFlightDel = 0;
-  private int repFactor;
-  private int minHealthyForMaintenance;
-  private ContainerInfo container;
-  private Set<ContainerReplica> replica;
+  private int healthyCount;
+  private int decommissionCount;
+  private int maintenanceCount;
+  private final int inFlightAdd;
+  private final int inFlightDel;
+  private final int repFactor;
+  private final int minHealthyForMaintenance;
+  private final ContainerInfo container;
+  private final Set<ContainerReplica> replica;
 
-  public ContainerReplicaCount(ContainerInfo container,
+  public RatisContainerReplicaCount(ContainerInfo container,
                                Set<ContainerReplica> replica, int inFlightAdd,
                                int inFlightDelete, int replicationFactor,
                                int minHealthyForMaintenance) {
@@ -79,10 +78,12 @@ public class ContainerReplicaCount {
     return healthyCount;
   }
 
+  @Override
   public int getDecommissionCount() {
     return decommissionCount;
   }
 
+  @Override
   public int getMaintenanceCount() {
     return maintenanceCount;
   }
@@ -91,11 +92,13 @@ public class ContainerReplicaCount {
     return repFactor;
   }
 
+  @Override
   public ContainerInfo getContainer() {
     return container;
   }
 
-  public Set<ContainerReplica> getReplica() {
+  @Override
+  public Set<ContainerReplica> getReplicas() {
     return replica;
   }
 
@@ -113,7 +116,7 @@ public class ContainerReplicaCount {
   }
 
   /**
-   * Calculates the the delta of replicas which need to be created or removed
+   * Calculates the delta of replicas which need to be created or removed
    * to ensure the container is correctly replicated when considered inflight
    * adds and deletes.
    *
@@ -238,6 +241,7 @@ public class ContainerReplicaCount {
    * @return True if the container is sufficiently replicated and False
    *         otherwise.
    */
+  @Override
   public boolean isSufficientlyReplicated() {
     return missingReplicas() + inFlightDel <= 0;
   }
@@ -251,33 +255,19 @@ public class ContainerReplicaCount {
    *
    * @return True if the container is over replicated, false otherwise.
    */
+  @Override
   public boolean isOverReplicated() {
     return missingReplicas() + inFlightDel < 0;
   }
 
   /**
-   * Returns true if the container is healthy, meaning all replica which are not
-   * in a decommission or maintenance state are in the same state as the
-   * container and in QUASI_CLOSED or in CLOSED state.
-   *
-   * @return true if the container is healthy, false otherwise
-   */
-  public boolean isHealthy() {
-    return (container.getState() == HddsProtos.LifeCycleState.CLOSED
-        || container.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED)
-        && replica.stream()
-        .filter(r -> r.getDatanodeDetails().getPersistedOpState() == IN_SERVICE)
-        .allMatch(r -> LegacyReplicationManager.compareState(
-            container.getState(), r.getState()));
-  }
-
-  /**
-   * Returns true is there are no replicas of a container available, ie the
-   * set of container replica passed in the constructor has zero entries.
+   * Returns true is there are no replicas of the container available, ie the
+   * set of container replicas has zero entries.
    *
    * @return true if there are no replicas, false otherwise.
    */
-  public boolean isMissing() {
-    return replica.size() == 0;
+  @Override
+  public boolean isUnrecoverable() {
+    return getReplicas().isEmpty();
   }
 }

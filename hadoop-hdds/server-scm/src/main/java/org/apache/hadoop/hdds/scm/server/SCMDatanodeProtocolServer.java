@@ -26,6 +26,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -268,7 +269,7 @@ public class SCMDatanodeProtocolServer implements
 
   @Override
   public SCMHeartbeatResponseProto sendHeartbeat(
-      SCMHeartbeatRequestProto heartbeat) throws IOException {
+      SCMHeartbeatRequestProto heartbeat) throws IOException, TimeoutException {
     List<SCMCommandProto> cmdResponses = new ArrayList<>();
     for (SCMCommand cmd : heartbeatDispatcher.dispatch(heartbeat)) {
       cmdResponses.add(getCommandResponse(cmd));
@@ -305,7 +306,7 @@ public class SCMDatanodeProtocolServer implements
    */
   @VisibleForTesting
   public SCMCommandProto getCommandResponse(SCMCommand cmd)
-      throws IOException {
+      throws IOException, TimeoutException {
     SCMCommandProto.Builder builder = SCMCommandProto.newBuilder()
         .setEncodedToken(cmd.getEncodedToken());
 
@@ -331,6 +332,11 @@ public class SCMDatanodeProtocolServer implements
               .stream()
               .map(tx -> tx.getTxID())
               .collect(Collectors.toList());
+      /*
+       * TODO: Can we avoid this?
+       *   This introduces a Ratis call while processing datanode heartbeat,
+       *   which is not good.
+       */
       scm.getScmBlockManager().getDeletedBlockLog().incrementCount(txs);
       return builder
           .setCommandType(deleteBlocksCommand)

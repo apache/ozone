@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -106,7 +107,8 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
     } catch (NotLeaderException nle) {
       LOG.warn("Skip sending close container command,"
           + " since current SCM is not leader.", nle);
-    } catch (IOException | InvalidStateTransitionException ex) {
+    } catch (IOException | InvalidStateTransitionException |
+             TimeoutException ex) {
       LOG.error("Failed to close the container {}.", containerID, ex);
     }
   }

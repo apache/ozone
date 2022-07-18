@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -304,7 +304,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           if (underReplicated < CONTAINER_DETAILS_LOGGING_LIMIT
               || LOG.isDebugEnabled()) {
             LOG.info("Under Replicated Container {} {}; {}",
-                cid, replicaSet, replicaDetails(replicaSet.getReplica()));
+                cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
           }
           underReplicated++;
         }
@@ -315,7 +315,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           if (unhealthy < CONTAINER_DETAILS_LOGGING_LIMIT
               || LOG.isDebugEnabled()) {
             LOG.info("Unhealthy Container {} {}; {}",
-                cid, replicaSet, replicaDetails(replicaSet.getReplica()));
+                cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
           }
           unhealthy++;
         }

@@ -147,4 +147,7 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
     return partsUnusedList;
   }
 
+  public OmBucketInfo getOmBucketInfo() {
+    return omBucketInfo;
+  }
 }

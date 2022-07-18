@@ -67,7 +67,7 @@ public class ReplicationSupervisorScheduling {
       destinationLocks.put(i, new Object());
     }
 
-    ContainerSet cs = new ContainerSet();
+    ContainerSet cs = new ContainerSet(1000);
 
     ReplicationSupervisor rs = new ReplicationSupervisor(cs,
 

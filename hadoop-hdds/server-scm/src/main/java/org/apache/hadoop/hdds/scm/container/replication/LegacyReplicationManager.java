@@ -34,11 +34,11 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.RatisContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
@@ -86,6 +86,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -492,7 +493,7 @@ public class LegacyReplicationManager {
           return;
         }
 
-        ContainerReplicaCount replicaSet =
+        RatisContainerReplicaCount replicaSet =
             getContainerReplicaCount(container, replicas);
         ContainerPlacementStatus placementStatus = getPlacementStatus(
             replicas, container.getReplicationConfig().getRequiredNodes());
@@ -524,7 +525,7 @@ public class LegacyReplicationManager {
           if (!sufficientlyReplicated) {
             report.incrementAndSample(
                 HealthState.UNDER_REPLICATED, container.containerID());
-            if (replicaSet.isMissing()) {
+            if (replicaSet.isUnrecoverable()) {
               report.incrementAndSample(HealthState.MISSING,
                   container.containerID());
             }
@@ -597,7 +598,7 @@ public class LegacyReplicationManager {
       final InflightMap inflightActions,
       final Predicate<InflightAction> filter,
       final Runnable timeoutCounter,
-      final Consumer<InflightAction> completedCounter) {
+      final Consumer<InflightAction> completedCounter) throws TimeoutException {
     final ContainerID id = container.containerID();
     final long deadline = clock.millis() - rmConf.getEventTimeout();
     inflightActions.iterate(id, a -> updateInflightAction(
@@ -635,6 +636,8 @@ public class LegacyReplicationManager {
       // Should not happen, but if it does, just remove the action as the
       // node somehow does not exist;
       remove = true;
+    } catch (TimeoutException e) {
+      LOG.error("Got exception while updating.", e);
     }
     return remove;
   }
@@ -654,7 +657,7 @@ public class LegacyReplicationManager {
                    final boolean isNotInService,
                    final ContainerInfo container, final DatanodeDetails dn,
                    final boolean isInflightReplication)
-      throws ContainerNotFoundException {
+      throws ContainerNotFoundException, TimeoutException {
     // make sure inflightMove contains the container
     ContainerID id = container.containerID();
 
@@ -743,7 +746,8 @@ public class LegacyReplicationManager {
    */
   public CompletableFuture<MoveResult> move(ContainerID cid,
              DatanodeDetails src, DatanodeDetails tgt)
-      throws ContainerNotFoundException, NodeNotFoundException {
+      throws ContainerNotFoundException, NodeNotFoundException,
+      TimeoutException {
     return move(cid, new MoveDataNodePair(src, tgt));
   }
 
@@ -754,8 +758,8 @@ public class LegacyReplicationManager {
    * @param mp MoveDataNodePair which contains source and target datanodes
    */
   private CompletableFuture<MoveResult> move(ContainerID cid,
-      MoveDataNodePair mp)
-      throws ContainerNotFoundException, NodeNotFoundException {
+      MoveDataNodePair mp) throws ContainerNotFoundException,
+      NodeNotFoundException, TimeoutException {
     CompletableFuture<MoveResult> ret = new CompletableFuture<>();
 
     if (!scmContext.isLeader()) {
@@ -990,9 +994,9 @@ public class LegacyReplicationManager {
    * @return ContainerReplicaCount representing the current state of the
    *         container
    */
-  private ContainerReplicaCount getContainerReplicaCount(
+  private RatisContainerReplicaCount getContainerReplicaCount(
       ContainerInfo container, Set<ContainerReplica> replica) {
-    return new ContainerReplicaCount(
+    return new RatisContainerReplicaCount(
         container,
         replica,
         getInflightAdd(container.containerID()),
@@ -1031,7 +1035,7 @@ public class LegacyReplicationManager {
    */
   private void deleteContainerReplicas(final ContainerInfo container,
       final Set<ContainerReplica> replicas) throws IOException,
-      InvalidStateTransitionException {
+      InvalidStateTransitionException, TimeoutException {
     Preconditions.assertTrue(container.getState() ==
         LifeCycleState.CLOSED);
     Preconditions.assertTrue(container.getNumberOfKeys() == 0);
@@ -1054,7 +1058,7 @@ public class LegacyReplicationManager {
    */
   private void handleContainerUnderDelete(final ContainerInfo container,
       final Set<ContainerReplica> replicas) throws IOException,
-      InvalidStateTransitionException {
+      InvalidStateTransitionException, TimeoutException {
     if (replicas.size() == 0) {
       containerManager.updateContainerState(container.containerID(),
           HddsProtos.LifeCycleEvent.CLEANUP);
@@ -1122,10 +1126,10 @@ public class LegacyReplicationManager {
    *                   current replica count and inflight adds and deletes
    */
   private void handleUnderReplicatedContainer(final ContainerInfo container,
-      final ContainerReplicaCount replicaSet,
+      final RatisContainerReplicaCount replicaSet,
       final ContainerPlacementStatus placementStatus) {
     LOG.debug("Handling under-replicated container: {}", container);
-    Set<ContainerReplica> replicas = replicaSet.getReplica();
+    Set<ContainerReplica> replicas = replicaSet.getReplicas();
     try {
 
       if (replicaSet.isSufficientlyReplicated()
@@ -1236,9 +1240,9 @@ public class LegacyReplicationManager {
    *                   current replica count and inflight adds and deletes
    */
   private void handleOverReplicatedContainer(final ContainerInfo container,
-      final ContainerReplicaCount replicaSet) {
+      final RatisContainerReplicaCount replicaSet) {
 
-    final Set<ContainerReplica> replicas = replicaSet.getReplica();
+    final Set<ContainerReplica> replicas = replicaSet.getReplicas();
     final ContainerID id = container.containerID();
     final int replicationFactor =
         container.getReplicationConfig().getRequiredNodes();
@@ -1305,7 +1309,8 @@ public class LegacyReplicationManager {
    * @param replicaSet An Set of replicas, which may have excess replicas
    */
   private void deleteSrcDnForMove(final ContainerInfo cif,
-                   final Set<ContainerReplica> replicaSet) {
+                   final Set<ContainerReplica> replicaSet)
+      throws TimeoutException {
     final ContainerID cid = cif.containerID();
     MoveDataNodePair movePair = moveScheduler.getMoveDataNodePair(cid);
     if (movePair == null) {
@@ -1828,7 +1833,8 @@ public class LegacyReplicationManager {
      * @param contianerIDProto Container to which the move option is finished
      */
     @Replicate
-    void completeMove(HddsProtos.ContainerID contianerIDProto);
+    void completeMove(HddsProtos.ContainerID contianerIDProto)
+        throws TimeoutException;
 
     /**
      * start a move action for a given container.
@@ -1838,7 +1844,8 @@ public class LegacyReplicationManager {
      */
     @Replicate
     void startMove(HddsProtos.ContainerID contianerIDProto,
-              HddsProtos.MoveDataNodePairProto mp) throws IOException;
+              HddsProtos.MoveDataNodePairProto mp)
+        throws IOException, TimeoutException;
 
     /**
      * get the MoveDataNodePair of the giver container.
@@ -1933,19 +1940,20 @@ public class LegacyReplicationManager {
     }
 
     private void initialize() throws IOException {
-      TableIterator<ContainerID,
-          ? extends Table.KeyValue<ContainerID, MoveDataNodePair>>
-          iterator = moveTable.iterator();
+      try (TableIterator<ContainerID,
+          ? extends Table.KeyValue<ContainerID, MoveDataNodePair>> iterator =
+               moveTable.iterator()) {
 
-      while (iterator.hasNext()) {
-        Table.KeyValue<ContainerID, MoveDataNodePair> kv = iterator.next();
-        final ContainerID cid = kv.getKey();
-        final MoveDataNodePair mp = kv.getValue();
-        Preconditions.assertNotNull(cid,
-            "moved container id should not be null");
-        Preconditions.assertNotNull(mp,
-            "MoveDataNodePair container id should not be null");
-        inflightMove.put(cid, mp);
+        while (iterator.hasNext()) {
+          Table.KeyValue<ContainerID, MoveDataNodePair> kv = iterator.next();
+          final ContainerID cid = kv.getKey();
+          final MoveDataNodePair mp = kv.getValue();
+          Preconditions.assertNotNull(cid,
+              "moved container id should not be null");
+          Preconditions.assertNotNull(mp,
+              "MoveDataNodePair container id should not be null");
+          inflightMove.put(cid, mp);
+        }
       }
     }
 
@@ -2025,7 +2033,11 @@ public class LegacyReplicationManager {
         if (isTgtExist) {
           //the former scm leader may or may not send the deletion command
           //before reelection.here, we just try to send the command again.
-          deleteSrcDnForMove(cif, replicas);
+          try {
+            deleteSrcDnForMove(cif, replicas);
+          } catch (TimeoutException ex) {
+            LOG.error("Exception while cleaning up excess replicas.", ex);
+          }
         } else {
           // resenting replication command is ok , no matter whether there is an
           // on-going replication
@@ -2040,7 +2052,13 @@ public class LegacyReplicationManager {
       }
     });
 
-    needToRemove.forEach(moveScheduler::completeMove);
+    for (HddsProtos.ContainerID containerID : needToRemove) {
+      try {
+        moveScheduler.completeMove(containerID);
+      } catch (TimeoutException ex) {
+        LOG.error("Exception while moving container.", ex);
+      }
+    }
   }
 
   /**

@@ -283,9 +283,8 @@ public class RDBStore implements DBStore {
       throw new IllegalArgumentException("Illegal count for getUpdatesSince.");
     }
     DBUpdatesWrapper dbUpdatesWrapper = new DBUpdatesWrapper();
-    try {
-      TransactionLogIterator transactionLogIterator =
-          db.getUpdatesSince(sequenceNumber);
+    try (TransactionLogIterator transactionLogIterator =
+        db.getUpdatesSince(sequenceNumber)) {
 
       // Only the first record needs to be checked if its seq number <
       // ( 1 + passed_in_sequence_number). For example, if seqNumber passed
@@ -298,24 +297,28 @@ public class RDBStore implements DBStore {
       while (transactionLogIterator.isValid()) {
         TransactionLogIterator.BatchResult result =
             transactionLogIterator.getBatch();
-        long currSequenceNumber = result.sequenceNumber();
-        if (checkValidStartingSeqNumber &&
-            currSequenceNumber > 1 + sequenceNumber) {
-          throw new SequenceNumberNotFoundException("Unable to read data from" +
-              " RocksDB wal to get delta updates. It may have already been" +
-              "flushed to SSTs.");
-        }
-        // If the above condition was not satisfied, then it is OK to reset
-        // the flag.
-        checkValidStartingSeqNumber = false;
-        if (currSequenceNumber <= sequenceNumber) {
-          transactionLogIterator.next();
-          continue;
-        }
-        dbUpdatesWrapper.addWriteBatch(result.writeBatch().data(),
-            result.sequenceNumber());
-        if (currSequenceNumber - sequenceNumber >= limitCount) {
-          break;
+        try {
+          long currSequenceNumber = result.sequenceNumber();
+          if (checkValidStartingSeqNumber &&
+              currSequenceNumber > 1 + sequenceNumber) {
+            throw new SequenceNumberNotFoundException("Unable to read data from"
+                + " RocksDB wal to get delta updates. It may have already been"
+                + "flushed to SSTs.");
+          }
+          // If the above condition was not satisfied, then it is OK to reset
+          // the flag.
+          checkValidStartingSeqNumber = false;
+          if (currSequenceNumber <= sequenceNumber) {
+            transactionLogIterator.next();
+            continue;
+          }
+          dbUpdatesWrapper.addWriteBatch(result.writeBatch().data(),
+              result.sequenceNumber());
+          if (currSequenceNumber - sequenceNumber >= limitCount) {
+            break;
+          }
+        } finally {
+          result.writeBatch().close();
         }
         transactionLogIterator.next();
       }

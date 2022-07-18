@@ -161,7 +161,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     multiTenantManager.checkTenantExistence(tenantId);
 
     // Below call implies user existence check in authorizer.
-    // If the user doesn't exist, Ranger return 400 and the call should throw.
+    // If the user doesn't exist, Ranger returns 400 and the call should throw.
 
     // Acquire write lock to authorizer (Ranger)
     multiTenantManager.getAuthorizerLock().tryWriteLockInOMRequest();
