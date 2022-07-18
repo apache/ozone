@@ -42,7 +42,7 @@ public interface UnhealthyReplicationHandler {
    * @param remainingMaintenanceRedundancy - represents that how many nodes go
    *                                      into maintenance.
    * @return Returns the key value pair of destination dn where the command gets
-   * executed and the command itself. If an empty list if returned, it indicates
+   * executed and the command itself. If an empty list is returned, it indicates
    * the container is no longer unhealthy and can be removed from the unhealthy
    * queue. Any exception indicates that the container is still unhealthy and
    * should be retried later.

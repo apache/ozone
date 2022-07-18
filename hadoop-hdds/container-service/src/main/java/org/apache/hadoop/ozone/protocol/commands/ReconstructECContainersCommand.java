@@ -52,7 +52,6 @@ public class ReconstructECContainersCommand
         ecReplicationConfig, HddsIdFactory.getLongId());
   }
 
-  // Should be called only for protobuf conversion
   public ReconstructECContainersCommand(long containerID,
       List<DatanodeDetailsAndReplicaIndex> sourceDatanodes,
       List<DatanodeDetails> targetDatanodes, byte[] missingContainerIndexes,

@@ -139,7 +139,7 @@ public class ReplicationManager implements SCMService {
   private final ReentrantLock lock = new ReentrantLock();
   private Queue<ContainerHealthResult.UnderReplicatedHealthResult>
       underRepQueue;
-  private ECUnderReplicationHandler ecUnderReplicationHandler;
+  private final ECUnderReplicationHandler ecUnderReplicationHandler;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
