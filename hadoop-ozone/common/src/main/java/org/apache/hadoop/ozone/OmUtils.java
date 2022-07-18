@@ -305,7 +305,6 @@ public final class OmUtils {
     case SetS3Secret:
     case RevokeS3Secret:
     case PurgeDirectories:
-    case PurgePaths:
     case CreateTenant:
     case DeleteTenant:
     case TenantAssignUserAccessId:
@@ -800,11 +799,10 @@ public final class OmUtils {
       if (info.getNodeType() == HddsProtos.NodeType.OM) {
         sb.append(
             String.format(
-                "{ HostName: %s | Node-Id: %s | Ratis-Port : %d | Role: %s } ",
+                " { HostName: %s | Node-Id: %s | Ratis-Port : %d } ",
                 info.getHostname(),
                 info.getOmRoleInfo().getNodeId(),
-                port,
-                info.getOmRoleInfo().getServerRole()
+                port
             ));
         count++;
       }
@@ -816,5 +814,4 @@ public final class OmUtils {
       return sb.toString();
     }
   }
-
 }

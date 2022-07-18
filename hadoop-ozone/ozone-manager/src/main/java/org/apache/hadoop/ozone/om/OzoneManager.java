@@ -277,6 +277,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
@@ -2966,7 +2967,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-
   public String getOmRatisRoles() {
     List<ServiceInfo> serviceList = null;
     int port = omNodeDetails.getRatisPort();
@@ -2977,6 +2977,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return "Exception: " + e.toString();
     }
     return OmUtils.format(serviceList, port);
+  }
+
+  @Override
+  public String getRatisLeader() {
+    RaftPeer leaderId = null;
+    try {
+      leaderId = omRatisServer.getLeader();
+    } catch (IOException e) {
+    }
+    return leaderId.getId().toString();
   }
 
   public String getRatisLogDirectory() {
