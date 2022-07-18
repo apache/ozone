@@ -192,10 +192,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <groupId>org.elasticsearch.plugin</groupId>
           <artifactId>*</artifactId>
         </exclusion>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>jcl-over-slf4j</artifactId>
-        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
