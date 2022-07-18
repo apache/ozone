@@ -30,6 +30,7 @@ import org.junit.Test;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 
@@ -185,8 +186,11 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
         new OMVolumeSetQuotaRequest(originalRequest);
 
+//    GenericTestUtils.LogCapturer logs = GenericTestUtils.LogCapturer
+//        .captureLogs(LogFactory.getLog(OMVolumeSetQuotaRequest.class));
     GenericTestUtils.LogCapturer logs = GenericTestUtils.LogCapturer
-        .captureLogs(LogFactory.getLog(OMVolumeSetQuotaRequest.class));
+            .captureLogs(LoggerFactory.getLogger(OMVolumeSetQuotaRequest.class));
+
 
     OMClientResponse omClientResponse = omVolumeSetQuotaRequest
         .validateAndUpdateCache(ozoneManager, 1,

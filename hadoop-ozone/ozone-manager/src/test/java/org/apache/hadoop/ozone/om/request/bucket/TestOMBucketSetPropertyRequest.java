@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .SetBucketPropertyRequest;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 
@@ -183,8 +184,11 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     OMBucketSetPropertyRequest omBucketSetPropertyRequest =
         new OMBucketSetPropertyRequest(omRequest);
 
+//    GenericTestUtils.LogCapturer logs = GenericTestUtils.LogCapturer
+//        .captureLogs(LogFactory.getLog(OMBucketSetPropertyRequest.class));
     GenericTestUtils.LogCapturer logs = GenericTestUtils.LogCapturer
-        .captureLogs(LogFactory.getLog(OMBucketSetPropertyRequest.class));
+            .captureLogs(LoggerFactory.getLogger(OMBucketSetPropertyRequest.class));
+
 
     OMClientResponse omClientResponse = omBucketSetPropertyRequest
         .validateAndUpdateCache(ozoneManager, 1,
