@@ -453,7 +453,7 @@ public class ReplicationManager implements SCMService {
         type = ConfigType.TIME,
         defaultValue = "30s",
         tags = {SCM, OZONE},
-        description = "Hpw frequently to check if there are work to process " +
+        description = "How frequently to check if there are work to process " +
             " on the under replicated queue"
     )
     private long underReplicatedInterval = Duration.ofSeconds(30).toMillis();
