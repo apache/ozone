@@ -269,6 +269,11 @@ public final class OmUtils {
     case ListTenant:
     case TenantGetUserInfo:
     case TenantListUser:
+    case RangerBGSync:
+      // RangerBGSync is a read operation in the sense that it doesn't directly
+      // write to OM DB. And therefore it doesn't need a OMClientRequest.
+      // Although indirectly the Ranger sync service task could invoke write
+      // operation SetRangerServiceVersion.
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -305,6 +310,7 @@ public final class OmUtils {
     case SetS3Secret:
     case RevokeS3Secret:
     case PurgeDirectories:
+    case PurgePaths:
     case CreateTenant:
     case DeleteTenant:
     case TenantAssignUserAccessId:
