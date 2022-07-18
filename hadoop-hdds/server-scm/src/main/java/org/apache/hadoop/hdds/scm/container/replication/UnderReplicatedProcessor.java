@@ -91,11 +91,13 @@ public class UnderReplicatedProcessor {
     Map<DatanodeDetails, SCMCommand<?>> cmds = replicationManager
         .processUnderReplicatedContainer(underRep);
     for (Map.Entry<DatanodeDetails, SCMCommand<?>> cmd : cmds.entrySet()) {
+      SCMCommand<?> scmCmd = cmd.getValue();
+      scmCmd.setTerm(replicationManager.getScmTerm());
       final CommandForDatanode<?> datanodeCommand =
-          new CommandForDatanode<>(cmd.getKey().getUuid(), cmd.getValue());
+          new CommandForDatanode<>(cmd.getKey().getUuid(), scmCmd);
       eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
       adjustPendingOps(underRep.getContainerInfo().containerID(),
-          cmd.getValue(), cmd.getKey());
+          scmCmd, cmd.getKey());
     }
   }
 

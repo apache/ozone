@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.ExitUtil;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -328,6 +329,10 @@ public class ReplicationManager implements SCMService {
         containerReplicaPendingOps.getPendingOps(containerID);
     return ecUnderReplicationHandler.processAndCreateCommands(replicas,
         pendingOps, result, 0);
+  }
+
+  public long getScmTerm() throws NotLeaderException {
+    return scmContext.getTermOfLeader();
   }
 
   protected ContainerHealthResult processContainer(ContainerInfo containerInfo,
