@@ -185,11 +185,10 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
         new OMVolumeSetQuotaRequest(originalRequest);
 
-    GenericTestUtils.LogCapturer logs = GenericTestUtils.LogCapturer
-            .captureLogs(LoggerFactory.getLogger(
-                    OMVolumeSetQuotaRequest.class)
+    GenericTestUtils.LogCapturer logs =
+            GenericTestUtils.LogCapturer.captureLogs(
+                    LoggerFactory.getLogger(OMVolumeSetQuotaRequest.class)
             );
-
 
     OMClientResponse omClientResponse = omVolumeSetQuotaRequest
         .validateAndUpdateCache(ozoneManager, 1,

@@ -183,11 +183,10 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     OMBucketSetPropertyRequest omBucketSetPropertyRequest =
         new OMBucketSetPropertyRequest(omRequest);
 
-    GenericTestUtils.LogCapturer logs = GenericTestUtils.LogCapturer
-            .captureLogs(LoggerFactory.getLogger(
-                    OMBucketSetPropertyRequest.class
-            ));
-
+    GenericTestUtils.LogCapturer logs =
+            GenericTestUtils.LogCapturer.captureLogs(
+                    LoggerFactory.getLogger(OMBucketSetPropertyRequest.class)
+            );
 
     OMClientResponse omClientResponse = omBucketSetPropertyRequest
         .validateAndUpdateCache(ozoneManager, 1,
