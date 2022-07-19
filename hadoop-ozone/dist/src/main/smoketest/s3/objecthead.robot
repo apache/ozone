@@ -35,7 +35,7 @@ Head existing object
 
     ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1   0
 
-Head object in unexisting bucket
+Head object in non existing bucket
     ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET}-non-exitst --key ${PREFIX}/putobject/key=value/f1   255
                         Should contain          ${result}    404
                         Should contain          ${result}    Not Found
