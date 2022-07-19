@@ -18,8 +18,7 @@
 package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -27,12 +26,14 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.failure.Failures;
+import org.apache.hadoop.ozone.freon.FreonReplicationOptions;
 import org.apache.hadoop.ozone.loadgenerators.LoadGenerator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.BeforeClass;
 import org.junit.AfterClass;
 import org.junit.Ignore;
 import org.junit.Test;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -98,18 +99,16 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
           "--failureInterval will be removed in later versions.")
   private static int failureInterval = 300; // 5 minute period between failures.
 
-  @Option(names = {"-r", "--replication-type"},
-      description = "Default replication type. Supported types are"
-          + " RATIS, EC")
-  private static String replicationType = "RATIS";
+  @CommandLine.Mixin
+  private FreonReplicationOptions replication;
 
   @Option(names = {"-l", "--layout"},
       description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}")
   private static AllowedBucketLayouts allowedBucketLayout =
       AllowedBucketLayouts.FILE_SYSTEM_OPTIMIZED;
 
-  private static MiniOzoneChaosCluster cluster;
-  private static MiniOzoneLoadGenerator loadGenerator;
+  private MiniOzoneChaosCluster cluster;
+  private MiniOzoneLoadGenerator loadGenerator;
 
   private static String omServiceId = null;
   private static String scmServiceId = null;
@@ -118,8 +117,11 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   private static final String SCM_SERVICE_ID = "scmChaosTest";
 
   @BeforeClass
-  public static void init() throws Exception {
+  public void init() throws Exception {
     OzoneConfiguration configuration = new OzoneConfiguration();
+
+    ReplicationConfig replicationConfig =
+        replication.fromParamsOrConfig(configuration);
 
     MiniOzoneChaosCluster.Builder chaosBuilder =
         new MiniOzoneChaosCluster.Builder(configuration);
@@ -145,12 +147,8 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
         BucketLayout.valueOf(allowedBucketLayout.toString());
     final BucketArgs.Builder builder = BucketArgs.newBuilder();
 
-    if (replicationType == "EC") {
-      builder.setDefaultReplicationConfig(
-          new DefaultReplicationConfig(ReplicationType.EC,
-              new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
-                  1024 * 1024)));
-    }
+    builder.setDefaultReplicationConfig(
+        new DefaultReplicationConfig(replicationConfig));
     builder.setBucketLayout(bucketLayout);
 
     MiniOzoneLoadGenerator.Builder loadBuilder =
@@ -194,7 +192,7 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
    * Shutdown MiniDFSCluster.
    */
   @AfterClass
-  public static void shutdown() {
+  public void shutdown() {
     if (loadGenerator != null) {
       loadGenerator.shutdownLoadGenerator();
     }
