@@ -105,6 +105,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   public ConfigurationSource getConf() {
     return conf;
   }
+
   /**
    * Given size required, return set of datanodes
    * that satisfy the nodes and size requirement.
@@ -126,14 +127,17 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    */
   @Override
   public List<DatanodeDetails> chooseDatanodes(
-          List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
+          List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes,
           int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
           throws SCMException {
     return chooseDatanodesInternal(
             excludedNodes.stream()
-                    .map(node->nodeManager.getNodeByUuid(node.getUuidString()))
+                    .map(node -> nodeManager
+                            .getNodeByUuid(node.getUuidString()))
                     .collect(Collectors.toList()),
-            favoredNodes, nodesRequired, metadataSizeRequired, dataSizeRequired);
+            favoredNodes, nodesRequired,
+            metadataSizeRequired, dataSizeRequired);
   }
 
   /**
