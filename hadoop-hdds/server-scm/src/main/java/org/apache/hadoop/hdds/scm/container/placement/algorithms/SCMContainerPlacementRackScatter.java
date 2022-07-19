@@ -92,7 +92,7 @@ public final class SCMContainerPlacementRackScatter
    * @throws SCMException  SCMException
    */
   @Override
-  public List<DatanodeDetails> chooseDatanodes(
+  protected List<DatanodeDetails> chooseDatanodesInternal(
       final List<DatanodeDetails> excludedNodes,
       final List<DatanodeDetails> favoredNodes,
       final int nodesRequiredToChoose, final long metadataSizeRequired,
@@ -107,12 +107,8 @@ public final class SCMContainerPlacementRackScatter
     int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
     List<Node> availableNodes = networkTopology.getNodes(
         networkTopology.getMaxLevel());
-    List<Node> unavailableNodes = new ArrayList<>();
     int totalNodesCount = availableNodes.size();
     if (excludedNodes != null) {
-      unavailableNodes.addAll(
-              availableNodes.stream().filter(excludedNodes::contains)
-                      .collect(Collectors.toList()));
       availableNodes.removeAll(excludedNodes);
     }
     if (availableNodes.size() < nodesRequired) {
@@ -123,6 +119,7 @@ public final class SCMContainerPlacementRackScatter
           " ExcludedNode = " + excludedNodesCount,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
+
     List<DatanodeDetails> mutableFavoredNodes = new ArrayList<>();
     if (favoredNodes != null) {
       // Generate mutableFavoredNodes, only stores valid favoredNodes
@@ -146,12 +143,10 @@ public final class SCMContainerPlacementRackScatter
 
     List<Node> toChooseRacks = new LinkedList<>();
     Set<DatanodeDetails> chosenNodes = new LinkedHashSet<>();
+    List<Node> unavailableNodes = new ArrayList<>();
     Set<Node> skippedRacks = new HashSet<>();
     if (excludedNodes != null) {
-      unavailableNodes.addAll(
-              excludedNodes.stream()
-                      .filter(node -> !unavailableNodes.contains(node))
-                      .collect(Collectors.toList()));
+      unavailableNodes.addAll(excludedNodes);
     }
 
     // If the result doesn't change after retryCount, we return with exception
@@ -194,6 +189,7 @@ public final class SCMContainerPlacementRackScatter
       if (nodesRequired == 0) {
         break;
       }
+
       for (Node rack : toChooseRacks) {
         if (rack == null) {
           // TODO: need to recheck why null coming here.

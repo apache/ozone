@@ -105,7 +105,6 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   public ConfigurationSource getConf() {
     return conf;
   }
-
   /**
    * Given size required, return set of datanodes
    * that satisfy the nodes and size requirement.
@@ -127,6 +126,28 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    */
   @Override
   public List<DatanodeDetails> chooseDatanodes(
+          List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
+          int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
+          throws SCMException {
+    return chooseDatanodesInternal(
+            excludedNodes.stream()
+                    .map(node->nodeManager.getNodeByUuid(node.getUuidString()))
+                    .collect(Collectors.toList()),
+            favoredNodes, nodesRequired, metadataSizeRequired, dataSizeRequired);
+  }
+
+  /**
+   * Pipeline placement choose datanodes to join the pipeline.
+   *
+   * @param excludedNodes - excluded nodes
+   * @param favoredNodes  - list of nodes preferred.
+   * @param nodesRequired - number of datanodes required.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
+   * @return a list of chosen datanodeDetails
+   * @throws SCMException when chosen nodes are not enough in numbers
+   */
+  protected List<DatanodeDetails> chooseDatanodesInternal(
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
       int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {

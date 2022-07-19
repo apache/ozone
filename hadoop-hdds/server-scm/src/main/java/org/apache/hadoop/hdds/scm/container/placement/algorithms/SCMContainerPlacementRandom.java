@@ -70,7 +70,7 @@ public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
    * @throws SCMException  SCMException
    */
   @Override
-  public List<DatanodeDetails> chooseDatanodes(
+  protected List<DatanodeDetails> chooseDatanodesInternal(
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
       final int nodesRequired,
       long metadataSizeRequired, long dataSizeRequired) throws SCMException {
