@@ -34,12 +34,12 @@ public class AuthOperation implements AuditAction {
   }
 
   public static AuthOperation fromContext(ContainerRequestContext context) {
-    return new AuthOperation(context.getUriInfo().getPath(),
+    return new AuthOperation("/" + context.getUriInfo().getPath(),
         context.getMethod());
   }
 
   @Override
   public String getAction() {
-    return String.format("%s %s", method, path);
+    return String.format("AUTH(%s %s)", method, path);
   }
 }
