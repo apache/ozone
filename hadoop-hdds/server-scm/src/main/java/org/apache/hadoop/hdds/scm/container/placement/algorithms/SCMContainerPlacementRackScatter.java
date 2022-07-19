@@ -123,7 +123,6 @@ public final class SCMContainerPlacementRackScatter
           " ExcludedNode = " + excludedNodesCount,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
-
     List<DatanodeDetails> mutableFavoredNodes = new ArrayList<>();
     if (favoredNodes != null) {
       // Generate mutableFavoredNodes, only stores valid favoredNodes
@@ -151,7 +150,7 @@ public final class SCMContainerPlacementRackScatter
     if (excludedNodes != null) {
       unavailableNodes.addAll(
               excludedNodes.stream()
-                      .filter(node->!unavailableNodes.contains(node))
+                      .filter(node -> !unavailableNodes.contains(node))
                       .collect(Collectors.toList()));
     }
 
@@ -195,7 +194,6 @@ public final class SCMContainerPlacementRackScatter
       if (nodesRequired == 0) {
         break;
       }
-
       for (Node rack : toChooseRacks) {
         if (rack == null) {
           // TODO: need to recheck why null coming here.
