@@ -127,11 +127,14 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    * @throws SCMException SCM exception.
    */
   @Override
-  public List<DatanodeDetails> chooseDatanodes(
+  public final List<DatanodeDetails> chooseDatanodes(
           List<DatanodeDetails> excludedNodes,
           List<DatanodeDetails> favoredNodes,
           int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
           throws SCMException {
+//    This method calls the chooseDatanodeInternal after fixing
+//    the excludeList to get the DatanodeDetails from the node manager.
+//    Network Topology requires this info to choose a random node.
     return chooseDatanodesInternal(
             Objects.isNull(excludedNodes)
                     ? excludedNodes : excludedNodes.stream()
