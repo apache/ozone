@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,11 +18,22 @@
 package org.apache.hadoop.ozone.s3.signature;
 
 /**
- * Parser contract to extract signature information from header or query.
+ * This exception is used to communicate validation errors when parsing
+ * signatures.
  */
-public interface SignatureParser {
+public class MalformedResourceException extends Exception {
+  private final String resource;
 
-  String AUTHORIZATION_HEADER = "Authorization";
+  public MalformedResourceException(String resource) {
+    this.resource = resource;
+  }
 
-  SignatureInfo parseSignature() throws MalformedResourceException;
+  public MalformedResourceException(String message, String resource) {
+    super(message);
+    this.resource = resource;
+  }
+
+  public String getResource() {
+    return resource;
+  }
 }

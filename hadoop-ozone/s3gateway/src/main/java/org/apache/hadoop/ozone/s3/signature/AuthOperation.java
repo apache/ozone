@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,12 +17,29 @@
  */
 package org.apache.hadoop.ozone.s3.signature;
 
+import org.apache.hadoop.ozone.audit.AuditAction;
+
+import javax.ws.rs.container.ContainerRequestContext;
+
 /**
- * Parser contract to extract signature information from header or query.
+ * Authentication/authorization actions for S3Gateway.
  */
-public interface SignatureParser {
+public class AuthOperation implements AuditAction {
+  private final String path;
+  private final String method;
 
-  String AUTHORIZATION_HEADER = "Authorization";
+  public AuthOperation(final String path, final String method) {
+    this.path = path;
+    this.method = method;
+  }
 
-  SignatureInfo parseSignature() throws MalformedResourceException;
+  public static AuthOperation fromContext(ContainerRequestContext context) {
+    return new AuthOperation("/" + context.getUriInfo().getPath(),
+        context.getMethod());
+  }
+
+  @Override
+  public String getAction() {
+    return String.format("AUTH(%s %s)", method, path);
+  }
 }

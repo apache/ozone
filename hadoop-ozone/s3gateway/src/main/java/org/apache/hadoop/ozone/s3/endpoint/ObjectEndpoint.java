@@ -213,8 +213,7 @@ public class ObjectEndpoint extends EndpointBase {
           .build();
     } catch (OMException ex) {
       auditSuccess = false;
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditWriteFailure(s3GAction, ex);
       if (copyHeader != null) {
         getMetrics().incCopyObjectFailure();
       } else {
@@ -231,18 +230,15 @@ public class ObjectEndpoint extends EndpointBase {
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
       }
-      LOG.error("Exception occurred in PutObject", ex);
       throw ex;
     } catch (Exception ex) {
       auditSuccess = false;
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(s3GAction,
-          getAuditParameters(), ex));
+      auditWriteFailure(s3GAction, ex);
       if (copyHeader != null) {
         getMetrics().incCopyObjectFailure();
       } else {
         getMetrics().incCreateKeyFailure();
       }
-      LOG.error("Exception occurred in PutObject", ex.getMessage());
       throw ex;
     } finally {
       if (auditSuccess) {
@@ -574,14 +570,11 @@ public class ObjectEndpoint extends EndpointBase {
       return Response.status(Status.OK).entity(
           multipartUploadInitiateResponse).build();
     } catch (OMException ex) {
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditWriteFailure(s3GAction, ex);
       getMetrics().incInitMultiPartUploadFailure();
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, key, ex);
       }
-      LOG.error("Error in Initiate Multipart Upload Request for bucket: {}, " +
-          "key: {}", bucket, key, ex);
       throw ex;
     } catch (Exception ex) {
       AUDIT.logWriteFailure(
@@ -651,8 +644,7 @@ public class ObjectEndpoint extends EndpointBase {
       return Response.status(Status.OK).entity(completeMultipartUploadResponse)
           .build();
     } catch (OMException ex) {
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditWriteFailure(s3GAction, ex);
       getMetrics().incCompleteMultiPartUploadFailure();
       if (ex.getResult() == ResultCodes.INVALID_PART) {
         throw newError(S3ErrorTable.INVALID_PART, key, ex);
@@ -677,12 +669,9 @@ public class ObjectEndpoint extends EndpointBase {
             "given KeyName caused failure for MPU");
         throw os3Exception;
       }
-      LOG.error("Error in Complete Multipart Upload Request for bucket: {}, " +
-          ", key: {}", bucket, key, ex);
       throw ex;
     } catch (Exception ex) {
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditWriteFailure(s3GAction, ex);
       throw ex;
     }
   }
