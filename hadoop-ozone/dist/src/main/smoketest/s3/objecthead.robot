@@ -41,6 +41,6 @@ Head object in non existing bucket
                         Should contain          ${result}    Not Found
 
 Head non existing key
-    ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/non-exist   255
+    ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/non-existent   255
                         Should contain          ${result}    404
                         Should contain          ${result}    Not Found
