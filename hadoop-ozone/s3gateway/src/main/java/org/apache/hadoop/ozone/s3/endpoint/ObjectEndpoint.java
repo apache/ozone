@@ -207,7 +207,7 @@ public class ObjectEndpoint extends EndpointBase {
         body = new SignedChunksInputStream(body);
       }
 
-      output = volume.createKey(bucketName,
+      output = getClientProtocol().createKey(volume.getName(), bucketName,
           keyPath, length, replicationConfig, new HashMap<>());
       IOUtils.copy(body, output);
 
@@ -293,7 +293,8 @@ public class ObjectEndpoint extends EndpointBase {
 
       OzoneVolume volume = getVolume();
 
-      OzoneKeyDetails keyDetails = volume.getKey(bucketName, keyPath);
+      OzoneKeyDetails keyDetails = getClientProtocol().getKeyDetails(
+          volume.getName(), bucketName, keyPath);
 
       long length = keyDetails.getDataSize();
 
@@ -316,7 +317,8 @@ public class ObjectEndpoint extends EndpointBase {
 
       if (rangeHeaderVal == null || rangeHeader.isReadFull()) {
         StreamingOutput output = dest -> {
-          try (OzoneInputStream key = volume.readKey(bucketName, keyPath)) {
+          try (OzoneInputStream key = getClientProtocol().getKey(
+              volume.getName(), bucketName, keyPath)) {
             IOUtils.copy(key, dest);
           }
         };
@@ -332,8 +334,8 @@ public class ObjectEndpoint extends EndpointBase {
         // byte from start offset
         long copyLength = endOffset - startOffset + 1;
         StreamingOutput output = dest -> {
-          try (OzoneInputStream ozoneInputStream = volume.readKey(bucketName,
-              keyPath)) {
+          try (OzoneInputStream ozoneInputStream = getClientProtocol().getKey(
+              volume.getName(), bucketName, keyPath)) {
             ozoneInputStream.seek(startOffset);
             IOUtils.copyLarge(ozoneInputStream, dest, 0,
                 copyLength, new byte[bufferSize]);
@@ -421,7 +423,9 @@ public class ObjectEndpoint extends EndpointBase {
 
     OzoneKey key;
     try {
-      key = getVolume().headObject(bucketName, keyPath);
+      OzoneVolume volume = getVolume();
+      key = getClientProtocol().headObject(volume.getName(),
+          bucketName, keyPath);
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
       AUDIT.logReadFailure(
@@ -468,7 +472,8 @@ public class ObjectEndpoint extends EndpointBase {
                                         String key, String uploadId)
       throws IOException, OS3Exception {
     try {
-      volume.abortMultipartUpload(bucket, key, uploadId);
+      getClientProtocol().abortMultipartUpload(volume.getName(), bucket,
+          key, uploadId);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(S3ErrorTable.NO_SUCH_UPLOAD, uploadId, ex);
@@ -509,7 +514,8 @@ public class ObjectEndpoint extends EndpointBase {
         s3GAction = S3GAction.ABORT_MULTIPART_UPLOAD;
         return abortMultipartUpload(volume, bucketName, keyPath, uploadId);
       }
-      volume.deleteKey(bucketName, keyPath);
+      getClientProtocol().deleteKey(volume.getName(), bucketName,
+          keyPath, false);
     } catch (OMException ex) {
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
@@ -650,8 +656,9 @@ public class ObjectEndpoint extends EndpointBase {
         LOG.debug("Parts map {}", partsMap);
       }
 
-      omMultipartUploadCompleteInfo = volume.completeMultipartUpload(bucket,
-          key, uploadID, partsMap);
+      omMultipartUploadCompleteInfo = getClientProtocol()
+          .completeMultipartUpload(volume.getName(), bucket, key, uploadID,
+              partsMap);
       CompleteMultipartUploadResponse completeMultipartUploadResponse =
           new CompleteMultipartUploadResponse();
       completeMultipartUploadResponse.setBucket(bucket);
@@ -719,8 +726,8 @@ public class ObjectEndpoint extends EndpointBase {
       }
 
       try {
-        ozoneOutputStream = volume.createMultipartKey(bucket, key, length,
-            partNumber, uploadID);
+        ozoneOutputStream = getClientProtocol().createMultipartKey(
+            volume.getName(), bucket, key, length, partNumber, uploadID);
         copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
         if (copyHeader != null) {
           Pair<String, String> result = parseSourceHeader(copyHeader);
@@ -728,8 +735,9 @@ public class ObjectEndpoint extends EndpointBase {
           String sourceBucket = result.getLeft();
           String sourceKey = result.getRight();
 
-          Long sourceKeyModificationTime = volume.getKey(sourceBucket,
-              sourceKey).getModificationTime().toEpochMilli();
+          Long sourceKeyModificationTime = getClientProtocol().getKeyDetails(
+              volume.getName(), sourceBucket, sourceKey)
+              .getModificationTime().toEpochMilli();
           String copySourceIfModifiedSince =
               headers.getHeaderString(COPY_SOURCE_IF_MODIFIED_SINCE);
           String copySourceIfUnmodifiedSince =
@@ -739,8 +747,8 @@ public class ObjectEndpoint extends EndpointBase {
             throw newError(PRECOND_FAILED, sourceBucket + "/" + sourceKey);
           }
 
-          try (OzoneInputStream sourceObject =
-                   volume.readKey(sourceBucket, sourceKey)) {
+          try (OzoneInputStream sourceObject = getClientProtocol().getKey(
+              volume.getName(), sourceBucket, sourceKey)) {
 
             String range =
                 headers.getHeaderString(COPY_SOURCE_HEADER_RANGE);
@@ -859,11 +867,12 @@ public class ObjectEndpoint extends EndpointBase {
     this.headers = headers;
   }
 
-  static void copy(OzoneVolume volume, InputStream src, long srcKeyLen,
+  void copy(OzoneVolume volume, InputStream src, long srcKeyLen,
       String destKey, String destBucket,
       ReplicationConfig replication) throws IOException {
-    try (OzoneOutputStream dest = volume.createKey(destBucket,
-        destKey, srcKeyLen, replication, new HashMap<>())) {
+    try (OzoneOutputStream dest = getClientProtocol().createKey(
+        volume.getName(), destBucket, destKey, srcKeyLen,
+        replication, new HashMap<>())) {
       IOUtils.copy(src, dest);
     }
   }
@@ -908,15 +917,17 @@ public class ObjectEndpoint extends EndpointBase {
         }
       }
 
-
-      OzoneKeyDetails sourceKeyDetails = volume.getKey(sourceBucket, sourceKey);
+      OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
+          volume.getName(), sourceBucket, sourceKey);
       long sourceKeyLen = sourceKeyDetails.getDataSize();
 
-      try (OzoneInputStream src = volume.readKey(sourceBucket, sourceKey)) {
+      try (OzoneInputStream src = getClientProtocol().getKey(volume.getName(),
+          sourceBucket, sourceKey)) {
         copy(volume, src, sourceKeyLen, destkey, destBucket, replicationConfig);
       }
 
-      final OzoneKeyDetails destKeyDetails = volume.getKey(destBucket, destkey);
+      final OzoneKeyDetails destKeyDetails = getClientProtocol().getKeyDetails(
+          volume.getName(), destBucket, destkey);
 
       getMetrics().incCopyObjectSuccess();
       CopyObjectResponse copyObjectResponse = new CopyObjectResponse();

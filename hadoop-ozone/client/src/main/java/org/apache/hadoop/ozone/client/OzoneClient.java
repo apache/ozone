@@ -90,9 +90,10 @@ public class OzoneClient implements Closeable {
   }
 
   @VisibleForTesting
-  protected OzoneClient(ObjectStore objectStore) {
+  protected OzoneClient(ObjectStore objectStore,
+                        ClientProtocol clientProtocol) {
     this.objectStore = objectStore;
-    this.proxy = null;
+    this.proxy = clientProtocol;
     // For the unit test
     this.conf = new OzoneConfiguration();
   }
@@ -119,5 +120,9 @@ public class OzoneClient implements Closeable {
   @Override
   public void close() throws IOException {
     proxy.close();
+  }
+
+  public ClientProtocol getProxy() {
+    return proxy;
   }
 }

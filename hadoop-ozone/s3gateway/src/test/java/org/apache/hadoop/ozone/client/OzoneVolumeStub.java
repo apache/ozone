@@ -27,13 +27,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.util.Time;
 
 /**
@@ -135,60 +131,4 @@ public class OzoneVolumeStub extends OzoneVolume {
     aclList.clear();
     return aclList.addAll(acls);
   }
-
-  @Override
-  public OzoneKey headObject(String bucketName, String key)
-      throws IOException {
-    return getBucket(bucketName).headObject(key);
-  }
-
-  @Override
-  public OzoneOutputStream createMultipartKey(String bucketName, String key,
-                                              long size, int partNumber,
-                                              String uploadID)
-      throws IOException {
-    return getBucket(bucketName).createMultipartKey(key, size, partNumber,
-        uploadID);
-  }
-
-  @Override
-  public void abortMultipartUpload(String bucketName, String key,
-                                   String uploadID) throws IOException {
-    getBucket(bucketName).abortMultipartUpload(key, uploadID);
-  }
-
-  @Override
-  public OzoneOutputStream createKey(String bucketName, String key, long size,
-                                     ReplicationConfig replicationConfig,
-                                     Map<String, String> keyMetadata)
-      throws IOException {
-    return getBucket(bucketName).createKey(key, size, replicationConfig,
-        keyMetadata);
-  }
-
-  @Override
-  public OzoneKeyDetails getKey(String bucketName, String key)
-      throws IOException {
-    return getBucket(bucketName).getKey(key);
-  }
-
-  @Override
-  public OzoneInputStream readKey(String bucketName, String key)
-      throws IOException {
-    return getBucket(bucketName).readKey(key);
-  }
-
-  @Override
-  public OmMultipartUploadCompleteInfo completeMultipartUpload(
-      String bucketName, String key, String uploadID,
-      Map<Integer, String> partsMap) throws IOException {
-    return getBucket(bucketName).completeMultipartUpload(key,
-        uploadID, partsMap);
-  }
-
-  @Override
-  public void deleteKey(String bucketName, String key) throws IOException {
-    getBucket(bucketName).deleteKey(key);
-  }
-
 }
