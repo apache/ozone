@@ -107,8 +107,12 @@ public final class SCMContainerPlacementRackScatter
     int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
     List<Node> availableNodes = networkTopology.getNodes(
         networkTopology.getMaxLevel());
+    List<Node> unavailableNodes = new ArrayList<>();
     int totalNodesCount = availableNodes.size();
     if (excludedNodes != null) {
+      unavailableNodes.addAll(
+              availableNodes.stream().filter(excludedNodes::contains)
+                      .collect(Collectors.toList()));
       availableNodes.removeAll(excludedNodes);
     }
     if (availableNodes.size() < nodesRequired) {
@@ -143,10 +147,12 @@ public final class SCMContainerPlacementRackScatter
 
     List<Node> toChooseRacks = new LinkedList<>();
     Set<DatanodeDetails> chosenNodes = new LinkedHashSet<>();
-    List<Node> unavailableNodes = new ArrayList<>();
     Set<Node> skippedRacks = new HashSet<>();
     if (excludedNodes != null) {
-      unavailableNodes.addAll(excludedNodes);
+      unavailableNodes.addAll(
+              excludedNodes.stream()
+                      .filter(node->!unavailableNodes.contains(node))
+                      .collect(Collectors.toList()));
     }
 
     // If the result doesn't change after retryCount, we return with exception
