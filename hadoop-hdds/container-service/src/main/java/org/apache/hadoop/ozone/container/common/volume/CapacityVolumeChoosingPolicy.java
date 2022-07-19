@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import org.apache.commons.logging.Log;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
