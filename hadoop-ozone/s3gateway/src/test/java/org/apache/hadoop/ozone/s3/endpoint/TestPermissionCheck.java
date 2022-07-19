@@ -50,6 +50,8 @@ import static org.mockito.Mockito.when;
 
 /**
  * Test operation permission check result.
+ * Test-cases in this class verify that permission denied errors from OM
+ * are handled correctly by S3 endpoints.
  */
 public class TestPermissionCheck {
   private OzoneConfiguration conf;
