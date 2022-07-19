@@ -125,6 +125,9 @@ public class TestReplicationManager {
     // Ensure that RM will run when asked.
     Mockito.when(scmContext.isLeaderReady()).thenReturn(true);
     Mockito.when(scmContext.isInSafeMode()).thenReturn(false);
+  }
+
+  private void enableProcessAll() {
     SCMServiceManager serviceManager = new SCMServiceManager();
     serviceManager.register(replicationManager);
     serviceManager.notifyStatusChanged();
@@ -315,6 +318,7 @@ public class TestReplicationManager {
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(underRep0, ContainerReplicaProto.State.CLOSED, 1, 2, 3);
 
+    enableProcessAll();
     replicationManager.processAll();
 
     // Get the first message off the queue - it should be underRep0.
