@@ -103,6 +103,9 @@ public class PipelineActionHandler
       }
       publisher.fireEvent(SCMEvents.DATANODE_COMMAND,
           new CommandForDatanode<>(datanode.getUuid(), command));
+    } catch (NotLeaderException nle) {
+      LOG.error("Could not execute pipeline action={} pipeline={}",
+          action, pid);
     } catch (IOException | TimeoutException ioe) {
       LOG.error("Could not execute pipeline action={} pipeline={}",
           action, pid, ioe);

@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.ozone.common.MonotonicClock;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -151,6 +152,8 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
         try {
           LOG.info("Removing invalid pipeline {} from Recon.", pipelineID);
           closePipeline(p, false);
+        } catch (NotLeaderException nle) {
+          LOG.warn("Unable to remove pipeline {}", pipelineID);
         } catch (IOException | TimeoutException e) {
           LOG.warn("Unable to remove pipeline {}", pipelineID, e);
         }

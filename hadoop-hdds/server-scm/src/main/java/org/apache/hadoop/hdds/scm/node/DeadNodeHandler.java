@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,6 +121,8 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
               } catch (PipelineNotFoundException ignore) {
                 // Pipeline is not there in pipeline manager,
                 // should we care?
+              } catch (NotLeaderException nle) {
+                LOG.warn("Exception while finalizing pipeline {}", id);
               } catch (IOException | TimeoutException ex) {
                 LOG.warn("Exception while finalizing pipeline {}",
                     id, ex);

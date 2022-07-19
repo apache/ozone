@@ -184,6 +184,8 @@ public class PipelineManagerImpl implements PipelineManager {
             .setPeriodicalTask(() -> {
               try {
                 pipelineManager.scrubPipelines();
+              } catch (NotLeaderException nle) {
+                LOG.error("Unexpected error during pipeline scrubbing");
               } catch (IOException | TimeoutException e) {
                 LOG.error("Unexpected error during pipeline scrubbing", e);
               }
@@ -471,6 +473,8 @@ public class PipelineManagerImpl implements PipelineManager {
         LOG.info("Closing the stale pipeline: {}", p.getId());
         closePipeline(p, false);
         LOG.info("Closed the stale pipeline: {}", p.getId());
+      } catch (NotLeaderException nle) {
+        LOG.error("Closing the stale pipeline failed: {}", p);
       } catch (IOException | TimeoutException e) {
         LOG.error("Closing the stale pipeline failed: {}", p, e);
       }

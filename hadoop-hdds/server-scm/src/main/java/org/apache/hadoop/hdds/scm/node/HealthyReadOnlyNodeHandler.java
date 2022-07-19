@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
@@ -92,6 +93,9 @@ public class HealthyReadOnlyNodeHandler
             HddsProtos.NodeState.HEALTHY_READONLY,
             datanodeDetails.getUuidString());
         pipelineManager.closePipeline(pipeline, true);
+      } catch (NotLeaderException nle) {
+        LOG.error("Failed to close pipeline {} which uses HEALTHY READONLY " +
+            "datanode {}", pipelineID, datanodeDetails);
       } catch (IOException | TimeoutException ex) {
         LOG.error("Failed to close pipeline {} which uses HEALTHY READONLY " +
             "datanode {}: ", pipelineID, datanodeDetails, ex);
