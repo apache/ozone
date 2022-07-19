@@ -2980,7 +2980,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public String getRatisLeader() throws NullPointerException{
+  public String getRatisLeader() throws NullPointerException {
     RaftPeer leaderId = null;
     try {
       leaderId = omRatisServer.getLeader();
