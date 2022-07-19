@@ -252,11 +252,6 @@ public abstract class GenericTestUtils {
     private WriterAppender appender;
     private Logger logger;
 
-    public static LogCapturer captureLogs(Log l) {
-      Logger logger = ((Log4JLogger) l).getLogger();
-      return new LogCapturer(logger, getDefaultLayout());
-    }
-
     public static LogCapturer captureLogs(org.slf4j.Logger logger) {
       return new LogCapturer(toLog4j(logger), getDefaultLayout());
     }

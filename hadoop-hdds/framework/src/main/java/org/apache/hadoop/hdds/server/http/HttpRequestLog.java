@@ -20,9 +20,7 @@ package org.apache.hadoop.hdds.server.http;
 import java.util.HashMap;
 
 import org.apache.commons.logging.impl.Log4JLogger;
-import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogConfigurationException;
-import org.apache.commons.logging.LogFactory;
 import org.apache.log4j.Appender;
 import org.eclipse.jetty.server.AsyncRequestLogWriter;
 import org.eclipse.jetty.server.CustomRequestLog;
@@ -57,7 +55,7 @@ public final class HttpRequestLog {
     }
     String loggerName = "http.requests." + name;
     String appenderName = name + "requestlog";
-    Log logger = LogFactory.getLog(loggerName);
+    Logger logger = LoggerFactory.getLogger(loggerName);
 
     boolean isLog4JLogger;
 
