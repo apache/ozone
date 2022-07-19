@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 import java.util.stream.Collectors;
 
@@ -132,7 +133,8 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
           int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
           throws SCMException {
     return chooseDatanodesInternal(
-            excludedNodes.stream()
+            Objects.isNull(excludedNodes)
+                    ? excludedNodes : excludedNodes.stream()
                     .map(node -> nodeManager
                             .getNodeByUuid(node.getUuidString()))
                     .collect(Collectors.toList()),
