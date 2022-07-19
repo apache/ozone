@@ -122,6 +122,10 @@ public class OzoneClient implements Closeable {
     proxy.close();
   }
 
+  /**
+   * Return the ClientProtocol associated with the Ozone Cluster.
+   * @return ClientProtocol
+   */
   public ClientProtocol getProxy() {
     return proxy;
   }
