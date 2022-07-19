@@ -542,10 +542,12 @@ public class ContainerBalancer extends StatefulService {
         sizeActuallyMovedInLatestIteration / OzoneConsts.GB);
     metrics.incrementDataSizeMovedGB(
         metrics.getDataSizeMovedGBInLatestIteration());
-    LOG.info("Number of datanodes involved in this iteration: {}. Size moved " +
-            "in this iteration: {}GB.",
+    LOG.info("Iteration Summary. Number of Datanodes involved: {}. Size " +
+            "moved: {}GB ({} Bytes). Number of Container moves completed: {}.",
         countDatanodesInvolvedPerIteration,
-        sizeActuallyMovedInLatestIteration / (double) OzoneConsts.GB);
+        sizeActuallyMovedInLatestIteration / (double) OzoneConsts.GB,
+        sizeActuallyMovedInLatestIteration,
+        metrics.getNumContainerMovesCompletedInLatestIteration());
   }
 
   /**
