@@ -184,7 +184,9 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         new OMBucketSetPropertyRequest(omRequest);
 
     GenericTestUtils.LogCapturer logs = GenericTestUtils.LogCapturer
-            .captureLogs(LoggerFactory.getLogger(OMBucketSetPropertyRequest.class));
+            .captureLogs(LoggerFactory.getLogger(
+                    OMBucketSetPropertyRequest.class
+            ));
 
 
     OMClientResponse omClientResponse = omBucketSetPropertyRequest
