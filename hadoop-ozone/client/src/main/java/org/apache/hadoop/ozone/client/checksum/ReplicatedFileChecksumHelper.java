@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.client.checksum;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -79,7 +78,8 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
 
       if (!checksumBlock(keyLocationInfo)) {
         throw new PathIOException(getSrc(),
-            "Fail to get block MD5 for " + keyLocationInfo);
+            "Fail to get block checksum for " + keyLocationInfo
+                + ", checksum combine mode : {}" + getCombineMode());
       }
     }
   }
@@ -90,6 +90,12 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
    */
   private boolean checksumBlock(OmKeyLocationInfo keyLocationInfo)
       throws IOException {
+    // for each block, send request
+    List<ContainerProtos.ChunkInfo> chunkInfos =
+        getChunkInfos(keyLocationInfo);
+    if (chunkInfos.size() == 0) {
+      return false;
+    }
 
     long blockNumBytes = keyLocationInfo.getLength();
 
@@ -97,10 +103,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
       blockNumBytes = getRemaining();
     }
     setRemaining(getRemaining() - blockNumBytes);
-    // for each block, send request
-    List<ContainerProtos.ChunkInfo> chunkInfos =
-        getChunkInfos(keyLocationInfo);
-    Preconditions.checkArgument(chunkInfos.size() > 0);
+
     ContainerProtos.ChecksumData checksumData =
         chunkInfos.get(0).getChecksumData();
     int bytesPerChecksum = checksumData.getBytesPerChecksum();
