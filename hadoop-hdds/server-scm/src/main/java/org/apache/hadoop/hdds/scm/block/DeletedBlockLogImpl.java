@@ -181,6 +181,31 @@ public class DeletedBlockLogImpl
     }
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * @throws IOException
+   */
+  @Override
+  public int resetCount(List<Long> txIDs) throws IOException {
+    List<Long> failedTransactions = getFailedTransactions().stream()
+        .map(DeletedBlocksTransaction::getTxID).collect(Collectors.toList());
+    if (txIDs != null && !txIDs.isEmpty()) {
+      failedTransactions = failedTransactions.stream().filter(txIDs::contains)
+          .collect(Collectors.toList());
+    }
+    lock.lock();
+    try {
+      return deletedBlockLogStateManager.resetRetryCountOfTransactionInDB(
+            new ArrayList<>(failedTransactions));
+    } catch (TimeoutException | IOException ex) {
+      LOG.error("Cannot reset block deletion transactions {}",
+          failedTransactions, ex);
+      return 0;
+    } finally {
+      lock.unlock();
+    }
+  }
 
   private DeletedBlocksTransaction constructNewTransaction(
       long txID, long containerID, List<Long> blocks) {

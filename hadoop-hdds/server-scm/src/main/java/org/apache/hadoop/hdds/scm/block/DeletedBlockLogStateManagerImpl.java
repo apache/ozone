@@ -209,6 +209,23 @@ public class DeletedBlockLogStateManagerImpl
     }
   }
 
+  @Override
+  public int resetRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
+      throws IOException {
+    for (long txId: txIDs) {
+      DeletedBlocksTransaction transaction = deletedTable.get(txId);
+      transactionBuffer.addToBuffer(deletedTable, txId,
+          transaction.toBuilder().setCount(0).build());
+      if (LOG.isDebugEnabled()) {
+        LOG.info("Reset block delete Txn count to 0 in container {} with " +
+            "txnId {} ", transaction.getContainerID(), txId);
+      }
+    }
+    LOG.info("Reset in total {} block delete Txn retry count",
+        txIDs.size());
+    return txIDs.size();
+  }
+
   public void onFlush() {
     // onFlush() can be invoked only when ratis is enabled.
     Preconditions.checkNotNull(deletingTxIDs);
