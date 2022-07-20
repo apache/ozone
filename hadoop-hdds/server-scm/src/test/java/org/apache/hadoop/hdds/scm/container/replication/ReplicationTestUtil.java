@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE;
 
 /**
@@ -49,28 +50,42 @@ public final class ReplicationTestUtil {
   private ReplicationTestUtil() {
   }
 
+  @SafeVarargs
   public static Set<ContainerReplica> createReplicas(ContainerID containerID,
+      Pair<HddsProtos.NodeOperationalState, Integer>... nodes) {
+    return createReplicas(containerID, CLOSED, nodes);
+  }
+
+  @SafeVarargs
+  public static Set<ContainerReplica> createReplicas(ContainerID containerID,
+      ContainerReplicaProto.State replicaState,
       Pair<HddsProtos.NodeOperationalState, Integer>... nodes) {
     Set<ContainerReplica> replicas = new HashSet<>();
     for (Pair<HddsProtos.NodeOperationalState, Integer> p : nodes) {
-      replicas.add(
-          createContainerReplica(containerID, p.getRight(), p.getLeft()));
+      replicas.add(createContainerReplica(
+          containerID, p.getRight(), p.getLeft(), replicaState));
     }
     return replicas;
   }
 
   public static Set<ContainerReplica> createReplicas(ContainerID containerID,
       int... indexes) {
+    return createReplicas(containerID, CLOSED, indexes);
+  }
+
+  public static Set<ContainerReplica> createReplicas(ContainerID containerID,
+      ContainerReplicaProto.State replicaState, int... indexes) {
     Set<ContainerReplica> replicas = new HashSet<>();
     for (int i : indexes) {
       replicas.add(createContainerReplica(
-          containerID, i, IN_SERVICE));
+          containerID, i, IN_SERVICE, replicaState));
     }
     return replicas;
   }
 
   public static ContainerReplica createContainerReplica(ContainerID containerID,
-      int replicaIndex, HddsProtos.NodeOperationalState opState) {
+      int replicaIndex, HddsProtos.NodeOperationalState opState,
+      ContainerReplicaProto.State replicaState) {
     ContainerReplica.ContainerReplicaBuilder builder
         = ContainerReplica.newBuilder();
     DatanodeDetails datanodeDetails
@@ -80,8 +95,7 @@ public final class ReplicationTestUtil {
     builder.setReplicaIndex(replicaIndex);
     builder.setKeyCount(123);
     builder.setBytesUsed(1234);
-    builder.setContainerState(StorageContainerDatanodeProtocolProtos
-        .ContainerReplicaProto.State.CLOSED);
+    builder.setContainerState(replicaState);
     builder.setDatanodeDetails(datanodeDetails);
     builder.setSequenceId(0);
     builder.setOriginNodeId(datanodeDetails.getUuid());
@@ -107,16 +121,25 @@ public final class ReplicationTestUtil {
   public static ContainerInfo createContainer(HddsProtos.LifeCycleState state,
       ReplicationConfig replicationConfig) {
     return new ContainerInfo.Builder()
-        .setContainerID(ContainerID.valueOf(1).getId()).setState(state)
+        .setContainerID(1).setState(state)
         .setReplicationConfig(replicationConfig).build();
   }
 
+  @SafeVarargs
   public static Set<ContainerReplica> createReplicas(
+      Pair<HddsProtos.NodeOperationalState, Integer>... states) {
+    return createReplicas(CLOSED,
+        states);
+  }
+
+  @SafeVarargs
+  public static Set<ContainerReplica> createReplicas(
+      ContainerReplicaProto.State replicaState,
       Pair<HddsProtos.NodeOperationalState, Integer>... states) {
     Set<ContainerReplica> replica = new HashSet<>();
     for (Pair<HddsProtos.NodeOperationalState, Integer> s : states) {
       replica.add(createContainerReplica(ContainerID.valueOf(1), s.getRight(),
-          s.getLeft()));
+          s.getLeft(), replicaState));
     }
     return replica;
   }
@@ -128,8 +151,7 @@ public final class ReplicationTestUtil {
       public List<DatanodeDetails> chooseDatanodes(
           List<DatanodeDetails> excludedNodes,
           List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
-          long metadataSizeRequired, long dataSizeRequired)
-          throws SCMException {
+          long metadataSizeRequired, long dataSizeRequired) {
         List<DatanodeDetails> dns = new ArrayList<>();
         for (int i = 0; i < nodesRequiredToChoose; i++) {
           dns.add(MockDatanodeDetails.randomDatanodeDetails());

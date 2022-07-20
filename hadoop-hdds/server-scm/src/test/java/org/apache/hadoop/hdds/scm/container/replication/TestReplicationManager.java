@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -123,16 +125,52 @@ public class TestReplicationManager {
     // Ensure that RM will run when asked.
     Mockito.when(scmContext.isLeaderReady()).thenReturn(true);
     Mockito.when(scmContext.isInSafeMode()).thenReturn(false);
+  }
+
+  private void enableProcessAll() {
     SCMServiceManager serviceManager = new SCMServiceManager();
     serviceManager.register(replicationManager);
     serviceManager.notifyStatusChanged();
   }
 
   @Test
+  public void testOpenContainerSkipped() throws ContainerNotFoundException {
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.OPEN);
+    // It is under replicated, but as its still open it is seen as healthy.
+    addReplicas(container, ContainerReplicaProto.State.OPEN, 1, 2, 3, 4);
+    ContainerHealthResult result = replicationManager.processContainer(
+        container, underRep, overRep, repReport);
+    Assert.assertEquals(ContainerHealthResult.HealthState.HEALTHY,
+        result.getHealthState());
+    Assert.assertEquals(0, underRep.size());
+    Assert.assertEquals(0, overRep.size());
+  }
+
+  @Test
+  public void testUnhealthyOpenContainerClosed()
+      throws ContainerNotFoundException {
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.OPEN);
+    // Container is open but replicas are closed, so it is open but unhealthy.
+    addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
+    ContainerHealthResult result = replicationManager.processContainer(
+        container, underRep, overRep, repReport);
+    Assert.assertEquals(ContainerHealthResult.HealthState.UNHEALTHY,
+        result.getHealthState());
+    Mockito.verify(eventPublisher, Mockito.times(1))
+        .fireEvent(SCMEvents.CLOSE_CONTAINER, container.containerID());
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.OPEN_UNHEALTHY));
+    Assert.assertEquals(0, underRep.size());
+    Assert.assertEquals(0, overRep.size());
+  }
+
+  @Test
   public void testHealthyContainer() throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
-    addReplicas(container, 1, 2, 3, 4, 5);
+    addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
 
     ContainerHealthResult result = replicationManager.processContainer(
         container, underRep, overRep, repReport);
@@ -146,7 +184,7 @@ public class TestReplicationManager {
   public void testUnderReplicatedContainer() throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
-    addReplicas(container, 1, 2, 3, 4);
+    addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
 
     ContainerHealthResult result = replicationManager.processContainer(
         container, underRep, overRep, repReport);
@@ -163,7 +201,7 @@ public class TestReplicationManager {
       throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
-    addReplicas(container, 1, 2, 3, 4);
+    addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
     containerReplicaPendingOps.scheduleAddReplica(container.containerID(),
         MockDatanodeDetails.randomDatanodeDetails(), 5);
 
@@ -189,7 +227,7 @@ public class TestReplicationManager {
       throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
-    addReplicas(container, 1, 2);
+    addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2);
 
     ContainerHealthResult result = replicationManager.processContainer(
         container, underRep, overRep, repReport);
@@ -210,7 +248,7 @@ public class TestReplicationManager {
       throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
-    addReplicas(container, 1, 2, 3, 5, 5);
+    addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 5, 5);
 
     ContainerHealthResult result = replicationManager.processContainer(
         container, underRep, overRep, repReport);
@@ -231,7 +269,8 @@ public class TestReplicationManager {
   public void testOverReplicated() throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
-    addReplicas(container, 1, 2, 3, 4, 5, 5);
+    addReplicas(container, ContainerReplicaProto.State.CLOSED,
+        1, 2, 3, 4, 5, 5);
     ContainerHealthResult result = replicationManager.processContainer(
         container, underRep, overRep, repReport);
     Assert.assertEquals(ContainerHealthResult.HealthState.OVER_REPLICATED,
@@ -247,7 +286,8 @@ public class TestReplicationManager {
       throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
-    addReplicas(container, 1, 2, 3, 4, 5, 5);
+    addReplicas(container, ContainerReplicaProto.State.CLOSED,
+        1, 2, 3, 4, 5, 5);
     containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(),
         MockDatanodeDetails.randomDatanodeDetails(), 5);
     ContainerHealthResult result = replicationManager.processContainer(
@@ -266,17 +306,19 @@ public class TestReplicationManager {
   public void testUnderReplicationQueuePopulated() {
     ContainerInfo decomContainer = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
-    addReplicas(decomContainer, Pair.of(DECOMMISSIONING, 1),
+    addReplicas(decomContainer, ContainerReplicaProto.State.CLOSED,
+        Pair.of(DECOMMISSIONING, 1),
         Pair.of(DECOMMISSIONING, 2), Pair.of(DECOMMISSIONING, 3),
         Pair.of(DECOMMISSIONING, 4), Pair.of(DECOMMISSIONING, 5));
 
     ContainerInfo underRep1 = createContainerInfo(repConfig, 2,
         HddsProtos.LifeCycleState.CLOSED);
-    addReplicas(underRep1, 1, 2, 3, 4);
+    addReplicas(underRep1, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
     ContainerInfo underRep0 = createContainerInfo(repConfig, 3,
         HddsProtos.LifeCycleState.CLOSED);
-    addReplicas(underRep0, 1, 2, 3);
+    addReplicas(underRep0, ContainerReplicaProto.State.CLOSED, 1, 2, 3);
 
+    enableProcessAll();
     replicationManager.processAll();
 
     // Get the first message off the queue - it should be underRep0.
@@ -314,18 +356,20 @@ public class TestReplicationManager {
     Assert.assertNull(res);
   }
 
-  private Set<ContainerReplica>  addReplicas(ContainerInfo container,
+  @SafeVarargs
+  private final Set<ContainerReplica>  addReplicas(ContainerInfo container,
+      ContainerReplicaProto.State replicaState,
       Pair<HddsProtos.NodeOperationalState, Integer>... nodes) {
     final Set<ContainerReplica> replicas =
-        createReplicas(container.containerID(), nodes);
+        createReplicas(container.containerID(), replicaState, nodes);
     storeContainerAndReplicas(container, replicas);
     return replicas;
   }
 
   private Set<ContainerReplica> addReplicas(ContainerInfo container,
-      int... indexes) {
+      ContainerReplicaProto.State replicaState, int... indexes) {
     final Set<ContainerReplica> replicas =
-        createReplicas(container.containerID(), indexes);
+        createReplicas(container.containerID(), replicaState, indexes);
     storeContainerAndReplicas(container, replicas);
     return replicas;
   }

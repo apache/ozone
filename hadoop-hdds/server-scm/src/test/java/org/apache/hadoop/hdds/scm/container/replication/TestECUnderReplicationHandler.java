@@ -32,13 +32,12 @@ import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.assertj.core.util.Lists;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -70,8 +69,7 @@ public class TestECUnderReplicationHandler {
   public void setup() {
     nodeManager = new MockNodeManager(true, 10) {
       @Override
-      public NodeStatus getNodeStatus(DatanodeDetails dd)
-          throws NodeNotFoundException {
+      public NodeStatus getNodeStatus(DatanodeDetails dd) {
         return NodeStatus.inServiceHealthy();
       }
     };
@@ -128,11 +126,11 @@ public class TestECUnderReplicationHandler {
     Map<DatanodeDetails, SCMCommand<?>> cmds =
         testUnderReplicationWithMissingIndexes(
             Lists.emptyList(), availableReplicas, 1, policy);
-    Assert.assertEquals(1, cmds.size());
+    Assertions.assertEquals(1, cmds.size());
     // Check the replicate command has index 1 set
     ReplicateContainerCommand cmd = (ReplicateContainerCommand) cmds.values()
         .iterator().next();
-    Assert.assertEquals(1, cmd.getReplicaIndex());
+    Assertions.assertEquals(1, cmd.getReplicaIndex());
 
   }
 
@@ -158,7 +156,7 @@ public class TestECUnderReplicationHandler {
   }
 
   @Test
-  public void testExceptionIfNoNodesFound() throws IOException {
+  public void testExceptionIfNoNodesFound() {
     PlacementPolicy noNodesPolicy = ReplicationTestUtil
         .getNoNodesTestPlacementPolicy(nodeManager, conf);
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
@@ -202,15 +200,15 @@ public class TestECUnderReplicationHandler {
       } else if (dnCommand
           .getValue() instanceof ReconstructECContainersCommand) {
         if (shouldReconstructCommandExist) {
-          Assert.assertArrayEquals(missingIndexesByteArr,
+          Assertions.assertArrayEquals(missingIndexesByteArr,
               ((ReconstructECContainersCommand) dnCommand.getValue())
-                  .getMissingContainerIndexes());
+              .getMissingContainerIndexes());
         }
         reconstructCommand++;
       }
     }
-    Assert.assertEquals(decomIndexes, replicateCommand);
-    Assert.assertEquals(shouldReconstructCommandExist ? 1 : 0,
+    Assertions.assertEquals(decomIndexes, replicateCommand);
+    Assertions.assertEquals(shouldReconstructCommandExist ? 1 : 0,
         reconstructCommand);
     return datanodeDetailsSCMCommandMap;
   }

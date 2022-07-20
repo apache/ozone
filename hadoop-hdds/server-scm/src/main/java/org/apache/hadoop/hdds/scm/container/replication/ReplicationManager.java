@@ -25,6 +25,8 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -34,6 +36,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -339,24 +342,35 @@ public class ReplicationManager implements SCMService {
       Queue<ContainerHealthResult.UnderReplicatedHealthResult> underRep,
       List<ContainerHealthResult.OverReplicatedHealthResult> overRep,
       ReplicationManagerReport report) throws ContainerNotFoundException {
+
+    ContainerID containerID = containerInfo.containerID();
     Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
-        containerInfo.containerID());
+        containerID);
+
+    if (containerInfo.getState() == HddsProtos.LifeCycleState.OPEN) {
+      if (!isOpenContainerHealthy(containerInfo, replicas)) {
+        report.incrementAndSample(
+            HealthState.OPEN_UNHEALTHY, containerID);
+        eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
+        return new ContainerHealthResult.UnHealthyResult(containerInfo);
+      }
+      return new ContainerHealthResult.HealthyResult(containerInfo);
+    }
+
     List<ContainerReplicaOp> pendingOps =
-        containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
+        containerReplicaPendingOps.getPendingOps(containerID);
     ContainerHealthResult health = ecContainerHealthCheck
         .checkHealth(containerInfo, replicas, pendingOps, 0);
       // TODO - should the report have a HEALTHY state, rather than just bad
       //        states? It would need to be added to legacy RM too.
     if (health.getHealthState()
         == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
-      report.incrementAndSample(
-          HealthState.UNDER_REPLICATED, containerInfo.containerID());
+      report.incrementAndSample(HealthState.UNDER_REPLICATED, containerID);
       ContainerHealthResult.UnderReplicatedHealthResult underHealth
           = ((ContainerHealthResult.UnderReplicatedHealthResult) health);
       if (underHealth.isUnrecoverable()) {
         // TODO - do we need a new health state for unrecoverable EC?
-        report.incrementAndSample(
-            HealthState.MISSING, containerInfo.containerID());
+        report.incrementAndSample(HealthState.MISSING, containerID);
       }
       if (!underHealth.isSufficientlyReplicatedAfterPending() &&
           !underHealth.isUnrecoverable()) {
@@ -364,8 +378,7 @@ public class ReplicationManager implements SCMService {
       }
     } else if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
-      report.incrementAndSample(HealthState.OVER_REPLICATED,
-          containerInfo.containerID());
+      report.incrementAndSample(HealthState.OVER_REPLICATED, containerID);
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
       if (!overHealth.isSufficientlyReplicatedAfterPending()) {
@@ -430,6 +443,44 @@ public class ReplicationManager implements SCMService {
       return getECContainerReplicaCount(container);
     }
     return legacyReplicationManager.getContainerReplicaCount(container);
+  }
+
+  /**
+   * An open container is healthy if all its replicas are in the same state as
+   * the container.
+   * @param container The container to check
+   * @param replicas The replicas belonging to the container
+   * @return True if the container is healthy, false otherwise
+   */
+  private boolean isOpenContainerHealthy(
+      ContainerInfo container, Set<ContainerReplica> replicas) {
+    HddsProtos.LifeCycleState state = container.getState();
+    return replicas.stream()
+        .allMatch(r -> compareState(state, r.getState()));
+  }
+
+  /**
+   * Compares the container state with the replica state.
+   *
+   * @param containerState ContainerState
+   * @param replicaState ReplicaState
+   * @return true if the state matches, false otherwise
+   */
+  public static boolean compareState(
+      final HddsProtos.LifeCycleState containerState,
+      final ContainerReplicaProto.State replicaState) {
+    switch (containerState) {
+    case OPEN:
+      return replicaState == ContainerReplicaProto.State.OPEN;
+    case CLOSING:
+      return replicaState == ContainerReplicaProto.State.CLOSING;
+    case QUASI_CLOSED:
+      return replicaState == ContainerReplicaProto.State.QUASI_CLOSED;
+    case CLOSED:
+      return replicaState == ContainerReplicaProto.State.CLOSED;
+    default:
+      return false;
+    }
   }
 
   /**

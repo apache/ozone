@@ -77,7 +77,7 @@ public class TestUnderReplicatedProcessor {
     Mockito.when(replicationManager.dequeueUnderReplicatedContainer())
         .thenReturn(new ContainerHealthResult
                 .UnderReplicatedHealthResult(container, 3, false, false, false),
-            null);
+            (ContainerHealthResult.UnderReplicatedHealthResult) null);
     List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
         sourceNodes = new ArrayList<>();
     for (int i = 1; i <= 3; i++) {
@@ -123,7 +123,7 @@ public class TestUnderReplicatedProcessor {
     Mockito.when(replicationManager.dequeueUnderReplicatedContainer())
         .thenReturn(new ContainerHealthResult
                 .UnderReplicatedHealthResult(container, 3, true, false, false),
-            null);
+            (ContainerHealthResult.UnderReplicatedHealthResult) null);
     List<DatanodeDetails> sourceDns = new ArrayList<>();
     sourceDns.add(MockDatanodeDetails.randomDatanodeDetails());
     DatanodeDetails targetDn = MockDatanodeDetails.randomDatanodeDetails();
@@ -159,7 +159,7 @@ public class TestUnderReplicatedProcessor {
     Mockito.when(replicationManager.dequeueUnderReplicatedContainer())
         .thenReturn(new ContainerHealthResult
                 .UnderReplicatedHealthResult(container, 3, false, false, false),
-            null);
+            (ContainerHealthResult.UnderReplicatedHealthResult) null);
 
     Mockito.when(replicationManager
             .processUnderReplicatedContainer(Mockito.any()))
