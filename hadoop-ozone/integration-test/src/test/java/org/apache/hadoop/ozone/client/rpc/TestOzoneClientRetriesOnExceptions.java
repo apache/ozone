@@ -169,7 +169,7 @@ public class TestOzoneClientRetriesOnExceptions {
     XceiverClientSpi xceiverClient =
             xceiverClientManager.acquireClient(pipeline);
     xceiverClient.sendCommand(ContainerTestHelper
-            .getCreateContainerRequest(containerID, pipeline));
+            .getCreateContainerRequest(containerID, pipeline).build());
     xceiverClientManager.releaseClient(xceiverClient, false);
     key.write(data1);
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
@@ -218,7 +218,7 @@ public class TestOzoneClientRetriesOnExceptions {
       Assume.assumeFalse(containerList.contains(containerID));
       containerList.add(containerID);
       xceiverClient.sendCommand(ContainerTestHelper
-          .getCreateContainerRequest(containerID, pipeline));
+          .getCreateContainerRequest(containerID, pipeline).build());
       xceiverClientManager.releaseClient(xceiverClient, false);
     }
     key.write(data1);

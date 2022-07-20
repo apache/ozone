@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -116,35 +115,14 @@ public final class ContainerTestHelper {
    * @param pipeline - A set of machines where this container lives.
    * @param blockID - Block ID of the chunk.
    * @param datalen - Length of data.
-   * @param token - block token.
    * @return ContainerCommandRequestProto
    */
-  public static ContainerCommandRequestProto getWriteChunkRequest(
-      Pipeline pipeline, BlockID blockID, int datalen, String token)
+  public static Builder getWriteChunkRequest(
+      Pipeline pipeline, BlockID blockID, int datalen)
       throws IOException {
     LOG.trace("writeChunk {} (blockID={}) to pipeline={}",
         datalen, blockID, pipeline);
-    return getWriteChunkRequest(pipeline, blockID, datalen, 0, token);
-  }
-
-  /**
-   * Returns a writeChunk Request.
-   *
-   * @param pipeline - A set of machines where this container lives.
-   * @param blockID - Block ID of the chunk.
-   * @param datalen - Length of data.
-   * @param token - block token.
-   * @return ContainerCommandRequestProto
-   */
-  public static ContainerCommandRequestProto getWriteChunkRequest(
-      Pipeline pipeline, BlockID blockID, int datalen, int seq, String token)
-      throws IOException {
-    Builder builder = newWriteChunkRequestBuilder(pipeline, blockID, datalen,
-        seq);
-    if (!Strings.isNullOrEmpty(token)) {
-      builder.setEncodedToken(token);
-    }
-    return builder.build();
+    return newWriteChunkRequestBuilder(pipeline, blockID, datalen, 0);
   }
 
   public static ContainerCommandRequestProto getListBlockRequest(
@@ -306,24 +284,10 @@ public final class ContainerTestHelper {
    *
    * @return ContainerCommandRequestProto.
    */
-  public static ContainerCommandRequestProto getCreateContainerRequest(
+  public static Builder getCreateContainerRequest(
       long containerID, Pipeline pipeline) throws IOException {
     LOG.trace("addContainer: {}", containerID);
-    return getContainerCommandRequestBuilder(containerID, pipeline).build();
-  }
-
-  /**
-   * Returns a create container command with token. There are a bunch of
-   * tests where we need to just send a request and get a reply.
-   *
-   * @return ContainerCommandRequestProto.
-   */
-  public static ContainerCommandRequestProto getCreateContainerRequest(
-      long containerID, Pipeline pipeline, Token<?> token) throws IOException {
-    LOG.trace("addContainer: {}", containerID);
-    return getContainerCommandRequestBuilder(containerID, pipeline)
-        .setEncodedToken(token.encodeToUrlString())
-        .build();
+    return getContainerCommandRequestBuilder(containerID, pipeline);
   }
 
   private static Builder getContainerCommandRequestBuilder(long containerID,
@@ -409,28 +373,10 @@ public final class ContainerTestHelper {
    * @param writeRequest - Write Chunk Request.
    * @return - Request
    */
-  public static ContainerCommandRequestProto getPutBlockRequest(
+  public static Builder getPutBlockRequest(
       Pipeline pipeline, ContainerProtos.WriteChunkRequestProto writeRequest)
       throws IOException {
-    return getPutBlockRequest(pipeline, null, writeRequest);
-  }
-
-  /**
-   * Returns the PutBlockRequest for test purpose.
-   * @param pipeline - pipeline.
-   * @param token - token.
-   * @param writeRequest - Write Chunk Request.
-   * @return - Request
-   */
-  public static ContainerCommandRequestProto getPutBlockRequest(
-      Pipeline pipeline, String token,
-      ContainerProtos.WriteChunkRequestProto writeRequest)
-      throws IOException {
-    Builder builder = newPutBlockRequestBuilder(pipeline, writeRequest);
-    if (!Strings.isNullOrEmpty(token)) {
-      builder.setEncodedToken(token);
-    }
-    return builder.build();
+    return newPutBlockRequestBuilder(pipeline, writeRequest);
   }
 
   public static Builder newPutBlockRequestBuilder(Pipeline pipeline,

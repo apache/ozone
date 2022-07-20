@@ -597,7 +597,7 @@ public class TestDatanodeUpgradeToScmHA {
 
     ContainerProtos.ContainerCommandRequestProto putBlockRequest =
         ContainerTestHelper.getPutBlockRequest(pipeline,
-            writeChunkRequest.getWriteChunk());
+            writeChunkRequest.getWriteChunk()).build();
     dispatchRequest(putBlockRequest);
 
     return writeChunkRequest.getWriteChunk();
@@ -606,7 +606,7 @@ public class TestDatanodeUpgradeToScmHA {
   public ContainerProtos.ContainerCommandRequestProto getWriteChunk(
       long containerID, Pipeline pipeline) throws Exception {
     return ContainerTestHelper.getWriteChunkRequest(pipeline,
-            ContainerTestHelper.getTestBlockID(containerID), 100, null);
+            ContainerTestHelper.getTestBlockID(containerID), 100).build();
   }
 
   public Pipeline getPipeline() {
@@ -618,7 +618,8 @@ public class TestDatanodeUpgradeToScmHA {
       throws Exception {
     long containerID = random.nextInt(Integer.MAX_VALUE);
     ContainerProtos.ContainerCommandRequestProto createContainerRequest =
-        ContainerTestHelper.getCreateContainerRequest(containerID, pipeline);
+        ContainerTestHelper.getCreateContainerRequest(containerID, pipeline)
+            .build();
     dispatchRequest(createContainerRequest);
 
     return containerID;

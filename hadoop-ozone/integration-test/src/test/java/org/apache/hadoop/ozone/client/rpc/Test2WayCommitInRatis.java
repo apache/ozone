@@ -158,7 +158,7 @@ public class Test2WayCommitInRatis {
     XceiverClientReply reply = xceiverClient.sendCommandAsync(
         ContainerTestHelper.getCreateContainerRequest(
             container1.getContainerInfo().getContainerID(),
-            xceiverClient.getPipeline()));
+            xceiverClient.getPipeline()).build());
     reply.getResponse().get();
     Assert.assertEquals(3, ratisClient.getCommitInfoMap().size());
     // wait for the container to be created on all the nodes

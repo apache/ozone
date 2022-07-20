@@ -264,7 +264,7 @@ public class TestWatchForCommit {
     XceiverClientReply reply = xceiverClient.sendCommandAsync(
         ContainerTestHelper.getCreateContainerRequest(
             container1.getContainerInfo().getContainerID(),
-            xceiverClient.getPipeline()));
+            xceiverClient.getPipeline()).build());
     reply.getResponse().get();
     long index = reply.getLogIndex();
     cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
@@ -308,7 +308,7 @@ public class TestWatchForCommit {
     XceiverClientReply reply = xceiverClient.sendCommandAsync(
         ContainerTestHelper.getCreateContainerRequest(
             container1.getContainerInfo().getContainerID(),
-            xceiverClient.getPipeline()));
+            xceiverClient.getPipeline()).build());
     reply.getResponse().get();
     Assert.assertEquals(3, ratisClient.getCommitInfoMap().size());
     List<DatanodeDetails> nodesInPipeline = pipeline.getNodes();
@@ -352,7 +352,7 @@ public class TestWatchForCommit {
     long containerId = container1.getContainerInfo().getContainerID();
     XceiverClientReply reply = xceiverClient.sendCommandAsync(
         ContainerTestHelper.getCreateContainerRequest(containerId,
-            xceiverClient.getPipeline()));
+            xceiverClient.getPipeline()).build());
     reply.getResponse().get();
     Assert.assertEquals(3, ratisClient.getCommitInfoMap().size());
     List<Pipeline> pipelineList = new ArrayList<>();

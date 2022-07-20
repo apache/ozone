@@ -163,7 +163,7 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
     XceiverClientSpi xceiverClient =
         xceiverClientManager.acquireClient(pipeline);
     xceiverClient.sendCommand(ContainerTestHelper
-        .getCreateContainerRequest(containerID, pipeline));
+        .getCreateContainerRequest(containerID, pipeline).build());
     xceiverClientManager.releaseClient(xceiverClient, false);
     key.write(data1);
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)

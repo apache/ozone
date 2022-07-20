@@ -56,14 +56,15 @@ public class TestContainerTokenVerifier
   protected ContainerCommandRequestProto unverifiedRequest()
       throws IOException {
     Pipeline pipeline = MockPipeline.createPipeline(1);
-    return getWriteChunkRequest(pipeline, new BlockID(1, 0), 123, null);
+    return getWriteChunkRequest(
+        pipeline, new BlockID(1, 0), 123).build();
   }
 
   @Override
   protected ContainerCommandRequestProto verifiedRequest(
       ContainerTokenIdentifier tokenId) throws IOException {
     Pipeline pipeline = MockPipeline.createPipeline(1);
-    return getCreateContainerRequest(CONTAINER_ID.get(), pipeline);
+    return getCreateContainerRequest(CONTAINER_ID.get(), pipeline).build();
   }
 
   @Override

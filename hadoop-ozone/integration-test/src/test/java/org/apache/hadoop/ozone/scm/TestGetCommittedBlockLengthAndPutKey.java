@@ -107,12 +107,13 @@ public class TestGetCommittedBlockLengthAndPutKey {
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
         ContainerTestHelper
             .getWriteChunkRequest(container.getPipeline(), blockID,
-                data.length, null);
+                data.length).build();
     client.sendCommand(writeChunkRequest);
     // Now, explicitly make a putKey request for the block.
     ContainerProtos.ContainerCommandRequestProto putKeyRequest =
         ContainerTestHelper
-            .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
+            .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk())
+            .build();
     client.sendCommand(putKeyRequest);
     response = ContainerProtocolCalls
         .getCommittedBlockLength(client, blockID, null);
@@ -165,12 +166,13 @@ public class TestGetCommittedBlockLengthAndPutKey {
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
         ContainerTestHelper
             .getWriteChunkRequest(container.getPipeline(), blockID,
-                data.length, null);
+                data.length).build();
     client.sendCommand(writeChunkRequest);
     // Now, explicitly make a putKey request for the block.
     ContainerProtos.ContainerCommandRequestProto putKeyRequest =
         ContainerTestHelper
-            .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
+            .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk())
+            .build();
     response = client.sendCommand(putKeyRequest).getPutBlock();
     Assert.assertEquals(
         response.getCommittedBlockLength().getBlockLength(), data.length);

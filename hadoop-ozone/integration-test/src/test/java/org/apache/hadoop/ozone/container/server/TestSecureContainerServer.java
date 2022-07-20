@@ -265,7 +265,7 @@ public class TestSecureContainerServer {
       BlockID blockID = getTestBlockID(containerID);
 
       assertFailsTokenVerification(client,
-          getCreateContainerRequest(containerID, pipeline));
+          getCreateContainerRequest(containerID, pipeline).build());
 
       //create the container
       ContainerProtocolCalls.createContainer(client, containerID,

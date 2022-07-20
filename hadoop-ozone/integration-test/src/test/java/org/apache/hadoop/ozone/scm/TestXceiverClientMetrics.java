@@ -105,7 +105,7 @@ public class TestXceiverClientMetrics {
     ContainerCommandRequestProto request = ContainerTestHelper
         .getCreateContainerRequest(
             container.getContainerInfo().getContainerID(),
-            container.getPipeline());
+            container.getPipeline()).build();
     client.sendCommand(request);
 
     MetricsRecordBuilder containerMetrics = getMetrics(

@@ -105,7 +105,7 @@ public class TestContainerStateMachineIdempotency {
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper
               .getWriteChunkRequest(container.getPipeline(), blockID,
-                  data.length, null);
+                  data.length).build();
       client.sendCommand(writeChunkRequest);
 
       //Make the write chunk request again without requesting for overWrite
@@ -113,7 +113,8 @@ public class TestContainerStateMachineIdempotency {
       // Now, explicitly make a putKey request for the block.
       ContainerProtos.ContainerCommandRequestProto putKeyRequest =
           ContainerTestHelper
-              .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
+              .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk())
+              .build();
       client.sendCommand(putKeyRequest).getPutBlock();
       // send the putBlock again
       client.sendCommand(putKeyRequest);
