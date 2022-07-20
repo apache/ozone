@@ -114,7 +114,9 @@ public class TestSCMContainerPlacementCapacity {
             invocation -> {
               String uuid = invocation.getArgument(0);
               return datanodes.stream().filter(
-                              datanode -> datanode.getUuid().toString().equals(uuid)).findFirst()
+                              datanode ->
+                                      datanode.getUuid().toString()
+                                              .equals(uuid)).findFirst()
                       .orElse(null);
             });
 

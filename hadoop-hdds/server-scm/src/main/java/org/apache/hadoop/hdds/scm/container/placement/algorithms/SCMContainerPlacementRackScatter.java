@@ -269,11 +269,11 @@ public final class SCMContainerPlacementRackScatter
       try {
         node = networkTopology.chooseRandom(scope, excludedNodes);
       } catch (Exception e) {
-        if(LOG.isDebugEnabled()) {
+        if (LOG.isDebugEnabled()) {
           LOG.debug("Error while choosing Node: Scope: {}, Excluded Nodes: " +
                           "{}, MetaDataSizeRequired: {}, DataSizeRequired: " +
                   "{}", scope, excludedNodes, metadataSizeRequired,
-                  dataSizeRequired,e);
+                  dataSizeRequired, e);
         }
       }
       if (node != null) {
