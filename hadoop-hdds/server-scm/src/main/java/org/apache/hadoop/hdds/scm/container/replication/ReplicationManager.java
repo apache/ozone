@@ -305,7 +305,7 @@ public class ReplicationManager implements SCMService {
   /**
    * Retrieve the new highest priority container to be replicated from the
    * under replicated queue.
-   * @return The new underReplicated container to be processed, or null if the
+   * @return The next over-replicated container to be processed, or null if the
    *         queue is empty.
    */
   public ContainerHealthResult.OverReplicatedHealthResult

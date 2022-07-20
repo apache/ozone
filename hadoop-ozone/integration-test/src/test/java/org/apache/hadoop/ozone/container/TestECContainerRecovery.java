@@ -59,7 +59,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 
 /**
- * Tests key output stream.
+ * Tests the EC recovery and over replication processing.
  */
 public class TestECContainerRecovery {
   private static MiniOzoneCluster cluster;
