@@ -140,23 +140,30 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
 
     if (index2replicas.size() > 0) {
       final Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
-      final int replicationFactor =
-          container.getReplicationConfig().getRequiredNodes();
       index2replicas.values().forEach(l -> {
         Iterator<ContainerReplica> it = l.iterator();
         Set<ContainerReplica> tempReplicaSet = new HashSet<>(replicas);
         while (it.hasNext() && l.size() > 1) {
+
           ContainerReplica r = it.next();
+          /*
+          TODO: Below placement check can be enforced once
+            ECUnderReplicationHandler enforces the placement policy.
+          Otherwise, over replications may not be deleted if placement is not
+           satisfied.
           if (isPlacementStatusActuallyEqualAfterRemove(
-              tempReplicaSet, r, replicationFactor)) {
-            DeleteContainerCommand deleteCommand =
-                new DeleteContainerCommand(container.getContainerID(), true);
-            commands.put(r.getDatanodeDetails(), deleteCommand);
-            it.remove();
-            tempReplicaSet.remove(r);
-          }
+              tempReplicaSet, r, replicationFactor)) {*/
+          DeleteContainerCommand deleteCommand =
+              new DeleteContainerCommand(container.getContainerID(), true);
+          commands.put(r.getDatanodeDetails(), deleteCommand);
+          it.remove();
+          tempReplicaSet.remove(r);
         }
       });
+      if (commands.size() == 0) {
+        LOG.info("With the current state of avilable replicas {}, no" +
+            " commands to process due to over replication.", replicas);
+      }
       return commands;
     }
 

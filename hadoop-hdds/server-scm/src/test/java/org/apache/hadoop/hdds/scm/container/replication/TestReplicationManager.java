@@ -46,7 +46,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
@@ -77,7 +77,7 @@ public class TestReplicationManager {
   private ReplicationConfig repConfig;
   private ReplicationManagerReport repReport;
   private Queue<ContainerHealthResult.UnderReplicatedHealthResult> underRep;
-  private List<ContainerHealthResult.OverReplicatedHealthResult> overRep;
+  private Queue<ContainerHealthResult.OverReplicatedHealthResult> overRep;
 
   @Before
   public void setup() throws IOException {
@@ -118,7 +118,7 @@ public class TestReplicationManager {
     repConfig = new ECReplicationConfig(3, 2);
     repReport = new ReplicationManagerReport();
     underRep = replicationManager.createUnderReplicatedQueue();
-    overRep = new ArrayList<>();
+    overRep = new LinkedList<>();
 
     // Ensure that RM will run when asked.
     Mockito.when(scmContext.isLeaderReady()).thenReturn(true);
