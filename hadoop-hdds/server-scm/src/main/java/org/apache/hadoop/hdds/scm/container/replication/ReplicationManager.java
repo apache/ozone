@@ -52,8 +52,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -142,7 +142,10 @@ public class ReplicationManager implements SCMService {
   private final ReentrantLock lock = new ReentrantLock();
   private Queue<ContainerHealthResult.UnderReplicatedHealthResult>
       underRepQueue;
+  private Queue<ContainerHealthResult.OverReplicatedHealthResult>
+      overRepQueue;
   private final ECUnderReplicationHandler ecUnderReplicationHandler;
+  private final ECOverReplicationHandler ecOverReplicationHandler;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -180,8 +183,11 @@ public class ReplicationManager implements SCMService {
     this.ecContainerHealthCheck = new ECContainerHealthCheck();
     this.nodeManager = nodeManager;
     this.underRepQueue = createUnderReplicatedQueue();
+    this.overRepQueue = new LinkedList<>();
     ecUnderReplicationHandler = new ECUnderReplicationHandler(
         containerPlacement, conf, nodeManager);
+    ecOverReplicationHandler =
+        new ECOverReplicationHandler(containerPlacement, nodeManager);
     start();
   }
 
@@ -250,8 +256,8 @@ public class ReplicationManager implements SCMService {
     ReplicationManagerReport report = new ReplicationManagerReport();
     Queue<ContainerHealthResult.UnderReplicatedHealthResult>
         underReplicated = createUnderReplicatedQueue();
-    List<ContainerHealthResult.OverReplicatedHealthResult> overReplicated =
-        new ArrayList<>();
+    Queue<ContainerHealthResult.OverReplicatedHealthResult> overReplicated =
+        new LinkedList<>();
 
     for (ContainerInfo c : containers) {
       if (!shouldRun()) {
@@ -273,6 +279,7 @@ public class ReplicationManager implements SCMService {
     lock.lock();
     try {
       underRepQueue = underReplicated;
+      overRepQueue = overReplicated;
     } finally {
       lock.unlock();
     }
@@ -293,6 +300,22 @@ public class ReplicationManager implements SCMService {
     lock.lock();
     try {
       return underRepQueue.poll();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /**
+   * Retrieve the new highest priority container to be replicated from the
+   * under replicated queue.
+   * @return The next over-replicated container to be processed, or null if the
+   *         queue is empty.
+   */
+  public ContainerHealthResult.OverReplicatedHealthResult
+      dequeueOverReplicatedContainer() {
+    lock.lock();
+    try {
+      return overRepQueue.poll();
     } finally {
       lock.unlock();
     }
@@ -323,6 +346,16 @@ public class ReplicationManager implements SCMService {
     }
   }
 
+  public void requeueOverReplicatedContainer(ContainerHealthResult
+      .OverReplicatedHealthResult overReplicatedHealthResult) {
+    lock.lock();
+    try {
+      overRepQueue.add(overReplicatedHealthResult);
+    } finally {
+      lock.unlock();
+    }
+  }
+
   public Map<DatanodeDetails, SCMCommand<?>> processUnderReplicatedContainer(
       final ContainerHealthResult result) throws IOException {
     ContainerID containerID = result.getContainerInfo().containerID();
@@ -334,13 +367,24 @@ public class ReplicationManager implements SCMService {
         pendingOps, result, 0);
   }
 
+  public Map<DatanodeDetails, SCMCommand<?>> processOverReplicatedContainer(
+      final ContainerHealthResult result) throws IOException {
+    ContainerID containerID = result.getContainerInfo().containerID();
+    Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
+        containerID);
+    List<ContainerReplicaOp> pendingOps =
+        containerReplicaPendingOps.getPendingOps(containerID);
+    return ecOverReplicationHandler.processAndCreateCommands(replicas,
+        pendingOps, result, 0);
+  }
+
   public long getScmTerm() throws NotLeaderException {
     return scmContext.getTermOfLeader();
   }
 
   protected ContainerHealthResult processContainer(ContainerInfo containerInfo,
       Queue<ContainerHealthResult.UnderReplicatedHealthResult> underRep,
-      List<ContainerHealthResult.OverReplicatedHealthResult> overRep,
+      Queue<ContainerHealthResult.OverReplicatedHealthResult> overRep,
       ReplicationManagerReport report) throws ContainerNotFoundException {
 
     ContainerID containerID = containerInfo.containerID();
@@ -515,6 +559,18 @@ public class ReplicationManager implements SCMService {
     private long underReplicatedInterval = Duration.ofSeconds(30).toMillis();
 
     /**
+     * The frequency in which the Over Replicated queue is processed.
+     */
+    @Config(key = "over.replicated.interval",
+        type = ConfigType.TIME,
+        defaultValue = "30s",
+        tags = {SCM, OZONE},
+        description = "How frequently to check if there are work to process " +
+            " on the over replicated queue"
+    )
+    private long overReplicatedInterval = Duration.ofSeconds(30).toMillis();
+
+    /**
      * Timeout for container replication & deletion command issued by
      * ReplicationManager.
      */
@@ -559,6 +615,10 @@ public class ReplicationManager implements SCMService {
 
     public long getUnderReplicatedInterval() {
       return underReplicatedInterval;
+    }
+
+    public long getOverReplicatedInterval() {
+      return overReplicatedInterval;
     }
 
     public long getEventTimeout() {

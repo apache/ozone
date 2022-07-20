@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.OverReplicatedProcessor;
 import org.apache.hadoop.hdds.scm.container.replication.UnderReplicatedProcessor;
 import org.apache.hadoop.hdds.scm.crl.CRLStatusReportHandler;
 import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
@@ -739,6 +740,19 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               .setWaitTimeInMillis(backgroundServiceSafemodeWaitMs)
               .setPeriodicalTask(underReplicatedProcessor::processAll).build();
       serviceManager.register(underReplicatedQueueThread);
+
+      OverReplicatedProcessor overReplicatedProcessor =
+          new OverReplicatedProcessor(replicationManager,
+              containerReplicaPendingOps, eventQueue);
+
+      BackgroundSCMService overReplicatedQueueThread =
+          new BackgroundSCMService.Builder().setClock(clock)
+              .setScmContext(scmContext)
+              .setServiceName("OverReplicatedQueueThread")
+              .setIntervalInMillis(rmConf.getOverReplicatedInterval())
+              .setWaitTimeInMillis(backgroundServiceSafemodeWaitMs)
+              .setPeriodicalTask(overReplicatedProcessor::processAll).build();
+      serviceManager.register(overReplicatedQueueThread);
     }
     serviceManager.register(replicationManager);
     if (configurator.getScmSafeModeManager() != null) {
