@@ -29,8 +29,6 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -43,9 +41,9 @@ public class BucketEntityHandler extends EntityHandler {
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
       OzoneStorageContainerManager reconSCM,
-      BucketHandler bucketHandler) {
+      BucketHandler bucketHandler, String path) {
     super(reconNamespaceSummaryManager, omMetadataManager,
-            reconSCM, bucketHandler);
+          reconSCM, bucketHandler, path);
   }
 
   @Override
@@ -57,7 +55,7 @@ public class BucketEntityHandler extends EntityHandler {
     assert (names.length == 2);
     long bucketObjectId = getBucketHandler().getBucketObjectId(names);
     namespaceSummaryResponse
-        .setNumTotalDir(getBucketHandler().getTotalDirCount(bucketObjectId));
+      .setNumTotalDir(getTotalDirCount(bucketObjectId));
     namespaceSummaryResponse.setNumTotalKey(getTotalKeyCount(bucketObjectId));
 
     return namespaceSummaryResponse;
@@ -91,12 +89,7 @@ public class BucketEntityHandler extends EntityHandler {
               .getNSSummary(subdirObjectId);
 
       // get directory's name and generate the next-level subpath.
-      Path dirPath = Paths.get(subdirNSSummary.getDirName());
-      Path dirFileName = dirPath.getFileName();
-      String dirName = "";
-      if (dirFileName != null) {
-        dirName += dirFileName.toString();
-      }
+      String dirName = subdirNSSummary.getDirName();
       String subpath = BucketHandler.buildSubpath(getNormalizedPath(), dirName);
       // we need to reformat the subpath in the response in a
       // format with leading slash and without trailing slash

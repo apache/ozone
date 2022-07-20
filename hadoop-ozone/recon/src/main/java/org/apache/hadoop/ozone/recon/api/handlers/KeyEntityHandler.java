@@ -38,9 +38,9 @@ public class KeyEntityHandler extends EntityHandler {
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
       OzoneStorageContainerManager reconSCM,
-      BucketHandler bucketHandler) {
+      BucketHandler bucketHandler, String path) {
     super(reconNamespaceSummaryManager, omMetadataManager,
-            reconSCM, bucketHandler);
+          reconSCM, bucketHandler, path);
   }
 
   @Override
@@ -60,8 +60,7 @@ public class KeyEntityHandler extends EntityHandler {
     duResponse.setPath(getNormalizedPath());
     // DU for key doesn't have subpaths
     duResponse.setCount(0);
-    String[] names = getNames();
-    OmKeyInfo keyInfo = getBucketHandler().getKeyInfo(names);
+    OmKeyInfo keyInfo = getBucketHandler().getKeyInfo(getNames());
 
     duResponse.setSize(keyInfo.getDataSize());
     if (withReplica) {

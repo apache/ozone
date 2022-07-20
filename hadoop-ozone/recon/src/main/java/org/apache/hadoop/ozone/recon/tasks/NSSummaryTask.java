@@ -52,7 +52,7 @@ public abstract class NSSummaryTask implements ReconOmTask {
   private static final Logger LOG =
           LoggerFactory.getLogger(NSSummaryTask.class);
 
-  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
   @Inject
   public NSSummaryTask(ReconNamespaceSummaryManager

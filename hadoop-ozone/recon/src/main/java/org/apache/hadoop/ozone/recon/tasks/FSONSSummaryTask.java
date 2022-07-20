@@ -73,7 +73,7 @@ public class FSONSSummaryTask extends NSSummaryTask {
 
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, ? extends
-          WithParentObjectId> omdbUpdateEvent = eventIterator.next();
+              WithParentObjectId> omdbUpdateEvent = eventIterator.next();
       OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
 
       // we only process updates on OM's FileTable and Dirtable
@@ -89,7 +89,7 @@ public class FSONSSummaryTask extends NSSummaryTask {
         if (updateOnFileTable) {
           // key update on fileTable
           OMDBUpdateEvent<String, OmKeyInfo> keyTableUpdateEvent =
-              (OMDBUpdateEvent<String, OmKeyInfo>) omdbUpdateEvent;
+                  (OMDBUpdateEvent<String, OmKeyInfo>) omdbUpdateEvent;
           OmKeyInfo updatedKeyInfo = keyTableUpdateEvent.getValue();
           OmKeyInfo oldKeyInfo = keyTableUpdateEvent.getOldValue();
 
@@ -108,19 +108,19 @@ public class FSONSSummaryTask extends NSSummaryTask {
               handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
             } else {
               LOG.warn("Update event does not have the old keyInfo for {}.",
-                  updatedKey);
+                      updatedKey);
             }
             handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
             break;
 
           default:
             LOG.debug("Skipping DB update event : {}",
-                omdbUpdateEvent.getAction());
+                    omdbUpdateEvent.getAction());
           }
         } else {
           // directory update on DirTable
           OMDBUpdateEvent<String, OmDirectoryInfo> dirTableUpdateEvent =
-              (OMDBUpdateEvent<String, OmDirectoryInfo>) omdbUpdateEvent;
+                  (OMDBUpdateEvent<String, OmDirectoryInfo>) omdbUpdateEvent;
           OmDirectoryInfo updatedDirectoryInfo = dirTableUpdateEvent.getValue();
           OmDirectoryInfo oldDirectoryInfo = dirTableUpdateEvent.getOldValue();
 
@@ -139,19 +139,19 @@ public class FSONSSummaryTask extends NSSummaryTask {
               handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
             } else {
               LOG.warn("Update event does not have the old dirInfo for {}.",
-                  updatedKey);
+                      updatedKey);
             }
             handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
             break;
 
           default:
             LOG.debug("Skipping DB update event : {}",
-                omdbUpdateEvent.getAction());
+                    omdbUpdateEvent.getAction());
           }
         }
       } catch (IOException ioEx) {
         LOG.error("Unable to process Namespace Summary data in Recon DB. ",
-            ioEx);
+                ioEx);
         return new ImmutablePair<>(getTaskName(), false);
       }
     }
@@ -175,9 +175,10 @@ public class FSONSSummaryTask extends NSSummaryTask {
       // reinit Recon RocksDB's namespace CF.
       getReconNamespaceSummaryManager().clearNSSummaryTable();
 
-      Table dirTable = omMetadataManager.getDirectoryTable();
+      Table<String, OmDirectoryInfo> dirTable =
+          omMetadataManager.getDirectoryTable();
       TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
-          dirTableIter = dirTable.iterator();
+              dirTableIter = dirTable.iterator();
 
       while (dirTableIter.hasNext()) {
         Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();
@@ -186,10 +187,10 @@ public class FSONSSummaryTask extends NSSummaryTask {
       }
 
       // Get fileTable used by FSO
-      Table keyTable = omMetadataManager.getFileTable();
+      Table<String, OmKeyInfo> keyTable = omMetadataManager.getFileTable();
 
       TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-          keyTableIter = keyTable.iterator();
+              keyTableIter = keyTable.iterator();
 
       while (keyTableIter.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
@@ -199,7 +200,7 @@ public class FSONSSummaryTask extends NSSummaryTask {
 
     } catch (IOException ioEx) {
       LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
-          ioEx);
+              ioEx);
       return new ImmutablePair<>(getTaskName(), false);
     }
 

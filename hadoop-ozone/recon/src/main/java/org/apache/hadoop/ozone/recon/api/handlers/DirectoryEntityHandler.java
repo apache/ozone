@@ -30,8 +30,6 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -45,9 +43,9 @@ public class DirectoryEntityHandler extends EntityHandler {
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
       OzoneStorageContainerManager reconSCM,
-      BucketHandler bucketHandler) {
+      BucketHandler bucketHandler, String path) {
     super(reconNamespaceSummaryManager, omMetadataManager,
-            reconSCM, bucketHandler);
+          reconSCM, bucketHandler, path);
   }
 
   @Override
@@ -58,7 +56,7 @@ public class DirectoryEntityHandler extends EntityHandler {
     NamespaceSummaryResponse namespaceSummaryResponse =
             new NamespaceSummaryResponse(EntityType.DIRECTORY);
     namespaceSummaryResponse
-        .setNumTotalDir(getBucketHandler().getTotalDirCount(dirObjectId));
+        .setNumTotalDir(getTotalDirCount(dirObjectId));
     namespaceSummaryResponse.setNumTotalKey(getTotalKeyCount(dirObjectId));
 
     return namespaceSummaryResponse;
@@ -91,12 +89,7 @@ public class DirectoryEntityHandler extends EntityHandler {
     for (long subdirObjectId: subdirs) {
       NSSummary subdirNSSummary =
               getReconNamespaceSummaryManager().getNSSummary(subdirObjectId);
-      Path subdirPath = Paths.get(subdirNSSummary.getDirName());
-      Path subdirFileName = subdirPath.getFileName();
-      String subdirName = "";
-      if (subdirFileName != null) {
-        subdirName += subdirFileName.toString();
-      }
+      String subdirName = subdirNSSummary.getDirName();
       // build the path for subdirectory
       String subpath = BucketHandler
               .buildSubpath(getNormalizedPath(), subdirName);

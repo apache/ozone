@@ -22,8 +22,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -78,20 +76,7 @@ public abstract class BucketHandler {
     return reconNamespaceSummaryManager;
   }
 
-  public ContainerManager getContainerManager() {
-    return containerManager;
-  }
-
-  public OzoneStorageContainerManager getReconSCM() {
-    return reconSCM;
-  }
-
   public abstract EntityType determineKeyPath(String keyName)
-      throws IOException;
-
-  public abstract Table<String, OmKeyInfo> getKeyTable();
-
-  public abstract long calculateDUForVolume(String volumeName)
       throws IOException;
 
   public abstract long calculateDUUnderObject(long parentId)
@@ -109,9 +94,6 @@ public abstract class BucketHandler {
           throws IOException;
 
   public abstract BucketLayout getBucketLayout();
-
-  public abstract int getTotalDirCount(long objectId)
-      throws IOException;
 
   public abstract OmKeyInfo getKeyInfo(String[] names)
       throws IOException;
@@ -179,9 +161,9 @@ public abstract class BucketHandler {
    * @throws IOException
    */
   public long getVolumeObjectId(String[] names) throws IOException {
-    String bucketKey = omMetadataManager.getVolumeKey(names[0]);
+    String volumeKey = omMetadataManager.getVolumeKey(names[0]);
     OmVolumeArgs volumeInfo = omMetadataManager
-            .getVolumeTable().getSkipCache(bucketKey);
+            .getVolumeTable().getSkipCache(volumeKey);
     return volumeInfo.getObjectID();
   }
 
@@ -204,14 +186,8 @@ public abstract class BucketHandler {
                 OzoneStorageContainerManager reconSCM,
                 OmBucketInfo bucketInfo) throws IOException {
 
-    if (bucketInfo.getBucketLayout()
-            .equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-      return new FSOBucketHandler(reconNamespaceSummaryManager,
+    return new FSOBucketHandler(reconNamespaceSummaryManager,
               omMetadataManager, reconSCM, bucketInfo);
-    } else {
-      return new LegacyBucketHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, bucketInfo);
-    }
   }
 
   public static BucketHandler getBucketHandler(
@@ -220,8 +196,9 @@ public abstract class BucketHandler {
       OzoneStorageContainerManager reconSCM,
       String volumeName, String bucketName) throws IOException {
 
-    OmBucketInfo bucketInfo = OzoneManagerUtils
-          .getOmBucketInfo(omMetadataManager, volumeName, bucketName);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo bucketInfo = omMetadataManager
+        .getBucketTable().getSkipCache(bucketKey);
 
     if (bucketInfo == null) {
       return null;

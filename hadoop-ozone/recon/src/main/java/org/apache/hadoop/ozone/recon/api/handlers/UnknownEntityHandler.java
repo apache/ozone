@@ -38,7 +38,7 @@ public class UnknownEntityHandler extends EntityHandler {
       ReconOMMetadataManager omMetadataManager,
       OzoneStorageContainerManager reconSCM) {
     super(reconNamespaceSummaryManager, omMetadataManager,
-            reconSCM, null);
+          reconSCM, null, null);
   }
 
   @Override

@@ -48,13 +48,11 @@ import java.io.IOException;
 @AdminOnly
 public class NSSummaryEndpoint {
 
-  @Inject
-  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
-  @Inject
-  private ReconOMMetadataManager omMetadataManager;
+  private final ReconOMMetadataManager omMetadataManager;
 
-  private OzoneStorageContainerManager reconSCM;
+  private final OzoneStorageContainerManager reconSCM;
   @Inject
   public NSSummaryEndpoint(ReconNamespaceSummaryManager namespaceSummaryManager,
                            ReconOMMetadataManager omMetadataManager,
@@ -102,7 +100,7 @@ public class NSSummaryEndpoint {
    * @param listFile show subpath/disk usage for each key
    * @param withReplica count actual DU with replication
    * @return DU response
-   * @throws IOException IOE
+   * @throws IOException
    */
   @GET
   @Path("/du")
@@ -138,7 +136,7 @@ public class NSSummaryEndpoint {
    * bytes.
    * @param path request path
    * @return Quota Usage response
-   * @throws IOException IOE
+   * @throws IOException
    */
   @GET
   @Path("/quota")
@@ -168,7 +166,7 @@ public class NSSummaryEndpoint {
    * Endpoint that returns aggregate file size distribution under a path.
    * @param path request path
    * @return File size distribution response
-   * @throws IOException IOE
+   * @throws IOException
    */
   @GET
   @Path("/dist")

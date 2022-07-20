@@ -40,9 +40,9 @@ public enum EntityType {
         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
         ReconOMMetadataManager omMetadataManager,
         OzoneStorageContainerManager reconSCM,
-        BucketHandler bucketHandler) {
+        BucketHandler bucketHandler, String path) {
       return new RootEntityHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM);
+              omMetadataManager, reconSCM, path);
     }
   },
   VOLUME {
@@ -50,9 +50,9 @@ public enum EntityType {
         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
         ReconOMMetadataManager omMetadataManager,
         OzoneStorageContainerManager reconSCM,
-        BucketHandler bucketHandler) {
+        BucketHandler bucketHandler, String path) {
       return new VolumeEntityHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM);
+              omMetadataManager, reconSCM, path);
     }
   },
   BUCKET {
@@ -60,9 +60,9 @@ public enum EntityType {
         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
         ReconOMMetadataManager omMetadataManager,
         OzoneStorageContainerManager reconSCM,
-        BucketHandler bucketHandler) {
+        BucketHandler bucketHandler, String path) {
       return new BucketEntityHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, bucketHandler);
+              omMetadataManager, reconSCM, bucketHandler, path);
     }
   },
   DIRECTORY {
@@ -70,9 +70,9 @@ public enum EntityType {
         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
         ReconOMMetadataManager omMetadataManager,
         OzoneStorageContainerManager reconSCM,
-        BucketHandler bucketHandler) {
+        BucketHandler bucketHandler, String path) {
       return new DirectoryEntityHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, bucketHandler);
+              omMetadataManager, reconSCM, bucketHandler, path);
     }
   },
   KEY {
@@ -80,9 +80,9 @@ public enum EntityType {
         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
         ReconOMMetadataManager omMetadataManager,
         OzoneStorageContainerManager reconSCM,
-        BucketHandler bucketHandler) {
+        BucketHandler bucketHandler, String path) {
       return new KeyEntityHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, bucketHandler);
+              omMetadataManager, reconSCM, bucketHandler, path);
     }
   },
   UNKNOWN { // if path is invalid
@@ -90,7 +90,7 @@ public enum EntityType {
         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
         ReconOMMetadataManager omMetadataManager,
         OzoneStorageContainerManager reconSCM,
-        BucketHandler bucketHandler) {
+        BucketHandler bucketHandler, String path) {
       return new UnknownEntityHandler(reconNamespaceSummaryManager,
               omMetadataManager, reconSCM);
     }
@@ -100,5 +100,5 @@ public enum EntityType {
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
       OzoneStorageContainerManager reconSCM,
-      BucketHandler bucketHandler);
+      BucketHandler bucketHandler, String path);
 }
