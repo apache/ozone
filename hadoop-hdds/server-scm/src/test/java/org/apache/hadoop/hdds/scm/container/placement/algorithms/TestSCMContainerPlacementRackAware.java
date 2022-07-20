@@ -107,24 +107,23 @@ public class TestSCMContainerPlacementRackAware {
       DatanodeDetails datanodeDetails =
           MockDatanodeDetails.createDatanodeDetails(
           hostname + i, rack + (i / NODE_PER_RACK));
-      DatanodeInfo datanodeInfo = new DatanodeInfo(
-          datanodeDetails, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
-
-      StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
-          STORAGE_CAPACITY, 0, 100L, null);
-      MetadataStorageReportProto metaStorage1 =
-          HddsTestUtils.createMetadataStorageReport(
-          "/metadata1-" + datanodeInfo.getUuidString(),
-          STORAGE_CAPACITY, 0, 100L, null);
-      datanodeInfo.updateStorageReports(
-          new ArrayList<>(Arrays.asList(storage1)));
-      datanodeInfo.updateMetaDataStorageReports(
-          new ArrayList<>(Arrays.asList(metaStorage1)));
-
       datanodes.add(datanodeDetails);
       cluster.add(datanodeDetails);
+      DatanodeInfo datanodeInfo = new DatanodeInfo(
+              datanodeDetails, NodeStatus.inServiceHealthy(),
+              UpgradeUtils.defaultLayoutVersionProto());
+
+      StorageReportProto storage1 = HddsTestUtils.createStorageReport(
+              datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+              STORAGE_CAPACITY, 0, 100L, null);
+      MetadataStorageReportProto metaStorage1 =
+              HddsTestUtils.createMetadataStorageReport(
+                      "/metadata1-" + datanodeInfo.getUuidString(),
+                      STORAGE_CAPACITY, 0, 100L, null);
+      datanodeInfo.updateStorageReports(
+              new ArrayList<>(Arrays.asList(storage1)));
+      datanodeInfo.updateMetaDataStorageReports(
+              new ArrayList<>(Arrays.asList(metaStorage1)));
       dnInfos.add(datanodeInfo);
     }
 
