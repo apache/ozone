@@ -233,8 +233,7 @@ public class ObjectEndpoint extends EndpointBase {
         throw os3Exception;
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
-      } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND
-          || ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
+      } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
       }
       LOG.error("Exception occurred in PutObject", ex);
@@ -376,8 +375,7 @@ public class ObjectEndpoint extends EndpointBase {
         throw newError(S3ErrorTable.NO_SUCH_KEY, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
-      } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND
-          || ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
+      } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
       } else {
         throw ex;
@@ -436,8 +434,7 @@ public class ObjectEndpoint extends EndpointBase {
         return Response.status(Status.NOT_FOUND).build();
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
-      } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND ||
-                 ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
+      } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
       } else {
         throw ex;
@@ -477,8 +474,7 @@ public class ObjectEndpoint extends EndpointBase {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(S3ErrorTable.NO_SUCH_UPLOAD, uploadId, ex);
-      } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND
-          || ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
+      } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucket, ex);
       }
       throw ex;
@@ -698,8 +694,7 @@ public class ObjectEndpoint extends EndpointBase {
             "considered as Unix Paths. A directory already exists with a " +
             "given KeyName caused failure for MPU");
         throw os3Exception;
-      } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND
-          || ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
+      } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucket, ex);
       }
       LOG.error("Error in Complete Multipart Upload Request for bucket: {}, " +
