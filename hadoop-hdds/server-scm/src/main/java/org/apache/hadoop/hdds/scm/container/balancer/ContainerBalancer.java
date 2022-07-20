@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -543,9 +544,9 @@ public class ContainerBalancer extends StatefulService {
     metrics.incrementDataSizeMovedGB(
         metrics.getDataSizeMovedGBInLatestIteration());
     LOG.info("Iteration Summary. Number of Datanodes involved: {}. Size " +
-            "moved: {}GB ({} Bytes). Number of Container moves completed: {}.",
+            "moved: {} ({} Bytes). Number of Container moves completed: {}.",
         countDatanodesInvolvedPerIteration,
-        sizeActuallyMovedInLatestIteration / (double) OzoneConsts.GB,
+        StringUtils.byteDesc(sizeActuallyMovedInLatestIteration),
         sizeActuallyMovedInLatestIteration,
         metrics.getNumContainerMovesCompletedInLatestIteration());
   }
