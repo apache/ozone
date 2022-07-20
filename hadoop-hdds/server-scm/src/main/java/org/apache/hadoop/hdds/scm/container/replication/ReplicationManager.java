@@ -309,7 +309,7 @@ public class ReplicationManager implements SCMService {
    *         queue is empty.
    */
   public ContainerHealthResult.OverReplicatedHealthResult
-    dequeueOverReplicatedContainer() {
+      dequeueOverReplicatedContainer() {
     lock.lock();
     try {
       return overRepQueue.poll();
@@ -345,7 +345,6 @@ public class ReplicationManager implements SCMService {
 
   public void requeueOverReplicatedContainer(ContainerHealthResult
       .OverReplicatedHealthResult overReplicatedHealthResult) {
-    //overReplicatedHealthResult.incrementRequeueCount();
     lock.lock();
     try {
       overRepQueue.add(overReplicatedHealthResult);
