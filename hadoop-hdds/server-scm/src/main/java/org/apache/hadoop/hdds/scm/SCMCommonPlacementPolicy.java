@@ -148,9 +148,11 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
     return chooseDatanodesInternal(
             Objects.isNull(excludedNodes)
                     ? excludedNodes : excludedNodes.stream()
-                    .map(node -> nodeManager
-                            .getNodeByUuid(node.getUuidString()))
-                    .collect(Collectors.toList()),
+                    .map(node -> {
+                      DatanodeDetails datanodeDetails =
+                              nodeManager.getNodeByUuid(node.getUuidString());
+                      return datanodeDetails != null ? datanodeDetails : node;
+                    }).collect(Collectors.toList()),
             favoredNodes, nodesRequired,
             metadataSizeRequired, dataSizeRequired);
   }
