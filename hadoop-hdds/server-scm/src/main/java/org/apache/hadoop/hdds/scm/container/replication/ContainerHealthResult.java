@@ -32,6 +32,7 @@ public class ContainerHealthResult {
    */
   public enum HealthState {
     HEALTHY,
+    UNHEALTHY,
     UNDER_REPLICATED,
     OVER_REPLICATED
   }
@@ -68,6 +69,17 @@ public class ContainerHealthResult {
 
     HealthyResult(ContainerInfo containerInfo) {
       super(containerInfo, HealthState.HEALTHY);
+    }
+  }
+
+  /**
+   * Class for Unhealthy container check results, where the container has some
+   * issue other than over or under replication.
+   */
+  public static class UnHealthyResult extends ContainerHealthResult {
+
+    UnHealthyResult(ContainerInfo containerInfo) {
+      super(containerInfo, HealthState.UNHEALTHY);
     }
   }
 
