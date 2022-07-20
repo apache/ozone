@@ -176,7 +176,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           commands.put(selectedDatanodes.get(0), reconstructionCommand);
         } else {
           LOG.warn("Cannot proceed for EC container reconstruction for {}, due"
-              + "to insufficient source replicas found. Number of source "
+              + " to insufficient source replicas found. Number of source "
               + "replicas needed: {}. Number of available source replicas are:"
               + " {}. Available sources are: {}", container.containerID(),
               repConfig.getData(), sources.size(), sources);
