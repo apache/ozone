@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
@@ -280,6 +281,10 @@ public abstract class EndpointBase implements Auditor {
 
   public OzoneClient getClient() {
     return client;
+  }
+
+  protected ClientProtocol getClientProtocol() {
+    return getClient().getProxy();
   }
 
   @VisibleForTesting
