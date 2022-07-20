@@ -87,24 +87,26 @@ public class ReplicatedBlockChecksumComputer extends
   // compute the block checksum of CompositeCrc,
   // which is the incremental computation of chunk checksums
   private void computeCompositeCrc() throws IOException {
-    DataChecksum.Type dataChecksumType = null;
-    long bytesPerCrc = 0;
-    long chunkSize = 0;
-    if (chunkInfoList.size() > 0) {
-      final ContainerProtos.ChunkInfo firstChunkInfo = chunkInfoList.get(0);
-      switch (firstChunkInfo.getChecksumData().getType()) {
-      case CRC32C:
-        dataChecksumType = DataChecksum.Type.CRC32C;
-        break;
-      case CRC32:
-        dataChecksumType = DataChecksum.Type.CRC32;
-        break;
-      default:
-        throw new IllegalArgumentException("unsupported checksum type");
-      }
-      chunkSize = firstChunkInfo.getLen();
-      bytesPerCrc = firstChunkInfo.getChecksumData().getBytesPerChecksum();
+    DataChecksum.Type dataChecksumType;
+    long bytesPerCrc;
+    long chunkSize;
+    Preconditions.checkArgument(chunkInfoList.size() > 0);
+
+    final ContainerProtos.ChunkInfo firstChunkInfo = chunkInfoList.get(0);
+    switch (firstChunkInfo.getChecksumData().getType()) {
+    case CRC32C:
+      dataChecksumType = DataChecksum.Type.CRC32C;
+      break;
+    case CRC32:
+      dataChecksumType = DataChecksum.Type.CRC32;
+      break;
+    default:
+      throw new IllegalArgumentException("unsupported checksum type: " +
+          firstChunkInfo.getChecksumData().getType());
     }
+    chunkSize = firstChunkInfo.getLen();
+    bytesPerCrc = firstChunkInfo.getChecksumData().getBytesPerChecksum();
+
 
     CrcComposer blockCrcComposer =
         CrcComposer.newCrcComposer(dataChecksumType, chunkSize);

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.client.checksum;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -99,6 +100,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
     // for each block, send request
     List<ContainerProtos.ChunkInfo> chunkInfos =
         getChunkInfos(keyLocationInfo);
+    Preconditions.checkArgument(chunkInfos.size() > 0);
     ContainerProtos.ChecksumData checksumData =
         chunkInfos.get(0).getChecksumData();
     int bytesPerChecksum = checksumData.getBytesPerChecksum();
