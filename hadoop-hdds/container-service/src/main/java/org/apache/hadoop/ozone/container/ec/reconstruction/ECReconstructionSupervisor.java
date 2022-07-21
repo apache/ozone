@@ -21,6 +21,9 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 
+import java.io.Closeable;
+import java.io.IOException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -30,28 +33,40 @@ import java.util.concurrent.TimeUnit;
  * This class is to handle all the EC reconstruction tasks to be scheduled as
  * they arrive.
  */
-public class ECReconstructionSupervisor {
+public class ECReconstructionSupervisor implements Closeable {
 
   private final ContainerSet containerSet;
   private final StateContext context;
   private final ExecutorService executor;
+  private final ECReconstructionCoordinator reconstructionCoordinator;
+  /**
+   * how many coordinator tasks currently being running.
+   */
+  private final ConcurrentHashMap.KeySetView<Object, Boolean>
+      inProgressReconstrucionCoordinatorCounter;
 
   public ECReconstructionSupervisor(ContainerSet containerSet,
-      StateContext context, ExecutorService executor) {
+      StateContext context, ExecutorService executor,
+      ECReconstructionCoordinator coordinator) {
     this.containerSet = containerSet;
     this.context = context;
     this.executor = executor;
+    this.reconstructionCoordinator = coordinator;
+    this.inProgressReconstrucionCoordinatorCounter =
+        ConcurrentHashMap.newKeySet();
   }
 
   public ECReconstructionSupervisor(ContainerSet containerSet,
-      StateContext context, int poolSize) {
+      StateContext context, int poolSize,
+      ECReconstructionCoordinator coordinator) {
     // TODO: ReplicationSupervisor and this class can be refactored to have a
     //  common interface.
     this(containerSet, context,
         new ThreadPoolExecutor(poolSize, poolSize, 60, TimeUnit.SECONDS,
             new LinkedBlockingQueue<>(),
             new ThreadFactoryBuilder().setDaemon(true)
-                .setNameFormat("ECContainerReconstructionThread-%d").build()));
+                .setNameFormat("ECContainerReconstructionThread-%d").build()),
+        coordinator);
   }
 
   public void stop() {
@@ -66,7 +81,28 @@ public class ECReconstructionSupervisor {
     }
   }
 
-  public void addTask(ECReconstructionCoordinatorTask task) {
-    executor.execute(task);
+  public void addTask(ECReconstructionCommandInfo taskInfo) {
+    if (inProgressReconstrucionCoordinatorCounter
+        .add(taskInfo.getContainerID())) {
+      executor.execute(
+          new ECReconstructionCoordinatorTask(getReconstructionCoordinator(),
+              taskInfo, inProgressReconstrucionCoordinatorCounter));
+    }
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (reconstructionCoordinator != null) {
+      reconstructionCoordinator.close();
+    }
+    stop();
+  }
+
+  public ECReconstructionCoordinator getReconstructionCoordinator() {
+    return reconstructionCoordinator;
+  }
+
+  public int getInFlightReplications() {
+    return this.inProgressReconstrucionCoordinatorCounter.size();
   }
 }

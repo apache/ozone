@@ -41,11 +41,13 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -57,7 +59,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
@@ -82,7 +83,9 @@ public class ContainerBalancer extends StatefulService {
   private double maxDatanodesRatioToInvolvePerIteration;
   private long maxSizeToMovePerIteration;
   private int countDatanodesInvolvedPerIteration;
-  private long sizeMovedPerIteration;
+  private long sizeScheduledForMoveInLatestIteration;
+  // count actual size moved in bytes
+  private long sizeActuallyMovedInLatestIteration;
   private int iterations;
   private List<DatanodeUsageInfo> unBalancedNodes;
   private List<DatanodeUsageInfo> overUtilizedNodes;
@@ -101,7 +104,7 @@ public class ContainerBalancer extends StatefulService {
   private double upperLimit;
   private double lowerLimit;
   private volatile Thread currentBalancingThread;
-  private Lock lock;
+  private ReentrantLock lock;
   private ContainerBalancerSelectionCriteria selectionCriteria;
   private Map<DatanodeDetails, ContainerMoveSelection> sourceToTargetMap;
   private Set<ContainerID> selectedContainers;
@@ -206,22 +209,23 @@ public class ContainerBalancer extends StatefulService {
       metrics.incrementNumIterations(1);
       LOG.info("Result of this iteration of Container Balancer: {}", iR);
 
-      // persist next iteration index
-      if (iR == IterationResult.ITERATION_COMPLETED) {
-        try {
-          saveConfiguration(config, true, i + 1);
-        } catch (IOException e) {
-          LOG.warn("Could not persist next iteration index value for " +
-              "ContainerBalancer after completing an iteration", e);
-        }
-      }
-
       // if no new move option is generated, it means the cluster cannot be
       // balanced anymore; so just stop balancer
       if (iR == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
         tryStopBalancer(iR.toString());
         return;
       }
+
+      // persist next iteration index
+      if (iR == IterationResult.ITERATION_COMPLETED) {
+        try {
+          saveConfiguration(config, true, i + 1);
+        } catch (IOException | TimeoutException e) {
+          LOG.warn("Could not persist next iteration index value for " +
+              "ContainerBalancer after completing an iteration", e);
+        }
+      }
+
 
       // return if balancing has been stopped
       if (!isBalancerRunning()) {
@@ -336,7 +340,7 @@ public class ContainerBalancer extends StatefulService {
         metrics.incrementNumDatanodesUnbalanced(1);
 
         // amount of bytes greater than upper limit in this node
-        Long overUtilizedBytes = ratioToBytes(
+        long overUtilizedBytes = ratioToBytes(
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
             utilization) - ratioToBytes(
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
@@ -347,7 +351,7 @@ public class ContainerBalancer extends StatefulService {
         metrics.incrementNumDatanodesUnbalanced(1);
 
         // amount of bytes lesser than lower limit in this node
-        Long underUtilizedBytes = ratioToBytes(
+        long underUtilizedBytes = ratioToBytes(
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
             lowerLimit) - ratioToBytes(
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
@@ -450,9 +454,20 @@ public class ContainerBalancer extends StatefulService {
   private void processMoveSelection(DatanodeDetails source,
                                     ContainerMoveSelection moveSelection,
                                     Set<DatanodeDetails> selectedTargets) {
-    LOG.info("ContainerBalancer is trying to move container {} from " +
-            "source datanode {} to target datanode {}",
+    ContainerInfo containerInfo;
+    try {
+      containerInfo =
+          containerManager.getContainer(moveSelection.getContainerID());
+    } catch (ContainerNotFoundException e) {
+      LOG.warn("Could not get container {} from Container Manager before " +
+          "starting a container move", moveSelection.getContainerID(),
+          e);
+      return;
+    }
+    LOG.info("ContainerBalancer is trying to move container {} with size " +
+            "{}B from source datanode {} to target datanode {}",
         moveSelection.getContainerID().toString(),
+        containerInfo.getUsedBytes(),
         source.getUuidString(),
         moveSelection.getTargetNode().getUuidString());
 
@@ -524,12 +539,16 @@ public class ContainerBalancer extends StatefulService {
         metrics.getNumContainerMovesCompletedInLatestIteration());
     metrics.incrementNumContainerMovesTimeout(
         metrics.getNumContainerMovesTimeoutInLatestIteration());
+    metrics.incrementDataSizeMovedGBInLatestIteration(
+        sizeActuallyMovedInLatestIteration / OzoneConsts.GB);
     metrics.incrementDataSizeMovedGB(
         metrics.getDataSizeMovedGBInLatestIteration());
-    LOG.info("Number of datanodes involved in this iteration: {}. Size moved " +
-            "in this iteration: {}GB.",
+    LOG.info("Iteration Summary. Number of Datanodes involved: {}. Size " +
+            "moved: {} ({} Bytes). Number of Container moves completed: {}.",
         countDatanodesInvolvedPerIteration,
-        metrics.getDataSizeMovedGBInLatestIteration());
+        StringUtils.byteDesc(sizeActuallyMovedInLatestIteration),
+        sizeActuallyMovedInLatestIteration,
+        metrics.getNumContainerMovesCompletedInLatestIteration());
   }
 
   /**
@@ -589,14 +608,15 @@ public class ContainerBalancer extends StatefulService {
       }
       return true;
     }
-    if (sizeMovedPerIteration + (long) ozoneConfiguration.getStorageSize(
+    if (sizeScheduledForMoveInLatestIteration +
+        (long) ozoneConfiguration.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES) > maxSizeToMovePerIteration) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Hit max size to move limit. {} bytes have already been " +
                 "scheduled for balancing and the limit is {} bytes.",
-            sizeMovedPerIteration,
+            sizeScheduledForMoveInLatestIteration,
             maxSizeToMovePerIteration);
       }
       return true;
@@ -623,6 +643,8 @@ public class ContainerBalancer extends StatefulService {
       future = replicationManager
           .move(containerID, source, moveSelection.getTargetNode())
           .whenComplete((result, ex) -> {
+
+            metrics.incrementCurrentIterationContainerMoveMetric(result, 1);
             if (ex != null) {
               LOG.info("Container move for container {} from source {} to " +
                       "target {} failed with exceptions {}",
@@ -631,9 +653,8 @@ public class ContainerBalancer extends StatefulService {
                   moveSelection.getTargetNode().getUuidString(), ex);
             } else {
               if (result == LegacyReplicationManager.MoveResult.COMPLETED) {
-                metrics.incrementDataSizeMovedGBInLatestIteration(
-                    containerInfo.getUsedBytes() / OzoneConsts.GB);
-                metrics.incrementNumContainerMovesCompletedInLatestIteration(1);
+                sizeActuallyMovedInLatestIteration +=
+                    containerInfo.getUsedBytes();
                 if (LOG.isDebugEnabled()) {
                   LOG.debug(
                       "Container move completed for container {} to target {}",
@@ -652,7 +673,7 @@ public class ContainerBalancer extends StatefulService {
       LOG.warn("Could not find Container {} for container move",
           containerID, e);
       return false;
-    } catch (NodeNotFoundException e) {
+    } catch (NodeNotFoundException | TimeoutException e) {
       LOG.warn("Container move failed for container {}", containerID, e);
       return false;
     }
@@ -799,7 +820,7 @@ public class ContainerBalancer extends StatefulService {
       return;
     }
     long size = container.getUsedBytes();
-    sizeMovedPerIteration += size;
+    sizeScheduledForMoveInLatestIteration += size;
 
     // update sizeLeavingNode map with the recent moveSelection
     findSourceStrategy.increaseSizeLeaving(source, size);
@@ -820,7 +841,8 @@ public class ContainerBalancer extends StatefulService {
     this.underUtilizedNodes.clear();
     this.unBalancedNodes.clear();
     this.countDatanodesInvolvedPerIteration = 0;
-    this.sizeMovedPerIteration = 0;
+    this.sizeScheduledForMoveInLatestIteration = 0;
+    this.sizeActuallyMovedInLatestIteration = 0;
     metrics.resetDataSizeMovedGBInLatestIteration();
     metrics.resetNumContainerMovesCompletedInLatestIteration();
     metrics.resetNumContainerMovesTimeoutInLatestIteration();
@@ -837,27 +859,33 @@ public class ContainerBalancer extends StatefulService {
    */
   @Override
   public void notifyStatusChanged() {
+    boolean shouldStop = false;
+    boolean shouldRun = false;
     lock.lock();
     try {
       if (!scmContext.isLeader() || scmContext.isInSafeMode()) {
-        if (isBalancerRunning()) {
-          LOG.info("Stopping ContainerBalancer in this scm on status change");
-          stop();
-        }
+        shouldStop = isBalancerRunning();
       } else {
-        if (shouldRun()) {
-          try {
-            LOG.info("Starting ContainerBalancer in this scm on status change");
-            start();
-          } catch (IllegalContainerBalancerStateException |
-              InvalidContainerBalancerConfigurationException e) {
-            LOG.warn("Could not start ContainerBalancer on raft/safe-mode " +
-                "status change.", e);
-          }
-        }
+        shouldRun = shouldRun();
       }
     } finally {
       lock.unlock();
+    }
+
+    if (shouldStop) {
+      LOG.info("Stopping ContainerBalancer in this scm on status change");
+      stop();
+    }
+
+    if (shouldRun) {
+      LOG.info("Starting ContainerBalancer in this scm on status change");
+      try {
+        start();
+      } catch (IllegalContainerBalancerStateException |
+          InvalidContainerBalancerConfigurationException e) {
+        LOG.warn("Could not start ContainerBalancer on raft/safe-mode " +
+            "status change.", e);
+      }
     }
   }
 
@@ -892,12 +920,7 @@ public class ContainerBalancer extends StatefulService {
    * @return true if the currentBalancingThread is not null, otherwise false
    */
   public boolean isBalancerRunning() {
-    lock.lock();
-    try {
-      return currentBalancingThread != null;
-    } finally {
-      lock.unlock();
-    }
+    return currentBalancingThread != null;
   }
 
   /**
@@ -967,7 +990,8 @@ public class ContainerBalancer extends StatefulService {
    */
   public void startBalancer(ContainerBalancerConfiguration configuration)
       throws IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException, IOException {
+      InvalidContainerBalancerConfigurationException, IOException,
+      TimeoutException {
     lock.lock();
     try {
       // validates state, config, and then saves config
@@ -1028,36 +1052,65 @@ public class ContainerBalancer extends StatefulService {
   }
 
   /**
-   * Stops the SCM service.
+   * Stops the ContainerBalancer thread in this SCM.
    */
   @Override
   public void stop() {
+    Thread balancingThread;
     lock.lock();
     try {
       if (!isBalancerRunning()) {
         LOG.warn("Cannot stop Container Balancer because it's not running");
         return;
       }
-      stopBalancingThread();
+      balancingThread = currentBalancingThread;
+      currentBalancingThread = null;
     } finally {
       lock.unlock();
     }
+
+    // wait for balancingThread to die
+    if (balancingThread != null &&
+            balancingThread.getId() != Thread.currentThread().getId()) {
+      balancingThread.interrupt();
+      try {
+        if (lock.isHeldByCurrentThread()) {
+          // warn for possible deadlock
+          String stackTrace =
+              Arrays.toString(Thread.currentThread().getStackTrace())
+                  .replace(',', '\n');
+          LOG.warn("Waiting for balancing thread \"{}\" to join while current" +
+                  " thread \"{}\" holds lock. This could result in a deadlock" +
+                  " if balancing thread is also waiting to acquire the lock. " +
+                  "\n{}",
+              balancingThread.getName(), Thread.currentThread().getName(),
+              stackTrace);
+        }
+        balancingThread.join();
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+      }
+    }
+    LOG.info("Container Balancer stopped successfully.");
   }
 
   /**
-   * Stops ContainerBalancer gracefully.
+   * Stops ContainerBalancer gracefully. Persists state such that
+   * {@link ContainerBalancer#shouldRun()} will return false. This is the
+   * "stop" command.
    */
   public void stopBalancer()
-      throws IOException, IllegalContainerBalancerStateException {
+      throws IOException, IllegalContainerBalancerStateException,
+      TimeoutException {
     lock.lock();
     try {
       // should be leader, out of safe mode, and currently running
       validateState(true);
       saveConfiguration(config, false, 0);
-      stop();
     } finally {
       lock.unlock();
     }
+    stop();
   }
 
   /**
@@ -1067,44 +1120,20 @@ public class ContainerBalancer extends StatefulService {
    *                   ContainerBalancer.
    */
   private void tryStopBalancer(String stopReason) {
-    lock.lock();
     try {
       LOG.info("Stopping ContainerBalancer. Reason for stopping: {}",
           stopReason);
       stopBalancer();
-    } catch (IllegalContainerBalancerStateException | IOException e) {
+    } catch (IllegalContainerBalancerStateException | IOException |
+        TimeoutException e) {
       LOG.warn("Tried to stop ContainerBalancer but failed. Reason for " +
           "stopping: {}", stopReason, e);
-    } finally {
-      lock.unlock();
     }
-  }
-
-  private void stopBalancingThread() {
-    Thread balancingThread;
-    lock.lock();
-    try {
-      balancingThread = currentBalancingThread;
-      currentBalancingThread = null;
-    } finally {
-      lock.unlock();
-    }
-    // wait for balancingThread to die
-    if (balancingThread != null &&
-        balancingThread.getId() != Thread.currentThread().getId()) {
-      balancingThread.interrupt();
-      try {
-        balancingThread.join();
-      } catch (InterruptedException exception) {
-        Thread.currentThread().interrupt();
-      }
-    }
-    LOG.info("Container Balancer stopped successfully.");
   }
 
   private void saveConfiguration(ContainerBalancerConfiguration configuration,
                                  boolean shouldRun, int index)
-      throws IOException {
+      throws IOException, TimeoutException {
     lock.lock();
     try {
       saveConfiguration(configuration.toProtobufBuilder()
@@ -1184,7 +1213,7 @@ public class ContainerBalancer extends StatefulService {
   private void setBalancerConfigOnStartBalancer(
       ContainerBalancerConfiguration configuration)
       throws InvalidContainerBalancerConfigurationException,
-      IllegalContainerBalancerStateException, IOException {
+      IllegalContainerBalancerStateException, IOException, TimeoutException {
     validateState(false);
     validateConfiguration(configuration);
     saveConfiguration(configuration, true, 0);
@@ -1242,8 +1271,8 @@ public class ContainerBalancer extends StatefulService {
   }
 
   @VisibleForTesting
-  public long getSizeMovedPerIteration() {
-    return sizeMovedPerIteration;
+  public long getSizeScheduledForMoveInLatestIteration() {
+    return sizeScheduledForMoveInLatestIteration;
   }
 
   public ContainerBalancerMetrics getMetrics() {

@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
@@ -409,7 +410,7 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testGetMissingContainers() throws IOException {
+  public void testGetMissingContainers() throws IOException, TimeoutException {
     Response response = containerEndpoint.getMissingContainers();
 
     MissingContainersResponse responseObject =
@@ -477,7 +478,7 @@ public class TestContainerEndpoint {
         .build();
   }
 
-  void putContainerInfos(int num) throws IOException {
+  void putContainerInfos(int num) throws IOException, TimeoutException {
     for (int i = 1; i <= num; i++) {
       final ContainerInfo info = newContainerInfo(i);
       reconContainerManager.addNewContainer(
@@ -486,7 +487,7 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testUnhealthyContainers() throws IOException {
+  public void testUnhealthyContainers() throws IOException, TimeoutException {
     Response response = containerEndpoint.getUnhealthyContainers(1000, 1);
 
     UnhealthyContainersResponse responseObject =
@@ -580,7 +581,8 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testUnhealthyContainersFilteredResponse() throws IOException {
+  public void testUnhealthyContainersFilteredResponse()
+      throws IOException, TimeoutException {
     String missing =  UnHealthyContainerStates.MISSING.toString();
 
     Response response = containerEndpoint
@@ -633,7 +635,8 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testUnhealthyContainersPaging() throws IOException {
+  public void testUnhealthyContainersPaging()
+      throws IOException, TimeoutException {
     putContainerInfos(6);
     uuid1 = newDatanode("host1", "127.0.0.1");
     uuid2 = newDatanode("host2", "127.0.0.2");

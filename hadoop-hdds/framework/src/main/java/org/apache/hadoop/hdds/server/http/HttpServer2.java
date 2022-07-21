@@ -1674,7 +1674,7 @@ public final class HttpServer2 implements FilterContainer {
       } else if (mime.startsWith("application/xml")) {
         httpResponse.setContentType("text/xml; charset=utf-8");
       }
-      headerMap.forEach((k, v) -> httpResponse.addHeader(k, v));
+      headerMap.forEach((k, v) -> httpResponse.setHeader(k, v));
       chain.doFilter(quoted, httpResponse);
     }
 

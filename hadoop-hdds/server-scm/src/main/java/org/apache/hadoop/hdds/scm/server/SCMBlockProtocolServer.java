@@ -26,6 +26,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -182,7 +183,6 @@ public class SCMBlockProtocolServer implements
     auditMap.put("replication", replicationConfig.toString());
     auditMap.put("owner", owner);
     List<AllocatedBlock> blocks = new ArrayList<>(num);
-    boolean auditSuccess = true;
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Allocating {} blocks of size {}, with {}",
@@ -196,19 +196,17 @@ public class SCMBlockProtocolServer implements
           blocks.add(block);
         }
       }
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.ALLOCATE_BLOCK, auditMap));
       return blocks;
+    } catch (TimeoutException ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.ALLOCATE_BLOCK, auditMap, ex));
+      throw new IOException(ex);
     } catch (Exception ex) {
-      auditSuccess = false;
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(SCMAction.ALLOCATE_BLOCK, auditMap, ex)
-      );
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.ALLOCATE_BLOCK, auditMap, ex));
       throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logWriteSuccess(
-            buildAuditMessageForSuccess(SCMAction.ALLOCATE_BLOCK, auditMap)
-        );
-      }
     }
   }
 

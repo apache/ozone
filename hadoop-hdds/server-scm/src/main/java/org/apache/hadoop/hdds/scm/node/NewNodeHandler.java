@@ -56,6 +56,7 @@ public class NewNodeHandler implements EventHandler<DatanodeDetails> {
   public void onMessage(DatanodeDetails datanodeDetails,
       EventPublisher publisher) {
     try {
+      pipelineManager.closeStalePipelines(datanodeDetails);
       serviceManager.notifyEventTriggered(Event.NEW_NODE_HANDLER_TRIGGERED);
 
       if (datanodeDetails.getPersistedOpState()

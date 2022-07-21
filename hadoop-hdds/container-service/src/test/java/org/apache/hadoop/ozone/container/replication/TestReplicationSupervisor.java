@@ -88,7 +88,7 @@ public class TestReplicationSupervisor {
 
   @Before
   public void setUp() throws Exception {
-    set = new ContainerSet();
+    set = new ContainerSet(1000);
   }
 
   @After

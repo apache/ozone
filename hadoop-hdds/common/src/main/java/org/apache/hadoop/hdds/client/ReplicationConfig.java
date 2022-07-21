@@ -192,9 +192,10 @@ public interface ReplicationConfig {
       replicationConfig = fromTypeAndFactor(type, factor);
       break;
     case EC:
-      return new ECReplicationConfig(replication);
+      replicationConfig = new ECReplicationConfig(replication);
+      break;
     default:
-      throw new RuntimeException("Replication type" + type + " can not"
+      throw new RuntimeException("Replication type " + type + " can not "
           + "be parsed.");
     }
 
@@ -219,5 +220,7 @@ public interface ReplicationConfig {
    * Returns the replication option in string format.
    */
   String getReplication();
+
+  String configFormat();
 
 }

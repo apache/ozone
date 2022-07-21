@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -49,6 +50,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
+import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Policy;
+import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Role;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetRangerServiceVersionRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -58,11 +61,9 @@ import org.apache.ratis.protocol.RaftClientRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGER_ROLE_DESCRIPTION;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
 
 /**
  * Background Sync thread that reads Multi-Tenancy state from OM DB
@@ -89,7 +90,7 @@ public class OMRangerBGSyncService extends BackgroundService {
   private final OzoneManager ozoneManager;
   private final OMMetadataManager metadataManager;
   private final OMMultiTenantManager multiTenantManager;
-  private final MultiTenantAccessAuthorizer authorizer;
+  private final MultiTenantAccessController accessController;
   private final AuthorizerLock authorizerLock;
 
   // Maximum number of attempts for each sync run
@@ -200,7 +201,7 @@ public class OMRangerBGSyncService extends BackgroundService {
 
   public OMRangerBGSyncService(OzoneManager ozoneManager,
       OMMultiTenantManager omMultiTenantManager,
-      MultiTenantAccessAuthorizer authorizer,
+      MultiTenantAccessController accessController,
       long interval, TimeUnit unit, long serviceTimeout) {
 
     super("OMRangerBGSyncService", interval, unit, 1, serviceTimeout);
@@ -212,12 +213,13 @@ public class OMRangerBGSyncService extends BackgroundService {
     this.multiTenantManager = omMultiTenantManager;
     this.authorizerLock = omMultiTenantManager.getAuthorizerLock();
 
-    if (authorizer != null) {
-      this.authorizer = authorizer;
+    if (accessController != null) {
+      this.accessController = accessController;
     } else {
       // authorizer can be null for unit tests
-      LOG.warn("MultiTenantAccessAuthorizer not set. Using dummy authorizer");
-      this.authorizer = new MultiTenantAccessAuthorizerDummyPlugin();
+      LOG.warn("MultiTenantAccessController not set. "
+          + "Using in-memory controller.");
+      this.accessController = new InMemoryMultiTenantAccessController();
     }
   }
 
@@ -230,7 +232,7 @@ public class OMRangerBGSyncService extends BackgroundService {
 
   @Override
   public void start() {
-    if (authorizer == null) {
+    if (accessController == null) {
       LOG.error("Failed to start the background sync service: "
           + "null authorizer. Please check OM configuration. Aborting");
       return;
@@ -276,8 +278,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       if (shouldRun()) {
         final long count = runCount.incrementAndGet();
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Initiating Ranger Multi-Tenancy Ranger Sync: run # {}",
-              count);
+          LOG.debug("Initiating Multi-Tenancy Ranger Sync: run # {}", count);
         }
         triggerRangerSyncOnce();
       }
@@ -286,10 +287,14 @@ public class OMRangerBGSyncService extends BackgroundService {
     }
   }
 
-  private void triggerRangerSyncOnce() {
+  /**
+   * Trigger the sync once.
+   * @return true if completed successfully, false if any exception is thrown.
+   */
+  public synchronized boolean triggerRangerSyncOnce() {
     try {
       long dbOzoneServiceVersion = getOMDBRangerServiceVersion();
-      long rangerOzoneServiceVersion = getLatestRangerServiceVersion();
+      long rangerOzoneServiceVersion = getRangerOzoneServicePolicyVersion();
 
       // Sync thread enters the while-loop when Ranger service (e.g. cm_ozone)
       // version doesn't match the current service version persisted in the DB.
@@ -337,21 +342,28 @@ public class OMRangerBGSyncService extends BackgroundService {
 
         // Check Ranger Ozone service version again
         dbOzoneServiceVersion = rangerOzoneServiceVersion;
-        rangerOzoneServiceVersion = getLatestRangerServiceVersion();
+        rangerOzoneServiceVersion = getRangerOzoneServicePolicyVersion();
       }
     } catch (IOException | ServiceException e) {
       LOG.warn("Exception during Ranger Sync", e);
       // TODO: Check for specific exception once switched to
       //  RangerRestMultiTenantAccessController
+      return false;
     }
 
+    return true;
   }
 
   /**
    * Query Ranger endpoint to get the latest Ozone service version.
    */
-  long getLatestRangerServiceVersion() throws IOException {
-    return authorizer.getLatestOzoneServiceVersion();
+  long getRangerOzoneServicePolicyVersion() throws IOException {
+    long policyVersion = accessController.getRangerServicePolicyVersion();
+    if (policyVersion < 0L) {
+      LOG.warn("Unable to get valid policyVersion for Ranger background sync "
+          + "to function properly. Please check if ");
+    }
+    return policyVersion;
   }
 
   private RaftClientRequest newRaftClientRequest(OMRequest omRequest) {
@@ -432,9 +444,12 @@ public class OMRangerBGSyncService extends BackgroundService {
     mtOMDBRoles.clear();
   }
 
-  /**
-   * TODO: Test and make sure invalid JSON response from Ranger won't crash OM.
-   */
+  private List<Policy> getAllMultiTenantPolicies() throws IOException {
+
+    return accessController.getLabeledPolicies(
+        OZONE_TENANT_RANGER_POLICY_LABEL);
+  }
+
   private void loadAllPoliciesAndRoleNamesFromRanger(long baseVersion)
       throws IOException {
 
@@ -442,56 +457,47 @@ public class OMRangerBGSyncService extends BackgroundService {
       LOG.debug("baseVersion is {}", baseVersion);
     }
 
-    String allPolicies = authorizer.getAllMultiTenantPolicies();
-    JsonObject jObject = new JsonParser().parse(allPolicies).getAsJsonObject();
-    JsonArray policies = jObject.getAsJsonArray("policies");
-    if (policies == null) {
-      LOG.warn("No Ranger policy received!");
+    final List<Policy> allPolicies = getAllMultiTenantPolicies();
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Received policies with {} label: {}",
+          OZONE_TENANT_RANGER_POLICY_LABEL, allPolicies);
+    }
+
+    if (allPolicies.isEmpty()) {
+      // This is normal only if no tenant is created yet.
+      LOG.info("No Ranger policy with label {} received.",
+          OZONE_TENANT_RANGER_POLICY_LABEL);
       return;
     }
-    for (int i = 0; i < policies.size(); ++i) {
-      JsonObject policy = policies.get(i).getAsJsonObject();
-      JsonArray policyLabels = policy.getAsJsonArray("policyLabels");
+
+    for (Policy policy : allPolicies) {
 
       // Verify that the policy has the OzoneTenant label
-      boolean hasOzoneTenantLabel = false;
-      // Loop just in case multiple labels are attached to the tenant policy
-      for (int j = 0; j < policyLabels.size(); j++) {
-        final String currentLabel = policyLabels.get(j).getAsString();
-        // Look for exact match
-        if (currentLabel.equals(OZONE_TENANT_RANGER_POLICY_LABEL)) {
-          hasOzoneTenantLabel = true;
-          break;
-        }
-      }
-
-      if (!hasOzoneTenantLabel) {
-        // Shouldn't get policies without the label often as it is
-        // specified in the query param, unless a user removed the tag during
-        // the sync
+      if (!policy.getLabels().contains(OZONE_TENANT_RANGER_POLICY_LABEL)) {
+        // Shouldn't get policies without the label very often as it is
+        // specified in the query param, unless someone removed the tag during
+        // the get all policies request.
         LOG.warn("Ignoring Ranger policy without the {} label: {}",
-            OZONE_TENANT_RANGER_POLICY_LABEL, policy.get("name").getAsString());
+            OZONE_TENANT_RANGER_POLICY_LABEL, policy);
         continue;
       }
 
       // Temporarily put the policy in the to-delete list,
       // valid entries will be removed later
-      mtRangerPoliciesToBeDeleted.put(
-          policy.get("name").getAsString(),
-          policy.get("id").getAsString());
+      mtRangerPoliciesToBeDeleted.put(policy.getName(),
+          String.valueOf(policy.getId()));
 
-      final JsonArray policyItems = policy.getAsJsonArray("policyItems");
-      for (int j = 0; j < policyItems.size(); ++j) {
-        JsonObject policyItem = policyItems.get(j).getAsJsonObject();
-        JsonArray roles = policyItem.getAsJsonArray("roles");
-        for (int k = 0; k < roles.size(); ++k) {
-          if (!mtRangerRoles.containsKey(roles.get(k).getAsString())) {
-            // We only get the role name here. We need to query and populate it.
-            mtRangerRoles.put(roles.get(k).getAsString(),
-                new BGRole(roles.get(k).getAsString()));
-          }
+      // We don't need to care about policy.getUserAcls() in the sync as
+      // we only uses special {OWNER} user, at least for now.
+
+      // Iterate through all the roles in this policy
+      policy.getRoleAcls().keySet().forEach(roleName -> {
+        if (!mtRangerRoles.containsKey(roleName)) {
+          // We only got role name here. Will check users in the roles later.
+          mtRangerRoles.put(roleName, new BGRole(roleName));
         }
-      }
+      });
     }
 
   }
@@ -504,6 +510,13 @@ public class OMRangerBGSyncService extends BackgroundService {
    * Note: EACH Ranger request can take 3-7 seconds as tested in UT.
    */
   private void checkLeader() throws IOException {
+    if (ozoneManager.getConfiguration().getBoolean(
+        OZONE_OM_TENANT_DEV_SKIP_RANGER, false)) {
+      // Skip leader check if the test flag is set, used in TestOzoneTenantShell
+      // TODO: Find a proper fix in MiniOzoneCluster to pass
+      //  ozoneManager.isLeaderReady() check?
+      return;
+    }
     if (!ozoneManager.isLeaderReady()) {
       throw new OMNotLeaderException("This OM is no longer the leader. Abort");
     }
@@ -513,15 +526,11 @@ public class OMRangerBGSyncService extends BackgroundService {
     for (Map.Entry<String, BGRole> entry: mtRangerRoles.entrySet()) {
       final String roleName = entry.getKey();
       checkLeader();
-      final String roleDataString = authorizer.getRole(roleName);
-      final JsonObject roleObject =
-          new JsonParser().parse(roleDataString).getAsJsonObject();
-      final BGRole role = entry.getValue();
-      role.setId(roleObject.get("id").getAsString());
-      final JsonArray userArray = roleObject.getAsJsonArray("users");
-      for (int i = 0; i < userArray.size(); ++i) {
-        role.addUserPrincipal(userArray.get(i).getAsJsonObject().get("name")
-            .getAsString());
+      final Role role = accessController.getRole(roleName);
+      final BGRole bgRole = entry.getValue();
+      bgRole.setId(role.getName());
+      for (String username : role.getUsersMap().keySet()) {
+        bgRole.addUserPrincipal(username);
       }
     }
   }
@@ -609,7 +618,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       checkLeader();
       withWriteLock(() -> {
         try {
-          authorizer.deletePolicyByName(policyName);
+          accessController.deletePolicy(policyName);
         } catch (IOException e) {
           LOG.error("Failed to delete policy: {}", policyName, e);
           // Proceed to delete other policies
@@ -632,7 +641,7 @@ public class OMRangerBGSyncService extends BackgroundService {
     final String userRoleName =
         multiTenantManager.getTenantUserRoleName(tenantId);
 
-    final AccessPolicy accessPolicy;
+    final Policy accessPolicy;
 
     switch (policyInfo.getPolicyType()) {
     case BUCKET_NAMESPACE_POLICY:
@@ -641,16 +650,15 @@ public class OMRangerBGSyncService extends BackgroundService {
       final String adminRoleName =
           multiTenantManager.getTenantAdminRoleName(tenantId);
 
-      accessPolicy = multiTenantManager.newDefaultVolumeAccessPolicy(volumeName,
-          new OzoneTenantRolePrincipal(userRoleName),
-          new OzoneTenantRolePrincipal(adminRoleName));
+      accessPolicy = OMMultiTenantManager.getDefaultVolumeAccessPolicy(
+          tenantId, volumeName, userRoleName, adminRoleName);
       break;
 
     case BUCKET_POLICY:
       LOG.info("Recovering BucketAccess policy for tenant: {}", tenantId);
 
-      accessPolicy = multiTenantManager.newDefaultBucketAccessPolicy(volumeName,
-              new OzoneTenantRolePrincipal(userRoleName));
+      accessPolicy = OMMultiTenantManager.getDefaultBucketAccessPolicy(
+          tenantId, volumeName, userRoleName);
       break;
 
     default:
@@ -660,8 +668,8 @@ public class OMRangerBGSyncService extends BackgroundService {
 
     withWriteLock(() -> {
       try {
-        final String id = authorizer.createAccessPolicy(accessPolicy);
-        LOG.info("Created policy. Policy ID: {}", id);
+        final Policy policy = accessController.createPolicy(accessPolicy);
+        LOG.info("Created policy: {}", policy);
       } catch (IOException e) {
         LOG.error("Failed to create policy: {}", accessPolicy, e);
       }
@@ -778,7 +786,11 @@ public class OMRangerBGSyncService extends BackgroundService {
         checkLeader();
         withWriteLock(() -> {
           try {
-            authorizer.createRole(roleName, null);
+            Role role = new Role.Builder()
+                .setName(roleName)
+                .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
+                .build();
+            accessController.createRole(role);
           } catch (IOException e) {
             // Tolerate create role failure, possibly due to role already exists
             LOG.error("Failed to create role: {}", roleName, e);
@@ -806,9 +818,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       checkLeader();
       withWriteLock(() -> {
         try {
-          final String roleObj = authorizer.getRole(roleName);
-          authorizer.deleteRoleById(new JsonParser().parse(roleObj)
-              .getAsJsonObject().get("id").getAsString());
+          accessController.deleteRole(roleName);
         } catch (IOException e) {
           // The role might have been deleted already.
           // Or the role could be referenced in other roles or policies.
@@ -824,8 +834,20 @@ public class OMRangerBGSyncService extends BackgroundService {
     final HashSet<String> omDBUserList = mtOMDBRoles.get(roleName);
     withWriteLock(() -> {
       try {
-        String roleJsonStr = authorizer.getRole(roleName);
-        authorizer.assignAllUsers(omDBUserList, roleJsonStr);
+        Role existingRole = accessController.getRole(roleName);
+        if (!existingRole.getId().isPresent()) {
+          // Should not happen. getRole() would have thrown exception if
+          // role doesn't exist in Ranger.
+          LOG.error("Role doesn't have ID: {}", existingRole);
+          return;
+        }
+        long roleId = existingRole.getId().get();
+        Role newRole = new Role.Builder(existingRole)
+            .clearUsers()
+            .addUsers(omDBUserList)
+            .build();
+        // TODO: Double check result
+        accessController.updateRole(roleId, newRole);
       } catch (IOException e) {
         LOG.error("Failed to update role: {}, target user list: {}",
             roleName, omDBUserList, e);

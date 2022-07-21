@@ -396,6 +396,18 @@ public abstract class StorageVolume
     return this.volumeInfo;
   }
 
+  public void incrementUsedSpace(long usedSpace) {
+    if (this.volumeInfo != null) {
+      this.volumeInfo.incrementUsedSpace(usedSpace);
+    }
+  }
+
+  public void decrementUsedSpace(long reclaimedSpace) {
+    if (this.volumeInfo != null) {
+      this.volumeInfo.decrementUsedSpace(reclaimedSpace);
+    }
+  }
+
   public VolumeSet getVolumeSet() {
     return this.volumeSet;
   }

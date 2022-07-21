@@ -167,6 +167,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.dir.du.reserved.percent</name>
+    <value/>
+    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
+    <description>Percentage of volume that should be reserved. This space is left free for other usage.
+      The value should be between 0-1. Such as 0.1 which means 10% of volume space will be reserved.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.volume.choosing.policy</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
@@ -1180,7 +1188,16 @@
       Default replication value. The actual number of replications can be
       specified when writing the key. The default is used if replication
       is not specified when creating key or no default replication set at
-      bucket. Supported values: 1, 3 and EC_3_2.
+      bucket. Supported values:
+      For Standalone: 1
+      For Ratis: 3
+      For Erasure Coding(EC) supported format:
+      {ECCodec}-{DataBlocks}-{ParityBlocks}-{ChunkSize}
+        ECCodec: Codec for encoding stripe. Supported values : XOR, RS (Reed Solomon)
+        DataBlocks: Number of data blocks in a stripe.
+        ParityBlocks: Number of parity blocks in a stripe.
+        ChunkSize: Chunk size in bytes. E.g. 1024k, 2048k etc.
+        Supported combinations of {DataBlocks}-{ParityBlocks} : 3-2, 6-3, 10-4
     </description>
   </property>
 
@@ -1246,6 +1263,19 @@
       A background job that periodically checks open key entries and marks
       expired open keys for deletion. This entry controls the interval of this
       cleanup check. Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.open.key.cleanup.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>A timeout value of open key cleanup service. If this is set
+      greater than 0, the service will stop waiting for the open key deleting
+      completion after this time. If timeout happens to a large proportion of
+      open key deletion, this value needs to be increased or
+      ozone.om.open.key.cleanup.limit.per.task should be decreased.
+      Unit could be defined with postfix (ns,ms,s,m,h,d)
     </description>
   </property>
 
@@ -2127,14 +2157,6 @@
     <description>
       optional config, the config when set to true skips the clusterId
       validation from leader scm during bootstrap
-    </description>
-  </property>
-  <property>
-    <name>ozone.scm.ratis.enable</name>
-    <value>false</value>
-    <tag>OZONE, SCM, HA, RATIS</tag>
-    <description>Property to enable or disable Ratis server on SCM.
-      Please note - this is a temporary property to disable SCM Ratis server.
     </description>
   </property>
 
@@ -3250,6 +3272,19 @@
     <description>
       The timeout for each Multi-Tenancy Ranger background sync thread run.
       If the timeout has been reached, a warning message will be logged.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.fs.default.bucket.layout</name>
+    <value>FILE_SYSTEM_OPTIMIZED</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      Default bucket layout value used when buckets are created using OFS.
+      Supported values are LEGACY and FILE_SYSTEM_OPTIMIZED.
+      FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
+      also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
+      will create intermediate directories.
     </description>
   </property>
 </configuration>

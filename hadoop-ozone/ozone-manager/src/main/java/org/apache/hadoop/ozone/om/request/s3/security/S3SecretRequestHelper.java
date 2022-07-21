@@ -49,8 +49,6 @@ public final class S3SecretRequestHelper {
       OzoneManager ozoneManager, UserGroupInformation ugi, String accessId)
       throws IOException {
 
-    final String username = ugi.getUserName();
-
     // Flag indicating whether the accessId is assigned to a tenant
     // (under S3 Multi-Tenancy feature) or not.
     boolean isAccessIdAssignedToTenant = false;
@@ -74,12 +72,15 @@ public final class S3SecretRequestHelper {
             multiTenantManager.getUserNameGivenAccessId(accessId);
         final String tenantId = optionalTenantId.get();
 
+        // Access ID owner is short name
+        final String shortName = ugi.getShortUserName();
+
         // HDDS-6691: ugi should either own the access ID, or be an Ozone/tenant
         // admin to pass the check.
-        if (!username.equals(accessIdOwnerUsername) &&
+        if (!shortName.equals(accessIdOwnerUsername) &&
             !multiTenantManager.isTenantAdmin(ugi, tenantId, false)) {
           throw new OMException("Requested accessId '" + accessId + "' doesn't"
-              + " belong to current user '" + username + "', nor does"
+              + " belong to current user '" + shortName + "', nor does"
               + " current user have Ozone or tenant administrator privilege",
               ResultCodes.USER_MISMATCH);
           // Note: A more fitting result code could be PERMISSION_DENIED,
@@ -95,11 +96,12 @@ public final class S3SecretRequestHelper {
 
     // 2. If S3 multi-tenancy is disabled (or the access ID is not assigned
     // to a tenant), fall back to the old permission check.
+    final String fullPrincipal = ugi.getUserName();
     if (!isAccessIdAssignedToTenant &&
-        !username.equals(accessId) && !ozoneManager.isAdmin(ugi)) {
+        !fullPrincipal.equals(accessId) && !ozoneManager.isAdmin(ugi)) {
 
       throw new OMException("Requested accessId '" + accessId +
-          "' doesn't match current user '" + username +
+          "' doesn't match current user '" + fullPrincipal +
           "', nor does current user has administrator privilege.",
           OMException.ResultCodes.USER_MISMATCH);
     }

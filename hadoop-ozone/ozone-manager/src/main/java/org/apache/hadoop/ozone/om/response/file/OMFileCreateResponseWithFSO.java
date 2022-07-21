@@ -45,15 +45,16 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
 
   private List<OmDirectoryInfo> parentDirInfos;
+  private long volumeId;
 
   public OMFileCreateResponseWithFSO(@Nonnull OMResponse omResponse,
-                                @Nonnull OmKeyInfo omKeyInfo,
-                                @Nonnull List<OmDirectoryInfo> parentDirInfos,
-                                long openKeySessionID,
-                                @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull OmKeyInfo omKeyInfo,
+      @Nonnull List<OmDirectoryInfo> parentDirInfos, long openKeySessionID,
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull long volumeId) {
     super(omResponse, omKeyInfo, new ArrayList<>(), openKeySessionID,
         omBucketInfo);
     this.parentDirInfos = parentDirInfos;
+    this.volumeId = volumeId;
   }
 
   /**
@@ -75,13 +76,10 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
      * XXX handle stale directory entries.
      */
     if (parentDirInfos != null) {
-      final long volumeId = omMetadataMgr.getVolumeId(
-              getOmKeyInfo().getVolumeName());
-      final long bucketId = omMetadataMgr.getBucketId(
-              getOmKeyInfo().getVolumeName(), getOmKeyInfo().getBucketName());
       for (OmDirectoryInfo parentDirInfo : parentDirInfos) {
-        String parentKey = omMetadataMgr.getOzonePathKey(volumeId, bucketId,
-                parentDirInfo.getParentObjectID(), parentDirInfo.getName());
+        String parentKey = omMetadataMgr.getOzonePathKey(volumeId,
+            getOmBucketInfo().getObjectID(), parentDirInfo.getParentObjectID(),
+            parentDirInfo.getName());
         if (LOG.isDebugEnabled()) {
           LOG.debug("putWithBatch adding parent : key {} info : {}", parentKey,
                   parentDirInfo);
@@ -92,7 +90,7 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
     }
 
     OMFileRequest.addToOpenFileTable(omMetadataMgr, batchOp, getOmKeyInfo(),
-            getOpenKeySessionID());
+        getOpenKeySessionID(), volumeId, getOmBucketInfo().getObjectID());
   }
 
   @Override

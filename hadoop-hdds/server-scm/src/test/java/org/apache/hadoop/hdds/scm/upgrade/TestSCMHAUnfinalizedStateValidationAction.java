@@ -17,10 +17,12 @@
  */
 package org.apache.hadoop.hdds.scm.upgrade;
 
+import org.apache.hadoop.hdds.conf.ConfigurationException;
+import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -74,18 +76,28 @@ public class TestSCMHAUnfinalizedStateValidationAction {
     conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS, dataPath.toString());
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, dataPath.toString());
     // This init should always succeed, since SCM is not pre-finalized yet.
+    DefaultConfigManager.clearDefaultConfigs();
     boolean initResult1 = StorageContainerManager.scmInit(conf, CLUSTER_ID);
     Assertions.assertTrue(initResult1);
 
     // Set up new pre-finalized SCM.
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
         haEnabledPreFinalized);
+    /* Clusters from Ratis SCM -> Non Ratis SCM
+       Ratis SCM -> Non Ratis SCM not supported
+     */
+    if (haEnabledPreFinalized != haEnabledBefore) {
+      Assertions.assertThrows(ConfigurationException.class,
+              () -> StorageContainerManager.scmInit(conf, CLUSTER_ID));
+      return;
+    }
     StorageContainerManager scm = HddsTestUtils.getScm(conf);
 
     Assertions.assertEquals(UpgradeFinalizer.Status.FINALIZATION_REQUIRED,
         scm.getFinalizationManager().getUpgradeFinalizer().getStatus());
 
     final boolean shouldFail = !haEnabledBefore && haEnabledPreFinalized;
+    DefaultConfigManager.clearDefaultConfigs();
     if (shouldFail) {
       // Start on its own should fail.
       Assertions.assertThrows(UpgradeException.class, scm::start);

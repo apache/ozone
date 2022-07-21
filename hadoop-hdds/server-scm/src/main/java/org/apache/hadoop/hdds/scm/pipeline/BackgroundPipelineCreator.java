@@ -44,6 +44,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NEW_NODE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.PRE_CHECK_COMPLETED;
@@ -64,7 +65,8 @@ public class BackgroundPipelineCreator implements SCMService {
    * SCMService related variables.
    * 1) after leaving safe mode, BackgroundPipelineCreator needs to
    *    wait for a while before really take effect.
-   * 2) NewNodeHandler, NonHealthyToHealthyNodeHandler, PreCheckComplete
+   * 2) NewNodeHandler, NodeAddressUpdateHandler,
+   *    NonHealthyToHealthyNodeHandler, PreCheckComplete
    *    will trigger a one-shot run of BackgroundPipelineCreator,
    *    no matter in safe mode or not.
    */
@@ -107,9 +109,6 @@ public class BackgroundPipelineCreator implements SCMService {
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
-
-    // start RatisPipelineUtilsThread
-    start();
   }
 
   /**
@@ -158,6 +157,10 @@ public class BackgroundPipelineCreator implements SCMService {
       LOG.warn("Interrupted during join {}.", THREAD_NAME);
       Thread.currentThread().interrupt();
     }
+  }
+
+  public boolean isRunning() {
+    return running.get();
   }
 
   private void run() {
@@ -267,8 +270,9 @@ public class BackgroundPipelineCreator implements SCMService {
       return;
     }
     if (event == NEW_NODE_HANDLER_TRIGGERED
-        || event == UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
-        || event == PRE_CHECK_COMPLETED) {
+            || event == NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED
+            || event == UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
+            || event == PRE_CHECK_COMPLETED) {
       LOG.info("trigger a one-shot run on {}.", THREAD_NAME);
 
       serviceLock.lock();

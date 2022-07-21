@@ -187,6 +187,30 @@ public final class OzoneConfigKeys {
   public static final int OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT
       = 10;
 
+  /**
+   * Configuration properties for Ozone Recovering Container Scrubbing Service.
+   */
+  public static final String
+      OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT =
+      "ozone.recovering.container.scrubbing.service.timeout";
+
+  // 300s for default
+  public static final String
+      OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT_DEFAULT = "300s";
+
+  public static final String
+      OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS =
+      "ozone.recovering.container.scrubbing.service.workers";
+  public static final int
+      OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS_DEFAULT = 10;
+
+  public static final String
+      OZONE_RECOVERING_CONTAINER_TIMEOUT =
+      "ozone.recovering.container.timeout";
+  public static final String
+      OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT = "20m";
+
+
   public static final String OZONE_KEY_PREALLOCATION_BLOCKS_MAX =
       "ozone.key.preallocation.max.blocks";
   public static final int OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT
@@ -475,6 +499,15 @@ public final class OzoneConfigKeys {
   public static final long
       OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS =
       300 * 1000;
+
+  public static final String OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT =
+      "ozone.client.fs.default.bucket.layout";
+
+  public static final String OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT =
+      "FILE_SYSTEM_OPTIMIZED";
+
+  public static final String OZONE_CLIENT_FS_BUCKET_LAYOUT_LEGACY =
+      "LEGACY";
 
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_OMAUDIT =
       "ozone.audit.log.debug.cmd.list.omaudit";

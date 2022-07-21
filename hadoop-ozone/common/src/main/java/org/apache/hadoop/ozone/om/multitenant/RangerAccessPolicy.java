@@ -55,7 +55,7 @@ public class RangerAccessPolicy implements AccessPolicy {
     roleList = new HashSet<>();
   }
 
-  public void setPolicyID(String id) {
+  public void setPolicyName(String id) {
     policyID = id;
   }
 
@@ -89,7 +89,7 @@ public class RangerAccessPolicy implements AccessPolicy {
 
   @Override
   public String deserializePolicyFromJsonString(JsonObject jsonObject) {
-    setPolicyID(jsonObject.get("id").getAsString());
+    setPolicyName(jsonObject.get("id").getAsString());
     try {
       JsonArray policyItems = jsonObject
           .getAsJsonArray("policyItems");

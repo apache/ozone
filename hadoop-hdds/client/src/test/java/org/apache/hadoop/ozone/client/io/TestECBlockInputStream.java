@@ -22,8 +22,10 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
@@ -391,6 +393,41 @@ public class TestECBlockInputStream {
           assertThrows(BadDataLocationException.class, () -> ecb.read(buf));
       Assertions.assertEquals(2,
           keyInfo.getPipeline().getReplicaIndex(e.getFailedLocation()));
+    }
+  }
+
+  @Test
+  public void testEcPipelineRefreshFunction() {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+        ONEMB);
+    BlockLocationInfo keyInfo =
+        ECStreamTestUtil.createKeyInfo(repConfig, 5, 5 * ONEMB);
+
+    BlockID blockID = new BlockID(1, 1);
+    Map<DatanodeDetails, Integer> dnMap = new HashMap<>();
+    for (int i = 1; i <= 5; i++) {
+      dnMap.put(MockDatanodeDetails.randomDatanodeDetails(), i);
+    }
+
+    // Create a refreshFunction that returns a hard-coded EC pipeline.
+    Function<BlockID, Pipeline> refreshFunction = blkID -> Pipeline.newBuilder()
+        .setReplicationConfig(repConfig)
+        .setNodes(new ArrayList<>(dnMap.keySet()))
+        .setReplicaIndexes(dnMap)
+        .setState(Pipeline.PipelineState.CLOSED)
+        .setId(PipelineID.randomId())
+        .build();
+
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
+        keyInfo, true, null, null, streamFactory)) {
+      Pipeline pipeline =
+          ecb.ecPipelineRefreshFunction(3, refreshFunction).apply(blockID);
+      // Check the pipeline is built with the correct Datanode
+      // with right replicaIndex.
+      Assertions.assertEquals(HddsProtos.ReplicationType.STAND_ALONE,
+          pipeline.getReplicationConfig().getReplicationType());
+      Assertions.assertEquals(1, pipeline.getNodes().size());
+      Assertions.assertEquals(3, dnMap.get(pipeline.getNodes().get(0)));
     }
   }
 
