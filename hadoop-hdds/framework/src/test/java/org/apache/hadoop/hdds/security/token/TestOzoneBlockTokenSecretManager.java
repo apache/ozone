@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.hdds.security.token;
 
-import static org.apache.hadoop.ozone.container.ContainerTestHelper.*;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getBlockRequest;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getReadChunkRequest;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.newPutBlockRequestBuilder;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChunkRequestBuilder;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
