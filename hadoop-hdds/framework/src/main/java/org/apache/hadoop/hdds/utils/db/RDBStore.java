@@ -322,8 +322,16 @@ public class RDBStore implements DBStore {
         }
         transactionLogIterator.next();
       }
+    } catch (SequenceNumberNotFoundException e) {
+      LOG.error("Unable to get delta updates since sequenceNumber {}. "
+              + "This exception will be thrown to the client",
+          sequenceNumber, e);
+      // Throw the exception back to Recon. Expect Recon to fall back to
+      // full snapshot.
+      throw e;
     } catch (RocksDBException | IOException e) {
-      LOG.error("Unable to get delta updates since sequenceNumber {} ",
+      LOG.error("Unable to get delta updates since sequenceNumber {}. "
+              + "This exception will not be thrown to the client ",
           sequenceNumber, e);
     }
     dbUpdatesWrapper.setLatestSequenceNumber(db.getLatestSequenceNumber());
