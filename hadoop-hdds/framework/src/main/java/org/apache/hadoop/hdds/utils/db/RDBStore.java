@@ -286,6 +286,16 @@ public class RDBStore implements DBStore {
     try (TransactionLogIterator transactionLogIterator =
         db.getUpdatesSince(sequenceNumber)) {
 
+      // If Recon's sequence number is out-of-date and the iterator is invalid,
+      // throw SNNFE and let Recon fall back to full snapshot.
+      // This could happen after OM restart.
+      if (db.getLatestSequenceNumber() != sequenceNumber &&
+          !transactionLogIterator.isValid()) {
+        throw new SequenceNumberNotFoundException(
+            "Invalid transaction log iterator when getting updates since "
+                + "sequence number " + sequenceNumber);
+      }
+
       // Only the first record needs to be checked if its seq number <
       // ( 1 + passed_in_sequence_number). For example, if seqNumber passed
       // in is 100, then we can read from the WAL ONLY if the first sequence
