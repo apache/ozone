@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
  */
 public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
-  public static final Log LOG = LogFactory.getLog(
+  public static final Logger LOG = LoggerFactory.getLogger(
       CapacityVolumeChoosingPolicy.class);
 
   // Stores the index of the next volume to be returned.
