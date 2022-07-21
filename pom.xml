@@ -79,7 +79,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <ratis.thirdparty.version>1.0.0</ratis.thirdparty.version>
 
     <!-- Apache Ranger plugin version -->
-    <ranger.version>3.0.0-SNAPSHOT</ranger.version>
+    <ranger.version>2.3.0</ranger.version>
 
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>

@@ -120,6 +120,7 @@ share/ozone/lib/jaxb-api.jar
 share/ozone/lib/jaxb-core.jar
 share/ozone/lib/jaxb-runtime.jar
 share/ozone/lib/jcip-annotations.jar
+share/ozone/lib/jcl-over-slf4j.jar
 share/ozone/lib/jersey-cdi1x.jar
 share/ozone/lib/jersey-client.jar
 share/ozone/lib/jersey-client.jar

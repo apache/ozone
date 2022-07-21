@@ -32,8 +32,6 @@ import com.google.common.base.Supplier;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.log4j.Appender;
 import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
@@ -251,11 +249,6 @@ public abstract class GenericTestUtils {
     private StringWriter sw = new StringWriter();
     private WriterAppender appender;
     private Logger logger;
-
-    public static LogCapturer captureLogs(Log l) {
-      Logger logger = ((Log4JLogger) l).getLogger();
-      return new LogCapturer(logger, getDefaultLayout());
-    }
 
     public static LogCapturer captureLogs(org.slf4j.Logger logger) {
       return new LogCapturer(toLog4j(logger), getDefaultLayout());
