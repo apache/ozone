@@ -313,7 +313,7 @@ public class RDBStore implements DBStore {
               currSequenceNumber > 1 + sequenceNumber) {
             throw new SequenceNumberNotFoundException("Unable to read data from"
                 + " RocksDB wal to get delta updates. It may have already been"
-                + "flushed to SSTs.");
+                + " flushed to SSTs.");
           }
           // If the above condition was not satisfied, then it is OK to reset
           // the flag.
