@@ -1126,6 +1126,51 @@ public class TestRootedOzoneFileSystem {
   }
 
   @Test
+  public void testDeleteBucketLink() throws Exception {
+    // Create test volume, bucket, directory
+    String volumeStr1 = getRandomNonExistVolumeName();
+    Path volumePath1 = new Path(OZONE_URI_DELIMITER + volumeStr1);
+    String bucketStr1 = "bucket";
+    Path bucketPath1 = new Path(volumePath1, bucketStr1);
+    String dirStr1 = "dir1";
+    Path dirPath1 = new Path(bucketPath1, dirStr1);
+    fs.mkdirs(dirPath1);
+    FileStatus dir1Status = fs.getFileStatus(dirPath1);
+
+    // Create volume with link to first
+    String linkVolume = getRandomNonExistVolumeName();
+    Path linkVolumePath = new Path(OZONE_URI_DELIMITER + linkVolume);
+    fs.mkdirs(linkVolumePath);
+
+    String linkStr = "link";
+    createLinkBucket(linkVolume, linkStr, volumeStr1, bucketStr1);
+    Path linkPath = new Path(linkVolumePath, linkStr);
+    Path dirPathLink = new Path(linkPath, dirStr1);
+
+    // confirm data through link
+    FileStatus dirLinkStatus = fs.getFileStatus(dirPathLink);
+    Assert.assertNotNull(dirLinkStatus);
+
+    // confirm non recursive delete of volume with link fails
+    deleteNonRecursivelyAndFail(linkVolumePath);
+
+    // confirm recursive delete of volume with link works
+    fs.delete(linkVolumePath, true);
+
+    // confirm vol1 data is unaffected
+    Assert.assertTrue(dir1Status.equals(fs.getFileStatus(dirPath1)));
+
+    // confirm link is gone
+    LambdaTestUtils.intercept(FileNotFoundException.class,
+        "File not found.",
+        () -> fs.getFileStatus(dirPathLink));
+
+    // Cleanup
+    fs.delete(volumePath1, true);
+
+  }
+
+  @Test
   public void testFailToDeleteRoot() throws IOException {
     // rm root should always fail for OFS
     Assert.assertFalse(fs.delete(new Path("/"), false));
@@ -1717,5 +1762,14 @@ public class TestRootedOzoneFileSystem {
     // Clean up
     proxy.deleteBucket(volume, bucket);
     proxy.deleteVolume(volume);
+  }
+
+  private void createLinkBucket(String linkVolume, String linkBucket,
+      String sourceVolume, String sourceBucket) throws IOException {
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setSourceVolume(sourceVolume)
+        .setSourceBucket(sourceBucket);
+    OzoneVolume ozoneVolume = objectStore.getVolume(linkVolume);
+    ozoneVolume.createBucket(linkBucket, builder.build());
   }
 }

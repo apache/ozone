@@ -21,7 +21,6 @@ import java.io.UnsupportedEncodingException;
 import java.time.ZonedDateTime;
 import java.util.Map;
 
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -51,7 +50,7 @@ public class AuthorizationV4QueryParser implements SignatureParser {
   }
 
   @Override
-  public SignatureInfo parseSignature() throws OS3Exception {
+  public SignatureInfo parseSignature() throws MalformedResourceException {
 
     if (!queryParameters.containsKey("X-Amz-Signature")) {
       return null;

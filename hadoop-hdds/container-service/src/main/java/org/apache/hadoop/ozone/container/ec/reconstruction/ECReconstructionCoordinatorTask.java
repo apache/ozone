@@ -81,6 +81,8 @@ public class ECReconstructionCoordinatorTask implements Runnable {
           reconstructionCommandInfo.getContainerID(),
           reconstructionCommandInfo.getEcReplicationConfig(), sourceNodeMap,
           targetNodeMap);
+      LOG.info("Completed the EC reconstruction of the container {}",
+          reconstructionCommandInfo.getContainerID());
     } catch (IOException e) {
       LOG.warn(
           "Failed to complete the reconstruction task for the container: "

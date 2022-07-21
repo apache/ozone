@@ -40,6 +40,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Matchers.anyObject;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.when;
@@ -109,6 +110,15 @@ public class TestSCMContainerPlacementCapacity {
         .thenReturn(new SCMNodeMetric(100L, 80L, 20L));
     when(mockNodeManager.getNodeStat(datanodes.get(4)))
         .thenReturn(new SCMNodeMetric(100L, 70L, 30L));
+    when(mockNodeManager.getNodeByUuid(anyString())).thenAnswer(
+            invocation -> {
+              String uuid = invocation.getArgument(0);
+              return datanodes.stream().filter(
+                              datanode ->
+                                      datanode.getUuid().toString()
+                                              .equals(uuid)).findFirst()
+                      .orElse(null);
+            });
 
     SCMContainerPlacementCapacity scmContainerPlacementRandom =
         new SCMContainerPlacementCapacity(mockNodeManager, conf, null, true,

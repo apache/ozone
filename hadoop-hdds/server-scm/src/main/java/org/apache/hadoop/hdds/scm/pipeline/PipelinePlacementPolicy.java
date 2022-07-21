@@ -214,7 +214,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * @throws SCMException when chosen nodes are not enough in numbers
    */
   @Override
-  public List<DatanodeDetails> chooseDatanodes(
+  protected List<DatanodeDetails> chooseDatanodesInternal(
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
       int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {

@@ -160,4 +160,5 @@ public class ObjectStoreStub extends ObjectStore {
   public void setBucketEmptyStatus(String bucketName, boolean status) {
     bucketEmptyStatus.computeIfPresent(bucketName, (k, v) -> status);
   }
+
 }
