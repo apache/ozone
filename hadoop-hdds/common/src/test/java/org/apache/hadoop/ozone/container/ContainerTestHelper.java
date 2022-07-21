@@ -117,12 +117,13 @@ public final class ContainerTestHelper {
    * @param datalen - Length of data.
    * @return ContainerCommandRequestProto
    */
-  public static Builder getWriteChunkRequest(
+  public static ContainerCommandRequestProto getWriteChunkRequest(
       Pipeline pipeline, BlockID blockID, int datalen)
       throws IOException {
     LOG.trace("writeChunk {} (blockID={}) to pipeline={}",
         datalen, blockID, pipeline);
-    return newWriteChunkRequestBuilder(pipeline, blockID, datalen, 0);
+    return newWriteChunkRequestBuilder(pipeline, blockID, datalen)
+        .build();
   }
 
   public static ContainerCommandRequestProto getListBlockRequest(
@@ -154,9 +155,9 @@ public final class ContainerTestHelper {
   }
 
   public static Builder newWriteChunkRequestBuilder(Pipeline pipeline,
-      BlockID blockID, int datalen, int seq) throws IOException {
+      BlockID blockID, int datalen) throws IOException {
     ChunkBuffer data = getData(datalen);
-    return newWriteChunkRequestBuilder(pipeline, blockID, data, seq);
+    return newWriteChunkRequestBuilder(pipeline, blockID, data, 0);
   }
 
   public static Builder newWriteChunkRequestBuilder(
@@ -284,10 +285,10 @@ public final class ContainerTestHelper {
    *
    * @return ContainerCommandRequestProto.
    */
-  public static Builder getCreateContainerRequest(
+  public static ContainerCommandRequestProto getCreateContainerRequest(
       long containerID, Pipeline pipeline) throws IOException {
     LOG.trace("addContainer: {}", containerID);
-    return getContainerCommandRequestBuilder(containerID, pipeline);
+    return getContainerCommandRequestBuilder(containerID, pipeline).build();
   }
 
   private static Builder getContainerCommandRequestBuilder(long containerID,
@@ -373,10 +374,10 @@ public final class ContainerTestHelper {
    * @param writeRequest - Write Chunk Request.
    * @return - Request
    */
-  public static Builder getPutBlockRequest(
+  public static ContainerCommandRequestProto getPutBlockRequest(
       Pipeline pipeline, ContainerProtos.WriteChunkRequestProto writeRequest)
       throws IOException {
-    return newPutBlockRequestBuilder(pipeline, writeRequest);
+    return newPutBlockRequestBuilder(pipeline, writeRequest).build();
   }
 
   public static Builder newPutBlockRequestBuilder(Pipeline pipeline,

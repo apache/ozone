@@ -299,7 +299,7 @@ public class TestContainerCommandsEC {
       // Now, explicitly make a putKey request for the block.
       ContainerProtos.ContainerCommandRequestProto putKeyRequest =
           ContainerTestHelper.getPutBlockRequest(newPipeline,
-              writeChunkRequest.getWriteChunk()).build();
+              writeChunkRequest.getWriteChunk());
       dnClient.sendCommand(putKeyRequest);
 
       ContainerProtos.ReadContainerResponseProto readContainerResponseProto =

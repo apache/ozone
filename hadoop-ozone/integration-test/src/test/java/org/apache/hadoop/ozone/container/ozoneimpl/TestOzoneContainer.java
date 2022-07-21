@@ -193,7 +193,7 @@ public class TestOzoneContainer {
 
       // Put Block
       putBlockRequest = ContainerTestHelper.getPutBlockRequest(
-          pipeline, writeChunkRequest.getWriteChunk()).build();
+          pipeline, writeChunkRequest.getWriteChunk());
 
 
       response = client.sendCommand(putBlockRequest);
@@ -329,7 +329,7 @@ public class TestOzoneContainer {
 
 
       putBlockRequest = ContainerTestHelper.getPutBlockRequest(
-          client.getPipeline(), writeChunkRequest.getWriteChunk()).build();
+          client.getPipeline(), writeChunkRequest.getWriteChunk());
       // Put block before closing.
       response = client.sendCommand(putBlockRequest);
       Assert.assertNotNull(response);
@@ -408,7 +408,7 @@ public class TestOzoneContainer {
           client, containerID, 1024);
 
       putBlockRequest = ContainerTestHelper.getPutBlockRequest(
-          client.getPipeline(), writeChunkRequest.getWriteChunk()).build();
+          client.getPipeline(), writeChunkRequest.getWriteChunk());
       // Put key before deleting.
       response = client.sendCommand(putBlockRequest);
       Assert.assertNotNull(response);
@@ -518,7 +518,7 @@ public class TestOzoneContainer {
     // Create container
     ContainerProtos.ContainerCommandRequestProto request =
         ContainerTestHelper.getCreateContainerRequest(
-            containerID, client.getPipeline()).build();
+            containerID, client.getPipeline());
     ContainerProtos.ContainerCommandResponseProto response =
         client.sendCommand(request);
     Assert.assertNotNull(response);
@@ -531,7 +531,7 @@ public class TestOzoneContainer {
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
         ContainerTestHelper.getWriteChunkRequest(client.getPipeline(),
-            blockID, dataLen).build();
+            blockID, dataLen);
     ContainerProtos.ContainerCommandResponseProto response =
         client.sendCommand(writeChunkRequest);
     Assert.assertNotNull(response);

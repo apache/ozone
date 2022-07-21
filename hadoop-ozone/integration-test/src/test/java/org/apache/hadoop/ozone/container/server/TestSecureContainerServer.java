@@ -265,7 +265,7 @@ public class TestSecureContainerServer {
       BlockID blockID = getTestBlockID(containerID);
 
       assertFailsTokenVerification(client,
-          getCreateContainerRequest(containerID, pipeline).build());
+          getCreateContainerRequest(containerID, pipeline));
 
       //create the container
       ContainerProtocolCalls.createContainer(client, containerID,
@@ -277,7 +277,7 @@ public class TestSecureContainerServer {
       String encodedToken = token.encodeToUrlString();
 
       ContainerCommandRequestProto.Builder writeChunk =
-          newWriteChunkRequestBuilder(pipeline, blockID, 1024, 0);
+          newWriteChunkRequestBuilder(pipeline, blockID, 1024);
       assertRequiresToken(client, encodedToken, writeChunk);
 
       ContainerCommandRequestProto.Builder putBlock =

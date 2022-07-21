@@ -62,7 +62,7 @@ public class TestBlockTokenVerifier
       OzoneBlockTokenIdentifier tokenId) throws IOException {
     Pipeline pipeline = MockPipeline.createPipeline(1);
     return getWriteChunkRequest(
-        pipeline, new BlockID(1, 0), 1024).build();
+        pipeline, new BlockID(1, 0), 1024);
   }
 
   @Override

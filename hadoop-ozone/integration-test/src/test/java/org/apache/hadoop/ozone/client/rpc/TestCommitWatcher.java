@@ -189,15 +189,14 @@ public class TestCommitWatcher {
     for (int i = 0; i < capacity; i++) {
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper
-              .getWriteChunkRequest(pipeline, blockID, chunkSize).build();
+              .getWriteChunkRequest(pipeline, blockID, chunkSize);
       // add the data to the buffer pool
       final ChunkBuffer byteBuffer = bufferPool.allocateBuffer(0);
       byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
       ratisClient.sendCommandAsync(writeChunkRequest);
       ContainerProtos.ContainerCommandRequestProto putBlockRequest =
           ContainerTestHelper
-              .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk())
-              .build();
+              .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
       XceiverClientReply reply = ratisClient.sendCommandAsync(putBlockRequest);
       final List<ChunkBuffer> bufferList = singletonList(byteBuffer);
       length += byteBuffer.position();
@@ -265,15 +264,14 @@ public class TestCommitWatcher {
     for (int i = 0; i < capacity; i++) {
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper
-              .getWriteChunkRequest(pipeline, blockID, chunkSize).build();
+              .getWriteChunkRequest(pipeline, blockID, chunkSize);
       // add the data to the buffer pool
       final ChunkBuffer byteBuffer = bufferPool.allocateBuffer(0);
       byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
       ratisClient.sendCommandAsync(writeChunkRequest);
       ContainerProtos.ContainerCommandRequestProto putBlockRequest =
           ContainerTestHelper
-              .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk())
-              .build();
+              .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
       XceiverClientReply reply = ratisClient.sendCommandAsync(putBlockRequest);
       final List<ChunkBuffer> bufferList = singletonList(byteBuffer);
       length += byteBuffer.position();

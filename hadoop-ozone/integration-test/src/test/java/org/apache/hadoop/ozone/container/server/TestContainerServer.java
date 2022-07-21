@@ -165,7 +165,7 @@ public class TestContainerServer {
       final ContainerCommandRequestProto request =
           ContainerTestHelper
               .getCreateContainerRequest(
-                  ContainerTestHelper.getTestContainerID(), pipeline).build();
+                  ContainerTestHelper.getTestContainerID(), pipeline);
       Assert.assertNotNull(request.getTraceID());
 
       client.sendCommand(request);
@@ -225,7 +225,7 @@ public class TestContainerServer {
 
       ContainerCommandRequestProto request =
           ContainerTestHelper.getCreateContainerRequest(
-              ContainerTestHelper.getTestContainerID(), pipeline).build();
+              ContainerTestHelper.getTestContainerID(), pipeline);
       ContainerCommandResponseProto response = client.sendCommand(request);
       Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
     } finally {

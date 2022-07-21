@@ -174,7 +174,7 @@ public class TestOzoneContainerWithTLS {
       long containerID) throws Exception {
     ContainerProtos.ContainerCommandRequestProto request =
         ContainerTestHelper.getCreateContainerRequest(
-            containerID, client.getPipeline()).build();
+            containerID, client.getPipeline());
     ContainerProtos.ContainerCommandResponseProto response =
         client.sendCommand(request);
     Assert.assertNotNull(response);
