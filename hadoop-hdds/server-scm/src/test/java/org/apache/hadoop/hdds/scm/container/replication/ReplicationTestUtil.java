@@ -148,7 +148,7 @@ public final class ReplicationTestUtil {
       final NodeManager nodeManager, final OzoneConfiguration conf) {
     return new SCMCommonPlacementPolicy(nodeManager, conf) {
       @Override
-      public List<DatanodeDetails> chooseDatanodes(
+      protected List<DatanodeDetails> chooseDatanodesInternal(
           List<DatanodeDetails> excludedNodes,
           List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
           long metadataSizeRequired, long dataSizeRequired) {
@@ -170,7 +170,7 @@ public final class ReplicationTestUtil {
       final NodeManager nodeManager, final OzoneConfiguration conf) {
     return new SCMCommonPlacementPolicy(nodeManager, conf) {
       @Override
-      public List<DatanodeDetails> chooseDatanodes(
+      protected List<DatanodeDetails> chooseDatanodesInternal(
           List<DatanodeDetails> excludedNodes,
           List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
           long metadataSizeRequired, long dataSizeRequired)
