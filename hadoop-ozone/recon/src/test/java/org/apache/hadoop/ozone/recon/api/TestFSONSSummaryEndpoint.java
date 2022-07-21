@@ -974,7 +974,8 @@ public class TestFSONSSummaryEndpoint {
   /**
    * Testing the following case.
    *                     vol
-   *               /             \   *        bucket1               bucket2
+   *               /             \
+   *        bucket1               bucket2
    *        /    \                /     \
    *     file1      dir1        file4  file5
    *           /   \   \     \
