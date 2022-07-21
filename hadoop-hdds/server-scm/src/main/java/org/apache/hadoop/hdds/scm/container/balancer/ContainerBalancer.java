@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,7 +83,9 @@ public class ContainerBalancer extends StatefulService {
   private double maxDatanodesRatioToInvolvePerIteration;
   private long maxSizeToMovePerIteration;
   private int countDatanodesInvolvedPerIteration;
-  private long sizeMovedPerIteration;
+  private long sizeScheduledForMoveInLatestIteration;
+  // count actual size moved in bytes
+  private long sizeActuallyMovedInLatestIteration;
   private int iterations;
   private List<DatanodeUsageInfo> unBalancedNodes;
   private List<DatanodeUsageInfo> overUtilizedNodes;
@@ -536,12 +539,16 @@ public class ContainerBalancer extends StatefulService {
         metrics.getNumContainerMovesCompletedInLatestIteration());
     metrics.incrementNumContainerMovesTimeout(
         metrics.getNumContainerMovesTimeoutInLatestIteration());
+    metrics.incrementDataSizeMovedGBInLatestIteration(
+        sizeActuallyMovedInLatestIteration / OzoneConsts.GB);
     metrics.incrementDataSizeMovedGB(
         metrics.getDataSizeMovedGBInLatestIteration());
-    LOG.info("Number of datanodes involved in this iteration: {}. Size moved " +
-            "in this iteration: {}GB.",
+    LOG.info("Iteration Summary. Number of Datanodes involved: {}. Size " +
+            "moved: {} ({} Bytes). Number of Container moves completed: {}.",
         countDatanodesInvolvedPerIteration,
-        metrics.getDataSizeMovedGBInLatestIteration());
+        StringUtils.byteDesc(sizeActuallyMovedInLatestIteration),
+        sizeActuallyMovedInLatestIteration,
+        metrics.getNumContainerMovesCompletedInLatestIteration());
   }
 
   /**
@@ -601,14 +608,15 @@ public class ContainerBalancer extends StatefulService {
       }
       return true;
     }
-    if (sizeMovedPerIteration + (long) ozoneConfiguration.getStorageSize(
+    if (sizeScheduledForMoveInLatestIteration +
+        (long) ozoneConfiguration.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES) > maxSizeToMovePerIteration) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Hit max size to move limit. {} bytes have already been " +
                 "scheduled for balancing and the limit is {} bytes.",
-            sizeMovedPerIteration,
+            sizeScheduledForMoveInLatestIteration,
             maxSizeToMovePerIteration);
       }
       return true;
@@ -645,8 +653,8 @@ public class ContainerBalancer extends StatefulService {
                   moveSelection.getTargetNode().getUuidString(), ex);
             } else {
               if (result == LegacyReplicationManager.MoveResult.COMPLETED) {
-                metrics.incrementDataSizeMovedGBInLatestIteration(
-                    containerInfo.getUsedBytes() / OzoneConsts.GB);
+                sizeActuallyMovedInLatestIteration +=
+                    containerInfo.getUsedBytes();
                 if (LOG.isDebugEnabled()) {
                   LOG.debug(
                       "Container move completed for container {} to target {}",
@@ -812,7 +820,7 @@ public class ContainerBalancer extends StatefulService {
       return;
     }
     long size = container.getUsedBytes();
-    sizeMovedPerIteration += size;
+    sizeScheduledForMoveInLatestIteration += size;
 
     // update sizeLeavingNode map with the recent moveSelection
     findSourceStrategy.increaseSizeLeaving(source, size);
@@ -833,7 +841,8 @@ public class ContainerBalancer extends StatefulService {
     this.underUtilizedNodes.clear();
     this.unBalancedNodes.clear();
     this.countDatanodesInvolvedPerIteration = 0;
-    this.sizeMovedPerIteration = 0;
+    this.sizeScheduledForMoveInLatestIteration = 0;
+    this.sizeActuallyMovedInLatestIteration = 0;
     metrics.resetDataSizeMovedGBInLatestIteration();
     metrics.resetNumContainerMovesCompletedInLatestIteration();
     metrics.resetNumContainerMovesTimeoutInLatestIteration();
@@ -1262,8 +1271,8 @@ public class ContainerBalancer extends StatefulService {
   }
 
   @VisibleForTesting
-  public long getSizeMovedPerIteration() {
-    return sizeMovedPerIteration;
+  public long getSizeScheduledForMoveInLatestIteration() {
+    return sizeScheduledForMoveInLatestIteration;
   }
 
   public ContainerBalancerMetrics getMetrics() {
