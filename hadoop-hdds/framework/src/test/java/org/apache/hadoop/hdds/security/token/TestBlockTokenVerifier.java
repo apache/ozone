@@ -61,7 +61,8 @@ public class TestBlockTokenVerifier
   protected ContainerCommandRequestProto verifiedRequest(
       OzoneBlockTokenIdentifier tokenId) throws IOException {
     Pipeline pipeline = MockPipeline.createPipeline(1);
-    return getWriteChunkRequest(pipeline, new BlockID(1, 0), 1024, null);
+    return getWriteChunkRequest(
+        pipeline, new BlockID(1, 0), 1024);
   }
 
   @Override
