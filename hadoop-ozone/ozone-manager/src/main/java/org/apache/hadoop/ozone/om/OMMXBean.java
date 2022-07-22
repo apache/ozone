@@ -34,4 +34,5 @@ public interface OMMXBean extends ServiceRuntimeInfo {
   String getRatisLogDirectory();
 
   String getRocksDbDirectory();
+
 }
