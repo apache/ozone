@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -142,12 +143,8 @@ public final class KeyValueContainerUtil {
         .getMetadataPath());
     File chunksPath = new File(containerData.getChunksPath());
 
-    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
-      BlockUtils.removeContainerFromDB(containerData, conf);
-    } else {
-      // Close the DB connection and remove the DB handler from cache
-      BlockUtils.removeDB(containerData, conf);
-    }
+    // Close the DB connection and remove the DB handler from cache
+    BlockUtils.removeDB(containerData, conf);
 
     // Delete the Container MetaData path.
     FileUtils.deleteDirectory(containerMetaDataPath);
@@ -157,6 +154,21 @@ public final class KeyValueContainerUtil {
 
     //Delete Container directory
     FileUtils.deleteDirectory(containerMetaDataPath.getParentFile());
+  }
+
+  public static void removeContainer(KeyValueContainerData containerData,
+                                   ConfigurationSource conf,
+                                   CleanUpManager cleanUpManager)
+      throws IOException {
+    Preconditions.checkNotNull(containerData);
+    File containerMetaDataPath = new File(containerData
+        .getMetadataPath());
+
+    BlockUtils.removeContainerFromDB(containerData, conf);
+
+    File parentDir = containerMetaDataPath.getParentFile();
+
+    FileUtils.deleteDirectory(parentDir);
   }
 
   /**

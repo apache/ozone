@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
+import org.apache.hadoop.ozone.container.common.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -125,6 +126,7 @@ public class KeyValueHandler extends Handler {
   private static final Logger LOG = LoggerFactory.getLogger(
       KeyValueHandler.class);
 
+  private final ConfigurationSource configurationSource;
   private final ContainerType containerType;
   private final BlockManager blockManager;
   private final ChunkManager chunkManager;
@@ -143,6 +145,7 @@ public class KeyValueHandler extends Handler {
                          ContainerMetrics metrics,
                          IncrementalReportSender<Container> icrSender) {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
+    this.configurationSource = config;
     containerType = ContainerType.KeyValueContainer;
     blockManager = new BlockManagerImpl(config);
     validateChunkChecksumData = conf.getObject(
@@ -1216,6 +1219,10 @@ public class KeyValueHandler extends Handler {
 
   private void deleteInternal(Container container, boolean force)
       throws StorageContainerException {
+    KeyValueContainerData keyValueContainerData =
+        (KeyValueContainerData) container.getContainerData();
+    CleanUpManager cleanUpManager =
+        new CleanUpManager(keyValueContainerData, configurationSource);
     container.writeLock();
     try {
     // If force is false, we check container state.
@@ -1237,6 +1244,13 @@ public class KeyValueHandler extends Handler {
           throw new StorageContainerException("Non-force deletion of " +
               "non-empty container is not allowed.",
               DELETE_ON_NON_EMPTY_CONTAINER);
+        }
+      }
+      if (cleanUpManager.checkContainerSchemaV3Enabled()) {
+        try {
+          cleanUpManager.renameDir();
+        } catch (IOException ex) {
+          LOG.error("Error while moving metadata and chunks under Tmp directory", ex);
         }
       }
       long containerId = container.getContainerData().getContainerID();

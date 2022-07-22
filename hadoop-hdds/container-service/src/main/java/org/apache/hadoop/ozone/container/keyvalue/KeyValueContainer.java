@@ -44,6 +44,7 @@ import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -290,19 +291,32 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public void delete() throws StorageContainerException {
+    CleanUpManager cleanUpManager = new CleanUpManager(containerData, config);
     long containerId = containerData.getContainerID();
     try {
-      KeyValueContainerUtil.removeContainer(containerData, config);
+      if (cleanUpManager.checkContainerSchemaV3Enabled()) {
+        KeyValueContainerUtil.removeContainer(
+            containerData, config, cleanUpManager);
+      } else {
+        KeyValueContainerUtil.removeContainer(
+            containerData, config);
+      }
     } catch (StorageContainerException ex) {
       throw ex;
     } catch (IOException ex) {
-      // TODO : An I/O error during delete can leave partial artifacts on the
-      // disk. We will need the cleaner thread to cleanup this information.
-      onFailure(containerData.getVolume());
-      String errMsg = String.format("Failed to cleanup container. ID: %d",
-          containerId);
-      LOG.error(errMsg, ex);
-      throw new StorageContainerException(errMsg, ex, CONTAINER_INTERNAL_ERROR);
+      if (cleanUpManager.checkContainerSchemaV3Enabled()) {
+        try {
+          cleanUpManager.cleanTmpDir();
+        } catch (IOException e) {
+          LOG.error("Failed to clean up artifacts left in the tmp directory", e);
+        }
+      } else {
+        onFailure(containerData.getVolume());
+        String errMsg = String.format("Failed to cleanup container. ID: %d",
+            containerId);
+        LOG.error(errMsg, ex);
+        throw new StorageContainerException(errMsg, ex, CONTAINER_INTERNAL_ERROR);
+      }
     }
   }
 

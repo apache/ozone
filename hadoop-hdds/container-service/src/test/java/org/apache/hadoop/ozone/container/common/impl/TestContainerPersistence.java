@@ -44,12 +44,14 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
@@ -299,6 +301,54 @@ public class TestContainerPersistence {
     container2.delete();
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID2));
+  }
+
+  @Test
+  public void testDeleteContainerWithSchemaV3Enabled()
+      throws Exception {
+    long testContainerID1 = getTestContainerID();
+    Thread.sleep(100);
+
+    Container container1 = addContainer(containerSet, testContainerID1);
+    container1.close();
+
+    Assert.assertTrue(containerSet.getContainerMapCopy()
+        .containsKey(testContainerID1));
+
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      KeyValueContainerData containerData =
+          (KeyValueContainerData) container1.getContainerData();
+      CleanUpManager cleanUpManager = new CleanUpManager(containerData, conf);
+
+      DatanodeConfiguration datanodeConfiguration =
+          cleanUpManager.getDatanodeConf();
+
+      datanodeConfiguration.setDiskTmpDirectoryPath("/home/xbis/tmpDir");
+
+      //move container dir
+      cleanUpManager.renameDir();
+      List<String> leftovers = cleanUpManager.getDeleteLeftovers();
+
+      //confirm there is exactly 1 dir under /tmpDir
+      Assert.assertTrue(leftovers.size() >= 1);
+
+      //confirm /tmpDir is not empty
+      Assert.assertFalse(cleanUpManager.checkTmpDirIsEmpty());
+
+      //delete
+      container1.delete();
+
+      //remove container from containerSet
+      containerSet.removeContainer(testContainerID1);
+      Assert.assertFalse(containerSet.getContainerMapCopy()
+          .containsKey(testContainerID1));
+
+      //confirm /tmpDir is empty
+      Assert.assertTrue(cleanUpManager.checkTmpDirIsEmpty());
+
+      //delete /tmpDir from system
+      cleanUpManager.deleteTmpDir();
+    }
   }
 
   @Test
