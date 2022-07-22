@@ -269,11 +269,6 @@ public final class OmUtils {
     case ListTenant:
     case TenantGetUserInfo:
     case TenantListUser:
-    case RangerBGSync:
-      // RangerBGSync is a read operation in the sense that it doesn't directly
-      // write to OM DB. And therefore it doesn't need a OMClientRequest.
-      // Although indirectly the Ranger sync service task could invoke write
-      // operation SetRangerServiceVersion.
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -797,18 +792,21 @@ public final class OmUtils {
     return printString.toString();
   }
 
-  public static String format(List<ServiceInfo> nodes, int port) {
+  public static String format(List<ServiceInfo> nodes, int port,
+                              String leaderId) {
     StringBuilder sb = new StringBuilder();
     int count = 0;
     for (ServiceInfo info : nodes) {
       // Printing only the OM's running
+      String role = info.getHostname().equals(leaderId) ? "LEADER" : "FOLLOWER";
       if (info.getNodeType() == HddsProtos.NodeType.OM) {
         sb.append(
             String.format(
-                " { HostName: %s | Node-Id: %s | Ratis-Port : %d } ",
+                " { HostName: %s | Node-Id: %s | Ratis-Port : %d | Role: %s} ",
                 info.getHostname(),
                 info.getOmRoleInfo().getNodeId(),
-                port
+                port,
+                role
             ));
         count++;
       }

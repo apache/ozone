@@ -2970,23 +2970,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public String getOmRatisRoles() {
     List<ServiceInfo> serviceList = null;
     int port = omNodeDetails.getRatisPort();
+    RaftPeer leaderId;
     try {
+      leaderId = omRatisServer.getLeader();
       serviceList = getServiceList();
     } catch (IOException e) {
       LOG.error("IO-Exception Occurred", e);
       return "Exception: " + e.toString();
     }
-    return OmUtils.format(serviceList, port);
-  }
-
-  @Override
-  public String getRatisLeader() throws NullPointerException {
-    RaftPeer leaderId = null;
-    try {
-      leaderId = omRatisServer.getLeader();
-    } catch (IOException e) {
-    }
-    return leaderId.getId().toString();
+    return OmUtils.format(serviceList, port, leaderId.getId().toString());
   }
 
   public String getRatisLogDirectory() {
