@@ -198,7 +198,7 @@ public class TestOMMultiTenantManagerImpl {
   }
 
   private void createTenantInDB(String tenantId, String userRoleName,
-                                String adminRoleName) throws IOException {
+      String adminRoleName) throws IOException {
     final String bucketNamespaceName = tenantId;
     final String bucketNamespacePolicyName =
         OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantId);
@@ -231,7 +231,7 @@ public class TestOMMultiTenantManagerImpl {
   }
 
   private void assignUserToTenantInDB(String tenantId, String accessId,
-                                      String user, boolean isAdmin, boolean isDelegatedAdmin)
+      String user, boolean isAdmin, boolean isDelegatedAdmin)
       throws IOException {
     omMetadataManager.getTenantAccessIdTable().put(accessId,
         new OmDBAccessIdInfo(tenantId, user, isAdmin, isDelegatedAdmin));
