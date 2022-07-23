@@ -41,32 +41,13 @@ public class OmMultipartUpload {
 
   private ReplicationConfig replicationConfig;
 
-  public OmMultipartUpload(String volumeName, String bucketName,
-      String keyName, String uploadId) {
-    this.volumeName = volumeName;
-    this.bucketName = bucketName;
-    this.keyName = keyName;
-    this.uploadId = uploadId;
-  }
-
-  public OmMultipartUpload(String volumeName, String bucketName,
-      String keyName, String uploadId, Instant creationDate) {
-    this.volumeName = volumeName;
-    this.bucketName = bucketName;
-    this.keyName = keyName;
-    this.uploadId = uploadId;
-    this.creationTime = creationDate;
-  }
-
-  public OmMultipartUpload(String volumeName, String bucketName,
-      String keyName, String uploadId, Instant creationTime,
-      ReplicationConfig replicationConfig) {
-    this.volumeName = volumeName;
-    this.bucketName = bucketName;
-    this.keyName = keyName;
-    this.uploadId = uploadId;
-    this.creationTime = creationTime;
-    this.replicationConfig = replicationConfig;
+  public OmMultipartUpload(Builder objectBuild) {
+    this.volumeName = objectBuild.volumeName;
+    this.bucketName = objectBuild.bucketName;
+    this.keyName = objectBuild.keyName;
+    this.uploadId = objectBuild.uploadId;
+    this.creationTime = objectBuild.creationTime;
+    this.replicationConfig = objectBuild.replicationConfig;
   }
 
   public static OmMultipartUpload from(String key) {
@@ -78,9 +59,12 @@ public class OmMultipartUpload {
     String uploadId = split[split.length - 1];
     String volume = split[1];
     String bucket = split[2];
-    return new OmMultipartUpload(volume, bucket,
-        key.substring(volume.length() + bucket.length() + 3,
-            key.length() - uploadId.length() - 1), uploadId);
+    return new OmMultipartUpload.Builder()
+        .setVolumeName(volume)
+        .setBucketName(bucket)
+        .setKeyName(key.substring(volume.length() + bucket.length() + 3,
+            key.length() - uploadId.length() - 1))
+        .setUploadID(uploadId).build();
   }
 
   public String getDbKey() {
@@ -130,4 +114,57 @@ public class OmMultipartUpload {
   public ReplicationConfig getReplicationConfig() {
     return replicationConfig;
   }
+
+  /**
+   * Builder class of OmMultipartUpload.
+   */
+  public static class Builder {
+    private String volumeName;
+
+    private String bucketName;
+
+    private String keyName;
+
+    private String uploadId;
+
+    private Instant creationTime;
+
+    private ReplicationConfig replicationConfig;
+
+    public Builder setVolumeName(String volumename) {
+      this.volumeName = volumename;
+      return this;
+    }
+
+    public Builder setBucketName(String bucketname) {
+      this.bucketName = bucketname;
+      return this;
+    }
+
+    public Builder setKeyName(String keyname) {
+      this.keyName = keyname;
+      return this;
+    }
+
+    public Builder setUploadID(String uploadid) {
+      this.uploadId = uploadid;
+      return this;
+    }
+
+    public Builder setCreationTime(Instant creationtime) {
+      this.creationTime = creationtime;
+      return this;
+    }
+
+    public Builder setReplicationConfig(ReplicationConfig replicationconfig) {
+      this.replicationConfig = replicationconfig;
+      return this;
+    }
+
+    //Return the final constructed builder object
+    public OmMultipartUpload build() {
+      return new OmMultipartUpload(this);
+    }
+  }
+
 }

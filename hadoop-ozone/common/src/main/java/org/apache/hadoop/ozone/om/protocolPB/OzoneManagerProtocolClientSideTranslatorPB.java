@@ -1398,15 +1398,16 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     List<OmMultipartUpload> uploadList =
         listMultipartUploadsResponse.getUploadsListList()
             .stream()
-            .map(proto -> new OmMultipartUpload(
-                proto.getVolumeName(),
-                proto.getBucketName(),
-                proto.getKeyName(),
-                proto.getUploadId(),
-                Instant.ofEpochMilli(proto.getCreationTime()),
-                ReplicationConfig.fromProto(proto.getType(), proto.getFactor(),
-                    proto.getEcReplicationConfig())
-            ))
+            .map(proto -> new OmMultipartUpload.Builder()
+                .setVolumeName(proto.getVolumeName())
+                .setBucketName(proto.getBucketName())
+                .setKeyName(proto.getKeyName())
+                .setUploadID(proto.getUploadId())
+                .setCreationTime(Instant.ofEpochMilli(proto.getCreationTime()))
+                .setReplicationConfig(
+                    ReplicationConfig.fromProtoTypeAndFactor(proto.getType(),
+                        proto.getFactor()))
+                .build())
             .collect(Collectors.toList());
 
     OmMultipartUploadList response = new OmMultipartUploadList(uploadList);
