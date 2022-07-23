@@ -68,7 +68,7 @@ public class RepeatedOmKeyInfo {
    */
   public RepeatedKeyInfo getProto(boolean compact, int clientVersion) {
     List<KeyInfo> list = new ArrayList<>();
-    for (OmKeyInfo k : omKeyInfoList) {
+    for (OmKeyInfo k : new ArrayList<>(omKeyInfoList)) {
       list.add(k.getProtobuf(compact, clientVersion));
     }
 
