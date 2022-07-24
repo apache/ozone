@@ -62,6 +62,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGER_ROLE_DESCRIPTION;
 import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
 
@@ -361,7 +362,10 @@ public class OMRangerBGSyncService extends BackgroundService {
     long policyVersion = accessController.getRangerServicePolicyVersion();
     if (policyVersion < 0L) {
       LOG.warn("Unable to get valid policyVersion for Ranger background sync "
-          + "to function properly. Please check if ");
+              + "to function properly. Please check if the Kerberos principal "
+              + "as configured in ozone.om.kerberos.principal ({}) has admin "
+              + "privilege in Ranger.",
+          ozoneManager.getConfiguration().get(OZONE_OM_KERBEROS_PRINCIPAL_KEY));
     }
     return policyVersion;
   }
