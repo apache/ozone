@@ -97,6 +97,14 @@ load bats-assert/load.bash
   run dev-support/ci/pr_title_check.sh 'HDDS-1234. Hello World '
   assert_output 'Fail: trailing space'
 
+  # trailing ellipsis
+  run dev-support/ci/pr_title_check.sh 'HDDS-1234. Hello World...'
+  assert_output 'Fail: trailing ellipsis indicates title is cut'
+
+  # trailing ellipsis
+  run dev-support/ci/pr_title_check.sh 'HDDS-1234. Hello World…'
+  assert_output 'Fail: trailing ellipsis indicates title is cut'
+
   # double spaces after Jira
   run dev-support/ci/pr_title_check.sh 'HDDS-1234.  Hello World'
   assert_output 'Fail: two consecutive spaces'
