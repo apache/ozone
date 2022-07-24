@@ -53,6 +53,7 @@ interface IDatanodeResponse {
   setupTime: number;
   revision: string;
   buildDate: string;
+  networkLocation: string;
 }
 
 interface IDatanodesResponse {
@@ -77,6 +78,7 @@ interface IDatanode {
   setupTime: number;
   revision: string;
   buildDate: string;
+  networkLocation: string;
 }
 
 interface IPipeline {
@@ -214,7 +216,7 @@ const COLUMNS = [
       <Icon type='info-circle'/>
     </Tooltip>
   </span>,
-    dataIndex: 'leaderCount',
+    dataIndex: 'leader Count',
     key: 'leaderCount',
     isVisible: true,
     isSearchable: true,
@@ -246,7 +248,7 @@ const COLUMNS = [
     defaultSortOrder: 'ascend' as const
   },
   {
-    title: 'SetupTime',
+    title: 'Setup Time',
     dataIndex: 'setupTime',
     key: 'setupTime',
     isVisible: true,
@@ -265,12 +267,21 @@ const COLUMNS = [
     defaultSortOrder: 'ascend' as const
   },
   {
-    title: 'BuildDate',
+    title: 'Build Date',
     dataIndex: 'buildDate',
     key: 'buildDate',
     isVisible: true,
     isSearchable: true,
     sorter: (a: IDatanode, b: IDatanode) => a.buildDate.localeCompare(b.buildDate),
+    defaultSortOrder: 'ascend' as const
+  },
+  {
+    title: 'Network Location',
+    dataIndex: 'networkLocation',
+    key: 'networkLocation',
+    isVisible: true,
+    isSearchable: true,
+    sorter: (a: IDatanode, b: IDatanode) => a.networkLocation.localeCompare(b.networkLocation),
     defaultSortOrder: 'ascend' as const
   }
 ];
@@ -342,7 +353,8 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           version: datanode.version,
           setupTime: datanode.setupTime,
           revision: datanode.revision,
-          buildDate: datanode.buildDate
+          buildDate: datanode.buildDate,
+          networkLocation: datanode.networkLocation
         };
       });
 
