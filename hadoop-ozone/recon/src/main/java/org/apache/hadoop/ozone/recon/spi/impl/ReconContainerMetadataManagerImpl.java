@@ -176,6 +176,10 @@ public class ReconContainerMetadataManagerImpl
                                                 containerKeyPrefix,
                                             Integer count) throws IOException {
     containerKeyTable.putWithBatch(batch, containerKeyPrefix, count);
+    if (containerKeyPrefix.toKeyPrefixContainer() != null) {
+      keyContainerTable.putWithBatch(batch,
+          containerKeyPrefix.toKeyPrefixContainer(), count);
+    }
   }
 
   /**
@@ -533,6 +537,7 @@ public class ReconContainerMetadataManagerImpl
   public void commitBatchOperation(RDBBatchOperation rdbBatchOperation)
       throws IOException {
     this.containerDbStore.commitBatchOperation(rdbBatchOperation);
+  }
     
   /**
    * Use the DB's prefix seek iterator to start the scan from the given
