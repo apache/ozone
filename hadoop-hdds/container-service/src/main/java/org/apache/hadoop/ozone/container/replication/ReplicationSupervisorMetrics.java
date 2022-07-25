@@ -56,7 +56,6 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
   }
 
   @Override
-  @SuppressWarnings("SuspiciousMethodCalls")
   public void getMetrics(MetricsCollector collector, boolean all) {
     collector.addRecord(SOURCE)
         .addGauge(Interns.info("numInFlightReplications",

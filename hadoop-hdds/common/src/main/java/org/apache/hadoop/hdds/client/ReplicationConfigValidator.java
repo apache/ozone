@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 import java.util.regex.Pattern;
 
@@ -50,14 +51,22 @@ public class ReplicationConfigValidator {
 
   public ReplicationConfig validate(ReplicationConfig replicationConfig) {
     if (validationRegexp != null) {
-      if (!validationRegexp.matcher(replicationConfig.toString()).matches()) {
+      if (!validationRegexp.matcher(
+          replicationConfig.configFormat()).matches()) {
+        String replication = replicationConfig.getReplication();
+        if (HddsProtos.ReplicationType.EC ==
+                replicationConfig.getReplicationType()) {
+          ECReplicationConfig ecConfig =
+              (ECReplicationConfig) replicationConfig;
+          replication =  ecConfig.getCodec() + "-" + ecConfig.getData() +
+              "-" + ecConfig.getParity() + "-{CHUNK_SIZE}";
+        }
         throw new IllegalArgumentException("Invalid replication config " +
-            replicationConfig.toString() +
-            " Replication config should match " + validationPattern);
+            "for type " + replicationConfig.getReplicationType() +
+            " and replication " + replication);
       }
     }
     return replicationConfig;
   }
-
 
 }

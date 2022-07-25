@@ -77,7 +77,7 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
           // overwrite pipeline state to main ALLOCATED
           .setState(Pipeline.PipelineState.ALLOCATED)
           .setReplicationConfig(ReplicationConfig
-              .fromTypeAndFactor(initialPipeline.getType(),
+              .fromProtoTypeAndFactor(initialPipeline.getType(),
                   replicationConfig.getReplicationFactor()))
           .setNodes(initialPipeline.getNodes())
           .build();

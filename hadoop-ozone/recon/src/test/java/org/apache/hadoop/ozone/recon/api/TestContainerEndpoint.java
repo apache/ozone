@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
@@ -409,7 +410,7 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testGetMissingContainers() throws IOException {
+  public void testGetMissingContainers() throws IOException, TimeoutException {
     Response response = containerEndpoint.getMissingContainers();
 
     MissingContainersResponse responseObject =
@@ -439,10 +440,10 @@ public class TestContainerEndpoint {
     final UUID u2 = newDatanode("host2", "127.0.0.2");
     final UUID u3 = newDatanode("host3", "127.0.0.3");
     final UUID u4 = newDatanode("host4", "127.0.0.4");
-    reconContainerManager.upsertContainerHistory(1L, u1, 1L);
-    reconContainerManager.upsertContainerHistory(1L, u2, 2L);
-    reconContainerManager.upsertContainerHistory(1L, u3, 3L);
-    reconContainerManager.upsertContainerHistory(1L, u4, 4L);
+    reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L);
+    reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L);
+    reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L);
+    reconContainerManager.upsertContainerHistory(1L, u4, 4L, 1L);
 
     response = containerEndpoint.getMissingContainers();
     responseObject = (MissingContainersResponse) response.getEntity();
@@ -469,7 +470,7 @@ public class TestContainerEndpoint {
     return new ContainerInfo.Builder()
         .setContainerID(containerId)
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(HddsProtos.LifeCycleState.OPEN)
         .setOwner("owner1")
         .setNumberOfKeys(keyCount)
@@ -477,7 +478,7 @@ public class TestContainerEndpoint {
         .build();
   }
 
-  void putContainerInfos(int num) throws IOException {
+  void putContainerInfos(int num) throws IOException, TimeoutException {
     for (int i = 1; i <= num; i++) {
       final ContainerInfo info = newContainerInfo(i);
       reconContainerManager.addNewContainer(
@@ -486,7 +487,7 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testUnhealthyContainers() throws IOException {
+  public void testUnhealthyContainers() throws IOException, TimeoutException {
     Response response = containerEndpoint.getUnhealthyContainers(1000, 1);
 
     UnhealthyContainersResponse responseObject =
@@ -580,7 +581,8 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testUnhealthyContainersFilteredResponse() throws IOException {
+  public void testUnhealthyContainersFilteredResponse()
+      throws IOException, TimeoutException {
     String missing =  UnHealthyContainerStates.MISSING.toString();
 
     Response response = containerEndpoint
@@ -633,7 +635,8 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testUnhealthyContainersPaging() throws IOException {
+  public void testUnhealthyContainersPaging()
+      throws IOException, TimeoutException {
     putContainerInfos(6);
     uuid1 = newDatanode("host1", "127.0.0.1");
     uuid2 = newDatanode("host2", "127.0.0.2");
@@ -670,12 +673,12 @@ public class TestContainerEndpoint {
     final UUID u2 = newDatanode("host2", "127.0.0.2");
     final UUID u3 = newDatanode("host3", "127.0.0.3");
     final UUID u4 = newDatanode("host4", "127.0.0.4");
-    reconContainerManager.upsertContainerHistory(1L, u1, 1L);
-    reconContainerManager.upsertContainerHistory(1L, u2, 2L);
-    reconContainerManager.upsertContainerHistory(1L, u3, 3L);
-    reconContainerManager.upsertContainerHistory(1L, u4, 4L);
+    reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L);
+    reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L);
+    reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L);
+    reconContainerManager.upsertContainerHistory(1L, u4, 4L, 1L);
 
-    reconContainerManager.upsertContainerHistory(1L, u1, 5L);
+    reconContainerManager.upsertContainerHistory(1L, u1, 5L, 1L);
 
     Response response = containerEndpoint.getReplicaHistoryForContainer(1L);
     List<ContainerHistory> histories =
@@ -755,10 +758,10 @@ public class TestContainerEndpoint {
     missingList.add(missing);
     containerHealthSchemaManager.insertUnhealthyContainerRecords(missingList);
 
-    reconContainerManager.upsertContainerHistory(cID, uuid1, 1L);
-    reconContainerManager.upsertContainerHistory(cID, uuid2, 2L);
-    reconContainerManager.upsertContainerHistory(cID, uuid3, 3L);
-    reconContainerManager.upsertContainerHistory(cID, uuid4, 4L);
+    reconContainerManager.upsertContainerHistory(cID, uuid1, 1L, 1L);
+    reconContainerManager.upsertContainerHistory(cID, uuid2, 2L, 1L);
+    reconContainerManager.upsertContainerHistory(cID, uuid3, 3L, 1L);
+    reconContainerManager.upsertContainerHistory(cID, uuid4, 4L, 1L);
   }
 
   private BucketLayout getBucketLayout() {

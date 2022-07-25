@@ -49,10 +49,10 @@ import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
-import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -81,6 +81,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@SuppressWarnings("java:S2245") // no need for secure random
 public class GeneratorDatanode extends BaseGenerator {
 
   @Option(names = {"--datanodes"},
@@ -160,9 +161,9 @@ public class GeneratorDatanode extends BaseGenerator {
           "Version file " + versionFile + " is missing");
     }
 
-    String clusterId =
-        HddsVolumeUtil.getProperty(props, OzoneConsts.CLUSTER_ID, versionFile);
-    datanodeId = HddsVolumeUtil
+    String clusterId = StorageVolumeUtil.getProperty(props,
+        OzoneConsts.CLUSTER_ID, versionFile);
+    datanodeId = StorageVolumeUtil
         .getProperty(props, OzoneConsts.DATANODE_UUID, versionFile);
 
     volumeSet = new MutableVolumeSet(datanodeId, clusterId, config, null,
@@ -316,8 +317,8 @@ public class GeneratorDatanode extends BaseGenerator {
 
   private KeyValueContainer createContainer(long containerId)
       throws IOException {
-    ChunkLayOutVersion layoutVersion =
-        ChunkLayOutVersion.getConfiguredVersion(config);
+    ContainerLayoutVersion layoutVersion =
+        ContainerLayoutVersion.getConfiguredVersion(config);
     KeyValueContainerData keyValueContainerData =
         new KeyValueContainerData(containerId, layoutVersion,
             getContainerSize(config),

@@ -39,12 +39,14 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
 import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.node.states.NodeStateMap;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -160,8 +162,8 @@ public class NodeStateManager implements Runnable, Closeable {
    * Conditions to check whether a node's metadata layout version matches
    * that of SCM.
    */
-  private Predicate<LayoutVersionProto> layoutMatchCondition;
-  private Predicate<LayoutVersionProto> layoutMisMatchCondition;
+  private final Predicate<LayoutVersionProto> layoutMatchCondition;
+  private final Predicate<LayoutVersionProto> layoutMisMatchCondition;
 
   /**
    * Constructs a NodeStateManager instance with the given configuration.
@@ -172,7 +174,8 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public NodeStateManager(ConfigurationSource conf,
                           EventPublisher eventPublisher,
-                          LayoutVersionManager layoutManager) {
+                          LayoutVersionManager layoutManager,
+                          SCMContext scmContext) {
     this.layoutVersionManager = layoutManager;
     this.nodeStateMap = new NodeStateMap();
     this.node2PipelineMap = new Node2PipelineMap();
@@ -199,13 +202,23 @@ public class NodeStateManager implements Runnable, Closeable {
     skippedHealthChecks = 0;
     checkPaused = false; // accessed only from test functions
 
-    layoutMatchCondition =
-        (layout) -> (layout.getMetadataLayoutVersion() ==
+    // This will move a datanode out of healthy readonly state if passed.
+    layoutMatchCondition = (layout) ->
+        (layout.getMetadataLayoutVersion() ==
              layoutVersionManager.getMetadataLayoutVersion()) &&
             (layout.getSoftwareLayoutVersion() ==
             layoutVersionManager.getSoftwareLayoutVersion());
 
-    layoutMisMatchCondition = (layout) -> !layoutMatchCondition.test(layout);
+    // This will move a datanode in to healthy readonly state if passed.
+    // When SCM finishes finalizing, it will automatically move all datanodes
+    // to healthy readonly as well.
+    // If nodes heartbeat while SCM is finalizing, they should not be moved
+    // to healthy readonly until SCM finishes updating its MLV, hence the
+    // checkpoint check here.
+    layoutMisMatchCondition = (layout) ->
+        FinalizationManager.shouldTellDatanodesToFinalize(
+            scmContext.getFinalizationCheckpoint()) &&
+            !layoutMatchCondition.test(layout);
 
     scheduleNextHealthCheck();
   }
@@ -387,6 +400,28 @@ public class NodeStateManager implements Runnable, Closeable {
       throws NodeNotFoundException {
     nodeStateMap.getNodeInfo(datanodeDetails.getUuid())
         .updateLastKnownLayoutVersion(layoutInfo);
+  }
+
+  /**
+   * Update node.
+   *
+   * @param datanodeDetails the datanode details
+   * @param layoutInfo the layoutInfo
+   * @throws NodeNotFoundException the node not found exception
+   */
+  public void updateNode(DatanodeDetails datanodeDetails,
+                         LayoutVersionProto layoutInfo)
+          throws NodeNotFoundException {
+    DatanodeInfo datanodeInfo =
+            nodeStateMap.getNodeInfo(datanodeDetails.getUuid());
+    NodeStatus newNodeStatus = newNodeStatus(datanodeDetails, layoutInfo);
+    LOG.info("updating node {} from {} to {} with status {}",
+            datanodeDetails.getUuidString(),
+            datanodeInfo,
+            datanodeDetails,
+            newNodeStatus);
+    nodeStateMap.updateNode(datanodeDetails, newNodeStatus, layoutInfo);
+    updateLastKnownLayoutVersion(datanodeDetails, layoutInfo);
   }
 
   /**
@@ -602,6 +637,20 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
+   * Removes the given container from the specified datanode.
+   *
+   * @param uuid - datanode uuid
+   * @param containerId - containerID
+   * @throws NodeNotFoundException - if datanode is not known. For new datanode
+   *                        use addDatanodeInContainerMap call.
+   */
+  public void removeContainer(final UUID uuid,
+                           final ContainerID containerId)
+      throws NodeNotFoundException {
+    nodeStateMap.removeContainer(uuid, containerId);
+  }
+
+  /**
    * Update set of containers available on a datanode.
    * @param uuid - DatanodeID
    * @param containerIds - Set of containerIDs
@@ -613,7 +662,9 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
-   * Return set of containerIDs available on a datanode.
+   * Return set of containerIDs available on a datanode. This is a copy of the
+   * set which resides inside NodeStateMap and hence can be modified without
+   * synchronization or side effects.
    * @param uuid - DatanodeID
    * @return - set of containerIDs
    */
@@ -666,7 +717,17 @@ public class NodeStateManager implements Runnable, Closeable {
     scheduleNextHealthCheck();
   }
 
-  public void forceNodesToHealthyReadOnly() {
+  /**
+   * Upgrade finalization needs to move all nodes to a healthy readonly state
+   * when finalization finishes to make sure no nodes with metadata layout
+   * version older than SCM's are used in pipelines. Pipeline creation is
+   * still frozen at this point in the finalization flow.
+   *
+   * This method is synchronized to coordinate node state updates between
+   * the upgrade finalization thread which calls this method, and the
+   * node health processing thread that calls {@link this#checkNodesHealth}.
+   */
+  public synchronized void forceNodesToHealthyReadOnly() {
     try {
       List<UUID> nodes = nodeStateMap.getNodes(null, HEALTHY);
       for (UUID id : nodes) {
@@ -674,6 +735,10 @@ public class NodeStateManager implements Runnable, Closeable {
         nodeStateMap.updateNodeHealthState(node.getUuid(),
             HEALTHY_READONLY);
         if (state2EventMap.containsKey(HEALTHY_READONLY)) {
+          // At this point pipeline creation is already frozen and the node's
+          // state has been updated in nodeStateMap. This event should be a
+          // no-op aside from logging a message, so it is ok to complete
+          // asynchronously.
           eventPublisher.fireEvent(state2EventMap.get(HEALTHY_READONLY),
               node);
         }
@@ -684,8 +749,14 @@ public class NodeStateManager implements Runnable, Closeable {
     }
   }
 
+  /**
+   * This method is synchronized to coordinate node state updates between
+   * the upgrade finalization thread which calls
+   * {@link this#forceNodesToHealthyReadOnly}, and the node health processing
+   * thread that calls this method.
+   */
   @VisibleForTesting
-  public void checkNodesHealth() {
+  public synchronized void checkNodesHealth() {
 
     /*
      *
@@ -728,7 +799,7 @@ public class NodeStateManager implements Runnable, Closeable {
         (lastHbTime) -> lastHbTime < staleNodeDeadline;
 
     try {
-      for(DatanodeInfo node : nodeStateMap.getAllDatanodeInfos()) {
+      for (DatanodeInfo node : nodeStateMap.getAllDatanodeInfos()) {
         NodeStatus status = nodeStateMap.getNodeStatus(node.getUuid());
         switch (status.getHealth()) {
         case HEALTHY:

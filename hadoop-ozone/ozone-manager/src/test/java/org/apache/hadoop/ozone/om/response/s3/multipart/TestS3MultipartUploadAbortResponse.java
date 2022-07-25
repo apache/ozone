@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import java.io.IOException;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -45,21 +46,34 @@ public class TestS3MultipartUploadAbortResponse
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
     String multipartUploadID = UUID.randomUUID().toString();
+
+    addVolumeToDB(volumeName);
+    addBucketToDB(volumeName, bucketName);
     String multipartOpenKey = getMultipartOpenKey(volumeName, bucketName,
         keyName, multipartUploadID);
 
     String multipartKey = omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
 
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
+    String buckDBKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+        omMetadataManager.getBucketTable().get(buckDBKey);
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponse =
-        createS3InitiateMPUResponse(volumeName, bucketName, keyName,
-            multipartUploadID);
+        getS3InitiateMultipartUploadResponse(volumeName, bucketName, keyName,
+            multipartUploadID, volumeId, omBucketInfo.getObjectID());
 
     s3InitiateMultipartUploadResponse.addToDBBatch(omMetadataManager,
         batchOperation);
+
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    // Make sure key is present in OpenKeyTable and MPU table before Abort.
+    Assert.assertNotNull(
+        omMetadataManager.getOpenKeyTable(getBucketLayout())
+            .get(multipartOpenKey));
+    Assert.assertNotNull(
+        omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
     S3MultipartUploadAbortResponse s3MultipartUploadAbortResponse =
         createS3AbortMPUResponse(multipartKey, multipartOpenKey,
@@ -71,6 +85,7 @@ public class TestS3MultipartUploadAbortResponse
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
+    // Key should be deleted from OpenKeyTable and MPU table after Abort.
     Assert.assertNull(
         omMetadataManager.getOpenKeyTable(getBucketLayout())
             .get(multipartOpenKey));
@@ -82,6 +97,14 @@ public class TestS3MultipartUploadAbortResponse
         omMetadataManager.getDeletedTable()) == 0);
   }
 
+  protected S3InitiateMultipartUploadResponse
+        getS3InitiateMultipartUploadResponse(
+      String volumeName, String bucketName, String keyName,
+      String multipartUploadID, long volumeId, long bucketId) {
+    return createS3InitiateMPUResponse(volumeName, bucketName, keyName,
+        multipartUploadID);
+  }
+
   @Test
   public void testAddDBToBatchWithParts() throws Exception {
 
@@ -89,6 +112,8 @@ public class TestS3MultipartUploadAbortResponse
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
     String multipartUploadID = UUID.randomUUID().toString();
+    addVolumeToDB(volumeName);
+    addBucketToDB(volumeName, bucketName);
     String multipartOpenKey = getMultipartOpenKey(volumeName, bucketName,
         keyName, multipartUploadID);
     String multipartKey = omMetadataManager.getMultipartKey(volumeName,
@@ -167,7 +192,7 @@ public class TestS3MultipartUploadAbortResponse
   }
 
   protected String getMultipartOpenKey(String volumeName, String bucketName,
-      String keyName, String multipartUploadID) {
+      String keyName, String multipartUploadID) throws IOException {
     return omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
   }

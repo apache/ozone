@@ -29,7 +29,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -54,9 +55,9 @@ public class TestOMFailovers {
 
     testException = new AccessControlException();
 
-    GenericTestUtils.setLogLevel(OMFailoverProxyProvider.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMFailoverProxyProviderBase.LOG, Level.DEBUG);
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(OMFailoverProxyProvider.LOG);
+        .captureLogs(OMFailoverProxyProviderBase.LOG);
 
     MockFailoverProxyProvider failoverProxyProvider =
         new MockFailoverProxyProvider(conf);
@@ -109,12 +110,12 @@ public class TestOMFailovers {
     public OMResponse submitRequest(RpcController controller,
         OzoneManagerProtocolProtos.OMRequest request) throws ServiceException {
       throw new ServiceException("ServiceException of type " +
-          exception.getClass() + " for "+ omNodeId, exception);
+          exception.getClass() + " for " + omNodeId, exception);
     }
   }
 
   private final class MockFailoverProxyProvider
-      extends OMFailoverProxyProvider {
+      extends HadoopRpcOMFailoverProxyProvider {
 
     private MockFailoverProxyProvider(ConfigurationSource configuration)
         throws IOException {

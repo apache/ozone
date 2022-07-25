@@ -147,8 +147,8 @@ start_docker_env(){
   create_results_dir
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
 
-  docker-compose --no-ansi down
-  if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" \
+  docker-compose --ansi never down
+  if ! { docker-compose --ansi never up -d --scale datanode="${datanode_count}" \
       && wait_for_safemode_exit \
       && wait_for_om_leader ; }; then
     [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME"
@@ -201,6 +201,10 @@ execute_robot_test(){
 
   copy_daemon_logs
 
+  if [[ ${rc} -gt 0 ]] && [[ ${rc} -le 250 ]]; then
+    create_stack_dumps
+  fi
+
   set -e
 
   if [[ ${rc} -gt 0 ]]; then
@@ -210,11 +214,22 @@ execute_robot_test(){
   return ${rc}
 }
 
+## @description Create stack dump of each java process in each container
+create_stack_dumps() {
+  local c pid procname
+  for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e om -e recon -e s3g -e scm); do
+    while read -r pid procname; do
+      echo "jstack $pid > ${RESULT_DIR}/${c}_${procname}.stack"
+      docker exec "${c}" bash -c "jstack $pid" > "${RESULT_DIR}/${c}_${procname}.stack"
+    done < <(docker exec "${c}" bash -c "jps | grep -v Jps")
+  done
+}
+
 ## @description Copy any 'out' files for daemon processes to the result dir
 copy_daemon_logs() {
   local c f
   for c in $(docker-compose ps | grep "^${COMPOSE_ENV_NAME}_" | awk '{print $1}'); do
-    for f in $(docker exec "${c}" ls -1 /var/log/hadoop | grep -F '.out'); do
+    for f in $(docker exec "${c}" ls -1 /var/log/hadoop 2> /dev/null | grep -F -e '.out' -e audit); do
       docker cp "${c}:/var/log/hadoop/${f}" "$RESULT_DIR/"
     done
   done
@@ -235,7 +250,7 @@ execute_command_in_container(){
 ## @param       List of container names, eg datanode_1 datanode_2
 stop_containers() {
   set -e
-  docker-compose --no-ansi stop $@
+  docker-compose --ansi never stop $@
   set +e
 }
 
@@ -244,7 +259,7 @@ stop_containers() {
 ## @param       List of container names, eg datanode_1 datanode_2
 start_containers() {
   set -e
-  docker-compose --no-ansi start $@
+  docker-compose --ansi never start $@
   set +e
 }
 
@@ -280,9 +295,9 @@ wait_for_port(){
 
 ## @description  Stops a docker-compose based test environment (with saving the logs)
 stop_docker_env(){
-  docker-compose --no-ansi logs > "$RESULT_DIR/docker-$OUTPUT_NAME.log"
+  docker-compose --ansi never logs > "$RESULT_DIR/docker-$OUTPUT_NAME.log"
   if [ "${KEEP_RUNNING:-false}" = false ]; then
-     docker-compose --no-ansi down
+     docker-compose --ansi never down
   fi
 }
 
@@ -320,13 +335,12 @@ copy_results() {
   local result_dir="${test_dir}/result"
   local test_dir_name=$(basename ${test_dir})
   if [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
-    rebot --nostatusrc -N "${test_dir_name}" -l NONE -r NONE -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}/*.xml"
+    rebot --nostatusrc -N "${test_dir_name}" -l NONE -r NONE -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}"/*.xml
+    rm -fv "${result_dir}"/*.xml "${result_dir}"/log.html "${result_dir}"/report.html
   fi
 
-  cp "${result_dir}"/docker-*.log "${all_result_dir}"/
-  if [[ -n "$(find "${result_dir}" -name "*.out")" ]]; then
-    cp "${result_dir}"/*.out* "${all_result_dir}"/
-  fi
+  mkdir -p "${all_result_dir}"/"${test_dir_name}"
+  mv -v "${result_dir}"/* "${all_result_dir}"/"${test_dir_name}"/
 }
 
 run_test_script() {
@@ -401,9 +415,70 @@ prepare_for_binary_image() {
 prepare_for_runner_image() {
   local default_version=${docker.ozone-runner.version} # set at build-time from Maven property
   local runner_version=${OZONE_RUNNER_VERSION:-${default_version}} # may be specified by user running the test
+  local runner_image=${OZONE_RUNNER_IMAGE:-apache/ozone-runner} # may be specified by user running the test
   local v=${1:-${runner_version}} # prefer explicit argument
 
   export OZONE_DIR=/opt/hadoop
-  export OZONE_IMAGE="apache/ozone-runner:${v}"
+  export OZONE_IMAGE="${runner_image}:${v}"
 }
 
+## @description Executing the Ozone Debug CLI related robot tests
+execute_debug_tests() {
+  local prefix=${RANDOM}
+
+  local volume="cli-debug-volume${prefix}"
+  local bucket="cli-debug-bucket"
+  local key="testfile"
+
+  execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests.robot
+
+  # get block locations for key
+  local chunkinfo="${key}-blocks-${prefix}"
+  docker-compose exec -T ${SCM} bash -c "ozone debug chunkinfo ${volume}/${bucket}/${key}" > "$chunkinfo"
+  local host="$(jq -r '.KeyLocations[0][0]["Datanode-HostName"]' ${chunkinfo})"
+  local container="${host%%.*}"
+
+  # corrupt the first block of key on one of the datanodes
+  local datafile="$(jq -r '.KeyLocations[0][0].Locations.files[0]' ${chunkinfo})"
+  docker exec "${container}" sed -i -e '1s/^/a/' "${datafile}"
+
+  execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "CORRUPT_DATANODE:${host}" debug/ozone-debug-corrupt-block.robot
+
+  docker stop "${container}"
+
+  wait_for_datanode "${container}" STALE 60
+  execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "STALE_DATANODE:${host}" debug/ozone-debug-stale-datanode.robot
+
+  wait_for_datanode "${container}" DEAD 60
+  execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-dead-datanode.robot
+
+  docker start "${container}"
+
+  wait_for_datanode "${container}" HEALTHY 60
+}
+
+## @description  Wait for datanode state
+## @param        Datanode name, eg datanode_1 datanode_2
+## @param        State to check for
+## @param        The maximum time to wait in seconds
+wait_for_datanode() {
+  local datanode=$1
+  local state=$2
+  local timeout=$3
+
+  SECONDS=0
+  while [[ $SECONDS -lt $timeout ]]; do
+    local command="ozone admin datanode list"
+    docker-compose exec -T ${SCM} bash -c "$command" | grep -A2 "$datanode" > /tmp/dn_check
+    local health=$(grep -c "State: $state" /tmp/dn_check)
+
+    if [[ "$health" -eq 1 ]]; then
+      echo "$datanode is $state"
+      return
+    else
+      echo "Waiting for $datanode to be $state"
+    fi
+    echo "SECONDS: $SECONDS"
+  done
+  echo "WARNING: $datanode is still not $state"
+}

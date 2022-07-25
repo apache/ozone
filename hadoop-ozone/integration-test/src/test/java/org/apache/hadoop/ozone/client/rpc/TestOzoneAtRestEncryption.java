@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.Collection;
 
 import com.google.common.cache.Cache;
 import org.apache.hadoop.conf.StorageUnit;
@@ -68,22 +69,33 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
 /**
  * This class is to test all the public facing APIs of Ozone Client.
  */
+@RunWith(Parameterized.class)
 public class TestOzoneAtRestEncryption {
+
+  @Parameterized.Parameters
+  public static Collection<BucketLayout> data() {
+    return Arrays.asList(
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        BucketLayout.OBJECT_STORE);
+  }
 
   private static MiniOzoneCluster cluster = null;
   private static MiniKMS miniKMS;
@@ -106,6 +118,11 @@ public class TestOzoneAtRestEncryption {
   private static final int DEFAULT_CRYPTO_BUFFER_SIZE = 8 * 1024; // 8KB
   // (this is the default Crypto Buffer size as determined by the config
   // hadoop.security.crypto.buffer.size)
+  private final BucketLayout bucketLayout;
+
+  public TestOzoneAtRestEncryption(BucketLayout layout) {
+    bucketLayout = layout;
+  }
 
   @BeforeClass
   public static void init() throws Exception {
@@ -161,7 +178,7 @@ public class TestOzoneAtRestEncryption {
    */
   @AfterClass
   public static void shutdown() throws IOException {
-    if(ozClient != null) {
+    if (ozClient != null) {
       ozClient.close();
     }
 
@@ -186,6 +203,7 @@ public class TestOzoneAtRestEncryption {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setBucketLayout(bucketLayout)
         .setBucketEncryptionKey(TEST_KEY).build();
     volume.createBucket(bucketName, bucketArgs);
     OzoneBucket bucket = volume.getBucket(bucketName);
@@ -217,7 +235,7 @@ public class TestOzoneAtRestEncryption {
     String value = "sample value";
     try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(StandardCharsets.UTF_8).length,
-        ReplicationType.STAND_ALONE,
+        ReplicationType.RATIS,
         ReplicationFactor.ONE, new HashMap<>())) {
       out.write(value.getBytes(StandardCharsets.UTF_8));
     }
@@ -233,7 +251,7 @@ public class TestOzoneAtRestEncryption {
     byte[] fileContent;
     int len = 0;
 
-    try(OzoneInputStream is = bucket.readKey(keyName)) {
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
       fileContent = new byte[value.getBytes(StandardCharsets.UTF_8).length];
       len = is.read(fileContent);
     }
@@ -241,7 +259,7 @@ public class TestOzoneAtRestEncryption {
 
     Assert.assertEquals(len, value.length());
     Assert.assertTrue(verifyRatisReplication(bucket.getVolumeName(),
-        bucket.getName(), keyName, ReplicationType.STAND_ALONE,
+        bucket.getName(), keyName, ReplicationType.RATIS,
         ReplicationFactor.ONE));
     Assert.assertEquals(value, new String(fileContent, StandardCharsets.UTF_8));
     Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
@@ -249,11 +267,12 @@ public class TestOzoneAtRestEncryption {
   }
 
   private OzoneBucket createVolumeAndBucket(String volumeName,
-      String bucketName) throws Exception{
+      String bucketName) throws Exception {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs bucketArgs = BucketArgs.newBuilder()
-        .setBucketEncryptionKey(TEST_KEY).build();
+        .setBucketEncryptionKey(TEST_KEY)
+        .setBucketLayout(bucketLayout).build();
     volume.createBucket(bucketName, bucketArgs);
     return volume.getBucket(bucketName);
   }
@@ -263,7 +282,8 @@ public class TestOzoneAtRestEncryption {
     store.createVolume(linkVol);
     OzoneVolume linkVolume = store.getVolume(linkVol);
     BucketArgs linkBucketArgs = BucketArgs.newBuilder()
-        .setSourceVolume(sourceVol).setSourceBucket(sourceBucket).build();
+        .setSourceVolume(sourceVol).setSourceBucket(sourceBucket)
+        .setBucketLayout(bucketLayout).build();
     linkVolume.createBucket(linkBucket, linkBucketArgs);
     return linkVolume.getBucket(linkBucket);
   }
@@ -288,7 +308,8 @@ public class TestOzoneAtRestEncryption {
     //Bucket with Encryption & GDPR enforced
     BucketArgs bucketArgs = BucketArgs.newBuilder()
         .setBucketEncryptionKey(TEST_KEY)
-        .addMetadata(OzoneConsts.GDPR_FLAG, "true").build();
+        .addMetadata(OzoneConsts.GDPR_FLAG, "true")
+        .setBucketLayout(bucketLayout).build();
     volume.createBucket(bucketName, bucketArgs);
     OzoneBucket bucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
@@ -302,7 +323,7 @@ public class TestOzoneAtRestEncryption {
     keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
     try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(StandardCharsets.UTF_8).length,
-        ReplicationType.STAND_ALONE,
+        ReplicationType.RATIS,
         ReplicationFactor.ONE, keyMetadata)) {
       out.write(value.getBytes(StandardCharsets.UTF_8));
     }
@@ -312,14 +333,14 @@ public class TestOzoneAtRestEncryption {
     byte[] fileContent;
     int len = 0;
 
-    try(OzoneInputStream is = bucket.readKey(keyName)) {
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
       fileContent = new byte[value.getBytes(StandardCharsets.UTF_8).length];
       len = is.read(fileContent);
     }
 
     Assert.assertEquals(len, value.length());
     Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
-        keyName, ReplicationType.STAND_ALONE,
+        keyName, ReplicationType.RATIS,
         ReplicationFactor.ONE));
     Assert.assertEquals(value, new String(fileContent, StandardCharsets.UTF_8));
     Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
@@ -412,6 +433,17 @@ public class TestOzoneAtRestEncryption {
     testMultipartUploadWithEncryption(bucket, 2);
   }
 
+  @Test
+  public void testMPUwithThreePartsOverride() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OzoneBucket bucket = createVolumeAndBucket(volumeName, bucketName);
+    testMultipartUploadWithEncryption(bucket, 3);
+
+    // override the key and check content
+    testMultipartUploadWithEncryption(bucket, 3);
+  }
+
 
   @Test
   public void testMPUwithLinkBucket() throws Exception {
@@ -431,7 +463,7 @@ public class TestOzoneAtRestEncryption {
     String keyName = "mpu_test_key_" + numParts;
 
     // Initiate multipart upload
-    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
+    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS,
         ONE);
 
     // Upload Parts
@@ -443,8 +475,9 @@ public class TestOzoneAtRestEncryption {
       // Adding a random int with a cap at 8K (the default crypto buffer
       // size) to get parts whose last byte does not coincide with crypto
       // buffer boundary.
-      byte[] data = generateRandomData((MPU_PART_MIN_SIZE * i) +
-          RANDOM.nextInt(DEFAULT_CRYPTO_BUFFER_SIZE));
+      int partSize = (MPU_PART_MIN_SIZE * i) +
+          RANDOM.nextInt(DEFAULT_CRYPTO_BUFFER_SIZE - 1) + 1;
+      byte[] data = generateRandomData(partSize);
       String partName = uploadPart(bucket, keyName, uploadID, i, data);
       partsMap.put(i, partName);
       partsData.add(data);
@@ -463,10 +496,20 @@ public class TestOzoneAtRestEncryption {
     // Complete MPU
     completeMultipartUpload(bucket, keyName, uploadID, partsMap);
 
+    // Create an input stream to read the data
+    OzoneInputStream inputStream = bucket.readKey(keyName);
+    Assert.assertTrue(inputStream instanceof MultipartCryptoKeyInputStream);
+
+    // Test complete read
+    byte[] completeRead = new byte[keySize];
+    int bytesRead = inputStream.read(completeRead, 0, keySize);
+    Assert.assertEquals(bytesRead, keySize);
+    Assert.assertArrayEquals(inputData, completeRead);
+
     // Read different data lengths and starting from different offsets and
     // verify the data matches.
     Random random = new Random();
-    int randomSize = random.nextInt(keySize/2);
+    int randomSize = random.nextInt(keySize / 2);
     int randomOffset = random.nextInt(keySize - randomSize);
 
     int[] readDataSizes = {keySize, keySize / 3 + 1, BLOCK_SIZE,
@@ -478,12 +521,6 @@ public class TestOzoneAtRestEncryption {
         BLOCK_SIZE - DEFAULT_CRYPTO_BUFFER_SIZE + 1, BLOCK_SIZE, keySize / 3,
         keySize - 1, randomOffset};
 
-    // Create an input stream to read the data
-    OzoneInputStream inputStream = bucket.readKey(keyName);
-    Assert.assertTrue(inputStream instanceof MultipartCryptoKeyInputStream);
-    MultipartCryptoKeyInputStream cryptoInputStream =
-        (MultipartCryptoKeyInputStream) inputStream;
-
     for (int readDataLen : readDataSizes) {
       for (int readFromPosition : readFromPositions) {
         // Check that offset + buffer size does not exceed the key size
@@ -492,10 +529,13 @@ public class TestOzoneAtRestEncryption {
         }
 
         byte[] readData = new byte[readDataLen];
-        cryptoInputStream.seek(readFromPosition);
-        inputStream.read(readData, 0, readDataLen);
+        inputStream.seek(readFromPosition);
+        int actualReadLen = inputStream.read(readData, 0, readDataLen);
 
         assertReadContent(inputData, readData, readFromPosition);
+        Assert.assertEquals(readFromPosition + readDataLen,
+            inputStream.getPos());
+        Assert.assertEquals(readDataLen, actualReadLen);
       }
     }
   }

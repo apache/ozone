@@ -114,7 +114,7 @@ public class OzoneManagerSnapshotProvider {
         + "-" + snapshotTime;
     String snapshotFilePath = Paths.get(omSnapshotDir.getAbsolutePath(),
         snapshotFileName).toFile().getAbsolutePath();
-    File targetFile = new File(snapshotFileName + ".tar.gz");
+    File targetFile = new File(snapshotFilePath + ".tar.gz");
 
     String omCheckpointUrl = peerNodesMap.get(leaderOMNodeID)
         .getOMDBCheckpointEnpointUrl(httpPolicy.isHttpEnabled());
@@ -135,6 +135,13 @@ public class OzoneManagerSnapshotProvider {
 
       try (InputStream inputStream = httpURLConnection.getInputStream()) {
         FileUtils.copyInputStreamToFile(inputStream, targetFile);
+      } catch (IOException ex) {
+        LOG.error("OM snapshot {} cannot be downloaded.", targetFile, ex);
+        boolean deleted = FileUtils.deleteQuietly(targetFile);
+        if (!deleted) {
+          LOG.error("OM snapshot which failed to download {} cannot be deleted",
+              targetFile);
+        }
       }
       return null;
     });
@@ -162,5 +169,12 @@ public class OzoneManagerSnapshotProvider {
    */
   public void addNewPeerNode(OMNodeDetails newOMNode) {
     peerNodesMap.put(newOMNode.getNodeId(), newOMNode);
+  }
+
+  /**
+   * When an OM is decommissioned, remove it from the peerNode map.
+   */
+  public void removeDecommissionedPeerNode(String decommNodeId) {
+    peerNodesMap.remove(decommNodeId);
   }
 }

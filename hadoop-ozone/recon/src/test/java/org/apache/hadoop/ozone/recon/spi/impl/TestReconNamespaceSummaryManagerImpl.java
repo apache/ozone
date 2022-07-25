@@ -18,9 +18,14 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
-import org.junit.*;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.ClassRule;
+import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
@@ -100,9 +105,11 @@ public class TestReconNamespaceSummaryManagerImpl {
     hmap.put(1L, new NSSummary(1, 2, testBucket, TEST_CHILD_DIR, "dir1"));
     hmap.put(2L, new NSSummary(3, 4, testBucket, TEST_CHILD_DIR, "dir2"));
     hmap.put(3L, new NSSummary(5, 6, testBucket, TEST_CHILD_DIR, "dir3"));
+    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
     for (Map.Entry entry: hmap.entrySet()) {
-      reconNamespaceSummaryManager.storeNSSummary(
+      reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation,
               (long)entry.getKey(), (NSSummary)entry.getValue());
     }
+    reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
   }
 }

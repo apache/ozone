@@ -102,11 +102,11 @@ public class TestAuthorizationV4QueryParser {
     //passed
   }
 
-  @Test
   /**
-   * Based on https://docs.aws.amazon
-   * .com/AmazonS3/latest/API/sigv4-query-string-auth.html.
+   * Based on <a href="https://docs.aws.amazon.com
+   * /AmazonS3/latest/API/sigv4-query-string-auth.html">AWS example</a>.
    */
+  @Test
   public void testWithAWSExample() throws Exception {
 
     Map<String, String> queryParams = new HashMap<>();
@@ -131,7 +131,7 @@ public class TestAuthorizationV4QueryParser {
     final SignatureInfo signatureInfo = parser.parseSignature();
 
     LowerCaseKeyStringMap headers = new LowerCaseKeyStringMap();
-    headers.put("host", "examplebucket.s3.amazonaws.com");
+    headers.put("host", "localhost");
 
     final String stringToSign =
         StringToSignProducer.createSignatureBase(signatureInfo, "https", "GET",
@@ -142,7 +142,7 @@ public class TestAuthorizationV4QueryParser {
             + "20130524T000000Z\n"
             + "20130524/us-east-1/s3/aws4_request\n"
             +
-            "3bfa292879f6447bbcda7001decf97f4a54dc650c8942174ae0a9121cf58ad04",
+            "521c030411bb1ad61412d44aff2a1b0916e473d2dc275ada8e5569c16ecdee36",
         stringToSign);
   }
 

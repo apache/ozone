@@ -25,52 +25,45 @@ import org.apache.hadoop.hdds.scm.update.client.SCMUpdateClientConfiguration;
 import org.apache.hadoop.hdds.scm.update.client.SCMUpdateServiceGrpcClient;
 import org.apache.hadoop.hdds.scm.update.client.UpdateServiceConfig;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Tests for SCM update Service.
  */
+@Timeout(300)
 public class TestSCMUpdateServiceGrpcServer {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestSCMUpdateServiceGrpcServer.class);
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
-
-  @Rule
-  public ExpectedException thrown= ExpectedException.none();
-
-  @Rule
-  public final TemporaryFolder tempDir = new TemporaryFolder();
 
   private MockCRLStore mockCRLStore;
 
-  @Before
-  public void setUp() throws Exception {
+  @BeforeEach
+  public void setUp(@TempDir Path tempDir) throws Exception {
     mockCRLStore = new MockCRLStore(tempDir, LOG);
     GenericTestUtils.setLogLevel(CRLClientUpdateHandler.getLog(), Level.DEBUG);
   }
 
-  @After
+  @AfterEach
   public void destroyDbStore() throws Exception {
     if (mockCRLStore != null) {
       mockCRLStore.close();
@@ -83,7 +76,7 @@ public class TestSCMUpdateServiceGrpcServer {
   }
 
   @Test
-  public void testStartStop() throws Exception {
+  public void testStartStop() {
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMUpdateServiceGrpcServer server = new SCMUpdateServiceGrpcServer(
         getUpdateServiceConfig(conf), mockCRLStore);
@@ -129,15 +122,15 @@ public class TestSCMUpdateServiceGrpcServer {
       }
       server.notifyCrlUpdate();
 
-      GenericTestUtils.waitFor(() -> client.getUpdateCount()==4, 100, 2000);
-      Assert.assertEquals(4, client.getUpdateCount());
-      Assert.assertEquals(0, client.getErrorCount());
+      GenericTestUtils.waitFor(() -> client.getUpdateCount() == 4, 100, 2000);
+      Assertions.assertEquals(4, client.getUpdateCount());
+      Assertions.assertEquals(0, client.getErrorCount());
 
       revokeCertNow(certIds.get(5));
       server.notifyCrlUpdate();
-      GenericTestUtils.waitFor(() -> client.getUpdateCount()>4, 100, 2000);
-      Assert.assertEquals(5, client.getUpdateCount());
-      Assert.assertEquals(0, client.getErrorCount());
+      GenericTestUtils.waitFor(() -> client.getUpdateCount() > 4, 100, 2000);
+      Assertions.assertEquals(5, client.getUpdateCount());
+      Assertions.assertEquals(0, client.getErrorCount());
     } catch (Exception e) {
       e.printStackTrace();
     } finally {
@@ -146,7 +139,7 @@ public class TestSCMUpdateServiceGrpcServer {
     }
   }
 
-  @Ignore("HDDS-5319")
+  @Disabled("HDDS-5319")
   @Test
   public void testClientUpdateWithDelayedRevoke() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -178,24 +171,24 @@ public class TestSCMUpdateServiceGrpcServer {
       revokeCertNow((certIds.get(0)));
       server.notifyCrlUpdate();
 
-      GenericTestUtils.waitFor(() -> client.getUpdateCount()==1,
+      GenericTestUtils.waitFor(() -> client.getUpdateCount() == 1,
           100, 2000);
-      Assert.assertEquals(1, client.getUpdateCount());
-      Assert.assertEquals(0, client.getErrorCount());
+      Assertions.assertEquals(1, client.getUpdateCount());
+      Assertions.assertEquals(0, client.getErrorCount());
 
       // revoke cert 5 with 10 seconds delay
       revokeCert(certIds.get(5), Instant.now().plus(Duration.ofSeconds(5)));
       server.notifyCrlUpdate();
-      GenericTestUtils.waitFor(() -> client.getUpdateCount()>1,
+      GenericTestUtils.waitFor(() -> client.getUpdateCount() > 1,
           100, 2000);
-      Assert.assertEquals(2, client.getUpdateCount());
-      Assert.assertEquals(0, client.getErrorCount());
-      Assert.assertEquals(1, client.getClientCRLStore()
+      Assertions.assertTrue(2 <= client.getUpdateCount());
+      Assertions.assertEquals(0, client.getErrorCount());
+      Assertions.assertTrue(1 >= client.getClientCRLStore()
           .getPendingCrlIds().size());
 
-      GenericTestUtils.waitFor(() -> client.getPendingCrlRemoveCount()==1,
+      GenericTestUtils.waitFor(() -> client.getPendingCrlRemoveCount() == 1,
           100, 20_000);
-      Assert.assertTrue(client.getClientCRLStore()
+      Assertions.assertTrue(client.getClientCRLStore()
           .getPendingCrlIds().isEmpty());
     } catch (Exception e) {
       e.printStackTrace();
@@ -206,19 +199,20 @@ public class TestSCMUpdateServiceGrpcServer {
   }
 
   private Long revokeCert(BigInteger certId, Instant revokeTime)
-      throws IOException {
+      throws IOException, TimeoutException {
     Optional<Long> crlId =
         mockCRLStore.revokeCert(Arrays.asList(certId), revokeTime);
     return crlId.get();
   }
 
-  private Long revokeCertNow(BigInteger certId) throws IOException {
+  private Long revokeCertNow(BigInteger certId)
+      throws IOException, TimeoutException {
     Optional<Long> crlId =
         mockCRLStore.revokeCert(Arrays.asList(certId), Instant.now());
     return crlId.get();
   }
 
-  @Ignore("HDDS-5319")
+  @Disabled("HDDS-5319")
   @Test
   public void testClientUpdateWithRestart() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -243,9 +237,9 @@ public class TestSCMUpdateServiceGrpcServer {
         revokeCertNow((certIds.get(i)));
       }
       server.notifyCrlUpdate();
-      GenericTestUtils.waitFor(() -> client.getUpdateCount()==4,
+      GenericTestUtils.waitFor(() -> client.getUpdateCount() == 4,
           100, 2000);
-      Assert.assertEquals(4, client.getUpdateCount());
+      Assertions.assertEquals(4, client.getUpdateCount());
 
 
       // server restart
@@ -257,20 +251,20 @@ public class TestSCMUpdateServiceGrpcServer {
       // client retry connect to the server. The client will handle that.
       server.stop();
       server.start();
-      GenericTestUtils.waitFor(() -> client.getErrorCount()==1,
+      GenericTestUtils.waitFor(() -> client.getErrorCount() == 1,
           100, 2000);
-      Assert.assertEquals(4, client.getUpdateCount());
-      Assert.assertEquals(1, client.getErrorCount());
-      Assert.assertEquals(4, clientCRLStore.getLatestCrlId());
+      Assertions.assertEquals(4, client.getUpdateCount());
+      Assertions.assertEquals(1, client.getErrorCount());
+      Assertions.assertEquals(4, clientCRLStore.getLatestCrlId());
       LOG.info("Test server restart end.");
 
       revokeCertNow(certIds.get(5));
       server.notifyCrlUpdate();
-      GenericTestUtils.waitFor(() -> client.getUpdateCount()>4,
+      GenericTestUtils.waitFor(() -> client.getUpdateCount() > 4,
           100, 5000);
-      Assert.assertEquals(5, client.getUpdateCount());
-      Assert.assertEquals(1, client.getErrorCount());
-      Assert.assertEquals(5, clientCRLStore.getLatestCrlId());
+      Assertions.assertEquals(5, client.getUpdateCount());
+      Assertions.assertEquals(1, client.getErrorCount());
+      Assertions.assertEquals(5, clientCRLStore.getLatestCrlId());
 
       // client restart
       // server onError->
@@ -281,19 +275,19 @@ public class TestSCMUpdateServiceGrpcServer {
       client.stop(true);
       client.createChannel();
       client.start();
-      Assert.assertEquals(5, clientCRLStore.getLatestCrlId());
-      GenericTestUtils.waitFor(() -> client.getUpdateCount()>4,
+      Assertions.assertEquals(5, clientCRLStore.getLatestCrlId());
+      GenericTestUtils.waitFor(() -> client.getUpdateCount() > 5,
           100, 2000);
       revokeCertNow(certIds.get(6));
       // mostly noop
       server.notifyCrlUpdate();
       LOG.info("Test client restart end.");
 
-      GenericTestUtils.waitFor(() -> client.getUpdateCount()>5,
+      GenericTestUtils.waitFor(() -> client.getUpdateCount() > 6,
           100, 2000);
-      Assert.assertTrue(client.getUpdateCount()>=6);
-      Assert.assertEquals(2, client.getErrorCount());
-      Assert.assertEquals(6, clientCRLStore.getLatestCrlId());
+      Assertions.assertTrue(client.getUpdateCount() >= 6);
+      Assertions.assertEquals(2, client.getErrorCount());
+      Assertions.assertEquals(6, clientCRLStore.getLatestCrlId());
     } catch (Exception e) {
       e.printStackTrace();
     } finally {

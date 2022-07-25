@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
-import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
@@ -57,7 +56,9 @@ import java.util.Collection;
         GetServiceRolesSubcommand.class,
         PrepareSubCommand.class,
         CancelPrepareSubCommand.class,
-        FinalizationStatusSubCommand.class
+        FinalizationStatusSubCommand.class,
+        DecommissionOMSubcommand.class,
+        UpdateRangerSubcommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class OMAdmin extends GenericCli implements SubcommandWithParent {
@@ -110,13 +111,12 @@ public class OMAdmin extends GenericCli implements SubcommandWithParent {
     } else if (omServiceID == null || omServiceID.isEmpty()) {
       omServiceID = getTheOnlyConfiguredOmServiceIdOrThrow();
     }
-    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     RPC.setProtocolEngine(conf, OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
     String clientId = ClientId.randomId().toString();
     if (!forceHA || (forceHA && OmUtils.isOmHAServiceId(conf, omServiceID))) {
       OmTransport omTransport = new Hadoop3OmTransportFactory()
-          .createOmTransport(conf, ugi, omServiceID);
+          .createOmTransport(conf, parent.getUser(), omServiceID);
       return new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
           clientId);
     } else {
@@ -130,7 +130,7 @@ public class OMAdmin extends GenericCli implements SubcommandWithParent {
 
   private String getTheOnlyConfiguredOmServiceIdOrThrow() {
     if (getConfiguredServiceIds().size() != 1) {
-      throw new IllegalArgumentException("There is no Ozone Manager service ID"
+      throw new IllegalArgumentException("There is no Ozone Manager service ID "
           + "specified, but there are either zero, or more than one service "
           + "configured. Please specify the service ID to be finalized.");
     }

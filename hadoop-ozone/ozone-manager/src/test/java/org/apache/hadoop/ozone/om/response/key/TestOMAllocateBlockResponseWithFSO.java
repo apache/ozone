@@ -18,17 +18,17 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
+
+import java.io.IOException;
 
 /**
  * Tests OMAllocateBlockResponse - prefix layout.
@@ -50,7 +50,7 @@ public class TestOMAllocateBlockResponseWithFSO
     long objectId = parentID + 1;
 
     OmKeyInfo omKeyInfoFSO =
-            TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
                     Time.now());
@@ -59,28 +59,21 @@ public class TestOMAllocateBlockResponseWithFSO
 
   @Override
   protected String getOpenKey() throws Exception {
-    return omMetadataManager.getOpenFileName(
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getOpenFileName(volumeId, bucketId,
             parentID, fileName, clientID);
   }
 
   @NotNull
   @Override
   protected OMAllocateBlockResponse getOmAllocateBlockResponse(
-          OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,
-          OMResponse omResponse) {
+      OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,
+      OMResponse omResponse) throws IOException {
     return new OMAllocateBlockResponseWithFSO(omResponse, omKeyInfo, clientID,
-            omBucketInfo);
-  }
-
-  @NotNull
-  @Override
-  protected OzoneConfiguration getOzoneConfiguration() {
-    OzoneConfiguration config = super.getOzoneConfiguration();
-    // Metadata layout prefix will be set while invoking OzoneManager#start()
-    // and its not invoked in this test. Hence it is explicitly setting
-    // this configuration to populate prefix tables.
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
-    return config;
+        getBucketLayout(), omMetadataManager.getVolumeId(volumeName),
+        omBucketInfo.getObjectID());
   }
 
   @Override

@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -48,8 +49,10 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  */
 public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
 
-  public OMKeyAclRequestWithFSO(OzoneManagerProtocolProtos.OMRequest omReq) {
+  public OMKeyAclRequestWithFSO(OzoneManagerProtocolProtos.OMRequest omReq,
+                                BucketLayout bucketLayout) {
     super(omReq);
+    setBucketLayout(bucketLayout);
   }
 
   @Override
@@ -78,7 +81,7 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
 
       // check Acl
       if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+        checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
             volume, bucket, key);
       }
@@ -90,7 +93,10 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
         throw new OMException("Key not found. Key:" + key, KEY_NOT_FOUND);
       }
       omKeyInfo = keyStatus.getKeyInfo();
-      String dbKey = omKeyInfo.getPath();
+      final long volumeId = omMetadataManager.getVolumeId(volume);
+      final long bucketId = omMetadataManager.getBucketId(volume, bucket);
+      final String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+              omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
       boolean isDirectory = keyStatus.isDirectory();
       operationResult = apply(omKeyInfo, trxnLogIndex);
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
@@ -118,12 +124,12 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
             new CacheValue<>(Optional.of(OMFileRequest.
                 getDirectoryInfo(omKeyInfo)), trxnLogIndex));
       } else {
-        omMetadataManager.getKeyTable(getBucketLayout(ozoneManager))
+        omMetadataManager.getKeyTable(getBucketLayout())
             .addCacheEntry(new CacheKey<>(dbKey),
                 new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
-      omClientResponse =
-          onSuccess(omResponse, omKeyInfo, operationResult, isDirectory);
+      omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult,
+          isDirectory, volumeId, bucketId);
       result = Result.SUCCESS;
     } catch (IOException ex) {
       result = Result.FAILURE;
@@ -158,11 +164,12 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
       OzoneManagerProtocolProtos.OMResponse.Builder omResp,
       IOException exception) {
     return new OMKeyAclResponseWithFSO(
-        createErrorOMResponse(omResp, exception));
+        createErrorOMResponse(omResp, exception), getBucketLayout());
   }
 
   abstract OMClientResponse onSuccess(
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
-      OmKeyInfo omKeyInfo, boolean operationResult, boolean isDirectory);
+      OmKeyInfo omKeyInfo, boolean operationResult, boolean isDirectory,
+      long volumeId, long bucketId);
 
 }

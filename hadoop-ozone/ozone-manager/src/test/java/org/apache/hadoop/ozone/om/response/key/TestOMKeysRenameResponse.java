@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
@@ -61,7 +61,7 @@ public class TestOMKeysRenameResponse extends TestOMKeyResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // Add volume, bucket and key entries to OM DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     for (int i = 0; i < count; i++) {
@@ -112,14 +112,14 @@ public class TestOMKeysRenameResponse extends TestOMKeyResponse {
   private void createPreRequisities() throws Exception {
 
     // Add volume, bucket and key entries to OM DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
     Map<String, OmKeyInfo> formAndToKeyInfo = new HashMap<>();
 
     for (int i = 0; i < count; i++) {
       String key = parentDir.concat("/key" + i);
       String toKey = parentDir.concat("/newKey" + i);
-      TestOMRequestUtils.addKeyToTable(false, volumeName,
+      OMRequestTestUtils.addKeyToTable(false, volumeName,
           bucketName, parentDir.concat("/key" + i), 0L, RATIS, THREE,
           omMetadataManager);
 

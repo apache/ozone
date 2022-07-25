@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -34,17 +34,14 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.BeforeClass;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Rule;
 import org.junit.Assert;
-
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.net.ConnectException;
@@ -58,7 +55,6 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONN
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
@@ -67,9 +63,10 @@ import static org.junit.Assert.fail;
 /**
  * Base class for Ozone Manager HA tests.
  */
+@Timeout(300)
 public abstract class TestOzoneManagerHA {
 
-  private static MiniOzoneOMHAClusterImpl cluster = null;
+  private static MiniOzoneHAClusterImpl cluster = null;
   private static MiniOzoneCluster.Builder clusterBuilder = null;
   private static ObjectStore objectStore;
   private static OzoneConfiguration conf;
@@ -85,13 +82,8 @@ public abstract class TestOzoneManagerHA {
   private static final long SNAPSHOT_THRESHOLD = 50;
   private static final Duration RETRY_CACHE_DURATION = Duration.ofSeconds(30);
 
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
 
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
-
-  public MiniOzoneOMHAClusterImpl getCluster() {
+  public MiniOzoneHAClusterImpl getCluster() {
     return cluster;
   }
 
@@ -138,7 +130,7 @@ public abstract class TestOzoneManagerHA {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
@@ -148,7 +140,6 @@ public abstract class TestOzoneManagerHA {
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS,
         OZONE_ADMINISTRATORS_WILDCARD);
-    conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
     conf.setInt(OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
         OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS);
     conf.setInt(IPC_CLIENT_CONNECT_MAX_RETRIES_KEY,
@@ -180,7 +171,7 @@ public abstract class TestOzoneManagerHA {
         .setOmId(omId)
         .setNumOfOzoneManagers(numOfOMs);
 
-    cluster = (MiniOzoneOMHAClusterImpl) clusterBuilder.build();
+    cluster = (MiniOzoneHAClusterImpl) clusterBuilder.build();
     cluster.waitForClusterToBeReady();
     objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
         .getObjectStore();
@@ -190,7 +181,7 @@ public abstract class TestOzoneManagerHA {
   /**
    * Reset cluster between tests.
    */
-  @After
+  @AfterEach
   public void resetCluster()
       throws IOException {
     if (cluster != null) {
@@ -201,7 +192,7 @@ public abstract class TestOzoneManagerHA {
   /**
    * Shutdown MiniDFSCluster after all tests of a class have run.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -217,7 +208,7 @@ public abstract class TestOzoneManagerHA {
     String keyName = "key" + RandomStringUtils.randomNumeric(5);
     String data = "data" + RandomStringUtils.randomNumeric(5);
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
-        data.length(), ReplicationType.STAND_ALONE,
+        data.length(), ReplicationType.RATIS,
         ReplicationFactor.ONE, new HashMap<>());
     ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
     ozoneOutputStream.close();
@@ -259,11 +250,11 @@ public abstract class TestOzoneManagerHA {
    */
   protected void stopLeaderOM() {
     //Stop the leader OM.
-    OMFailoverProxyProvider omFailoverProxyProvider =
+    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
         OmFailoverProxyUtil.getFailoverProxyProvider(
             (RpcClient) objectStore.getClientProxy());
 
-    // The OMFailoverProxyProvider will point to the current leader OM node.
+    // The omFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     // Stop one of the ozone manager, to see when the OM leader changes
@@ -297,14 +288,18 @@ public abstract class TestOzoneManagerHA {
         // Verify that the request failed
         fail("There is no quorum. Request should have failed");
       }
-    } catch (ConnectException | RemoteException e) {
+    } catch (IOException e) {
       if (!checkSuccess) {
         // If the last OM to be tried by the RetryProxy is down, we would get
         // ConnectException. Otherwise, we would get a RemoteException from the
         // last running OM as it would fail to get a quorum.
         if (e instanceof RemoteException) {
+          GenericTestUtils.assertExceptionContains("OMNotLeaderException", e);
+        } else if (e instanceof ConnectException) {
+          GenericTestUtils.assertExceptionContains("Connection refused", e);
+        } else {
           GenericTestUtils.assertExceptionContains(
-              "OMNotLeaderException", e);
+              "Could not determine or connect to OM Leader", e);
         }
       } else {
         throw e;
@@ -380,7 +375,7 @@ public abstract class TestOzoneManagerHA {
 
       String value = "random data";
       OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
-          value.length(), ReplicationType.STAND_ALONE,
+          value.length(), ReplicationType.RATIS,
           ReplicationFactor.ONE, new HashMap<>());
       ozoneOutputStream.write(value.getBytes(UTF_8), 0, value.length());
       ozoneOutputStream.close();
@@ -391,14 +386,18 @@ public abstract class TestOzoneManagerHA {
       ozoneInputStream.read(fileContent);
       Assert.assertEquals(value, new String(fileContent, UTF_8));
 
-    } catch (ConnectException | RemoteException e) {
+    } catch (IOException e) {
       if (!checkSuccess) {
         // If the last OM to be tried by the RetryProxy is down, we would get
         // ConnectException. Otherwise, we would get a RemoteException from the
         // last running OM as it would fail to get a quorum.
         if (e instanceof RemoteException) {
+          GenericTestUtils.assertExceptionContains("OMNotLeaderException", e);
+        } else if (e instanceof ConnectException) {
+          GenericTestUtils.assertExceptionContains("Connection refused", e);
+        } else {
           GenericTestUtils.assertExceptionContains(
-              "OMNotLeaderException", e);
+              "Could not determine or connect to OM Leader", e);
         }
       } else {
         throw e;

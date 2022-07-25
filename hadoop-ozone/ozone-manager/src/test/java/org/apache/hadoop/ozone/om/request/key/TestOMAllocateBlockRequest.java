@@ -24,13 +24,14 @@ import java.util.List;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -55,8 +56,8 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
   @Test
   public void testValidateAndUpdateCache() throws Exception {
     // Add volume, bucket, key entries to DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
 
     addKeyToOpenKeyTable(volumeName, bucketName);
 
@@ -93,7 +94,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     Assert.assertEquals(modifiedOmRequest.getAllocateBlockRequest()
         .getKeyArgs().getModificationTime(), omKeyInfo.getModificationTime());
 
-    // creationTime was assigned at TestOMRequestUtils.addKeyToTable
+    // creationTime was assigned at OMRequestTestUtils.addKeyToTable
     // modificationTime was assigned at
     // doPreExecute(createAllocateBlockRequest())
     Assert.assertTrue(
@@ -119,7 +120,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
   @NotNull
   protected OMAllocateBlockRequest getOmAllocateBlockRequest(
           OMRequest modifiedOmRequest) {
-    return new OMAllocateBlockRequest(modifiedOmRequest);
+    return new OMAllocateBlockRequest(modifiedOmRequest, BucketLayout.DEFAULT);
   }
 
   @Test
@@ -152,7 +153,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
 
 
     // Added only volume to DB.
-    TestOMRequestUtils.addVolumeToDB(volumeName, OzoneConsts.OZONE,
+    OMRequestTestUtils.addVolumeToDB(volumeName, OzoneConsts.OZONE,
         omMetadataManager);
 
     OMClientResponse omAllocateBlockResponse =
@@ -174,8 +175,8 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
             getOmAllocateBlockRequest(modifiedOmRequest);
 
     // Add volume, bucket entries to DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, omAllocateBlockRequest.getBucketLayout());
 
 
     OMClientResponse omAllocateBlockResponse =
@@ -253,7 +254,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
 
   protected String addKeyToOpenKeyTable(String volumeName, String bucketName)
           throws Exception {
-    TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(true, volumeName, bucketName,
             keyName, clientID, replicationType, replicationFactor,
             omMetadataManager);
     return "";

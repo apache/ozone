@@ -18,10 +18,13 @@
 
 package org.apache.hadoop.ozone.client;
 
+import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -70,21 +73,24 @@ public class TestOzoneClient {
 
   @Before
   public void init() throws IOException {
-    ConfigurationSource config = new InMemoryConfiguration();
+    OzoneConfiguration config = new OzoneConfiguration();
+    createNewClient(config, new SinglePipelineBlockAllocator(config));
+  }
+
+  private void createNewClient(ConfigurationSource config,
+      MockBlockAllocator blkAllocator) throws IOException {
     client = new OzoneClient(config, new RpcClient(config, null) {
 
       @Override
-      protected OmTransport createOmTransport(
-          String omServiceId)
+      protected OmTransport createOmTransport(String omServiceId)
           throws IOException {
-        return new MockOmTransport();
+        return new MockOmTransport(blkAllocator);
       }
 
       @NotNull
       @Override
       protected XceiverClientFactory createXceiverClientFactory(
-          List<X509Certificate> x509Certificates)
-          throws IOException {
+          List<X509Certificate> x509Certificates) throws IOException {
         return new MockXceiverClientFactory();
       }
     });
@@ -180,6 +186,35 @@ public class TestOzoneClient {
         out.write(value.getBytes(UTF_8));
         out.write(value.getBytes(UTF_8));
       }
+    }
+  }
+
+  @Test
+  public void testPutKeyWithECReplicationConfig() throws IOException {
+    close();
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2,
+        StorageUnit.KB);
+    int data = 3;
+    int parity = 2;
+    int chunkSize = 1024;
+    createNewClient(config,
+        new MultiNodePipelineBlockAllocator(config, data + parity, 15));
+    String value = new String(new byte[chunkSize], UTF_8);
+    OzoneBucket bucket = getOzoneBucket();
+
+    for (int i = 0; i < 10; i++) {
+      String keyName = UUID.randomUUID().toString();
+      try (OzoneOutputStream out = bucket
+          .createKey(keyName, value.getBytes(UTF_8).length,
+              new ECReplicationConfig(data, parity,
+                  ECReplicationConfig.EcCodec.RS, chunkSize),
+              new HashMap<>())) {
+        out.write(value.getBytes(UTF_8));
+        out.write(value.getBytes(UTF_8));
+      }
+      OzoneKey key = bucket.getKey(keyName);
+      Assert.assertEquals(keyName, key.getName());
     }
   }
 

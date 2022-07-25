@@ -144,7 +144,7 @@ public class TestDatanodeUpgradeToScmHA {
     ExecutorService executor = Executors.newFixedThreadPool(1);
     Future<Void> readFuture = executor.submit(() -> {
       // Layout version check should be thread safe.
-      while(!dsm.getLayoutVersionManager()
+      while (!dsm.getLayoutVersionManager()
           .isAllowed(HDDSLayoutFeature.SCM_HA)) {
         readChunk(writeChunk, pipeline);
       }
@@ -192,7 +192,9 @@ public class TestDatanodeUpgradeToScmHA {
     // restarted with SCM HA config and gets a different SCM ID.
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     changeScmID();
-    restartDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+
+    restartDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(), true);
+
     // Make sure the existing container can be read.
     readChunk(exportWriteChunk2, pipeline);
 
@@ -203,7 +205,7 @@ public class TestDatanodeUpgradeToScmHA {
     ExecutorService executor = Executors.newFixedThreadPool(1);
     Future<Void> importFuture = executor.submit(() -> {
       // Layout version check should be thread safe.
-      while(!dsm.getLayoutVersionManager()
+      while (!dsm.getLayoutVersionManager()
           .isAllowed(HDDSLayoutFeature.SCM_HA)) {
         importContainer(exportContainerID, exportedContainerFile);
         readChunk(exportWriteChunk, pipeline);
@@ -289,7 +291,7 @@ public class TestDatanodeUpgradeToScmHA {
 
     /// FINALIZED: Restart datanode to upgrade the failed volume ///
 
-    restartDatanode(HDDSLayoutFeature.SCM_HA.layoutVersion());
+    restartDatanode(HDDSLayoutFeature.SCM_HA.layoutVersion(), false);
 
     Assert.assertEquals(1,
         dsm.getContainer().getVolumeSet().getVolumesList().size());
@@ -344,7 +346,8 @@ public class TestDatanodeUpgradeToScmHA {
     changeScmID();
     // A new volume is added that must be formatted.
     File preFinVolume2 = addVolume();
-    restartDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+
+    restartDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(), true);
 
     Assert.assertEquals(2,
         dsm.getContainer().getVolumeSet().getVolumesList().size());
@@ -378,7 +381,9 @@ public class TestDatanodeUpgradeToScmHA {
     File finVolume = addVolume();
     // Yet another SCM ID is received this time, but it should not matter.
     changeScmID();
-    restartDatanode(HDDSLayoutFeature.SCM_HA.layoutVersion());
+
+    restartDatanode(HDDSLayoutFeature.SCM_HA.layoutVersion(), false);
+
     Assert.assertEquals(3,
         dsm.getContainer().getVolumeSet().getVolumesList().size());
     Assert.assertEquals(0,
@@ -521,7 +526,7 @@ public class TestDatanodeUpgradeToScmHA {
     callVersionEndpointTask();
   }
 
-  public void restartDatanode(int expectedMlv)
+  public void restartDatanode(int expectedMlv, boolean exactMatch)
       throws Exception {
     // Stop existing datanode.
     DatanodeDetails dd = dsm.getDatanodeDetails();
@@ -532,7 +537,12 @@ public class TestDatanodeUpgradeToScmHA {
         conf, null, null,
         null);
     int mlv = dsm.getLayoutVersionManager().getMetadataLayoutVersion();
-    Assert.assertEquals(expectedMlv, mlv);
+    if (exactMatch) {
+      Assert.assertEquals(expectedMlv, mlv);
+    } else {
+      Assert.assertTrue("Expected minimum mlv(" + expectedMlv
+          + ") is smaller than mlv(" + mlv + ").", expectedMlv <= mlv);
+    }
 
     callVersionEndpointTask();
   }
@@ -541,7 +551,7 @@ public class TestDatanodeUpgradeToScmHA {
    * Get the cluster ID and SCM ID from SCM to the datanode.
    */
   public void callVersionEndpointTask() throws Exception {
-    try(EndpointStateMachine esm = ContainerTestUtils.createEndpoint(conf,
+    try (EndpointStateMachine esm = ContainerTestUtils.createEndpoint(conf,
         address, 1000)) {
       VersionEndpointTask vet = new VersionEndpointTask(esm, conf,
           dsm.getContainer());
@@ -596,7 +606,7 @@ public class TestDatanodeUpgradeToScmHA {
   public ContainerProtos.ContainerCommandRequestProto getWriteChunk(
       long containerID, Pipeline pipeline) throws Exception {
     return ContainerTestHelper.getWriteChunkRequest(pipeline,
-            ContainerTestHelper.getTestBlockID(containerID), 100, null);
+            ContainerTestHelper.getTestBlockID(containerID), 100);
   }
 
   public Pipeline getPipeline() {

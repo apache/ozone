@@ -28,13 +28,14 @@ public class QuotaList {
   private ArrayList<OzoneQuota.Units> unitQuota;
   private ArrayList<Long> sizeQuota;
 
-  public QuotaList(){
+  public QuotaList() {
     ozoneQuota = new ArrayList<String>();
     unitQuota = new ArrayList<OzoneQuota.Units>();
     sizeQuota = new ArrayList<Long>();
   }
 
-  public void addQuotaList(String oQuota, OzoneQuota.Units uQuota, Long sQuota){
+  public void addQuotaList(
+      String oQuota, OzoneQuota.Units uQuota, Long sQuota) {
     ozoneQuota.add(oQuota);
     unitQuota.add(uQuota);
     sizeQuota.add(sQuota);
@@ -52,15 +53,15 @@ public class QuotaList {
     return this.unitQuota;
   }
 
-  public OzoneQuota.Units getUnits(String oQuota){
+  public OzoneQuota.Units getUnits(String oQuota) {
     return unitQuota.get(ozoneQuota.indexOf(oQuota));
   }
 
-  public Long getQuotaSize(OzoneQuota.Units uQuota){
+  public Long getQuotaSize(OzoneQuota.Units uQuota) {
     return sizeQuota.get(unitQuota.indexOf(uQuota));
   }
 
-  public OzoneQuota.Units getQuotaUnit(Long sQuota){
+  public OzoneQuota.Units getQuotaUnit(Long sQuota) {
     return unitQuota.get(sizeQuota.indexOf(sQuota));
   }
 

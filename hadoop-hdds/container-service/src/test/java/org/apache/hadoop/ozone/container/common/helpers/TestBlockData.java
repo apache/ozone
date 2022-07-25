@@ -60,11 +60,11 @@ public class TestBlockData {
     assertChunks(expected, computed);
     long offset = 0;
     int n = 5;
-    for(int i = 0; i < n; i++) {
+    for (int i = 0; i < n; i++) {
       offset += assertAddChunk(expected, computed, offset);
     }
 
-    for(; !expected.isEmpty();) {
+    for (; !expected.isEmpty();) {
       removeChunk(expected, computed);
     }
   }
@@ -125,7 +125,7 @@ public class TestBlockData {
     assertChunks(expected, computed);
     long offset = 0;
     int n = 5;
-    for(int i = 0; i < n; i++) {
+    for (int i = 0; i < n; i++) {
       offset += addChunk(expected, offset).getLen();
       LOG.info("setChunk: {}", toString(expected));
       computed.setChunks(expected);

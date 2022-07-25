@@ -24,10 +24,10 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
@@ -48,7 +48,6 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     // Metadata layout prefix will be set while invoking OzoneManager#start()
     // and its not invoked in this test. Hence it is explicitly setting
     // this configuration to populate prefix tables.
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
     return config;
   }
 
@@ -58,31 +57,37 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     long parentId = checkIntermediatePaths(keyPath);
     String fileName = OzoneFSUtils.getFileName(keyName);
     OmKeyInfo omKeyInfo =
-            TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, fileName,
+            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, fileName,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE,
                     parentId + 1,
                     parentId, 100, Time.now());
-    TestOMRequestUtils.addFileToKeyTable(false, false,
+    OMRequestTestUtils.addFileToKeyTable(false, false,
             fileName, omKeyInfo, -1, 50, omMetadataManager);
   }
 
   @Override
   protected void checkCreatedPaths(OMKeyCreateRequest omKeyCreateRequest,
       OMRequest omRequest, String keyName) throws Exception {
-    keyName = omKeyCreateRequest.validateAndNormalizeKey(true, keyName);
+    keyName = omKeyCreateRequest.validateAndNormalizeKey(true, keyName,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
     // Check intermediate directories created or not.
     Path keyPath = Paths.get(keyName);
     long parentID = checkIntermediatePaths(keyPath);
+
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
 
     // Check open key entry
     Path keyPathFileName = keyPath.getFileName();
     Assert.assertNotNull("Failed to find fileName", keyPathFileName);
     String fileName = keyPathFileName.toString();
-    String openKey = omMetadataManager.getOpenFileName(parentID, fileName,
-            omRequest.getCreateKeyRequest().getClientID());
+    String openKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
+            parentID, fileName, omRequest.getCreateKeyRequest().getClientID());
     OmKeyInfo omKeyInfo =
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
+        omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout())
+            .get(openKey);
     Assert.assertNotNull(omKeyInfo);
   }
 
@@ -95,6 +100,7 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
             omMetadataManager.getBucketTable().get(bucketKey);
     Assert.assertNotNull("Bucket not found!", omBucketInfo);
     long lastKnownParentId = omBucketInfo.getObjectID();
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
 
     Iterator<Path> elements = keyPath.iterator();
     StringBuilder fullKeyPath = new StringBuilder(bucketKey);
@@ -102,8 +108,8 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
       String fileName = elements.next().toString();
       fullKeyPath.append(OzoneConsts.OM_KEY_PREFIX);
       fullKeyPath.append(fileName);
-      String dbNodeName = omMetadataManager.getOzonePathKey(
-              lastKnownParentId, fileName);
+      String dbNodeName = omMetadataManager.getOzonePathKey(volumeId,
+              omBucketInfo.getObjectID(), lastKnownParentId, fileName);
       OmDirectoryInfo omDirInfo = omMetadataManager.getDirectoryTable().
               get(dbNodeName);
 
@@ -117,33 +123,40 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
 
   @Override
   protected String getOpenKey(long id) throws IOException {
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-            omMetadataManager.getBucketTable().get(bucketKey);
-    if (omBucketInfo != null) {
-      return omMetadataManager.getOpenFileName(omBucketInfo.getObjectID(),
-              keyName, id);
-    } else {
-      return omMetadataManager.getOpenFileName(1000, keyName, id);
-    }
+
+    OmVolumeArgs volumeInfo = omMetadataManager.getVolumeTable()
+            .get(omMetadataManager.getVolumeKey(volumeName));
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable()
+            .get(omMetadataManager.getBucketKey(volumeName, bucketName));
+    return omMetadataManager.getOpenFileName(
+            volumeInfo == null ? 100 : volumeInfo.getObjectID(),
+            omBucketInfo == null ? 1000 : omBucketInfo.getObjectID(),
+            omBucketInfo == null ? 1000 : omBucketInfo.getObjectID(),
+            keyName, id);
+
   }
 
   @Override
   protected String getOzoneKey() throws IOException {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
     OmBucketInfo omBucketInfo =
         omMetadataManager.getBucketTable().get(bucketKey);
     if (omBucketInfo != null) {
-      return omMetadataManager.getOzonePathKey(omBucketInfo.getObjectID(),
-          keyName);
+      final long bucketId = omMetadataManager.getBucketId(volumeName,
+              bucketName);
+      return omMetadataManager.getOzonePathKey(volumeId, bucketId,
+              omBucketInfo.getObjectID(), keyName);
     } else {
-      return omMetadataManager.getOzonePathKey(1000, keyName);
+      return omMetadataManager.getOzonePathKey(volumeId, 1000,
+              1000, keyName);
     }
   }
 
   @Override
   protected OMKeyCreateRequest getOMKeyCreateRequest(OMRequest omRequest) {
-    return new OMKeyCreateRequestWithFSO(omRequest);
+    return new OMKeyCreateRequestWithFSO(omRequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override

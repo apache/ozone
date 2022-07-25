@@ -38,15 +38,13 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.AfterClass;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +52,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.LongSupplier;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
@@ -63,19 +62,12 @@ import static org.junit.Assert.fail;
 /**
  * Directory deletion service test cases.
  */
+@Timeout(300)
 public class TestDirectoryDeletingServiceWithFSO {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDirectoryDeletingServiceWithFSO.class);
 
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
-
-  private static boolean isBucketFSOptimized = true;
-  private static boolean enabledFileSystemPaths = true;
   private static boolean omRatisEnabled = true;
 
   private static MiniOzoneCluster cluster;
@@ -83,7 +75,7 @@ public class TestDirectoryDeletingServiceWithFSO {
   private static String volumeName;
   private static String bucketName;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 1);
@@ -92,20 +84,14 @@ public class TestDirectoryDeletingServiceWithFSO {
         TimeUnit.MILLISECONDS);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
-    if (isBucketFSOptimized) {
-      TestOMRequestUtils.configureFSOptimizedPaths(conf,
-          enabledFileSystemPaths, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
-    } else {
-      conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-          enabledFileSystemPaths);
-    }
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
 
@@ -120,7 +106,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     fs = FileSystem.get(conf);
   }
 
-  @AfterClass
+  @AfterAll
   public static void teardown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -128,7 +114,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     IOUtils.closeQuietly(fs);
   }
 
-  @After
+  @AfterEach
   public void cleanup() {
     try {
       Path root = new Path("/");
@@ -160,8 +146,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(dirTable, 2);
 
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 0);
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 0);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
 
     // Delete the appRoot, empty dir
     fs.delete(appRoot, true);
@@ -172,8 +158,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(dirTable, 1);
 
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 1);
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 0);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 1);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
 
     Assert.assertTrue(dirTable.iterator().hasNext());
     Assert.assertEquals(root.getName(),
@@ -211,7 +197,7 @@ public class TestDirectoryDeletingServiceWithFSO {
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
     Table<String, OmKeyInfo> keyTable =
         cluster.getOzoneManager().getMetadataManager()
-            .getKeyTable(getBucketLayout());
+            .getKeyTable(getFSOBucketLayout());
     Table<String, OmDirectoryInfo> dirTable =
         cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
 
@@ -224,8 +210,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(keyTable, 15);
     assertTableRowCount(dirTable, 20);
 
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 0);
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 0);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
 
     // Delete the appRoot
     fs.delete(appRoot, true);
@@ -237,8 +223,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(keyTable, 0);
     assertTableRowCount(dirTable, 1);
 
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 15);
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 19);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 15);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 19);
 
     Assert.assertTrue(dirDeletingService.getRunCount() > 1);
   }
@@ -258,7 +244,7 @@ public class TestDirectoryDeletingServiceWithFSO {
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
     Table<String, OmKeyInfo> keyTable =
         cluster.getOzoneManager().getMetadataManager()
-            .getKeyTable(getBucketLayout());
+            .getKeyTable(getFSOBucketLayout());
     Table<String, OmDirectoryInfo> dirTable =
         cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
 
@@ -271,8 +257,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(dirTable, 5);
     assertTableRowCount(keyTable, 3);
 
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 0);
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 0);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
 
     // Delete the rootDir, which should delete all keys.
     fs.delete(root, true);
@@ -284,15 +270,16 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(keyTable, 0);
     assertTableRowCount(dirTable, 0);
 
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 3);
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 5);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 3);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
 
     Assert.assertTrue(dirDeletingService.getRunCount() > 1);
   }
 
-  private void assertSubPathsCount(long pathCount, long expectedCount)
+  static void assertSubPathsCount(LongSupplier pathCount, long expectedCount)
       throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> pathCount >= expectedCount, 1000, 120000);
+    GenericTestUtils.waitFor(() -> pathCount.getAsLong() >= expectedCount,
+        1000, 120000);
   }
 
   private void assertTableRowCount(Table<String, ?> table, int count)
@@ -332,7 +319,7 @@ public class TestDirectoryDeletingServiceWithFSO {
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
     Table<String, OmKeyInfo> keyTable =
         cluster.getOzoneManager().getMetadataManager()
-            .getKeyTable(getBucketLayout());
+            .getKeyTable(getFSOBucketLayout());
     Table<String, OmDirectoryInfo> dirTable =
         cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
     Table<String, RepeatedOmKeyInfo> deletedKeyTable =
@@ -379,8 +366,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(deletedKeyTable, 0);
 
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 0);
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 0);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
     // verify whether KeyDeletingService has purged the keys
     long currentDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
     Assert.assertEquals(prevDeletedKeyCount + 3, currentDeletedKeyCount);
@@ -397,14 +384,14 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(deletedKeyTable, 0);
 
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 2);
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 1);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 2);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 1);
     // verify whether KeyDeletingService has purged the keys
     currentDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
     Assert.assertEquals(prevDeletedKeyCount + 5, currentDeletedKeyCount);
   }
 
-  public BucketLayout getBucketLayout() {
+  private static BucketLayout getFSOBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

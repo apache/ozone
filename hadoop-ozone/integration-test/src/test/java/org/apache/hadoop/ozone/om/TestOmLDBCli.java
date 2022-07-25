@@ -23,10 +23,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.debug.DBScanner;
 import org.apache.hadoop.ozone.debug.RDBParser;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -43,7 +44,6 @@ import java.util.List;
 import java.util.ArrayList;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 
 /**
@@ -70,7 +70,7 @@ public class TestOmLDBCli {
 
   @After
   public void shutdown() throws Exception {
-    if (dbStore!=null){
+    if (dbStore != null) {
       dbStore.close();
     }
   }
@@ -78,7 +78,7 @@ public class TestOmLDBCli {
   @Test
   public void testOMDB() throws Exception {
     File newFolder = folder.newFolder();
-    if(!newFolder.exists()) {
+    if (!newFolder.exists()) {
       Assert.assertTrue(newFolder.mkdirs());
     }
     // Dummy om.db with only keyTable
@@ -88,13 +88,14 @@ public class TestOmLDBCli {
       .addTable("keyTable")
       .build();
     // insert 5 keys
-    for (int i = 0; i<5; i++) {
-      OmKeyInfo value = TestOMRequestUtils.createOmKeyInfo("sampleVol",
-          "sampleBuck", "key" + (i+1), HddsProtos.ReplicationType.STAND_ALONE,
+    for (int i = 0; i < 5; i++) {
+      OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("sampleVol",
+          "sampleBuck", "key" + (i + 1), HddsProtos.ReplicationType.STAND_ALONE,
           HddsProtos.ReplicationFactor.ONE);
-      String key = "key"+ (i);
+      String key = "key" + (i);
       Table<byte[], byte[]> keyTable = dbStore.getTable("keyTable");
-      byte[] arr = value.getProtobuf(CURRENT_VERSION).toByteArray();
+      byte[] arr = value
+          .getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray();
       keyTable.put(key.getBytes(UTF_8), arr);
     }
     rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
@@ -111,7 +112,7 @@ public class TestOmLDBCli {
     try {
       getKeyNames(dbScanner);
       Assert.fail("IllegalArgumentException is expected");
-    }catch (IllegalArgumentException e){
+    }  catch (IllegalArgumentException e) {
       //ignore
     }
 
@@ -177,7 +178,7 @@ public class TestOmLDBCli {
     scanner.setTableName("keyTable");
     scanner.call();
     Assert.assertFalse(scanner.getScannedObjects().isEmpty());
-    for (Object o : scanner.getScannedObjects()){
+    for (Object o : scanner.getScannedObjects()) {
       OmKeyInfo keyInfo = (OmKeyInfo)o;
       keyNames.add(keyInfo.getKeyName());
     }

@@ -50,12 +50,19 @@ public class TestS3InitiateMultipartUploadResponseWithFSO
 
     String multipartUploadID = UUID.randomUUID().toString();
 
+    addVolumeToDB(volumeName);
+    addBucketToDB(volumeName, bucketName);
+
     long parentID = 1027; // assume objectID of dir path "a/b/c/d" is 1027
     List<OmDirectoryInfo> parentDirInfos = new ArrayList<>();
 
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+        bucketName);
+
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponseFSO =
-            createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
-                    keyName, multipartUploadID, parentDirInfos);
+        createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
+            keyName, multipartUploadID, parentDirInfos, volumeId, bucketId);
 
     s3InitiateMultipartUploadResponseFSO.addToDBBatch(omMetadataManager,
         batchOperation);
@@ -66,8 +73,11 @@ public class TestS3InitiateMultipartUploadResponseWithFSO
     String multipartKey = omMetadataManager
         .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
 
+
+
     String multipartOpenKey = omMetadataManager
-        .getMultipartKey(parentID, fileName, multipartUploadID);
+        .getMultipartKey(volumeId, bucketId, parentID,
+                fileName, multipartUploadID);
 
     OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
         .get(multipartOpenKey);

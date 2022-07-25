@@ -19,16 +19,15 @@ package org.apache.hadoop.ozone.om;
  */
 
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
+import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.assertClusterPrepared;
+import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.waitForFinalization;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.maxLayoutVersion;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_COMPLETED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -37,7 +36,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -67,7 +66,7 @@ public class TestOMUpgradeFinalization {
    */
   @Rule
   public Timeout timeout = new Timeout(300000);
-  private MiniOzoneOMHAClusterImpl cluster;
+  private MiniOzoneHAClusterImpl cluster;
   private OzoneManager ozoneManager;
   private ClientProtocol clientProtocol;
   private int fromLayoutVersion;
@@ -100,7 +99,7 @@ public class TestOMUpgradeFinalization {
 
     OzoneConfiguration conf = new OzoneConfiguration();
     String omServiceId = UUID.randomUUID().toString();
-    cluster = (MiniOzoneOMHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
+    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(UUID.randomUUID().toString())
         .setScmId(UUID.randomUUID().toString())
         .setOMServiceId(omServiceId)
@@ -204,51 +203,4 @@ public class TestOMUpgradeFinalization {
     assertEquals(maxLayoutVersion(),
         Integer.parseInt(lvString));
   }
-
-  private void assertClusterPrepared(
-      long preparedIndex, List<OzoneManager> ozoneManagers) throws Exception {
-    for (OzoneManager om : ozoneManagers) {
-      LambdaTestUtils.await(120000,
-          1000, () -> {
-            if (!om.isRunning()) {
-              return false;
-            } else {
-              boolean preparedAtIndex = false;
-              OzoneManagerPrepareState.State state =
-                  om.getPrepareState().getState();
-
-              if (state.getStatus() == PREPARE_COMPLETED) {
-                if (state.getIndex() == preparedIndex) {
-                  preparedAtIndex = true;
-                } else {
-                  // State will not change if we are prepared at the wrong
-                  // index. Break out of wait.
-                  throw new Exception("OM " + om.getOMNodeId() + " prepared " +
-                      "but prepare index " + state.getIndex() + " does not " +
-                      "match expected prepare index " + preparedIndex);
-                }
-              }
-              return preparedAtIndex;
-            }
-          });
-    }
-  }
-
-  private void waitForFinalization(OzoneManagerProtocol omClient)
-      throws TimeoutException, InterruptedException {
-    waitFor(() -> {
-      try {
-        StatusAndMessages statusAndMessages =
-            omClient.queryUpgradeFinalizationProgress("finalize-test", false,
-                false);
-        System.out.println("Finalization Messages : " +
-            statusAndMessages.msgs());
-        return statusAndMessages.status().equals(FINALIZATION_DONE);
-      } catch (IOException e) {
-        Assert.fail(e.getMessage());
-      }
-      return false;
-    }, 2000, 20000);
-  }
-
 }

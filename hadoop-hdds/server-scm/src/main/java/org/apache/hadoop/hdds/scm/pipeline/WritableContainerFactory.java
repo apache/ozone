@@ -18,12 +18,14 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Factory class to obtain a container to which a block can be allocated for
@@ -33,23 +35,30 @@ public class WritableContainerFactory {
 
   private final WritableContainerProvider<ReplicationConfig> ratisProvider;
   private final WritableContainerProvider<ReplicationConfig> standaloneProvider;
+  private final WritableContainerProvider<ECReplicationConfig> ecProvider;
 
   public WritableContainerFactory(StorageContainerManager scm) {
     this.ratisProvider = new WritableRatisContainerProvider(
         scm.getConfiguration(), scm.getPipelineManager(),
         scm.getContainerManager(), scm.getPipelineChoosePolicy());
     this.standaloneProvider = ratisProvider;
+    this.ecProvider = new WritableECContainerProvider(scm.getConfiguration(),
+        scm.getPipelineManager(), scm.getContainerManager(),
+        scm.getPipelineChoosePolicy());
   }
 
   public ContainerInfo getContainer(final long size,
       ReplicationConfig repConfig, String owner, ExcludeList excludeList)
-      throws IOException {
-    switch(repConfig.getReplicationType()) {
+      throws IOException, TimeoutException {
+    switch (repConfig.getReplicationType()) {
     case STAND_ALONE:
       return standaloneProvider
           .getContainer(size, repConfig, owner, excludeList);
     case RATIS:
       return ratisProvider.getContainer(size, repConfig, owner, excludeList);
+    case EC:
+      return ecProvider.getContainer(size, (ECReplicationConfig)repConfig,
+          owner, excludeList);
     default:
       throw new IOException(repConfig.getReplicationType()
           + " is an invalid replication type");

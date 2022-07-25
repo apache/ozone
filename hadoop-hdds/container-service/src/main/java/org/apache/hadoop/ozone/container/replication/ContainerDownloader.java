@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.replication;
 import java.io.Closeable;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 
@@ -34,7 +33,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
  */
 public interface ContainerDownloader extends Closeable {
 
-  CompletableFuture<Path> getContainerDataFromReplicas(long containerId,
+  Path getContainerDataFromReplicas(long containerId,
       List<DatanodeDetails> sources);
 
 }

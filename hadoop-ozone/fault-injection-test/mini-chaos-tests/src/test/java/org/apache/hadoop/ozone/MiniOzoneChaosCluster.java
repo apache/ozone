@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -34,7 +33,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.failure.FailureManager;
@@ -102,15 +102,14 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
   @SuppressWarnings("parameternumber")
   public MiniOzoneChaosCluster(OzoneConfiguration conf,
-      List<OzoneManager> ozoneManagers, List<StorageContainerManager> scms,
-      List<HddsDatanodeService> hddsDatanodes, String omServiceID,
-      String scmServiceId, String clusterPath,
+      OMHAService omService, SCMHAService scmService,
+      List<HddsDatanodeService> hddsDatanodes, String clusterPath,
       Set<Class<? extends Failures>> clazzes) {
-    super(conf, ozoneManagers, scms, hddsDatanodes, omServiceID, scmServiceId,
-        clusterPath);
+    super(conf, new SCMConfigurator(), omService, scmService, hddsDatanodes,
+        clusterPath, null);
     this.numDatanodes = getHddsDatanodes().size();
-    this.numOzoneManagers = ozoneManagers.size();
-    this.numStorageContainerManagers = scms.size();
+    this.numOzoneManagers = omService.getServices().size();
+    this.numStorageContainerManagers = scmService.getServices().size();
 
     this.failedOmSet = new HashSet<>();
     this.failedDnSet = new HashSet<>();
@@ -232,7 +231,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     protected void initializeConfiguration() throws IOException {
       super.initializeConfiguration();
 
-      OzoneClientConfig clientConfig =new OzoneClientConfig();
+      OzoneClientConfig clientConfig = new OzoneClientConfig();
       clientConfig.setStreamBufferFlushSize(8 * 1024 * 1024);
       clientConfig.setStreamBufferMaxSize(16 * 1024 * 1024);
       clientConfig.setStreamBufferSize(4 * 1024);
@@ -304,33 +303,21 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
         initOMRatisConf();
       }
 
-      List<OzoneManager> omList;
-      List<StorageContainerManager> scmList;
+      SCMHAService scmService;
+      OMHAService omService;
       try {
-        if (numOfSCMs > 1) {
-          scmList = createSCMService();
-        } else {
-          StorageContainerManager scm = createSCM();
-          scm.start();
-          scmList = Arrays.asList(scm);
-        }
-        if (numOfOMs > 1) {
-          omList = createOMService();
-        } else {
-          OzoneManager om = createOM();
-          om.start();
-          omList = Arrays.asList(om);
-        }
+        scmService = createSCMService();
+        omService = createOMService();
       } catch (AuthenticationException ex) {
         throw new IOException("Unable to build MiniOzoneCluster. ", ex);
       }
 
       final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(
-          scmList, null);
+          scmService.getActiveServices(), null);
 
       MiniOzoneChaosCluster cluster =
-          new MiniOzoneChaosCluster(conf, omList, scmList, hddsDatanodes,
-              omServiceId, scmServiceId, path, clazzes);
+          new MiniOzoneChaosCluster(conf, omService, scmService, hddsDatanodes,
+              path, clazzes);
 
       if (startDataNodes) {
         cluster.startHddsDatanodes();
@@ -346,7 +333,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
   public Set<OzoneManager> omToFail() {
     int numNodesToFail = getNumberOfOmToFail();
-    if (failedOmSet.size() >= numOzoneManagers/2) {
+    if (failedOmSet.size() >= numOzoneManagers / 2) {
       return Collections.emptySet();
     }
 
@@ -374,7 +361,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
   // Should the selected node be stopped or started.
   public boolean shouldStopOm() {
-    if (failedOmSet.size() >= numOzoneManagers/2) {
+    if (failedOmSet.size() >= numOzoneManagers / 2) {
       return false;
     }
     return RandomUtils.nextBoolean();
@@ -422,7 +409,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
   public Set<StorageContainerManager> scmToFail() {
     int numNodesToFail = getNumberOfScmToFail();
-    if (failedScmSet.size() >= numStorageContainerManagers/2) {
+    if (failedScmSet.size() >= numStorageContainerManagers / 2) {
       return Collections.emptySet();
     }
 
@@ -440,16 +427,17 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     failedScmSet.add(scm);
   }
 
-  public void restartStorageContainerManager(StorageContainerManager scm,
-      boolean waitForScm) throws IOException, TimeoutException,
-      InterruptedException, AuthenticationException {
-    super.restartStorageContainerManager(scm, waitForScm);
+  public StorageContainerManager restartStorageContainerManager(
+      StorageContainerManager scm, boolean waitForScm)
+      throws IOException, TimeoutException, InterruptedException,
+      AuthenticationException {
     failedScmSet.remove(scm);
+    return super.restartStorageContainerManager(scm, waitForScm);
   }
 
   // Should the selected node be stopped or started.
   public boolean shouldStopScm() {
-    if (failedScmSet.size() >= numStorageContainerManagers/2) {
+    if (failedScmSet.size() >= numStorageContainerManagers / 2) {
       return false;
     }
     return RandomUtils.nextBoolean();

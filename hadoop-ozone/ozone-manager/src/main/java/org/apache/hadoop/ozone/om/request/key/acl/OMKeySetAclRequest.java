@@ -28,12 +28,20 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.key.acl.OMKeyAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
@@ -70,7 +78,7 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
   private List<OzoneAcl> ozoneAcls;
   private OzoneObj obj;
 
-  public OMKeySetAclRequest(OMRequest omRequest) {
+  public OMKeySetAclRequest(OMRequest omRequest, OzoneManager ozoneManager) {
     super(omRequest);
     OzoneManagerProtocolProtos.SetAclRequest setAclRequest =
         getOmRequest().getSetAclRequest();
@@ -78,6 +86,8 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
     path = obj.getPath();
     ozoneAcls = Lists.newArrayList(
         OzoneAclUtil.fromProtobuf(setAclRequest.getAclList()));
+
+    initializeBucketLayout(ozoneManager);
   }
 
   @Override
@@ -143,5 +153,38 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
         omDoubleBufferHelper);
   }
 
+  /**
+   * Validates Add ACL requests.
+   * We do not want to allow older clients to create set ACL requests
+   * for keys that are present in buckets which use non LEGACY layouts.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.SetAcl
+  )
+  public static OMRequest blockSetAclWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    if (req.getSetAclRequest().hasObj()) {
+      OzoneObj obj =
+          OzoneObjInfo.fromProtobuf(req.getSetAclRequest().getObj());
+      String path = obj.getPath();
+
+      ObjectParser objectParser = new ObjectParser(path,
+          OzoneManagerProtocolProtos.OzoneObj.ObjectType.KEY);
+
+      String volume = objectParser.getVolume();
+      String bucket = objectParser.getBucket();
+
+      BucketLayout bucketLayout = ctx.getBucketLayout(volume, bucket);
+      bucketLayout.validateSupportedOperation();
+    }
+    return req;
+  }
 }
 

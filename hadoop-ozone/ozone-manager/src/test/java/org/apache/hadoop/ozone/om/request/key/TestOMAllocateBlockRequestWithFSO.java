@@ -26,8 +26,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
@@ -47,7 +46,6 @@ public class TestOMAllocateBlockRequestWithFSO
     // metadata layout prefix will be set while invoking OzoneManager#start()
     // and its not invoked in this test. Hence it is explicitly setting
     // this configuration to populate prefix tables.
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
     return config;
   }
 
@@ -60,29 +58,34 @@ public class TestOMAllocateBlockRequestWithFSO
     keyName = parentDir + OzoneConsts.OM_KEY_PREFIX + fileName;
 
     // add parentDir to dirTable
-    long parentID = TestOMRequestUtils.addParentsToDirTable(volumeName,
+    long parentID = OMRequestTestUtils.addParentsToDirTable(volumeName,
             bucketName, parentDir, omMetadataManager);
     long txnId = 50;
     long objectId = parentID + 1;
 
     OmKeyInfo omKeyInfoFSO =
-            TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
                     Time.now());
 
     // add key to openFileTable
-    TestOMRequestUtils.addFileToKeyTable(true, false,
+    OMRequestTestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfoFSO, clientID, txnLogId, omMetadataManager);
 
-    return omMetadataManager.getOzonePathKey(parentID, fileName);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getOzonePathKey(volumeId, bucketId,
+            parentID, fileName);
   }
 
   @NotNull
   @Override
   protected OMAllocateBlockRequest getOmAllocateBlockRequest(
-          OzoneManagerProtocolProtos.OMRequest modifiedOmRequest) {
-    return new OMAllocateBlockRequestWithFSO(modifiedOmRequest);
+      OzoneManagerProtocolProtos.OMRequest modifiedOmRequest) {
+    return new OMAllocateBlockRequestWithFSO(modifiedOmRequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override
@@ -93,8 +96,8 @@ public class TestOMAllocateBlockRequestWithFSO
   @Override
   protected OmKeyInfo verifyPathInOpenKeyTable(String key, long id,
       boolean doAssert) throws Exception {
-    long bucketId = TestOMRequestUtils.getBucketId(volumeName, bucketName,
-            omMetadataManager);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
     String[] pathComponents = StringUtils.split(key, '/');
     long parentId = bucketId;
     for (int indx = 0; indx < pathComponents.length; indx++) {
@@ -102,7 +105,8 @@ public class TestOMAllocateBlockRequestWithFSO
       // Reached last component, which is file name
       if (indx == pathComponents.length - 1) {
         String dbOpenFileName =
-            omMetadataManager.getOpenFileName(parentId, pathElement, id);
+            omMetadataManager.getOpenFileName(volumeId, bucketId,
+                    parentId, pathElement, id);
         OmKeyInfo omKeyInfo =
             omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(dbOpenFileName);
@@ -112,7 +116,8 @@ public class TestOMAllocateBlockRequestWithFSO
         return omKeyInfo;
       } else {
         // directory
-        String dbKey = omMetadataManager.getOzonePathKey(parentId, pathElement);
+        String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+                parentId, pathElement);
         OmDirectoryInfo dirInfo =
             omMetadataManager.getDirectoryTable().get(dbKey);
         parentId = dirInfo.getObjectID();

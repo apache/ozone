@@ -20,7 +20,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.container.common.statemachine
     .DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
-import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -72,15 +72,15 @@ public class TestCloseContainerCommandHandler {
   private CloseContainerCommandHandler subject =
       new CloseContainerCommandHandler();
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
 
-  public TestCloseContainerCommandHandler(ChunkLayOutVersion layout) {
+  public TestCloseContainerCommandHandler(ContainerLayoutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
   @Before
@@ -98,7 +98,7 @@ public class TestCloseContainerCommandHandler {
         pipelineID.getId().toString(), null);
 
     container = new KeyValueContainer(data, new OzoneConfiguration());
-    containerSet = new ContainerSet();
+    containerSet = new ContainerSet(1000);
     containerSet.addContainer(container);
 
     containerHandler = mock(Handler.class);
@@ -141,7 +141,18 @@ public class TestCloseContainerCommandHandler {
     // Container in CLOSING state is moved to UNHEALTHY if pipeline does not
     // exist. Container should not exist in CLOSING state without a pipeline.
     verify(containerHandler)
-        .markContainerUnhealthy(container);
+        .quasiCloseContainer(container);
+  }
+
+  @Test
+  public void closeContainerWithForceFlagSet() throws IOException {
+    // close a container that's associated with an existing pipeline
+    subject.handle(forceCloseWithoutPipeline(), ozoneContainer, context, null);
+
+    verify(containerHandler)
+        .markContainerForClose(container);
+    verify(writeChannel, never()).submitRequest(any(), any());
+    verify(containerHandler).closeContainer(container);
   }
 
   @Test
@@ -165,10 +176,10 @@ public class TestCloseContainerCommandHandler {
 
     verify(writeChannel, never())
         .submitRequest(any(), any());
-    // Container in CLOSING state is moved to UNHEALTHY if pipeline does not
-    // exist. Container should not exist in CLOSING state without a pipeline.
+    // Container in CLOSING state is moved to CLOSED if pipeline does not
+    // exist and force is set to TRUE.
     verify(containerHandler)
-        .markContainerUnhealthy(container);
+        .closeContainer(container);
   }
 
   @Test
@@ -214,7 +225,7 @@ public class TestCloseContainerCommandHandler {
     } catch (IOException e) {
 
       GenericTestUtils.assertExceptionContains("The Container " +
-                      "is not found. ContainerID: "+containerID, e);
+                      "is not found. ContainerID: " + containerID, e);
     }
   }
 
@@ -227,7 +238,7 @@ public class TestCloseContainerCommandHandler {
     } catch (IOException e) {
       GenericTestUtils.assertExceptionContains("The Container is in " +
               "the MissingContainerSet hence we can't close it. " +
-              "ContainerID: "+containerID, e);
+              "ContainerID: " + containerID, e);
     }
   }
 

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
@@ -36,7 +37,38 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
  */
 public class TestOmPrefixInfo {
 
-  public OmPrefixInfo getOmPrefixInfoForTest(String path,
+  private static OzoneManagerStorageProtos.OzoneAclInfo buildTestOzoneAclInfo(
+      String aclString) {
+    OzoneAcl oacl = OzoneAcl.parseAcl(aclString);
+    ByteString rights = ByteString.copyFrom(oacl.getAclBitSet().toByteArray());
+    return OzoneManagerStorageProtos.OzoneAclInfo.newBuilder()
+        .setType(OzoneManagerStorageProtos.OzoneAclInfo.OzoneAclType.USER)
+        .setName(oacl.getName())
+        .setRights(rights)
+        .setAclScope(OzoneManagerStorageProtos.
+            OzoneAclInfo.OzoneAclScope.ACCESS)
+        .build();
+  }
+
+  private static HddsProtos.KeyValue getDefaultTestMetadata(
+      String key, String value) {
+    return HddsProtos.KeyValue.newBuilder()
+        .setKey(key)
+        .setValue(value)
+        .build();
+  }
+
+  private static OzoneManagerStorageProtos.PersistedPrefixInfo
+      getDefaultTestPrefixInfo(String name, String aclString,
+      HddsProtos.KeyValue metadata) {
+    return OzoneManagerStorageProtos.PersistedPrefixInfo.newBuilder()
+        .setName(name)
+        .addAcls(buildTestOzoneAclInfo(aclString))
+        .addMetadata(metadata)
+        .build();
+  }
+
+  private OmPrefixInfo getOmPrefixInfoForTest(String path,
       IAccessAuthorizer.ACLIdentityType identityType,
       String identityString,
       IAccessAuthorizer.ACLType aclType,
@@ -77,10 +109,9 @@ public class TestOmPrefixInfo {
     String aclString = "user:myuser:rw";
     String metakey = "metakey";
     String metaval = "metaval";
-    HddsProtos.KeyValue metadata = TestInstanceHelper
-        .getDefaultTestMetadata(metakey, metaval);
+    HddsProtos.KeyValue metadata = getDefaultTestMetadata(metakey, metaval);
     OzoneManagerStorageProtos.PersistedPrefixInfo prefixInfo =
-        TestInstanceHelper.getDefaultTestPrefixInfo(prefixInfoPath,
+        getDefaultTestPrefixInfo(prefixInfoPath,
             aclString, metadata);
 
     OmPrefixInfo ompri = OmPrefixInfo.getFromProtobuf(prefixInfo);

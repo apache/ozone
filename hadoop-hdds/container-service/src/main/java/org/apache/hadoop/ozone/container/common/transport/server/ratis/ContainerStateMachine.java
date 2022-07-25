@@ -23,6 +23,8 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -36,6 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -57,6 +60,7 @@ import org.apache.hadoop.hdds.utils.ResourceLimitCache;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
 
@@ -148,6 +152,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   private final AtomicBoolean stateMachineHealthy;
 
   private final Semaphore applyTransactionSemaphore;
+  private final boolean waitOnBothFollowers;
   /**
    * CSM metrics.
    */
@@ -193,8 +198,15 @@ public class ContainerStateMachine extends BaseStateMachine {
     applyTransactionSemaphore = new Semaphore(maxPendingApplyTransactions);
     stateMachineHealthy = new AtomicBoolean(true);
 
-    this.executor = Executors.newFixedThreadPool(numContainerOpExecutors);
+    this.executor = Executors.newFixedThreadPool(numContainerOpExecutors,
+        new ThreadFactoryBuilder()
+            .setNameFormat("ContainerOp-" + gid.getUuid() + "-%d")
+            .build());
+
     this.containerTaskQueues = new ConcurrentHashMap<>();
+    this.waitOnBothFollowers = conf.getObject(
+        DatanodeConfiguration.class).waitOnAllFollowers();
+
   }
 
   @Override
@@ -682,7 +694,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   private synchronized void updateLastApplied() {
     Long appliedTerm = null;
     long appliedIndex = -1;
-    for(long i = getLastAppliedTermIndex().getIndex() + 1;; i++) {
+    for (long i = getLastAppliedTermIndex().getIndex() + 1;; i++) {
       final Long removed = applyTransactionCompletionMap.remove(i);
       if (removed == null) {
         break;
@@ -711,6 +723,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     // with some information like its peers and termIndex). So, calling
     // updateLastApplied updates lastAppliedTermIndex.
     updateLastApplied();
+    removeStateMachineDataIfNeeded(index);
   }
 
   private CompletableFuture<ContainerCommandResponseProto> submitTask(
@@ -732,8 +745,27 @@ public class ContainerStateMachine extends BaseStateMachine {
         = queue.submit(task, executor);
     // after the task is completed, remove the queue if the queue is empty.
     f.thenAccept(dummy -> containerTaskQueues.computeIfPresent(containerId,
-        (id, q) -> q.isEmpty()? null: q));
+        (id, q) -> q.isEmpty() ? null : q));
     return f;
+  }
+
+  // Removes the stateMachine data from cache once both followers catch up
+  // to the particular index.
+  private void removeStateMachineDataIfNeeded(long index) {
+    if (waitOnBothFollowers) {
+      try {
+        RaftServer.Division division = ratisServer.getServer().getDivision(gid);
+        if (division.getInfo().isLeader()) {
+          long minIndex = Arrays.stream(division.getInfo()
+              .getFollowerNextIndices()).min().getAsLong();
+          LOG.debug("Removing data corresponding to log index {} min index {} "
+                  + "from cache", index, minIndex);
+          stateMachineDataCache.removeIf(k -> k >= (Math.min(minIndex, index)));
+        }
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 
   /*
@@ -742,17 +774,22 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public CompletableFuture<Message> applyTransaction(TransactionContext trx) {
     long index = trx.getLogEntry().getIndex();
-    // Since leader and one of the followers has written the data, it can
-    // be removed from the stateMachineDataMap.
-    stateMachineDataCache.remove(index);
-
-    DispatcherContext.Builder builder =
-        new DispatcherContext.Builder()
-            .setTerm(trx.getLogEntry().getTerm())
-            .setLogIndex(index);
-
-    long applyTxnStartTime = Time.monotonicNowNanos();
     try {
+      // Remove the stateMachine data once both followers have caught up. If any
+      // one of the follower is behind, the pending queue will max out as
+      // configurable limit on pending request size and count and then will
+      // block and client will backoff as a result of that.
+      removeStateMachineDataIfNeeded(index);
+      // if waitOnBothFollower is false, remove the entry from the cache
+      // as soon as its applied and such entry exists in the cache.
+      if (!waitOnBothFollowers) {
+        stateMachineDataCache.removeIf(k -> k >= index);
+      }
+      DispatcherContext.Builder builder =
+          new DispatcherContext.Builder().setTerm(trx.getLogEntry().getTerm())
+              .setLogIndex(index);
+
+      long applyTxnStartTime = Time.monotonicNowNanos();
       applyTransactionSemaphore.acquire();
       metrics.incNumApplyTransactionsOps();
       ContainerCommandRequestProto requestProto =
@@ -763,8 +800,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       if (cmdType == Type.WriteChunk) {
         Preconditions
             .checkArgument(requestProto.getWriteChunk().getData().isEmpty());
-        builder
-            .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA);
+        builder.setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA);
       }
       if (cmdType == Type.WriteChunk || cmdType == Type.PutSmallFile
           || cmdType == Type.PutBlock || cmdType == Type.CreateContainer) {
@@ -774,8 +810,7 @@ public class ContainerStateMachine extends BaseStateMachine {
           new CompletableFuture<>();
       final Consumer<Exception> exceptionHandler = e -> {
         LOG.error("gid {} : ApplyTransaction failed. cmd {} logIndex "
-                + "{} exception {}", gid, requestProto.getCmdType(),
-            index, e);
+            + "{} exception {}", gid, requestProto.getCmdType(), index, e);
         stateMachineHealthy.compareAndSet(true, false);
         metrics.incNumApplyTransactionsFails();
         applyTransactionFuture.completeExceptionally(e);
@@ -783,8 +818,8 @@ public class ContainerStateMachine extends BaseStateMachine {
 
       // Ensure the command gets executed in a separate thread than
       // stateMachineUpdater thread which is calling applyTransaction here.
-      final CompletableFuture<ContainerCommandResponseProto> future
-          = submitTask(requestProto, builder, exceptionHandler);
+      final CompletableFuture<ContainerCommandResponseProto> future =
+          submitTask(requestProto, builder, exceptionHandler);
       future.thenApply(r -> {
         if (trx.getServerRole() == RaftPeerRole.LEADER
             && trx.getStateMachineContext() != null) {
@@ -818,11 +853,11 @@ public class ContainerStateMachine extends BaseStateMachine {
                     + "{} Container Result: {}", gid, r.getCmdType(), index,
                 r.getMessage(), r.getResult());
           }
-          applyTransactionFuture.complete(r::toByteString);
           if (cmdType == Type.WriteChunk || cmdType == Type.PutSmallFile) {
             metrics.incNumBytesCommittedCount(
                 requestProto.getWriteChunk().getChunkData().getLen());
           }
+          applyTransactionFuture.complete(r::toByteString);
           // add the entry to the applyTransactionCompletionMap only if the
           // stateMachine is healthy i.e, there has been no applyTransaction
           // failures before.
@@ -834,12 +869,11 @@ public class ContainerStateMachine extends BaseStateMachine {
           }
         }
         return applyTransactionFuture;
-      }).whenComplete((r, t) ->  {
+      }).whenComplete((r, t) -> {
         if (t != null) {
           stateMachineHealthy.set(false);
           LOG.error("gid {} : ApplyTransaction failed. cmd {} logIndex "
-                  + "{} exception {}", gid, requestProto.getCmdType(),
-              index, t);
+              + "{} exception {}", gid, requestProto.getCmdType(), index, t);
         }
         applyTransactionSemaphore.release();
         metrics.recordApplyTransactionCompletion(
@@ -860,6 +894,12 @@ public class ContainerStateMachine extends BaseStateMachine {
     final CompletableFuture<T> future = new CompletableFuture<>();
     future.completeExceptionally(e);
     return future;
+  }
+
+  @Override
+  public void notifyNotLeader(Collection<TransactionContext> pendingEntries) {
+    // once the leader steps down , clear the cache
+    evictStateMachineCache();
   }
 
   @Override

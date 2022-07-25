@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -102,8 +102,8 @@ public class TestCloseContainer {
   public void testReplicasAreReportedForClosedContainerAfterRestart()
       throws Exception {
     // Create some keys to write data into the open containers
-    for (int i=0; i<10; i++) {
-      TestDataUtil.createKey(bucket, "key"+i, ReplicationFactor.THREE,
+    for (int i = 0; i < 10; i++) {
+      TestDataUtil.createKey(bucket, "key" + i, ReplicationFactor.THREE,
           ReplicationType.RATIS, "this is the content");
     }
     StorageContainerManager scm = cluster.getStorageContainerManager();

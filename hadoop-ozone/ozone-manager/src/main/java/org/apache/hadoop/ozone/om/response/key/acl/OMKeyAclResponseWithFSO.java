@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.response.key.acl;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -26,6 +27,7 @@ import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.jetbrains.annotations.NotNull;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
@@ -38,12 +40,18 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 public class OMKeyAclResponseWithFSO extends OMKeyAclResponse {
 
   private boolean isDirectory;
+  private long volumeId;
+  private long bucketId;
 
   public OMKeyAclResponseWithFSO(
       @NotNull OzoneManagerProtocolProtos.OMResponse omResponse,
-      @NotNull OmKeyInfo omKeyInfo, boolean isDirectory) {
-    super(omResponse, omKeyInfo);
+      @NotNull OmKeyInfo omKeyInfo, boolean isDirectory,
+      @Nonnull BucketLayout bucketLayout, @Nonnull long volumeId,
+      @Nonnull long bucketId) {
+    super(omResponse, omKeyInfo, bucketLayout);
     this.isDirectory = isDirectory;
+    this.volumeId = volumeId;
+    this.bucketId = bucketId;
   }
 
   /**
@@ -53,24 +61,22 @@ public class OMKeyAclResponseWithFSO extends OMKeyAclResponse {
    * @param omResponse
    */
   public OMKeyAclResponseWithFSO(
-      @NotNull OzoneManagerProtocolProtos.OMResponse omResponse) {
-    super(omResponse);
+      @NotNull OzoneManagerProtocolProtos.OMResponse omResponse,
+      BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 
   @Override public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    String ozoneDbKey = omMetadataManager
-        .getOzonePathKey(getOmKeyInfo().getParentObjectID(),
-            getOmKeyInfo().getFileName());
+    String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+        getOmKeyInfo().getParentObjectID(), getOmKeyInfo().getFileName());
     if (isDirectory) {
       OmDirectoryInfo dirInfo = OMFileRequest.getDirectoryInfo(getOmKeyInfo());
       omMetadataManager.getDirectoryTable()
           .putWithBatch(batchOperation, ozoneDbKey, dirInfo);
     } else {
-      omMetadataManager.getKeyTable(
-          getBucketLayout(omMetadataManager, getOmKeyInfo().getVolumeName(),
-              getOmKeyInfo().getBucketName()))
+      omMetadataManager.getKeyTable(getBucketLayout())
           .putWithBatch(batchOperation, ozoneDbKey, getOmKeyInfo());
     }
   }

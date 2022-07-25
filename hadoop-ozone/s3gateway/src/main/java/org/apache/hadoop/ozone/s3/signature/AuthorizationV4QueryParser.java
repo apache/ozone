@@ -18,15 +18,15 @@
 package org.apache.hadoop.ozone.s3.signature;
 
 import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
 import java.time.ZonedDateTime;
 import java.util.Map;
 
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
 
 import com.google.common.annotations.VisibleForTesting;
 import static java.time.temporal.ChronoUnit.SECONDS;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +50,7 @@ public class AuthorizationV4QueryParser implements SignatureParser {
   }
 
   @Override
-  public SignatureInfo parseSignature() throws OS3Exception {
+  public SignatureInfo parseSignature() throws MalformedResourceException {
 
     if (!queryParameters.containsKey("X-Amz-Signature")) {
       return null;
@@ -63,7 +63,7 @@ public class AuthorizationV4QueryParser implements SignatureParser {
     Credential credential =
         null;
     try {
-      credential = new Credential(URLDecoder.decode(rawCredential, "UTF-8"));
+      credential = new Credential(urlDecode(rawCredential));
     } catch (UnsupportedEncodingException e) {
       throw new IllegalArgumentException(
           "X-Amz-Credential is not proper URL encoded");

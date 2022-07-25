@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -171,7 +171,7 @@ public class TestVolumeSet {
     // Attempting to remove a volume which does not exist in VolumeSet should
     // log a warning.
     LogCapturer logs = LogCapturer.captureLogs(
-        LogFactory.getLog(MutableVolumeSet.class));
+            LoggerFactory.getLogger(MutableVolumeSet.class));
     volumeSet.removeVolume(HddsVolumeUtil.getHddsRoot(volume1));
     assertEquals(1, volumeSet.getVolumesList().size());
     String expectedLogMessage = "Volume : " +
@@ -225,7 +225,7 @@ public class TestVolumeSet {
   }
 
   @Test
-  public void testFailVolumes() throws  Exception{
+  public void testFailVolumes() throws  Exception {
     MutableVolumeSet volSet = null;
     File readOnlyVolumePath = new File(baseDir);
     //Set to readonly, so that this volume will be failed

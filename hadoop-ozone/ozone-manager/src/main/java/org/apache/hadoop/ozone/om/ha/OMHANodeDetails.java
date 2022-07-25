@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +38,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
@@ -124,7 +127,8 @@ public class OMHANodeDetails {
     boolean isOMAddressSet = false;
 
     for (String serviceId : omServiceIds) {
-      Collection<String> omNodeIds = OmUtils.getOMNodeIds(conf, serviceId);
+      Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(conf,
+          serviceId);
 
       if (omNodeIds.size() == 0) {
         throwConfException("Configuration does not have any value set for %s " +
@@ -168,21 +172,24 @@ public class OMHANodeDetails {
           throw e;
         }
 
-        if (addr.isUnresolved()) {
+        boolean flexibleFqdnResolutionEnabled = conf.getBoolean(
+                OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
+                OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT);
+        if (OzoneNetUtils.isUnresolved(flexibleFqdnResolutionEnabled, addr)) {
           LOG.error("Address for OM {} : {} couldn't be resolved. Proceeding " +
                   "with unresolved host to create Ratis ring.", nodeId,
               rpcAddrStr);
         }
 
-        if (!addr.isUnresolved() && !isPeer && ConfUtils.isAddressLocal(addr)) {
+        if (!isPeer
+                && OzoneNetUtils
+                .isAddressLocal(flexibleFqdnResolutionEnabled, addr)) {
           localRpcAddress = addr;
           localOMServiceId = serviceId;
           localOMNodeId = nodeId;
           localRatisPort = ratisPort;
           found++;
         } else {
-          // This OMNode belongs to same OM service as the current OMNode.
-          // Add it to peerNodes list.
           // This OMNode belongs to same OM service as the current OMNode.
           // Add it to peerNodes list.
           peerNodesList.add(getHAOMNodeDetails(conf, serviceId,
@@ -219,7 +226,7 @@ public class OMHANodeDetails {
       LOG.info("Configuration does not have {} set. Falling back to the " +
           "default OM address {}", OZONE_OM_ADDRESS_KEY, omAddress);
 
-      return new OMHANodeDetails(getOMNodeDetails(conf, null,
+      return new OMHANodeDetails(getOMNodeDetailsForNonHA(conf, null,
           null, omAddress, ratisPort), new ArrayList<>());
 
     } else {
@@ -237,7 +244,7 @@ public class OMHANodeDetails {
    * @param ratisPort - Ratis port of the OM.
    * @return OMNodeDetails
    */
-  public static OMNodeDetails getOMNodeDetails(OzoneConfiguration conf,
+  public static OMNodeDetails getOMNodeDetailsForNonHA(OzoneConfiguration conf,
       String serviceId, String nodeId, InetSocketAddress rpcAddress,
       int ratisPort) {
 

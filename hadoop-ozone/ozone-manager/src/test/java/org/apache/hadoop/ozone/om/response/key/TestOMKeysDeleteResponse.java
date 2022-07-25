@@ -21,11 +21,10 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -44,20 +43,25 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
 
 
-  private List<OmKeyInfo> omKeyInfoList;
-  private List<String> ozoneKeys;
+  private List<OmKeyInfo> omKeyInfoList = new ArrayList<>();
+  private List<String> ozoneKeys = new ArrayList<>();
 
+  protected List<OmKeyInfo> getOmKeyInfoList() {
+    return omKeyInfoList;
+  }
 
-  private void createPreRequisities() throws Exception {
+  protected List<String> getOzoneKeys() {
+    return ozoneKeys;
+  }
+
+  protected void createPreRequisities() throws Exception {
     String parent = "/user";
     String key = "key";
 
-    omKeyInfoList = new ArrayList<>();
-    ozoneKeys = new ArrayList<>();
     String ozoneKey = "";
     for (int i = 0; i < 10; i++) {
       keyName = parent.concat(key + i);
-      TestOMRequestUtils.addKeyToTable(false, volumeName,
+      OMRequestTestUtils.addKeyToTable(false, volumeName,
           bucketName, keyName, 0L, RATIS, THREE, omMetadataManager);
       ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
       omKeyInfoList
@@ -77,12 +81,8 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
             .setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
                 .setStatus(true)).build();
 
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
-
-    OMClientResponse omKeysDeleteResponse = new OMKeysDeleteResponse(
-        omResponse, omKeyInfoList, true, omBucketInfo);
+    OMClientResponse omKeysDeleteResponse =
+        getOmKeysDeleteResponse(omResponse, omBucketInfo);
 
     omKeysDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
@@ -100,6 +100,12 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
 
   }
 
+  protected OMClientResponse getOmKeysDeleteResponse(OMResponse omResponse,
+      OmBucketInfo omBucketInfo) {
+    return new OMKeysDeleteResponse(
+        omResponse, omKeyInfoList, true, omBucketInfo);
+  }
+
   @Test
   public void testKeysDeleteResponseFail() throws Exception {
     createPreRequisities();
@@ -110,12 +116,8 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
             .setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
                 .setStatus(false)).build();
 
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
-
-    OMClientResponse omKeysDeleteResponse = new OMKeysDeleteResponse(
-        omResponse, omKeyInfoList, true, omBucketInfo);
+    OMClientResponse omKeysDeleteResponse
+        = getOmKeysDeleteResponse(omResponse, omBucketInfo);
 
     omKeysDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 

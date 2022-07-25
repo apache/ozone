@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -43,9 +43,9 @@ import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.security.authentication.client
     .AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -61,7 +61,7 @@ public class TestStatisticsUpdate {
   private NodeManager nodeManager;
   private NodeReportHandler nodeReportHandler;
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException, AuthenticationException {
     final OzoneConfiguration conf = new OzoneConfiguration();
     final String storageDir = GenericTestUtils.getTempPath(
@@ -72,7 +72,7 @@ public class TestStatisticsUpdate {
     conf.set(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, "1s");
     conf.set(ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL, "2s");
     final EventQueue eventQueue = new EventQueue();
-    final StorageContainerManager scm = TestUtils.getScm(conf);
+    final StorageContainerManager scm = HddsTestUtils.getScm(conf);
     nodeManager = scm.getScmNodeManager();
     final DeadNodeHandler deadNodeHandler = new DeadNodeHandler(
         nodeManager, Mockito.mock(PipelineManager.class),
@@ -92,21 +92,21 @@ public class TestStatisticsUpdate {
     String storagePath2 = GenericTestUtils.getRandomizedTempPath()
         .concat("/" + datanode2.getUuidString());
 
-    StorageReportProto storageOne = TestUtils.createStorageReport(
+    StorageReportProto storageOne = HddsTestUtils.createStorageReport(
         datanode1.getUuid(), storagePath1, 100, 10, 90, null);
-    StorageReportProto storageTwo = TestUtils.createStorageReport(
+    StorageReportProto storageTwo = HddsTestUtils.createStorageReport(
         datanode2.getUuid(), storagePath2, 200, 20, 180, null);
 
     nodeManager.register(datanode1,
-        TestUtils.createNodeReport(Arrays.asList(storageOne),
+        HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
             Collections.emptyList()), null);
     nodeManager.register(datanode2,
-        TestUtils.createNodeReport(Arrays.asList(storageTwo),
+        HddsTestUtils.createNodeReport(Arrays.asList(storageTwo),
             Collections.emptyList()), null);
 
-    NodeReportProto nodeReportProto1 = TestUtils.createNodeReport(
+    NodeReportProto nodeReportProto1 = HddsTestUtils.createNodeReport(
         Arrays.asList(storageOne), Collections.emptyList());
-    NodeReportProto nodeReportProto2 = TestUtils.createNodeReport(
+    NodeReportProto nodeReportProto2 = HddsTestUtils.createNodeReport(
         Arrays.asList(storageTwo), Collections.emptyList());
 
     nodeReportHandler.onMessage(
@@ -117,14 +117,14 @@ public class TestStatisticsUpdate {
         Mockito.mock(EventPublisher.class));
 
     SCMNodeStat stat = nodeManager.getStats();
-    Assert.assertEquals(300L, stat.getCapacity().get().longValue());
-    Assert.assertEquals(270L, stat.getRemaining().get().longValue());
-    Assert.assertEquals(30L, stat.getScmUsed().get().longValue());
+    Assertions.assertEquals(300L, stat.getCapacity().get());
+    Assertions.assertEquals(270L, stat.getRemaining().get());
+    Assertions.assertEquals(30L, stat.getScmUsed().get());
 
     SCMNodeMetric nodeStat = nodeManager.getNodeStat(datanode1);
-    Assert.assertEquals(100L, nodeStat.get().getCapacity().get().longValue());
-    Assert.assertEquals(90L, nodeStat.get().getRemaining().get().longValue());
-    Assert.assertEquals(10L, nodeStat.get().getScmUsed().get().longValue());
+    Assertions.assertEquals(100L, nodeStat.get().getCapacity().get());
+    Assertions.assertEquals(90L, nodeStat.get().getRemaining().get());
+    Assertions.assertEquals(10L, nodeStat.get().getScmUsed().get());
 
     //TODO: Support logic to mark a node as dead in NodeManager.
 
@@ -143,10 +143,10 @@ public class TestStatisticsUpdate {
     nodeManager.processHeartbeat(datanode2, layoutInfo);
     //THEN statistics in SCM should changed.
     stat = nodeManager.getStats();
-    Assert.assertEquals(200L, stat.getCapacity().get().longValue());
-    Assert.assertEquals(180L,
-        stat.getRemaining().get().longValue());
-    Assert.assertEquals(20L, stat.getScmUsed().get().longValue());
+    Assertions.assertEquals(200L, stat.getCapacity().get());
+    Assertions.assertEquals(180L,
+        stat.getRemaining().get());
+    Assertions.assertEquals(20L, stat.getScmUsed().get());
   }
 
 }

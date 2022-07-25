@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
@@ -229,8 +228,6 @@ public class TestNSSummaryEndpoint {
     reconNamespaceSummaryManager =
             reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
     nsSummaryEndpoint = reconTestInjector.getInstance(NSSummaryEndpoint.class);
-    // enable FSO mode
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
 
     // populate OM DB and reprocess into Recon RocksDB
     populateOMDB();
@@ -448,13 +445,17 @@ public class TestNSSummaryEndpoint {
   private void populateOMDB() throws Exception {
     // write all 4 directories
     writeDirToOm(reconOMMetadataManager, DIR_ONE_OBJECT_ID,
-            BUCKET_ONE_OBJECT_ID, DIR_ONE);
+            BUCKET_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID, DIR_ONE);
     writeDirToOm(reconOMMetadataManager, DIR_TWO_OBJECT_ID,
-            DIR_ONE_OBJECT_ID, DIR_TWO);
+            DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID, DIR_TWO);
     writeDirToOm(reconOMMetadataManager, DIR_THREE_OBJECT_ID,
-            DIR_ONE_OBJECT_ID, DIR_THREE);
+            DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID, DIR_THREE);
     writeDirToOm(reconOMMetadataManager, DIR_FOUR_OBJECT_ID,
-            DIR_ONE_OBJECT_ID, DIR_FOUR);
+            DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID, DIR_FOUR);
 
     // write all 6 keys
     writeKeyToOm(reconOMMetadataManager,
@@ -464,6 +465,8 @@ public class TestNSSummaryEndpoint {
             FILE_ONE,
             KEY_ONE_OBJECT_ID,
             BUCKET_ONE_OBJECT_ID,
+            BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID,
             KEY_ONE_SIZE);
     writeKeyToOm(reconOMMetadataManager,
             KEY_TWO,
@@ -472,6 +475,8 @@ public class TestNSSummaryEndpoint {
             FILE_TWO,
             KEY_TWO_OBJECT_ID,
             DIR_TWO_OBJECT_ID,
+            BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID,
             KEY_TWO_SIZE);
     writeKeyToOm(reconOMMetadataManager,
             KEY_THREE,
@@ -480,6 +485,8 @@ public class TestNSSummaryEndpoint {
             FILE_THREE,
             KEY_THREE_OBJECT_ID,
             DIR_THREE_OBJECT_ID,
+            BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID,
             KEY_THREE_SIZE);
     writeKeyToOm(reconOMMetadataManager,
             KEY_FOUR,
@@ -488,6 +495,8 @@ public class TestNSSummaryEndpoint {
             FILE_FOUR,
             KEY_FOUR_OBJECT_ID,
             BUCKET_TWO_OBJECT_ID,
+            BUCKET_TWO_OBJECT_ID,
+            VOL_OBJECT_ID,
             KEY_FOUR_SIZE);
     writeKeyToOm(reconOMMetadataManager,
             KEY_FIVE,
@@ -496,6 +505,8 @@ public class TestNSSummaryEndpoint {
             FILE_FIVE,
             KEY_FIVE_OBJECT_ID,
             BUCKET_TWO_OBJECT_ID,
+            BUCKET_TWO_OBJECT_ID,
+            VOL_OBJECT_ID,
             KEY_FIVE_SIZE);
     writeKeyToOm(reconOMMetadataManager,
             KEY_SIX,
@@ -504,6 +515,8 @@ public class TestNSSummaryEndpoint {
             FILE_SIX,
             KEY_SIX_OBJECT_ID,
             DIR_FOUR_OBJECT_ID,
+            BUCKET_ONE_OBJECT_ID,
+            VOL_OBJECT_ID,
             KEY_SIX_SIZE);
   }
 
@@ -585,6 +598,8 @@ public class TestNSSummaryEndpoint {
 
     // add the multi-block key to Recon's OM
     writeKeyToOm(reconOMMetadataManager,
+            VOL_OBJECT_ID,
+            BUCKET_ONE_OBJECT_ID,
             DIR_ONE_OBJECT_ID,
             MULTI_BLOCK_KEY_OBJECT_ID,
             VOL, BUCKET_ONE,

@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
@@ -41,6 +42,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
 /**
@@ -73,17 +75,39 @@ public class AbstractContainerReportHandler {
   /**
    * Process the given ContainerReplica received from specified datanode.
    *
-   * @param datanodeDetails DatanodeDetails of the node which reported
-   *                        this replica
-   * @param replicaProto ContainerReplica
-   *
-   * @throws IOException In case of any Exception while processing the report
+   * @param datanodeDetails DatanodeDetails for the DN
+   * @param replicaProto Protobuf representing the replicas
+   * @param publisher EventPublisher instance
+   * @throws IOException
+   * @throws InvalidStateTransitionException
+   * @throws TimeoutException
    */
   protected void processContainerReplica(final DatanodeDetails datanodeDetails,
       final ContainerReplicaProto replicaProto, final EventPublisher publisher)
-      throws IOException, InvalidStateTransitionException {
-    final ContainerID containerId = ContainerID
-        .valueOf(replicaProto.getContainerID());
+      throws IOException, InvalidStateTransitionException, TimeoutException {
+    ContainerInfo container = getContainerManager().getContainer(
+        ContainerID.valueOf(replicaProto.getContainerID()));
+    processContainerReplica(
+        datanodeDetails, container, replicaProto, publisher);
+  }
+
+  /**
+   * Process the given ContainerReplica received from specified datanode.
+   *
+   * @param datanodeDetails DatanodeDetails of the node which reported
+   *                        this replica
+   * @param containerInfo ContainerInfo represending the container
+   * @param replicaProto ContainerReplica
+   * @param publisher EventPublisher instance
+   *
+   * @throws IOException In case of any Exception while processing the report
+   * @throws TimeoutException In case of timeout while updating container state
+   */
+  protected void processContainerReplica(final DatanodeDetails datanodeDetails,
+      final ContainerInfo containerInfo,
+      final ContainerReplicaProto replicaProto, final EventPublisher publisher)
+      throws IOException, InvalidStateTransitionException, TimeoutException {
+    final ContainerID containerId = containerInfo.containerID();
 
     if (logger.isDebugEnabled()) {
       logger.debug("Processing replica of container {} from datanode {}",
@@ -91,9 +115,9 @@ public class AbstractContainerReportHandler {
     }
     // Synchronized block should be replaced by container lock,
     // once we have introduced lock inside ContainerInfo.
-    synchronized (containerManager.getContainer(containerId)) {
-      updateContainerStats(datanodeDetails, containerId, replicaProto);
-      if (!updateContainerState(datanodeDetails, containerId, replicaProto,
+    synchronized (containerInfo) {
+      updateContainerStats(datanodeDetails, containerInfo, replicaProto);
+      if (!updateContainerState(datanodeDetails, containerInfo, replicaProto,
           publisher)) {
         updateContainerReplica(datanodeDetails, containerId, replicaProto);
       }
@@ -104,16 +128,14 @@ public class AbstractContainerReportHandler {
    * Update the container stats if it's lagging behind the stats in reported
    * replica.
    *
-   * @param containerId ID of the container
+   * @param containerInfo ContainerInfo representing the container
    * @param replicaProto Container Replica information
    * @throws ContainerNotFoundException If the container is not present
    */
   private void updateContainerStats(final DatanodeDetails datanodeDetails,
-                                    final ContainerID containerId,
+                                    final ContainerInfo containerInfo,
                                     final ContainerReplicaProto replicaProto)
       throws ContainerNotFoundException {
-    final ContainerInfo containerInfo = containerManager
-        .getContainer(containerId);
 
     if (isHealthy(replicaProto::getState)) {
       if (containerInfo.getSequenceId() <
@@ -121,30 +143,77 @@ public class AbstractContainerReportHandler {
         containerInfo.updateSequenceId(
             replicaProto.getBlockCommitSequenceId());
       }
-      List<ContainerReplica> otherReplicas =
-          getOtherReplicas(containerId, datanodeDetails);
-      long usedBytes = replicaProto.getUsed();
-      long keyCount = replicaProto.getKeyCount();
-      for (ContainerReplica r : otherReplicas) {
-        // Open containers are generally growing in key count and size, the
-        // overall size should be the min of all reported replicas.
-        if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)) {
-          usedBytes = Math.min(usedBytes, r.getBytesUsed());
-          keyCount = Math.min(keyCount, r.getKeyCount());
-        } else {
-          // Containers which are not open can only shrink in size, so use the
-          // largest values reported.
-          usedBytes = Math.max(usedBytes, r.getBytesUsed());
-          keyCount = Math.max(keyCount, r.getKeyCount());
-        }
+      if (containerInfo.getReplicationConfig().getReplicationType()
+          == HddsProtos.ReplicationType.EC) {
+        updateECContainerStats(containerInfo, replicaProto, datanodeDetails);
+      } else {
+        updateRatisContainerStats(containerInfo, replicaProto, datanodeDetails);
       }
+    }
+  }
 
-      if (containerInfo.getUsedBytes() != usedBytes) {
-        containerInfo.setUsedBytes(usedBytes);
+  private void updateRatisContainerStats(ContainerInfo containerInfo,
+      ContainerReplicaProto newReplica, DatanodeDetails newSource)
+      throws ContainerNotFoundException {
+    List<ContainerReplica> otherReplicas =
+        getOtherReplicas(containerInfo.containerID(), newSource);
+    long usedBytes = newReplica.getUsed();
+    long keyCount = newReplica.getKeyCount();
+    for (ContainerReplica r : otherReplicas) {
+      usedBytes = calculateUsage(containerInfo, usedBytes, r.getBytesUsed());
+      keyCount = calculateUsage(containerInfo, keyCount, r.getKeyCount());
+    }
+    updateContainerUsedAndKeys(containerInfo, usedBytes, keyCount);
+  }
+
+  private void updateECContainerStats(ContainerInfo containerInfo,
+      ContainerReplicaProto newReplica, DatanodeDetails newSource)
+      throws ContainerNotFoundException {
+    int dataNum =
+        ((ECReplicationConfig)containerInfo.getReplicationConfig()).getData();
+    // The first EC index and the parity indexes must all be the same size
+    // while the other data indexes may be smaller due to partial stripes.
+    // When calculating the stats, we only use the first data and parity and
+    // ignore the others. We only need to run the check if we are processing
+    // the first data or parity replicas.
+    if (newReplica.getReplicaIndex() == 1
+        || newReplica.getReplicaIndex() > dataNum) {
+      List<ContainerReplica> otherReplicas =
+          getOtherReplicas(containerInfo.containerID(), newSource);
+      long usedBytes = newReplica.getUsed();
+      long keyCount = newReplica.getKeyCount();
+      for (ContainerReplica r : otherReplicas) {
+        if (r.getReplicaIndex() > 1 && r.getReplicaIndex() <= dataNum) {
+          // Ignore all data replicas except the first for stats
+          continue;
+        }
+        usedBytes = calculateUsage(containerInfo, usedBytes, r.getBytesUsed());
+        keyCount = calculateUsage(containerInfo, keyCount, r.getKeyCount());
       }
-      if (containerInfo.getNumberOfKeys() != keyCount) {
-        containerInfo.setNumberOfKeys(keyCount);
-      }
+      updateContainerUsedAndKeys(containerInfo, usedBytes, keyCount);
+    }
+  }
+
+  private long calculateUsage(ContainerInfo containerInfo, long lastValue,
+      long thisValue) {
+    if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)) {
+      // Open containers are generally growing in key count and size, the
+      // overall size should be the min of all reported replicas.
+      return Math.min(lastValue, thisValue);
+    } else {
+      // Containers which are not open can only shrink in size, so use the
+      // largest values reported.
+      return Math.max(lastValue, thisValue);
+    }
+  }
+
+  private void updateContainerUsedAndKeys(ContainerInfo containerInfo,
+      long usedBytes, long keyCount) {
+    if (containerInfo.getUsedBytes() != usedBytes) {
+      containerInfo.setUsedBytes(usedBytes);
+    }
+    if (containerInfo.getNumberOfKeys() != keyCount) {
+      containerInfo.setNumberOfKeys(keyCount);
     }
   }
 
@@ -165,19 +234,19 @@ public class AbstractContainerReportHandler {
    * Updates the container state based on the given replica state.
    *
    * @param datanode Datanode from which the report is received
-   * @param containerId ID of the container
+   * @param container ContainerInfo representing the the container
    * @param replica ContainerReplica
    * @boolean true - replica should be ignored in the next process
    * @throws IOException In case of Exception
+   * @throws TimeoutException In case of timeout while updating container state
    */
   private boolean updateContainerState(final DatanodeDetails datanode,
-                                    final ContainerID containerId,
+                                    final ContainerInfo container,
                                     final ContainerReplicaProto replica,
                                     final EventPublisher publisher)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException, InvalidStateTransitionException, TimeoutException {
 
-    final ContainerInfo container = containerManager
-        .getContainer(containerId);
+    final ContainerID containerId = container.containerID();
     boolean ignored = false;
 
     switch (container.getState()) {
@@ -290,6 +359,7 @@ public class AbstractContainerReportHandler {
         .setOriginNodeId(UUID.fromString(replicaProto.getOriginNodeId()))
         .setSequenceId(replicaProto.getBlockCommitSequenceId())
         .setKeyCount(replicaProto.getKeyCount())
+        .setReplicaIndex(replicaProto.getReplicaIndex())
         .setBytesUsed(replicaProto.getUsed())
         .build();
 

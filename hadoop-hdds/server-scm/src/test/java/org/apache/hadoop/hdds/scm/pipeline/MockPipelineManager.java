@@ -20,26 +20,33 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.ClientVersion;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Set;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * Mock PipelineManager implementation for testing.
  */
-public final class MockPipelineManager implements PipelineManager {
+public class MockPipelineManager implements PipelineManager {
 
   private PipelineStateManager stateManager;
 
@@ -55,7 +62,15 @@ public final class MockPipelineManager implements PipelineManager {
 
   @Override
   public Pipeline createPipeline(ReplicationConfig replicationConfig)
-      throws IOException {
+      throws IOException, TimeoutException {
+    return createPipeline(replicationConfig, Collections.emptyList(),
+        Collections.emptyList());
+  }
+
+  @Override
+  public Pipeline createPipeline(ReplicationConfig replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      throws IOException, TimeoutException {
     final List<DatanodeDetails> nodes = Stream.generate(
         MockDatanodeDetails::randomDatanodeDetails)
         .limit(replicationConfig.getRequiredNodes())
@@ -68,7 +83,7 @@ public final class MockPipelineManager implements PipelineManager {
         .build();
 
     stateManager.addPipeline(pipeline.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION));
+        ClientVersion.CURRENT_VERSION));
     return pipeline;
   }
 
@@ -80,6 +95,25 @@ public final class MockPipelineManager implements PipelineManager {
         .setReplicationConfig(replicationConfig)
         .setNodes(nodes)
         .setState(Pipeline.PipelineState.OPEN)
+        .build();
+  }
+
+  @Override
+  public Pipeline createPipelineForRead(
+      final ReplicationConfig replicationConfig,
+      final Set<ContainerReplica> replicas) {
+    List<DatanodeDetails> dns = new ArrayList<>();
+    Map<DatanodeDetails, Integer> map = new HashMap<>();
+    for (ContainerReplica r : replicas) {
+      map.put(r.getDatanodeDetails(), r.getReplicaIndex());
+      dns.add(r.getDatanodeDetails());
+    }
+    return Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(replicationConfig)
+        .setNodes(dns)
+        .setReplicaIndexes(map)
+        .setState(Pipeline.PipelineState.CLOSED)
         .build();
   }
 
@@ -126,6 +160,19 @@ public final class MockPipelineManager implements PipelineManager {
   }
 
   @Override
+  /**
+   * Returns the count of pipelines meeting the given ReplicationConfig and
+   * state.
+   * @param replicationConfig The ReplicationConfig of the pipelines to count
+   * @param state The current state of the pipelines to count
+   * @return The count of pipelines meeting the above criteria
+   */
+  public int getPipelineCount(ReplicationConfig replicationConfig,
+      final Pipeline.PipelineState state) {
+    return stateManager.getPipelineCount(replicationConfig, state);
+  }
+
+  @Override
   public void addContainerToPipeline(final PipelineID pipelineID,
                                      final ContainerID containerID)
       throws IOException {
@@ -159,17 +206,25 @@ public final class MockPipelineManager implements PipelineManager {
 
   @Override
   public void openPipeline(final PipelineID pipelineId)
-      throws IOException {
+      throws IOException, TimeoutException {
+    stateManager.updatePipelineState(
+        pipelineId.getProtobuf(), HddsProtos.PipelineState.PIPELINE_OPEN);
   }
 
   @Override
   public void closePipeline(final Pipeline pipeline, final boolean onTimeout)
-      throws IOException {
+      throws IOException, TimeoutException {
+    stateManager.updatePipelineState(pipeline.getId().getProtobuf(),
+        HddsProtos.PipelineState.PIPELINE_CLOSED);
   }
 
   @Override
-  public void scrubPipeline(ReplicationConfig replicationConfig)
-      throws IOException {
+  public void closeStalePipelines(DatanodeDetails datanodeDetails) {
+
+  }
+
+  @Override
+  public void scrubPipelines() {
 
   }
 
@@ -205,7 +260,9 @@ public final class MockPipelineManager implements PipelineManager {
 
   @Override
   public void deactivatePipeline(final PipelineID pipelineID)
-      throws IOException {
+      throws IOException, TimeoutException {
+    stateManager.updatePipelineState(pipelineID.getProtobuf(),
+        HddsProtos.PipelineState.PIPELINE_DORMANT);
   }
 
   @Override
@@ -257,5 +314,10 @@ public final class MockPipelineManager implements PipelineManager {
   @Override
   public void releaseWriteLock() {
 
+  }
+
+  @Override
+  public boolean isPipelineCreationFrozen() {
+    return false;
   }
 }

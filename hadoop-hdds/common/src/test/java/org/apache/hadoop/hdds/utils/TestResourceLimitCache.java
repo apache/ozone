@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -17,19 +17,23 @@
 package org.apache.hadoop.hdds.utils;
 
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 /**
  * Test for ResourceLimitCache.
  */
 public class TestResourceLimitCache {
+
+  private static final String ANY_VALUE = "asdf";
 
   @Test
   public void testResourceLimitCache()
@@ -45,7 +49,7 @@ public class TestResourceLimitCache {
 
     // Create a future which blocks to put 1. Currently map has acquired 10
     // permits out of 10
-    CompletableFuture future = CompletableFuture.supplyAsync(() -> {
+    CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
       try {
         return resourceCache.put(1, "a");
       } catch (InterruptedException e) {
@@ -53,9 +57,9 @@ public class TestResourceLimitCache {
       }
       return null;
     });
-    Assert.assertTrue(!future.isDone());
+    Assertions.assertFalse(future.isDone());
     Thread.sleep(100);
-    Assert.assertTrue(!future.isDone());
+    Assertions.assertFalse(future.isDone());
 
     // remove 4 so that permits are released for key 1 to be put. Currently map
     // has acquired 6 permits out of 10
@@ -63,8 +67,9 @@ public class TestResourceLimitCache {
 
     GenericTestUtils.waitFor(future::isDone, 100, 1000);
     // map has the key 1
-    Assert.assertTrue(future.isDone() && !future.isCompletedExceptionally());
-    Assert.assertNotNull(resourceCache.get(1));
+    Assertions.assertTrue(future.isDone());
+    Assertions.assertFalse(future.isCompletedExceptionally());
+    Assertions.assertNotNull(resourceCache.get(1));
 
     // Create a future which blocks to put 4. Currently map has acquired 7
     // permits out of 10
@@ -76,9 +81,9 @@ public class TestResourceLimitCache {
         return null;
       }
     }, pool);
-    Assert.assertTrue(!future.isDone());
+    Assertions.assertFalse(future.isDone());
     Thread.sleep(100);
-    Assert.assertTrue(!future.isDone());
+    Assertions.assertFalse(future.isDone());
 
     // Shutdown the thread pool for putting key 4
     pool.shutdownNow();
@@ -86,6 +91,50 @@ public class TestResourceLimitCache {
     future.cancel(true);
     // remove key 1 so currently map has acquired 6 permits out of 10
     resourceCache.remove(1);
-    Assert.assertNull(resourceCache.get(4));
+    Assertions.assertNull(resourceCache.get(4));
   }
+
+  @Test
+  @Timeout(5)
+  public void testRemove() throws Exception {
+    testRemove(cache -> cache.remove(2), 2);
+  }
+
+  @Test
+  @Timeout(5)
+  public void testRemoveIf() throws Exception {
+    testRemove(cache -> cache.removeIf(k -> k <= 2), 1, 2);
+  }
+
+  @Test
+  @Timeout(5)
+  public void testClear() throws Exception {
+    testRemove(Cache::clear, 1, 2, 3);
+  }
+
+  private static void testRemove(Consumer<Cache<Integer, String>> op,
+      int... removedKeys) throws InterruptedException {
+
+    // GIVEN
+    final int maxSize = 3;
+    Cache<Integer, String> resourceCache =
+        new ResourceLimitCache<>(new ConcurrentHashMap<>(),
+            (k, v) -> new int[] {1}, maxSize);
+    for (int i = 1; i <= maxSize; ++i) {
+      resourceCache.put(i, ANY_VALUE);
+    }
+
+    // WHEN: remove some entries
+    op.accept(resourceCache);
+
+    // THEN
+    for (Integer k : removedKeys) {
+      Assertions.assertNull(resourceCache.get(k));
+    }
+    // can put new entries
+    for (int i = 1; i <= removedKeys.length; ++i) {
+      resourceCache.put(maxSize + i, ANY_VALUE);
+    }
+  }
+
 }

@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.ozone.scm;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -66,7 +66,7 @@ public class TestSCMMXBean {
   @Rule
   public Timeout timeout = Timeout.seconds(300);
 
-  public static final Log LOG = LogFactory.getLog(TestSCMMXBean.class);
+  public static final Logger LOG = LoggerFactory.getLogger(TestSCMMXBean.class);
   private static int numOfDatanodes = 3;
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
@@ -151,14 +151,14 @@ public class TestSCMMXBean {
     ContainerManager scmContainerManager = scm.getContainerManager();
 
     List<ContainerInfo> containerInfoList = new ArrayList<>();
-    for (int i=0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
       containerInfoList.add(
-          scmContainerManager.allocateContainer(new StandaloneReplicationConfig(
-                  ReplicationFactor.ONE),
+          scmContainerManager.allocateContainer(
+              StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE),
               UUID.randomUUID().toString()));
     }
     long containerID;
-    for (int i=0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
       if (i % 2 == 0) {
         containerID = containerInfoList.get(i).getContainerID();
         scmContainerManager.updateContainerState(
@@ -184,7 +184,7 @@ public class TestSCMMXBean {
     containerStateCount = scm.getContainerStateCount();
 
     containerStateCount.forEach((k, v) -> {
-      if(k.equals(HddsProtos.LifeCycleState.CLOSING.toString())) {
+      if (k.equals(HddsProtos.LifeCycleState.CLOSING.toString())) {
         assertEquals((int)v, 5);
       } else if (k.equals(HddsProtos.LifeCycleState.CLOSED.toString())) {
         assertEquals((int)v, 5);

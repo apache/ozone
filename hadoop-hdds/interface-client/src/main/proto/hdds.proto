@@ -84,6 +84,13 @@ message ScmNodeDetailsProto {
     required string hostName = 3;      // Hostname of SCM.
 }
 
+message NodeDetailsProto {
+    required string uuid = 1;
+    required string clusterId = 2;
+    required string hostName = 3;
+    required NodeType nodeType = 4;
+}
+
 message Port {
     required string name = 1;
     required uint32 value = 2;
@@ -118,6 +125,8 @@ message Pipeline {
     repeated uint32 memberOrders = 7;
     optional uint64 creationTimeStamp = 8;
     optional UUID suggestedLeaderID = 9;
+    repeated uint32 memberReplicaIndexes = 10;
+    optional ECReplicationConfig ecReplicationConfig = 11;
     // TODO(runzhiwang): when leaderID is gone, specify 6 as the index of leaderID128
     optional UUID leaderID128 = 100;
 }
@@ -201,6 +210,7 @@ enum LifeCycleState {
     CLOSED = 4;
     DELETING = 5;
     DELETED = 6; // object is deleted.
+    RECOVERING = 7;
 }
 
 enum LifeCycleEvent {
@@ -223,8 +233,9 @@ message ContainerInfoProto {
     required string owner = 7;
     optional int64 deleteTransactionId = 8;
     optional int64 sequenceId = 9;
-    required ReplicationFactor replicationFactor  = 10;
+    optional ReplicationFactor replicationFactor  = 10;
     required ReplicationType replicationType  = 11;
+    optional ECReplicationConfig ecReplicationConfig = 12;
 }
 
 message ContainerWithPipeline {
@@ -257,11 +268,27 @@ enum ReplicationType {
     RATIS = 1;
     STAND_ALONE = 2;
     CHAINED = 3;
+    EC = 4;
+    NONE = -1; // Invalid Type
 }
 
 enum ReplicationFactor {
     ONE = 1;
     THREE = 3;
+    ZERO = 0; // Invalid Factor
+}
+
+message ECReplicationConfig {
+    required int32 data = 1;
+    required int32 parity = 2;
+    required string codec = 3;
+    required int32 ecChunkSize = 4;
+}
+
+message DefaultReplicationConfig {
+    required ReplicationType type = 1;
+    optional ReplicationFactor factor = 2;
+    optional ECReplicationConfig ecReplicationConfig = 3;
 }
 
 enum ScmOps {
@@ -368,3 +395,59 @@ message CertInfoProto {
     required uint64 timestamp = 2;
 }
 
+message ContainerReplicaHistoryListProto {
+    repeated ContainerReplicaHistoryProto replicaHistory = 1;
+}
+
+message ContainerReplicaHistoryProto {
+    required string uuid = 1;
+    required int64 firstSeenTime = 2;
+    required int64 lastSeenTime = 3;
+    required int64 bcsId = 4;
+}
+
+message SCMContainerReplicaProto {
+    required int64 containerID = 1;
+    required string state = 2;
+    required DatanodeDetailsProto datanodeDetails = 3;
+    required string placeOfBirth = 4;
+    required int64 sequenceID = 5;
+    required int64 keyCount = 6;
+    required int64 bytesUsed = 7;
+    optional int64 replicaIndex = 8;
+}
+
+message KeyContainerIDList {
+    required string key = 1;
+    repeated ContainerID container = 2;
+}
+
+message KeyIntValue {
+    required string key = 1;
+    optional int64 value = 2;
+}
+
+message ReplicationManagerReportProto {
+    required int64 timestamp = 1;
+    repeated KeyIntValue stat = 2;
+    repeated KeyContainerIDList statSample = 3;
+}
+
+message ContainerBalancerConfigurationProto {
+    optional string utilizationThreshold = 5;
+    optional int32 datanodesInvolvedMaxPercentagePerIteration = 6;
+    optional int64 sizeMovedMaxPerIteration = 7;
+    optional int64 sizeEnteringTargetMax = 8;
+    optional int64 sizeLeavingSourceMax = 9;
+    optional int32 iterations = 10;
+    optional string excludeContainers = 11;
+    optional int64 moveTimeout = 12;
+    optional int64 balancingIterationInterval = 13;
+    optional string includeDatanodes = 14;
+    optional string excludeDatanodes = 15;
+    optional bool moveNetworkTopologyEnable = 16;
+    optional bool triggerDuBeforeMoveEnable = 17;
+
+    required bool shouldRun = 18;
+    optional int32 nextIterationIndex = 19;
+}

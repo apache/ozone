@@ -20,6 +20,7 @@ services:
       build:
          context: .
          args:
+            - OZONE_RUNNER_IMAGE
             - OZONE_RUNNER_VERSION
       image: ozone-runner-scripts:${OZONE_RUNNER_VERSION}
       volumes:
@@ -32,6 +33,7 @@ services:
       build:
          context: .
          args:
+            - OZONE_RUNNER_IMAGE
             - OZONE_RUNNER_VERSION
       image: ozone-runner-scripts:${OZONE_RUNNER_VERSION}
       volumes:
@@ -45,6 +47,7 @@ services:
       build:
          context: .
          args:
+            - OZONE_RUNNER_IMAGE
             - OZONE_RUNNER_VERSION
       image: ozone-runner-scripts:${OZONE_RUNNER_VERSION}
       volumes:

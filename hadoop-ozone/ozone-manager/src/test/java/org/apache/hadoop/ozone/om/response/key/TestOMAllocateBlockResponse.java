@@ -19,16 +19,17 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+
+import java.io.IOException;
 
 /**
  * Tests OMAllocateBlockResponse.
@@ -39,9 +40,6 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
   public void testAddToDBBatch() throws Exception {
 
     OmKeyInfo omKeyInfo = createOmKeyInfo();
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
 
     OMResponse omResponse = OMResponse.newBuilder()
         .setAllocateBlockResponse(
@@ -69,9 +67,6 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
     OmKeyInfo omKeyInfo = createOmKeyInfo();
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
 
     OMResponse omResponse = OMResponse.newBuilder()
         .setAllocateBlockResponse(
@@ -99,7 +94,7 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
   }
 
   protected OmKeyInfo createOmKeyInfo() throws Exception {
-    return TestOMRequestUtils.createOmKeyInfo(volumeName,
+    return OMRequestTestUtils.createOmKeyInfo(volumeName,
             bucketName, keyName, replicationType, replicationFactor);
   }
 
@@ -111,8 +106,8 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
   @NotNull
   protected OMAllocateBlockResponse getOmAllocateBlockResponse(
           OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,
-          OMResponse omResponse) {
+          OMResponse omResponse) throws IOException {
     return new OMAllocateBlockResponse(omResponse, omKeyInfo, clientID,
-            omBucketInfo);
+        getBucketLayout());
   }
 }

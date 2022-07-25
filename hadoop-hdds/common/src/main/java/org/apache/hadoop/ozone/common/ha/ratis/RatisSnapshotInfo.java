@@ -50,7 +50,7 @@ public class RatisSnapshotInfo implements SnapshotInfo {
     this.snapshotIndex = newIndex;
   }
 
-  public RatisSnapshotInfo() {}
+  public RatisSnapshotInfo() { }
 
   public RatisSnapshotInfo(long term, long index) {
     this.term = term;

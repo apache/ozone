@@ -81,6 +81,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
         .setOmMetadataManager(omMetadataManager)
         .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
+        .setmaxUnFlushedTransactionCount(10000)
         .enableRatis(true)
         .setIndexToTerm((val) -> term)
         .build();
@@ -109,7 +110,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     assertEquals(0, metrics.getTotalNumOfFlushedTransactions());
     assertEquals(0, metrics.getMaxNumberOfTransactionsFlushedInOneIteration());
 
-    for (int i=0; i < bucketCount; i++) {
+    for (int i = 0; i < bucketCount; i++) {
       doubleBuffer.add(createDummyBucketResponse(volumeName),
           trxId.incrementAndGet());
     }
@@ -124,6 +125,8 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     assertTrue(doubleBuffer.getFlushIterations() > 0);
     assertTrue(metrics.getFlushTime().lastStat().numSamples() > 0);
     assertTrue(metrics.getAvgFlushTransactionsInOneIteration() > 0);
+    assertEquals(bucketCount, (long) metrics.getQueueSize().lastStat().total());
+    assertTrue(metrics.getQueueSize().lastStat().numSamples() > 0);
 
     // Assert there is only instance of OM Double Metrics.
     OzoneManagerDoubleBufferMetrics metricsCopy =

@@ -38,8 +38,8 @@ import picocli.CommandLine.Spec;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
     subcommands = {
-      InfoSubcommand.class,
-      ListSubcommand.class,
+        InfoSubcommand.class,
+        ListSubcommand.class,
     })
 
 @MetaInfServices(SubcommandWithParent.class)

@@ -25,6 +25,7 @@ import java.util.Objects;
  * S3Secret to be saved in database.
  */
 public class S3SecretValue {
+  // TODO: This field should be renamed to accessId for generalization.
   private String kerberosID;
   private String awsSecret;
 

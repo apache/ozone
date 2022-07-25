@@ -21,7 +21,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.server.SCMCertStore;
@@ -31,17 +31,17 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateSto
 import org.apache.hadoop.hdds.security.x509.crl.CRLStatus;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,15 +58,12 @@ public class TestCRLStatusReportHandler implements EventPublisher {
   private CertificateStore certificateStore;
   private SCMMetadataStore scmMetadataStore;
 
-  @Rule
-  public final TemporaryFolder tempDir = new TemporaryFolder();
-
-  @Before
-  public void init() throws IOException {
+  @BeforeEach
+  public void init(@TempDir Path tempDir) throws IOException {
     OzoneConfiguration config = new OzoneConfiguration();
 
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        tempDir.newFolder().getAbsolutePath());
+        tempDir.toAbsolutePath().toString());
     config.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
 
     SCMStorageConfig storageConfig = Mockito.mock(SCMStorageConfig.class);
@@ -80,7 +77,7 @@ public class TestCRLStatusReportHandler implements EventPublisher {
         new CRLStatusReportHandler(certificateStore, config);
   }
 
-  @After
+  @AfterEach
   public void destroyDbStore() throws Exception {
     if (scmMetadataStore.getStore() != null) {
       scmMetadataStore.getStore().close();
@@ -103,21 +100,24 @@ public class TestCRLStatusReportHandler implements EventPublisher {
         getCRLStatusReport(dn2, pendingCRLIds2, 2L);
     crlStatusReportHandler.onMessage(reportFromDatanode1, this);
     CRLStatus crlStatus = certificateStore.getCRLStatusForDN(dn1.getUuid());
-    Assert.assertTrue(crlStatus.getPendingCRLIds().containsAll(pendingCRLIds1));
-    Assert.assertEquals(5L, crlStatus.getReceivedCRLId());
+    Assertions.assertTrue(
+        crlStatus.getPendingCRLIds().containsAll(pendingCRLIds1));
+    Assertions.assertEquals(5L, crlStatus.getReceivedCRLId());
 
     pendingCRLIds1.remove(0);
     reportFromDatanode1 = getCRLStatusReport(dn1, pendingCRLIds1, 6L);
     crlStatusReportHandler.onMessage(reportFromDatanode1, this);
     crlStatus = certificateStore.getCRLStatusForDN(dn1.getUuid());
-    Assert.assertEquals(1, crlStatus.getPendingCRLIds().size());
-    Assert.assertEquals(4L, crlStatus.getPendingCRLIds().get(0).longValue());
-    Assert.assertEquals(6L, crlStatus.getReceivedCRLId());
+    Assertions.assertEquals(1, crlStatus.getPendingCRLIds().size());
+    Assertions.assertEquals(4L,
+        crlStatus.getPendingCRLIds().get(0).longValue());
+    Assertions.assertEquals(6L, crlStatus.getReceivedCRLId());
 
     crlStatusReportHandler.onMessage(reportFromDatanode2, this);
     crlStatus = certificateStore.getCRLStatusForDN(dn2.getUuid());
-    Assert.assertTrue(crlStatus.getPendingCRLIds().containsAll(pendingCRLIds2));
-    Assert.assertEquals(2L, crlStatus.getReceivedCRLId());
+    Assertions.assertTrue(
+        crlStatus.getPendingCRLIds().containsAll(pendingCRLIds2));
+    Assertions.assertEquals(2L, crlStatus.getReceivedCRLId());
   }
 
   private CRLStatusReportFromDatanode getCRLStatusReport(
@@ -125,7 +125,7 @@ public class TestCRLStatusReportHandler implements EventPublisher {
       List<Long> pendingCRLIds,
       long receivedCRLId) {
     CRLStatusReport crlStatusReportProto =
-        TestUtils.createCRLStatusReport(pendingCRLIds, receivedCRLId);
+        HddsTestUtils.createCRLStatusReport(pendingCRLIds, receivedCRLId);
     return new CRLStatusReportFromDatanode(dn, crlStatusReportProto);
   }
 

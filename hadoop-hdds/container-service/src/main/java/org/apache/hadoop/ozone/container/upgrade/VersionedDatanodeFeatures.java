@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 
 import java.io.File;
@@ -120,14 +120,14 @@ public final class VersionedDatanodeFeatures {
       boolean scmHAEnabled =
           conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
           ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
-      if (isFinalized(HDDSLayoutFeature.SCM_HA) || scmHAEnabled){
+      if (isFinalized(HDDSLayoutFeature.SCM_HA) || scmHAEnabled) {
         return clusterID;
       } else {
         return scmID;
       }
     }
 
-    public static boolean upgradeVolumeIfNeeded(HddsVolume volume,
+    public static boolean upgradeVolumeIfNeeded(StorageVolume volume,
         String clusterID) {
       File clusterIDDir = new File(volume.getStorageDir(), clusterID);
       boolean needsUpgrade = isFinalized(HDDSLayoutFeature.SCM_HA) &&
@@ -140,6 +140,30 @@ public final class VersionedDatanodeFeatures {
             clusterID);
       }
       return success;
+    }
+  }
+
+  /**
+   * Utilities for container Schema V3 layout feature.
+   * This schema put all container metadata info into a per-disk
+   * rocksdb instance instead of a per-container instance.
+   */
+  public static class SchemaV3 {
+    public static String chooseSchemaVersion(ConfigurationSource conf) {
+      if (isFinalizedAndEnabled(conf)) {
+        return OzoneConsts.SCHEMA_V3;
+      } else {
+        return SchemaV2.chooseSchemaVersion();
+      }
+    }
+
+    public static boolean isFinalizedAndEnabled(ConfigurationSource conf) {
+      DatanodeConfiguration dcf = conf.getObject(DatanodeConfiguration.class);
+      if (isFinalized(HDDSLayoutFeature.DATANODE_SCHEMA_V3)
+          && dcf.getContainerSchemaV3Enabled()) {
+        return true;
+      }
+      return false;
     }
   }
 }

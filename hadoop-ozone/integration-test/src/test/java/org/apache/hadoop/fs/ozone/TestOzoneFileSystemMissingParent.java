@@ -54,6 +54,8 @@ public class TestOzoneFileSystemMissingParent {
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
@@ -127,5 +129,8 @@ public class TestOzoneFileSystemMissingParent {
     LambdaTestUtils.intercept(OMException.class,
         "Cannot create file : parent/file " + "as parent "
             + "directory doesn't exist", () -> stream.close());
+
+    // cleanup
+    fs.delete(renamedPath, true);
   }
 }

@@ -19,9 +19,9 @@ package org.apache.hadoop.hdds.fs;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.util.Shell;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.ozone.test.GenericTestUtils.getTestDir;
@@ -41,14 +41,14 @@ public class TestDU {
 
   private static final File DIR = getTestDir(TestDU.class.getSimpleName());
 
-  @Before
+  @BeforeEach
   public void setUp() {
     assumeFalse(Shell.WINDOWS);
     FileUtil.fullyDelete(DIR);
     assertTrue(DIR.mkdirs());
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws IOException {
     FileUtil.fullyDelete(DIR);
   }
@@ -96,7 +96,7 @@ public class TestDU {
 
     long usedSpace = du.getUsedSpace();
 
-    assertFileSize(4*KB, usedSpace);
+    assertFileSize(4 * KB, usedSpace);
   }
 
   private static void assertFileSize(long expected, long actual) {

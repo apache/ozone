@@ -30,9 +30,9 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
-import org.junit.Assert;
-import static org.junit.Assert.assertEquals;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.Test;
 
 /**
  * Asserts that allocation strategy works as expected.
@@ -85,8 +85,8 @@ public class TestContainerPlacement {
         null, true, null);
 
     for (int x = 0; x < opsCount; x++) {
-      long containerSize = random.nextInt(100) * OzoneConsts.GB;
-      long metadataSize = random.nextInt(100) * OzoneConsts.GB;
+      long containerSize = random.nextInt(10) * OzoneConsts.GB;
+      long metadataSize = random.nextInt(10) * OzoneConsts.GB;
       List<DatanodeDetails> nodesCapacity =
           capacityPlacer.chooseDatanodes(new ArrayList<>(), null, nodesRequired,
               metadataSize, containerSize);
@@ -111,14 +111,14 @@ public class TestContainerPlacement {
     // This is a very bold claim, and needs large number of I/O operations.
     // The claim in this assertion is that we improved the data distribution
     // of this cluster in relation to the start state of the cluster.
-    Assert.assertTrue(beforeCapacity.getStandardDeviation() >
+    Assertions.assertTrue(beforeCapacity.getStandardDeviation() >
         postCapacity.getStandardDeviation());
 
     // This asserts that Capacity placement yields a better placement
     // algorithm than random placement, since both cluster started at an
     // identical state.
 
-    Assert.assertTrue(postRandom.getStandardDeviation() >
+    Assertions.assertTrue(postRandom.getStandardDeviation() >
         postCapacity.getStandardDeviation());
   }
 

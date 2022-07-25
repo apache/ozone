@@ -70,7 +70,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
   /** Format of checkpoint directories used prior to Hadoop 0.23. */
   private static final DateFormat OLD_CHECKPOINT =
       new SimpleDateFormat("yyMMddHHmm");
-  private static final int MSECS_PER_MINUTE = 60*1000;
+  private static final int MSECS_PER_MINUTE = 60 * 1000;
 
   private long emptierInterval;
 
@@ -78,7 +78,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
   private OzoneManager om;
 
-  public TrashPolicyOzone(){
+  public TrashPolicyOzone() {
   }
 
   @Override
@@ -110,7 +110,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
     }
   }
 
-  TrashPolicyOzone(FileSystem fs, Configuration conf, OzoneManager om){
+  TrashPolicyOzone(FileSystem fs, Configuration conf, OzoneManager om) {
     initialize(conf, fs);
     this.om = om;
   }
@@ -198,7 +198,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           // sleep for interval
           Thread.sleep(end - now);
           // if not leader, thread will always be sleeping
-          if (!om.isLeaderReady()){
+          if (!om.isLeaderReady()) {
             continue;
           }
         } catch (InterruptedException e) {
@@ -219,7 +219,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
                 continue;
               }
               TrashPolicyOzone trash = new TrashPolicyOzone(fs, conf, om);
-              Runnable task = ()->{
+              Runnable task = () -> {
                 try {
                   om.getMetrics().incNumTrashRootsProcessed();
                   trash.deleteCheckpoint(trashRoot.getPath(), false);
@@ -241,7 +241,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
       }
       try {
         fs.close();
-      } catch(IOException e) {
+      } catch (IOException e) {
         LOG.warn("Trash cannot close FileSystem: ", e);
       } finally {
         executor.shutdown();
