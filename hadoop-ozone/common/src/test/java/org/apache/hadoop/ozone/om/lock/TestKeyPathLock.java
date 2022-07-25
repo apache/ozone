@@ -21,9 +21,7 @@ package org.apache.hadoop.ozone.om.lock;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
