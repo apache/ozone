@@ -22,8 +22,8 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
@@ -44,34 +44,34 @@ public class TestContainerInfo {
     HddsProtos.ContainerInfoProto proto = container.getProtobuf();
 
     // No EC Config
-    Assert.assertFalse(proto.hasEcReplicationConfig());
-    Assert.assertEquals(THREE, proto.getReplicationFactor());
-    Assert.assertEquals(RATIS, proto.getReplicationType());
+    Assertions.assertFalse(proto.hasEcReplicationConfig());
+    Assertions.assertEquals(THREE, proto.getReplicationFactor());
+    Assertions.assertEquals(RATIS, proto.getReplicationType());
 
     // Reconstruct object from Proto
     ContainerInfo recovered = ContainerInfo.fromProtobuf(proto);
-    Assert.assertEquals(RATIS, recovered.getReplicationType());
-    Assert.assertTrue(
+    Assertions.assertEquals(RATIS, recovered.getReplicationType());
+    Assertions.assertTrue(
         recovered.getReplicationConfig() instanceof RatisReplicationConfig);
 
     // EC Config
     container = createContainerInfo(new ECReplicationConfig(3, 2));
     proto = container.getProtobuf();
 
-    Assert.assertEquals(3, proto.getEcReplicationConfig().getData());
-    Assert.assertEquals(2, proto.getEcReplicationConfig().getParity());
-    Assert.assertFalse(proto.hasReplicationFactor());
-    Assert.assertEquals(EC, proto.getReplicationType());
+    Assertions.assertEquals(3, proto.getEcReplicationConfig().getData());
+    Assertions.assertEquals(2, proto.getEcReplicationConfig().getParity());
+    Assertions.assertFalse(proto.hasReplicationFactor());
+    Assertions.assertEquals(EC, proto.getReplicationType());
 
     // Reconstruct object from Proto
     recovered = ContainerInfo.fromProtobuf(proto);
-    Assert.assertEquals(EC, recovered.getReplicationType());
-    Assert.assertTrue(
+    Assertions.assertEquals(EC, recovered.getReplicationType());
+    Assertions.assertTrue(
         recovered.getReplicationConfig() instanceof ECReplicationConfig);
     ECReplicationConfig config =
         (ECReplicationConfig)recovered.getReplicationConfig();
-    Assert.assertEquals(3, config.getData());
-    Assert.assertEquals(2, config.getParity());
+    Assertions.assertEquals(3, config.getData());
+    Assertions.assertEquals(2, config.getParity());
   }
 
   private ContainerInfo createContainerInfo(ReplicationConfig repConfig) {

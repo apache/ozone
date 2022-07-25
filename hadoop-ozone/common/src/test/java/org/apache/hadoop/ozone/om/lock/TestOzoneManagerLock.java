@@ -24,6 +24,7 @@ import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -678,5 +679,27 @@ public class TestOzoneManagerLock {
         "Expected " + writeThreadCount +
             " samples in writeLockWaitingTimeMsStat" + writeWaitingStat,
         writeWaitingStat.contains("Samples = " + writeThreadCount));
+  }
+
+  @Test
+  public void testOMLockMetricsRecords() {
+    OMLockMetrics omLockMetrics = OMLockMetrics.create();
+    try {
+      MetricsCollectorImpl metricsCollector = new MetricsCollectorImpl();
+      omLockMetrics.getMetrics(metricsCollector, true);
+      Assert.assertEquals(1, metricsCollector.getRecords().size());
+
+      String omLockMetricsRecords = metricsCollector.getRecords().toString();
+      Assert.assertTrue(omLockMetricsRecords,
+          omLockMetricsRecords.contains("ReadLockWaitingTime"));
+      Assert.assertTrue(omLockMetricsRecords,
+          omLockMetricsRecords.contains("ReadLockHeldTime"));
+      Assert.assertTrue(omLockMetricsRecords,
+          omLockMetricsRecords.contains("WriteLockWaitingTime"));
+      Assert.assertTrue(omLockMetricsRecords,
+          omLockMetricsRecords.contains("WriteLockHeldTime"));
+    } finally {
+      omLockMetrics.unRegister();
+    }
   }
 }

@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
@@ -70,7 +69,6 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
@@ -452,11 +450,11 @@ public class TestObjectStoreWithFSO {
     expectedKeys = new LinkedList<>();
     expectedKeys.add("a/b2/");
     expectedKeys.add("a/b2/d1/");
-    expectedKeys.add("a/b2/d2/");
-    expectedKeys.add("a/b2/d3/");
     expectedKeys.add("a/b2/d1/d11.tx");
+    expectedKeys.add("a/b2/d2/");
     expectedKeys.add("a/b2/d2/d21.tx");
     expectedKeys.add("a/b2/d2/d22.tx");
+    expectedKeys.add("a/b2/d3/");
     expectedKeys.add("a/b2/d3/d31.tx");
     checkKeyList(ozoneKeyIterator, expectedKeys);
 
@@ -486,24 +484,24 @@ public class TestObjectStoreWithFSO {
     LinkedList<String> expectedKeys = new LinkedList<>();
     expectedKeys.add("a/");
     expectedKeys.add("a/b1/");
-    expectedKeys.add("a/b2/");
-    expectedKeys.add("a/b3/");
     expectedKeys.add("a/b1/c1/");
-    expectedKeys.add("a/b1/c2/");
     expectedKeys.add("a/b1/c1/c1.tx");
+    expectedKeys.add("a/b1/c2/");
     expectedKeys.add("a/b1/c2/c2.tx");
+    expectedKeys.add("a/b2/");
     expectedKeys.add("a/b2/d1/");
-    expectedKeys.add("a/b2/d2/");
-    expectedKeys.add("a/b2/d3/");
     expectedKeys.add("a/b2/d1/d11.tx");
+    expectedKeys.add("a/b2/d2/");
     expectedKeys.add("a/b2/d2/d21.tx");
     expectedKeys.add("a/b2/d2/d22.tx");
+    expectedKeys.add("a/b2/d3/");
     expectedKeys.add("a/b2/d3/d31.tx");
+    expectedKeys.add("a/b3/");
     expectedKeys.add("a/b3/e1/");
-    expectedKeys.add("a/b3/e2/");
-    expectedKeys.add("a/b3/e3/");
     expectedKeys.add("a/b3/e1/e11.tx");
+    expectedKeys.add("a/b3/e2/");
     expectedKeys.add("a/b3/e2/e21.tx");
+    expectedKeys.add("a/b3/e3/");
     expectedKeys.add("a/b3/e3/e31.tx");
     checkKeyList(keyItr, expectedKeys);
   }
@@ -743,9 +741,9 @@ public class TestObjectStoreWithFSO {
     Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         bucket.getBucketLayout());
 
-    // Case 4: Bucket layout: DEFAULT
+    // Case 4: Bucket layout: Empty
     sampleBucketName = UUID.randomUUID().toString();
-    builder.setBucketLayout(BucketLayout.DEFAULT);
+    builder = BucketArgs.newBuilder();
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
     Assert.assertEquals(sampleBucketName, bucket.getName());
@@ -758,7 +756,7 @@ public class TestObjectStoreWithFSO {
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
     Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertNotEquals(BucketLayout.LEGACY, bucket.getBucketLayout());
+    Assert.assertEquals(BucketLayout.LEGACY, bucket.getBucketLayout());
   }
 
   private void assertKeyRenamedEx(OzoneBucket bucket, String keyName)
@@ -785,17 +783,16 @@ public class TestObjectStoreWithFSO {
   private OmDirectoryInfo getDirInfo(String parentKey) throws Exception {
     OMMetadataManager omMetadataManager =
             cluster.getOzoneManager().getMetadataManager();
-    long bucketId = OMRequestTestUtils.getBucketId(volumeName, bucketName,
-            omMetadataManager);
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
+    long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
     String[] pathComponents = StringUtils.split(parentKey, '/');
     long parentId = bucketId;
     OmDirectoryInfo dirInfo = null;
     for (int indx = 0; indx < pathComponents.length; indx++) {
       String pathElement = pathComponents[indx];
-      String dbKey = omMetadataManager.getOzonePathKey(parentId,
-              pathElement);
-      dirInfo =
-              omMetadataManager.getDirectoryTable().get(dbKey);
+      String dbKey = omMetadataManager.getOzonePathKey(volumeId,
+              bucketId, parentId, pathElement);
+      dirInfo = omMetadataManager.getDirectoryTable().get(dbKey);
       parentId = dirInfo.getObjectID();
     }
     return dirInfo;
@@ -804,7 +801,12 @@ public class TestObjectStoreWithFSO {
   private void verifyKeyInFileTable(Table<String, OmKeyInfo> fileTable,
       String fileName, long parentID, boolean isEmpty) throws IOException {
 
-    String dbFileKey = parentID + OM_KEY_PREFIX + fileName;
+    final OMMetadataManager omMetadataManager =
+            cluster.getOzoneManager().getMetadataManager();
+    final String dbFileKey = omMetadataManager.getOzonePathKey(
+            omMetadataManager.getVolumeId(volumeName),
+            omMetadataManager.getBucketId(volumeName, bucketName),
+            parentID, fileName);
     OmKeyInfo omKeyInfo = fileTable.get(dbFileKey);
     if (isEmpty) {
       Assert.assertNull("Table is not empty!", omKeyInfo);
@@ -822,8 +824,12 @@ public class TestObjectStoreWithFSO {
   private void verifyKeyInOpenFileTable(Table<String, OmKeyInfo> openFileTable,
       long clientID, String fileName, long parentID, boolean isEmpty)
           throws IOException, TimeoutException, InterruptedException {
-    String dbOpenFileKey =
-            parentID + OM_KEY_PREFIX + fileName + OM_KEY_PREFIX + clientID;
+    final OMMetadataManager omMetadataManager =
+            cluster.getOzoneManager().getMetadataManager();
+    final String dbOpenFileKey = omMetadataManager.getOpenFileName(
+            omMetadataManager.getVolumeId(volumeName),
+            omMetadataManager.getBucketId(volumeName, bucketName),
+            parentID, fileName, clientID);
 
     if (isEmpty) {
       // wait for DB updates

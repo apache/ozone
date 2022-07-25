@@ -25,7 +25,7 @@ dirs="dev-support/annotations hadoop-hdds hadoop-ozone"
 
 for d in $dirs; do
   pushd "$d"
-  mvn -B -fn org.apache.rat:apache-rat-plugin:0.13:check
+  mvn -B --no-transfer-progress -fn org.apache.rat:apache-rat-plugin:0.13:check
   popd
 done
 

@@ -17,7 +17,7 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.junit.Assert;
 import org.junit.jupiter.api.Test;
 
@@ -44,11 +44,11 @@ public class TestOzoneManagerHAWithFailover extends TestOzoneManagerHA {
     long waitBetweenRetries = getConf().getLong(
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
-    OMFailoverProxyProvider omFailoverProxyProvider =
+    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
         OmFailoverProxyUtil
             .getFailoverProxyProvider(getObjectStore().getClientProxy());
 
-    // The OMFailoverProxyProvider will point to the current leader OM node.
+    // The omFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     getCluster().stopOzoneManager(leaderOMNodeId);

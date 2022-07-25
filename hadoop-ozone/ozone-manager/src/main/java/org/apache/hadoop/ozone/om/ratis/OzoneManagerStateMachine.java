@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -47,6 +48,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.protocolPB.RequestHandler;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
@@ -92,6 +94,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
+  private final AtomicInteger statePausedCount = new AtomicInteger(0);
 
   // Map which contains index and term for the ratis transactions which are
   // stateMachine entries which are received through applyTransaction.
@@ -139,12 +142,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void reinitialize() throws IOException {
-    getLifeCycle().startAndTransition(() -> {
-      loadSnapshotInfoFromDB();
-      this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-      handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
-    });
+  public synchronized void reinitialize() throws IOException {
+    loadSnapshotInfoFromDB();
+    if (getLifeCycleState() == LifeCycle.State.PAUSED) {
+      unpause(getLastAppliedTermIndex().getIndex(),
+          getLastAppliedTermIndex().getTerm());
+    }
   }
 
   @Override
@@ -239,10 +242,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // Must authenticate prepare requests here, since we must determine
       // whether or not to apply the prepare gate before proceeding with the
       // prepare request.
-      String username = request.getUserInfo().getUserName();
-      if (ozoneManager.getAclsEnabled() && !ozoneManager.isAdmin(username)) {
-        String message = "Access denied for user " + username + ". " +
-            "Superuser privilege is required to prepare ozone managers.";
+      UserGroupInformation userGroupInformation =
+          UserGroupInformation.createRemoteUser(
+          request.getUserInfo().getUserName());
+      if (ozoneManager.getAclsEnabled()
+          && !ozoneManager.isAdmin(userGroupInformation)) {
+        String message = "Access denied for user " + userGroupInformation
+            + ". "
+            + "Superuser privilege is required to prepare ozone managers.";
         OMException cause =
             new OMException(message, OMException.ResultCodes.ACCESS_DENIED);
         // Leader should not step down because of this failure.
@@ -378,7 +385,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void pause() {
+  public synchronized void pause() {
+    LOG.info("OzoneManagerStateMachine is pausing");
+    statePausedCount.incrementAndGet();
+    if (getLifeCycleState() == LifeCycle.State.PAUSED) {
+      return;
+    }
     getLifeCycle().transition(LifeCycle.State.PAUSING);
     getLifeCycle().transition(LifeCycle.State.PAUSED);
     ozoneManagerDoubleBuffer.stop();
@@ -389,14 +401,17 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * lastAppliedIndex. This should be done after uploading new state to the
    * StateMachine.
    */
-  public void unpause(long newLastAppliedSnaphsotIndex,
+  public synchronized void unpause(long newLastAppliedSnaphsotIndex,
       long newLastAppliedSnapShotTermIndex) {
-    getLifeCycle().startAndTransition(() -> {
-      this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-      handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
-      this.setLastAppliedTermIndex(TermIndex.valueOf(
-          newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
-    });
+    LOG.info("OzoneManagerStateMachine is un-pausing");
+    if (statePausedCount.decrementAndGet() == 0) {
+      getLifeCycle().startAndTransition(() -> {
+        this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
+        handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
+        this.setLastAppliedTermIndex(TermIndex.valueOf(
+            newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
+      });
+    }
   }
 
   public OzoneManagerDoubleBuffer buildDoubleBufferForRatis() {

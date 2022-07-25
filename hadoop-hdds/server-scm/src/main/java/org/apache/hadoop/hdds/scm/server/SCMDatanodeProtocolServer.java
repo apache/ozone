@@ -26,6 +26,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -38,6 +39,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReregisterCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
@@ -90,6 +92,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.deleteBlocksCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.deleteContainerCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewLayoutVersionCommand;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.refreshVolumeUsageInfo;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.replicateContainerCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reregisterCommand;
@@ -266,7 +269,7 @@ public class SCMDatanodeProtocolServer implements
 
   @Override
   public SCMHeartbeatResponseProto sendHeartbeat(
-      SCMHeartbeatRequestProto heartbeat) throws IOException {
+      SCMHeartbeatRequestProto heartbeat) throws IOException, TimeoutException {
     List<SCMCommandProto> cmdResponses = new ArrayList<>();
     for (SCMCommand cmd : heartbeatDispatcher.dispatch(heartbeat)) {
       cmdResponses.add(getCommandResponse(cmd));
@@ -303,7 +306,7 @@ public class SCMDatanodeProtocolServer implements
    */
   @VisibleForTesting
   public SCMCommandProto getCommandResponse(SCMCommand cmd)
-      throws IOException {
+      throws IOException, TimeoutException {
     SCMCommandProto.Builder builder = SCMCommandProto.newBuilder()
         .setEncodedToken(cmd.getEncodedToken());
 
@@ -329,6 +332,11 @@ public class SCMDatanodeProtocolServer implements
               .stream()
               .map(tx -> tx.getTxID())
               .collect(Collectors.toList());
+      /*
+       * TODO: Can we avoid this?
+       *   This introduces a Ratis call while processing datanode heartbeat,
+       *   which is not good.
+       */
       scm.getScmBlockManager().getDeletedBlockLog().incrementCount(txs);
       return builder
           .setCommandType(deleteBlocksCommand)
@@ -351,6 +359,12 @@ public class SCMDatanodeProtocolServer implements
           .setCommandType(replicateContainerCommand)
           .setReplicateContainerCommandProto(
               ((ReplicateContainerCommand)cmd).getProto())
+          .build();
+    case reconstructECContainersCommand:
+      return builder
+          .setCommandType(reconstructECContainersCommand)
+          .setReconstructECContainersCommandProto(
+              (ReconstructECContainersCommandProto) cmd.getProto())
           .build();
     case createPipelineCommand:
       return builder

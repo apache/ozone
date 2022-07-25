@@ -17,7 +17,12 @@
 package org.apache.hadoop.ozone.om.request.validation;
 
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManagerUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
+
+import java.io.IOException;
 
 /**
  * A context that contains useful information for request validator instances.
@@ -35,17 +40,34 @@ public interface ValidationContext {
   LayoutVersionManager versionManager();
 
   /**
+   * Gets the {@link BucketLayout} of the given bucket. In case of a link bucket
+   * the method returns the layout of the source bucket.
+   *
+   * @return {@link BucketLayout} of the given bucket.
+   */
+  BucketLayout getBucketLayout(String volumeName, String bucketName)
+      throws IOException;
+
+  /**
    * Creates a context object based on the given parameters.
    *
    * @param versionManager the {@link LayoutVersionManager} of the service
    * @return the {@link ValidationContext} specified by the parameters.
    */
-  static ValidationContext of(LayoutVersionManager versionManager) {
+  static ValidationContext of(LayoutVersionManager versionManager,
+                              OMMetadataManager omMetadataManager) {
 
     return new ValidationContext() {
       @Override
       public LayoutVersionManager versionManager() {
         return versionManager;
+      }
+
+      @Override
+      public BucketLayout getBucketLayout(String volumeName, String bucketName)
+          throws IOException {
+        return OzoneManagerUtils.getBucketLayout(omMetadataManager, volumeName,
+            bucketName);
       }
     };
   }

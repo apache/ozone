@@ -375,12 +375,17 @@ public class SCMHAManagerImpl implements SCMHAManager {
         metadataStore.getDeletedBlocksTXTable());
     scm.getReplicationManager().getMoveScheduler()
         .reinitialize(metadataStore.getMoveTable());
+    scm.getStatefulServiceStateManager().reinitialize(
+        metadataStore.getStatefulServiceConfigTable());
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       if (scm.getRootCertificateServer() != null) {
         scm.getRootCertificateServer().reinitialize(metadataStore);
       }
       scm.getScmCertificateServer().reinitialize(metadataStore);
     }
+    // This call also performs upgrade finalization if the new table contains a
+    // higher metadata layout version than the SCM's current one.
+    scm.getFinalizationManager().reinitialize(metadataStore.getMetaTable());
   }
 
   @VisibleForTesting

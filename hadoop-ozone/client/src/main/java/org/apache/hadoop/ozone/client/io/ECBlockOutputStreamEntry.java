@@ -90,24 +90,15 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     if (!isInitialized()) {
       blockOutputStreams =
           new ECBlockOutputStream[replicationConfig.getRequiredNodes()];
+      for (int i = currentStreamIdx; i < replicationConfig
+          .getRequiredNodes(); i++) {
+        List<DatanodeDetails> nodes = getPipeline().getNodes();
+        blockOutputStreams[i] =
+            new ECBlockOutputStream(getBlockID(), getXceiverClientManager(),
+                createSingleECBlockPipeline(getPipeline(), nodes.get(i), i + 1),
+                getBufferPool(), getConf(), getToken());
+      }
     }
-    if (blockOutputStreams[currentStreamIdx] == null) {
-      createOutputStream();
-    }
-  }
-
-  @Override
-  void createOutputStream() throws IOException {
-    Pipeline ecPipeline = getPipeline();
-    List<DatanodeDetails> nodes = getPipeline().getNodes();
-    blockOutputStreams[currentStreamIdx] = new ECBlockOutputStream(
-        getBlockID(),
-        getXceiverClientManager(),
-        createSingleECBlockPipeline(
-            ecPipeline, nodes.get(currentStreamIdx), currentStreamIdx + 1),
-        getBufferPool(),
-        getConf(),
-        getToken());
   }
 
   @Override
@@ -269,7 +260,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
         .build();
   }
 
-  void executePutBlock(boolean isClose) {
+  void executePutBlock(boolean isClose, long blockGroupLength) {
     if (!isInitialized()) {
       return;
     }
@@ -278,7 +269,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
         continue;
       }
       try {
-        stream.executePutBlock(isClose, true);
+        stream.executePutBlock(isClose, true, blockGroupLength);
       } catch (Exception e) {
         stream.setIoException(e);
       }
@@ -318,6 +309,13 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     List<ECBlockOutputStream> failedStreams = new ArrayList<>();
     while (iter.hasNext()) {
       final ECBlockOutputStream stream = iter.next();
+      if (!forPutBlock && stream.getWrittenDataLength() <= 0) {
+        // If we did not write any data to this stream yet, let's not consider
+        // for failure checking. But we should do failure checking for putBlock
+        // though. In the case of padding stripes, we do send empty put blocks
+        // for creating empty containers at DNs ( Refer: HDDS-6794).
+        continue;
+      }
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
           responseFuture = null;
       if (forPutBlock) {

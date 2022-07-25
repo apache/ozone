@@ -148,6 +148,7 @@ public class NodeEndpoint {
           .withBuildDate(nodeManager.getBuildDate(datanode))
           .withLayoutVersion(
               dnInfo.getLastKnownLayoutVersion().getMetadataLayoutVersion())
+          .withNetworkLocation(datanode.getNetworkLocation())
           .build());
     });
 

@@ -46,11 +46,14 @@ import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Slow;
+import org.apache.ratis.util.ExitUtils;
 import org.junit.Assert;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,6 +92,9 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   @BeforeEach
   public void initOM() throws Exception {
     setup();
+    LOG.info("Waiting for OM leader election");
+    GenericTestUtils.waitFor(() -> cluster.getOMLeader() != null,
+        1000, 120_000);
     submitCancelPrepareRequest();
     assertClusterNotPrepared();
   }
@@ -131,6 +137,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    * @throws Exception
    */
   @Test
+  @Disabled("RATIS-1481") // until upgrade to Ratis 2.3.0
   public void testPrepareDownedOM() throws Exception {
     // Index of the OM that will be shut down during this test.
     final int shutdownOMIndex = 2;
@@ -162,6 +169,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     // it missed once it receives the prepare transaction.
     cluster.restartOzoneManager(downedOM, true);
     runningOms.add(shutdownOMIndex, downedOM);
+    ExitUtils.assertNotTerminated();
 
     // Make sure all OMs are prepared and still have data.
     assertClusterPrepared(prepareIndex, runningOms);

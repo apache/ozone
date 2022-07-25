@@ -112,10 +112,9 @@ public final class CommandDispatcher {
 
   /**
    * For each registered handler, call its getQueuedCount method to retrieve the
-   * number of queued commands. Any handlers which do not implement an internal
-   * queue will have a count of 0 from the default interface implementation.
-   * The returned map will contain an entry for every registered command in the
-   * dispatcher, with a value of zero if there are no queued commands.
+   * number of queued commands. The returned map will contain an entry for every
+   * registered command in the dispatcher, with a value of zero if there are no
+   * queued commands.
    * @return A Map of CommandType where the value is the queued command count.
    */
   public Map<Type, Integer> getQueuedCommandCount() {

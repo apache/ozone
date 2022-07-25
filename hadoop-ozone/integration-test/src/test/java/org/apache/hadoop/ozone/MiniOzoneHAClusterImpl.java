@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.CheckedConsumer;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
+import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -94,12 +95,13 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    */
   public MiniOzoneHAClusterImpl(
       OzoneConfiguration conf,
+      SCMConfigurator scmConfigurator,
       OMHAService omhaService,
       SCMHAService scmhaService,
       List<HddsDatanodeService> hddsDatanodes,
       String clusterPath,
       ReconServer reconServer) {
-    super(conf, hddsDatanodes, reconServer);
+    super(conf, scmConfigurator, hddsDatanodes, reconServer);
     this.omhaService = omhaService;
     this.scmhaService = scmhaService;
     this.clusterMetaPath = clusterPath;
@@ -249,23 +251,25 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     LOG.info("Shutting down StorageContainerManager " + scm.getScmId());
 
     scm.stop();
-    scmhaService.deactivate(scm);
+    scmhaService.removeInstance(scm);
   }
 
-  public void restartStorageContainerManager(
+  public StorageContainerManager restartStorageContainerManager(
       StorageContainerManager scm, boolean waitForSCM)
       throws IOException, TimeoutException,
       InterruptedException, AuthenticationException {
     LOG.info("Restarting SCM in cluster " + this.getClass());
+    scmhaService.removeInstance(scm);
     OzoneConfiguration scmConf = scm.getConfiguration();
     shutdownStorageContainerManager(scm);
     scm.join();
-    scm = HddsTestUtils.getScmSimple(scmConf);
-    scmhaService.activate(scm);
+    scm = HddsTestUtils.getScmSimple(scmConf, getSCMConfigurator());
+    scmhaService.addInstance(scm, true);
     scm.start();
     if (waitForSCM) {
       waitForClusterToBeReady();
     }
+    return scm;
   }
 
   public String getClusterId() throws IOException {
@@ -433,7 +437,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           scmService.getActiveServices(), reconServer);
 
       MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(conf,
-          omService, scmService, hddsDatanodes, path, reconServer);
+          scmConfigurator, omService, scmService, hddsDatanodes, path,
+          reconServer);
 
       if (startDataNodes) {
         cluster.startHddsDatanodes();
@@ -583,7 +588,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             } else {
               StorageContainerManager.scmBootstrap(scmConfig);
             }
-            StorageContainerManager scm = HddsTestUtils.getScmSimple(scmConfig);
+            StorageContainerManager scm =
+                HddsTestUtils.getScmSimple(scmConfig, scmConfigurator);
             HealthyPipelineSafeModeRule rule =
                 scm.getScmSafeModeManager().getHealthyPipelineSafeModeRule();
             if (rule != null) {
@@ -977,7 +983,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
 
     public boolean removeInstance(Type t) {
-      return services.remove(t);
+      boolean result =  services.remove(t);
+      serviceMap.remove(serviceIdProvider.apply(t));
+      activeServices.remove(t);
+      inactiveServices.remove(t);
+      return result;
     }
 
     public void addInstance(Type t, boolean isActive) {
@@ -1053,7 +1063,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   }
 
   public List<StorageContainerManager> getStorageContainerManagers() {
-    return this.scmhaService.getServices();
+    return new ArrayList<>(this.scmhaService.getServices());
   }
 
   public StorageContainerManager getStorageContainerManager() {

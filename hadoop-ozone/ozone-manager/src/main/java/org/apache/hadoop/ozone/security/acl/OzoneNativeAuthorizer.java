@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.security.acl;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -227,6 +228,8 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
   }
 
   private boolean isAdmin(UserGroupInformation callerUgi) {
+    Preconditions.checkNotNull(callerUgi, "callerUgi should not be null!");
+
     if (ozAdmins == null) {
       return false;
     }

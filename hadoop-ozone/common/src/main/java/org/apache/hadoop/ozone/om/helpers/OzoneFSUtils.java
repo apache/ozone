@@ -151,6 +151,52 @@ public final class OzoneFSUtils {
   }
 
   /**
+   * Verifies whether the childKey is a sibling of a given
+   * parentKey.
+   *
+   * @param parentKey parent key name
+   * @param childKey  child key name
+   * @return true if childKey is a sibling of parentKey
+   */
+  public static boolean isSibling(String parentKey, String childKey) {
+    // Empty childKey has no parent, so just returning false.
+    if (org.apache.commons.lang3.StringUtils.isBlank(childKey)) {
+      return false;
+    }
+    java.nio.file.Path parentPath = Paths.get(parentKey);
+    java.nio.file.Path childPath = Paths.get(childKey);
+
+    java.nio.file.Path childParent = childPath.getParent();
+    java.nio.file.Path parentParent = parentPath.getParent();
+
+    if (childParent != null && parentParent != null) {
+      return childParent.equals(parentParent);
+    }
+
+    return childParent == parentParent;
+  }
+
+  public static boolean isAncestorPath(String parentKey, String childKey) {
+    // Empty childKey has no parent, so just returning false.
+    if (org.apache.commons.lang3.StringUtils.isBlank(childKey)) {
+      return false;
+    }
+    java.nio.file.Path parentPath = Paths.get(parentKey);
+    java.nio.file.Path childPath = Paths.get(childKey);
+
+    java.nio.file.Path childParent = childPath.getParent();
+    java.nio.file.Path parentParent = parentPath.getParent();
+
+    if (childParent != null && parentParent != null) {
+      return childParent.startsWith(parentParent) ||
+          childParent.equals(parentParent);
+    }
+
+    return childParent == parentParent;
+  }
+
+
+  /**
    * Verifies whether the childKey is an immediate path under the given
    * parentKey.
    *
@@ -168,6 +214,7 @@ public final class OzoneFSUtils {
     java.nio.file.Path childPath = Paths.get(childKey);
 
     java.nio.file.Path childParent = childPath.getParent();
+
     // Following are the valid parentKey formats:
     // parentKey="" or parentKey="/" or parentKey="/a" or parentKey="a"
     // Following are the valid childKey formats:
