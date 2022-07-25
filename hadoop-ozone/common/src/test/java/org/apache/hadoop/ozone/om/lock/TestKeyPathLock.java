@@ -39,9 +39,6 @@ import static org.junit.Assert.fail;
  */
 public class TestKeyPathLock extends TestOzoneManagerLock {
 
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
-
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyPathLock.class);
 
