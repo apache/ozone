@@ -411,7 +411,7 @@ public class TestContainerEndpoint {
 
   @Test
   public void testGetMissingContainers() throws IOException, TimeoutException {
-    Response response = containerEndpoint.getMissingContainers();
+    Response response = containerEndpoint.getMissingContainers(1000);
 
     MissingContainersResponse responseObject =
         (MissingContainersResponse) response.getEntity();
@@ -445,7 +445,7 @@ public class TestContainerEndpoint {
     reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L);
     reconContainerManager.upsertContainerHistory(1L, u4, 4L, 1L);
 
-    response = containerEndpoint.getMissingContainers();
+    response = containerEndpoint.getMissingContainers(1000);
     responseObject = (MissingContainersResponse) response.getEntity();
     assertEquals(1, responseObject.getTotalCount());
     MissingContainerMetadata container =
