@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.apache.commons.io.FileExistsException;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -306,27 +307,29 @@ public class TestContainerPersistence {
   @Test
   public void testDeleteContainerWithSchemaV3Enabled()
       throws Exception {
-    long testContainerID1 = getTestContainerID();
+    long testContainerID = getTestContainerID();
     Thread.sleep(100);
 
-    Container container1 = addContainer(containerSet, testContainerID1);
-    container1.close();
+    Container container = addContainer(containerSet, testContainerID);
+    container.close();
 
     Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID1));
+        .containsKey(testContainerID));
 
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
       KeyValueContainerData containerData =
-          (KeyValueContainerData) container1.getContainerData();
+          (KeyValueContainerData) container.getContainerData();
       CleanUpManager cleanUpManager = new CleanUpManager(containerData, conf);
 
-      DatanodeConfiguration datanodeConfiguration =
-          cleanUpManager.getDatanodeConf();
-
-      datanodeConfiguration.setDiskTmpDirectoryPath("/home/xbis/tmpDir");
+      String oldPath = containerData.getContainerPath();
+      File oldContainerDir = new File(oldPath);
 
       //move container dir
-      cleanUpManager.renameDir();
+      Assert.assertTrue(cleanUpManager.renameDir());
+
+      //confirm the container has been moved
+      Assert.assertFalse(oldContainerDir.exists());
+
       List<String> leftovers = cleanUpManager.getDeleteLeftovers();
 
       //confirm there is exactly 1 dir under /tmpDir
@@ -336,16 +339,19 @@ public class TestContainerPersistence {
       Assert.assertFalse(cleanUpManager.checkTmpDirIsEmpty());
 
       //delete
-      container1.delete();
+      container.delete();
 
       //remove container from containerSet
-      containerSet.removeContainer(testContainerID1);
+      containerSet.removeContainer(testContainerID);
       Assert.assertFalse(containerSet.getContainerMapCopy()
-          .containsKey(testContainerID1));
+          .containsKey(testContainerID));
 
       //confirm /tmpDir is empty
       Assert.assertTrue(cleanUpManager.checkTmpDirIsEmpty());
 
+      /**
+       * TODO: move inside @After
+       */
       //delete /tmpDir from system
       cleanUpManager.deleteTmpDir();
     }

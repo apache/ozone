@@ -143,32 +143,24 @@ public final class KeyValueContainerUtil {
         .getMetadataPath());
     File chunksPath = new File(containerData.getChunksPath());
 
-    // Close the DB connection and remove the DB handler from cache
-    BlockUtils.removeDB(containerData, conf);
+    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+      BlockUtils.removeContainerFromDB(containerData, conf);
 
-    // Delete the Container MetaData path.
-    FileUtils.deleteDirectory(containerMetaDataPath);
+      File parentDir = containerMetaDataPath.getParentFile();
+      FileUtils.deleteDirectory(parentDir);
+    } else {
+      // Close the DB connection and remove the DB handler from cache
+      BlockUtils.removeDB(containerData, conf);
 
-    //Delete the Container Chunks Path.
-    FileUtils.deleteDirectory(chunksPath);
+      // Delete the Container MetaData path.
+      FileUtils.deleteDirectory(containerMetaDataPath);
 
-    //Delete Container directory
-    FileUtils.deleteDirectory(containerMetaDataPath.getParentFile());
-  }
+      //Delete the Container Chunks Path.
+      FileUtils.deleteDirectory(chunksPath);
 
-  public static void removeContainer(KeyValueContainerData containerData,
-                                   ConfigurationSource conf,
-                                   CleanUpManager cleanUpManager)
-      throws IOException {
-    Preconditions.checkNotNull(containerData);
-    File containerMetaDataPath = new File(containerData
-        .getMetadataPath());
-
-    BlockUtils.removeContainerFromDB(containerData, conf);
-
-    File parentDir = containerMetaDataPath.getParentFile();
-
-    FileUtils.deleteDirectory(parentDir);
+      //Delete Container directory
+      FileUtils.deleteDirectory(containerMetaDataPath.getParentFile());
+    }
   }
 
   /**

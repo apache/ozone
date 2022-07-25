@@ -294,13 +294,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     CleanUpManager cleanUpManager = new CleanUpManager(containerData, config);
     long containerId = containerData.getContainerID();
     try {
-      if (cleanUpManager.checkContainerSchemaV3Enabled()) {
-        KeyValueContainerUtil.removeContainer(
-            containerData, config, cleanUpManager);
-      } else {
-        KeyValueContainerUtil.removeContainer(
-            containerData, config);
-      }
+      KeyValueContainerUtil.removeContainer(containerData, config);
     } catch (StorageContainerException ex) {
       throw ex;
     } catch (IOException ex) {

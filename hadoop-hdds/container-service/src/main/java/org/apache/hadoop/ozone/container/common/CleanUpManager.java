@@ -1,3 +1,21 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
 package org.apache.hadoop.ozone.container.common;
 
 import org.apache.commons.io.FileUtils;
@@ -16,6 +34,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
+/**
+ * Helper class for renaming the container to a new
+ * location, before delete.
+ */
 public class CleanUpManager {
 
   private static final Logger LOG =
@@ -23,7 +45,6 @@ public class CleanUpManager {
 
   private final KeyValueContainerData keyValueContainerData;
   private final ConfigurationSource configurationSource;
-
   private DatanodeConfiguration datanodeConf;
 
   public CleanUpManager(KeyValueContainerData keyValueContainerData,
@@ -32,7 +53,6 @@ public class CleanUpManager {
     this.configurationSource = configurationSource;
     this.datanodeConf =
         configurationSource.getObject(DatanodeConfiguration.class);
-//    datanodeConf.setDiskTmpDirectoryPath("/home/xbis/tmpDir");
   }
 
   public DatanodeConfiguration getDatanodeConf() {
@@ -48,7 +68,8 @@ public class CleanUpManager {
     }
   }
 
-  public void renameDir() throws IOException {
+  public boolean renameDir() throws IOException {
+    boolean success = false;
     String tmpDirPath = datanodeConf.getDiskTmpDirectoryPath();
 
     String containerPath = keyValueContainerData.getContainerPath();
@@ -60,12 +81,14 @@ public class CleanUpManager {
 
     try {
       FileUtils.moveDirectory(container, new File(destinationDirPath));
+      success = true;
     } catch (IOException ex) {
       LOG.error("Error while moving metadata and chunks under Tmp volume", ex);
     }
 
     keyValueContainerData.setMetadataPath(destinationDirPath + "/metadata");
     keyValueContainerData.setChunksPath(destinationDirPath + "/chunks");
+    return success;
   }
 
   public boolean checkTmpDirIsEmpty() throws IOException {
@@ -77,6 +100,10 @@ public class CleanUpManager {
     }
   }
 
+  /**
+   * Get all filenames under TmpDir and store them in a list.
+   * @return list of the leftover filenames
+   */
   public List<String> getDeleteLeftovers() {
     List<String> leftovers = new ArrayList<String>();
     String tmpDirPath = datanodeConf.getDiskTmpDirectoryPath();
@@ -89,6 +116,10 @@ public class CleanUpManager {
     return leftovers;
   }
 
+  /**
+   * Delete all files under the TmpDir.
+   * @throws IOException
+   */
   public void cleanTmpDir() throws IOException {
     String tmpDirPath = datanodeConf.getDiskTmpDirectoryPath();
     File tmpDir = new File(tmpDirPath);
@@ -97,6 +128,10 @@ public class CleanUpManager {
     }
   }
 
+  /**
+   * Delete the TmpDir and all of its contents.
+   * @throws IOException
+   */
   public void deleteTmpDir() throws IOException {
     String tmpDirPath = datanodeConf.getDiskTmpDirectoryPath();
     File tmpDir = new File(tmpDirPath);

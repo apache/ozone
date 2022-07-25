@@ -1250,7 +1250,7 @@ public class KeyValueHandler extends Handler {
         try {
           cleanUpManager.renameDir();
         } catch (IOException ex) {
-          LOG.error("Error while moving metadata and chunks under Tmp directory", ex);
+          LOG.error("Error while moving metadata and chunks under Tmp Directory", ex);
         }
       }
       long containerId = container.getContainerData().getContainerID();
