@@ -20,6 +20,9 @@ package org.apache.hadoop.ozone.freon;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +30,8 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 
 /**
  * Utility to generate RPC request to OM with or without payload.
@@ -79,14 +84,11 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
   }
   private void sendRPCReq(long l) throws Exception {
     OzoneConfiguration configuration = createOzoneConfiguration();
-    OzoneClient client = createOzoneClient(null, configuration);
-    ServiceInfoEx serviceInfo = client.getProxy().
-            getOzoneManagerClient().getServiceInfo();
-    LOG.info("###########################################");
-    LOG.info("###########################################");
-    LOG.info(serviceInfo.toString());
-    LOG.info("###########################################");
-    LOG.info("###########################################");
+    LOG.info("###################-3-########################");
+    RpcClient rpcclient = new RpcClient(configuration, null);
+    LOG.info(rpcclient.getCanonicalServiceName());
+    LOG.info("###################-4-########################");
+
   }
 
 }
