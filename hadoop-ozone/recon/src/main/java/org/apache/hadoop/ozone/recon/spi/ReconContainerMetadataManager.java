@@ -23,6 +23,8 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -51,8 +53,20 @@ public interface ReconContainerMetadataManager {
    * @param containerKeyPrefix the containerId, key-prefix tuple.
    * @param count              Count of Keys with that prefix.
    */
+  @Deprecated
   void storeContainerKeyMapping(ContainerKeyPrefix containerKeyPrefix,
                                 Integer count) throws IOException;
+
+  /**
+   * Store the container to Key prefix mapping into a batch.
+   *
+   * @param batch the batch operation we store into
+   * @param containerKeyPrefix the containerId, key-prefix tuple.
+   * @param count              Count of Keys with that prefix.
+   */
+  void batchStoreContainerKeyMapping(BatchOperation batch,
+                                     ContainerKeyPrefix containerKeyPrefix,
+                                     Integer count) throws IOException;
 
   /**
    * Store the containerID -> no. of keys count into the container DB store.
@@ -61,7 +75,19 @@ public interface ReconContainerMetadataManager {
    * @param count count of the keys within the given containerID.
    * @throws IOException
    */
+  @Deprecated
   void storeContainerKeyCount(Long containerID, Long count) throws IOException;
+
+  /**
+   * Store the containerID -> no. of keys count into a batch.
+   *
+   * @param batch the batch operation we store into
+   * @param containerID the containerID.
+   * @param count count of the keys within the given containerID.
+   * @throws IOException
+   */
+  void batchStoreContainerKeyCounts(BatchOperation batch, Long containerID,
+                                    Long count) throws IOException;
 
   /**
    * Store the containerID -> ContainerReplicaWithTimestamp mapping to the
@@ -167,7 +193,19 @@ public interface ReconContainerMetadataManager {
    * @param containerKeyPrefix container key prefix to be deleted.
    * @throws IOException exception.
    */
+  @Deprecated
   void deleteContainerMapping(ContainerKeyPrefix containerKeyPrefix)
+      throws IOException;
+
+  /**
+   * Add the deletion of an entry to a batch.
+   *
+   * @param batch the batch operation we add the deletion
+   * @param containerKeyPrefix container key prefix to be deleted.
+   * @throws IOException exception.
+   */
+  void batchDeleteContainerMapping(BatchOperation batch,
+                                   ContainerKeyPrefix containerKeyPrefix)
       throws IOException;
 
   /**
@@ -192,7 +230,15 @@ public interface ReconContainerMetadataManager {
   void incrementContainerCountBy(long count);
 
   /**
-   * Get iterator to the entire Key_Container DB.
+   * Commit a batch operation into the containerDbStore.
+   *
+   * @param rdbBatchOperation batch operation we want to commit
+   */
+  void commitBatchOperation(RDBBatchOperation rdbBatchOperation)
+      throws IOException;
+      
+  /**
+     * Get iterator to the entire Key_Container DB.
    * @return TableIterator
    */
   TableIterator getKeyContainerTableIterator() throws IOException;

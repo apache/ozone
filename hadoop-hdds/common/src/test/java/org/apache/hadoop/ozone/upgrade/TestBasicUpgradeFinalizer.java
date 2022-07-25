@@ -22,9 +22,12 @@ import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLa
 import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_3;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+
+import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.inOrder;
@@ -32,18 +35,28 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.mockito.InOrder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test for BasicUpgradeFinalizer.
  */
 public class TestBasicUpgradeFinalizer {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestBasicUpgradeFinalizer.class);
 
   @Test
   public void testFinalizerPhasesAreInvokedInOrder() throws IOException {
@@ -60,7 +73,14 @@ public class TestBasicUpgradeFinalizer {
     assertEquals(FINALIZATION_DONE, res.status());
 
     inOrder.verify(finalizer).preFinalizeUpgrade(ArgumentMatchers.eq(mockObj));
-    inOrder.verify(finalizer).finalizeUpgrade(ArgumentMatchers.eq(mockObj));
+    inOrder.verify(finalizer).finalizeLayoutFeature(
+        ArgumentMatchers.eq(
+            TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_2),
+        ArgumentMatchers.eq(mockObj));
+    inOrder.verify(finalizer).finalizeLayoutFeature(
+        ArgumentMatchers.eq(
+            TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_3),
+        ArgumentMatchers.eq(mockObj));
     inOrder.verify(finalizer).postFinalizeUpgrade(ArgumentMatchers.eq(mockObj));
 
     assertTrue(finalizer.isFinalizationDone());
@@ -84,6 +104,82 @@ public class TestBasicUpgradeFinalizer {
         finalizer.postCalled);
   }
 
+
+  /**
+   * Tests that the upgrade finalizer gives expected statuses when multiple
+   * clients invoke finalize and query finalize status simultaneously.
+   * @throws Exception
+   */
+  @Test
+  public void testConcurrentFinalization() throws Exception {
+    CountDownLatch pauseLatch = new CountDownLatch(1);
+    CountDownLatch unpauseLatch = new CountDownLatch(1);
+    // Pause finalization to test concurrent finalize requests. The injection
+    // point to pause at does not matter.
+    InjectedUpgradeFinalizationExecutor<Object> executor =
+        UpgradeTestUtils.newPausingFinalizationExecutor(
+            UpgradeTestInjectionPoints.AFTER_PRE_FINALIZE_UPGRADE,
+            pauseLatch, unpauseLatch, LOG);
+    SimpleTestFinalizer finalizer =
+        new SimpleTestFinalizer(
+            new MockLayoutVersionManager(VERSION_1.layoutVersion()), executor);
+
+    // The first finalize call should block until the executor is unpaused.
+    Future<?> firstFinalizeFuture = runFinalization(finalizer,
+        UpgradeFinalizer.Status.STARTING_FINALIZATION);
+    // Wait for finalization to pause at the halting point.
+    pauseLatch.await();
+
+    Future<?> secondFinalizeFuture = runFinalization(finalizer,
+        UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS);
+    Future<?> finalizeQueryFuture = runFinalizationQuery(finalizer,
+        UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS);
+
+    // While finalization is paused, the two following requests should have
+    // reported it is in progress.
+    secondFinalizeFuture.get();
+    finalizeQueryFuture.get();
+
+    // Now resume finalization so the initial finalize request can complete.
+    unpauseLatch.countDown();
+    firstFinalizeFuture.get();
+
+    // All subsequent queries should return finalization done, even if they
+    // land in parallel.
+    List<Future<?>> finalizeFutures = new ArrayList<>();
+    for (int i = 0; i < 10; i++) {
+      finalizeFutures.add(runFinalizationQuery(finalizer,
+          UpgradeFinalizer.Status.FINALIZATION_DONE));
+    }
+
+    // Wait for all queries to complete.
+    for (Future<?> finalizeFuture: finalizeFutures) {
+      finalizeFuture.get();
+    }
+  }
+
+  private Future<?> runFinalization(
+      BasicUpgradeFinalizer<Object, MockLayoutVersionManager> finalizer,
+      UpgradeFinalizer.Status expectedStatus) {
+    return Executors.newSingleThreadExecutor().submit(() -> {
+      try {
+        StatusAndMessages result = finalizer.finalize("test", new Object());
+        assertEquals(expectedStatus, result.status());
+      } catch (Exception ex) {
+        LOG.error("Finalization failed", ex);
+        fail("Finalization failed with exception: " +
+            ex.getMessage());
+      }
+    });
+  }
+
+  private Future<?> runFinalizationQuery(UpgradeFinalizer<Object> finalizer,
+      UpgradeFinalizer.Status expectedStatus) {
+    return Executors.newSingleThreadExecutor().submit(() -> {
+      assertEquals(expectedStatus, finalizer.getStatus());
+    });
+  }
+
   /**
    * Yet another mock finalizer.
    */
@@ -94,6 +190,9 @@ public class TestBasicUpgradeFinalizer {
     private boolean finalizeCalled = false;
     private boolean postCalled = false;
 
+    /**
+     * Invoked by Mockito.
+     */
     SimpleTestFinalizer() throws IOException {
       super(new MockLayoutVersionManager(VERSION_1.layoutVersion()));
     }
@@ -102,25 +201,46 @@ public class TestBasicUpgradeFinalizer {
       super(lvm);
     }
 
+    SimpleTestFinalizer(MockLayoutVersionManager lvm,
+                        UpgradeFinalizationExecutor<Object> executor) {
+      super(lvm, executor);
+    }
+
     @Override
-    protected void preFinalizeUpgrade(Object service) {
+    protected void preFinalizeUpgrade(Object service) throws IOException {
+      super.preFinalizeUpgrade(service);
       preCalled = true;
     }
 
     @Override
-    protected void postFinalizeUpgrade(Object service) {
+    protected void postFinalizeUpgrade(Object service) throws IOException {
+      super.postFinalizeUpgrade(service);
       postCalled = true;
     }
 
     @Override
-    public void finalizeUpgrade(Object service) {
+    public void finalizeLayoutFeature(LayoutFeature lf, Object service)
+        throws UpgradeException {
+      Storage mockStorage = mock(Storage.class);
+      InOrder inOrder = inOrder(mockStorage);
+
+      super.finalizeLayoutFeature(lf,
+          lf.action(LayoutFeature.UpgradeActionType.ON_FINALIZE), mockStorage);
+
+      inOrder.verify(mockStorage)
+          .setLayoutVersion(ArgumentMatchers.eq(lf.layoutVersion()));
+      try {
+        inOrder.verify(mockStorage).persistCurrentState();
+      } catch (IOException ex) {
+        throw new UpgradeException(ex,
+            UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
+      }
       finalizeCalled = true;
-      getVersionManager().completeFinalization();
     }
 
     @Override
     public void runPrefinalizeStateActions(Storage storage, Object service) {
-
+      // no-op for testing.
     }
   }
 }

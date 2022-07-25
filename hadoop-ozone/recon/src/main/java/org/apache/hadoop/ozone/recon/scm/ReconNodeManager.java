@@ -95,7 +95,7 @@ public class ReconNodeManager extends SCMNodeManager {
     super(conf, scmStorageConfig, eventPublisher, networkTopology,
         SCMContext.emptyContext(), scmLayoutVersionManager);
     this.reconDatanodeOutdatedTime = reconStaleDatanodeMultiplier *
-        HddsServerUtil.getScmHeartbeatInterval(conf);
+        HddsServerUtil.getReconHeartbeatInterval(conf);
     this.nodeDB = nodeDB;
     loadExistingNodes();
   }
@@ -253,6 +253,15 @@ public class ReconNodeManager extends SCMNodeManager {
         reportedDn.getPersistedOpStateExpiryEpochSec());
   }
 
+  /**
+   * send refresh command to all the healthy datanodes to refresh
+   * volume usage info immediately.
+   */
+  @Override
+  public void refreshAllHealthyDnUsageInfo() {
+    //no op
+  }
+
   @Override
   public RegisteredCommand register(
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
@@ -303,6 +312,13 @@ public class ReconNodeManager extends SCMNodeManager {
 
   @VisibleForTesting
   public long getNodeDBKeyCount() throws IOException {
-    return nodeDB.getEstimatedKeyCount();
+    long nodeCount = 0;
+    TableIterator<UUID, ? extends Table.KeyValue<UUID, DatanodeDetails>>
+        iterator = nodeDB.iterator();
+    while (iterator.hasNext()) {
+      iterator.next();
+      nodeCount++;
+    }
+    return nodeCount;
   }
 }

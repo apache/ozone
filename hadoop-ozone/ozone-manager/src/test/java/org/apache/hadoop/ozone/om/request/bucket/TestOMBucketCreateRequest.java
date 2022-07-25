@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.om.request.bucket;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -100,7 +101,6 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     Assert.assertNull(omMetadataManager.getBucketTable().get(bucketKey));
   }
 
-
   @Test
   public void testValidateAndUpdateCacheWithBucketAlreadyExists()
       throws Exception {
@@ -124,6 +124,21 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
         omResponse.getStatus());
   }
 
+  @Test
+  public void testValidateAndUpdateCacheVerifyBucketLayout() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    OMBucketCreateRequest omBucketCreateRequest = doPreExecute(volumeName,
+        bucketName);
+
+    doValidateAndUpdateCache(volumeName, bucketName,
+        omBucketCreateRequest.getOmRequest());
+
+    Assert.assertEquals(BucketLayout.LEGACY,
+        omMetadataManager.getBucketTable().get(bucketKey).getBucketLayout());
+  }
 
   private OMBucketCreateRequest doPreExecute(String volumeName,
       String bucketName) throws Exception {

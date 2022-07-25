@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -32,11 +33,12 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
@@ -77,7 +79,7 @@ public final class KeyValueContainerUtil {
    * @param conf The configuration to use for this container.
    * @throws IOException
    */
-  public static void createContainerMetaData(long containerID,
+  public static void createContainerMetaData(
       File containerMetaDataPath, File chunksPath, File dbFile,
       String schemaVersion, ConfigurationSource conf) throws IOException {
     Preconditions.checkNotNull(containerMetaDataPath);
@@ -102,20 +104,22 @@ public final class KeyValueContainerUtil {
 
     DatanodeStore store;
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
-      store = new DatanodeStoreSchemaOneImpl(conf,
-              containerID, dbFile.getAbsolutePath(), false);
+      store = new DatanodeStoreSchemaOneImpl(conf, dbFile.getAbsolutePath(),
+          false);
     } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
-      store = new DatanodeStoreSchemaTwoImpl(conf,
-              containerID, dbFile.getAbsolutePath(), false);
+      store = new DatanodeStoreSchemaTwoImpl(conf, dbFile.getAbsolutePath(),
+          false);
+    } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      // We don't create per-container store for schema v3 containers,
+      // they should use per-volume db store.
+      return;
     } else {
       throw new IllegalArgumentException(
               "Unrecognized schema version for container: " + schemaVersion);
     }
 
-    ReferenceCountedDB db =
-        new ReferenceCountedDB(store, dbFile.getAbsolutePath());
     //add db handler into cache
-    BlockUtils.addDB(db, dbFile.getAbsolutePath(), conf);
+    BlockUtils.addDB(store, dbFile.getAbsolutePath(), conf, schemaVersion);
   }
 
   /**
@@ -138,8 +142,12 @@ public final class KeyValueContainerUtil {
         .getMetadataPath());
     File chunksPath = new File(containerData.getChunksPath());
 
-    // Close the DB connection and remove the DB handler from cache
-    BlockUtils.removeDB(containerData, conf);
+    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+      BlockUtils.removeContainerFromDB(containerData, conf);
+    } else {
+      // Close the DB connection and remove the DB handler from cache
+      BlockUtils.removeDB(containerData, conf);
+    }
 
     // Delete the Container MetaData path.
     FileUtils.deleteDirectory(containerMetaDataPath);
@@ -163,13 +171,18 @@ public final class KeyValueContainerUtil {
       ConfigurationSource config) throws IOException {
 
     long containerID = kvContainerData.getContainerID();
-    File metadataPath = new File(kvContainerData.getMetadataPath());
 
     // Verify Checksum
     ContainerUtils.verifyChecksum(kvContainerData, config);
 
+    if (kvContainerData.getSchemaVersion() == null) {
+      // If this container has not specified a schema version, it is in the old
+      // format with one default column family.
+      kvContainerData.setSchemaVersion(OzoneConsts.SCHEMA_V1);
+    }
+
     File dbFile = KeyValueContainerLocationUtil.getContainerDBFile(
-        metadataPath, containerID);
+        kvContainerData);
     if (!dbFile.exists()) {
       LOG.error("Container DB file is missing for ContainerID {}. " +
           "Skipping loading of this container.", containerID);
@@ -178,19 +191,21 @@ public final class KeyValueContainerUtil {
     }
     kvContainerData.setDbFile(dbFile);
 
-    if (kvContainerData.getSchemaVersion() == null) {
-      // If this container has not specified a schema version, it is in the old
-      // format with one default column family.
-      kvContainerData.setSchemaVersion(OzoneConsts.SCHEMA_V1);
+    if (kvContainerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+      try (DBHandle db = BlockUtils.getDB(kvContainerData, config)) {
+        populateContainerMetadata(kvContainerData, db.getStore());
+      }
+      return;
     }
 
-    boolean isBlockMetadataSet = false;
-    ReferenceCountedDB cachedDB = null;
+    DBHandle cachedDB = null;
     DatanodeStore store = null;
     try {
       try {
+        boolean readOnly = ContainerInspectorUtil.isReadOnly(
+            ContainerProtos.ContainerType.KeyValueContainer);
         store = BlockUtils.getUncachedDatanodeStore(
-            kvContainerData, config, true);
+            kvContainerData, config, readOnly);
       } catch (IOException e) {
         // If an exception is thrown, then it may indicate the RocksDB is
         // already open in the container cache. As this code is only executed at
@@ -201,59 +216,7 @@ public final class KeyValueContainerUtil {
             "instance was retrieved from the cache. This should only happen " +
             "in tests");
       }
-      Table<String, Long> metadataTable = store.getMetadataTable();
-
-      // Set pending deleted block count.
-      Long pendingDeleteBlockCount =
-          metadataTable.get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT);
-      if (pendingDeleteBlockCount != null) {
-        kvContainerData.incrPendingDeletionBlocks(
-                pendingDeleteBlockCount);
-      } else {
-        // Set pending deleted block count.
-        MetadataKeyFilters.KeyPrefixFilter filter =
-                MetadataKeyFilters.getDeletingKeyFilter();
-        int numPendingDeletionBlocks =
-            store.getBlockDataTable()
-            .getSequentialRangeKVs(null, Integer.MAX_VALUE, filter)
-            .size();
-        kvContainerData.incrPendingDeletionBlocks(numPendingDeletionBlocks);
-      }
-
-      // Set delete transaction id.
-      Long delTxnId =
-          metadataTable.get(OzoneConsts.DELETE_TRANSACTION_KEY);
-      if (delTxnId != null) {
-        kvContainerData
-            .updateDeleteTransactionId(delTxnId);
-      }
-
-      // Set BlockCommitSequenceId.
-      Long bcsId = metadataTable.get(
-          OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID);
-      if (bcsId != null) {
-        kvContainerData
-            .updateBlockCommitSequenceId(bcsId);
-      }
-
-      // Set bytes used.
-      // commitSpace for Open Containers relies on usedBytes
-      Long bytesUsed =
-          metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED);
-      if (bytesUsed != null) {
-        isBlockMetadataSet = true;
-        kvContainerData.setBytesUsed(bytesUsed);
-      }
-
-      // Set block count.
-      Long blockCount = metadataTable.get(OzoneConsts.BLOCK_COUNT);
-      if (blockCount != null) {
-        isBlockMetadataSet = true;
-        kvContainerData.setKeyCount(blockCount);
-      }
-      if (!isBlockMetadataSet) {
-        initializeUsedBytesAndBlockCount(store, kvContainerData);
-      }
+      populateContainerMetadata(kvContainerData, store);
     } finally {
       if (cachedDB != null) {
         // If we get a cached instance, calling close simply decrements the
@@ -274,6 +237,78 @@ public final class KeyValueContainerUtil {
     }
   }
 
+  private static void populateContainerMetadata(
+      KeyValueContainerData kvContainerData, DatanodeStore store)
+      throws IOException {
+    boolean isBlockMetadataSet = false;
+    Table<String, Long> metadataTable = store.getMetadataTable();
+
+    // Set pending deleted block count.
+    Long pendingDeleteBlockCount =
+        metadataTable.get(kvContainerData
+            .pendingDeleteBlockCountKey());
+    if (pendingDeleteBlockCount != null) {
+      kvContainerData.incrPendingDeletionBlocks(
+          pendingDeleteBlockCount);
+    } else {
+      // Set pending deleted block count.
+      MetadataKeyFilters.KeyPrefixFilter filter =
+          kvContainerData.getDeletingBlockKeyFilter();
+      int numPendingDeletionBlocks = store.getBlockDataTable()
+              .getSequentialRangeKVs(kvContainerData.startKeyEmpty(),
+                  Integer.MAX_VALUE, kvContainerData.containerPrefix(),
+                  filter).size();
+      kvContainerData.incrPendingDeletionBlocks(numPendingDeletionBlocks);
+    }
+
+    // Set delete transaction id.
+    Long delTxnId =
+        metadataTable.get(kvContainerData.latestDeleteTxnKey());
+    if (delTxnId != null) {
+      kvContainerData
+          .updateDeleteTransactionId(delTxnId);
+    }
+
+    // Set BlockCommitSequenceId.
+    Long bcsId = metadataTable.get(
+        kvContainerData.bcsIdKey());
+    if (bcsId != null) {
+      kvContainerData
+          .updateBlockCommitSequenceId(bcsId);
+    }
+
+    // Set bytes used.
+    // commitSpace for Open Containers relies on usedBytes
+    Long bytesUsed =
+        metadataTable.get(kvContainerData.bytesUsedKey());
+    if (bytesUsed != null) {
+      isBlockMetadataSet = true;
+      kvContainerData.setBytesUsed(bytesUsed);
+    }
+
+    // Set block count.
+    Long blockCount = metadataTable.get(
+        kvContainerData.blockCountKey());
+    if (blockCount != null) {
+      isBlockMetadataSet = true;
+      kvContainerData.setBlockCount(blockCount);
+    }
+    if (!isBlockMetadataSet) {
+      initializeUsedBytesAndBlockCount(store, kvContainerData);
+    }
+
+    // If the container is missing a chunks directory, possibly due to the
+    // bug fixed by HDDS-6235, create it here.
+    File chunksDir = new File(kvContainerData.getChunksPath());
+    if (!chunksDir.exists()) {
+      Files.createDirectories(chunksDir.toPath());
+    }
+    // Run advanced container inspection/repair operations if specified on
+    // startup. If this method is called but not as a part of startup,
+    // The inspectors will be unloaded and this will be a no-op.
+    ContainerInspectorUtil.process(kvContainerData, store);
+  }
+
   /**
    * Initialize bytes used and block count.
    * @param kvData
@@ -287,8 +322,8 @@ public final class KeyValueContainerUtil {
     long usedBytes = 0;
 
     try (BlockIterator<BlockData> blockIter =
-             store.getBlockIterator(
-                 MetadataKeyFilters.getUnprefixedKeyFilter())) {
+             store.getBlockIterator(kvData.getContainerID(),
+                 kvData.getUnprefixedKeyFilter())) {
 
       while (blockIter.hasNext()) {
         blockCount++;
@@ -302,8 +337,8 @@ public final class KeyValueContainerUtil {
 
     // Count all deleting blocks.
     try (BlockIterator<BlockData> blockIter =
-             store.getBlockIterator(
-                 MetadataKeyFilters.getDeletingKeyFilter())) {
+             store.getBlockIterator(kvData.getContainerID(),
+                 kvData.getDeletingBlockKeyFilter())) {
 
       while (blockIter.hasNext()) {
         blockCount++;
@@ -315,10 +350,10 @@ public final class KeyValueContainerUtil {
       }
     }
     kvData.setBytesUsed(usedBytes);
-    kvData.setKeyCount(blockCount);
+    kvData.setBlockCount(blockCount);
   }
 
-  private static long getBlockLength(BlockData block) throws IOException {
+  public static long getBlockLength(BlockData block) throws IOException {
     long blockLen = 0;
     List<ContainerProtos.ChunkInfo> chunkInfoList = block.getChunks();
 

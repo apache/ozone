@@ -22,11 +22,11 @@ import com.google.common.base.Strings;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.server.ServerUtils;
-import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -40,6 +40,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_DN_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_OM_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_SCM_CERTIFICATE_FAILED;
@@ -105,7 +106,7 @@ public final class RatisUtil {
    */
   private static void setRaftRpcProperties(final RaftProperties properties,
       ConfigurationSource ozoneConf) {
-    RaftConfigKeys.Rpc.setType(properties,
+    RatisHelper.setRpcType(properties,
         RpcType.valueOf(ozoneConf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_RPC_TYPE,
                 ScmConfigKeys.OZONE_SCM_HA_RATIS_RPC_TYPE_DEFAULT)));
     GrpcConfigKeys.Server.setPort(properties, ozoneConf
@@ -258,7 +259,8 @@ public final class RatisUtil {
         throw new ServiceException(new RetriableWithFailOverException(e));
       } else if (ex.getErrorCode().equals(GET_SCM_CERTIFICATE_FAILED) ||
           ex.getErrorCode().equals(GET_OM_CERTIFICATE_FAILED) ||
-          ex.getErrorCode().equals(GET_DN_CERTIFICATE_FAILED)) {
+          ex.getErrorCode().equals(GET_DN_CERTIFICATE_FAILED) ||
+          ex.getErrorCode().equals(GET_CERTIFICATE_FAILED)) {
         throw new ServiceException(new RetriableWithNoFailoverException(e));
       }
     }

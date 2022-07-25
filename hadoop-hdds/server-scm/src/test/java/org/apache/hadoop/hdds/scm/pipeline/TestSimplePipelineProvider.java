@@ -27,19 +27,19 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
@@ -58,7 +58,7 @@ public class TestSimplePipelineProvider {
   private File testDir;
   private DBStore dbStore;
 
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     nodeManager = new MockNodeManager(true, 10);
     final OzoneConfiguration conf = SCMTestUtils.getConf();
@@ -67,7 +67,7 @@ public class TestSimplePipelineProvider {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
-    SCMHAManager scmhaManager = MockSCMHAManager.getInstance(true);
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     stateManager = PipelineStateManagerImpl.newBuilder()
         .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
         .setRatisServer(scmhaManager.getRatisServer())
@@ -77,7 +77,7 @@ public class TestSimplePipelineProvider {
     provider = new SimplePipelineProvider(nodeManager, stateManager);
   }
 
-  @After
+  @AfterEach
   public void cleanup() throws Exception {
     if (dbStore != null) {
       dbStore.close();
@@ -87,35 +87,35 @@ public class TestSimplePipelineProvider {
   }
 
   @Test
-  public void testCreatePipelineWithFactor() throws IOException {
+  public void testCreatePipelineWithFactor() throws Exception {
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
     Pipeline pipeline =
-        provider.create(new StandaloneReplicationConfig(factor));
+        provider.create(StandaloneReplicationConfig.getInstance(factor));
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION);
+        ClientVersion.CURRENT_VERSION);
     stateManager.addPipeline(pipelineProto);
-    Assert.assertEquals(pipeline.getType(),
+    Assertions.assertEquals(pipeline.getType(),
         HddsProtos.ReplicationType.STAND_ALONE);
-    Assert.assertEquals(pipeline.getReplicationConfig().getRequiredNodes(),
+    Assertions.assertEquals(pipeline.getReplicationConfig().getRequiredNodes(),
         factor.getNumber());
-    Assert.assertEquals(pipeline.getPipelineState(),
+    Assertions.assertEquals(pipeline.getPipelineState(),
         Pipeline.PipelineState.OPEN);
-    Assert.assertEquals(pipeline.getNodes().size(), factor.getNumber());
+    Assertions.assertEquals(pipeline.getNodes().size(), factor.getNumber());
 
     factor = HddsProtos.ReplicationFactor.ONE;
     Pipeline pipeline1 =
-        provider.create(new StandaloneReplicationConfig(factor));
+        provider.create(StandaloneReplicationConfig.getInstance(factor));
     HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION);
+        ClientVersion.CURRENT_VERSION);
     stateManager.addPipeline(pipelineProto1);
-    Assert.assertEquals(pipeline1.getType(),
+    Assertions.assertEquals(pipeline1.getType(),
         HddsProtos.ReplicationType.STAND_ALONE);
-    Assert.assertEquals(
+    Assertions.assertEquals(
         ((StandaloneReplicationConfig) pipeline1.getReplicationConfig())
             .getReplicationFactor(), factor);
-    Assert.assertEquals(pipeline1.getPipelineState(),
+    Assertions.assertEquals(pipeline1.getPipelineState(),
         Pipeline.PipelineState.OPEN);
-    Assert.assertEquals(pipeline1.getNodes().size(), factor.getNumber());
+    Assertions.assertEquals(pipeline1.getNodes().size(), factor.getNumber());
   }
 
   private List<DatanodeDetails> createListOfNodes(int nodeCount) {
@@ -130,27 +130,27 @@ public class TestSimplePipelineProvider {
   public void testCreatePipelineWithNodes() throws IOException {
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
     Pipeline pipeline =
-        provider.create(new StandaloneReplicationConfig(factor),
+        provider.create(StandaloneReplicationConfig.getInstance(factor),
             createListOfNodes(factor.getNumber()));
-    Assert.assertEquals(pipeline.getType(),
+    Assertions.assertEquals(pipeline.getType(),
         HddsProtos.ReplicationType.STAND_ALONE);
-    Assert.assertEquals(
+    Assertions.assertEquals(
         ((StandaloneReplicationConfig) pipeline.getReplicationConfig())
             .getReplicationFactor(), factor);
-    Assert.assertEquals(pipeline.getPipelineState(),
+    Assertions.assertEquals(pipeline.getPipelineState(),
         Pipeline.PipelineState.OPEN);
-    Assert.assertEquals(pipeline.getNodes().size(), factor.getNumber());
+    Assertions.assertEquals(pipeline.getNodes().size(), factor.getNumber());
 
     factor = HddsProtos.ReplicationFactor.ONE;
-    pipeline = provider.create(new StandaloneReplicationConfig(factor),
+    pipeline = provider.create(StandaloneReplicationConfig.getInstance(factor),
         createListOfNodes(factor.getNumber()));
-    Assert.assertEquals(pipeline.getType(),
+    Assertions.assertEquals(pipeline.getType(),
         HddsProtos.ReplicationType.STAND_ALONE);
-    Assert.assertEquals(
+    Assertions.assertEquals(
         ((StandaloneReplicationConfig) pipeline.getReplicationConfig())
             .getReplicationFactor(), factor);
-    Assert.assertEquals(pipeline.getPipelineState(),
+    Assertions.assertEquals(pipeline.getPipelineState(),
         Pipeline.PipelineState.OPEN);
-    Assert.assertEquals(pipeline.getNodes().size(), factor.getNumber());
+    Assertions.assertEquals(pipeline.getNodes().size(), factor.getNumber());
   }
 }

@@ -40,6 +40,7 @@ import javax.inject.Singleton;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
@@ -161,6 +162,23 @@ public class ReconContainerMetadataManagerImpl
   }
 
   /**
+   * Concatenate the containerID and Key Prefix using a delimiter and store the
+   * count into a batch.
+   *
+   * @param batch the batch we store into
+   * @param containerKeyPrefix the containerID, key-prefix tuple.
+   * @param count Count of the keys matching that prefix.
+   * @throws IOException on failure.
+   */
+  @Override
+  public void batchStoreContainerKeyMapping(BatchOperation batch,
+                                            ContainerKeyPrefix
+                                                containerKeyPrefix,
+                                            Integer count) throws IOException {
+    containerKeyTable.putWithBatch(batch, containerKeyPrefix, count);
+  }
+
+  /**
    * Store the containerID -> no. of keys count into the container DB store.
    *
    * @param containerID the containerID.
@@ -171,6 +189,21 @@ public class ReconContainerMetadataManagerImpl
   public void storeContainerKeyCount(Long containerID, Long count)
       throws IOException {
     containerKeyCountTable.put(containerID, count);
+  }
+
+  /**
+   * Store the containerID -> no. of keys count into a batch.
+   *
+   * @param batch the batch we store into
+   * @param containerID the containerID.
+   * @param count count of the keys within the given containerID.
+   * @throws IOException on failure.
+   */
+  @Override
+  public void batchStoreContainerKeyCounts(BatchOperation batch,
+                                           Long containerID,
+                                           Long count) throws IOException {
+    containerKeyCountTable.putWithBatch(batch, containerID, count);
   }
 
   /**
@@ -438,6 +471,13 @@ public class ReconContainerMetadataManagerImpl
     }
   }
 
+  @Override
+  public void batchDeleteContainerMapping(BatchOperation batch,
+                                          ContainerKeyPrefix containerKeyPrefix)
+      throws IOException {
+    containerKeyTable.deleteWithBatch(batch, containerKeyPrefix);
+  }
+
   /**
    * Get total count of containers.
    *
@@ -484,6 +524,16 @@ public class ReconContainerMetadataManagerImpl
     storeContainerCount(containersCount + count);
   }
 
+  /**
+   * Commit a batch operation into the containerDbStore.
+   *
+   * @param rdbBatchOperation batch operation we want to commit
+   */
+  @Override
+  public void commitBatchOperation(RDBBatchOperation rdbBatchOperation)
+      throws IOException {
+    this.containerDbStore.commitBatchOperation(rdbBatchOperation);
+    
   /**
    * Use the DB's prefix seek iterator to start the scan from the given
    * key prefix and key version.

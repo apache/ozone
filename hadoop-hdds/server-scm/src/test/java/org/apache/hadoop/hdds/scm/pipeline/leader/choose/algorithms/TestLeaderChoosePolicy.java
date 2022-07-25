@@ -24,9 +24,9 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.RatisPipelineProvider;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import static org.mockito.Mockito.mock;
 
@@ -36,7 +36,7 @@ import static org.mockito.Mockito.mock;
 public class TestLeaderChoosePolicy {
   private OzoneConfiguration conf;
 
-  @Before
+  @BeforeEach
   public void setup() {
     //initialize network topology instance
     conf = new OzoneConfiguration();
@@ -50,23 +50,25 @@ public class TestLeaderChoosePolicy {
         conf,
         mock(EventPublisher.class),
         SCMContext.emptyContext());
-    Assert.assertSame(
+    Assertions.assertSame(
         ratisPipelineProvider.getLeaderChoosePolicy().getClass(),
         MinLeaderCountChoosePolicy.class);
   }
 
-  @Test(expected = RuntimeException.class)
+  @Test
   public void testClassNotImplemented() {
     // set a class not implemented
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,
         "org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms" +
             ".HelloWorld");
-    new RatisPipelineProvider(
-        mock(NodeManager.class),
-        mock(PipelineStateManagerImpl.class),
-        conf,
-        mock(EventPublisher.class),
-        SCMContext.emptyContext());
+    Assertions.assertThrows(RuntimeException.class, () ->
+        new RatisPipelineProvider(
+            mock(NodeManager.class),
+            mock(PipelineStateManagerImpl.class),
+            conf,
+            mock(EventPublisher.class),
+            SCMContext.emptyContext())
+    );
 
     // expecting exception
   }

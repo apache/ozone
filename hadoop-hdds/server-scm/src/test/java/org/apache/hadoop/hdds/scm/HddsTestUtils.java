@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -40,8 +41,9 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -87,6 +89,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Stateless helper functions for Hdds tests.
@@ -95,6 +98,9 @@ public final class HddsTestUtils {
 
   private static ThreadLocalRandom random = ThreadLocalRandom.current();
   private static PipelineID randomPipelineID = PipelineID.randomId();
+
+  public static final long CONTAINER_USED_BYTES_DEFAULT = 100L;
+  public static final long CONTAINER_NUM_KEYS_DEFAULT = 2L;
 
   private HddsTestUtils() {
   }
@@ -392,12 +398,12 @@ public final class HddsTestUtils {
   }
 
   public static void openAllRatisPipelines(PipelineManager pipelineManager)
-      throws IOException {
+      throws IOException, TimeoutException {
     // Pipeline is created by background thread
     for (ReplicationFactor factor : ReplicationFactor.values()) {
       // Trigger the processed pipeline report event
       for (Pipeline pipeline : pipelineManager
-          .getPipelines(new RatisReplicationConfig(factor))) {
+          .getPipelines(RatisReplicationConfig.getInstance(factor))) {
         pipelineManager.openPipeline(pipeline.getId());
       }
     }
@@ -527,15 +533,17 @@ public final class HddsTestUtils {
 
   public static org.apache.hadoop.hdds.scm.container.ContainerInfo
       allocateContainer(ContainerManager containerManager)
-      throws IOException {
+      throws IOException, TimeoutException {
     return containerManager
-        .allocateContainer(new RatisReplicationConfig(ReplicationFactor.THREE),
+        .allocateContainer(RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE),
             "root");
 
   }
 
   public static void closeContainer(ContainerManager containerManager,
-        ContainerID id) throws IOException, InvalidStateTransitionException {
+        ContainerID id) throws IOException,
+      InvalidStateTransitionException, TimeoutException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(
@@ -550,7 +558,8 @@ public final class HddsTestUtils {
    * @throws IOException
    */
   public static void quasiCloseContainer(ContainerManager containerManager,
-       ContainerID id) throws IOException, InvalidStateTransitionException {
+       ContainerID id) throws IOException,
+      InvalidStateTransitionException, TimeoutException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(
@@ -569,10 +578,23 @@ public final class HddsTestUtils {
    */
   public static StorageContainerManager getScmSimple(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
-    SCMConfigurator configurator = new SCMConfigurator();
     // The default behaviour whether ratis will be enabled or not
     // in SCM will be inferred from ozone-default.xml.
-    // conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    return getScmSimple(conf, new SCMConfigurator());
+  }
+
+  /**
+   * Construct and returns StorageContainerManager instance using the given
+   * configuration and service configurator.
+   *
+   * @param conf OzoneConfiguration
+   * @return StorageContainerManager instance
+   * @throws IOException
+   * @throws AuthenticationException
+   */
+  public static StorageContainerManager getScmSimple(OzoneConfiguration conf,
+      SCMConfigurator configurator) throws IOException,
+      AuthenticationException {
     return StorageContainerManager.createSCM(conf, configurator);
   }
 
@@ -589,7 +611,7 @@ public final class HddsTestUtils {
   public static StorageContainerManager getScm(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
     SCMConfigurator configurator = new SCMConfigurator();
-    configurator.setSCMHAManager(MockSCMHAManager.getInstance(true));
+    configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
     configurator.setScmContext(SCMContext.emptyContext());
     return getScm(conf, configurator);
   }
@@ -618,6 +640,7 @@ public final class HddsTestUtils {
       String scmId = UUID.randomUUID().toString();
       scmStore.setClusterId(clusterId);
       scmStore.setScmId(scmId);
+      scmStore.setSCMHAFlag(SCMHAUtils.isSCMHAEnabled(conf));
       // writes the version file properties
       scmStore.initialize();
     }
@@ -629,7 +652,8 @@ public final class HddsTestUtils {
     return new ContainerInfo.Builder()
         .setContainerID(RandomUtils.nextLong())
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE))
         .setState(state)
         .setSequenceId(10000L)
         .setOwner("TEST");
@@ -645,6 +669,15 @@ public final class HddsTestUtils {
   public static ContainerInfo getContainer(
       final HddsProtos.LifeCycleState state, PipelineID pipelineID) {
     return getDefaultContainerInfoBuilder(state)
+        .setPipelineID(pipelineID)
+        .build();
+  }
+
+  public static ContainerInfo getECContainer(
+      final HddsProtos.LifeCycleState state, PipelineID pipelineID,
+      ECReplicationConfig replicationConfig) {
+    return getDefaultContainerInfoBuilder(state)
+        .setReplicationConfig(replicationConfig)
         .setPipelineID(pipelineID)
         .build();
   }
@@ -675,13 +708,26 @@ public final class HddsTestUtils {
       final long sequenceId,
       final UUID originNodeId,
       final DatanodeDetails datanodeDetails) {
+    return getReplicas(containerId, state, CONTAINER_USED_BYTES_DEFAULT,
+        CONTAINER_NUM_KEYS_DEFAULT, sequenceId, originNodeId, datanodeDetails);
+  }
+
+  public static ContainerReplica getReplicas(
+      final ContainerID containerId,
+      final ContainerReplicaProto.State state,
+      final long usedBytes,
+      final long keyCount,
+      final long sequenceId,
+      final UUID originNodeId,
+      final DatanodeDetails datanodeDetails) {
     return ContainerReplica.newBuilder()
         .setContainerID(containerId)
         .setContainerState(state)
         .setDatanodeDetails(datanodeDetails)
         .setOriginNodeId(originNodeId)
         .setSequenceId(sequenceId)
-        .setBytesUsed(100)
+        .setBytesUsed(usedBytes)
+        .setKeyCount(keyCount)
         .build();
   }
 
@@ -692,7 +738,7 @@ public final class HddsTestUtils {
     nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     return Pipeline.newBuilder()
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setId(PipelineID.randomId())
         .setNodes(nodes)
         .setState(Pipeline.PipelineState.OPEN)

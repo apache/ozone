@@ -19,7 +19,10 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -27,6 +30,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -118,7 +122,8 @@ public class RatisPipelineProvider
           getPipelineStateManager().getPipelines(
               replicationConfig, PipelineState.CLOSED).size()) >
           (pipelineNumberLimit - getPipelineStateManager()
-              .getPipelines(new RatisReplicationConfig(ReplicationFactor.ONE))
+              .getPipelines(RatisReplicationConfig
+                  .getInstance(ReplicationFactor.ONE))
               .size());
     }
 
@@ -132,6 +137,14 @@ public class RatisPipelineProvider
 
   @Override
   public synchronized Pipeline create(RatisReplicationConfig replicationConfig)
+      throws IOException {
+    return create(replicationConfig, Collections.emptyList(),
+        Collections.emptyList());
+  }
+
+  @Override
+  public synchronized Pipeline create(RatisReplicationConfig replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException {
     if (exceedPipelineNumberLimit(replicationConfig)) {
       throw new SCMException("Ratis pipeline number meets the limit: " +
@@ -150,8 +163,8 @@ public class RatisPipelineProvider
           containerSizeBytes);
       break;
     case THREE:
-      dns = placementPolicy.chooseDatanodes(null,
-          null, factor.getNumber(), minRatisVolumeSizeBytes,
+      dns = placementPolicy.chooseDatanodes(excludedNodes,
+          favoredNodes, factor.getNumber(), minRatisVolumeSizeBytes,
           containerSizeBytes);
       break;
     default:
@@ -163,8 +176,7 @@ public class RatisPipelineProvider
     Pipeline pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(PipelineState.ALLOCATED)
-        .setReplicationConfig(new RatisReplicationConfig(
-            factor))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(factor))
         .setNodes(dns)
         .setSuggestedLeaderId(
             suggestedLeader != null ? suggestedLeader.getUuid() : null)
@@ -198,6 +210,16 @@ public class RatisPipelineProvider
         .setReplicationConfig(replicationConfig)
         .setNodes(nodes)
         .build();
+  }
+
+  @Override
+  public Pipeline createForRead(
+      RatisReplicationConfig replicationConfig,
+      Set<ContainerReplica> replicas) {
+    return create(replicationConfig, replicas
+        .stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toList()));
   }
 
   @Override

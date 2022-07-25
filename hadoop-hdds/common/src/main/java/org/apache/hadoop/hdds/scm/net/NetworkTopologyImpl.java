@@ -117,6 +117,59 @@ public class NetworkTopologyImpl implements NetworkTopology {
   }
 
   /**
+   * Update a leaf node. It is called when a datanode needs to be updated.
+   * If the old datanode does not exist, then just add the new datanode.
+   * @param oldNode node to be updated; can be null
+   * @param newNode node to update to; cannot be null
+   */
+  @Override
+  public void update(Node oldNode, Node newNode) {
+    Preconditions.checkArgument(newNode != null, "newNode cannot be null");
+    if (oldNode != null && oldNode instanceof InnerNode) {
+      throw new IllegalArgumentException(
+              "Not allowed to update an inner node: "
+                      + oldNode.getNetworkFullPath());
+    }
+
+    if (newNode instanceof InnerNode) {
+      throw new IllegalArgumentException(
+              "Not allowed to update a leaf node to an inner node: "
+                      + newNode.getNetworkFullPath());
+    }
+
+    int newDepth = NetUtils.locationToDepth(newNode.getNetworkLocation()) + 1;
+    // Check depth
+    if (maxLevel != newDepth) {
+      throw new InvalidTopologyException("Failed to update to " +
+              newNode.getNetworkFullPath()
+              + ": Its path depth is not "
+              + maxLevel);
+    }
+
+    netlock.writeLock().lock();
+    boolean add;
+    try {
+      boolean exist = false;
+      if (oldNode != null) {
+        exist = containsNode(oldNode);
+      }
+      if (exist) {
+        clusterTree.remove(oldNode);
+      }
+
+      add = clusterTree.add(newNode);
+    } finally {
+      netlock.writeLock().unlock();
+    }
+    if (add) {
+      LOG.info("Updated to the new node: {}", newNode.getNetworkFullPath());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("NetworkTopology became:\n{}", this);
+      }
+    }
+  }
+
+  /**
    * Remove a node from the network topology. This will be called when a
    * existing datanode is removed from the system.
    * @param node node to be removed; cannot be null
@@ -150,15 +203,19 @@ public class NetworkTopologyImpl implements NetworkTopology {
     Preconditions.checkArgument(node != null, "node cannot be null");
     netlock.readLock().lock();
     try {
-      Node parent = node.getParent();
-      while (parent != null && parent != clusterTree) {
-        parent = parent.getParent();
-      }
-      if (parent == clusterTree) {
-        return true;
-      }
+      return containsNode(node);
     } finally {
       netlock.readLock().unlock();
+    }
+  }
+
+  private boolean containsNode(Node node) {
+    Node parent = node.getParent();
+    while (parent != null && parent != clusterTree) {
+      parent = parent.getParent();
+    }
+    if (parent == clusterTree) {
+      return true;
     }
     return false;
   }
@@ -511,6 +568,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     }
   }
 
+  @SuppressWarnings("java:S2245") // no need for secure random
   private Node chooseNodeInternal(String scope, int leafIndex,
       List<String> excludedScopes, Collection<? extends Node> excludedNodes,
       Node affinityNode, int ancestorGen) {
@@ -534,13 +592,18 @@ public class NetworkTopologyImpl implements NetworkTopology {
             " generation  " + ancestorGen);
       }
       // affinity ancestor should has overlap with scope
-      if (affinityAncestor.getNetworkFullPath().startsWith(scope)) {
+      if (affinityAncestor.isDescendant(scope)) {
         finalScope = affinityAncestor.getNetworkFullPath();
       } else if (!scope.startsWith(affinityAncestor.getNetworkFullPath())) {
         return null;
       }
       // reset ancestor generation since the new scope is identified now
       ancestorGen = 0;
+    }
+    Node scopeNode = getNode(finalScope);
+    if (scopeNode == null) {
+      throw new IllegalArgumentException(String.format("No nodes with Scope: " +
+              "%s exists", finalScope));
     }
 
     // check overlap of excludedScopes and finalScope
@@ -549,12 +612,13 @@ public class NetworkTopologyImpl implements NetworkTopology {
       mutableExcludedScopes = new ArrayList<>();
       for (String s: excludedScopes) {
         // excludeScope covers finalScope
-        if (finalScope.startsWith(s)) {
+        if (scopeNode.isDescendant(s)) {
           return null;
         }
         // excludeScope and finalScope share nothing case
-        if (s.startsWith(finalScope)) {
-          if (mutableExcludedScopes.stream().noneMatch(s::startsWith)) {
+        if (scopeNode.isAncestor(s)) {
+          if (mutableExcludedScopes.stream().
+              noneMatch(n -> getNode(s).isDescendant(n))) {
             mutableExcludedScopes.add(s);
           }
         }
@@ -581,7 +645,6 @@ public class NetworkTopologyImpl implements NetworkTopology {
         ancestorGen);
 
     // calculate available node count
-    Node scopeNode = getNode(finalScope);
     int availableNodes = getAvailableNodesCount(
         scopeNode.getNetworkFullPath(), mutableExcludedScopes, mutableExNodes,
         ancestorGen);
@@ -746,13 +809,12 @@ public class NetworkTopologyImpl implements NetworkTopology {
       return 0;
     }
     if (!CollectionUtils.isEmpty(mutableExcludedNodes)) {
-      mutableExcludedNodes.removeIf(
-          next -> !next.getNetworkFullPath().startsWith(scope));
+      mutableExcludedNodes.removeIf(next -> !next.isDescendant(scope));
     }
     List<Node> excludedAncestorList =
         NetUtils.getAncestorList(this, mutableExcludedNodes, ancestorGen);
     for (Node ancestor : excludedAncestorList) {
-      if (scope.startsWith(ancestor.getNetworkFullPath())) {
+      if (ancestor.isAncestor(scope)) {
         return 0;
       }
     }
@@ -762,9 +824,9 @@ public class NetworkTopologyImpl implements NetworkTopology {
       for (String excludedScope: excludedScopes) {
         Node excludedScopeNode = getNode(excludedScope);
         if (excludedScopeNode != null) {
-          if (excludedScope.startsWith(scope)) {
+          if (excludedScopeNode.isDescendant(scope)) {
             excludedCount += excludedScopeNode.getNumOfLeaves();
-          } else if (scope.startsWith(excludedScope)) {
+          } else if (excludedScopeNode.isAncestor(scope)) {
             return 0;
           }
         }
@@ -780,7 +842,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
         }
       } else {
         for (Node ancestor : excludedAncestorList) {
-          if (ancestor.getNetworkFullPath().startsWith(scope)) {
+          if (ancestor.isDescendant(scope)) {
             excludedCount += ancestor.getNumOfLeaves();
           }
         }

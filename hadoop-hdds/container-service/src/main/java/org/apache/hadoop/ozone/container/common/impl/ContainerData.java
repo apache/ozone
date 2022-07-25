@@ -95,7 +95,7 @@ public abstract class ContainerData {
   private final AtomicLong readCount;
   private final AtomicLong writeCount;
   private final AtomicLong bytesUsed;
-  private final AtomicLong keyCount;
+  private final AtomicLong blockCount;
 
   private HddsVolume volume;
 
@@ -150,7 +150,7 @@ public abstract class ContainerData {
     this.writeCount =  new AtomicLong(0L);
     this.writeBytes =  new AtomicLong(0L);
     this.bytesUsed = new AtomicLong(0L);
-    this.keyCount = new AtomicLong(0L);
+    this.blockCount = new AtomicLong(0L);
     this.maxSize = size;
     this.originPipelineId = originPipelineId;
     this.originNodeId = originNodeId;
@@ -289,6 +289,14 @@ public abstract class ContainerData {
   }
 
   /**
+   * checks if the container is closing.
+   * @return - boolean
+   */
+  public synchronized  boolean isClosing() {
+    return ContainerDataProto.State.CLOSING == state;
+  }
+
+  /**
    * checks if the container is invalid.
    * @return - boolean
    */
@@ -417,7 +425,12 @@ public abstract class ContainerData {
     long unused = getMaxSize() - getBytesUsed();
 
     this.writeBytes.addAndGet(bytes);
-
+    /*
+       Increase the cached Used Space in VolumeInfo as it
+       maybe not updated, DU or DedicatedDiskSpaceUsage runs
+       periodically to update the Used Space in VolumeInfo.
+     */
+    this.getVolume().incrementUsedSpace(bytes);
     // only if container size < max size
     if (committedSpace && unused > 0) {
       //with this write, container size might breach max size
@@ -494,42 +507,42 @@ public abstract class ContainerData {
   }
 
   /**
-   * Increments the number of keys in the container.
+   * Increments the number of blocks in the container.
    */
-  public void incrKeyCount() {
-    this.keyCount.incrementAndGet();
+  public void incrBlockCount() {
+    this.blockCount.incrementAndGet();
   }
 
   /**
-   * Decrements number of keys in the container.
+   * Decrements number of blocks in the container.
    */
-  public void decrKeyCount() {
-    this.keyCount.decrementAndGet();
+  public void decrBlockCount() {
+    this.blockCount.decrementAndGet();
   }
 
   /**
-   * Decrease the count of keys in the container.
+   * Decrease the count of blocks (blocks) in the container.
    *
-   * @param deletedKeyCount
+   * @param deletedBlockCount
    */
-  public void decrKeyCount(long deletedKeyCount) {
-    this.keyCount.addAndGet(-1 * deletedKeyCount);
+  public void decrBlockCount(long deletedBlockCount) {
+    this.blockCount.addAndGet(-1 * deletedBlockCount);
   }
 
   /**
-   * Returns number of keys in the container.
-   * @return key count
+   * Returns number of blocks in the container.
+   * @return block count
    */
-  public long getKeyCount() {
-    return this.keyCount.get();
+  public long getBlockCount() {
+    return this.blockCount.get();
   }
 
   /**
-   * Set's number of keys in the container.
+   * Set's number of blocks in the container.
    * @param count
    */
-  public void setKeyCount(long count) {
-    this.keyCount.set(count);
+  public void setBlockCount(long count) {
+    this.blockCount.set(count);
   }
 
   public void setChecksumTo0ByteArray() {

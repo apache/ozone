@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.debug;
 
 import java.nio.file.Paths;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaOneDBDefinition;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaTwoDBDefinition;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition;
@@ -61,11 +63,18 @@ public class TestDBDefinitionFactory {
     assertTrue(definition instanceof ReconDBDefinition);
     DBDefinitionFactory.setDnDBSchemaVersion("V2");
     definition =
-        DBDefinitionFactory.getDefinition(Paths.get("/tmp/test-container.db"));
+        DBDefinitionFactory.getDefinition(Paths.get("/tmp/test-container.db"),
+            new OzoneConfiguration());
     assertTrue(definition instanceof DatanodeSchemaTwoDBDefinition);
     DBDefinitionFactory.setDnDBSchemaVersion("V1");
     definition =
-        DBDefinitionFactory.getDefinition(Paths.get("/tmp/test-container.db"));
+        DBDefinitionFactory.getDefinition(Paths.get("/tmp/test-container.db"),
+            new OzoneConfiguration());
     assertTrue(definition instanceof DatanodeSchemaOneDBDefinition);
+    DBDefinitionFactory.setDnDBSchemaVersion("V3");
+    definition =
+        DBDefinitionFactory.getDefinition(Paths.get("/tmp/test-container.db"),
+            new OzoneConfiguration());
+    assertTrue(definition instanceof DatanodeSchemaThreeDBDefinition);
   }
 }

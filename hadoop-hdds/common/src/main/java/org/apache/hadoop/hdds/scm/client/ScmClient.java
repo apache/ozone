@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.client;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -126,12 +128,14 @@ public interface ScmClient extends Closeable {
    * @param startContainerID start containerID.
    * @param count count must be {@literal >} 0.
    * @param state Container of this state will be returned.
-   * @param factor container factor.
+   * @param replicationConfig container replication Config.
    * @return a list of pipeline.
    * @throws IOException
    */
   List<ContainerInfo> listContainer(long startContainerID, int count,
-      HddsProtos.LifeCycleState state, HddsProtos.ReplicationFactor factor)
+      HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig)
       throws IOException;
 
   /**
@@ -331,7 +335,8 @@ public interface ScmClient extends Closeable {
   /**
    * Start ContainerBalancer.
    */
-  boolean startContainerBalancer(Optional<Double> threshold,
+  StartContainerBalancerResponseProto startContainerBalancer(
+      Optional<Double> threshold,
       Optional<Integer> iterations,
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,

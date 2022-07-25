@@ -47,15 +47,21 @@ grep -A1 'Crashed tests' "${REPORT_DIR}/output.log" \
   | sort -u \
   | tee -a "${REPORT_DIR}/summary.txt"
 
-# Add tests where "There was a timeout or other error in the fork"
-grep -e 'Running org' -e 'Tests run: .* in org' "${REPORT_DIR}/output.log" \
-  | sed -e 's/.* \(org[^ ]*\)/\1/' \
-  | uniq -c \
-  | grep -v ' 2 ' \
-  | awk '{ print $2 }' \
-  | sort -u \
-  | tee -a "${REPORT_DIR}/summary.txt"
-
+# Check for tests that started but were not finished
+if grep -q 'There was a timeout or other error in the fork' "${REPORT_DIR}/output.log"; then
+  diff -uw \
+    <(grep -e 'Running org' "${REPORT_DIR}/output.log" \
+      | sed -e 's/.* \(org[^ ]*\)/\1/' \
+      | uniq -c \
+      | sort -u -k2) \
+    <(grep -e 'Tests run: .* in org' "${REPORT_DIR}/output.log" \
+      | sed -e 's/.* \(org[^ ]*\)/\1/' \
+      | uniq -c \
+      | sort -u -k2) \
+    | grep '^- ' \
+    | awk '{ print $3 }' \
+    | tee -a "${REPORT_DIR}/summary.txt"
+fi
 
 #Collect of all of the report files of FAILED tests
 for failed_test in $(< ${REPORT_DIR}/summary.txt); do

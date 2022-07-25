@@ -17,8 +17,10 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
@@ -26,8 +28,10 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.fs.OzoneManagerFS;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -117,15 +121,17 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   List<BlockGroup> getPendingDeletionKeys(int count) throws IOException;
 
   /**
-   * Returns the names of up to {@code count} open keys that are older than
-   * the configured expiration age.
+   * Returns the names of up to {@code count} open keys whose age is
+   * greater than or equal to {@code expireThreshold}.
    *
    * @param count The maximum number of expired open keys to return.
-   * @return a list of {@link String} representing the names of expired
-   * open keys.
+   * @param expireThreshold The threshold of open key expiration age.
+   * @param bucketLayout The type of open keys to get (e.g. DEFAULT or FSO).
+   * @return a {@link List} of {@link OpenKeyBucket}, the expired open keys.
    * @throws IOException
    */
-  List<String> getExpiredOpenKeys(int count) throws IOException;
+  List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold, int count,
+      BucketLayout bucketLayout) throws IOException;
 
   /**
    * Returns the metadataManager.
@@ -189,7 +195,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return OmKeyInfo
    * @throws IOException
    */
-  OmKeyInfo getPendingDeletionDir() throws IOException;
+  Table.KeyValue<String, OmKeyInfo> getPendingDeletionDir() throws IOException;
 
   /**
    * Returns all sub directories under the given parent directory.
@@ -199,8 +205,8 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return list of dirs
    * @throws IOException
    */
-  List<OmKeyInfo> getPendingDeletionSubDirs(OmKeyInfo parentInfo,
-      long numEntries) throws IOException;
+  List<OmKeyInfo> getPendingDeletionSubDirs(long volumeId, long bucketId,
+      OmKeyInfo parentInfo, long numEntries) throws IOException;
 
   /**
    * Returns all sub files under the given parent directory.
@@ -210,12 +216,19 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return list of files
    * @throws IOException
    */
-  List<OmKeyInfo> getPendingDeletionSubFiles(OmKeyInfo parentInfo,
-      long numEntries) throws IOException;
+  List<OmKeyInfo> getPendingDeletionSubFiles(long volumeId,
+      long bucketId, OmKeyInfo parentInfo, long numEntries)
+          throws IOException;
 
   /**
    * Returns the instance of Directory Deleting Service.
    * @return Background service.
    */
   BackgroundService getDirDeletingService();
+
+  /**
+   * Returns the instance of Open Key Cleanup Service.
+   * @return Background service.
+   */
+  BackgroundService getOpenKeyCleanupService();
 }

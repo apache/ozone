@@ -32,13 +32,17 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -47,7 +51,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -59,7 +65,6 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension
     .EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -73,7 +78,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
-import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -126,23 +131,21 @@ public abstract class OMKeyRequest extends OMClientRequest {
   @SuppressWarnings("parameternumber")
   protected List< OmKeyLocationInfo > allocateBlock(ScmClient scmClient,
       OzoneBlockTokenSecretManager secretManager,
-      HddsProtos.ReplicationType replicationType,
-      HddsProtos.ReplicationFactor replicationFactor,
-      ExcludeList excludeList, long requestedSize, long scmBlockSize,
-      int preallocateBlocksMax, boolean grpcBlockTokenEnabled, String omID)
-      throws IOException {
-
-    int numBlocks = Math.min((int) ((requestedSize - 1) / scmBlockSize + 1),
-        preallocateBlocksMax);
+      ReplicationConfig replicationConfig, ExcludeList excludeList,
+      long requestedSize, long scmBlockSize, int preallocateBlocksMax,
+      boolean grpcBlockTokenEnabled, String omID) throws IOException {
+    int dataGroupSize = replicationConfig instanceof ECReplicationConfig
+        ? ((ECReplicationConfig) replicationConfig).getData() : 1;
+    int numBlocks = (int) Math.min(preallocateBlocksMax,
+        (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
     List<AllocatedBlock> allocatedBlocks;
     try {
-      allocatedBlocks = scmClient.getBlockClient().allocateBlock(scmBlockSize,
-          numBlocks, ReplicationConfig.fromProtoTypeAndFactor(replicationType,
-              replicationFactor),
-          omID, excludeList);
+      allocatedBlocks = scmClient.getBlockClient()
+          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, omID,
+              excludeList);
     } catch (SCMException ex) {
       if (ex.getResult()
           .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
@@ -200,6 +203,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // exception
       throw new OMException("Bucket not found " + bucketName, BUCKET_NOT_FOUND);
     }
+
+    // Make sure associated bucket's layout matches the one associated with
+    // the request.
+    OMClientRequestUtils.checkClientRequestPrecondition(
+        omMetadataManager.getBucketTable().get(bucketKey).getBucketLayout(),
+        getBucketLayout());
   }
 
   // For keys batch delete and rename only
@@ -569,11 +578,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
    */
   protected static long sumBlockLengths(OmKeyInfo omKeyInfo) {
     long bytesUsed = 0;
-    int keyFactor = omKeyInfo.getReplicationConfig().getRequiredNodes();
-
     for (OmKeyLocationInfoGroup group: omKeyInfo.getKeyLocationVersions()) {
       for (OmKeyLocationInfo locationInfo : group.getLocationList()) {
-        bytesUsed += locationInfo.getLength() * keyFactor;
+        bytesUsed += QuotaUtil.getReplicatedSize(
+            locationInfo.getLength(), omKeyInfo.getReplicationConfig());
       }
     }
 
@@ -583,11 +591,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
   /**
    * Return bucket info for the specified bucket.
    */
+  @Nullable
   protected OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
       String volume, String bucket) {
-    return omMetadataManager.getBucketTable().getCacheValue(
-        new CacheKey<>(omMetadataManager.getBucketKey(volume, bucket)))
-        .getCacheValue();
+    String bucketKey = omMetadataManager.getBucketKey(volume, bucket);
+
+    CacheValue<OmBucketInfo> value = omMetadataManager.getBucketTable()
+        .getCacheValue(new CacheKey<>(bucketKey));
+
+    return value != null ? value.getCacheValue() : null;
   }
 
   /**
@@ -603,12 +615,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable FileEncryptionInfo encInfo,
           @Nonnull PrefixManager prefixManager,
           @Nullable OmBucketInfo omBucketInfo,
-          long transactionLogIndex, long objectID, boolean isRatisEnabled)
+          long transactionLogIndex, long objectID, boolean isRatisEnabled,
+          ReplicationConfig replicationConfig)
           throws IOException {
 
     return prepareFileInfo(omMetadataManager, keyArgs, dbKeyInfo, size,
             locations, encInfo, prefixManager, omBucketInfo, null,
-            transactionLogIndex, objectID, isRatisEnabled);
+            transactionLogIndex, objectID, isRatisEnabled, replicationConfig);
   }
 
   /**
@@ -626,7 +639,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable OmBucketInfo omBucketInfo,
           OMFileRequest.OMPathInfoWithFSO omPathInfo,
           long transactionLogIndex, long objectID,
-          boolean isRatisEnabled)
+          boolean isRatisEnabled, ReplicationConfig replicationConfig)
           throws IOException {
     if (keyArgs.getIsMultipartKey()) {
       return prepareMultipartFileInfo(omMetadataManager, keyArgs,
@@ -649,14 +662,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // modification time.
       dbKeyInfo.setModificationTime(keyArgs.getModificationTime());
       dbKeyInfo.setUpdateID(transactionLogIndex, isRatisEnabled);
+      dbKeyInfo.setReplicationConfig(replicationConfig);
       return dbKeyInfo;
     }
 
     // the key does not exist, create a new object.
     // Blocks will be appended as version 0.
-    return createFileInfo(keyArgs, locations,
-            ReplicationConfig.fromProtoTypeAndFactor(
-                    keyArgs.getType(), keyArgs.getFactor()),
+    return createFileInfo(keyArgs, locations, replicationConfig,
             keyArgs.getDataSize(), encInfo, prefixManager,
             omBucketInfo, omPathInfo, transactionLogIndex, objectID);
   }
@@ -675,7 +687,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable OmBucketInfo omBucketInfo,
       OMFileRequest.OMPathInfoWithFSO omPathInfo,
       long transactionLogIndex, long objectID) {
-
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
     builder.setVolumeName(keyArgs.getVolumeName())
             .setBucketName(keyArgs.getBucketName())
@@ -728,8 +739,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
     Preconditions.checkNotNull(uploadID);
     String multipartKey = "";
     if (omPathInfo != null) {
+      final long volumeId = omMetadataManager.getVolumeId(
+              args.getVolumeName());
+      final long bucketId = omMetadataManager.getBucketId(
+              args.getVolumeName(), args.getBucketName());
       // FileTable metadata format
-      multipartKey = omMetadataManager.getMultipartKey(
+      multipartKey = omMetadataManager.getMultipartKey(volumeId, bucketId,
               omPathInfo.getLastKnownParentId(),
               omPathInfo.getLeafNodeName(), uploadID);
     } else {
@@ -769,5 +784,30 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     return omMetadataManager
         .getMultipartKey(volumeName, bucketName, keyName, uploadID);
+  }
+
+  /**
+   * Prepare key for deletion service on overwrite.
+   *
+   * @param dbOzoneKey key to point to an object in RocksDB
+   * @param keyToDelete OmKeyInfo of a key to be in deleteTable
+   * @param omMetadataManager
+   * @param trxnLogIndex
+   * @param isRatisEnabled
+   * @return Old keys eligible for deletion.
+   * @throws IOException
+   */
+  protected RepeatedOmKeyInfo getOldVersionsToCleanUp(
+      @Nonnull String dbOzoneKey, @Nonnull OmKeyInfo keyToDelete,
+      OMMetadataManager omMetadataManager, long trxnLogIndex,
+      boolean isRatisEnabled) throws IOException {
+
+    // Past keys that was deleted but still in deleted table,
+    // waiting for deletion service.
+    RepeatedOmKeyInfo keysToDelete =
+        omMetadataManager.getDeletedTable().get(dbOzoneKey);
+
+    return OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,
+          trxnLogIndex, isRatisEnabled);
   }
 }

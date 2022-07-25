@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
@@ -100,7 +101,7 @@ public interface ContainerStateManager {
   /**
    *
    */
-  boolean contains(HddsProtos.ContainerID containerID);
+  boolean contains(ContainerID containerID);
 
   /**
    * Returns the ID of all the managed containers.
@@ -117,23 +118,23 @@ public interface ContainerStateManager {
   /**
    *
    */
-  ContainerInfo getContainer(HddsProtos.ContainerID id);
+  ContainerInfo getContainer(ContainerID id);
 
   /**
    *
    */
-  Set<ContainerReplica> getContainerReplicas(HddsProtos.ContainerID id);
+  Set<ContainerReplica> getContainerReplicas(ContainerID id);
 
   /**
    *
    */
-  void updateContainerReplica(HddsProtos.ContainerID id,
+  void updateContainerReplica(ContainerID id,
                               ContainerReplica replica);
 
   /**
    *
    */
-  void removeContainerReplica(HddsProtos.ContainerID id,
+  void removeContainerReplica(ContainerID id,
                               ContainerReplica replica);
 
   /**
@@ -141,7 +142,7 @@ public interface ContainerStateManager {
    */
   @Replicate
   void addContainer(ContainerInfoProto containerInfo)
-      throws IOException;
+      throws IOException, TimeoutException;
 
   /**
    *
@@ -149,7 +150,7 @@ public interface ContainerStateManager {
   @Replicate
   void updateContainerState(HddsProtos.ContainerID id,
                             HddsProtos.LifeCycleEvent event)
-      throws IOException, InvalidStateTransitionException;
+      throws IOException, InvalidStateTransitionException, TimeoutException;
 
   /**
    *
@@ -170,7 +171,7 @@ public interface ContainerStateManager {
    */
   @Replicate
   void removeContainer(HddsProtos.ContainerID containerInfo)
-      throws IOException;
+      throws IOException, TimeoutException;
 
   /**
    * Reinitialize the ContainerStateManager with container store.

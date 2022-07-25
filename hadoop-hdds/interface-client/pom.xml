@@ -47,6 +47,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>javax.annotation</groupId>
       <artifactId>javax.annotation-api</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.google.code.findbugs</groupId>
+      <artifactId>jsr305</artifactId>
+      <scope>compile</scope>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
@@ -81,7 +86,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
               <clearOutputDirectory>false</clearOutputDirectory>
               <pluginId>grpc-java</pluginId>
               <pluginArtifact>
-                io.grpc:protoc-gen-grpc-java:${grpc-compile.version}:exe:${os.detected.classifier}
+                io.grpc:protoc-gen-grpc-java:${io.grpc.version}:exe:${os.detected.classifier}
               </pluginArtifact>
             </configuration>
           </execution>

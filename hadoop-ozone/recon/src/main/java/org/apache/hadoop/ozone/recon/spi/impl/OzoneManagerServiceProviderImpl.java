@@ -30,6 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -78,7 +79,6 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA
 import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
-import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.WriteBatch;
 import org.rocksdb.WriteOptions;
@@ -372,17 +372,21 @@ public class OzoneManagerServiceProviderImpl
       long fromSequenceNumber, OMDBUpdatesHandler omdbUpdatesHandler)
       throws IOException, RocksDBException {
     int loopCount = 0;
-    long originalFromSequenceNumber = fromSequenceNumber;
-    long resultCount = Long.MAX_VALUE;
+    LOG.info("OriginalFromSequenceNumber : {} ", fromSequenceNumber);
+    long deltaUpdateCnt = Long.MAX_VALUE;
+    long inLoopStartSequenceNumber = fromSequenceNumber;
+    long inLoopLatestSequenceNumber;
     while (loopCount < deltaUpdateLoopLimit &&
-        resultCount >= deltaUpdateLimit) {
-      resultCount = innerGetAndApplyDeltaUpdatesFromOM(fromSequenceNumber,
-          omdbUpdatesHandler);
-      fromSequenceNumber += resultCount;
+        deltaUpdateCnt >= deltaUpdateLimit) {
+      innerGetAndApplyDeltaUpdatesFromOM(
+          inLoopStartSequenceNumber, omdbUpdatesHandler);
+      inLoopLatestSequenceNumber = getCurrentOMDBSequenceNumber();
+      deltaUpdateCnt = inLoopLatestSequenceNumber - inLoopStartSequenceNumber;
+      inLoopStartSequenceNumber = inLoopLatestSequenceNumber;
       loopCount++;
     }
     LOG.info("Delta updates received from OM : {} loops, {} records", loopCount,
-        fromSequenceNumber - originalFromSequenceNumber
+        getCurrentOMDBSequenceNumber() - fromSequenceNumber
     );
   }
 
@@ -395,23 +399,23 @@ public class OzoneManagerServiceProviderImpl
    * @throws RocksDBException when writing to RocksDB fails.
    */
   @VisibleForTesting
-  long innerGetAndApplyDeltaUpdatesFromOM(long fromSequenceNumber,
+  void innerGetAndApplyDeltaUpdatesFromOM(long fromSequenceNumber,
       OMDBUpdatesHandler omdbUpdatesHandler)
       throws IOException, RocksDBException {
-    int recordCount = 0;
     DBUpdatesRequest dbUpdatesRequest = DBUpdatesRequest.newBuilder()
         .setSequenceNumber(fromSequenceNumber)
         .setLimitCount(deltaUpdateLimit)
         .build();
     DBUpdates dbUpdates = ozoneManagerClient.getDBUpdates(dbUpdatesRequest);
-    if (null != dbUpdates) {
+    int numUpdates = 0;
+    long latestSequenceNumberOfOM = -1L;
+    if (null != dbUpdates && dbUpdates.getCurrentSequenceNumber() != -1) {
+      latestSequenceNumberOfOM = dbUpdates.getLatestSequenceNumber();
       RDBStore rocksDBStore = (RDBStore) omMetadataManager.getStore();
-      RocksDB rocksDB = rocksDBStore.getDb();
-      int numUpdates = dbUpdates.getData().size();
-      LOG.info("Number of updates received from OM : {}", numUpdates);
+      final RocksDatabase rocksDB = rocksDBStore.getDb();
+      numUpdates = dbUpdates.getData().size();
       if (numUpdates > 0) {
         metrics.incrNumUpdatesInDeltaTotal(numUpdates);
-        recordCount = numUpdates;
       }
       for (byte[] data : dbUpdates.getData()) {
         try (WriteBatch writeBatch = new WriteBatch(data)) {
@@ -425,7 +429,12 @@ public class OzoneManagerServiceProviderImpl
         }
       }
     }
-    return recordCount;
+    long lag = latestSequenceNumberOfOM == -1 ? 0 :
+        latestSequenceNumberOfOM - getCurrentOMDBSequenceNumber();
+    metrics.setSequenceNumberLag(lag);
+    LOG.info("Number of updates received from OM : {}, " +
+            "SequenceNumber diff: {}, SequenceNumber Lag from OM {}.",
+        numUpdates, getCurrentOMDBSequenceNumber() - fromSequenceNumber, lag);
   }
 
   /**

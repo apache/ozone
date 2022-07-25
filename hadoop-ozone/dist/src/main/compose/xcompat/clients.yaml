@@ -26,6 +26,24 @@ services:
     environment:
       HADOOP_OPTS:
     command: ["sleep","1000000"]
+  old_client_1_1_0:
+    image: apache/ozone:1.1.0
+    env_file:
+      - docker-config
+    volumes:
+      - ../..:/opt/ozone
+    environment:
+      HADOOP_OPTS:
+    command: ["sleep","1000000"]
+  old_client_1_2_1:
+    image: apache/ozone:1.2.1
+    env_file:
+      - docker-config
+    volumes:
+      - ../..:/opt/ozone
+    environment:
+      HADOOP_OPTS:
+    command: ["sleep","1000000"]
   new_client:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     env_file:

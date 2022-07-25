@@ -250,9 +250,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       /**
        * Create Container should happen only as part of Write_Data phase of
        * writeChunk.
+       * In EC, we are doing empty putBlock. In the partial stripe writes, if
+       * file size is less than chunkSize*(ECData-1), we are making empty block
+       * to get the container created in non writing nodes. If replica index is
+       * >0 then we know it's for ec container.
        */
       if (container == null && ((isWriteStage || isCombinedStage)
-          || cmdType == Type.PutSmallFile)) {
+          || cmdType == Type.PutSmallFile
+          || cmdType == Type.PutBlock)) {
         // If container does not exist, create one for WriteChunk and
         // PutSmallFile request
         responseProto = createContainer(msg);
@@ -264,7 +269,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           return ContainerUtils.logAndReturnError(LOG, sce, msg);
         }
         Preconditions.checkArgument(isWriteStage && container2BCSIDMap != null
-            || dispatcherContext == null);
+            || dispatcherContext == null
+            || cmdType == Type.PutBlock);
         if (container2BCSIDMap != null) {
           // adds this container to list of containers created in the pipeline
           // with initial BCSID recorded as 0.
@@ -344,7 +350,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // only be in open or closing state.
         State containerState = container.getContainerData().getState();
         Preconditions.checkState(
-            containerState == State.OPEN || containerState == State.CLOSING);
+            containerState == State.OPEN
+                || containerState == State.CLOSING
+                || containerState == State.RECOVERING);
         // mark and persist the container state to be unhealthy
         try {
           handler.markContainerUnhealthy(container);
@@ -409,6 +417,17 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         ContainerProtos.ContainerType.KeyValueContainer;
     createRequest.setContainerType(containerType);
 
+    if (containerRequest.hasWriteChunk()) {
+      createRequest.setReplicaIndex(
+          containerRequest.getWriteChunk().getBlockID().getReplicaIndex());
+    }
+
+    if (containerRequest.hasPutBlock()) {
+      createRequest.setReplicaIndex(
+          containerRequest.getPutBlock().getBlockData().getBlockID()
+              .getReplicaIndex());
+    }
+
     ContainerCommandRequestProto.Builder requestBuilder =
         ContainerCommandRequestProto.newBuilder()
             .setCmdType(Type.CreateContainer)
@@ -466,7 +485,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
 
     State containerState = container.getContainerState();
-    if (!HddsUtils.isReadOnly(msg) && containerState != State.OPEN) {
+    if (!HddsUtils.isReadOnly(msg)
+        && !HddsUtils.isOpenToWriteState(containerState)) {
       switch (cmdType) {
       case CreateContainer:
         // Create Container is idempotent. There is nothing to validate.
@@ -476,8 +496,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // while execution. Nothing to validate here.
         break;
       default:
-        // if the container is not open, no updates can happen. Just throw
-        // an exception
+        // if the container is not open/recovering, no updates can happen. Just
+        // throw an exception
         ContainerNotOpenException cex = new ContainerNotOpenException(
             "Container " + containerID + " in " + containerState + " state");
         audit(action, eventType, params, AuditEventStatus.FAILURE, cex);

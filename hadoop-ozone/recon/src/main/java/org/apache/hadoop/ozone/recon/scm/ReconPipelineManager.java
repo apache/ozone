@@ -19,7 +19,9 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -35,10 +37,11 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.ClientVersion;
 
 import com.google.common.annotations.VisibleForTesting;
 
+import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +63,8 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
                                EventPublisher eventPublisher,
                                SCMContext scmContext) {
     super(conf, scmhaManager, nodeManager, pipelineStateManager,
-        pipelineFactory, eventPublisher, scmContext);
+        pipelineFactory, eventPublisher, scmContext,
+        new MonotonicClock(ZoneOffset.UTC));
   }
 
   public static ReconPipelineManager newReconPipelineManager(
@@ -92,7 +96,8 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
    * @param pipelinesFromScm pipelines from SCM.
    * @throws IOException on exception.
    */
-  void initializePipelines(List<Pipeline> pipelinesFromScm) throws IOException {
+  void initializePipelines(List<Pipeline> pipelinesFromScm)
+      throws IOException, TimeoutException {
 
     acquireWriteLock();
     try {
@@ -138,7 +143,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
             getStateManager().updatePipelineState(
                 pipelineID.getProtobuf(),
                 HddsProtos.PipelineState.PIPELINE_CLOSED);
-          } catch (IOException e) {
+          } catch (IOException | TimeoutException e) {
             LOG.warn("Pipeline {} not found while updating state. ",
                 p.getId(), e);
           }
@@ -146,7 +151,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
         try {
           LOG.info("Removing invalid pipeline {} from Recon.", pipelineID);
           closePipeline(p, false);
-        } catch (IOException e) {
+        } catch (IOException | TimeoutException e) {
           LOG.warn("Unable to remove pipeline {}", pipelineID, e);
         }
       });
@@ -160,11 +165,12 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
    * @throws IOException
    */
   @VisibleForTesting
-  public void addPipeline(Pipeline pipeline) throws IOException {
+  public void addPipeline(Pipeline pipeline)
+      throws IOException, TimeoutException {
     acquireWriteLock();
     try {
       getStateManager().addPipeline(
-          pipeline.getProtobufMessage(ClientVersions.CURRENT_VERSION));
+          pipeline.getProtobufMessage(ClientVersion.CURRENT_VERSION));
     } finally {
       releaseWriteLock();
     }

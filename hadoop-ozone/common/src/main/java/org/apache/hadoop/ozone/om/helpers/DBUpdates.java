@@ -29,6 +29,8 @@ public class DBUpdates {
 
   private long currentSequenceNumber = -1;
 
+  private long latestSequenceNumber = -1L;
+
   public DBUpdates() {
     this.dataList = new ArrayList<>();
   }
@@ -54,5 +56,13 @@ public class DBUpdates {
 
   public long getCurrentSequenceNumber() {
     return currentSequenceNumber;
+  }
+
+  public void setLatestSequenceNumber(long sequenceNumber) {
+    this.latestSequenceNumber = sequenceNumber;
+  }
+
+  public long getLatestSequenceNumber() {
+    return latestSequenceNumber;
   }
 }

@@ -32,8 +32,6 @@ import com.google.common.base.Supplier;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.log4j.Appender;
 import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
@@ -137,6 +135,7 @@ public abstract class GenericTestUtils {
    *
    * @return a string to use in paths
    */
+  @SuppressWarnings("java:S2245") // no need for secure random
   public static String getRandomizedTempPath() {
     return getTempPath(RandomStringUtils.randomAlphanumeric(10));
   }
@@ -251,23 +250,26 @@ public abstract class GenericTestUtils {
     private WriterAppender appender;
     private Logger logger;
 
-    public static LogCapturer captureLogs(Log l) {
-      Logger logger = ((Log4JLogger) l).getLogger();
-      return new LogCapturer(logger);
-    }
-
     public static LogCapturer captureLogs(org.slf4j.Logger logger) {
-      return new LogCapturer(toLog4j(logger));
+      return new LogCapturer(toLog4j(logger), getDefaultLayout());
     }
 
-    private LogCapturer(Logger logger) {
-      this.logger = logger;
+    public static LogCapturer captureLogs(org.slf4j.Logger logger,
+        Layout layout) {
+      return new LogCapturer(toLog4j(logger), layout);
+    }
+
+    private static Layout getDefaultLayout() {
       Appender defaultAppender = Logger.getRootLogger().getAppender("stdout");
       if (defaultAppender == null) {
         defaultAppender = Logger.getRootLogger().getAppender("console");
       }
-      final Layout layout = (defaultAppender == null) ? new PatternLayout() :
+      return (defaultAppender == null) ? new PatternLayout() :
           defaultAppender.getLayout();
+    }
+
+    private LogCapturer(Logger logger, Layout layout) {
+      this.logger = logger;
       this.appender = new WriterAppender(layout, sw);
       logger.addAppender(this.appender);
     }

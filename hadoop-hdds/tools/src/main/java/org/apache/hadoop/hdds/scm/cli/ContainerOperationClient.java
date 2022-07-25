@@ -21,11 +21,13 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -40,6 +42,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.HAUtils;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.slf4j.Logger;
@@ -56,7 +59,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 /**
  * This class provides the client-facing APIs of container operations.
@@ -276,7 +278,7 @@ public class ContainerOperationClient implements ScmClient {
       HddsProtos.QueryScope queryScope, String poolName)
       throws IOException {
     return storageContainerLocationClient.queryNode(opState, nodeState,
-        queryScope, poolName, CURRENT_VERSION);
+        queryScope, poolName, ClientVersion.CURRENT_VERSION);
   }
 
   @Override
@@ -408,9 +410,10 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public List<ContainerInfo> listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
-      HddsProtos.ReplicationFactor factor) throws IOException {
+      HddsProtos.ReplicationType repType,
+      ReplicationConfig replicationConfig) throws IOException {
     return storageContainerLocationClient.listContainer(
-        startContainerID, count, state, factor);
+        startContainerID, count, state, repType, replicationConfig);
   }
 
   /**
@@ -493,8 +496,9 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public List<ContainerReplicaInfo>
       getContainerReplicas(long containerId) throws IOException {
-    List<HddsProtos.SCMContainerReplicaProto> protos
-        = storageContainerLocationClient.getContainerReplicas(containerId);
+    List<HddsProtos.SCMContainerReplicaProto> protos =
+        storageContainerLocationClient.getContainerReplicas(containerId,
+            ClientVersion.CURRENT_VERSION);
     List<ContainerReplicaInfo> replicas = new ArrayList<>();
     for (HddsProtos.SCMContainerReplicaProto p : protos) {
       replicas.add(ContainerReplicaInfo.fromProto(p));
@@ -579,7 +583,7 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public boolean startContainerBalancer(
+  public StartContainerBalancerResponseProto startContainerBalancer(
       Optional<Double> threshold, Optional<Integer> iterations,
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
@@ -620,7 +624,7 @@ public class ContainerOperationClient implements ScmClient {
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       String ipaddress, String uuid) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(ipaddress,
-        uuid);
+        uuid, ClientVersion.CURRENT_VERSION);
   }
 
   /**
@@ -635,7 +639,8 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException {
-    return storageContainerLocationClient.getDatanodeUsageInfo(mostUsed, count);
+    return storageContainerLocationClient.getDatanodeUsageInfo(mostUsed, count,
+        ClientVersion.CURRENT_VERSION);
   }
 
   @Override
