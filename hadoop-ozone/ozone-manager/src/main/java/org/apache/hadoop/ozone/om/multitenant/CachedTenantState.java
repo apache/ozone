@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
 import java.util.HashMap;
+import java.util.Objects;
 
 /**
  * A collection of things that we want to maintain about a tenant in memory.
@@ -64,6 +65,25 @@ public class CachedTenantState {
     public boolean getIsAdmin() {
       return isAdmin;
     }
+
+    @Override
+    public boolean equals(Object object) {
+      if (object == null) {
+        return false;
+      }
+      if (object instanceof CachedAccessIdInfo) {
+        CachedAccessIdInfo other = (CachedAccessIdInfo) object;
+        return isAdmin == other.isAdmin &&
+            userPrincipal.equals(other.userPrincipal);
+      } else {
+        return false;
+      }
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(isAdmin, userPrincipal);
+    }
   }
 
   public CachedTenantState(String tenantId,
@@ -84,5 +104,26 @@ public class CachedTenantState {
 
   public boolean isTenantEmpty() {
     return accessIdInfoMap.isEmpty();
+  }
+
+  @Override
+  public boolean equals(Object object) {
+    if (object == null) {
+      return false;
+    }
+    if (object instanceof CachedTenantState) {
+      CachedTenantState other = (CachedTenantState) object;
+      return tenantId.equals(other.tenantId) &&
+          tenantUserRoleName.equals(other.tenantUserRoleName) &&
+          tenantAdminRoleName.equals(other.tenantAdminRoleName) &&
+          accessIdInfoMap.equals(other.accessIdInfoMap);
+    } else {
+      return false;
+    }
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(tenantId, tenantUserRoleName, tenantAdminRoleName);
   }
 }
