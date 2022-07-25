@@ -184,22 +184,22 @@ public class DeletedBlockLogImpl
   /**
    * {@inheritDoc}
    *
-   * @throws IOException
    */
   @Override
-  public int resetCount(List<Long> txIDs) throws IOException {
-    List<Long> failedTransactions = getFailedTransactions().stream()
-        .map(DeletedBlocksTransaction::getTxID).collect(Collectors.toList());
-    if (txIDs != null && !txIDs.isEmpty()) {
-      failedTransactions = failedTransactions.stream().filter(txIDs::contains)
-          .collect(Collectors.toList());
-    }
+  public int resetCount(List<Long> txIDs) {
+    Set<Long> failedTransactions = null;
     lock.lock();
     try {
+      failedTransactions = getFailedTransactions().stream()
+          .map(DeletedBlocksTransaction::getTxID)
+          .collect(Collectors.toSet());
+      if (txIDs != null && !txIDs.isEmpty()) {
+        failedTransactions.retainAll(txIDs);
+      }
       return deletedBlockLogStateManager.resetRetryCountOfTransactionInDB(
             new ArrayList<>(failedTransactions));
     } catch (TimeoutException | IOException ex) {
-      LOG.error("Cannot reset block deletion transactions {}",
+      LOG.error("Could not reset block deletion transactions {}.",
           failedTransactions, ex);
       return 0;
     } finally {

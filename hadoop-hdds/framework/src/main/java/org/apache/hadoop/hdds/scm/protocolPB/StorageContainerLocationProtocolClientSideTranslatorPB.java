@@ -87,7 +87,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RenewDeletedBlockRetryCountRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -703,15 +703,15 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public int renewDeletedBlockRetryCount(List<Long> txIDs)
+  public int resetDeletedBlockRetryCount(List<Long> txIDs)
       throws IOException {
-    RenewDeletedBlockRetryCountRequestProto request =
-        RenewDeletedBlockRetryCountRequestProto.newBuilder()
+    ResetDeletedBlockRetryCountRequestProto request =
+        ResetDeletedBlockRetryCountRequestProto.newBuilder()
             .addAllTransactionId(txIDs)
             .build();
-    return submitRequest(Type.RenewDeletedBlockRetryCount,
-        builder -> builder.setRenewDeletedBlockRetryCountRequest(request)).
-        getRenewDeletedBlockRetryCountResponse().getRenewedCount();
+    return submitRequest(Type.ResetDeletedBlockRetryCount,
+        builder -> builder.setResetDeletedBlockRetryCountRequest(request)).
+        getResetDeletedBlockRetryCountResponse().getResetCount();
   }
 
   /**

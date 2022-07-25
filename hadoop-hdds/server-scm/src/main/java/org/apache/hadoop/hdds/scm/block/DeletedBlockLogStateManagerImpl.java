@@ -217,11 +217,11 @@ public class DeletedBlockLogStateManagerImpl
       transactionBuffer.addToBuffer(deletedTable, txId,
           transaction.toBuilder().setCount(0).build());
       if (LOG.isDebugEnabled()) {
-        LOG.info("Reset block delete Txn count to 0 in container {} with " +
-            "txnId {} ", transaction.getContainerID(), txId);
+        LOG.info("Reset deleted block Txn retry count to 0 in container {}" +
+            " with txnId {} ", transaction.getContainerID(), txId);
       }
     }
-    LOG.info("Reset in total {} block delete Txn retry count",
+    LOG.info("Reset in total {} deleted block Txn retry count",
         txIDs.size());
     return txIDs.size();
   }

@@ -612,8 +612,8 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public int renewDeletedBlockRetryCount(List<Long> txIDs) throws IOException {
-    return storageContainerLocationClient.renewDeletedBlockRetryCount(txIDs);
+  public int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException {
+    return storageContainerLocationClient.resetDeletedBlockRetryCount(txIDs);
   }
 
   /**

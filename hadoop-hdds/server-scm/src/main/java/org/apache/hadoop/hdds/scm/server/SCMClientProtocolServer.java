@@ -784,13 +784,24 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public int renewDeletedBlockRetryCount(List<Long> txIDs) throws IOException {
+  public int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException {
+    Map<String, String> auditMap = Maps.newHashMap();
     getScm().checkAdminAccess(getRemoteUser());
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-        SCMAction.RENEW_DELETED_BLOCK_RETRY_COUNT, null));
-    int count = scm.getScmBlockManager().getDeletedBlockLog().resetCount(txIDs);
-    scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
-    return count;
+    try {
+      int count = scm.getScmBlockManager().getDeletedBlockLog().
+          resetCount(txIDs);
+      scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
+
+      auditMap.put("txIDs", txIDs.stream().map(String::valueOf).
+          collect(Collectors.joining(",")));
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.RENEW_DELETED_BLOCK_RETRY_COUNT, auditMap));
+      return count;
+    } catch (IOException ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.RENEW_DELETED_BLOCK_RETRY_COUNT, auditMap, ex));
+      throw ex;
+    }
   }
 
   /**

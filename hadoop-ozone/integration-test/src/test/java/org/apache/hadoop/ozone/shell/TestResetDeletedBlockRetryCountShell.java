@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.debug.DeletedBlockRetryCountRenewer;
+import org.apache.hadoop.ozone.admin.scm.ResetDeletedBlockRetryCountSubcommand;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,12 +45,12 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
 
 /**
- * Test for DeletedBlockRetryCountRenewer Cli.
+ * Test for ResetDeletedBlockRetryCountSubcommand Cli.
  */
-public class TestDeletedBlockRetryCountRenewer {
+public class TestResetDeletedBlockRetryCountShell {
 
   private static final Logger LOG = LoggerFactory
-      .getLogger(TestDeletedBlockRetryCountRenewer.class);
+      .getLogger(TestResetDeletedBlockRetryCountShell.class);
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
   private String clusterId;
@@ -119,7 +119,7 @@ public class TestDeletedBlockRetryCountRenewer {
   }
 
   @Test
-  public void testRenewCmd() throws IOException, TimeoutException {
+  public void testResetCmd() throws IOException, TimeoutException {
     int maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
     // add some block deletion transactions
     DeletedBlockLog deletedBlockLog = getSCMLeader().
@@ -128,7 +128,7 @@ public class TestDeletedBlockRetryCountRenewer {
     getSCMLeader().getScmHAManager().asSCMHADBTransactionBuffer().flush();
     LOG.info("Valid num of txns: {}", deletedBlockLog.
         getNumOfValidTransactions());
-    Assertions.assertEquals(deletedBlockLog.getNumOfValidTransactions(), 30);
+    Assertions.assertEquals(30, deletedBlockLog.getNumOfValidTransactions());
 
     List<Long> txIds = new ArrayList<>();
     for (int i = 1; i < 31; i++) {
@@ -144,23 +144,24 @@ public class TestDeletedBlockRetryCountRenewer {
     }
     LOG.info("Valid num of txns: {}", deletedBlockLog.
         getNumOfValidTransactions());
-    Assertions.assertEquals(deletedBlockLog.getNumOfValidTransactions(), 0);
+    Assertions.assertEquals(0, deletedBlockLog.getNumOfValidTransactions());
 
-    DeletedBlockRetryCountRenewer renewer = new DeletedBlockRetryCountRenewer();
+    ResetDeletedBlockRetryCountSubcommand subcommand =
+        new ResetDeletedBlockRetryCountSubcommand();
     ContainerOperationClient scmClient = new ContainerOperationClient(conf);
-    CommandLine c = new CommandLine(renewer);
-    // renew the given txIds list, only these transactions should be available
-    c.parseArgs("-r", "-l", "1,2,3,4,5");
-    renewer.execute(scmClient);
+    CommandLine c = new CommandLine(subcommand);
+    // reset the given txIds list, only these transactions should be available
+    c.parseArgs("-l", "1,2,3,4,5");
+    subcommand.execute(scmClient);
     LOG.info("Valid num of txns: {}", deletedBlockLog.
         getNumOfValidTransactions());
-    Assertions.assertEquals(deletedBlockLog.getNumOfValidTransactions(), 5);
+    Assertions.assertEquals(5, deletedBlockLog.getNumOfValidTransactions());
 
-    // renew all the result expired txIds, all transactions should be available
-    c.parseArgs("-r");
-    renewer.execute(scmClient);
+    // reset all the result expired txIds, all transactions should be available
+    c.parseArgs("-a");
+    subcommand.execute(scmClient);
     LOG.info("Valid num of txns: {}", deletedBlockLog.
         getNumOfValidTransactions());
-    Assertions.assertEquals(deletedBlockLog.getNumOfValidTransactions(), 30);
+    Assertions.assertEquals(30, deletedBlockLog.getNumOfValidTransactions());
   }
 }

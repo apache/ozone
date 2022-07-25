@@ -96,8 +96,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RenewDeletedBlockRetryCountRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RenewDeletedBlockRetryCountResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -648,13 +648,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
               request.getGetContainerReplicasRequest(),
               request.getVersion()))
           .build();
-      case RenewDeletedBlockRetryCount:
+      case ResetDeletedBlockRetryCount:
         return ScmContainerLocationResponse.newBuilder()
               .setCmdType(request.getCmdType())
               .setStatus(Status.OK)
-              .setRenewDeletedBlockRetryCountResponse(
-                  getRenewDeletedBlockRetryCount(
-                      request.getRenewDeletedBlockRetryCountRequest()))
+              .setResetDeletedBlockRetryCountResponse(
+                  getResetDeletedBlockRetryCount(
+                      request.getResetDeletedBlockRetryCountRequest()))
               .build();
       default:
         throw new IllegalArgumentException(
@@ -1149,11 +1149,11 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       .build();
   }
 
-  public RenewDeletedBlockRetryCountResponseProto
-      getRenewDeletedBlockRetryCount(RenewDeletedBlockRetryCountRequestProto
+  public ResetDeletedBlockRetryCountResponseProto
+      getResetDeletedBlockRetryCount(ResetDeletedBlockRetryCountRequestProto
       request) throws IOException {
-    return RenewDeletedBlockRetryCountResponseProto.newBuilder()
-        .setRenewedCount(impl.renewDeletedBlockRetryCount(
+    return ResetDeletedBlockRetryCountResponseProto.newBuilder()
+        .setResetCount(impl.resetDeletedBlockRetryCount(
             request.getTransactionIdList()))
         .build();
   }
