@@ -476,7 +476,9 @@ public class TestContainerBalancer {
     Assuming move is called exactly once for each unique container, number of
      calls to move should equal number of unique containers. If number of
      calls to move is more than number of unique containers, at least one
-     container has been re-selected.
+     container has been re-selected. It's expected that number of calls to
+     move should equal number of unique, selected containers (from
+     containerToTargetMap).
      */
     Mockito.verify(replicationManager, times(numContainers))
         .move(any(ContainerID.class), any(DatanodeDetails.class),

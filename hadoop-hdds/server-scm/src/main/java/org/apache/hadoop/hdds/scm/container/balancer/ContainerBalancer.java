@@ -147,6 +147,8 @@ public class ContainerBalancer extends StatefulService {
     this.nextIterationIndex = 0;
     this.containerToSourceMap = new HashMap<>();
     this.containerToTargetMap = new HashMap<>();
+    this.selectedSources = new HashSet<>();
+    this.selectedTargets = new HashSet<>();
 
     this.lock = new ReentrantLock();
     findSourceStrategy = new FindSourceGreedy(nodeManager);
@@ -414,8 +416,6 @@ public class ContainerBalancer extends StatefulService {
     List<DatanodeUsageInfo> potentialTargets = getPotentialTargets();
     findTargetStrategy.reInitialize(potentialTargets, config, upperLimit);
 
-    selectedTargets = new HashSet<>(potentialTargets.size());
-    selectedSources = new HashSet<>(getPotentialSources().size());
     moveSelectionToFutureMap = new HashMap<>(unBalancedNodes.size());
     boolean isMoveGeneratedInThisIteration = false;
     iterationResult = IterationResult.ITERATION_COMPLETED;
@@ -851,6 +851,8 @@ public class ContainerBalancer extends StatefulService {
     this.unBalancedNodes.clear();
     this.containerToSourceMap.clear();
     this.containerToTargetMap.clear();
+    this.selectedSources.clear();
+    this.selectedTargets.clear();
     this.countDatanodesInvolvedPerIteration = 0;
     this.sizeMovedPerIteration = 0;
     metrics.resetDataSizeMovedGBInLatestIteration();
