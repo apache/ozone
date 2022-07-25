@@ -39,14 +39,14 @@ public class DeletedBlockRetryCountRenewer extends ScmSubcommand implements
 
   @CommandLine.Option(names = {"-r", "--renew"},
       required = true,
-      description = "set the deleted block retry count from -1 to 0")
+      description = "Renew the deleted block transaction retry count from" +
+          " -1 to 0. By default renew all expired transactions.")
   private boolean toRenew;
 
   @CommandLine.Option(names = {"-l", "--list"},
       split = ",",
-      description = "renew the given deletedBlock transaction ID list," +
-          " if not set then by default renew all expired transactions, e.g" +
-          " -l 100,101,102")
+      description = "Renew the only given deletedBlock transaction ID list, " +
+          "e.g 100,101,102.(Separated by ',')")
   private List<Long> txList;
 
   @Override
