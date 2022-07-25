@@ -157,6 +157,10 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
           }
         }
       });
+      if (commands.size() == 0) {
+        LOG.info("With the current state of avilable replicas {}, no" +
+            " commands to process due to over replication.", replicas);
+      }
       return commands;
     }
 

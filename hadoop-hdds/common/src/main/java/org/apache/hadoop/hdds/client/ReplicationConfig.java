@@ -195,7 +195,7 @@ public interface ReplicationConfig {
       replicationConfig = new ECReplicationConfig(replication);
       break;
     default:
-      throw new RuntimeException("Replication type" + type + " can not"
+      throw new RuntimeException("Replication type " + type + " can not "
           + "be parsed.");
     }
 

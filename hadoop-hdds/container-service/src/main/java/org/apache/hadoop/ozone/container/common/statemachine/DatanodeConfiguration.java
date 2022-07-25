@@ -145,8 +145,25 @@ public class DatanodeConfiguration {
   )
   private long blockDeletionInterval = Duration.ofSeconds(60).toMillis();
 
+  @Config(key = "recovering.container.scrubbing.service.interval",
+      defaultValue = "1m",
+      type = ConfigType.TIME,
+      tags = { ConfigTag.SCM, ConfigTag.DELETION },
+      description =
+          "Time interval of the stale recovering container scrubbing " +
+              "service. The recovering container scrubbing service runs " +
+              "on Datanode periodically and deletes stale recovering " +
+              "container Unit could be defined with postfix (ns,ms,s,m,h,d)."
+  )
+  private long recoveringContainerScrubInterval =
+      Duration.ofMinutes(10).toMillis();
+
   public Duration getBlockDeletionInterval() {
     return Duration.ofMillis(blockDeletionInterval);
+  }
+
+  public Duration getRecoveringContainerScrubInterval() {
+    return Duration.ofMillis(recoveringContainerScrubInterval);
   }
 
   public void setBlockDeletionInterval(Duration duration) {

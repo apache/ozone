@@ -51,6 +51,7 @@ OZONE-SITE.XML_ozone.scm.pipeline.allocated.timeout=2m
 
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
+OZONE-SITE.XML_ozone.recon.address=recon:9891
 
 no_proxy=om1,om2,om3,scm,s3g,kdc,localhost,127.0.0.1
 

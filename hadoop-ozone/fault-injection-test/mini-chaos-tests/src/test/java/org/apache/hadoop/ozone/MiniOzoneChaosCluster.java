@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.failure.FailureManager;
@@ -104,7 +105,8 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       OMHAService omService, SCMHAService scmService,
       List<HddsDatanodeService> hddsDatanodes, String clusterPath,
       Set<Class<? extends Failures>> clazzes) {
-    super(conf, omService, scmService, hddsDatanodes, clusterPath, null);
+    super(conf, new SCMConfigurator(), omService, scmService, hddsDatanodes,
+        clusterPath, null);
     this.numDatanodes = getHddsDatanodes().size();
     this.numOzoneManagers = omService.getServices().size();
     this.numStorageContainerManagers = scmService.getServices().size();
@@ -425,11 +427,12 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     failedScmSet.add(scm);
   }
 
-  public void restartStorageContainerManager(StorageContainerManager scm,
-      boolean waitForScm) throws IOException, TimeoutException,
-      InterruptedException, AuthenticationException {
-    super.restartStorageContainerManager(scm, waitForScm);
+  public StorageContainerManager restartStorageContainerManager(
+      StorageContainerManager scm, boolean waitForScm)
+      throws IOException, TimeoutException, InterruptedException,
+      AuthenticationException {
     failedScmSet.remove(scm);
+    return super.restartStorageContainerManager(scm, waitForScm);
   }
 
   // Should the selected node be stopped or started.

@@ -111,13 +111,28 @@ public class ECContainerOperationClient implements Closeable {
     }
   }
 
+  /**
+   * Deletes the container at the given DN. Before deleting it will pre-check
+   * whether the container is in RECOVERING state. As this is not an atomic
+   * check for RECOVERING container, there is a chance non recovering containers
+   * could get deleted if they just created in the window time of RECOVERING
+   * container exist check and delete op. So, user of the API needs to keep this
+   * scenario in mind and use this API if it is still safe.
+   *
+   * TODO: Alternatively we can extend this API to pass the flag to perform the
+   *       check at server side. So, that it will become atomic op.
+   * @param containerID - Container ID.
+   * @param dn - Datanode details.
+   * @param repConfig - Replication config.
+   * @param encodedToken - Token
+   */
   public void deleteRecoveringContainer(long containerID, DatanodeDetails dn,
       ECReplicationConfig repConfig, String encodedToken) throws IOException {
     XceiverClientSpi xceiverClient = this.xceiverClientManager
         .acquireClient(singleNodePipeline(dn, repConfig));
     try {
       // Before deleting the recovering container, just make sure that state is
-      // Recovering. There will be still race condition, but that will avoid
+      // Recovering. There will be still race condition, but this will avoid
       // most usual case.
       ContainerProtos.ReadContainerResponseProto readContainerResponseProto =
           ContainerProtocolCalls

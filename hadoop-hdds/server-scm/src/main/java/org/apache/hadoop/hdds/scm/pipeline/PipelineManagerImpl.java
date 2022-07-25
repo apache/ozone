@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
@@ -155,6 +156,16 @@ public class PipelineManagerImpl implements PipelineManager {
     BackgroundPipelineCreator backgroundPipelineCreator =
         new BackgroundPipelineCreator(pipelineManager, conf, scmContext, clock);
 
+    pipelineManager.setBackgroundPipelineCreator(backgroundPipelineCreator);
+    serviceManager.register(backgroundPipelineCreator);
+
+    if (FinalizationManager.shouldCreateNewPipelines(
+        scmContext.getFinalizationCheckpoint())) {
+      pipelineManager.resumePipelineCreation();
+    } else {
+      pipelineManager.freezePipelineCreation();
+    }
+
     final long scrubberIntervalInMillis = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL,
         ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT,
@@ -178,10 +189,7 @@ public class PipelineManagerImpl implements PipelineManager {
               }
             }).build();
 
-    pipelineManager.setBackgroundPipelineCreator(backgroundPipelineCreator);
     pipelineManager.setBackgroundPipelineScrubber(backgroundPipelineScrubber);
-
-    serviceManager.register(backgroundPipelineCreator);
     serviceManager.register(backgroundPipelineScrubber);
 
     return pipelineManager;
@@ -684,6 +692,12 @@ public class PipelineManagerImpl implements PipelineManager {
   public void resumePipelineCreation() {
     freezePipelineCreation.set(false);
     backgroundPipelineCreator.start();
+  }
+
+  @Override
+  public boolean isPipelineCreationFrozen() {
+    return freezePipelineCreation.get() &&
+        !backgroundPipelineCreator.isRunning();
   }
 
   @Override

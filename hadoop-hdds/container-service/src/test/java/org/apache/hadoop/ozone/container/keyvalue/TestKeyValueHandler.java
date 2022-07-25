@@ -260,7 +260,7 @@ public class TestKeyValueHandler {
         volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
     try {
-      ContainerSet cset = new ContainerSet();
+      ContainerSet cset = new ContainerSet(1000);
       int[] interval = new int[1];
       interval[0] = 2;
       ContainerMetrics metrics = new ContainerMetrics(interval);
@@ -350,7 +350,7 @@ public class TestKeyValueHandler {
     try {
       final long containerID = 1L;
       final ConfigurationSource conf = new OzoneConfiguration();
-      final ContainerSet containerSet = new ContainerSet();
+      final ContainerSet containerSet = new ContainerSet(1000);
       final VolumeSet volumeSet = Mockito.mock(VolumeSet.class);
 
       Mockito.when(volumeSet.getVolumesList())
