@@ -319,40 +319,40 @@ public class TestContainerPersistence {
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
       KeyValueContainerData containerData =
           (KeyValueContainerData) container.getContainerData();
-      CleanUpManager cleanUpManager = new CleanUpManager(containerData, conf);
+      CleanUpManager cleanUpManager = new CleanUpManager(conf);
 
       String oldPath = containerData.getContainerPath();
       File oldContainerDir = new File(oldPath);
 
-      //move container dir
-      Assert.assertTrue(cleanUpManager.renameDir());
+      // Move container dir
+      Assert.assertTrue(cleanUpManager.renameDir(containerData));
 
-      //confirm the container has been moved
+      // The container has been moved
       Assert.assertFalse(oldContainerDir.exists());
 
       List<String> leftovers = cleanUpManager.getDeleteLeftovers();
 
-      //confirm there is exactly 1 dir under /tmpDir
+      // There is at least 1 dir under '/tmp'
       Assert.assertTrue(leftovers.size() >= 1);
 
-      //confirm /tmpDir is not empty
+      // '/tmp' is not empty
       Assert.assertFalse(cleanUpManager.checkTmpDirIsEmpty());
 
-      //delete
+      // Delete
       container.delete();
 
-      //remove container from containerSet
+      // Remove container from containerSet
       containerSet.removeContainer(testContainerID);
       Assert.assertFalse(containerSet.getContainerMapCopy()
           .containsKey(testContainerID));
 
-      //confirm /tmpDir is empty
+      // '/tmp' is empty
       Assert.assertTrue(cleanUpManager.checkTmpDirIsEmpty());
 
       /**
        * TODO: move inside @After
        */
-      //delete /tmpDir from system
+      // Delete /tmpDir from system
       cleanUpManager.deleteTmpDir();
     }
   }

@@ -291,14 +291,14 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public void delete() throws StorageContainerException {
-    CleanUpManager cleanUpManager = new CleanUpManager(containerData, config);
+    CleanUpManager cleanUpManager = new CleanUpManager(config);
     long containerId = containerData.getContainerID();
     try {
       KeyValueContainerUtil.removeContainer(containerData, config);
     } catch (StorageContainerException ex) {
       throw ex;
     } catch (IOException ex) {
-      if (cleanUpManager.checkContainerSchemaV3Enabled()) {
+      if (cleanUpManager.checkContainerSchemaV3Enabled(containerData)) {
         try {
           cleanUpManager.cleanTmpDir();
         } catch (IOException e) {

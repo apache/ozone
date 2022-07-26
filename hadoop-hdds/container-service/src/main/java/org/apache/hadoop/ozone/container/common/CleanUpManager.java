@@ -35,21 +35,18 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * Helper class for renaming the container to a new
- * location, before delete.
+ * Helper class for moving the container to a new
+ * location, before deletion.
  */
 public class CleanUpManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(CleanUpManager.class);
 
-  private final KeyValueContainerData keyValueContainerData;
   private final ConfigurationSource configurationSource;
   private DatanodeConfiguration datanodeConf;
 
-  public CleanUpManager(KeyValueContainerData keyValueContainerData,
-                        ConfigurationSource configurationSource) {
-    this.keyValueContainerData = keyValueContainerData;
+  public CleanUpManager(ConfigurationSource configurationSource) {
     this.configurationSource = configurationSource;
     this.datanodeConf =
         configurationSource.getObject(DatanodeConfiguration.class);
@@ -59,7 +56,8 @@ public class CleanUpManager {
     return datanodeConf;
   }
 
-  public boolean checkContainerSchemaV3Enabled() {
+  public boolean checkContainerSchemaV3Enabled(
+      KeyValueContainerData keyValueContainerData) {
     if (keyValueContainerData.getSchemaVersion()
         .equals(OzoneConsts.SCHEMA_V3)) {
       return true;
@@ -68,7 +66,8 @@ public class CleanUpManager {
     }
   }
 
-  public boolean renameDir() throws IOException {
+  public boolean renameDir(KeyValueContainerData keyValueContainerData)
+      throws IOException {
     boolean success = false;
     String tmpDirPath = datanodeConf.getDiskTmpDirectoryPath();
 
@@ -83,7 +82,7 @@ public class CleanUpManager {
       FileUtils.moveDirectory(container, new File(destinationDirPath));
       success = true;
     } catch (IOException ex) {
-      LOG.error("Error while moving metadata and chunks under Tmp volume", ex);
+      LOG.error("Error while moving metadata and chunks under /tmp", ex);
     }
 
     keyValueContainerData.setMetadataPath(destinationDirPath + "/metadata");
@@ -101,7 +100,7 @@ public class CleanUpManager {
   }
 
   /**
-   * Get all filenames under TmpDir and store them in a list.
+   * Get all filenames under /tmp and store them in a list.
    * @return list of the leftover filenames
    */
   public List<String> getDeleteLeftovers() {
@@ -117,7 +116,7 @@ public class CleanUpManager {
   }
 
   /**
-   * Delete all files under the TmpDir.
+   * Delete all files under the /tmp.
    * @throws IOException
    */
   public void cleanTmpDir() throws IOException {
@@ -129,7 +128,7 @@ public class CleanUpManager {
   }
 
   /**
-   * Delete the TmpDir and all of its contents.
+   * Delete the /tmp and all of its contents.
    * @throws IOException
    */
   public void deleteTmpDir() throws IOException {

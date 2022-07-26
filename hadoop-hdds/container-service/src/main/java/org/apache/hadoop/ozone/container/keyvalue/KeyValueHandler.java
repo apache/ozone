@@ -1222,7 +1222,7 @@ public class KeyValueHandler extends Handler {
     KeyValueContainerData keyValueContainerData =
         (KeyValueContainerData) container.getContainerData();
     CleanUpManager cleanUpManager =
-        new CleanUpManager(keyValueContainerData, configurationSource);
+        new CleanUpManager(configurationSource);
     container.writeLock();
     try {
     // If force is false, we check container state.
@@ -1246,11 +1246,11 @@ public class KeyValueHandler extends Handler {
               DELETE_ON_NON_EMPTY_CONTAINER);
         }
       }
-      if (cleanUpManager.checkContainerSchemaV3Enabled()) {
+      if (cleanUpManager.checkContainerSchemaV3Enabled(keyValueContainerData)) {
         try {
-          cleanUpManager.renameDir();
+          cleanUpManager.renameDir(keyValueContainerData);
         } catch (IOException ex) {
-          LOG.error("Error while moving metadata and chunks under Tmp Directory", ex);
+          LOG.error("Error while moving metadata and chunks under /tmp", ex);
         }
       }
       long containerId = container.getContainerData().getContainerID();

@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.common.Storage;
+import org.apache.hadoop.ozone.container.common.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -212,6 +213,13 @@ public class ContainerReader implements Runnable {
             config);
         if (kvContainer.getContainerState() == RECOVERING) {
           if (shouldDeleteRecovering) {
+            CleanUpManager cleanUpManager =
+                new CleanUpManager(config);
+            KeyValueContainerData keyValueContainerData =
+                (KeyValueContainerData) containerData;
+            if (cleanUpManager.checkContainerSchemaV3Enabled(keyValueContainerData)) {
+              cleanUpManager.renameDir(keyValueContainerData);
+            }
             kvContainer.delete();
             LOG.info("Delete recovering container {}.",
                 kvContainer.getContainerData().getContainerID());
