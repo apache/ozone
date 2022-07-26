@@ -18,11 +18,10 @@
 package org.apache.hadoop.ozone.freon;
 
 import com.codahale.metrics.Timer;
-import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
-import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,19 +50,19 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
 
   private Timer timer;
 
-  @Option(names = {"--payload"},
+  @Option(names = {"-p", "--payload"},
           description =
                   "Specifies the size of payload in KB in each RPC request.",
           defaultValue = "1")
   private int payloadSizeKB = 1;
 
-  @Option(names = {"--empty-req"},
+  @Option(names = {"-erq", "--empty-req"},
           description =
                   "Specifies whether the payload of request is empty or not",
           defaultValue = "False")
   private boolean isEmptyReq = false;
 
-  @Option(names = {"--empty-resp"},
+  @Option(names = {"-erp", "--empty-resp"},
           description =
                   "Specifies whether the payload of response is empty or not",
           defaultValue = "False")
@@ -87,26 +86,25 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
   }
   private void sendRPCReq(long l) throws Exception {
     OzoneConfiguration configuration = createOzoneConfiguration();
-    LOG.info("###################-3-########################");
     RpcClient rpcclient = new RpcClient(configuration, null);
     if (payloadSizeKB < 0) {
       throw new IllegalArgumentException(
               "RPC request payload can't be negative."
       );
     }
-    int payloadSize = (int) Math.min(
-            (long)payloadSizeKB * MULTIPLICATION_FACTOR, Integer.MAX_VALUE);
-//    byte[] payloadBytes = RandomUtils.nextBytes((int)payloadSize);
+    byte[] payloadBytes;
+    if (isEmptyReq) {
+      payloadBytes = null;
+    } else {
+      int payloadSize = (int) Math.min(
+              (long)payloadSizeKB * MULTIPLICATION_FACTOR, Integer.MAX_VALUE);
+      payloadBytes = RandomUtils.nextBytes(payloadSize);
+    }
     timer.time(() -> {
-      rpcclient.getCanonicalServiceName();
-      return null;
+      byte[] resp = rpcclient.postRPCReq(payloadBytes, isEmptyResp);
+      return resp;
     });
-
-//    byte[] resp = rpcclient.sendRPCReqWithPayload(payloadBytes);
-    LOG.info("###################-4-########################");
-
   }
-
 }
 
 

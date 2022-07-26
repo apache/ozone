@@ -837,6 +837,7 @@ public interface OzoneManagerProtocol
       OzoneManagerProtocolProtos.DBUpdatesRequest dbUpdatesRequest)
       throws IOException;
 
+
   /**
    * List trash allows the user to list the keys that were marked as deleted,
    * but not actually deleted by Ozone Manager. This allows a user to recover
