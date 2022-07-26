@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.ozone.scm.node;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -93,6 +93,8 @@ public class TestDecommissionAndMaintenance {
   private static int numOfDatanodes = 6;
   private static String bucketName = "bucket1";
   private static String volName = "vol1";
+  private static RatisReplicationConfig ratisRepConfig =
+      RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
   private OzoneBucket bucket;
   private MiniOzoneCluster cluster;
   private NodeManager nm;
@@ -163,7 +165,7 @@ public class TestDecommissionAndMaintenance {
   public void testNodeWithOpenPipelineCanBeDecommissionedAndRecommissioned()
       throws Exception {
     // Generate some data on the empty cluster to create some containers
-    generateData(20, "key", ReplicationFactor.THREE, ReplicationType.RATIS);
+    generateData(20, "key", ratisRepConfig);
 
     // Locate any container and find its open pipeline
     final ContainerInfo container = waitForAndReturnContainer();
@@ -215,7 +217,7 @@ public class TestDecommissionAndMaintenance {
     // Generate some data and then pick a DN to decommission which is hosting a
     // container. This ensures it will not decommission immediately due to
     // having no containers.
-    generateData(20, "key", ReplicationFactor.THREE, ReplicationType.RATIS);
+    generateData(20, "key", ratisRepConfig);
     final ContainerInfo container = waitForAndReturnContainer();
     final DatanodeDetails dn
         = getOneDNHostingReplica(getContainerReplicas(container));
@@ -254,7 +256,7 @@ public class TestDecommissionAndMaintenance {
   public void testStoppedDecommissionedNodeTakesSCMStateOnRestart()
       throws Exception {
     // Decommission node and wait for it to be DECOMMISSIONED
-    generateData(20, "key", ReplicationFactor.THREE, ReplicationType.RATIS);
+    generateData(20, "key", ratisRepConfig);
 
     DatanodeDetails dn = nm.getAllNodes().get(0);
     scmClient.decommissionNodes(Arrays.asList(getDNHostAndPort(dn)));
@@ -290,7 +292,7 @@ public class TestDecommissionAndMaintenance {
   public void testSingleNodeWithOpenPipelineCanGotoMaintenance()
       throws Exception {
     // Generate some data on the empty cluster to create some containers
-    generateData(20, "key", ReplicationFactor.THREE, ReplicationType.RATIS);
+    generateData(20, "key", ratisRepConfig);
 
     // Locate any container and find its open pipeline
     final ContainerInfo container = waitForAndReturnContainer();
@@ -355,7 +357,7 @@ public class TestDecommissionAndMaintenance {
   public void testContainerIsReplicatedWhenAllNodesGotoMaintenance()
       throws Exception {
     // Generate some data on the empty cluster to create some containers
-    generateData(20, "key", ReplicationFactor.THREE, ReplicationType.RATIS);
+    generateData(20, "key", ratisRepConfig);
     // Locate any container and find its open pipeline
     final ContainerInfo container = waitForAndReturnContainer();
     Set<ContainerReplica> replicas = getContainerReplicas(container);
@@ -397,7 +399,7 @@ public class TestDecommissionAndMaintenance {
     // Stop Replication Manager to sure no containers are replicated
     stopReplicationManager();
     // Generate some data on the empty cluster to create some containers
-    generateData(20, "key", ReplicationFactor.THREE, ReplicationType.RATIS);
+    generateData(20, "key", ratisRepConfig);
     // Locate any container and find its open pipeline
     final ContainerInfo container = waitForAndReturnContainer();
     Set<ContainerReplica> replicas = getContainerReplicas(container);
@@ -440,7 +442,7 @@ public class TestDecommissionAndMaintenance {
   public void testMaintenanceEndsAutomaticallyAtTimeout()
       throws Exception {
     // Generate some data on the empty cluster to create some containers
-    generateData(20, "key", ReplicationFactor.THREE, ReplicationType.RATIS);
+    generateData(20, "key", ratisRepConfig);
     ContainerInfo container = waitForAndReturnContainer();
     DatanodeDetails dn =
         getOneDNHostingReplica(getContainerReplicas(container));
@@ -482,7 +484,7 @@ public class TestDecommissionAndMaintenance {
   public void testSCMHandlesRestartForMaintenanceNode()
       throws Exception {
     // Generate some data on the empty cluster to create some containers
-    generateData(20, "key", ReplicationFactor.THREE, ReplicationType.RATIS);
+    generateData(20, "key", ratisRepConfig);
     ContainerInfo container = waitForAndReturnContainer();
     DatanodeDetails dn =
         getOneDNHostingReplica(getContainerReplicas(container));
@@ -547,14 +549,13 @@ public class TestDecommissionAndMaintenance {
    * Generates some data on the cluster so the cluster has some containers.
    * @param keyCount The number of keys to create
    * @param keyPrefix The prefix to use for the key name.
-   * @param repFactor The replication Factor for the keys
-   * @param repType The replication Type for the keys
+   * @param replicationConfig The replication config for the keys
    * @throws IOException
    */
   private void generateData(int keyCount, String keyPrefix,
-      ReplicationFactor repFactor, ReplicationType repType) throws IOException {
+      ReplicationConfig replicationConfig) throws IOException {
     for (int i = 0; i < keyCount; i++) {
-      TestDataUtil.createKey(bucket, keyPrefix + i, repFactor, repType,
+      TestDataUtil.createKey(bucket, keyPrefix + i, replicationConfig,
           "this is the content");
     }
   }
