@@ -17,13 +17,12 @@
  */
 package org.apache.hadoop.ozone.freon;
 
+import com.codahale.metrics.Timer;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
-import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
-import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,13 +30,11 @@ import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
-
 /**
  * Utility to generate RPC request to OM with or without payload.
  */
 @Command(name = "om-rpc-load",
-        aliases = "omrpcl",
+        aliases = "rpcl",
         description =
                 "Generate random RPC request to the OM " +
                         "with or without layload.",
@@ -50,11 +47,15 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
   private static final Logger LOG =
           LoggerFactory.getLogger(OmRPCLoadGenerator.class);
 
+  private static final int MULTIPLICATION_FACTOR = 1000;
+
+  private Timer timer;
+
   @Option(names = {"--payload"},
           description =
-                  "Specifies the size of payload in bytes in each RPC request.",
-          defaultValue = "1024")
-  private int payloadSize = 1024;
+                  "Specifies the size of payload in KB in each RPC request.",
+          defaultValue = "1")
+  private int payloadSizeKB = 1;
 
   @Option(names = {"--empty-req"},
           description =
@@ -73,20 +74,35 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
     init();
     int numOfThreads = getThreadNo();
     LOG.info("Number of Threads: {}", numOfThreads);
-    LOG.info("RPC request payload size: {} bytes", payloadSize);
+    LOG.info("RPC request payload size: {} KB", payloadSizeKB);
     LOG.info("Empty RPC request: {}", isEmptyReq);
     LOG.info("Empty RPC response: {}", isEmptyResp);
+    timer = getMetrics().timer("rpc-payload");
 
     for (int i = 0; i < numOfThreads; i++) {
       runTests(this::sendRPCReq);
     }
+    printReport();
     return null;
   }
   private void sendRPCReq(long l) throws Exception {
     OzoneConfiguration configuration = createOzoneConfiguration();
     LOG.info("###################-3-########################");
     RpcClient rpcclient = new RpcClient(configuration, null);
-    LOG.info(rpcclient.getCanonicalServiceName());
+    if (payloadSizeKB < 0) {
+      throw new IllegalArgumentException(
+              "RPC request payload can't be negative."
+      );
+    }
+    int payloadSize = (int) Math.min(
+            (long)payloadSizeKB * MULTIPLICATION_FACTOR, Integer.MAX_VALUE);
+//    byte[] payloadBytes = RandomUtils.nextBytes((int)payloadSize);
+    timer.time(() -> {
+      rpcclient.getCanonicalServiceName();
+      return null;
+    });
+
+//    byte[] resp = rpcclient.sendRPCReqWithPayload(payloadBytes);
     LOG.info("###################-4-########################");
 
   }
