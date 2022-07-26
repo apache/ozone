@@ -212,9 +212,6 @@ public final class ECKeyOutputStream extends KeyOutputStream {
         streamEntry.streamsWithWriteFailure();
     if (!failedStreams.isEmpty()) {
       excludePipelineAndFailedDN(streamEntry.getPipeline(), failedStreams);
-      if(LOG.isDebugEnabled()) {
-
-      }
       return StripeWriteStatus.FAILED;
     }
 
