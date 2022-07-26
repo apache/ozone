@@ -154,7 +154,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     }
     try {
       int writtenLen = 0;
-      while (off + writtenLen < len) {
+      while (writtenLen < len) {
         writtenLen += handleWrite(b, off + writtenLen, len - writtenLen);
       }
     } catch (Exception e) {
@@ -212,6 +212,9 @@ public final class ECKeyOutputStream extends KeyOutputStream {
         streamEntry.streamsWithWriteFailure();
     if (!failedStreams.isEmpty()) {
       excludePipelineAndFailedDN(streamEntry.getPipeline(), failedStreams);
+      if(LOG.isDebugEnabled()) {
+
+      }
       return StripeWriteStatus.FAILED;
     }
 
