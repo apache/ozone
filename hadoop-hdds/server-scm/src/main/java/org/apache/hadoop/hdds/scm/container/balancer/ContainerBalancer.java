@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.DUFactory;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBalancerConfigurationProto;
+import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -134,7 +135,7 @@ public class ContainerBalancer extends StatefulService {
     this.underUtilizedNodes = new ArrayList<>();
     this.withinThresholdUtilizedNodes = new ArrayList<>();
     this.unBalancedNodes = new ArrayList<>();
-    this.placementPolicyValidateProxy = new PlacementPolicyValidateProxy(scm);
+    this.placementPolicyValidateProxy = scm.getPlacementPolicyValidateProxy();
     this.networkTopology = scm.getClusterMap();
     this.nextIterationIndex = 0;
 

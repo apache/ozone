@@ -15,13 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.container.balancer;
+package org.apache.hadoop.hdds.scm;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 
 import java.util.List;
 
@@ -33,9 +30,11 @@ public class PlacementPolicyValidateProxy {
   private PlacementPolicy defaultPlacementPolicy;
   private PlacementPolicy ecPlacementPolicy;
 
-  public PlacementPolicyValidateProxy(StorageContainerManager scm) {
-    this.defaultPlacementPolicy = scm.getContainerPlacementPolicy();
-    this.ecPlacementPolicy = scm.getEcContainerPlacementPolicy();
+  public PlacementPolicyValidateProxy(
+      PlacementPolicy defaultPlacementPolicy,
+      PlacementPolicy ecPlacementPolicy) {
+    this.defaultPlacementPolicy = defaultPlacementPolicy;
+    this.ecPlacementPolicy = ecPlacementPolicy;
   }
 
   public ContainerPlacementStatus validateContainerPlacement(

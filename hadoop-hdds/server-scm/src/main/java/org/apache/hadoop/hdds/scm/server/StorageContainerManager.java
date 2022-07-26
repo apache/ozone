@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.crl.CRLStatusReportHandler;
 import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
@@ -266,6 +267,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
   private PlacementPolicy ecContainerPlacementPolicy;
+  private PlacementPolicyValidateProxy placementPolicyValidateProxy;
   private MetricsSystem ms;
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
@@ -607,7 +609,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       long term = SCMHAUtils.isSCMHAEnabled(conf) ? 0 : SCMContext.INVALID_TERM;
       // non-leader of term 0, in safe mode, preCheck not completed.
       scmContext = new SCMContext.Builder()
-          .setLeader(false).setTerm(term)
+          .setLeader(false)
+          .setTerm(term)
           .setIsInSafeMode(true)
           .setIsPreCheckComplete(false)
           .setSCM(this)
@@ -629,6 +632,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     ecContainerPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(
         conf, scmNodeManager, clusterMap, true, placementMetrics);
+
+    placementPolicyValidateProxy = new PlacementPolicyValidateProxy(
+        containerPlacementPolicy, ecContainerPlacementPolicy);
 
     if (configurator.getPipelineManager() != null) {
       pipelineManager = configurator.getPipelineManager();
@@ -1733,8 +1739,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return containerPlacementPolicy;
   }
 
-  public PlacementPolicy getEcContainerPlacementPolicy() {
-    return ecContainerPlacementPolicy;
+  public PlacementPolicyValidateProxy getPlacementPolicyValidateProxy() {
+    return placementPolicyValidateProxy;
   }
 
   @VisibleForTesting

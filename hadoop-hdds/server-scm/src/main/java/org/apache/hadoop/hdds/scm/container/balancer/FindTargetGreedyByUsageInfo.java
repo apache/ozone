@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.LoggerFactory;
