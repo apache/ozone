@@ -763,7 +763,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
   /**
-   * Get the Replication Index
+   * Get the Replication Index.
    * @return replicationIndex
    */
   public int getReplicationIndex() {

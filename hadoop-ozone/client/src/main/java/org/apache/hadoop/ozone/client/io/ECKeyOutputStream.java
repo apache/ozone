@@ -23,7 +23,6 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -212,18 +211,20 @@ public final class ECKeyOutputStream extends KeyOutputStream {
                               String operation) {
     Map<Integer, ECBlockOutputStream> failedStreamIndexMap =
             failedStreams.stream()
-                    .collect(Collectors.toMap(ECBlockOutputStream::getReplicationIndex, Function.identity()));
+                    .collect(Collectors.toMap(
+                            ECBlockOutputStream::getReplicationIndex,
+                            Function.identity()));
 
     String failedStreamsString = IntStream.range(1,
                     numDataBlks + numParityBlks + 1)
             .mapToObj(index -> failedStreamIndexMap.containsKey(index)
                     ? "F" : "P")
             .collect(Collectors.joining(" "));
-    LOG.error("{} failed: {}",operation , failedStreamsString);
-    for(ECBlockOutputStream stream : failedStreams) {
+    LOG.error("{} failed: {}", operation, failedStreamsString);
+    for (ECBlockOutputStream stream : failedStreams) {
       LOG.error("Failure for replica index: {}, DatanodeDetails: {}",
-              stream.getReplicationIndex(), stream.getDatanodeDetails()
-              , stream.getIoException());
+              stream.getReplicationIndex(), stream.getDatanodeDetails(),
+              stream.getIoException());
     }
   }
 
