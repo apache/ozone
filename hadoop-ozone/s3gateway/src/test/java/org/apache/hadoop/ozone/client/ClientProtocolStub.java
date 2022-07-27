@@ -19,7 +19,6 @@
  */
 package org.apache.hadoop.ozone.client;
 
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -52,7 +51,6 @@ import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -61,7 +59,6 @@ import java.util.Map;
  */
 public class ClientProtocolStub implements ClientProtocol {
   private final ObjectStoreStub objectStoreStub;
-  private int respBytesSize = 1000;
 
   public ClientProtocolStub(ObjectStoreStub objectStoreStub) {
     this.objectStoreStub = objectStoreStub;
@@ -573,5 +570,4 @@ public class ClientProtocolStub implements ClientProtocol {
       String volumeName, String bucketName, String keyName) throws IOException {
     return null;
   }
-
 }

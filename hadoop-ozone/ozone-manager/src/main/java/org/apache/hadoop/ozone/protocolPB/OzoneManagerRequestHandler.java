@@ -896,7 +896,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   @RequestFeatureValidator(
       conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.EchoRPC
+      requestType = Type.GetFileStatus
   )
   public static OMResponse disallowGetFileStatusWithECReplicationConfig(
       OMRequest req, OMResponse resp, ValidationContext ctx)

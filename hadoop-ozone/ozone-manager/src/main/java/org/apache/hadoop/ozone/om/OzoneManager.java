@@ -4470,16 +4470,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public EchoRPCResponse echoRPCReq(byte[] payload, boolean emptyResp)
           throws IOException {
-//    EchoRPCRequest echoRPCRequest =
-//            EchoRPCRequest.newBuilder().build();
-//
-//    OMRequest omRequest = createOMRequest(Type.EchoRPC)
-//            .setEchoRPCRequest(echoRPCRequest).build();
-//
-//    EchoRPCResponse echoRPCResponse =
-//            handleError(submitRequest(omRequest)).getEchoRPCResponse();
-//    return echoRPCResponse;
-
     return null;
   }
 
