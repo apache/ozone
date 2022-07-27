@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -61,6 +62,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -382,7 +384,9 @@ public class TestOzoneECClient {
                 keyDetails.getOzoneKeyLocations().get(0).getContainerID())
                 .setLocalID(
                     keyDetails.getOzoneKeyLocations().get(0).getLocalID())
-                .setBlockCommitSequenceId(1).build());
+                .setBlockCommitSequenceId(1).setReplicaIndex(
+                blockList.getKeyLocations(0).getPipeline()
+                    .getMemberReplicaIndexes(i)).build());
 
         List<ContainerProtos.KeyValue> metadataList =
             block.getMetadataList().stream().filter(kv -> kv.getKey()
@@ -558,6 +562,9 @@ public class TestOzoneECClient {
         OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT);
     int dataBlks = 10;
     int parityBlks = 4;
+    MultiNodePipelineBlockAllocator blkAllocator =
+        new MultiNodePipelineBlockAllocator(conf, dataBlks + parityBlks, 14);
+    createNewClient(conf, blkAllocator);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -811,6 +818,73 @@ public class TestOzoneECClient {
                 UTF_8) + " \n " + "Actual: " + new String(fileContent, UTF_8),
             Arrays.equals(inputChunks[i % dataBlocks], fileContent));
       }
+    }
+  }
+
+  @Test
+  public void testExcludeOnDNFailure() throws IOException {
+    testExcludeFailedDN(IntStream.range(0, 5), IntStream.empty());
+  }
+
+  @Test
+  public void testExcludeOnDNClosed() throws IOException {
+    testExcludeFailedDN(IntStream.empty(), IntStream.range(0, 5));
+  }
+
+  @Test
+  public void testExcludeOnDNMixed() throws IOException {
+    testExcludeFailedDN(IntStream.range(0, 3), IntStream.range(3, 5));
+  }
+
+  private void testExcludeFailedDN(IntStream failedDNIndex,
+      IntStream closedDNIndex) throws IOException {
+    close();
+    OzoneConfiguration con = new OzoneConfiguration();
+    MultiNodePipelineBlockAllocator blkAllocator =
+        new MultiNodePipelineBlockAllocator(con, dataBlocks + parityBlocks, 10);
+    createNewClient(con, blkAllocator);
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    ECReplicationConfig repConfig = new ECReplicationConfig(
+        dataBlocks, parityBlocks, ECReplicationConfig.EcCodec.RS, chunkSize);
+
+    try (OzoneOutputStream out = bucket.createKey(keyName,
+        2L * dataBlocks * chunkSize, repConfig, new HashMap<>())) {
+
+      Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+      ECKeyOutputStream ecKeyOut = (ECKeyOutputStream) out.getOutputStream();
+
+      List<HddsProtos.DatanodeDetailsProto> dns = blkAllocator.getClusterDns();
+
+      for (int i = 0; i < dataBlocks; i++) {
+        out.write(inputChunks[i % dataBlocks]);
+      }
+
+      // Then let's mark datanodes with closed container
+      List<DatanodeDetails> closedDNs = closedDNIndex
+          .mapToObj(i -> DatanodeDetails.getFromProtoBuf(dns.get(i)))
+          .collect(Collectors.toList());
+      ((MockXceiverClientFactory) factoryStub).mockStorageFailure(closedDNs,
+          new ContainerNotOpenException("Mocked"));
+
+      // Then let's mark failed datanodes
+      List<DatanodeDetails> failedDNs = failedDNIndex
+          .mapToObj(i -> DatanodeDetails.getFromProtoBuf(dns.get(i)))
+          .collect(Collectors.toList());
+      ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
+
+      for (int i = 0; i < dataBlocks; i++) {
+        out.write(inputChunks[i % dataBlocks]);
+      }
+
+      // Assert excludeList only includes failedDNs
+      Assert.assertArrayEquals(failedDNs.toArray(new DatanodeDetails[0]),
+          ecKeyOut.getExcludeList().getDatanodes()
+              .toArray(new DatanodeDetails[0]));
     }
   }
 

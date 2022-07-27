@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
@@ -414,6 +415,16 @@ public final class HddsUtils {
     default:
       return false;
     }
+  }
+
+  /**
+   * Returns true if the container is in open to write state
+   * (OPEN or RECOVERING).
+   *
+   * @param state - container state
+   */
+  public static boolean isOpenToWriteState(State state) {
+    return state == State.OPEN || state == State.RECOVERING;
   }
 
   /**

@@ -22,8 +22,17 @@ scrape_configs:
     static_configs:
      - targets:
         - "scm:9876"
+       labels:
+         component: scm
+     - targets:
         - "om:9874"
+       labels:
+         component: om
+     - targets:
         - "s3g:9878"
+       labels:
+         component: s3g
+     - targets:
         - "ozone_datanode_1:9882"
         - "ozone_datanode_2:9882"
         - "ozone_datanode_3:9882"
@@ -34,3 +43,5 @@ scrape_configs:
         - "ozone_datanode_8:9882"
         - "ozone_datanode_9:9882"
         - "ozone_datanode_10:9882"
+       labels:
+         component: datanode

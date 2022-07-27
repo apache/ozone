@@ -34,6 +34,7 @@ import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -50,7 +51,7 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 public class TestOmKeyInfo {
 
   @Test
-  public void protobufConversion() {
+  public void protobufConversion() throws IOException {
     OmKeyInfo key = createOmKeyInfo(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
 
@@ -61,7 +62,7 @@ public class TestOmKeyInfo {
   }
 
   @Test
-  public void getProtobufMessageEC() {
+  public void getProtobufMessageEC() throws IOException {
     OmKeyInfo key = createOmKeyInfo(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     OzoneManagerProtocolProtos.KeyInfo omKeyProto =

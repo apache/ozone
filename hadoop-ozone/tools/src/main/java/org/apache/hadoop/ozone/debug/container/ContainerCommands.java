@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -47,8 +46,8 @@ import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Spec;
 
 import java.io.File;
@@ -109,7 +108,7 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
   public void loadContainersFromVolumes() throws IOException {
     OzoneConfiguration conf = parent.getOzoneConf();
 
-    ContainerSet containerSet = new ContainerSet();
+    ContainerSet containerSet = new ContainerSet(1000);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 
@@ -152,7 +151,7 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
       HddsVolume volume = volumeSetIterator.next();
       LOG.info("Loading container metadata from volume " + volume.toString());
       final ContainerReader reader =
-          new ContainerReader(volumeSet, volume, containerSet, conf);
+          new ContainerReader(volumeSet, volume, containerSet, conf, false);
       reader.run();
     }
 
@@ -191,7 +190,7 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
           "Version file " + versionFile + " is missing");
     }
 
-    return HddsVolumeUtil
+    return StorageVolumeUtil
         .getProperty(props, OzoneConsts.DATANODE_UUID, versionFile);
   }
 

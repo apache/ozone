@@ -38,10 +38,16 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 @CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE, BUCKET_TABLE})
 public class OMAllocateBlockResponseWithFSO extends OMAllocateBlockResponse {
 
+  private long volumeId;
+  private long bucketId;
+
   public OMAllocateBlockResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, long clientID,
-      @Nonnull BucketLayout bucketLayout) {
+      @Nonnull BucketLayout bucketLayout, @Nonnull long volumeId,
+      @Nonnull long bucketId) {
     super(omResponse, omKeyInfo, clientID, bucketLayout);
+    this.volumeId = volumeId;
+    this.bucketId = bucketId;
   }
 
   /**
@@ -58,7 +64,7 @@ public class OMAllocateBlockResponseWithFSO extends OMAllocateBlockResponse {
       BatchOperation batchOperation) throws IOException {
 
     OMFileRequest.addToOpenFileTable(omMetadataManager, batchOperation,
-            getOmKeyInfo(), getClientID());
+            getOmKeyInfo(), getClientID(), volumeId, bucketId);
   }
 }
 

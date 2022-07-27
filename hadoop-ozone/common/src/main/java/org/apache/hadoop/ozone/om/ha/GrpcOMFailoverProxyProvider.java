@@ -17,18 +17,21 @@
  */
 package org.apache.hadoop.ozone.om.ha;
 
+import io.grpc.Status;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.io.Text;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
-import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -36,6 +39,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import io.grpc.StatusRuntimeException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
@@ -48,39 +54,29 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
  * connecting to another OM node from the list of proxies.
  */
 public class GrpcOMFailoverProxyProvider<T> extends
-    OMFailoverProxyProvider<T> {
-
-  private Map<String, String> omAddresses;
+    OMFailoverProxyProviderBase<T> {
+  public static final Logger LOG =
+      LoggerFactory.getLogger(GrpcOMFailoverProxyProvider.class);
 
   public GrpcOMFailoverProxyProvider(ConfigurationSource configuration,
-                                     UserGroupInformation ugi,
                                      String omServiceId,
                                      Class<T> protocol) throws IOException {
-    super(configuration, ugi, omServiceId, protocol);
+    super(configuration, omServiceId, protocol);
   }
 
   @Override
   protected void loadOMClientConfigs(ConfigurationSource config, String omSvcId)
       throws IOException {
-    // to be used for base class omProxies,
-    // ProxyInfo not applicable for gRPC, just need key set
-    Map<String, ProxyInfo<T>> omProxiesNodeIdKeyset = new HashMap<>();
-    // to be used for base class omProxyInfos
-    // OMProxyInfo not applicable for gRPC, just need key set
-    Map<String, OMProxyInfo> omProxyInfosNodeIdKeyset = new HashMap<>();
-    List<String> omNodeIDList = new ArrayList<>();
-    omAddresses = new HashMap<>();
 
     Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(config, omSvcId);
+    Map<String, ProxyInfo<T>> omProxies = new HashMap<>();
+    List<String> omNodeIDList = new ArrayList<>();
 
     for (String nodeId : OmUtils.emptyAsSingletonNull(omNodeIds)) {
-
       String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
           omSvcId, nodeId);
-
       Optional<String> hostaddr = getHostNameFromConfigKeys(config,
           rpcAddrKey);
-
       OptionalInt hostport = HddsUtils.getNumberFromConfigKeys(config,
           ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_GRPC_PORT_KEY,
               omSvcId, nodeId),
@@ -88,15 +84,15 @@ public class GrpcOMFailoverProxyProvider<T> extends
       if (nodeId == null) {
         nodeId = OzoneConsts.OM_DEFAULT_NODE_ID;
       }
-      omProxiesNodeIdKeyset.put(nodeId, null);
-      omProxyInfosNodeIdKeyset.put(nodeId, null);
       if (hostaddr.isPresent()) {
-        omAddresses.put(nodeId,
-            hostaddr.get() + ":"
-                + hostport.orElse(config
-                .getObject(GrpcOmTransport
-                    .GrpcOmTransportConfig.class)
-                .getPort()));
+        ProxyInfo<T> proxyInfo =
+            new ProxyInfo<>(createOMProxy(),
+                hostaddr.get() + ":"
+                    + hostport.orElse(config
+                    .getObject(GrpcOmTransport
+                        .GrpcOmTransportConfig.class)
+                    .getPort()));
+        omProxies.put(nodeId, proxyInfo);
       } else {
         LOG.error("expected host address not defined for: {}", rpcAddrKey);
         throw new ConfigurationException(rpcAddrKey + "is not defined");
@@ -104,37 +100,63 @@ public class GrpcOMFailoverProxyProvider<T> extends
       omNodeIDList.add(nodeId);
     }
 
-    if (omProxiesNodeIdKeyset.isEmpty()) {
+    if (omProxies.isEmpty()) {
       throw new IllegalArgumentException("Could not find any configured " +
           "addresses for OM. Please configure the system with "
           + OZONE_OM_ADDRESS_KEY);
     }
+    setOmProxies(omProxies);
+    setOmNodeIDList(omNodeIDList);
+  }
 
-    // set base class omProxies, omProxyInfos, omNodeIDList
+  private T createOMProxy() throws IOException {
+    InetSocketAddress addr = new InetSocketAddress(0);
+    Configuration hadoopConf =
+        LegacyHadoopConfigurationSource.asHadoopConfiguration(getConf());
+    return (T) RPC.getProxy(getInterface(), 0, addr, hadoopConf);
+  }
 
-    // omProxies needed in base class
-    // omProxies.size == number of om nodes
-    // omProxies key needs to be valid nodeid
-    // omProxyInfos keyset needed in base class
-    setProxies(omProxiesNodeIdKeyset, omProxyInfosNodeIdKeyset, omNodeIDList);
+  /**
+   * Get the proxy object which should be used until the next failover event
+   * occurs. RPC proxy object is intialized lazily.
+   * @return the OM proxy object to invoke methods upon
+   */
+  @Override
+  public synchronized ProxyInfo<T> getProxy() {
+    return getOMProxyMap().get(getCurrentProxyOMNodeId());
   }
 
   @Override
-  protected Text computeDelegationTokenService() {
-    return new Text();
+  protected synchronized boolean shouldFailover(Exception ex) {
+    if (ex instanceof StatusRuntimeException) {
+      StatusRuntimeException srexp = (StatusRuntimeException)ex;
+      Status status = srexp.getStatus();
+      if (status.getCode() == Status.Code.RESOURCE_EXHAUSTED) {
+        LOG.debug("Grpc response has invalid length, {}", srexp.getMessage());
+        return false;
+      } else if (status.getCode() == Status.Code.DATA_LOSS) {
+        LOG.debug("Grpc unrecoverable data loss or corruption, {}",
+                srexp.getMessage());
+        return false;
+      }
+    }
+    return super.shouldFailover(ex);
   }
+
+  @Override
+  public synchronized void close() throws IOException { }
 
   // need to throw if nodeID not in omAddresses
   public String getGrpcProxyAddress(String nodeId) throws IOException {
-    if (omAddresses.containsKey(nodeId)) {
-      return omAddresses.get(nodeId);
+    Map<String, ProxyInfo<T>> omProxies = getOMProxyMap();
+    if (omProxies.containsKey(nodeId)) {
+      return omProxies.get(nodeId).proxyInfo;
     } else {
-      LOG.error("expected nodeId not found in omAddresses for proxyhost {}",
+      LOG.error("expected nodeId not found in omProxies for proxyhost {}",
           nodeId);
       throw new IOException(
-          "expected nodeId not found in omAddresses for proxyhost");
+          "expected nodeId not found in omProxies for proxyhost");
     }
-
   }
 
   public List<String> getGrpcOmNodeIDList() {

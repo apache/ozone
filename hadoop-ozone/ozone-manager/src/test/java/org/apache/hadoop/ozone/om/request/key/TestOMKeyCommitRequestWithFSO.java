@@ -41,6 +41,9 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
 
   private long parentID = Long.MIN_VALUE;
 
+  private long getVolumeID() throws IOException {
+    return omMetadataManager.getVolumeId(volumeName);
+  }
   private long getBucketID() throws java.io.IOException {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
@@ -54,9 +57,11 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
 
   @Override
   protected String getOzonePathKey() throws IOException {
-    long bucketID = getBucketID();
+    final long volumeId = getVolumeID();
+    final long bucketID = getBucketID();
     String fileName = OzoneFSUtils.getFileName(keyName);
-    return omMetadataManager.getOzonePathKey(bucketID, fileName);
+    return omMetadataManager.getOzonePathKey(volumeId, bucketID,
+            bucketID, fileName);
   }
 
   @Override
@@ -82,7 +87,8 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
     OMRequestTestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfoFSO, clientID, txnLogId, omMetadataManager);
 
-    return omMetadataManager.getOzonePathKey(parentID, fileName);
+    return omMetadataManager.getOzonePathKey(getVolumeID(), getBucketID(),
+            parentID, fileName);
   }
 
   @NotNull

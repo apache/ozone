@@ -165,6 +165,7 @@ message SCMNodeAddressList {
 message NodeReportProto {
   repeated StorageReportProto storageReport = 1;
   repeated MetadataStorageReportProto metadataStorageReport = 2;
+  repeated StorageReportProto dbStorageReport = 3;
 }
 
 message StorageReportProto {
@@ -399,6 +400,7 @@ message DeleteContainerCommandProto {
   required int64 containerID = 1;
   required int64 cmdId = 2;
   required bool force = 3 [default = false];
+  optional int32 replicaIndex = 4;
 }
 
 /**
@@ -408,6 +410,7 @@ message ReplicateContainerCommandProto {
   required int64 containerID = 1;
   repeated DatanodeDetailsProto sources = 2;
   required int64 cmdId = 3;
+  optional int32 replicaIndex = 4;
 }
 
 /**

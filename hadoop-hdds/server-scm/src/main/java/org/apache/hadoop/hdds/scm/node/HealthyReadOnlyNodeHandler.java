@@ -19,11 +19,12 @@ package org.apache.hadoop.hdds.scm.node;
 
 import java.io.IOException;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -42,14 +43,11 @@ public class HealthyReadOnlyNodeHandler
       LoggerFactory.getLogger(HealthyReadOnlyNodeHandler.class);
   private final PipelineManager pipelineManager;
   private final NodeManager nodeManager;
-  private final ConfigurationSource conf;
 
   public HealthyReadOnlyNodeHandler(
-      NodeManager nodeManager, PipelineManager pipelineManager,
-      OzoneConfiguration conf) {
+      NodeManager nodeManager, PipelineManager pipelineManager) {
     this.pipelineManager = pipelineManager;
     this.nodeManager = nodeManager;
-    this.conf = conf;
   }
 
   @Override
@@ -57,17 +55,49 @@ public class HealthyReadOnlyNodeHandler
       EventPublisher publisher) {
     LOG.info("Datanode {} moved to HEALTHY READONLY state.", datanodeDetails);
 
+    /*
+     * Order of finalization operations should be:
+     * 1. SCM closes all pipelines.
+     *   - This queues close commands for all containers to be sent to the
+     *     datanodes.
+     *   - Pipelines will remain in the DB until the scrubber removes them
+     *     since we did not force close the pipelines.
+     * 2. SCM finalizes.
+     * 3. SCM moves all datanodes healthy readonly state.
+     *   - Before this, no datanode should have been moved to healthy
+     *     readonly, even if it heartbeated while SCM was finalizing.
+     *
+     * During the initial pipeline close phase, some containers may end up
+     * in the CLOSING state if they were in the process of leader election
+     * for their pipeline when the close command was received. A datanode
+     * cannot finalize with CLOSING containers, so we want to move those
+     * containers to CLOSE soon without waiting for the replication manager
+     * to do it.
+     *
+     * To do this, we will resend close commands for each pipeline. Since the
+     * pipelines should already be closed and we are not force closing them, no
+     * pipeline action is queued for the datanode. However, close container
+     * commands are still queued for all containers currently in the pipeline.
+     * The datanode will ignore these commands for CLOSED containers, but it
+     * allows CLOSING containers to move to CLOSED so finalization can progress.
+     */
     Set<PipelineID> pipelineIDs = nodeManager.getPipelines(datanodeDetails);
-    for (PipelineID id: pipelineIDs) {
-      LOG.info("Closing pipeline {} which uses HEALTHY READONLY datanode {} ",
-              id,  datanodeDetails);
+    for (PipelineID pipelineID : pipelineIDs) {
       try {
-        pipelineManager.closePipeline(pipelineManager.getPipeline(id), false);
-      } catch (IOException ex) {
+        Pipeline pipeline = pipelineManager.getPipeline(pipelineID);
+        LOG.info("Sending close command for pipeline {} in state {} which " +
+                "uses {} datanode {}. This will send close commands for its " +
+                "containers.",
+            pipelineID, pipeline.getPipelineState(),
+            HddsProtos.NodeState.HEALTHY_READONLY,
+            datanodeDetails.getUuidString());
+        pipelineManager.closePipeline(pipeline, true);
+      } catch (IOException | TimeoutException ex) {
         LOG.error("Failed to close pipeline {} which uses HEALTHY READONLY " +
-            "datanode {}: ", id, datanodeDetails, ex);
+            "datanode {}: ", pipelineID, datanodeDetails, ex);
       }
     }
+
     //add node back if it is not present in networkTopology
     NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();
     if (!nt.contains(datanodeDetails)) {

@@ -220,27 +220,29 @@ public final class ContainerStateManagerImpl
    * @throws IOException in case of error while loading the containers
    */
   private void initialize() throws IOException {
-    TableIterator<ContainerID, ? extends KeyValue<ContainerID, ContainerInfo>>
-        iterator = containerStore.iterator();
+    try (TableIterator<ContainerID,
+        ? extends KeyValue<ContainerID, ContainerInfo>> iterator =
+             containerStore.iterator()) {
 
-    while (iterator.hasNext()) {
-      final ContainerInfo container = iterator.next().getValue();
-      Preconditions.checkNotNull(container);
-      containers.addContainer(container);
-      if (container.getState() == LifeCycleState.OPEN) {
-        try {
-          pipelineManager.addContainerToPipelineSCMStart(
-              container.getPipelineID(), container.containerID());
-        } catch (PipelineNotFoundException ex) {
-          LOG.warn("Found container {} which is in OPEN state with " +
-                  "pipeline {} that does not exist. Marking container for " +
-                  "closing.", container, container.getPipelineID());
+      while (iterator.hasNext()) {
+        final ContainerInfo container = iterator.next().getValue();
+        Preconditions.checkNotNull(container);
+        containers.addContainer(container);
+        if (container.getState() == LifeCycleState.OPEN) {
           try {
-            updateContainerState(container.containerID().getProtobuf(),
-                LifeCycleEvent.FINALIZE);
-          } catch (InvalidStateTransitionException e) {
-            // This cannot happen.
-            LOG.warn("Unable to finalize Container {}.", container);
+            pipelineManager.addContainerToPipelineSCMStart(
+                container.getPipelineID(), container.containerID());
+          } catch (PipelineNotFoundException ex) {
+            LOG.warn("Found container {} which is in OPEN state with " +
+                "pipeline {} that does not exist. Marking container for " +
+                "closing.", container, container.getPipelineID());
+            try {
+              updateContainerState(container.containerID().getProtobuf(),
+                  LifeCycleEvent.FINALIZE);
+            } catch (InvalidStateTransitionException e) {
+              // This cannot happen.
+              LOG.warn("Unable to finalize Container {}.", container);
+            }
           }
         }
       }

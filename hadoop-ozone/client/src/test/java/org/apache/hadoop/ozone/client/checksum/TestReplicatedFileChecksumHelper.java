@@ -241,6 +241,36 @@ public class TestReplicatedFileChecksumHelper {
     FileChecksum fileChecksum = helper.getFileChecksum();
     assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
     assertEquals(1, helper.getKeyLocationInfoList().size());
+
+    FileChecksum cachedChecksum = new MD5MD5CRC32GzipFileChecksum();
+    /// test cached checksum
+    OmKeyInfo omKeyInfoWithChecksum = new OmKeyInfo.Builder()
+        .setVolumeName(null)
+        .setBucketName(null)
+        .setKeyName(null)
+        .setOmKeyLocationInfos(Collections.singletonList(
+            new OmKeyLocationInfoGroup(0, omKeyLocationInfoList)))
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setDataSize(0)
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.ONE))
+        .setFileEncryptionInfo(null)
+        .setAcls(null)
+        .setFileChecksum(cachedChecksum)
+        .build();
+    when(om.lookupKey(ArgumentMatchers.any())).
+        thenReturn(omKeyInfoWithChecksum);
+
+    helper = new ReplicatedFileChecksumHelper(
+        mockVolume, bucket, "dummy", 10, combineMode,
+        mockRpcClient);
+
+    helper.compute();
+    fileChecksum = helper.getFileChecksum();
+    assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
+    assertEquals(1, helper.getKeyLocationInfoList().size());
   }
 
   private XceiverClientReply buildValidResponse() {

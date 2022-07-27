@@ -268,7 +268,7 @@ public class TestContainerStateManagerIntegration {
 
   @Test
   public void testUpdateContainerState() throws IOException,
-      InvalidStateTransitionException {
+      InvalidStateTransitionException, TimeoutException {
     Set<ContainerID> containerList = containerStateManager
         .getContainerIDs(HddsProtos.LifeCycleState.OPEN);
     int containers = containerList == null ? 0 : containerList.size();

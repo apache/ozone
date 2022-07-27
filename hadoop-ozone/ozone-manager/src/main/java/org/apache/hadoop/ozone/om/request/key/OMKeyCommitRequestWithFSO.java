@@ -122,13 +122,17 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       String fileName = OzoneFSUtils.getFileName(keyName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
-      long bucketId = omBucketInfo.getObjectID();
-      long parentID = OMFileRequest.getParentID(bucketId, pathComponents,
-          keyName, omMetadataManager, "Cannot create file : " + keyName
+      final long volumeId = omMetadataManager.getVolumeId(volumeName);
+      final long bucketId = omMetadataManager.getBucketId(
+              volumeName, bucketName);
+      long parentID = OMFileRequest.getParentID(volumeId, bucketId,
+              pathComponents, keyName, omMetadataManager,
+              "Cannot create file : " + keyName
               + " as parent directory doesn't exist");
-      String dbFileKey = omMetadataManager.getOzonePathKey(parentID, fileName);
-      dbOpenFileKey = omMetadataManager.getOpenFileName(parentID, fileName,
-              commitKeyRequest.getClientID());
+      String dbFileKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+              parentID, fileName);
+      dbOpenFileKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
+              parentID, fileName, commitKeyRequest.getClientID());
 
       omKeyInfo = OMFileRequest.getOmKeyInfoFromFileTable(true,
               omMetadataManager, dbOpenFileKey, keyName);
@@ -158,19 +162,20 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       long correctedSpace = omKeyInfo.getReplicatedSize();
 
+      // if keyToDelete isn't null, usedNamespace shouldn't check and
+      // increase.
       if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
         // Subtract the size of blocks to be overwritten.
         correctedSpace -= keyToDelete.getReplicatedSize();
         oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbFileKey,
             keyToDelete, omMetadataManager,
             trxnLogIndex, ozoneManager.isRatisEnabled());
+        checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
       } else {
-        // if keyToDelete isn't null, usedNamespace shouldn't check and
-        // increase.
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
+        checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
         omBucketInfo.incrUsedNamespace(1L);
       }
-      checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
 
       // Add to cache of open key table and key table.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, dbFileKey,
@@ -188,7 +193,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
               omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject(),
-              oldKeyVersionsToDelete);
+              oldKeyVersionsToDelete, volumeId);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

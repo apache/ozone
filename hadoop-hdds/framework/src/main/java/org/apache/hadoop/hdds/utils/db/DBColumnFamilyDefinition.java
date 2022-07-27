@@ -18,6 +18,8 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import org.rocksdb.ColumnFamilyOptions;
+
 import java.io.IOException;
 
 /**
@@ -38,6 +40,8 @@ public class DBColumnFamilyDefinition<KEY, VALUE> {
 
   private final Codec<VALUE> valueCodec;
 
+  private ColumnFamilyOptions cfOptions;
+
   public DBColumnFamilyDefinition(
       String tableName,
       Class<KEY> keyType,
@@ -49,6 +53,7 @@ public class DBColumnFamilyDefinition<KEY, VALUE> {
     this.keyCodec = keyCodec;
     this.valueType = valueType;
     this.valueCodec = valueCodec;
+    this.cfOptions = null;
   }
 
   public Table<KEY, VALUE> getTable(DBStore db) throws IOException {
@@ -77,5 +82,13 @@ public class DBColumnFamilyDefinition<KEY, VALUE> {
 
   public Codec<VALUE> getValueCodec() {
     return valueCodec;
+  }
+
+  public ColumnFamilyOptions getCfOptions() {
+    return this.cfOptions;
+  }
+
+  public void setCfOptions(ColumnFamilyOptions cfOptions) {
+    this.cfOptions = cfOptions;
   }
 }

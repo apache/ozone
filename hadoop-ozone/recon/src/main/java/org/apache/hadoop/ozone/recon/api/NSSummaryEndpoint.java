@@ -394,10 +394,13 @@ public class NSSummaryEndpoint {
       // DU for key doesn't have subpaths
       duResponse.setCount(0);
       // The object ID for the directory that the key is directly in
+      final long volumeId = getVolumeObjectId(names);
+      final long bucketId = getBucketObjectId(names);
       long parentObjectId = getDirObjectId(names, names.length - 1);
       String fileName = names[names.length - 1];
       String ozoneKey =
-          omMetadataManager.getOzonePathKey(parentObjectId, fileName);
+          omMetadataManager.getOzonePathKey(volumeId, bucketId,
+                  parentObjectId, fileName);
       OmKeyInfo keyInfo =
           omMetadataManager.getFileTable().getSkipCache(ozoneKey);
       duResponse.setSize(keyInfo.getDataSize());
@@ -615,9 +618,23 @@ public class NSSummaryEndpoint {
           || !bucketExists(volName, bucketName)) {
         return EntityType.UNKNOWN;
       }
+      final long volumeId = getVolumeObjectId(names);
       long bucketObjectId = getBucketObjectId(names);
-      return determineKeyPath(keyName, bucketObjectId);
+      return determineKeyPath(keyName, volumeId, bucketObjectId);
     }
+  }
+
+  /**
+   * Given a existent path, get the volume object ID.
+   * @param names valid path request
+   * @return volume objectID
+   * @throws IOException
+   */
+  private long getVolumeObjectId(String[] names) throws IOException {
+    String bucketKey = omMetadataManager.getVolumeKey(names[0]);
+    OmVolumeArgs volumeInfo = omMetadataManager
+            .getVolumeTable().getSkipCache(bucketKey);
+    return volumeInfo.getObjectID();
   }
 
   /**
@@ -656,7 +673,8 @@ public class NSSummaryEndpoint {
     long dirObjectId = getBucketObjectId(names);
     String dirKey = null;
     for (int i = 2; i < cutoff; ++i) {
-      dirKey = omMetadataManager.getOzonePathKey(dirObjectId, names[i]);
+      dirKey = omMetadataManager.getOzonePathKey(getVolumeObjectId(names),
+              getBucketObjectId(names), dirObjectId, names[i]);
       OmDirectoryInfo dirInfo =
           omMetadataManager.getDirectoryTable().getSkipCache(dirKey);
       dirObjectId = dirInfo.getObjectID();
@@ -996,7 +1014,8 @@ public class NSSummaryEndpoint {
    * @return DIRECTORY, KEY, or UNKNOWN
    * @throws IOException
    */
-  private EntityType determineKeyPath(String keyName, long bucketObjectId)
+  private EntityType determineKeyPath(String keyName, long volumeId,
+                                      long bucketObjectId)
       throws IOException {
 
     java.nio.file.Path keyPath = Paths.get(keyName);
@@ -1012,8 +1031,8 @@ public class NSSummaryEndpoint {
       // 'buck1' to the leaf node component, which is 'file1.txt'.
       // 2. If there is no dir exists for the leaf node component 'file1.txt'
       // then do look it on fileTable.
-      String dbNodeName = omMetadataManager.getOzonePathKey(
-          lastKnownParentId, fileName);
+      String dbNodeName = omMetadataManager.getOzonePathKey(volumeId,
+              bucketObjectId, lastKnownParentId, fileName);
       omDirInfo = omMetadataManager.getDirectoryTable()
           .getSkipCache(dbNodeName);
 

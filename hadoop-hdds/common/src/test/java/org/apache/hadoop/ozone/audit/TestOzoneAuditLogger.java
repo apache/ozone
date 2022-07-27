@@ -19,9 +19,9 @@ package org.apache.hadoop.ozone.audit;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,8 +37,8 @@ import static org.apache.hadoop.ozone.audit.AuditEventStatus.FAILURE;
 import static org.apache.hadoop.ozone.audit.AuditEventStatus.SUCCESS;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.StringContains.containsString;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.hamcrest.Matcher;
 import org.hamcrest.collection.IsIterableContainingInOrder;
 
@@ -102,7 +102,16 @@ public class TestOzoneAuditLogger {
           .withResult(SUCCESS)
           .withException(null).build();
 
-  @AfterClass
+  private static final AuditMessage AUTH_FAIL_MSG =
+      new AuditMessage.Builder()
+          .setUser(USER)
+          .atIp(IP_ADDRESS)
+          .forOperation(DummyAction.READ_VOLUME)
+          .withParams(PARAMS)
+          .withResult(FAILURE)
+          .withException(null).build();
+
+  @AfterAll
   public static void tearDown() {
     File file = new File("audit.log");
     if (FileUtils.deleteQuietly(file)) {
@@ -113,7 +122,7 @@ public class TestOzoneAuditLogger {
     }
   }
 
-  @Before
+  @BeforeEach
   public void init() {
     AUDIT.refreshDebugCmdSet();
   }
@@ -164,13 +173,21 @@ public class TestOzoneAuditLogger {
   }
 
   @Test
+  public void verifyDefaultLogLevelForAuthFailure() throws IOException {
+    AUDIT.logAuthFailure(AUTH_FAIL_MSG);
+    String expected =
+        "ERROR | OMAudit | ? | " + AUTH_FAIL_MSG.getFormattedMessage();
+    verifyLog(expected);
+  }
+
+  @Test
   public void messageIncludesAllParts() {
     String message = WRITE_FAIL_MSG.getFormattedMessage();
-    assertTrue(message, message.contains(USER));
-    assertTrue(message, message.contains(IP_ADDRESS));
-    assertTrue(message, message.contains(DummyAction.CREATE_VOLUME.name()));
-    assertTrue(message, message.contains(PARAMS.toString()));
-    assertTrue(message, message.contains(FAILURE.getStatus()));
+    assertTrue(message.contains(USER), message);
+    assertTrue(message.contains(IP_ADDRESS), message);
+    assertTrue(message.contains(DummyAction.CREATE_VOLUME.name()), message);
+    assertTrue(message.contains(PARAMS.toString()), message);
+    assertTrue(message.contains(FAILURE.getStatus()), message);
   }
 
   /**

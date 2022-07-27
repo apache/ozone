@@ -246,9 +246,14 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
   private OMClientResponse renameKey(long toKeyParentId,
       long trxnLogIndex, OmKeyInfo fromKeyValue, boolean isRenameDirectory,
       String toKeyName, long modificationTime, OMResponse.Builder omResponse,
-      OzoneManager ozoneManager) {
+      OzoneManager ozoneManager) throws IOException {
 
-    String dbFromKey = fromKeyValue.getPath();
+    final OMMetadataManager ommm = ozoneManager.getMetadataManager();
+    final long volumeId = ommm.getVolumeId(fromKeyValue.getVolumeName());
+    final long bucketId = ommm.getBucketId(fromKeyValue.getVolumeName(),
+            fromKeyValue.getBucketName());
+    final String dbFromKey = ommm.getOzonePathKey(volumeId, bucketId,
+            fromKeyValue.getParentObjectID(), fromKeyValue.getFileName());
     String toKeyFileName = OzoneFSUtils.getFileName(toKeyName);
 
     fromKeyValue.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
@@ -261,7 +266,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     fromKeyValue.setModificationTime(modificationTime);
 
     // destination dbKeyName
-    String dbToKey = fromKeyValue.getPath();
+    String dbToKey = ommm.getOzonePathKey(volumeId, bucketId,
+            fromKeyValue.getParentObjectID(), toKeyFileName);
 
     // Add to cache.
     // dbFromKey should be deleted, dbToKey should be added with newly updated

@@ -42,9 +42,9 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.Assume;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
@@ -54,15 +54,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.collections.CollectionUtils.intersection;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test for RatisPipelineProvider.
@@ -124,7 +125,8 @@ public class TestRatisPipelineProvider {
   }
 
   private void createPipelineAndAssertions(
-      HddsProtos.ReplicationFactor factor) throws IOException {
+      HddsProtos.ReplicationFactor factor)
+      throws IOException, TimeoutException {
     Pipeline pipeline = provider.create(RatisReplicationConfig
         .getInstance(factor));
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
@@ -236,8 +238,8 @@ public class TestRatisPipelineProvider {
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
         replicas);
 
-    Assert.assertEquals(pipeline1.getNodeSet(), pipeline2.getNodeSet());
-    Assert.assertEquals(pipeline2.getNodeSet(), pipeline3.getNodeSet());
+    Assertions.assertEquals(pipeline1.getNodeSet(), pipeline2.getNodeSet());
+    Assertions.assertEquals(pipeline2.getNodeSet(), pipeline3.getNodeSet());
     cleanup();
   }
 
@@ -281,12 +283,12 @@ public class TestRatisPipelineProvider {
     List<DatanodeDetails> nodes = pipeline.getNodes();
 
     assertTrue(
-        "nodes of new pipeline cannot be all from open pipelines",
-        nodes.stream().noneMatch(membersOfOpenPipelines::contains));
+        nodes.stream().noneMatch(membersOfOpenPipelines::contains),
+        "nodes of new pipeline cannot be all from open pipelines");
 
     assertTrue(
-        "at least 1 node should have been from members of closed pipelines",
-        nodes.stream().anyMatch(membersOfClosedPipelines::contains));
+        nodes.stream().anyMatch(membersOfClosedPipelines::contains),
+        "at least 1 node should have been from members of closed pipelines");
     cleanup();
   }
 
@@ -331,10 +333,10 @@ public class TestRatisPipelineProvider {
       }
       try {
         provider.create(RatisReplicationConfig.getInstance(factor));
-        Assert.fail("Expected SCMException for large container size with " +
+        Assertions.fail("Expected SCMException for large container size with " +
             "replication factor " + factor.toString());
       } catch (SCMException ex) {
-        Assert.assertTrue(ex.getMessage().contains(expectedErrorSubstring));
+        Assertions.assertTrue(ex.getMessage().contains(expectedErrorSubstring));
       }
     }
 
@@ -347,10 +349,10 @@ public class TestRatisPipelineProvider {
       }
       try {
         provider.create(RatisReplicationConfig.getInstance(factor));
-        Assert.fail("Expected SCMException for large metadata size with " +
+        Assertions.fail("Expected SCMException for large metadata size with " +
             "replication factor " + factor.toString());
       } catch (SCMException ex) {
-        Assert.assertTrue(ex.getMessage().contains(expectedErrorSubstring));
+        Assertions.assertTrue(ex.getMessage().contains(expectedErrorSubstring));
       }
     }
     cleanup();
@@ -359,7 +361,7 @@ public class TestRatisPipelineProvider {
   private void addPipeline(
       List<DatanodeDetails> dns,
       Pipeline.PipelineState open, ReplicationConfig replicationConfig)
-      throws IOException {
+      throws IOException, TimeoutException {
     Pipeline openPipeline = Pipeline.newBuilder()
         .setReplicationConfig(replicationConfig)
         .setNodes(dns)
