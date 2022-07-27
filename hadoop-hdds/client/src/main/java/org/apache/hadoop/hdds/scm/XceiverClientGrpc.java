@@ -440,8 +440,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       return reply;
     } else {
       Objects.requireNonNull(ioException);
-      LOG.error("Failed to execute command {} on the pipeline {}.",
-          processForDebug(request), pipeline);
+      if (LOG.isDebugEnabled()) {
+        LOG.error("Failed to execute command {} on the pipeline {}.",
+                processForDebug(request), pipeline);
+      }
       throw ioException;
     }
   }
