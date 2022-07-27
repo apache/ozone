@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -390,7 +391,8 @@ public class TestContainerCommandsEC {
         new XceiverClientManager(config);
     createKeyAndWriteData(keyString, bucket);
     ECReconstructionCoordinator coordinator =
-        new ECReconstructionCoordinator(config, certClient);
+        new ECReconstructionCoordinator(config, certClient,
+            ContainerClientMetrics.create());
 
     OzoneKeyDetails key = bucket.getKey(keyString);
     long conID = key.getOzoneKeyLocations().get(0).getContainerID();
@@ -565,7 +567,8 @@ public class TestContainerCommandsEC {
 
     Assert.assertThrows(IOException.class, () -> {
       ECReconstructionCoordinator coordinator =
-          new ECReconstructionCoordinator(config, certClient);
+          new ECReconstructionCoordinator(config, certClient,
+              ContainerClientMetrics.create());
       coordinator.reconstructECContainerGroup(conID,
           (ECReplicationConfig) containerPipeline.getReplicationConfig(),
           sourceNodeMap, targetNodeMap);

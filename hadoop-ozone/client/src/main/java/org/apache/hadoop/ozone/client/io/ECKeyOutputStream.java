@@ -108,7 +108,8 @@ public final class ECKeyOutputStream extends KeyOutputStream {
             builder.getMultipartUploadID(), builder.getMultipartNumber(),
             builder.isMultipartKey(),
             info, builder.isUnsafeByteBufferConversionEnabled(),
-            builder.getXceiverManager(), builder.getOpenHandler().getId());
+            builder.getXceiverManager(), builder.getOpenHandler().getId(),
+            builder.getClientMetrics());
 
     this.writeOffset = 0;
     this.encoder = CodecUtil.createRawEncoderWithFallback(

@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -137,7 +138,8 @@ public class KeyOutputStream extends OutputStream {
       OzoneManagerProtocol omClient, int chunkSize,
       String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
-      boolean unsafeByteBufferConversion
+      boolean unsafeByteBufferConversion,
+      ContainerClientMetrics clientMetrics
   ) {
     this.config = config;
     blockOutputStreamEntryPool =
@@ -149,7 +151,8 @@ public class KeyOutputStream extends OutputStream {
             isMultipart, handler.getKeyInfo(),
             unsafeByteBufferConversion,
             xceiverClientManager,
-            handler.getId());
+            handler.getId(),
+            clientMetrics);
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval());
     this.retryCount = 0;
@@ -552,6 +555,7 @@ public class KeyOutputStream extends OutputStream {
     private boolean unsafeByteBufferConversion;
     private OzoneClientConfig clientConfig;
     private ReplicationConfig replicationConfig;
+    private ContainerClientMetrics clientMetrics;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -652,6 +656,15 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+    public Builder setClientMetrics(ContainerClientMetrics clientMetrics) {
+      this.clientMetrics = clientMetrics;
+      return this;
+    }
+
+    public ContainerClientMetrics getClientMetrics() {
+      return clientMetrics;
+    }
+
     public KeyOutputStream build() {
       return new KeyOutputStream(
           clientConfig,
@@ -664,7 +677,8 @@ public class KeyOutputStream extends OutputStream {
           multipartUploadID,
           multipartNumber,
           isMultipartKey,
-          unsafeByteBufferConversion);
+          unsafeByteBufferConversion,
+          clientMetrics);
     }
 
   }
