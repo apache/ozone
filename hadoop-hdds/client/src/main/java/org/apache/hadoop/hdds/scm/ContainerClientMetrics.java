@@ -79,12 +79,14 @@ public final class ContainerClientMetrics {
                 "Number of bytes written on a pipelines"),
             0L)
     ).incr(chunkSizeBytes);
-    writeChunksCallsByLeaders.computeIfAbsent(pipeline.getLeaderId(),
-        leader -> registry.newCounter(
-            Interns.info("writeChunkCallsLeader-" + leader,
-                "Number of writeChunk calls on a leader node"),
-            0L)
-    ).incr();
+    if (pipeline.getLeaderId() != null) {
+      writeChunksCallsByLeaders.computeIfAbsent(pipeline.getLeaderId(),
+          leader -> registry.newCounter(
+              Interns.info("writeChunkCallsLeader-" + leader,
+                  "Number of writeChunk calls on a leader node"),
+              0L)
+      ).incr();
+    }
     totalWriteChunkCalls.incr();
     totalWriteChunkBytes.incr(chunkSizeBytes);
   }
