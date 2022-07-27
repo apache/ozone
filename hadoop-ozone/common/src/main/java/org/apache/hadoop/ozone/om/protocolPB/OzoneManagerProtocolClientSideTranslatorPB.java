@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.protocolPB;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -174,6 +173,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantRevokeUserAccessIdRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -1821,7 +1822,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return dbUpdatesWrapper;
   }
 
-
   @Override
   public OpenKeySession createFile(OmKeyArgs args,
       boolean overWrite, boolean recursive) throws IOException {
@@ -2027,6 +2027,48 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return handleError(submitRequest(omRequest)).getCancelPrepareResponse();
   }
 
+  @Override
+  public EchoRPCResponse echoRPCReq(byte[] payload, boolean emptyResp)
+          throws IOException {
+    EchoRPCRequest echoRPCRequest =
+            EchoRPCRequest.newBuilder().setPayload(ByteString.copyFrom(payload))
+                    .setIsEmptyResp(emptyResp).build();
+
+    OMRequest omRequest = createOMRequest(Type.EchoRPC)
+            .setEchoRPCRequest(echoRPCRequest).build();
+
+    EchoRPCResponse echoRPCResponse =
+            handleError(submitRequest(omRequest)).getEchoRPCResponse();
+    return echoRPCResponse;
+
+//    if (emptyResp) {
+//      return null;
+//    }
+//    if (payload == null || payload.length == 0) {
+//      return RandomUtils.nextBytes(respBytesSize);
+//    }
+//    return Arrays.copyOf(payload, payload.length);
+  }
+
+  /*
+  *
+  *   @Override
+  public boolean addAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
+    AddAclRequest req = AddAclRequest.newBuilder()
+        .setObj(OzoneObj.toProtobuf(obj))
+        .setAcl(OzoneAcl.toProtobuf(acl))
+        .build();
+
+    OMRequest omRequest = createOMRequest(Type.AddAcl)
+        .setAddAclRequest(req)
+        .build();
+    AddAclResponse addAclResponse =
+        handleError(submitRequest(omRequest)).getAddAclResponse();
+
+    return addAclResponse.getResponse();
+  }
+
+  * */
 
   @VisibleForTesting
   public OmTransport getTransport() {

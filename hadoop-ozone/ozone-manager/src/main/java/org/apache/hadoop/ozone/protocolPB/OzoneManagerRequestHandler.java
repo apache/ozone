@@ -18,11 +18,13 @@
 package org.apache.hadoop.ozone.protocolPB;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.google.protobuf.ByteString;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
@@ -64,6 +66,9 @@ import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
+
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
@@ -891,7 +896,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   @RequestFeatureValidator(
       conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.GetFileStatus
+      requestType = Type.EchoRPC
   )
   public static OMResponse disallowGetFileStatusWithECReplicationConfig(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -913,6 +918,32 @@ public class OzoneManagerRequestHandler implements RequestHandler {
               + ".")
           .clearGetFileStatusResponse()
           .build();
+    }
+    return resp;
+  }
+
+  @RequestFeatureValidator(
+          conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+          processingPhase = RequestProcessingPhase.POST_PROCESS,
+          requestType = Type.EchoRPC
+  )
+  public static OMResponse echoRPC(
+          OMRequest req, OMResponse resp, ValidationContext ctx)
+          throws ServiceException, UnsupportedEncodingException {
+    if (!resp.hasEchoRPCResponse()) {
+      return resp;
+    }
+    if (!req.getEchoRPCRequest().hasIsEmptyResp() ||
+            !req.getEchoRPCRequest().getIsEmptyResp()) {
+      resp = resp.toBuilder()
+              .setMessage(req.getEchoRPCRequest().
+                      getPayload().toString("UTF-8"))
+              .clearEchoRPCResponse()
+              .build();
+    } else {
+      resp = resp.toBuilder()
+              .clearEchoRPCResponse()
+              .build();
     }
     return resp;
   }
@@ -1125,6 +1156,30 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     return resp;
   }
+
+  @RequestFeatureValidator(
+          conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+          processingPhase = RequestProcessingPhase.POST_PROCESS,
+          requestType = Type.EchoRPC
+  )
+  public static OMResponse echoRPCRequest(
+          OMRequest req, OMResponse resp, ValidationContext ctx)
+          throws ServiceException {
+    if (!resp.hasEchoRPCResponse()) {
+      return resp;
+    }
+    resp = resp.toBuilder()
+            .setStatus(Status.NOT_SUPPORTED_OPERATION)
+            .setMessage("The list of keys contains keys with Erasure Coded"
+                    + " replication set, hence the client is not able to"
+                    + " represent all the keys returned."
+                    + " Please upgrade the client to get the list of keys.")
+//            .setEmptyResponse(req.getEchoRPCRequest().getIsEmptyResponse)
+            .clearEchoRPCResponse()
+            .build();
+    return resp;
+  }
+
 
   private FinalizeUpgradeProgressResponse reportUpgradeProgress(
       FinalizeUpgradeProgressRequest request) throws IOException {

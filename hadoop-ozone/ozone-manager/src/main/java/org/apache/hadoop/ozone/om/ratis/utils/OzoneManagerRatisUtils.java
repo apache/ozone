@@ -80,11 +80,15 @@ import org.apache.hadoop.ozone.om.request.volume.OMVolumeSetQuotaRequest;
 import org.apache.hadoop.ozone.om.request.volume.acl.OMVolumeAddAclRequest;
 import org.apache.hadoop.ozone.om.request.volume.acl.OMVolumeRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.volume.acl.OMVolumeSetAclRequest;
+import org.apache.hadoop.ozone.om.request.OMEchoRPCRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
+
 import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
@@ -289,6 +293,8 @@ public final class OzoneManagerRatisUtils {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
       break;
+    case EchoRPC:
+      return new OMEchoRPCRequest(omRequest);
     default:
       throw new IllegalStateException("Unrecognized write command " +
           "type request" + cmdType);

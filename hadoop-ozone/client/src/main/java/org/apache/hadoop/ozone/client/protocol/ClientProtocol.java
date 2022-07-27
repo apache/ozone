@@ -702,17 +702,6 @@ public interface ClientProtocol {
   String getCanonicalServiceName();
 
   /**
-   * Freon api to send request with or without payload to OM
-   * to benchmark RPC request performance.
-   *
-   * @param payload payload
-   * @throws IOException if there is error in the RPC communication
-   * @return response in bytes.
-   */
-  byte[] postRPCReq(byte[] payload, boolean emptyResp) throws IOException;
-
-
-  /**
    * Get the Ozone File Status for a particular Ozone key.
    *
    * @param volumeName volume name.

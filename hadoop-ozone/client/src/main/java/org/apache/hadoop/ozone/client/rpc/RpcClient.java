@@ -1972,18 +1972,6 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public byte[] postRPCReq(byte[] payload, boolean emptyResp) {
-    if (emptyResp) {
-      return null;
-    }
-    if (payload == null || payload.length == 0) {
-      return RandomUtils.nextBytes(respBytesSize);
-    }
-    return Arrays.copyOf(payload, payload.length);
-  }
-
-
-  @Override
   @VisibleForTesting
   public OzoneManagerProtocol getOzoneManagerClient() {
     return ozoneManagerClient;

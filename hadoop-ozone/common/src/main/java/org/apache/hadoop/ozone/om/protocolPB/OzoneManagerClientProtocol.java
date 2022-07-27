@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.om.protocolPB;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 
+import java.io.IOException;
+
 /**
  * OzoneManagerClientProtocol defines interfaces needed on the client side
  * when communicating with Ozone Manager.
@@ -35,4 +37,5 @@ public interface OzoneManagerClientProtocol extends OzoneManagerProtocol {
   void setThreadLocalS3Auth(S3Auth s3Auth);
   S3Auth getThreadLocalS3Auth();
   void clearThreadLocalS3Auth();
+
 }

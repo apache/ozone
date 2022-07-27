@@ -164,6 +164,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authe
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantState;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
+
 import org.apache.hadoop.ozone.protocolPB.OMInterServiceProtocolServerSideImpl;
 import org.apache.hadoop.ozone.protocolPB.OMAdminProtocolServerSideImpl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
@@ -4463,6 +4466,23 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public boolean isOmRpcServerRunning() {
     return isOmRpcServerRunning;
   }
+
+  @Override
+  public EchoRPCResponse echoRPCReq(byte[] payload, boolean emptyResp)
+          throws IOException {
+//    EchoRPCRequest echoRPCRequest =
+//            EchoRPCRequest.newBuilder().build();
+//
+//    OMRequest omRequest = createOMRequest(Type.EchoRPC)
+//            .setEchoRPCRequest(echoRPCRequest).build();
+//
+//    EchoRPCResponse echoRPCResponse =
+//            handleError(submitRequest(omRequest)).getEchoRPCResponse();
+//    return echoRPCResponse;
+
+    return null;
+  }
+
   /**
    * Write down Layout version of a finalized feature to DB on finalization.
    * @param lvm OMLayoutVersionManager

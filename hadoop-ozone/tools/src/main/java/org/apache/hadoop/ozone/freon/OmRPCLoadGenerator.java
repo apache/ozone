@@ -21,9 +21,10 @@ import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.client.rpc.RpcClient;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 
 import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
@@ -50,7 +51,7 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
 
   private Timer timer;
 
-  @Option(names = {"-p", "--payload"},
+  @Option(names = {"-pl", "--payload"},
           description =
                   "Specifies the size of payload in KB in each RPC request.",
           defaultValue = "1")
@@ -70,12 +71,14 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
 
   @Override
   public Void call() throws Exception {
+    if (payloadSizeKB < 0) {
+      throw new IllegalArgumentException(
+              "RPC request payload can't be negative."
+      );
+    }
+
     init();
     int numOfThreads = getThreadNo();
-    LOG.info("Number of Threads: {}", numOfThreads);
-    LOG.info("RPC request payload size: {} KB", payloadSizeKB);
-    LOG.info("Empty RPC request: {}", isEmptyReq);
-    LOG.info("Empty RPC response: {}", isEmptyResp);
     timer = getMetrics().timer("rpc-payload");
 
     for (int i = 0; i < numOfThreads; i++) {
@@ -86,12 +89,9 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
   }
   private void sendRPCReq(long l) throws Exception {
     OzoneConfiguration configuration = createOzoneConfiguration();
-    RpcClient rpcclient = new RpcClient(configuration, null);
-    if (payloadSizeKB < 0) {
-      throw new IllegalArgumentException(
-              "RPC request payload can't be negative."
-      );
-    }
+//    RpcClient rpcclient = new RpcClient(configuration, null);
+    OzoneManagerProtocolClientSideTranslatorPB client =
+            createOmClient(configuration, null);
     byte[] payloadBytes;
     if (isEmptyReq) {
       payloadBytes = null;
@@ -101,7 +101,7 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
       payloadBytes = RandomUtils.nextBytes(payloadSize);
     }
     timer.time(() -> {
-      byte[] resp = rpcclient.postRPCReq(payloadBytes, isEmptyResp);
+      EchoRPCResponse resp = client.echoRPCReq(payloadBytes, isEmptyResp);
       return resp;
     });
   }

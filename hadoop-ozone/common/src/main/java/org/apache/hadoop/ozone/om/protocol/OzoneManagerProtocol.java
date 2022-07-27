@@ -58,6 +58,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
+
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
@@ -837,7 +840,6 @@ public interface OzoneManagerProtocol
       OzoneManagerProtocolProtos.DBUpdatesRequest dbUpdatesRequest)
       throws IOException;
 
-
   /**
    * List trash allows the user to list the keys that were marked as deleted,
    * but not actually deleted by Ozone Manager. This allows a user to recover
@@ -909,4 +911,17 @@ public interface OzoneManagerProtocol
   default CancelPrepareResponse cancelOzoneManagerPrepare() throws IOException {
     return CancelPrepareResponse.newBuilder().build();
   }
+
+  /**
+   * Send RPC request with or without payload to OM
+   * to benchmark RPC request performance.
+   * @param payload payload.
+   * @param emptyResp if the payload of response is empty or not.
+   * @throws IOException if there is error in the RPC communication.
+   * @return EchoRPCResponse.
+   */
+  EchoRPCResponse echoRPCReq(byte[] payload, boolean emptyResp)
+          throws IOException;
+
+
 }
