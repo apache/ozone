@@ -54,6 +54,10 @@ public class TestHddsDatanodeService {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
     conf.setClass(OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY, MockService.class,
         ServicePlugin.class);
+
+    // Tokens only work if security is enabled.  Here we're testing that a
+    // misconfig in unsecure cluster does not prevent datanode from starting up.
+    // see HDDS-7055
     conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, false);
     conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
     conf.setBoolean(HDDS_CONTAINER_TOKEN_ENABLED, true);
