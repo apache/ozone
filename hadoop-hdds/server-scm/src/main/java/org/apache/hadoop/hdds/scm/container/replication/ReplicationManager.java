@@ -706,7 +706,7 @@ public class ReplicationManager implements SCMService {
             " container it will have at least dataNum + 1 online, allowing" +
             " the loss of 1 more replica before data becomes unavailable."
     )
-    private int maintenanceRemainingRedundancy = 2;
+    private int maintenanceRemainingRedundancy = 1;
 
     public void setMaintenanceRemainingRedundancy(int redundancy) {
       this.maintenanceRemainingRedundancy = redundancy;
@@ -722,6 +722,14 @@ public class ReplicationManager implements SCMService {
 
     public long getUnderReplicatedInterval() {
       return underReplicatedInterval;
+    }
+
+    public void setUnderReplicatedInterval(Duration interval) {
+      this.underReplicatedInterval = interval.toMillis();
+    }
+
+    public void setOverReplicatedInterval(Duration interval) {
+      this.overReplicatedInterval = interval.toMillis();
     }
 
     public long getOverReplicatedInterval() {
