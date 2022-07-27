@@ -134,14 +134,14 @@ public class TestContainerManagerImpl {
         containerManager.getContainer(cid).getState());
     containerManager.updateContainerState(cid,
         HddsProtos.LifeCycleEvent.DELETE);
-    Assert.assertEquals(HddsProtos.LifeCycleState.DELETING,
+    Assertions.assertEquals(HddsProtos.LifeCycleState.DELETING,
         containerManager.getContainer(cid).getState());
-    Assert.assertTrue(containerManager.containerExist(cid));
+    Assertions.assertTrue(containerManager.containerExist(cid));
     containerManager.updateContainerState(cid,
         HddsProtos.LifeCycleEvent.CLEANUP);
     //when a CLEANUP event is fired , the container should be
     //removed from scm.
-    Assert.assertFalse(containerManager.containerExist(cid));
+    Assertions.assertFalse(containerManager.containerExist(cid));
   }
 
   @Test
