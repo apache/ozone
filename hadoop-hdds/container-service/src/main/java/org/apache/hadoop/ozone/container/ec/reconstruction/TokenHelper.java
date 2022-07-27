@@ -58,7 +58,11 @@ class TokenHelper {
     boolean blockTokenEnabled = securityConfig.isBlockTokenEnabled();
     boolean containerTokenEnabled = securityConfig.isContainerTokenEnabled();
 
-    if (blockTokenEnabled || containerTokenEnabled) {
+    // checking certClient != null instead of securityConfig.isSecurityEnabled()
+    // to allow integration test without full kerberos etc. setup
+    boolean securityEnabled = certClient != null;
+
+    if (securityEnabled && (blockTokenEnabled || containerTokenEnabled)) {
       user = UserGroupInformation.getCurrentUser().getShortUserName();
 
       long expiryTime = conf.getTimeDuration(
