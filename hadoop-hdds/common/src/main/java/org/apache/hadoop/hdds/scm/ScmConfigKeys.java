@@ -422,6 +422,12 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT =
       "5m";
 
+  public static final String OZONE_SCM_REMOVE_DELETED_CONTAINER_ENABLED =
+      "ozone.scm.remove.deleted.container.enabled";
+
+  public static final boolean
+      OZONE_SCM_REMOVE_DELETED_CONTAINER_ENABLED_DEFAULT = true;
+
 
   // Allow SCM to auto create factor ONE ratis pipeline.
   public static final String OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE =

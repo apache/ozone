@@ -2179,6 +2179,15 @@
   </property>
 
   <property>
+    <name>ozone.scm.remove.deleted.container.enabled</name>
+    <value>true</value>
+    <tag>OZONE,SCM,OPERATION</tag>
+    <description>Boolean value to enable removing container reference from scm
+      if its state is DELETED
+    </description>
+  </property>
+
+  <property>
     <name>hdds.metadata.dir</name>
     <value/>
     <tag>X509, SECURITY</tag>

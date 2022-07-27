@@ -333,6 +333,8 @@ public class LegacyReplicationManager {
    */
   private final MoveScheduler moveScheduler;
 
+  private final boolean shouldRemoveDeletedContainer;
+
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -377,6 +379,10 @@ public class LegacyReplicationManager {
         .setDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .setRatisServer(scmhaManager.getRatisServer())
         .setMoveTable(moveTable).build();
+
+    shouldRemoveDeletedContainer = conf.getBoolean(
+        ScmConfigKeys.OZONE_SCM_REMOVE_DELETED_CONTAINER_ENABLED,
+        ScmConfigKeys.OZONE_SCM_REMOVE_DELETED_CONTAINER_ENABLED_DEFAULT);
   }
 
 
@@ -492,8 +498,10 @@ public class LegacyReplicationManager {
          * just remove it.
          */
         if (state == LifeCycleState.DELETED) {
-          LOG.warn("container {} is in DELETED state, but not removed", id);
-          containerManager.deleteContainer(id);
+          if (shouldRemoveDeletedContainer) {
+            LOG.warn("container {} is in DELETED state, but not removed", id);
+            containerManager.deleteContainer(id);
+          }
           return;
         }
 

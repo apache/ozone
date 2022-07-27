@@ -147,7 +147,7 @@ public final class ContainerStateManagerImpl
     this.containerSize = getConfiguredContainerSize(conf);
     this.containers = new ContainerStateMap();
     this.lastUsedMap = new ConcurrentHashMap<>();
-    this.containerStateChangeActions = getContainerStateChangeActions();
+    this.containerStateChangeActions = getContainerStateChangeActions(conf);
     this.transactionBuffer = buffer;
 
     initialize();
@@ -250,17 +250,23 @@ public final class ContainerStateManagerImpl
   }
 
   private Map<LifeCycleEvent, CheckedConsumer<ContainerInfo, IOException>>
-      getContainerStateChangeActions() {
+      getContainerStateChangeActions(final Configuration conf) {
     final Map<LifeCycleEvent, CheckedConsumer<ContainerInfo, IOException>>
         actions = new EnumMap<>(LifeCycleEvent.class);
     actions.put(FINALIZE, info -> pipelineManager
         .removeContainerFromPipeline(info.getPipelineID(), info.containerID()));
-    //when a CLEANUP event if fired , the state of the container will be changed
-    //to DELETED. at this time, we should remove the reference of the container
-    // from scm. this happens immediately, thus DELETED is a transient state
-    // and hardly be captured.
-    actions.put(CLEANUP, info ->
-        removeContainer(info.containerID().getProtobuf()));
+
+    boolean shouldRemoveDeletedContainer = conf.getBoolean(
+        ScmConfigKeys.OZONE_SCM_REMOVE_DELETED_CONTAINER_ENABLED,
+        ScmConfigKeys.OZONE_SCM_REMOVE_DELETED_CONTAINER_ENABLED_DEFAULT);
+    if (shouldRemoveDeletedContainer) {
+      // when a CLEANUP event if fired , the state of the container will be
+      // changed to DELETED. at this time, we should remove the reference
+      // of the container from scm. this happens immediately, thus DELETED
+      // is a transient state and hardly be captured.
+      actions.put(CLEANUP, info ->
+          removeContainer(info.containerID().getProtobuf()));
+    }
     return actions;
   }
 
