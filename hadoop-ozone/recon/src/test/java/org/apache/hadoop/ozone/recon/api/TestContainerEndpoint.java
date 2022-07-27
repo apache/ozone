@@ -507,6 +507,22 @@ public class TestContainerEndpoint {
     uuid4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2);
 
+    Response responseWithLimit = containerEndpoint.getUnhealthyContainers(3, 1);
+    UnhealthyContainersResponse responseWithLimitObject = (UnhealthyContainersResponse) responseWithLimit.getEntity();
+
+    assertEquals(5, responseWithLimitObject.getMissingCount());
+    Collection<UnhealthyContainerMetadata> recordsWithLimit
+            = responseWithLimitObject.getContainers();
+    List<UnhealthyContainerMetadata> missingWithLimit = recordsWithLimit
+            .stream()
+            .filter(r -> r.getContainerState()
+                    .equals(UnHealthyContainerStates.MISSING.toString()))
+            .collect(Collectors.toList());
+    assertEquals(3, missingWithLimit.size());
+    assertEquals(1L, missingWithLimit.get(0).getContainerID());
+    assertEquals(2L, missingWithLimit.get(1).getContainerID());
+    assertEquals(3L, missingWithLimit.get(2).getContainerID());
+
     response = containerEndpoint.getUnhealthyContainers(1000, 1);
 
     responseObject = (UnhealthyContainersResponse) response.getEntity();
