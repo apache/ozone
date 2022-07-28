@@ -1460,8 +1460,9 @@ message PartInfo {
  Stores the raw payload of rpc request, used in OmRPCLoadGenerator
  */
 message EchoRPCRequest {
-    optional bytes payload = 1;
-    optional bool isEmptyResp = 2;
+    optional bytes payloadReq = 1;
+    optional int32 payloadSizeResp = 2;
+    optional bool isEmptyResp = 3;
 }
 
 /**

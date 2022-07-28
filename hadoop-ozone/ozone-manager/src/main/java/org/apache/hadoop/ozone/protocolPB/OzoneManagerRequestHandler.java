@@ -18,12 +18,14 @@
 package org.apache.hadoop.ozone.protocolPB;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import com.google.protobuf.ServiceException;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -136,6 +138,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       LoggerFactory.getLogger(OzoneManagerRequestHandler.class);
   private final OzoneManager impl;
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
+  private static final int RPC_PAYLOAD_MULTIPLICATION_FACTOR = 1024;
 
   public OzoneManagerRequestHandler(OzoneManager om,
       OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer) {
@@ -931,9 +934,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
     if (!req.getEchoRPCRequest().hasIsEmptyResp() ||
             !req.getEchoRPCRequest().getIsEmptyResp()) {
+      int payloadRespSize = (int) Math.min(
+              (long)req.getEchoRPCRequest().getPayloadSizeResp()
+                      * RPC_PAYLOAD_MULTIPLICATION_FACTOR, Integer.MAX_VALUE);
+      byte[] payloadBytes = RandomUtils.nextBytes(payloadRespSize);
       resp = resp.toBuilder()
-              .setMessage(req.getEchoRPCRequest().
-                      getPayload().toString("UTF-8"))
+              .setMessage(new String(payloadBytes, StandardCharsets.UTF_8))
               .clearEchoRPCResponse()
               .build();
     } else {

@@ -47,15 +47,21 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
   private static final Logger LOG =
           LoggerFactory.getLogger(OmRPCLoadGenerator.class);
 
-  private static final int MULTIPLICATION_FACTOR = 1024;
+  private static final int RPC_PAYLOAD_MULTIPLICATION_FACTOR = 1024;
 
   private Timer timer;
 
-  @Option(names = {"-pl", "--payload"},
+  @Option(names = {"-plrq", "--payload-req"},
           description =
-                  "Specifies the size of payload in KB in each RPC request.",
+                  "Specifies the size of payload in KB in RPC request.",
           defaultValue = "1")
-  private int payloadSizeKB = 1;
+  private int payloadReqSizeKB = 1;
+
+  @Option(names = {"-plrp", "--payload-resp"},
+          description =
+                  "Specifies the size of payload in KB in RPC response.",
+          defaultValue = "1")
+  private int payloadRespSizeKB = 1;
 
   @Option(names = {"-erq", "--empty-req"},
           description =
@@ -71,9 +77,9 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
 
   @Override
   public Void call() throws Exception {
-    if (payloadSizeKB < 0) {
+    if (payloadReqSizeKB < 0 || payloadRespSizeKB < 0) {
       throw new IllegalArgumentException(
-              "RPC request payload can't be negative."
+              "RPC request or response payload can't be negative value."
       );
     }
 
@@ -91,16 +97,27 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
     OzoneConfiguration configuration = createOzoneConfiguration();
     OzoneManagerProtocolClientSideTranslatorPB client =
             createOmClient(configuration, null);
-    byte[] payloadBytes;
+    byte[] payloadReq;
     if (isEmptyReq) {
-      payloadBytes = null;
+      payloadReq = null;
     } else {
-      int payloadSize = (int) Math.min(
-              (long)payloadSizeKB * MULTIPLICATION_FACTOR, Integer.MAX_VALUE);
-      payloadBytes = RandomUtils.nextBytes(payloadSize);
+      int payloadReqSize = (int) Math.min(
+              (long)payloadReqSizeKB * RPC_PAYLOAD_MULTIPLICATION_FACTOR,
+              Integer.MAX_VALUE);
+      payloadReq = RandomUtils.nextBytes(payloadReqSize);
     }
+    int payloadRespSize;
+    if (isEmptyResp) {
+      payloadRespSize = 0;
+    } else {
+      payloadRespSize = (int) Math.min(
+              (long)payloadRespSizeKB * RPC_PAYLOAD_MULTIPLICATION_FACTOR,
+              Integer.MAX_VALUE);
+    }
+
     timer.time(() -> {
-      EchoRPCResponse resp = client.echoRPCReq(payloadBytes, isEmptyResp);
+      EchoRPCResponse resp = client.echoRPCReq(payloadReq,
+              payloadRespSize, isEmptyResp);
       return resp;
     });
   }
