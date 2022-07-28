@@ -109,6 +109,7 @@ public class OzoneKeyDetails extends OzoneKey {
    * @return OzoneInputStream
    * @throws IOException
    */
+  @JsonIgnore
   public OzoneInputStream getContent() throws IOException {
     return this.contentSupplier.get();
   }
