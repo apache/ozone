@@ -315,6 +315,7 @@ public final class OmUtils {
     case TenantRevokeUserAccessId:
     case TenantAssignAdmin:
     case TenantRevokeAdmin:
+    case EchoRPC:
     case SetRangerServiceVersion:
       return false;
     default:
