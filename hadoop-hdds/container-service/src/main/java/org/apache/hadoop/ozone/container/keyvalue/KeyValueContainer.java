@@ -124,6 +124,10 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     }
   }
 
+  public ConfigurationSource getConfig() {
+    return config;
+  }
+
   @Override
   public void create(VolumeSet volumeSet, VolumeChoosingPolicy
       volumeChoosingPolicy, String clusterId) throws StorageContainerException {

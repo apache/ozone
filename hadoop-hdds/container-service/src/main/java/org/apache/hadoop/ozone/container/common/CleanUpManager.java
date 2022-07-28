@@ -30,13 +30,15 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.stream.Stream;
 
 /**
- * Helper class for moving the container to a new
- * location, before deletion.
+ * Helper class for handling /tmp/delete_container_service
+ * operations used for container delete when Schema V3 is enabled.
  */
 public class CleanUpManager {
 
@@ -44,16 +46,12 @@ public class CleanUpManager {
       LoggerFactory.getLogger(CleanUpManager.class);
 
   private final ConfigurationSource configurationSource;
-  private DatanodeConfiguration datanodeConf;
+  private final DatanodeConfiguration datanodeConf;
 
   public CleanUpManager(ConfigurationSource configurationSource) {
     this.configurationSource = configurationSource;
     this.datanodeConf =
         configurationSource.getObject(DatanodeConfiguration.class);
-  }
-
-  public DatanodeConfiguration getDatanodeConf() {
-    return datanodeConf;
   }
 
   public boolean checkContainerSchemaV3Enabled(
@@ -66,27 +64,29 @@ public class CleanUpManager {
     }
   }
 
+  public void tmpDirInit() throws IOException {
+    String tmpDir = datanodeConf.getDiskTmpDirectoryPath();
+    Path tmpDirPath = Paths.get(tmpDir);
+
+    Files.createDirectories(tmpDirPath);
+  }
+
   public boolean renameDir(KeyValueContainerData keyValueContainerData)
       throws IOException {
-    boolean success = false;
     String tmpDirPath = datanodeConf.getDiskTmpDirectoryPath();
 
     String containerPath = keyValueContainerData.getContainerPath();
     File container = new File(containerPath);
-
     String containerDirName = container.getName();
 
     String destinationDirPath = tmpDirPath + "/" + containerDirName;
 
-    try {
-      FileUtils.moveDirectory(container, new File(destinationDirPath));
-      success = true;
-    } catch (IOException ex) {
-      LOG.error("Error while moving metadata and chunks under /tmp", ex);
-    }
+    boolean success = container.renameTo(new File(destinationDirPath));
 
-    keyValueContainerData.setMetadataPath(destinationDirPath + "/metadata");
-    keyValueContainerData.setChunksPath(destinationDirPath + "/chunks");
+    if (success == true) {
+      keyValueContainerData.setMetadataPath(destinationDirPath + "/metadata");
+      keyValueContainerData.setChunksPath(destinationDirPath + "/chunks");
+    }
     return success;
   }
 
@@ -100,40 +100,45 @@ public class CleanUpManager {
   }
 
   /**
-   * Get all filenames under /tmp and store them in a list.
-   * @return list of the leftover filenames
+   * Get all filenames under /tmp/delete_container_service
+   * and store them in a list.
+   * @return iterator to the list of the leftover files
    */
-  public List<String> getDeleteLeftovers() {
-    List<String> leftovers = new ArrayList<String>();
+  public ListIterator<File> getDeleteLeftovers() {
+    List<File> leftovers = new ArrayList<File>();
+
     String tmpDirPath = datanodeConf.getDiskTmpDirectoryPath();
     File tmpDir = new File(tmpDirPath);
 
     for (File file : tmpDir.listFiles()) {
-      String fileName = file.getName();
-      leftovers.add(fileName);
+      leftovers.add(file);
     }
-    return leftovers;
+
+    ListIterator<File> leftoversListIt = leftovers.listIterator();
+
+    return leftoversListIt;
   }
 
   /**
-   * Delete all files under the /tmp.
+   * Delete all files under the /tmp/delete_container_service.
    * @throws IOException
    */
   public void cleanTmpDir() throws IOException {
-    String tmpDirPath = datanodeConf.getDiskTmpDirectoryPath();
-    File tmpDir = new File(tmpDirPath);
-    for (File file : tmpDir.listFiles()) {
-      FileUtils.deleteDirectory(file);
+    ListIterator<File> leftoversListIt = getDeleteLeftovers();
+
+    while (leftoversListIt.hasNext()) {
+      FileUtils.deleteDirectory(leftoversListIt.next());
     }
   }
 
   /**
-   * Delete the /tmp and all of its contents.
+   * Delete the /tmp/delete_container_service and all of its contents.
    * @throws IOException
    */
   public void deleteTmpDir() throws IOException {
-    String tmpDirPath = datanodeConf.getDiskTmpDirectoryPath();
-    File tmpDir = new File(tmpDirPath);
+    String deleteDirPath = datanodeConf.getDiskTmpDirectoryPath();
+    File deleteDir = new File(deleteDirPath);
+    File tmpDir = deleteDir.getParentFile();
     FileUtils.deleteDirectory(tmpDir);
   }
 }

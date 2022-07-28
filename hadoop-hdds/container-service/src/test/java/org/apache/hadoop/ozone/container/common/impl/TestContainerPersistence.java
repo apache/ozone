@@ -23,12 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 import org.apache.commons.io.FileExistsException;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -307,52 +302,62 @@ public class TestContainerPersistence {
   @Test
   public void testDeleteContainerWithSchemaV3Enabled()
       throws Exception {
-    long testContainerID = getTestContainerID();
+    long testContainerID1 = getTestContainerID();
     Thread.sleep(100);
+    long testContainerID2 = getTestContainerID();
 
-    Container container = addContainer(containerSet, testContainerID);
-    container.close();
+    Container container1 = addContainer(containerSet, testContainerID1);
+    container1.close();
+
+    Container container2 = addContainer(containerSet, testContainerID2);
 
     Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+        .containsKey(testContainerID1));
+    Assert.assertTrue(containerSet.getContainerMapCopy()
+        .containsKey(testContainerID2));
 
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
-      KeyValueContainerData containerData =
-          (KeyValueContainerData) container.getContainerData();
       CleanUpManager cleanUpManager = new CleanUpManager(conf);
 
-      String oldPath = containerData.getContainerPath();
-      File oldContainerDir = new File(oldPath);
+      // Create /tmp/delete_container_service
+      cleanUpManager.tmpDirInit();
 
-      // Move container dir
-      Assert.assertTrue(cleanUpManager.renameDir(containerData));
+      KeyValueContainerData container1Data =
+          (KeyValueContainerData) container1.getContainerData();
 
-      // The container has been moved
-      Assert.assertFalse(oldContainerDir.exists());
+      // Rename container1 dir
+      Assert.assertTrue(cleanUpManager.renameDir(container1Data));
 
-      List<String> leftovers = cleanUpManager.getDeleteLeftovers();
+      KeyValueContainerData container2Data =
+          (KeyValueContainerData) container2.getContainerData();
 
-      // There is at least 1 dir under '/tmp'
-      Assert.assertTrue(leftovers.size() >= 1);
-
-      // '/tmp' is not empty
-      Assert.assertFalse(cleanUpManager.checkTmpDirIsEmpty());
+      // Rename container2 dir
+      Assert.assertTrue(cleanUpManager.renameDir(container2Data));
 
       // Delete
-      container.delete();
+      container1.delete();
+
+      Assert.assertFalse(cleanUpManager.checkTmpDirIsEmpty());
+
+      ListIterator<File> iterator = cleanUpManager.getDeleteLeftovers();
+
+      File metadata2Dir = container2.getContainerFile().getParentFile();
+      File container2Dir = metadata2Dir.getParentFile();
+
+      Assert.assertTrue(iterator.hasNext());
+      Assert.assertEquals(container2Dir, iterator.next());
+
+      container2.delete();
 
       // Remove container from containerSet
-      containerSet.removeContainer(testContainerID);
+      containerSet.removeContainer(testContainerID1);
       Assert.assertFalse(containerSet.getContainerMapCopy()
-          .containsKey(testContainerID));
+          .containsKey(testContainerID1));
 
-      // '/tmp' is empty
+      // '/tmp/delete_container_service' is empty
       Assert.assertTrue(cleanUpManager.checkTmpDirIsEmpty());
 
-      /**
-       * TODO: move inside @After
-       */
-      // Delete /tmpDir from system
+      // Delete /tmp/delete_container_service from system
       cleanUpManager.deleteTmpDir();
     }
   }
