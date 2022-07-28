@@ -2040,35 +2040,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     EchoRPCResponse echoRPCResponse =
             handleError(submitRequest(omRequest)).getEchoRPCResponse();
     return echoRPCResponse;
-
-//    if (emptyResp) {
-//      return null;
-//    }
-//    if (payload == null || payload.length == 0) {
-//      return RandomUtils.nextBytes(respBytesSize);
-//    }
-//    return Arrays.copyOf(payload, payload.length);
   }
-
-  /*
-  *
-  *   @Override
-  public boolean addAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
-    AddAclRequest req = AddAclRequest.newBuilder()
-        .setObj(OzoneObj.toProtobuf(obj))
-        .setAcl(OzoneAcl.toProtobuf(acl))
-        .build();
-
-    OMRequest omRequest = createOMRequest(Type.AddAcl)
-        .setAddAclRequest(req)
-        .build();
-    AddAclResponse addAclResponse =
-        handleError(submitRequest(omRequest)).getAddAclResponse();
-
-    return addAclResponse.getResponse();
-  }
-
-  * */
 
   @VisibleForTesting
   public OmTransport getTransport() {

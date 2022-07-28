@@ -47,7 +47,7 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
   private static final Logger LOG =
           LoggerFactory.getLogger(OmRPCLoadGenerator.class);
 
-  private static final int MULTIPLICATION_FACTOR = 1000;
+  private static final int MULTIPLICATION_FACTOR = 1024;
 
   private Timer timer;
 
@@ -89,7 +89,6 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
   }
   private void sendRPCReq(long l) throws Exception {
     OzoneConfiguration configuration = createOzoneConfiguration();
-//    RpcClient rpcclient = new RpcClient(configuration, null);
     OzoneManagerProtocolClientSideTranslatorPB client =
             createOmClient(configuration, null);
     byte[] payloadBytes;

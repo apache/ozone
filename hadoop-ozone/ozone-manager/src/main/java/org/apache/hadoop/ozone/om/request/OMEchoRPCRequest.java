@@ -11,9 +11,6 @@ import org.slf4j.LoggerFactory;
  * Handles EchoRPCRequest.
  */
 public class OMEchoRPCRequest extends OMClientRequest {
-  public static final Logger LOG =
-          LoggerFactory.getLogger(OMEchoRPCRequest.class);
-
   public OMEchoRPCRequest(OMRequest omRequest) {
     super(omRequest);
   }
@@ -24,6 +21,5 @@ public class OMEchoRPCRequest extends OMClientRequest {
          OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
     return null;
   }
-
 
 }
