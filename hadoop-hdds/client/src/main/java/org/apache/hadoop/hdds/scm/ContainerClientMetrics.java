@@ -40,10 +40,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Metrics(about = "Client Metrics", context = OzoneConsts.OZONE)
 public final class ContainerClientMetrics {
+  private static ContainerClientMetrics instance;
+
   private static final String SOURCE_NAME =
       ContainerClientMetrics.class.getSimpleName();
-
-  private static ContainerClientMetrics instance;
 
   @Metric
   private MutableCounterLong totalWriteChunkCalls;
@@ -54,14 +54,7 @@ public final class ContainerClientMetrics {
   private Map<UUID, MutableCounterLong> writeChunksCallsByLeaders;
   private MetricsRegistry registry;
 
-  private ContainerClientMetrics() {
-    this.registry = new MetricsRegistry(SOURCE_NAME);
-    writeChunkCallsByPipeline = new ConcurrentHashMap<>();
-    writeChunkBytesByPipeline = new ConcurrentHashMap<>();
-    writeChunksCallsByLeaders = new ConcurrentHashMap<>();
-  }
-
-  public synchronized static ContainerClientMetrics create() {
+  public static synchronized ContainerClientMetrics create() {
     if (instance == null) {
       MetricsSystem ms = DefaultMetricsSystem.instance();
       ContainerClientMetrics clientMetrics = ms.register(SOURCE_NAME,
@@ -69,6 +62,13 @@ public final class ContainerClientMetrics {
       instance = clientMetrics;
     }
     return instance;
+  }
+
+  private ContainerClientMetrics() {
+    this.registry = new MetricsRegistry(SOURCE_NAME);
+    writeChunkCallsByPipeline = new ConcurrentHashMap<>();
+    writeChunkBytesByPipeline = new ConcurrentHashMap<>();
+    writeChunksCallsByLeaders = new ConcurrentHashMap<>();
   }
 
   public void unregister() {
