@@ -580,12 +580,12 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
       } catch (ExecutionException ee) {
         String message = "Failed to read from block {} EC index {}. Excluding" +
                 " the block";
-        if (LOG.isDebugEnabled()) {
+        if (LOG.isDebugEnabled() || ee.getCause() == null) {
           LOG.debug(message, getBlockID(), index + 1, ee.getCause());
         } else {
           LOG.warn(message + " Exception: {} Exception Message: {}",
-                  getBlockID(), index + 1,
-                  ee.getCause().getClass().getName(), ee.getMessage());
+                  getBlockID(), index + 1, ee.getCause().getClass().getName(),
+                  ee.getCause().getMessage());
         }
 
         failedDataIndexes.add(index);

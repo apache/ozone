@@ -22,9 +22,7 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -217,7 +215,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     String failedStreamsString = IntStream.range(1,
                     numDataBlks + numParityBlks + 1)
             .mapToObj(index -> failedStreamIndexMap.contains(index)
-                    ? "S" : "P")
+                    ? "F" : "S")
             .collect(Collectors.joining(" "));
     LOG.error("{} failed: {}", operation, failedStreamsString);
     for (ECBlockOutputStream stream : failedStreams) {
