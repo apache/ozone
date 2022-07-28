@@ -18,40 +18,38 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
-import org.apache.hadoop.hdds.utils.db.*;
+import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
+import org.apache.hadoop.hdds.utils.db.DBProfile;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
-import org.rocksdb.BlockBasedTableConfig;
-import org.rocksdb.BloomFilter;
+import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
-import org.rocksdb.LRUCache;
-import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
-import org.rocksdb.util.SizeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.concurrent.ConcurrentHashMap;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT;
 
 /**
  * Implementation of the {@link DatanodeStore} interface that contains
@@ -69,14 +67,11 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractDatanodeStore.class);
-  private DBStore store;
+  private volatile DBStore store;
   private final AbstractDatanodeDBDefinition dbDef;
-  private final long containerID;
   private final ColumnFamilyOptions cfOptions;
 
-  private static final DBProfile DEFAULT_PROFILE = DBProfile.DISK;
-  private static final Map<ConfigurationSource, ColumnFamilyOptions>
-      OPTIONS_CACHE = new ConcurrentHashMap<>();
+  private static DatanodeDBProfile dbProfile;
   private final boolean openReadOnly;
 
   /**
@@ -85,20 +80,19 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  protected AbstractDatanodeStore(ConfigurationSource config, long containerID,
+  protected AbstractDatanodeStore(ConfigurationSource config,
       AbstractDatanodeDBDefinition dbDef, boolean openReadOnly)
       throws IOException {
+
+    dbProfile = DatanodeDBProfile
+        .getProfile(config.getEnum(HDDS_DB_PROFILE, HDDS_DEFAULT_DB_PROFILE));
 
     // The same config instance is used on each datanode, so we can share the
     // corresponding column family options, providing a single shared cache
     // for all containers on a datanode.
-    if (!OPTIONS_CACHE.containsKey(config)) {
-      OPTIONS_CACHE.put(config, buildColumnFamilyOptions(config));
-    }
-    cfOptions = OPTIONS_CACHE.get(config);
+    cfOptions = dbProfile.getColumnFamilyOptions(config);
 
     this.dbDef = dbDef;
-    this.containerID = containerID;
     this.openReadOnly = openReadOnly;
     start(config);
   }
@@ -107,9 +101,15 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   public void start(ConfigurationSource config)
       throws IOException {
     if (this.store == null) {
-      DBOptions options = DEFAULT_PROFILE.getDBOptions();
+      DBOptions options = dbProfile.getDBOptions();
       options.setCreateIfMissing(true);
       options.setCreateMissingColumnFamilies(true);
+
+      if (this.dbDef instanceof DatanodeSchemaOneDBDefinition ||
+          this.dbDef instanceof DatanodeSchemaTwoDBDefinition) {
+        long maxWalSize = DBProfile.toLong(StorageUnit.MB.toBytes(2));
+        options.setMaxTotalWalSize(maxWalSize);
+      }
 
       String rocksDbStat = config.getTrimmed(
               OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
@@ -151,7 +151,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public void stop() throws Exception {
+  public synchronized void stop() throws Exception {
     if (store != null) {
       store.close();
       store = null;
@@ -184,15 +184,30 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public BlockIterator<BlockData> getBlockIterator() {
+  public BlockIterator<BlockData> getBlockIterator(long containerID)
+      throws IOException {
     return new KeyValueBlockIterator(containerID,
             blockDataTableWithIterator.iterator());
   }
 
   @Override
-  public BlockIterator<BlockData> getBlockIterator(KeyPrefixFilter filter) {
+  public BlockIterator<BlockData> getBlockIterator(long containerID,
+      KeyPrefixFilter filter) throws IOException {
     return new KeyValueBlockIterator(containerID,
             blockDataTableWithIterator.iterator(), filter);
+  }
+
+  @Override
+  public synchronized boolean isClosed() {
+    if (this.store == null) {
+      return true;
+    }
+    return this.store.isClosed();
+  }
+
+  @Override
+  public void close() throws IOException {
+    this.store.close();
   }
 
   @Override
@@ -211,9 +226,16 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @VisibleForTesting
-  public static Map<ConfigurationSource, ColumnFamilyOptions>
-      getColumnFamilyOptionsCache() {
-    return Collections.unmodifiableMap(OPTIONS_CACHE);
+  public DatanodeDBProfile getDbProfile() {
+    return dbProfile;
+  }
+
+  protected AbstractDatanodeDBDefinition getDbDef() {
+    return this.dbDef;
+  }
+
+  protected Table<String, BlockData> getBlockDataTableWithIterator() {
+    return this.blockDataTableWithIterator;
   }
 
   private static void checkTableStatus(Table<?, ?> table, String name)
@@ -228,26 +250,6 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     }
   }
 
-  private static ColumnFamilyOptions buildColumnFamilyOptions(
-      ConfigurationSource config) {
-    long cacheSize = (long) config.getStorageSize(
-        HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE,
-        HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT,
-        StorageUnit.BYTES);
-
-    // Enables static creation of RocksDB objects.
-    RocksDB.loadLibrary();
-
-    BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
-    tableConfig.setBlockCache(new LRUCache(cacheSize * SizeUnit.MB))
-        .setPinL0FilterAndIndexBlocksInCache(true)
-        .setFilterPolicy(new BloomFilter());
-
-    return DEFAULT_PROFILE
-        .getColumnFamilyOptions()
-        .setTableFormatConfig(tableConfig);
-  }
-
   /**
    * Block Iterator for KeyValue Container. This block iterator returns blocks
    * which match with the {@link MetadataKeyFilters.KeyPrefixFilter}. If no
@@ -255,7 +257,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
    * {@link MetadataKeyFilters#getUnprefixedKeyFilter()}
    */
   @InterfaceAudience.Public
-  private static class KeyValueBlockIterator implements
+  public static class KeyValueBlockIterator implements
           BlockIterator<BlockData>, Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(
@@ -307,7 +309,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
         nextBlock = null;
         return currentBlock;
       }
-      if(hasNext()) {
+      if (hasNext()) {
         return nextBlock();
       }
       throw new NoSuchElementException("Block Iterator reached end for " +

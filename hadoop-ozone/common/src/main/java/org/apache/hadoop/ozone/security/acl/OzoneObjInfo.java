@@ -37,6 +37,8 @@ public final class OzoneObjInfo extends OzoneObj {
   private final String bucketName;
   private final String name;
 
+  private OzonePrefixPath ozonePrefixPath;
+
   /**
    *
    * @param resType
@@ -46,11 +48,13 @@ public final class OzoneObjInfo extends OzoneObj {
    * @param name - keyName/PrefixName
    */
   private OzoneObjInfo(ResourceType resType, StoreType storeType,
-      String volumeName, String bucketName, String name) {
+      String volumeName, String bucketName, String name,
+      OzonePrefixPath ozonePrefixPath) {
     super(resType, storeType);
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.name = name;
+    this.ozonePrefixPath = ozonePrefixPath;
   }
 
   @Override
@@ -95,6 +99,10 @@ public final class OzoneObjInfo extends OzoneObj {
     return name;
   }
 
+  @Override
+  public OzonePrefixPath getOzonePrefixPathViewer() {
+    return ozonePrefixPath;
+  }
 
   public static OzoneObjInfo fromProtobuf(OzoneManagerProtocolProtos.OzoneObj
       proto) {
@@ -103,7 +111,7 @@ public final class OzoneObjInfo extends OzoneObj {
         .setStoreType(StoreType.valueOf(proto.getStoreType().name()));
     String[] tokens = StringUtils.split(proto.getPath(),
         OZONE_URI_DELIMITER, 3);
-    if(tokens == null) {
+    if (tokens == null) {
       throw new IllegalArgumentException("Unexpected path:" + proto.getPath());
     }
     // Set volume name.
@@ -154,6 +162,7 @@ public final class OzoneObjInfo extends OzoneObj {
     private String volumeName;
     private String bucketName;
     private String name;
+    private OzonePrefixPath ozonePrefixPath;
 
     public static Builder newBuilder() {
       return new Builder();
@@ -207,8 +216,15 @@ public final class OzoneObjInfo extends OzoneObj {
       return this;
     }
 
+    public Builder setOzonePrefixPath(OzonePrefixPath ozonePrefixPathViewer) {
+      this.ozonePrefixPath = ozonePrefixPathViewer;
+      return this;
+    }
+
+
     public OzoneObjInfo build() {
-      return new OzoneObjInfo(resType, storeType, volumeName, bucketName, name);
+      return new OzoneObjInfo(resType, storeType, volumeName, bucketName,
+          name, ozonePrefixPath);
     }
   }
 }

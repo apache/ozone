@@ -50,7 +50,7 @@ public final class InterfaceAudience {
    */
   @Documented
   @Retention(RetentionPolicy.RUNTIME)
-  public @interface Public {};
+  public @interface Public { };
   
   /**
    * Intended only for the project(s) specified in the annotation.
@@ -67,7 +67,7 @@ public final class InterfaceAudience {
    */
   @Documented
   @Retention(RetentionPolicy.RUNTIME)
-  public @interface Private {};
+  public @interface Private { };
 
-  private InterfaceAudience() {} // Audience can't exist on its own
+  private InterfaceAudience() { } // Audience can't exist on its own
 }

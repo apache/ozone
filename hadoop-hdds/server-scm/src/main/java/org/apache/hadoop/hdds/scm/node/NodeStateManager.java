@@ -34,29 +34,41 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
 import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.node.states.NodeStateMap;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.HEALTHY_READONLY_NODE;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,7 +92,7 @@ public class NodeStateManager implements Runnable, Closeable {
    * Node's life cycle events.
    */
   private enum NodeLifeCycleEvent {
-    TIMEOUT, RESTORE, RESURRECT
+    TIMEOUT, RESTORE, RESURRECT, LAYOUT_MISMATCH, LAYOUT_MATCH
   }
 
   private static final Logger LOG = LoggerFactory
@@ -144,20 +156,35 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   private long skippedHealthChecks;
 
+  private LayoutVersionManager layoutVersionManager;
+
+  /**
+   * Conditions to check whether a node's metadata layout version matches
+   * that of SCM.
+   */
+  private final Predicate<LayoutVersionProto> layoutMatchCondition;
+  private final Predicate<LayoutVersionProto> layoutMisMatchCondition;
+
   /**
    * Constructs a NodeStateManager instance with the given configuration.
    *
    * @param conf Configuration
+   * @param eventPublisher event publisher
+   * @param layoutManager Layout version manager
    */
   public NodeStateManager(ConfigurationSource conf,
-      EventPublisher eventPublisher) {
+                          EventPublisher eventPublisher,
+                          LayoutVersionManager layoutManager,
+                          SCMContext scmContext) {
+    this.layoutVersionManager = layoutManager;
     this.nodeStateMap = new NodeStateMap();
     this.node2PipelineMap = new Node2PipelineMap();
     this.eventPublisher = eventPublisher;
     this.state2EventMap = new HashMap<>();
     initialiseState2EventMap();
     Set<NodeState> finalStates = new HashSet<>();
-    this.nodeHealthSM = new StateMachine<>(NodeState.HEALTHY, finalStates);
+    this.nodeHealthSM = new StateMachine<>(NodeState.HEALTHY,
+        finalStates);
     initializeStateMachines();
     heartbeatCheckerIntervalMs = HddsServerUtil
         .getScmheartbeatCheckerInterval(conf);
@@ -175,6 +202,24 @@ public class NodeStateManager implements Runnable, Closeable {
     skippedHealthChecks = 0;
     checkPaused = false; // accessed only from test functions
 
+    // This will move a datanode out of healthy readonly state if passed.
+    layoutMatchCondition = (layout) ->
+        (layout.getMetadataLayoutVersion() ==
+             layoutVersionManager.getMetadataLayoutVersion()) &&
+            (layout.getSoftwareLayoutVersion() ==
+            layoutVersionManager.getSoftwareLayoutVersion());
+
+    // This will move a datanode in to healthy readonly state if passed.
+    // When SCM finishes finalizing, it will automatically move all datanodes
+    // to healthy readonly as well.
+    // If nodes heartbeat while SCM is finalizing, they should not be moved
+    // to healthy readonly until SCM finishes updating its MLV, hence the
+    // checkpoint check here.
+    layoutMisMatchCondition = (layout) ->
+        FinalizationManager.shouldTellDatanodesToFinalize(
+            scmContext.getFinalizationCheckpoint()) &&
+            !layoutMatchCondition.test(layout);
+
     scheduleNextHealthCheck();
   }
 
@@ -182,37 +227,55 @@ public class NodeStateManager implements Runnable, Closeable {
    * Populates state2event map.
    */
   private void initialiseState2EventMap() {
-    state2EventMap.put(NodeState.STALE, SCMEvents.STALE_NODE);
-    state2EventMap.put(NodeState.DEAD, SCMEvents.DEAD_NODE);
-    state2EventMap.put(NodeState.HEALTHY,
-        SCMEvents.NON_HEALTHY_TO_HEALTHY_NODE);
+    state2EventMap.put(STALE, SCMEvents.STALE_NODE);
+    state2EventMap.put(DEAD, SCMEvents.DEAD_NODE);
+    state2EventMap
+        .put(HEALTHY, SCMEvents.HEALTHY_READONLY_TO_HEALTHY_NODE);
+    state2EventMap
+        .put(NodeState.HEALTHY_READONLY, HEALTHY_READONLY_NODE);
   }
 
   /*
    *
    * Node and State Transition Mapping:
    *
-   * State: HEALTHY         -------------------> STALE
-   * Event:                       TIMEOUT
+   * State: HEALTHY             -------------------> STALE
+   * Event:                          TIMEOUT
+   *
+   * State: HEALTHY             -------------------> HEALTHY_READONLY
+   * Event:                       LAYOUT_MISMATCH
+   *
+   * State: HEALTHY_READONLY    -------------------> HEALTHY
+   * Event:                       LAYOUT_MATCH
+   *
+   * State: HEALTHY_READONLY    -------------------> STALE
+   * Event:                          TIMEOUT
+   *
+   * State: STALE           -------------------> HEALTHY_READONLY
+   * Event:                       RESTORE
+   *
+   * State: DEAD            -------------------> HEALTHY_READONLY
+   * Event:                       RESURRECT
    *
    * State: STALE           -------------------> DEAD
    * Event:                       TIMEOUT
    *
-   * State: STALE           -------------------> HEALTHY
-   * Event:                       RESTORE
-   *
-   * State: DEAD            -------------------> HEALTHY
-   * Event:                       RESURRECT
-   *
    *  Node State Flow
    *
-   *  +--------------------------------------------------------+
-   *  |                                     (RESURRECT)        |
-   *  |   +--------------------------+                         |
-   *  |   |      (RESTORE)           |                         |
-   *  |   |                          |                         |
-   *  V   V                          |                         |
-   * [HEALTHY]------------------->[STALE]------------------->[DEAD]
+   *                                        +-----<---------<---+
+   *                                        |    (RESURRECT)    |
+   *    +-->-----(LAYOUT_MISMATCH)-->--+    V                   |
+   *    |                              |    |                   ^
+   *    |                              |    |                   |
+   *    |                              V    V                   |
+   *    |  +-----(LAYOUT_MATCH)--[HEALTHY_READONLY]             |
+   *    |  |                            ^  |                    |
+   *    |  |                            |  |                    ^
+   *    |  |                            |  |(TIMEOUT)           |
+   *    ^  |                  (RESTORE) |  |                    |
+   *    |  V                            |  V                    |
+   * [HEALTHY]---->----------------->[STALE]------->--------->[DEAD]
+   *               (TIMEOUT)                  (TIMEOUT)
    *
    */
 
@@ -220,28 +283,39 @@ public class NodeStateManager implements Runnable, Closeable {
    * Initializes the lifecycle of node state machine.
    */
   private void initializeStateMachines() {
-    nodeHealthSM.addTransition(
-        NodeState.HEALTHY, NodeState.STALE, NodeLifeCycleEvent.TIMEOUT);
-    nodeHealthSM.addTransition(
-        NodeState.STALE, NodeState.DEAD, NodeLifeCycleEvent.TIMEOUT);
-    nodeHealthSM.addTransition(
-        NodeState.STALE, NodeState.HEALTHY, NodeLifeCycleEvent.RESTORE);
-    nodeHealthSM.addTransition(
-        NodeState.DEAD, NodeState.HEALTHY, NodeLifeCycleEvent.RESURRECT);
+    nodeHealthSM.addTransition(HEALTHY_READONLY, HEALTHY,
+        NodeLifeCycleEvent.LAYOUT_MATCH);
+    nodeHealthSM.addTransition(HEALTHY_READONLY, STALE,
+        NodeLifeCycleEvent.TIMEOUT);
+    nodeHealthSM.addTransition(HEALTHY, STALE, NodeLifeCycleEvent.TIMEOUT);
+    nodeHealthSM.addTransition(HEALTHY, HEALTHY_READONLY,
+        NodeLifeCycleEvent.LAYOUT_MISMATCH);
+    nodeHealthSM.addTransition(STALE, DEAD, NodeLifeCycleEvent.TIMEOUT);
+    nodeHealthSM.addTransition(STALE, HEALTHY_READONLY,
+        NodeLifeCycleEvent.RESTORE);
+    nodeHealthSM.addTransition(DEAD, HEALTHY_READONLY,
+        NodeLifeCycleEvent.RESURRECT);
   }
 
   /**
    * Adds a new node to the state manager.
    *
    * @param datanodeDetails DatanodeDetails
+   * @param layoutInfo LayoutVersionProto
    *
    * @throws NodeAlreadyExistsException if the node is already present
    */
-  public void addNode(DatanodeDetails datanodeDetails)
-      throws NodeAlreadyExistsException {
-    NodeStatus newNodeStatus = newNodeStatus(datanodeDetails);
-    nodeStateMap.addNode(datanodeDetails, newNodeStatus);
-    eventPublisher.fireEvent(SCMEvents.NEW_NODE, datanodeDetails);
+  public void addNode(DatanodeDetails datanodeDetails,
+      LayoutVersionProto layoutInfo) throws NodeAlreadyExistsException {
+    NodeStatus newNodeStatus = newNodeStatus(datanodeDetails, layoutInfo);
+    nodeStateMap.addNode(datanodeDetails, newNodeStatus, layoutInfo);
+    UUID dnID = datanodeDetails.getUuid();
+    try {
+      updateLastKnownLayoutVersion(datanodeDetails, layoutInfo);
+    } catch (NodeNotFoundException ex) {
+      LOG.error("Inconsistent NodeStateMap! Datanode with ID {} was " +
+          "added but not found in  map: {}", dnID, nodeStateMap);
+    }
   }
 
   /**
@@ -251,17 +325,24 @@ public class NodeStateManager implements Runnable, Closeable {
    * updated to reflect the datanode state.
    * @param dn DatanodeDetails reported by the datanode
    */
-  private NodeStatus newNodeStatus(DatanodeDetails dn) {
+  private NodeStatus newNodeStatus(DatanodeDetails dn,
+      LayoutVersionProto layoutInfo) {
     HddsProtos.NodeOperationalState dnOpState = dn.getPersistedOpState();
+    NodeState state = HEALTHY;
+
+    if (layoutMisMatchCondition.test(layoutInfo)) {
+      state = HEALTHY_READONLY;
+    }
+
     if (dnOpState != NodeOperationalState.IN_SERVICE) {
       LOG.info("Updating nodeOperationalState on registration as the " +
               "datanode has a persisted state of {} and expiry of {}",
           dnOpState, dn.getPersistedOpStateExpiryEpochSec());
-      return new NodeStatus(dnOpState, nodeHealthSM.getInitialState(),
+      return new NodeStatus(dnOpState, state,
           dn.getPersistedOpStateExpiryEpochSec());
     } else {
       return new NodeStatus(
-          NodeOperationalState.IN_SERVICE, nodeHealthSM.getInitialState());
+          NodeOperationalState.IN_SERVICE, state);
     }
   }
 
@@ -308,6 +389,42 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
+   * Updates the last known layout version of the node.
+   * @param datanodeDetails DataNode Details
+   * @param layoutInfo DataNode Layout Information
+   *
+   * @throws NodeNotFoundException if the node is not present
+   */
+  public void updateLastKnownLayoutVersion(DatanodeDetails datanodeDetails,
+                                      LayoutVersionProto layoutInfo)
+      throws NodeNotFoundException {
+    nodeStateMap.getNodeInfo(datanodeDetails.getUuid())
+        .updateLastKnownLayoutVersion(layoutInfo);
+  }
+
+  /**
+   * Update node.
+   *
+   * @param datanodeDetails the datanode details
+   * @param layoutInfo the layoutInfo
+   * @throws NodeNotFoundException the node not found exception
+   */
+  public void updateNode(DatanodeDetails datanodeDetails,
+                         LayoutVersionProto layoutInfo)
+          throws NodeNotFoundException {
+    DatanodeInfo datanodeInfo =
+            nodeStateMap.getNodeInfo(datanodeDetails.getUuid());
+    NodeStatus newNodeStatus = newNodeStatus(datanodeDetails, layoutInfo);
+    LOG.info("updating node {} from {} to {} with status {}",
+            datanodeDetails.getUuidString(),
+            datanodeInfo,
+            datanodeDetails,
+            newNodeStatus);
+    nodeStateMap.updateNode(datanodeDetails, newNodeStatus, layoutInfo);
+    updateLastKnownLayoutVersion(datanodeDetails, layoutInfo);
+  }
+
+  /**
    * Returns the current state of the node.
    *
    * @param datanodeDetails DatanodeDetails
@@ -328,7 +445,7 @@ public class NodeStateManager implements Runnable, Closeable {
    * @return list of healthy nodes
    */
   public List<DatanodeInfo> getHealthyNodes() {
-    return getNodes(null, NodeState.HEALTHY);
+    return getNodes(null, HEALTHY);
   }
 
   /**
@@ -520,6 +637,20 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
+   * Removes the given container from the specified datanode.
+   *
+   * @param uuid - datanode uuid
+   * @param containerId - containerID
+   * @throws NodeNotFoundException - if datanode is not known. For new datanode
+   *                        use addDatanodeInContainerMap call.
+   */
+  public void removeContainer(final UUID uuid,
+                           final ContainerID containerId)
+      throws NodeNotFoundException {
+    nodeStateMap.removeContainer(uuid, containerId);
+  }
+
+  /**
    * Update set of containers available on a datanode.
    * @param uuid - DatanodeID
    * @param containerIds - Set of containerIDs
@@ -531,7 +662,9 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
-   * Return set of containerIDs available on a datanode.
+   * Return set of containerIDs available on a datanode. This is a copy of the
+   * set which resides inside NodeStateMap and hence can be modified without
+   * synchronization or side effects.
    * @param uuid - DatanodeID
    * @return - set of containerIDs
    */
@@ -584,8 +717,46 @@ public class NodeStateManager implements Runnable, Closeable {
     scheduleNextHealthCheck();
   }
 
+  /**
+   * Upgrade finalization needs to move all nodes to a healthy readonly state
+   * when finalization finishes to make sure no nodes with metadata layout
+   * version older than SCM's are used in pipelines. Pipeline creation is
+   * still frozen at this point in the finalization flow.
+   *
+   * This method is synchronized to coordinate node state updates between
+   * the upgrade finalization thread which calls this method, and the
+   * node health processing thread that calls {@link this#checkNodesHealth}.
+   */
+  public synchronized void forceNodesToHealthyReadOnly() {
+    try {
+      List<UUID> nodes = nodeStateMap.getNodes(null, HEALTHY);
+      for (UUID id : nodes) {
+        DatanodeInfo node = nodeStateMap.getNodeInfo(id);
+        nodeStateMap.updateNodeHealthState(node.getUuid(),
+            HEALTHY_READONLY);
+        if (state2EventMap.containsKey(HEALTHY_READONLY)) {
+          // At this point pipeline creation is already frozen and the node's
+          // state has been updated in nodeStateMap. This event should be a
+          // no-op aside from logging a message, so it is ok to complete
+          // asynchronously.
+          eventPublisher.fireEvent(state2EventMap.get(HEALTHY_READONLY),
+              node);
+        }
+      }
+
+    } catch (NodeNotFoundException ex) {
+      LOG.error("Inconsistent NodeStateMap! {}", nodeStateMap);
+    }
+  }
+
+  /**
+   * This method is synchronized to coordinate node state updates between
+   * the upgrade finalization thread which calls
+   * {@link this#forceNodesToHealthyReadOnly}, and the node health processing
+   * thread that calls this method.
+   */
   @VisibleForTesting
-  public void checkNodesHealth() {
+  public synchronized void checkNodesHealth() {
 
     /*
      *
@@ -626,11 +797,22 @@ public class NodeStateManager implements Runnable, Closeable {
         (lastHbTime) -> lastHbTime < healthyNodeDeadline;
     Predicate<Long> deadNodeCondition =
         (lastHbTime) -> lastHbTime < staleNodeDeadline;
+
     try {
-      for(DatanodeInfo node : nodeStateMap.getAllDatanodeInfos()) {
+      for (DatanodeInfo node : nodeStateMap.getAllDatanodeInfos()) {
         NodeStatus status = nodeStateMap.getNodeStatus(node.getUuid());
         switch (status.getHealth()) {
         case HEALTHY:
+          updateNodeLayoutVersionState(node, layoutMisMatchCondition, status,
+              NodeLifeCycleEvent.LAYOUT_MISMATCH);
+          // Move the node to STALE if the last heartbeat time is less than
+          // configured stale-node interval.
+          updateNodeState(node, staleNodeCondition, status,
+              NodeLifeCycleEvent.TIMEOUT);
+          break;
+        case HEALTHY_READONLY:
+          updateNodeLayoutVersionState(node, layoutMatchCondition, status,
+              NodeLifeCycleEvent.LAYOUT_MATCH);
           // Move the node to STALE if the last heartbeat time is less than
           // configured stale-node interval.
           updateNodeState(node, staleNodeCondition, status,
@@ -740,6 +922,37 @@ public class NodeStateManager implements Runnable, Closeable {
     Event<DatanodeDetails> event = state2EventMap.get(health);
     if (event != null) {
       eventPublisher.fireEvent(event, node);
+    }
+  }
+
+  /**
+   * Updates the node state if the condition satisfies.
+   *
+   * @param node DatanodeInfo
+   * @param condition condition to check
+   * @param status current state of node
+   * @param lifeCycleEvent NodeLifeCycleEvent to be applied if condition
+   *                       matches
+   *
+   * @throws NodeNotFoundException if the node is not present
+   */
+  private void updateNodeLayoutVersionState(DatanodeInfo node,
+                             Predicate<LayoutVersionProto> condition,
+                                            NodeStatus status,
+                                            NodeLifeCycleEvent lifeCycleEvent)
+      throws NodeNotFoundException {
+    try {
+      if (condition.test(node.getLastKnownLayoutVersion())) {
+        NodeState newHealthState = nodeHealthSM.getNextState(status.getHealth(),
+            lifeCycleEvent);
+        NodeStatus newStatus =
+            nodeStateMap.updateNodeHealthState(node.getUuid(), newHealthState);
+        fireHealthStateEvent(newStatus.getHealth(), node);
+      }
+    } catch (InvalidStateTransitionException e) {
+      LOG.warn("Invalid state transition of node {}." +
+              " Current state: {}, life cycle event: {}",
+          node, status, lifeCycleEvent);
     }
   }
 

@@ -24,8 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -34,16 +33,14 @@ import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
+import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
 import org.apache.hadoop.ozone.shell.bucket.BucketHandler;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
+
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
+import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Parameters;
 
 /**
@@ -62,15 +59,8 @@ public class CopyKeyHandler extends BucketHandler {
       description = "The new desired name of the key")
   private String toKey;
 
-  @Option(names = {"-r", "--replication"},
-      description = "Replication factor of the new key. (use ONE or THREE) "
-          + "Default is specified in the cluster-wide config.")
-  private ReplicationFactor replicationFactor;
-
-  @Option(names = {"-t", "--type"},
-      description = "Replication type of the new key. (use RATIS or " +
-          "STAND_ALONE) Default is specified in the cluster-wide config.")
-  private ReplicationType replicationType;
+  @Mixin
+  private ShellReplicationOptions replication;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -82,16 +72,8 @@ public class CopyKeyHandler extends BucketHandler {
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);
 
-    if (replicationFactor == null) {
-      replicationFactor = ReplicationFactor.valueOf(
-          getConf().getInt(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT));
-    }
-
-    if (replicationType == null) {
-      replicationType = ReplicationType.valueOf(
-          getConf().get(OZONE_REPLICATION_TYPE,
-              OZONE_REPLICATION_TYPE_DEFAULT));
-    }
+    ReplicationConfig replicationConfig =
+        replication.fromParamsOrConfig(getConf());
 
     OzoneKeyDetails keyDetail = bucket.getKey(fromKey);
     Map<String, String> keyMetadata = new HashMap<>(keyDetail.getMetadata());
@@ -107,7 +89,7 @@ public class CopyKeyHandler extends BucketHandler {
         OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
     try (InputStream input = bucket.readKey(fromKey);
          OutputStream output = bucket.createKey(toKey, input.available(),
-             replicationType, replicationFactor, keyMetadata)) {
+             replicationConfig, keyMetadata)) {
       IOUtils.copyBytes(input, output, chunkSize);
     }
 

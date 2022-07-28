@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.tasks;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
@@ -30,8 +31,8 @@ import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
 import org.jooq.DSLContext;
 import org.jooq.Record3;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.AdditionalAnswers;
 
 import java.io.IOException;
@@ -43,9 +44,9 @@ import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateActi
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
 import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -59,7 +60,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
   private FileSizeCountTask fileSizeCountTask;
   private DSLContext dslContext;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     fileCountBySizeDao = getDao(FileCountBySizeDao.class);
     UtilizationSchemaDefinition utilizationSchemaDefinition =
@@ -100,7 +101,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         TypedTable.TypedKeyValue.class);
 
     when(keyTable.iterator()).thenReturn(mockKeyIter);
-    when(omMetadataManager.getKeyTable()).thenReturn(keyTable);
+    when(omMetadataManager.getKeyTable(getBucketLayout())).thenReturn(keyTable);
     when(mockKeyIter.hasNext())
         .thenReturn(true)
         .thenReturn(true)
@@ -274,7 +275,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         TypedTable.TypedKeyValue.class);
 
     when(keyTable.iterator()).thenReturn(mockKeyIter);
-    when(omMetadataManager.getKeyTable()).thenReturn(keyTable);
+    when(omMetadataManager.getKeyTable(getBucketLayout())).thenReturn(keyTable);
     when(mockKeyIter.hasNext())
         .thenAnswer(AdditionalAnswers.returnsElementsOf(hasNextAnswer));
     when(mockKeyIter.next()).thenReturn(mockKeyValue);
@@ -414,5 +415,9 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     recordToFind.value1("vol2");
     assertEquals(1, fileCountBySizeDao.findById(recordToFind)
         .getCount().longValue());
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

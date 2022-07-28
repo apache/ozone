@@ -22,8 +22,11 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaOneDBDefinition;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaTwoDBDefinition;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition;
@@ -44,6 +47,8 @@ public final class DBDefinitionFactory {
 
   private static HashMap<String, DBDefinition> dbMap;
 
+  private static String dnDBSchemaVersion;
+
   static {
     dbMap = new HashMap<>();
     Arrays.asList(
@@ -60,7 +65,8 @@ public final class DBDefinitionFactory {
     return getReconDBDefinition(dbName);
   }
 
-  public static DBDefinition getDefinition(Path dbPath) {
+  public static DBDefinition getDefinition(Path dbPath,
+      ConfigurationSource config) {
     Preconditions.checkNotNull(dbPath,
         "Path is required to identify the used db scheme");
     final Path fileName = dbPath.getFileName();
@@ -69,9 +75,18 @@ public final class DBDefinitionFactory {
           "Path is required to identify the used db scheme");
     }
     String dbName = fileName.toString();
-    if (dbName.endsWith("-container.db")) {
-      return new DatanodeSchemaTwoDBDefinition(
-          dbPath.toAbsolutePath().toString());
+    if (dbName.endsWith("container.db")) {
+      switch (dnDBSchemaVersion) {
+      case "V1":
+        return new DatanodeSchemaOneDBDefinition(
+            dbPath.toAbsolutePath().toString(), config);
+      case "V3":
+        return new DatanodeSchemaThreeDBDefinition(
+            dbPath.toAbsolutePath().toString(), config);
+      default:
+        return new DatanodeSchemaTwoDBDefinition(
+            dbPath.toAbsolutePath().toString(), config);
+      }
     }
     return getDefinition(dbName);
   }
@@ -83,5 +98,9 @@ public final class DBDefinitionFactory {
       return new OMDBDefinition();
     }
     return null;
+  }
+
+  public static void setDnDBSchemaVersion(String dnDBSchemaVersion) {
+    DBDefinitionFactory.dnDBSchemaVersion = dnDBSchemaVersion;
   }
 }

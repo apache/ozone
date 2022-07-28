@@ -29,6 +29,7 @@ import java.time.Instant;
 @XmlAccessorType(XmlAccessType.FIELD)
 public class KeyMetadata {
 
+  @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
   @XmlElement(name = "Key")
   private String key; // or the Object Name
 

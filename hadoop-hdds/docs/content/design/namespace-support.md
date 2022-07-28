@@ -1,10 +1,10 @@
 ---
-title: Ozone FS namespace
+title: Ozone FS namespace / prefix table
 summary: Use additional prefix table for indexed data retrieval
-date: 2020-01-20
+date: 2021-04-12
 jira: HDDS-2939
-status: implementing
-author: Supratim Deka, Anu Engineer
+status: implemented
+author: Supratim Deka, Anu Engineer, Rakesh Radhakrishnan
 ---
 <!--
   Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,8 +22,9 @@ author: Supratim Deka, Anu Engineer
 
 # Abstract
 
- Flat namespace (like key -> key info) is not efficient for retrieveing directories. (Large segments should be scanned, the whole sub-hierarchy)
+ Flat namespace (like key -> key info) is not efficient for listing/deleting/renaming directories. (Large segments should be scanned, the whole sub-hierarchy). To make deletion / rename fast and atomic (and make the lists faster) the key table is separated for prefix + key table.
 
 # Link
 
- * https://issues.apache.org/jira/secure/attachment/12991926/Ozone%20FS%20Namespace%20Proposal%20v1.0.docx
+ * [Design doc](https://issues.apache.org/jira/secure/attachment/12991926/Ozone%20FS%20Namespace%20Proposal%20v1.0.docx)
+ * [Quick overview](https://issues.apache.org/jira/secure/attachment/13023399/OzoneFS%20Optimizations_DesignOverview_%20HDDS-2939.pdf)

@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.client.io;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -28,13 +28,18 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.fs.CanUnbuffer;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.FSExceptionMessages;
-import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
+import org.apache.hadoop.hdds.scm.storage.ByteArrayReader;
+import org.apache.hadoop.hdds.scm.storage.ByteBufferReader;
+import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
+import org.apache.hadoop.hdds.scm.storage.ExtendedInputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
@@ -46,8 +51,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Maintaining a list of BlockInputStream. Read based on offset.
  */
-public class KeyInputStream extends InputStream
-    implements Seekable, CanUnbuffer {
+public class KeyInputStream extends ExtendedInputStream {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyInputStream.class);
@@ -59,7 +63,7 @@ public class KeyInputStream extends InputStream
   private boolean closed = false;
 
   // List of BlockInputStreams, one for each block in the key
-  private final List<BlockInputStream> blockStreams;
+  private final List<BlockExtendedInputStream> blockStreams;
 
   // blockOffsets[i] stores the index of the first data byte in
   // blockStream w.r.t the key data.
@@ -87,20 +91,23 @@ public class KeyInputStream extends InputStream
    */
   public static LengthInputStream getFromOmKeyInfo(OmKeyInfo keyInfo,
       XceiverClientFactory xceiverClientFactory,
-      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction) {
+      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      BlockInputStreamFactory blockStreamFactory) {
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
 
     KeyInputStream keyInputStream = new KeyInputStream();
     keyInputStream.initialize(keyInfo, keyLocationInfos,
-        xceiverClientFactory, verifyChecksum, retryFunction);
+        xceiverClientFactory, verifyChecksum, retryFunction,
+        blockStreamFactory);
 
     return new LengthInputStream(keyInputStream, keyInputStream.length);
   }
 
   public static List<LengthInputStream> getStreamsFromKeyInfo(OmKeyInfo keyInfo,
       XceiverClientFactory xceiverClientFactory, boolean verifyChecksum,
-      Function<OmKeyInfo, OmKeyInfo> retryFunction) {
+      Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      BlockInputStreamFactory blockStreamFactory) {
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
 
@@ -131,7 +138,8 @@ public class KeyInputStream extends InputStream
         partsToBlocksMap.entrySet()) {
       KeyInputStream keyInputStream = new KeyInputStream();
       keyInputStream.initialize(keyInfo, entry.getValue(),
-          xceiverClientFactory, verifyChecksum, retryFunction);
+          xceiverClientFactory, verifyChecksum, retryFunction,
+          blockStreamFactory);
       lengthInputStreams.add(new LengthInputStream(keyInputStream,
           partsLengthMap.get(entry.getKey())));
     }
@@ -142,7 +150,8 @@ public class KeyInputStream extends InputStream
   private synchronized void initialize(OmKeyInfo keyInfo,
       List<OmKeyLocationInfo> blockInfos,
       XceiverClientFactory xceiverClientFactory,
-      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction) {
+      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      BlockInputStreamFactory blockStreamFactory) {
     this.key = keyInfo.getKeyName();
     this.blockOffsets = new long[blockInfos.size()];
     long keyLength = 0;
@@ -155,7 +164,8 @@ public class KeyInputStream extends InputStream
 
       // We also pass in functional reference which is used to refresh the
       // pipeline info for a given OM Key location info.
-      addStream(omKeyLocationInfo, xceiverClientFactory,
+      addStream(keyInfo.getReplicationConfig(), omKeyLocationInfo,
+          xceiverClientFactory,
           verifyChecksum, keyLocationInfo -> {
             OmKeyInfo newKeyInfo = retryFunction.apply(keyInfo);
             BlockID blockID = keyLocationInfo.getBlockID();
@@ -170,7 +180,7 @@ public class KeyInputStream extends InputStream
             } else {
               return null;
             }
-          });
+          }, blockStreamFactory);
 
       this.blockOffsets[i] = keyLength;
       keyLength += omKeyLocationInfo.getLength();
@@ -184,18 +194,24 @@ public class KeyInputStream extends InputStream
    * BlockInputStream is initialized when a read operation is performed on
    * the block for the first time.
    */
-  private synchronized void addStream(OmKeyLocationInfo blockInfo,
-      XceiverClientFactory xceiverClientFactory,
-      boolean verifyChecksum,
-      Function<OmKeyLocationInfo, Pipeline> refreshPipelineFunction) {
-    blockStreams.add(new BlockInputStream(blockInfo.getBlockID(),
-        blockInfo.getLength(), blockInfo.getPipeline(), blockInfo.getToken(),
+  private synchronized void addStream(ReplicationConfig repConfig,
+      OmKeyLocationInfo blockInfo,
+      XceiverClientFactory xceiverClientFactory, boolean verifyChecksum,
+      Function<OmKeyLocationInfo, Pipeline> refreshPipelineFunction,
+      BlockInputStreamFactory blockStreamFactory) {
+    blockStreams.add(blockStreamFactory.create(repConfig, blockInfo,
+        blockInfo.getPipeline(), blockInfo.getToken(),
         verifyChecksum, xceiverClientFactory,
         blockID -> refreshPipelineFunction.apply(blockInfo)));
   }
 
   @VisibleForTesting
   public void addStream(BlockInputStream blockInputStream) {
+    blockStreams.add(blockInputStream);
+  }
+
+  @VisibleForTesting
+  public void addStream(BlockExtendedInputStream blockInputStream) {
     blockStreams.add(blockInputStream);
   }
 
@@ -216,18 +232,33 @@ public class KeyInputStream extends InputStream
    */
   @Override
   public synchronized int read(byte[] b, int off, int len) throws IOException {
-    checkOpen();
-    if (b == null) {
-      throw new NullPointerException();
-    }
-    if (off < 0 || len < 0 || len > b.length - off) {
-      throw new IndexOutOfBoundsException();
-    }
-    if (len == 0) {
+    ByteReaderStrategy strategy = new ByteArrayReader(b, off, len);
+    int bufferLen = strategy.getTargetLength();
+    if (bufferLen == 0) {
       return 0;
     }
+    return readWithStrategy(strategy);
+  }
+
+  @Override
+  public synchronized int read(ByteBuffer byteBuffer) throws IOException {
+    ByteReaderStrategy strategy = new ByteBufferReader(byteBuffer);
+    int bufferLen = strategy.getTargetLength();
+    if (bufferLen == 0) {
+      return 0;
+    }
+    return readWithStrategy(strategy);
+  }
+
+  @Override
+  protected synchronized int readWithStrategy(ByteReaderStrategy strategy)
+      throws IOException {
+    Preconditions.checkArgument(strategy != null);
+    checkOpen();
+
+    int buffLen = strategy.getTargetLength();
     int totalReadLen = 0;
-    while (len > 0) {
+    while (buffLen > 0) {
       // if we are at the last block and have read the entire block, return
       if (blockStreams.size() == 0 ||
           (blockStreams.size() - 1 <= blockIndex &&
@@ -237,21 +268,20 @@ public class KeyInputStream extends InputStream
       }
 
       // Get the current blockStream and read data from it
-      BlockInputStream current = blockStreams.get(blockIndex);
-      int numBytesToRead = Math.min(len, (int)current.getRemaining());
-      int numBytesRead = current.read(b, off, numBytesToRead);
+      BlockExtendedInputStream current = blockStreams.get(blockIndex);
+      int numBytesToRead = (int)Math.min(buffLen, current.getRemaining());
+      int numBytesRead = strategy.readFromBlock(current, numBytesToRead);
       if (numBytesRead != numBytesToRead) {
         // This implies that there is either data loss or corruption in the
         // chunk entries. Even EOF in the current stream would be covered in
         // this case.
         throw new IOException(String.format("Inconsistent read for blockID=%s "
-                        + "length=%d numBytesToRead=%d numBytesRead=%d",
-                current.getBlockID(), current.getLength(), numBytesToRead,
-                numBytesRead));
+                + "length=%d numBytesToRead=%d numBytesRead=%d",
+            current.getBlockID(), current.getLength(), numBytesToRead,
+            numBytesRead));
       }
       totalReadLen += numBytesRead;
-      off += numBytesRead;
-      len -= numBytesRead;
+      buffLen -= numBytesRead;
       if (current.getRemaining() <= 0 &&
           ((blockIndex + 1) < blockStreams.size())) {
         blockIndex += 1;
@@ -307,7 +337,7 @@ public class KeyInputStream extends InputStream
     }
 
     // Reset the previous blockStream's position
-    blockStreams.get(blockIndexOfPrevPosition).resetPosition();
+    blockStreams.get(blockIndexOfPrevPosition).seek(0);
 
     // Reset all the blockStreams above the blockIndex. We do this to reset
     // any previous reads which might have updated the blockPosition and
@@ -332,16 +362,16 @@ public class KeyInputStream extends InputStream
   }
 
   @Override
-  public int available() throws IOException {
+  public synchronized int available() throws IOException {
     checkOpen();
     long remaining = length - getPos();
     return remaining <= Integer.MAX_VALUE ? (int) remaining : Integer.MAX_VALUE;
   }
 
   @Override
-  public void close() throws IOException {
+  public synchronized void close() throws IOException {
     closed = true;
-    for (BlockInputStream blockStream : blockStreams) {
+    for (ExtendedInputStream blockStream : blockStreams) {
       blockStream.close();
     }
   }
@@ -369,7 +399,7 @@ public class KeyInputStream extends InputStream
   }
 
   @Override
-  public long skip(long n) throws IOException {
+  public synchronized long skip(long n) throws IOException {
     if (n <= 0) {
       return 0;
     }
@@ -380,14 +410,14 @@ public class KeyInputStream extends InputStream
   }
 
   @Override
-  public void unbuffer() {
-    for (BlockInputStream is : blockStreams) {
+  public synchronized void unbuffer() {
+    for (ExtendedInputStream is : blockStreams) {
       is.unbuffer();
     }
   }
 
   @VisibleForTesting
-  public List<BlockInputStream> getBlockStreams() {
+  public List<BlockExtendedInputStream> getBlockStreams() {
     return blockStreams;
   }
 }

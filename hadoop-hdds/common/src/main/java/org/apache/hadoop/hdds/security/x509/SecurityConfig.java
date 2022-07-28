@@ -32,6 +32,8 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_ALGORITHM;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_LEN;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_SECURITY_PROVIDER;
@@ -90,9 +92,10 @@ public class SecurityConfig {
   private final String keyDir;
   private final String privateKeyFileName;
   private final String publicKeyFileName;
-  private final Duration certDuration;
+  private final Duration maxCertDuration;
   private final String x509SignatureAlgo;
   private final boolean blockTokenEnabled;
+  private final boolean containerTokenEnabled;
   private final String certificateDir;
   private final String certificateFileName;
   private final boolean grpcTlsEnabled;
@@ -130,7 +133,7 @@ public class SecurityConfig {
 
     String durationString = this.configuration.get(HDDS_X509_MAX_DURATION,
         HDDS_X509_MAX_DURATION_DEFAULT);
-    this.certDuration = Duration.parse(durationString);
+    this.maxCertDuration = Duration.parse(durationString);
     this.x509SignatureAlgo = this.configuration.get(HDDS_X509_SIGNATURE_ALGO,
         HDDS_X509_SIGNATURE_ALGO_DEFAULT);
     this.certificateDir = this.configuration.get(HDDS_X509_DIR_NAME,
@@ -141,6 +144,9 @@ public class SecurityConfig {
     this.blockTokenEnabled = this.configuration.getBoolean(
         HDDS_BLOCK_TOKEN_ENABLED,
         HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
+    this.containerTokenEnabled = this.configuration.getBoolean(
+        HDDS_CONTAINER_TOKEN_ENABLED,
+        HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT);
 
     this.grpcTlsEnabled = this.configuration.getBoolean(HDDS_GRPC_TLS_ENABLED,
         HDDS_GRPC_TLS_ENABLED_DEFAULT);
@@ -158,6 +164,13 @@ public class SecurityConfig {
         this.configuration.get(HDDS_X509_DEFAULT_DURATION,
             HDDS_X509_DEFAULT_DURATION_DEFAULT);
     defaultCertDuration = Duration.parse(certDurationString);
+
+    if (maxCertDuration.compareTo(defaultCertDuration) < 0) {
+      LOG.error("Certificate duration {} should not be greater than Maximum " +
+          "Certificate duration {}", maxCertDuration, defaultCertDuration);
+      throw new IllegalArgumentException("Certificate duration should not be " +
+          "greater than maximum Certificate duration");
+    }
 
     this.crlName = this.configuration.get(HDDS_X509_CRL_NAME,
                                           HDDS_X509_CRL_NAME_DEFAULT);
@@ -320,11 +333,21 @@ public class SecurityConfig {
    * @return Duration.
    */
   public Duration getMaxCertificateDuration() {
-    return this.certDuration;
+    return this.maxCertDuration;
   }
 
+  /**
+   * Whether to require short-lived tokens for block operations.
+   */
   public boolean isBlockTokenEnabled() {
     return this.blockTokenEnabled;
+  }
+
+  /**
+   * Whether to require short-lived tokens for container operations.
+   */
+  public boolean isContainerTokenEnabled() {
+    return this.containerTokenEnabled;
   }
 
   /**

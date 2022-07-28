@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
-import static org.apache.hadoop.test.GenericTestUtils.getTestDir;
+import static org.apache.ozone.test.GenericTestUtils.getTestDir;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -114,7 +114,7 @@ public class TestRoundRobinVolumeChoosingPolicy {
     try {
       policy.chooseVolume(volumes, blockSize);
       Assert.fail("expected to throw DiskOutOfSpaceException");
-    } catch(DiskOutOfSpaceException e) {
+    } catch (DiskOutOfSpaceException e) {
       Assert.assertEquals("Not returning the expected message",
           "Out of space: The volume with the most available space (=" + 200
               + " B) is less than the container size (=" + blockSize + " B).",

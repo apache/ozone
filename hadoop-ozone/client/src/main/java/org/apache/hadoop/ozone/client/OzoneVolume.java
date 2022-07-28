@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
+import org.apache.commons.collections.ListUtils;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -35,6 +36,8 @@ import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 
@@ -89,6 +92,21 @@ public class OzoneVolume extends WithMetadata {
 
   private int listCacheSize;
 
+  private OzoneObj ozoneObj;
+  /**
+   * Reference count on this Ozone volume.
+   *
+   * When reference count is larger than zero, it indicates that at least one
+   * "lock" is held on the volume by some Ozone feature (e.g. multi-tenancy).
+   * Volume delete operation will be denied in this case, and user should be
+   * prompted to release the lock first via the interface provided by that
+   * feature.
+   *
+   * Volumes created using CLI, ObjectStore API or upgraded from older OM DB
+   * will have reference count set to zero by default.
+   */
+  private long refCount;
+
   /**
    * Constructs OzoneVolume instance.
    * @param conf Configuration object.
@@ -122,6 +140,24 @@ public class OzoneVolume extends WithMetadata {
       modificationTime = Instant.ofEpochSecond(
           this.creationTime.getEpochSecond(), this.creationTime.getNano());
     }
+    this.ozoneObj = OzoneObjInfo.Builder.newBuilder()
+        .setVolumeName(name)
+        .setResType(OzoneObj.ResourceType.VOLUME)
+        .setStoreType(OzoneObj.StoreType.OZONE).build();
+  }
+
+  /**
+   * @param refCount volume reference count.
+   */
+  @SuppressWarnings("parameternumber")
+  public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
+      String name, String admin, String owner, long quotaInBytes,
+      long quotaInNamespace, long usedNamespace, long creationTime,
+      long modificationTime, List<OzoneAcl> acls,
+      Map<String, String> metadata, long refCount) {
+    this(conf, proxy, name, admin, owner, quotaInBytes, quotaInNamespace,
+        usedNamespace, creationTime, modificationTime, acls, metadata);
+    this.refCount = refCount;
   }
 
   /**
@@ -261,7 +297,53 @@ public class OzoneVolume extends WithMetadata {
    * @return aclMap
    */
   public List<OzoneAcl> getAcls() {
-    return acls;
+    return ListUtils.unmodifiableList(acls);
+  }
+
+   /**
+   * Adds ACLs to the volume.
+   * @param addAcl ACL to be added
+   * @return true - if acl is successfully added, false if acl already exists
+   * for the bucket.
+   * @throws IOException
+   */
+  public boolean addAcl(OzoneAcl addAcl) throws IOException {
+    boolean added = proxy.addAcl(ozoneObj, addAcl);
+    if (added) {
+      acls.add(addAcl);
+    }
+    return added;
+  }
+
+  /**
+   * Remove acl for Ozone object. Return true if acl is removed successfully
+   * else false.
+   * @param acl Ozone acl to be removed.
+   *
+   * @throws IOException if there is error.
+   * */
+  public boolean removeAcl(OzoneAcl acl) throws IOException {
+    boolean removed = proxy.removeAcl(ozoneObj, acl);
+    if (removed) {
+      acls.remove(acl);
+    }
+    return removed;
+  }
+
+  /**
+   * Acls to be set for given Ozone object. This operations reset ACL for
+   * given object to list of ACLs provided in argument.
+   * @param aclList List of acls.
+   *
+   * @throws IOException if there is error.
+   * */
+  public boolean setAcl(List<OzoneAcl> aclList) throws IOException {
+    boolean reset = proxy.setAcl(ozoneObj, aclList);
+    if (reset) {
+      acls.clear();
+      acls.addAll(aclList);
+    }
+    return reset;
   }
 
   /**
@@ -389,6 +471,9 @@ public class OzoneVolume extends WithMetadata {
     proxy.deleteBucket(name, bucketName);
   }
 
+  public long getRefCount() {
+    return refCount;
+  }
 
   /**
    * An Iterator to iterate over {@link OzoneBucket} list.
@@ -425,7 +510,7 @@ public class OzoneVolume extends WithMetadata {
 
     @Override
     public OzoneBucket next() {
-      if(hasNext()) {
+      if (hasNext()) {
         currentValue = currentIterator.next();
         return currentValue;
       }

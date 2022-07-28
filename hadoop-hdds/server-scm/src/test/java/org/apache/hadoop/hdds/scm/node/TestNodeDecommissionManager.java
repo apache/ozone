@@ -23,20 +23,23 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.Before;
-import org.junit.Test;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import java.util.Arrays;
 import java.util.ArrayList;
-import static junit.framework.TestCase.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.assertj.core.api.Fail.fail;
-import static org.junit.Assert.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
  * Unit tests for the decommision manager.
@@ -50,15 +53,15 @@ public class TestNodeDecommissionManager {
   private OzoneConfiguration conf;
   private String storageDir;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
     storageDir = GenericTestUtils.getTempPath(
         TestDeadNodeHandler.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
     nodeManager = createNodeManager(conf);
-    decom = new NodeDecommissionManager(
-        conf, nodeManager, null, null, null);
+    decom = new NodeDecommissionManager(conf, nodeManager, null,
+        SCMContext.emptyContext(), new EventQueue(), null);
   }
 
   @Test
@@ -91,12 +94,12 @@ public class TestNodeDecommissionManager {
 
   @Test
   public void testAnyInvalidHostThrowsException()
-      throws InvalidHostStringException{
+      throws InvalidHostStringException {
     List<DatanodeDetails> dns = generateDatanodes();
 
     // Try to decommission a host that does exist, but give incorrect port
     try {
-      decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()+":10"));
+      decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress() + ":10"));
       fail("InvalidHostStringException expected");
     } catch (InvalidHostStringException e) {
     }
@@ -128,7 +131,7 @@ public class TestNodeDecommissionManager {
     // that does not exist
     try {
       decom.decommissionNodes(Arrays.asList(
-          dns.get(0).getIpAddress()+":10"));
+          dns.get(0).getIpAddress() + ":10"));
       fail("InvalidHostStringException expected");
     } catch (InvalidHostStringException e) {
     }
@@ -156,7 +159,7 @@ public class TestNodeDecommissionManager {
     // and we hardcoded ports to 3456, 4567, 5678
     DatanodeDetails multiDn = dns.get(10);
     String multiAddr =
-        multiDn.getIpAddress()+":"+multiDn.getPorts().get(0).getValue();
+        multiDn.getIpAddress() + ":" + multiDn.getPorts().get(0).getValue();
     decom.decommissionNodes(Arrays.asList(multiAddr));
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(multiDn).getOperationalState());
@@ -199,7 +202,7 @@ public class TestNodeDecommissionManager {
     // and we hardcoded ports to 3456, 4567, 5678
     DatanodeDetails multiDn = dns.get(10);
     String multiAddr =
-        multiDn.getIpAddress()+":"+multiDn.getPorts().get(0).getValue();
+        multiDn.getIpAddress() + ":" + multiDn.getPorts().get(0).getValue();
     decom.startMaintenanceNodes(Arrays.asList(multiAddr), 100);
     assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
         nodeManager.getNodeStatus(multiDn).getOperationalState());
@@ -229,18 +232,18 @@ public class TestNodeDecommissionManager {
         nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
 
     // Try to go from maint to decom:
-    try {
-      decom.startDecommission(dns.get(1));
-      fail("Expected InvalidNodeStateException");
-    } catch (InvalidNodeStateException e) {
-    }
+    List<String> dn = new ArrayList<>();
+    dn.add(dns.get(1).getIpAddress());
+    List<DatanodeAdminError> errors = decom.decommissionNodes(dn);
+    assertEquals(1, errors.size());
+    assertEquals(dns.get(1).getHostName(), errors.get(0).getHostname());
 
     // Try to go from decom to maint:
-    try {
-      decom.startMaintenance(dns.get(2), 100);
-      fail("Expected InvalidNodeStateException");
-    } catch (InvalidNodeStateException e) {
-    }
+    dn = new ArrayList<>();
+    dn.add(dns.get(2).getIpAddress());
+    errors = decom.startMaintenanceNodes(dn, 100);
+    assertEquals(1, errors.size());
+    assertEquals(dns.get(2).getHostName(), errors.get(0).getHostname());
 
     // Ensure the states are still as before
     assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
@@ -249,7 +252,33 @@ public class TestNodeDecommissionManager {
         nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
   }
 
+  @Test
+  public void testNodeDecommissionManagerOnBecomeLeader() throws Exception {
+    List<DatanodeDetails> dns = generateDatanodes();
 
+    long maintenanceEnd =
+        (System.currentTimeMillis() / 1000L) + (100 * 60L * 60L);
+
+    // Put 1 node into entering_maintenance, 1 node into decommissioning
+    // and 1 node into in_maintenance.
+    nodeManager.setNodeOperationalState(dns.get(1),
+        HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, maintenanceEnd);
+    nodeManager.setNodeOperationalState(dns.get(2),
+        HddsProtos.NodeOperationalState.DECOMMISSIONING, 0);
+    nodeManager.setNodeOperationalState(dns.get(3),
+        HddsProtos.NodeOperationalState.IN_MAINTENANCE, maintenanceEnd);
+
+    // trackedNodes should be empty now.
+    assertEquals(decom.getMonitor().getTrackedNodes().size(), 0);
+
+    // all nodes with decommissioning, entering_maintenance and in_maintenance
+    // should be added to trackedNodes
+    decom.onBecomeLeader();
+    decom.getMonitor().run();
+
+    // so size of trackedNodes will be 3.
+    assertEquals(decom.getMonitor().getTrackedNodes().size(), 3);
+  }
 
   private SCMNodeManager createNodeManager(OzoneConfiguration config)
       throws IOException, AuthenticationException {
@@ -267,7 +296,7 @@ public class TestNodeDecommissionManager {
    */
   private List<DatanodeDetails> generateDatanodes() {
     List<DatanodeDetails> dns = new ArrayList<>();
-    for (int i=0; i<10; i++) {
+    for (int i = 0; i < 10; i++) {
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       dns.add(dn);
       nodeManager.register(dn, null, null);

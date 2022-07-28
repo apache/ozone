@@ -33,7 +33,7 @@ import org.apache.ratis.protocol.RaftGroupId;
  * This class is for maintaining Container State Machine statistics.
  */
 @InterfaceAudience.Private
-@Metrics(about="Container State Machine Metrics", context="dfs")
+@Metrics(about = "Container State Machine Metrics", context = "dfs")
 public class CSMMetrics {
   public static final String SOURCE_NAME =
       CSMMetrics.class.getSimpleName();
@@ -59,6 +59,8 @@ public class CSMMetrics {
   private @Metric MutableCounterLong numReadStateMachineMissCount;
   private @Metric MutableCounterLong numStartTransactionVerifyFailures;
   private @Metric MutableCounterLong numContainerNotOpenVerifyFailures;
+  private @Metric MutableCounterLong numDataCacheMiss;
+  private @Metric MutableCounterLong numDataCacheHit;
 
   private @Metric MutableRate applyTransaction;
   private @Metric MutableRate writeStateMachineData;
@@ -213,6 +215,14 @@ public class CSMMetrics {
 
   public void recordWriteStateMachineCompletion(long latencyNanos) {
     writeStateMachineData.add(latencyNanos);
+  }
+
+  public void incNumDataCacheMiss() {
+    numDataCacheMiss.incr();
+  }
+
+  public void incNumDataCacheHit() {
+    numDataCacheHit.incr();
   }
 
   public void unRegister() {

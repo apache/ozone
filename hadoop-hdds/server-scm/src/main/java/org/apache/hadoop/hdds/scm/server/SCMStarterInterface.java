@@ -22,6 +22,8 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
+
 import java.io.IOException;
 
 /**
@@ -33,5 +35,7 @@ public interface SCMStarterInterface {
   void start(OzoneConfiguration conf) throws Exception;
   boolean init(OzoneConfiguration conf, String clusterId)
       throws IOException;
+  boolean bootStrap(OzoneConfiguration conf)
+      throws IOException, AuthenticationException;
   String generateClusterId();
 }

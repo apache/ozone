@@ -22,6 +22,9 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -37,6 +40,7 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.GrpcServerInterceptor;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
@@ -45,10 +49,19 @@ import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.ratis.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.ratis.thirdparty.io.grpc.Server;
 import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
+import org.apache.ratis.thirdparty.io.netty.channel.EventLoopGroup;
+import org.apache.ratis.thirdparty.io.netty.channel.ServerChannel;
+import org.apache.ratis.thirdparty.io.netty.channel.epoll.Epoll;
+import org.apache.ratis.thirdparty.io.netty.channel.epoll.EpollEventLoopGroup;
+import org.apache.ratis.thirdparty.io.netty.channel.epoll.EpollServerSocketChannel;
+import org.apache.ratis.thirdparty.io.netty.channel.nio.NioEventLoopGroup;
+import org.apache.ratis.thirdparty.io.netty.channel.socket.nio.NioServerSocketChannel;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,7 +80,9 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   private final ContainerDispatcher storageContainer;
   private boolean isStarted;
   private DatanodeDetails datanodeDetails;
-
+  private ThreadPoolExecutor readExecutors;
+  private EventLoopGroup eventLoopGroup;
+  private Class<? extends ServerChannel> channelType;
 
   /**
    * Constructs a Grpc server class.
@@ -89,8 +104,38 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       this.port = 0;
     }
 
+    final int threadCountPerDisk =
+        conf.getObject(DatanodeConfiguration.class).getNumReadThreadPerVolume();
+    final int numberOfDisks =
+        HddsServerUtil.getDatanodeStorageDirs(conf).size();
+    final int poolSize = threadCountPerDisk * numberOfDisks;
+
+    readExecutors = new ThreadPoolExecutor(poolSize, poolSize,
+        60, TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(),
+        new ThreadFactoryBuilder().setDaemon(true)
+            .setNameFormat("ChunkReader-%d")
+            .build());
+
+    ThreadFactory factory = new ThreadFactoryBuilder().setDaemon(true)
+        .setNameFormat("ChunkReader-ELG-%d")
+        .build();
+
+    if (Epoll.isAvailable()) {
+      eventLoopGroup = new EpollEventLoopGroup(poolSize / 10, factory);
+      channelType = EpollServerSocketChannel.class;
+    } else {
+      eventLoopGroup = new NioEventLoopGroup(poolSize / 10, factory);
+      channelType = NioServerSocketChannel.class;
+    }
+
+    LOG.info("GrpcServer channel type {}", channelType.getSimpleName());
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
+        .bossEventLoopGroup(eventLoopGroup)
+        .workerEventLoopGroup(eventLoopGroup)
+        .channelType(channelType)
+        .executor(readExecutors)
         .addService(ServerInterceptors.intercept(
             new GrpcXceiverService(dispatcher), new GrpcServerInterceptor()));
 
@@ -149,11 +194,15 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   @Override
   public void stop() {
     if (isStarted) {
-      server.shutdown();
       try {
+        readExecutors.shutdown();
+        readExecutors.awaitTermination(5L, TimeUnit.SECONDS);
+        server.shutdown();
         server.awaitTermination(5, TimeUnit.SECONDS);
-      } catch (Exception e) {
+        eventLoopGroup.shutdownGracefully().sync();
+      } catch (InterruptedException e) {
         LOG.error("failed to shutdown XceiverServerGrpc", e);
+        Thread.currentThread().interrupt();
       }
       isStarted = false;
     }

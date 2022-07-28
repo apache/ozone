@@ -60,10 +60,8 @@ public class CommandStatusReportHandler implements
             .getCmdId(), cmdStatus.getType());
       }
       if (cmdStatus.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
-        if (cmdStatus.getStatus() == CommandStatus.Status.EXECUTED) {
-          publisher.fireEvent(SCMEvents.DELETE_BLOCK_STATUS,
-              new DeleteBlockStatus(cmdStatus));
-        }
+        publisher.fireEvent(SCMEvents.DELETE_BLOCK_STATUS,
+            new DeleteBlockStatus(cmdStatus));
       } else {
         LOGGER.debug("CommandStatus of type:{} not handled in " +
             "CommandStatusReportHandler.", cmdStatus.getType());

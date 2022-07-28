@@ -69,25 +69,12 @@ public final class DFSConfigKeysLegacy {
   public static final String DFS_DATANODE_KERBEROS_PRINCIPAL_KEY =
       "dfs.datanode.kerberos.principal";
 
+  @Deprecated
   public static final String DFS_DATANODE_KEYTAB_FILE_KEY =
       "dfs.datanode.keytab.file";
 
-  public static final String DFS_DATANODE_DISK_CHECK_MIN_GAP_KEY =
-      "dfs.datanode.disk.check.min.gap";
-
-  public static final String DFS_DATANODE_DISK_CHECK_MIN_GAP_DEFAULT =
-      "15m";
-
-  public static final String DFS_DATANODE_DISK_CHECK_TIMEOUT_KEY =
-      "dfs.datanode.disk.check.timeout";
-
-  public static final String DFS_DATANODE_DISK_CHECK_TIMEOUT_DEFAULT =
-      "10m";
-
-  public static final String DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY =
-      "dfs.datanode.failed.volumes.tolerated";
-
-  public static final int DFS_DATANODE_FAILED_VOLUMES_TOLERATED_DEFAULT = 0;
+  public static final String DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY =
+      "dfs.datanode.kerberos.keytab.file";
 
   public static final String DFS_METRICS_PERCENTILES_INTERVALS_KEY =
       "dfs.metrics.percentiles.intervals";

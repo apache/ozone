@@ -90,10 +90,10 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
     if (host.length() > domain.length()) {
       String bucketName = host.substring(0, host.length() - domain.length());
 
-      if(!bucketName.endsWith(".")) {
+      if (!bucketName.endsWith(".")) {
         //Checking this as the virtual host style pattern is http://bucket.host/
         throw getException("Invalid S3 Gateway request {" + requestContext
-            .getUriInfo().getRequestUri().toString() +"}:" +" Host: {" + host
+            .getUriInfo().getRequestUri().toString() + "}:" + " Host: {" + host
             + " is in invalid format");
       } else {
         bucketName = bucketName.substring(0, bucketName.length() - 1);
@@ -134,7 +134,7 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
    */
   private String getDomainName(String host) {
     String match = null;
-    int length=0;
+    int length = 0;
     for (String domainVal : domains) {
       if (host.endsWith(domainVal)) {
         int len = domainVal.length();
@@ -148,7 +148,7 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
   }
 
   private String checkHostWithoutPort(String host) {
-    if (host.contains(":")){
+    if (host.contains(":")) {
       return host.substring(0, host.lastIndexOf(":"));
     } else {
       return host;

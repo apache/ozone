@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.container.common.impl;
 
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.
+    StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
+import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.StorageTypeProto;
@@ -149,15 +151,34 @@ public final class StorageLocationReport implements
   }
 
   /**
-   * Returns the SCMStorageReport protoBuf message for the Storage Location
+   * Returns the StorageReportProto protoBuf message for the Storage Location
    * report.
-   * @return SCMStorageReport
+   * @return StorageReportProto
    * @throws IOException In case, the storage type specified is invalid.
    */
   public StorageReportProto getProtoBufMessage() throws IOException {
     StorageReportProto.Builder srb = StorageReportProto.newBuilder();
     return srb.setStorageUuid(getId())
         .setCapacity(getCapacity())
+        .setScmUsed(getScmUsed())
+        .setRemaining(getRemaining())
+        .setStorageType(getStorageTypeProto())
+        .setStorageLocation(getStorageLocation())
+        .setFailed(isFailed())
+        .build();
+  }
+
+  /**
+   * Returns the MetadataStorageReportProto protoBuf message for the
+   * Storage Location report.
+   * @return MetadataStorageReportProto
+   * @throws IOException In case, the storage type specified is invalid.
+   */
+  public MetadataStorageReportProto getMetadataProtoBufMessage()
+      throws IOException {
+    MetadataStorageReportProto.Builder srb =
+        MetadataStorageReportProto.newBuilder();
+    return srb.setCapacity(getCapacity())
         .setScmUsed(getScmUsed())
         .setRemaining(getRemaining())
         .setStorageType(getStorageTypeProto())
@@ -178,6 +199,36 @@ public final class StorageLocationReport implements
     StorageLocationReport.Builder builder = StorageLocationReport.newBuilder();
     builder.setId(report.getStorageUuid())
         .setStorageLocation(report.getStorageLocation());
+    if (report.hasCapacity()) {
+      builder.setCapacity(report.getCapacity());
+    }
+    if (report.hasScmUsed()) {
+      builder.setScmUsed(report.getScmUsed());
+    }
+    if (report.hasStorageType()) {
+      builder.setStorageType(getStorageType(report.getStorageType()));
+    }
+    if (report.hasRemaining()) {
+      builder.setRemaining(report.getRemaining());
+    }
+
+    if (report.hasFailed()) {
+      builder.setFailed(report.getFailed());
+    }
+    return builder.build();
+  }
+
+  /**
+   * Returns the StorageLocationReport from the protoBuf message.
+   * @param report MetadataStorageReportProto
+   * @return StorageLocationReport
+   * @throws IOException in case of invalid storage type
+   */
+
+  public static StorageLocationReport getMetadataFromProtobuf(
+      MetadataStorageReportProto report) throws IOException {
+    StorageLocationReport.Builder builder = StorageLocationReport.newBuilder();
+    builder.setStorageLocation(report.getStorageLocation());
     if (report.hasCapacity()) {
       builder.setCapacity(report.getCapacity());
     }
