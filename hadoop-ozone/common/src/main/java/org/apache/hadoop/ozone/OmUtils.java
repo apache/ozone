@@ -245,7 +245,6 @@ public final class OmUtils {
       OzoneManagerProtocolProtos.OMRequest omRequest) {
     OzoneManagerProtocolProtos.Type cmdType = omRequest.getCmdType();
     switch (cmdType) {
-    case EchoRPC: return true;
     case CheckVolumeAccess:
     case InfoVolume:
     case ListVolume:
