@@ -15,10 +15,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.container;
+package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import java.util.Set;
 
@@ -258,6 +259,37 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   @Override
   public boolean isOverReplicated() {
     return missingReplicas() + inFlightDel < 0;
+  }
+
+  /**
+   * @return Return Excess Redundancy replica nums.
+   */
+  public int getExcessRedundancy() {
+    int excessRedundancy = missingReplicas() + inFlightDel;
+    return -excessRedundancy;
+  }
+
+  /**
+   * How many more replicas can be lost before the container is
+   * unreadable. For containers which are under-replicated due to decommission
+   * or maintenance only, the remaining redundancy will include those
+   * decommissioning or maintenance replicas, as they are technically still
+   * available until the datanode processes are stopped.
+   * @return Count of remaining redundant replicas.
+   */
+  public int getRemainingRedundancy() {
+    return repFactor - missingReplicas() - inFlightDel - 1;
+  }
+
+  /**
+   * Considering the pending replicas, which have been scheduled for copy or
+   * reconstruction, will the container still be under-replicated when they
+   * complete.
+   * @return True if the under-replication is corrected by the pending
+   *         replicas. False otherwise.
+   */
+  public boolean isSufficientlyReplicatedAfterPending() {
+    return getHealthyCount() + inFlightAdd >= repFactor;
   }
 
   /**
