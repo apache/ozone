@@ -43,6 +43,8 @@ public final class ContainerClientMetrics {
   private static final String SOURCE_NAME =
       ContainerClientMetrics.class.getSimpleName();
 
+  private static ContainerClientMetrics instance;
+
   @Metric
   private MutableCounterLong totalWriteChunkCalls;
   @Metric
@@ -59,11 +61,19 @@ public final class ContainerClientMetrics {
     writeChunksCallsByLeaders = new ConcurrentHashMap<>();
   }
 
-  public static ContainerClientMetrics create() {
+  public synchronized static ContainerClientMetrics create() {
+    if (instance == null) {
+      MetricsSystem ms = DefaultMetricsSystem.instance();
+      ContainerClientMetrics clientMetrics = ms.register(SOURCE_NAME,
+          "Ozone Client Metrics", new ContainerClientMetrics());
+      instance = clientMetrics;
+    }
+    return instance;
+  }
+
+  public void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ContainerClientMetrics clientMetrics = ms.register(SOURCE_NAME,
-        "Ozone Client Metrics", new ContainerClientMetrics());
-    return clientMetrics;
+    ms.unregisterSource(SOURCE_NAME);
   }
 
   public void recordWriteChunk(Pipeline pipeline, long chunkSizeBytes) {

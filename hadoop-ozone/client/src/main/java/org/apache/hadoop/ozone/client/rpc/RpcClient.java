@@ -1443,6 +1443,7 @@ public class RpcClient implements ClientProtocol {
     IOUtils.cleanupWithLogger(LOG, ozoneManagerClient, xceiverClientManager);
     keyProviderCache.invalidateAll();
     keyProviderCache.cleanUp();
+    clientMetrics.unregister();
   }
 
   @Deprecated
