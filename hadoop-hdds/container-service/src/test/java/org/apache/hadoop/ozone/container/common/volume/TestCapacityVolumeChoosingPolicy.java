@@ -80,6 +80,7 @@ public class TestCapacityVolumeChoosingPolicy {
         .conf(CONF)
         .usageCheckFactory(factory3)
         .build();
+    vol3.incCommittedBytes(50);
 
     volumes.add(vol1);
     volumes.add(vol2);
@@ -126,7 +127,7 @@ public class TestCapacityVolumeChoosingPolicy {
     String msg = e.getMessage();
     assertTrue(msg,
         msg.contains("No volumes have enough space for a new container.  " +
-            "Most available space: 300 bytes"));
+            "Most available space: 250 bytes"));
   }
 
 }

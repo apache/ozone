@@ -71,6 +71,7 @@ public class TestRoundRobinVolumeChoosingPolicy {
         .conf(CONF)
         .usageCheckFactory(factory2)
         .build();
+    vol2.incCommittedBytes(50);
 
     volumes.add(vol1);
     volumes.add(vol2);
@@ -98,7 +99,7 @@ public class TestRoundRobinVolumeChoosingPolicy {
     // The first volume has only 100L space, so the policy should
     // choose the second one in case we ask for more.
     Assert.assertEquals(hddsVolume2,
-        policy.chooseVolume(volumes, 150));
+        policy.chooseVolume(volumes, 120));
   }
 
   @Test
@@ -109,7 +110,7 @@ public class TestRoundRobinVolumeChoosingPolicy {
     String msg = e.getMessage();
     assertTrue(msg,
         msg.contains("No volumes have enough space for a new container.  " +
-            "Most available space: 200 bytes"));
+            "Most available space: 150 bytes"));
   }
 
 }
