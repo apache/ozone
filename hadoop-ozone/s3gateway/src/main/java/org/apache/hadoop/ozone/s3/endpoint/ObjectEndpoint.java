@@ -312,8 +312,7 @@ public class ObjectEndpoint extends EndpointBase {
 
       if (rangeHeaderVal == null || rangeHeader.isReadFull()) {
         StreamingOutput output = dest -> {
-          try (OzoneInputStream key = getClientProtocol().getKey(
-              volume.getName(), bucketName, keyPath)) {
+          try (OzoneInputStream key = keyDetails.getContent()) {
             IOUtils.copy(key, dest);
           }
         };
@@ -329,8 +328,7 @@ public class ObjectEndpoint extends EndpointBase {
         // byte from start offset
         long copyLength = endOffset - startOffset + 1;
         StreamingOutput output = dest -> {
-          try (OzoneInputStream ozoneInputStream = getClientProtocol().getKey(
-              volume.getName(), bucketName, keyPath)) {
+          try (OzoneInputStream ozoneInputStream = keyDetails.getContent()) {
             ozoneInputStream.seek(startOffset);
             IOUtils.copyLarge(ozoneInputStream, dest, 0,
                 copyLength, new byte[bufferSize]);
