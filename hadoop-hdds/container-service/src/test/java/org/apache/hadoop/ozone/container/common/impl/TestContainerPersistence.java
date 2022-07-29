@@ -319,9 +319,6 @@ public class TestContainerPersistence {
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
       CleanUpManager cleanUpManager = new CleanUpManager(conf);
 
-      // Create /tmp/delete_container_service
-      cleanUpManager.tmpDirInit();
-
       KeyValueContainerData container1Data =
           (KeyValueContainerData) container1.getContainerData();
 
@@ -337,7 +334,7 @@ public class TestContainerPersistence {
       // Delete
       container1.delete();
 
-      Assert.assertFalse(cleanUpManager.checkTmpDirIsEmpty());
+      Assert.assertFalse(cleanUpManager.tmpDirIsEmpty());
 
       ListIterator<File> iterator = cleanUpManager.getDeleteLeftovers();
 
@@ -354,10 +351,10 @@ public class TestContainerPersistence {
       Assert.assertFalse(containerSet.getContainerMapCopy()
           .containsKey(testContainerID1));
 
-      // '/tmp/delete_container_service' is empty
-      Assert.assertTrue(cleanUpManager.checkTmpDirIsEmpty());
+      // '/tmp/container_delete_service' is empty
+      Assert.assertTrue(cleanUpManager.tmpDirIsEmpty());
 
-      // Delete /tmp/delete_container_service from system
+      // Delete /tmp/container_delete_service from system
       cleanUpManager.deleteTmpDir();
     }
   }

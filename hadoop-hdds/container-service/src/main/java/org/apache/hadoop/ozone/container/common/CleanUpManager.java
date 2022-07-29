@@ -37,21 +37,19 @@ import java.util.ListIterator;
 import java.util.stream.Stream;
 
 /**
- * Helper class for handling /tmp/delete_container_service
+ * Helper class for handling /tmp/container_delete_service
  * operations used for container delete when Schema V3 is enabled.
  */
 public class CleanUpManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(CleanUpManager.class);
-
-  private final ConfigurationSource configurationSource;
   private final DatanodeConfiguration datanodeConf;
 
   public CleanUpManager(ConfigurationSource configurationSource) {
-    this.configurationSource = configurationSource;
     this.datanodeConf =
         configurationSource.getObject(DatanodeConfiguration.class);
+    tmpDirInit();
   }
 
   public boolean checkContainerSchemaV3Enabled(
@@ -64,11 +62,17 @@ public class CleanUpManager {
     }
   }
 
-  public void tmpDirInit() throws IOException {
+  private void tmpDirInit() {
     String tmpDir = datanodeConf.getDiskTmpDirectoryPath();
     Path tmpDirPath = Paths.get(tmpDir);
 
-    Files.createDirectories(tmpDirPath);
+    if (Files.notExists(tmpDirPath)) {
+      try {
+        Files.createDirectories(tmpDirPath);
+      } catch (IOException e) {
+        LOG.error("Error creating /tmp/container_delete_service", e);
+      }
+    }
   }
 
   public boolean renameDir(KeyValueContainerData keyValueContainerData)
@@ -90,17 +94,8 @@ public class CleanUpManager {
     return success;
   }
 
-  public boolean checkTmpDirIsEmpty() throws IOException {
-    String tmpDirPath = datanodeConf.getDiskTmpDirectoryPath();
-    File tmpDir = new File(tmpDirPath);
-
-    try (Stream<Path> entries = Files.list(tmpDir.toPath())) {
-      return !entries.findFirst().isPresent();
-    }
-  }
-
   /**
-   * Get all filenames under /tmp/delete_container_service
+   * Get direct files under /tmp/container_delete_service
    * and store them in a list.
    * @return iterator to the list of the leftover files
    */
@@ -119,8 +114,18 @@ public class CleanUpManager {
     return leftoversListIt;
   }
 
+  public boolean tmpDirIsEmpty() {
+    ListIterator<File> leftoversListIt = getDeleteLeftovers();
+
+    if (!leftoversListIt.hasNext()) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
   /**
-   * Delete all files under the /tmp/delete_container_service.
+   * Delete all files under the /tmp/container_delete_service.
    * @throws IOException
    */
   public void cleanTmpDir() throws IOException {
@@ -132,7 +137,7 @@ public class CleanUpManager {
   }
 
   /**
-   * Delete the /tmp/delete_container_service and all of its contents.
+   * Delete the /tmp/container_delete_service and all of its contents.
    * @throws IOException
    */
   public void deleteTmpDir() throws IOException {

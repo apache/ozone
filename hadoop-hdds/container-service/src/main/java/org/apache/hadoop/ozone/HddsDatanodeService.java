@@ -54,8 +54,10 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.hadoop.ozone.container.common.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -123,8 +125,23 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     this.args = args != null ? Arrays.copyOf(args, args.length) : null;
   }
 
+  public void cleanTmpDir() {
+    DatanodeConfiguration datanodeConfig =
+        getConf().getObject(DatanodeConfiguration.class);
+    if (datanodeConfig.getContainerSchemaV3Enabled()) {
+      CleanUpManager cleanUpManager = new CleanUpManager(getConf());
+      if (!cleanUpManager.tmpDirIsEmpty()) {
+        try {
+          cleanUpManager.cleanTmpDir();
+        } catch (IOException ex) {
+          LOG.error("Error cleaning /tmp/container_delete_service", ex);
+        }
+      }
+    }
+  }
+
   /**
-   * Create an Datanode instance based on the supplied command-line arguments.
+   * Create a Datanode instance based on the supplied command-line arguments.
    * <p>
    * This method is intended for unit tests only. It suppresses the
    * startup/shutdown message and skips registering Unix signal handlers.
@@ -286,6 +303,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       startPlugins();
       // Starting HDDS Daemons
       datanodeStateMachine.startDaemon();
+
+      // Checking and deleting leftovers in /tmp/container_delete_service
+      cleanTmpDir();
 
       //for standalone, follower only test we can start the datanode (==raft
       // rings)
@@ -560,6 +580,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   @Override
   public void stop() {
+    cleanTmpDir();
+
     if (!isStopped.getAndSet(true)) {
       if (plugins != null) {
         for (ServicePlugin plugin : plugins) {
