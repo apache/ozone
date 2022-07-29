@@ -208,18 +208,18 @@ public final class ECKeyOutputStream extends KeyOutputStream {
 
   private void logStreamError(List<ECBlockOutputStream> failedStreams,
                               String operation) {
-    Set<Integer> failedStreamIndexMap =
+    Set<Integer> failedStreamIndexSet =
             failedStreams.stream().map(ECBlockOutputStream::getReplicationIndex)
                     .collect(Collectors.toSet());
 
     String failedStreamsString = IntStream.range(1,
                     numDataBlks + numParityBlks + 1)
-            .mapToObj(index -> failedStreamIndexMap.contains(index)
+            .mapToObj(index -> failedStreamIndexSet.contains(index)
                     ? "F" : "S")
             .collect(Collectors.joining(" "));
-    LOG.error("{} failed: {}", operation, failedStreamsString);
+    LOG.warn("{} failed: {}", operation, failedStreamsString);
     for (ECBlockOutputStream stream : failedStreams) {
-      LOG.error("Failure for replica index: {}, DatanodeDetails: {}",
+      LOG.warn("Failure for replica index: {}, DatanodeDetails: {}",
               stream.getReplicationIndex(), stream.getDatanodeDetails(),
               stream.getIoException());
     }
