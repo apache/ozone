@@ -139,6 +139,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   private final OzoneManager impl;
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
   private static final int RPC_PAYLOAD_MULTIPLICATION_FACTOR = 1024;
+  private static final int MAX_SIZE_KB = 2097151;
 
   public OzoneManagerRequestHandler(OzoneManager om,
       OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer) {
@@ -928,25 +929,18 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   public static OMResponse echoRPC(
           OMRequest req, OMResponse resp, ValidationContext ctx)
           throws ServiceException {
-
     if (!resp.hasEchoRPCResponse()) {
       return resp;
     }
-    if (!req.getEchoRPCRequest().hasIsEmptyResp() ||
-            !req.getEchoRPCRequest().getIsEmptyResp()) {
-      int payloadRespSize = (int) Math.min(
-              (long)req.getEchoRPCRequest().getPayloadSizeResp()
-                      * RPC_PAYLOAD_MULTIPLICATION_FACTOR, Integer.MAX_VALUE);
-      byte[] payloadBytes = RandomUtils.nextBytes(payloadRespSize);
-      resp = resp.toBuilder()
-              .setMessage(new String(payloadBytes, StandardCharsets.UTF_8))
-              .clearEchoRPCResponse()
-              .build();
-    } else {
-      resp = resp.toBuilder()
-              .clearEchoRPCResponse()
-              .build();
-    }
+    //To avoid integer overflow, we cap the payload by max 2048000 KB
+    int payloadRespSize = Math.min(
+            req.getEchoRPCRequest().getPayloadSizeResp()
+                    * RPC_PAYLOAD_MULTIPLICATION_FACTOR, MAX_SIZE_KB);
+    byte[] payloadBytes = RandomUtils.nextBytes(payloadRespSize);
+    resp = resp.toBuilder()
+            .setMessage(new String(payloadBytes, StandardCharsets.UTF_8))
+            .clearEchoRPCResponse()
+            .build();
     return resp;
   }
 

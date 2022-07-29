@@ -2029,13 +2029,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public EchoRPCResponse echoRPCReq(byte[] payloadReq,
-                                    int payloadSizeResp, boolean emptyResp)
+                                    int payloadSizeResp)
           throws IOException {
     EchoRPCRequest echoRPCRequest =
             EchoRPCRequest.newBuilder()
                     .setPayloadReq(ByteString.copyFrom(payloadReq))
                     .setPayloadSizeResp(payloadSizeResp)
-                    .setIsEmptyResp(emptyResp).build();
+                    .build();
 
     OMRequest omRequest = createOMRequest(Type.EchoRPC)
             .setEchoRPCRequest(echoRPCRequest).build();

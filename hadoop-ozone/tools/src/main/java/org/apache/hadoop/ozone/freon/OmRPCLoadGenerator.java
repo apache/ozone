@@ -22,9 +22,6 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 
 import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
@@ -37,29 +34,32 @@ import picocli.CommandLine.Option;
         aliases = "rpcl",
         description =
                 "Generate random RPC request to the OM " +
-                        "with or without layload.",
+                        "with or without layload. " +
+                        "Max payload size is 2097151 KB",
         versionProvider = HddsVersionProvider.class,
         mixinStandardHelpOptions = true,
         showDefaultValues = true)
 public class OmRPCLoadGenerator extends BaseFreonGenerator
         implements Callable<Void> {
 
-  private static final Logger LOG =
-          LoggerFactory.getLogger(OmRPCLoadGenerator.class);
-
   private static final int RPC_PAYLOAD_MULTIPLICATION_FACTOR = 1024;
-
+  private static final int MAX_SIZE_KB = 2097151;
   private Timer timer;
-
+  private OzoneConfiguration configuration;
+  private OzoneManagerProtocolClientSideTranslatorPB client;
+  private byte[] payloadReq;
+  private int payloadRespSize;
   @Option(names = {"-plrq", "--payload-req"},
           description =
-                  "Specifies the size of payload in KB in RPC request.",
+                  "Specifies the size of payload in KB in RPC request. " +
+                          "Max size is 2097151 KB",
           defaultValue = "1")
   private int payloadReqSizeKB = 1;
 
   @Option(names = {"-plrp", "--payload-resp"},
           description =
-                  "Specifies the size of payload in KB in RPC response.",
+                  "Specifies the size of payload in KB in RPC response. " +
+                          "Max size is 2097151 KB",
           defaultValue = "1")
   private int payloadRespSizeKB = 1;
 
@@ -83,41 +83,39 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
       );
     }
 
+    configuration = createOzoneConfiguration();
+    client = createOmClient(configuration, null);
     init();
-    int numOfThreads = getThreadNo();
+    if (isEmptyReq) {
+      payloadReq = null;
+    } else {
+      //To avoid integer overflow, we cap the payload by max 2048000 KB
+      int payloadReqSize = Math.min(
+              Math.toIntExact(payloadReqSizeKB *
+                      RPC_PAYLOAD_MULTIPLICATION_FACTOR),
+              MAX_SIZE_KB);
+      payloadReq = RandomUtils.nextBytes(payloadReqSize);
+    }
+    if (isEmptyResp) {
+      payloadRespSize = 0;
+    } else {
+      //To avoid integer overflow, we cap the payload by max 2048000 KB
+      payloadRespSize = Math.min(
+              Math.toIntExact(payloadRespSizeKB *
+                      RPC_PAYLOAD_MULTIPLICATION_FACTOR),
+              MAX_SIZE_KB);
+    }
     timer = getMetrics().timer("rpc-payload");
-
-    for (int i = 0; i < numOfThreads; i++) {
+    for (int i = 0; i < getThreadNo(); i++) {
       runTests(this::sendRPCReq);
     }
     printReport();
     return null;
   }
   private void sendRPCReq(long l) throws Exception {
-    OzoneConfiguration configuration = createOzoneConfiguration();
-    OzoneManagerProtocolClientSideTranslatorPB client =
-            createOmClient(configuration, null);
-    byte[] payloadReq;
-    if (isEmptyReq) {
-      payloadReq = null;
-    } else {
-      int payloadReqSize = (int) Math.min(
-              (long)payloadReqSizeKB * RPC_PAYLOAD_MULTIPLICATION_FACTOR,
-              Integer.MAX_VALUE);
-      payloadReq = RandomUtils.nextBytes(payloadReqSize);
-    }
-    int payloadRespSize;
-    if (isEmptyResp) {
-      payloadRespSize = 0;
-    } else {
-      payloadRespSize = (int) Math.min(
-              (long)payloadRespSizeKB * RPC_PAYLOAD_MULTIPLICATION_FACTOR,
-              Integer.MAX_VALUE);
-    }
-
     timer.time(() -> {
       EchoRPCResponse resp = client.echoRPCReq(payloadReq,
-              payloadRespSize, isEmptyResp);
+              payloadRespSize);
       return resp;
     });
   }

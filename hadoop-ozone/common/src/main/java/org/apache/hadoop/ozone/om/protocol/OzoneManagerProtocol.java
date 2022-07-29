@@ -915,12 +915,11 @@ public interface OzoneManagerProtocol
    * to benchmark RPC communication performance.
    * @param payloadReq payload in request.
    * @param payloadSizeResp payload size of response.
-   * @param emptyResp if the payload of response is empty or not.
    * @throws IOException if there is error in the RPC communication.
    * @return EchoRPCResponse.
    */
   EchoRPCResponse echoRPCReq(byte[] payloadReq,
-                             int payloadSizeResp, boolean emptyResp)
+                             int payloadSizeResp)
           throws IOException;
 
 }

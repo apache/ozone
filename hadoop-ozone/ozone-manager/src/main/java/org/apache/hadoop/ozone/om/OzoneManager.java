@@ -4467,7 +4467,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public EchoRPCResponse echoRPCReq(byte[] payloadReq,
-                                    int payloadSizeResp, boolean emptyResp)
+                                    int payloadSizeResp)
           throws IOException {
     return null;
   }
