@@ -582,14 +582,11 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
                 " the block";
         if (LOG.isDebugEnabled()) {
           LOG.debug(message, getBlockID(), index + 1, ee.getCause());
-        } else if (ee.getCause() != null) {
-          LOG.warn(message + " Exception: {} Exception Message: {}",
-                  getBlockID(), index + 1, ee.getCause().getClass().getName(),
-                  ee.getCause().getMessage());
         } else {
+          Throwable t = ee.getCause() != null ? ee.getCause() : ee;
           LOG.warn(message + " Exception: {} Exception Message: {}",
-                  getBlockID(), index + 1, ee.getClass().getName(),
-                  ee.getMessage());
+                  getBlockID(), index + 1, t.getClass().getName(),
+                  t.getMessage());
         }
 
         failedDataIndexes.add(index);
