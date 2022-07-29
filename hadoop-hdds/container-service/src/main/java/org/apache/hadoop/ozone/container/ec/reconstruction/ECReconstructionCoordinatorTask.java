@@ -64,6 +64,10 @@ public class ECReconstructionCoordinatorTask implements Runnable {
     // respective container. HDDS-6582
     // 5. Close/finalize the recovered containers.
     long containerID = this.reconstructionCommandInfo.getContainerID();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Starting the EC reconstruction of the container {}",
+          containerID);
+    }
     try {
       SortedMap<Integer, DatanodeDetails> sourceNodeMap =
           reconstructionCommandInfo.getSources().stream().collect(Collectors

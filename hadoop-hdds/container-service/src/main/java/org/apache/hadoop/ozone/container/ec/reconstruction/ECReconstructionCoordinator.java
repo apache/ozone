@@ -179,8 +179,8 @@ public class ECReconstructionCoordinator implements Closeable {
           LOG.error("Exception while deleting the container {} at target: {}",
               containerID, dn, ioe);
         }
-        throw e;
       }
+      throw e;
     }
 
   }
