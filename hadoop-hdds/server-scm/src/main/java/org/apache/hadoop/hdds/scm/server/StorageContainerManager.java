@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.OverReplicatedProcessor;
@@ -270,6 +271,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
+  private PlacementPolicy ecContainerPlacementPolicy;
+  private PlacementPolicyValidateProxy placementPolicyValidateProxy;
   private MetricsSystem ms;
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
@@ -569,7 +572,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @SuppressWarnings("methodLength")
   private void initializeSystemManagers(OzoneConfiguration conf,
       SCMConfigurator configurator) throws IOException {
-
     Clock clock = new MonotonicClock(ZoneOffset.UTC);
 
     if (configurator.getNetworkTopology() != null) {
@@ -638,6 +640,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     containerPlacementPolicy =
         ContainerPlacementPolicyFactory.getPolicy(conf, scmNodeManager,
             clusterMap, true, placementMetrics);
+
+    ecContainerPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(
+        conf, scmNodeManager, clusterMap, true, placementMetrics);
+
+    placementPolicyValidateProxy = new PlacementPolicyValidateProxy(
+        containerPlacementPolicy, ecContainerPlacementPolicy);
 
     if (configurator.getPipelineManager() != null) {
       pipelineManager = configurator.getPipelineManager();
@@ -1773,6 +1781,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public PlacementPolicy getContainerPlacementPolicy() {
     return containerPlacementPolicy;
+  }
+
+  public PlacementPolicyValidateProxy getPlacementPolicyValidateProxy() {
+    return placementPolicyValidateProxy;
   }
 
   @VisibleForTesting
