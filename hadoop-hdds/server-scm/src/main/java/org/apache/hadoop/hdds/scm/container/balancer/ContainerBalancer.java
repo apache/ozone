@@ -24,15 +24,15 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.DUFactory;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBalancerConfigurationProto;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.StatefulService;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -99,7 +99,7 @@ public class ContainerBalancer extends StatefulService {
   private long clusterUsed;
   private long clusterRemaining;
   private double clusterAvgUtilisation;
-  private PlacementPolicy placementPolicy;
+  private PlacementPolicyValidateProxy placementPolicyValidateProxy;
   private NetworkTopology networkTopology;
   private double upperLimit;
   private double lowerLimit;
@@ -138,7 +138,7 @@ public class ContainerBalancer extends StatefulService {
     this.underUtilizedNodes = new ArrayList<>();
     this.withinThresholdUtilizedNodes = new ArrayList<>();
     this.unBalancedNodes = new ArrayList<>();
-    this.placementPolicy = scm.getContainerPlacementPolicy();
+    this.placementPolicyValidateProxy = scm.getPlacementPolicyValidateProxy();
     this.networkTopology = scm.getClusterMap();
     this.nextIterationIndex = 0;
 
@@ -285,10 +285,11 @@ public class ContainerBalancer extends StatefulService {
     this.maxSizeToMovePerIteration = config.getMaxSizeToMovePerIteration();
     if (config.getNetworkTopologyEnable()) {
       findTargetStrategy = new FindTargetGreedyByNetworkTopology(
-          containerManager, placementPolicy, nodeManager, networkTopology);
+          containerManager, placementPolicyValidateProxy,
+          nodeManager, networkTopology);
     } else {
       findTargetStrategy = new FindTargetGreedyByUsageInfo(containerManager,
-          placementPolicy, nodeManager);
+          placementPolicyValidateProxy, nodeManager);
     }
     this.excludeNodes = config.getExcludeNodes();
     this.includeNodes = config.getIncludeNodes();

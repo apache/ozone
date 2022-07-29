@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -43,6 +44,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -89,6 +91,8 @@ public class TestContainerBalancer {
   private StorageContainerManager scm;
   private OzoneConfiguration conf;
   private PlacementPolicy placementPolicy;
+  private PlacementPolicy ecPlacementPolicy;
+  private PlacementPolicyValidateProxy placementPolicyValidateProxy;
   private ContainerBalancerConfiguration balancerConfiguration;
   private List<DatanodeUsageInfo> nodesInCluster;
   private List<Double> nodeUtilizations;
@@ -132,10 +136,16 @@ public class TestContainerBalancer {
     averageUtilization = createCluster();
     mockNodeManager = new MockNodeManager(datanodeToContainersMap);
 
+    NetworkTopology clusterMap = mockNodeManager.getClusterNetworkTopologyMap();
+
     placementPolicy = ContainerPlacementPolicyFactory
-        .getPolicy(conf, mockNodeManager,
-            mockNodeManager.getClusterNetworkTopologyMap(), true,
+        .getPolicy(conf, mockNodeManager, clusterMap, true,
             SCMContainerPlacementMetrics.create());
+    ecPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(
+        conf, mockNodeManager, clusterMap,
+        true, SCMContainerPlacementMetrics.create());
+    placementPolicyValidateProxy = new PlacementPolicyValidateProxy(
+        placementPolicy, ecPlacementPolicy);
 
     Mockito.when(replicationManager
         .isContainerReplicatingOrDeleting(Mockito.any(ContainerID.class)))
@@ -171,6 +181,8 @@ public class TestContainerBalancer {
     when(scm.getConfiguration()).thenReturn(conf);
     when(scm.getStatefulServiceStateManager()).thenReturn(serviceStateManager);
     when(scm.getSCMServiceManager()).thenReturn(scmServiceManager);
+    when(scm.getPlacementPolicyValidateProxy())
+        .thenReturn(placementPolicyValidateProxy);
 
     /*
     When StatefulServiceStateManager#saveConfiguration is called, save to
