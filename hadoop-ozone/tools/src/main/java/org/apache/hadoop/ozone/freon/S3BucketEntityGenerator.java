@@ -16,23 +16,26 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import com.amazonaws.auth.EnvironmentVariableCredentialsProvider;
-import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
-import com.amazonaws.regions.Regions;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
+
 import java.util.concurrent.Callable;
 
 import static com.amazonaws.services.s3.internal.SkipMd5CheckStrategy.DISABLE_PUT_OBJECT_MD5_VALIDATION_PROPERTY;
 
 /**
  * Generate buckets via the s3 interface.
+ *
+ * For a secure cluster,
+ * $> init user keytab
+ * $> kinit -kt /etc/security/keytabs/testuser.keytab testuser/scm@EXAMPLE.COM
+ * $> eval $(ozone s3 getsecret -e)
+ * for getting and exporting access_key_id and secret_access_key
+ * to freon shell test environment
+ * secret access key.
  */
 @Command(name = "s3bg",
     aliases = "s3-bucket-generator",
@@ -40,46 +43,17 @@ import static com.amazonaws.services.s3.internal.SkipMd5CheckStrategy.DISABLE_PU
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-public class S3BucketGenerator extends BaseFreonGenerator
+public class S3BucketEntityGenerator extends S3EntityGenerator
     implements Callable<Void> {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(S3BucketGenerator.class);
-
-  @Option(names = {"-b", "--bucket"},
-      description =
-          "Prefix name to use for bucket creation.",
-      defaultValue = "bucket")
-  private String bucketName;
-
-  @Option(names = {"-e", "--endpoint"},
-      description = "S3 HTTP endpoint",
-      defaultValue = "http://localhost:9878")
-  private String endpoint;
+      LoggerFactory.getLogger(S3BucketEntityGenerator.class);
 
   private Timer timer;
 
-  private AmazonS3 s3;
-
   @Override
   public Void call() throws Exception {
-
-    init();
-
-    AmazonS3ClientBuilder amazonS3ClientBuilder =
-        AmazonS3ClientBuilder.standard()
-            .withCredentials(new EnvironmentVariableCredentialsProvider());
-
-    if (endpoint.length() > 0) {
-      amazonS3ClientBuilder
-          .withPathStyleAccessEnabled(true)
-          .withEndpointConfiguration(
-              new EndpointConfiguration(endpoint, "us-east-1"));
-    } else {
-      amazonS3ClientBuilder.withRegion(Regions.DEFAULT_REGION);
-    }
-
-    s3 = amazonS3ClientBuilder.build();
+    s3ClientInit();
 
     timer = getMetrics().timer("bucket-create");
 
@@ -90,9 +64,9 @@ public class S3BucketGenerator extends BaseFreonGenerator
   }
 
   private void createBucket(long bucketNum) throws Exception {
-    String bName = getPrefix() + bucketName + bucketNum;
+    String bName = getPrefix() + bucketNum;
     timer.time(() -> {
-      s3.createBucket(bName);
+      getS3().createBucket(bName);
       return null;
     });
   }
