@@ -29,11 +29,11 @@ import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadResult;
 import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.UploadPartRequest;
+import static com.amazonaws.services.s3.internal.SkipMd5CheckStrategy.DISABLE_PUT_OBJECT_MD5_VALIDATION_PROPERTY;
 import com.amazonaws.services.s3.model.UploadPartResult;
 import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomStringUtils;
 
-import static com.amazonaws.services.s3.internal.SkipMd5CheckStrategy.DISABLE_PUT_OBJECT_MD5_VALIDATION_PROPERTY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_MULTIPART_MIN_SIZE;
 
 import org.slf4j.Logger;
@@ -51,11 +51,11 @@ import picocli.CommandLine.Option;
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
 @SuppressWarnings("java:S2245") // no need for secure random
-public class S3KeyEntityGenerator extends S3EntityGenerator
+public class S3KeyGenerator extends S3EntityGenerator
     implements Callable<Void> {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(S3KeyEntityGenerator.class);
+      LoggerFactory.getLogger(S3KeyGenerator.class);
 
   @Option(names = {"-b", "--bucket"},
       description =

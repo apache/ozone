@@ -43,11 +43,11 @@ import static com.amazonaws.services.s3.internal.SkipMd5CheckStrategy.DISABLE_PU
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-public class S3BucketEntityGenerator extends S3EntityGenerator
+public class S3BucketGenerator extends S3EntityGenerator
     implements Callable<Void> {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(S3BucketEntityGenerator.class);
+      LoggerFactory.getLogger(S3BucketGenerator.class);
 
   private Timer timer;
 
