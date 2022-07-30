@@ -67,3 +67,9 @@ Freon OMBR
     [arguments]    ${prefix}=ombg    ${n}=1    ${threads}=1    ${args}=${EMPTY}
     ${result} =        Execute          ozone freon ombr ${OM_HA_PARAM} -t ${threads} -n${n} -p ${prefix} ${args}
                        Should contain   ${result}   Successful executions: ${n}
+
+Freon RPCL
+    [arguments]    ${prefix}=rpcl    ${n}=1    ${threads}=1    ${args}=${EMPTY}
+    ${result} =        Execute          ozone freon rpcl ${OM_HA_PARAM} -t ${threads} -n${n} -p ${prefix} ${args}
+                       Should contain   ${result}   Successful executions: ${n}
+

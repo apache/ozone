@@ -23,10 +23,10 @@ ${PREFIX}    ${EMPTY}
 
 *** Test Cases ***
 Ozone Echo RPC Load Generator
-#    Freon RPCL    prefix=rpcl${PREFIX}
-        ${output} =         Execute          ozone freon rpcl
-                            Should Contain   ${output}   Total execution time
-                            Should Contain   ${output}   Failures: 0
-                            Should Contain   Successful executions
-                            Should Contain   ${output}   mean rate
+    Freon RPCL    prefix=rpcl${PREFIX}
+#    ${output} =         Execute          ozone freon rpcl
+#                        Should Contain   ${output}   Total execution time
+#                        Should Contain   ${output}   Failures: 0
+#                        Should Contain   Successful executions
+#                        Should Contain   ${output}   mean rate
 
