@@ -14,7 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test freon data validation commands
+Documentation       Test freon echo RPC commands
 Resource            ../ozone-lib/freon.robot
 Test Timeout        5 minutes
 
