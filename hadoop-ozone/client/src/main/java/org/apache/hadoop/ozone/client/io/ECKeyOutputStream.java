@@ -22,6 +22,9 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -203,6 +206,25 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     }
   }
 
+  private void logStreamError(List<ECBlockOutputStream> failedStreams,
+                              String operation) {
+    Set<Integer> failedStreamIndexSet =
+            failedStreams.stream().map(ECBlockOutputStream::getReplicationIndex)
+                    .collect(Collectors.toSet());
+
+    String failedStreamsString = IntStream.range(1,
+                    numDataBlks + numParityBlks + 1)
+            .mapToObj(index -> failedStreamIndexSet.contains(index)
+                    ? "F" : "S")
+            .collect(Collectors.joining(" "));
+    LOG.warn("{} failed: {}", operation, failedStreamsString);
+    for (ECBlockOutputStream stream : failedStreams) {
+      LOG.warn("Failure for replica index: {}, DatanodeDetails: {}",
+              stream.getReplicationIndex(), stream.getDatanodeDetails(),
+              stream.getIoException());
+    }
+  }
+
   private StripeWriteStatus handleParityWrites() throws IOException {
     writeParityCells();
 
@@ -211,6 +233,9 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     List<ECBlockOutputStream> failedStreams =
         streamEntry.streamsWithWriteFailure();
     if (!failedStreams.isEmpty()) {
+      if (LOG.isDebugEnabled()) {
+        logStreamError(failedStreams, "EC stripe write");
+      }
       excludePipelineAndFailedDN(streamEntry.getPipeline(), failedStreams);
       return StripeWriteStatus.FAILED;
     }
@@ -224,6 +249,9 @@ public final class ECKeyOutputStream extends KeyOutputStream {
 
     failedStreams = streamEntry.streamsWithPutBlockFailure();
     if (!failedStreams.isEmpty()) {
+      if (LOG.isDebugEnabled()) {
+        logStreamError(failedStreams, "Put block");
+      }
       excludePipelineAndFailedDN(streamEntry.getPipeline(), failedStreams);
       return StripeWriteStatus.FAILED;
     }
