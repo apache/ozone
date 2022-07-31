@@ -23,4 +23,4 @@ ${PREFIX}    ${EMPTY}
 
 *** Test Cases ***
 Ozone Echo RPC Load Generator
-    Freon RPCL    prefix=rpcl${PREFIX}
+    Freon RPCL     prefix=rpcl${PREFIX}
