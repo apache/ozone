@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import java.util.stream.Stream;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -41,6 +40,7 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -66,6 +66,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
@@ -111,21 +112,16 @@ public class TestBlockDeletion {
   private OzoneManagerProtocol writeClient;
   private Set<Long> containerIdsWithDeletedBlocks;
   private long maxTransactionId = 0;
-  private File baseDir;
   private ScmBlockDeletingServiceMetrics metrics;
 
   @BeforeEach
-  public void init() throws Exception {
+  public void init(@TempDir File baseDir) throws Exception {
     conf = new OzoneConfiguration();
     GenericTestUtils.setLogLevel(DeletedBlockLogImpl.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(SCMBlockDeletingService.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(LegacyReplicationManager.LOG, Level.DEBUG);
 
-    String path =
-        GenericTestUtils.getTempPath(TestBlockDeletion.class.getSimpleName());
-    baseDir = new File(path);
-    baseDir.mkdirs();
-
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, baseDir.getAbsolutePath());
     conf.set("ozone.replication.allowed-configs", "^(RATIS/THREE)|(EC/2-1)$");
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
@@ -176,14 +172,13 @@ public class TestBlockDeletion {
     if (cluster != null) {
       cluster.shutdown();
     }
-    FileUtils.deleteDirectory(baseDir);
   }
 
   private static Stream<ReplicationConfig> replicationConfigs() {
     return Stream.of(
         ReplicationConfig.fromTypeAndFactor(
             ReplicationType.RATIS, ReplicationFactor.THREE),
-        new ECReplicationConfig("rs-2-1-1024"));
+        new ECReplicationConfig("rs-2-1-256k"));
   }
 
   @ParameterizedTest
@@ -237,10 +232,10 @@ public class TestBlockDeletion {
     writeClient.deleteKey(keyArgs);
     Thread.sleep(5000);
     // The blocks should not be deleted in the DN as the container is open
-    Throwable e = Assertions.assertThrows(AssertionError.class, () -> {
-      verifyBlocksDeleted(omKeyLocationInfoGroupList);
-    });
-    Assertions.assertTrue(e.getMessage().startsWith("expected: <null> but was:"));
+    Throwable e = Assertions.assertThrows(AssertionError.class,
+        () -> verifyBlocksDeleted(omKeyLocationInfoGroupList));
+    Assertions.assertTrue(
+        e.getMessage().startsWith("expected: <null> but was:"));
 
     Assertions.assertEquals(0L, metrics.getNumBlockDeletionTransactionSent());
     // close the containers which hold the blocks for the key
