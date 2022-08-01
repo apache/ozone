@@ -53,28 +53,15 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
           description =
                   "Specifies the size of payload in KB in RPC request. " +
                           "Max size is 2097151 KB",
-          defaultValue = "1")
-  private int payloadReqSizeKB = 1;
+          defaultValue = "0")
+  private int payloadReqSizeKB = 0;
 
   @Option(names = {"-plrp", "--payload-resp"},
           description =
                   "Specifies the size of payload in KB in RPC response. " +
                           "Max size is 2097151 KB",
-          defaultValue = "1")
-  private int payloadRespSizeKB = 1;
-
-  @Option(names = {"-erq", "--empty-req"},
-          description =
-                  "Specifies whether the payload of request is empty or not",
-          defaultValue = "False")
-  private boolean isEmptyReq = false;
-
-  @Option(names = {"-erp", "--empty-resp"},
-          description =
-                  "Specifies whether the payload of response is empty or not",
-          defaultValue = "False")
-  private boolean isEmptyResp = false;
-
+          defaultValue = "0")
+  private int payloadRespSizeKB = 0;
   @Override
   public Void call() throws Exception {
     if (payloadReqSizeKB < 0 || payloadRespSizeKB < 0) {
@@ -86,9 +73,7 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
     configuration = createOzoneConfiguration();
     client = createOmClient(configuration, null);
     init();
-    if (isEmptyReq) {
-      payloadReq = null;
-    } else {
+    if (payloadReqSizeKB > 0) {
       //To avoid integer overflow, we cap the payload by max 2048000 KB
       int payloadReqSize = Math.min(
               Math.toIntExact(payloadReqSizeKB *
@@ -96,9 +81,7 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
               MAX_SIZE_KB);
       payloadReq = RandomUtils.nextBytes(payloadReqSize);
     }
-    if (isEmptyResp) {
-      payloadRespSize = 0;
-    } else {
+    if (payloadRespSizeKB > 0) {
       //To avoid integer overflow, we cap the payload by max 2048000 KB
       payloadRespSize = Math.min(
               Math.toIntExact(payloadRespSizeKB *

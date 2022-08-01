@@ -1457,7 +1457,7 @@ message PartInfo {
 }
 
 /**
- Stores the raw payload of rpc request, used in OmRPCLoadGenerator
+ Rpc request with optional payload, used in OmRPCLoadGenerator
  */
 message EchoRPCRequest {
     optional bytes payloadReq = 1;
@@ -1465,7 +1465,7 @@ message EchoRPCRequest {
 }
 
 /**
- Stores the raw payload of rpc response, used in OmRPCLoadGenerator
+ Rpc response with optional payload, used in OmRPCLoadGenerator
  */
 message EchoRPCResponse {
     optional bytes payload = 1;

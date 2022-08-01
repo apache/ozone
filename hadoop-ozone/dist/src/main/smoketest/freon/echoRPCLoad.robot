@@ -23,14 +23,14 @@ ${PREFIX}    ${EMPTY}
 
 *** Test Cases ***
 Ozone Echo RPC Load Generator with request payload and response layload
-    Freon RPCL     prefix=rpcl${PREFIX}
+    Freon RPCL     prefix=rpcl${PREFIX} -plrq=10    -plrp=10
 
 Ozone Echo RPC Load Generator with request payload and empty response layload
-    Freon RPCL     prefix=rpcl${PREFIX} -erp=true
+    Freon RPCL     prefix=rpcl${PREFIX} -plrq=10
 
 Ozone Echo RPC Load Generator with empty request payload and response layload
-    Freon RPCL     prefix=rpcl${PREFIX} -erq=true
+    Freon RPCL     prefix=rpcl${PREFIX} -plrp=10
 
 Ozone Echo RPC Load Generator with empty request payload and empty response layload
-    Freon RPCL     prefix=rpcl${PREFIX} -erq=true -erp=true
+    Freon RPCL     prefix=rpcl${PREFIX}
 
