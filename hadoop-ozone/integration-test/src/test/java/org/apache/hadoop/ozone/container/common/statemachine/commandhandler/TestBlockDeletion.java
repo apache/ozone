@@ -17,9 +17,12 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -63,6 +66,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -121,6 +126,7 @@ public class TestBlockDeletion {
     baseDir = new File(path);
     baseDir.mkdirs();
 
+    conf.set("ozone.replication.allowed-configs", "^(RATIS/THREE)|(EC/2-1)$");
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
     DatanodeConfiguration datanodeConfiguration = conf.getObject(
@@ -173,8 +179,16 @@ public class TestBlockDeletion {
     FileUtils.deleteDirectory(baseDir);
   }
 
-  @Test
-  public void testBlockDeletion() throws Exception {
+  private static Stream<ReplicationConfig> replicationConfigs() {
+    return Stream.of(
+        ReplicationConfig.fromTypeAndFactor(
+            ReplicationType.RATIS, ReplicationFactor.THREE),
+        new ECReplicationConfig("rs-2-1-1024"));
+  }
+
+  @ParameterizedTest
+  @MethodSource("replicationConfigs")
+  public void testBlockDeletion(ReplicationConfig repConfig) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -187,8 +201,7 @@ public class TestBlockDeletion {
     String keyName = UUID.randomUUID().toString();
 
     OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes(UTF_8).length, ReplicationType.RATIS,
-        ReplicationFactor.THREE, new HashMap<>());
+        value.getBytes(UTF_8).length, repConfig, new HashMap<>());
     for (int i = 0; i < 10; i++) {
       out.write(value.getBytes(UTF_8));
     }
@@ -196,9 +209,7 @@ public class TestBlockDeletion {
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
-        .setReplicationConfig(
-            RatisReplicationConfig
-                .getInstance(HddsProtos.ReplicationFactor.THREE))
+        .setReplicationConfig(repConfig)
         .setRefreshPipeline(true)
         .build();
     List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
