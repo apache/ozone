@@ -33,7 +33,7 @@ import picocli.CommandLine.Option;
 @Command(name = "om-rpc-load",
         aliases = "rpcl",
         description =
-                "Generate random RPC request to the OM " +
+                "Generate echo RPC request to the OM " +
                         "with or without layload. " +
                         "Max payload size is 2097151 KB",
         versionProvider = HddsVersionProvider.class,
