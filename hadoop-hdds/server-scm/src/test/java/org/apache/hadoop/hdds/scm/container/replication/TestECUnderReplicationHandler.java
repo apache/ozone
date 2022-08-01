@@ -22,6 +22,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -167,6 +168,34 @@ public class TestECUnderReplicationHandler {
         testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
             availableReplicas, 2, noNodesPolicy));
 
+  }
+
+  @Test
+  public void testSameNodeIsNotReused() throws IOException {
+    DatanodeDetails newDn = MockDatanodeDetails.randomDatanodeDetails();
+    PlacementPolicy sameNodePolicy = ReplicationTestUtil
+        .getSameNodeTestPlacementPolicy(nodeManager, conf, newDn);
+    // Just have a missing index, this should return OK.
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1),
+            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
+            Pair.of(IN_SERVICE, 4));
+    // Passing zero for decommIndexes, as we don't expect the decom command to
+    // get created due to the placement policy returning an already used node
+    testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
+        availableReplicas, 0, sameNodePolicy);
+
+    // Now add a decommissioning index - we should get an exception as the
+    // placement policy should throw. It will have used up the node for
+    // reconstruction, and hence no nodes will be found to fix the decommission
+    // index.
+    Set<ContainerReplica> replicas = ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1),
+            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
+            Pair.of(IN_SERVICE, 4));
+    assertThrows(SCMException.class, () ->
+        testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
+            replicas, 1, sameNodePolicy));
   }
 
   public Map<DatanodeDetails, SCMCommand<?>>
