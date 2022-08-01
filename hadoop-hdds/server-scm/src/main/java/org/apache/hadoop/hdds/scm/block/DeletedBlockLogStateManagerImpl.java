@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -213,6 +214,7 @@ public class DeletedBlockLogStateManagerImpl
   public int resetRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
       throws IOException {
     for (long txId: txIDs) {
+      Objects.requireNonNull(txId, "transactionId cannot be null");
       DeletedBlocksTransaction transaction = deletedTable.get(txId);
       transactionBuffer.addToBuffer(deletedTable, txId,
           transaction.toBuilder().setCount(0).build());

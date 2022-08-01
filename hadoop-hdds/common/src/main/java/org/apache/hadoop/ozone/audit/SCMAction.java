@@ -50,7 +50,7 @@ public enum SCMAction implements AuditAction {
   GET_CONTAINER_WITH_PIPELINE_BATCH,
   ADD_SCM,
   GET_REPLICATION_MANAGER_REPORT,
-  RENEW_DELETED_BLOCK_RETRY_COUNT;
+  RESET_DELETED_BLOCK_RETRY_COUNT;
 
   @Override
   public String getAction() {

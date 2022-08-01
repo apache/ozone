@@ -791,15 +791,13 @@ public class SCMClientProtocolServer implements
       int count = scm.getScmBlockManager().getDeletedBlockLog().
           resetCount(txIDs);
       scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
-
-      auditMap.put("txIDs", txIDs.stream().map(String::valueOf).
-          collect(Collectors.joining(",")));
+      auditMap.put("txIDs", txIDs.toString());
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-          SCMAction.RENEW_DELETED_BLOCK_RETRY_COUNT, auditMap));
+          SCMAction.RESET_DELETED_BLOCK_RETRY_COUNT, auditMap));
       return count;
     } catch (IOException ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
-          SCMAction.RENEW_DELETED_BLOCK_RETRY_COUNT, auditMap, ex));
+          SCMAction.RESET_DELETED_BLOCK_RETRY_COUNT, auditMap, ex));
       throw ex;
     }
   }

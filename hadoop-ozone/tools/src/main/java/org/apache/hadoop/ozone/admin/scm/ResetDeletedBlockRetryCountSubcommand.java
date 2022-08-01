@@ -37,9 +37,9 @@ import java.util.List;
 public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
 
   @CommandLine.ArgGroup(multiplicity = "1")
-  private ExclusiveGroup group;
+  private TransactionsOption group;
 
-  static class ExclusiveGroup {
+  static class TransactionsOption {
     @CommandLine.Option(names = {"-a", "--all"},
         description = "reset all expired deleted block transaction retry" +
             " count from -1 to 0.")
@@ -62,7 +62,7 @@ public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
       count = client.resetDeletedBlockRetryCount(new ArrayList<>());
     } else {
       if (group.txList == null || group.txList.isEmpty()) {
-        System.out.println("TransactionId list could not be empty");
+        System.out.println("TransactionId list should not be empty");
         return;
       }
       count = client.resetDeletedBlockRetryCount(group.txList);
