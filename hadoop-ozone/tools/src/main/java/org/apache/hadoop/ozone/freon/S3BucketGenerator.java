@@ -24,8 +24,6 @@ import picocli.CommandLine.Command;
 
 import java.util.concurrent.Callable;
 
-import static com.amazonaws.services.s3.internal.SkipMd5CheckStrategy.DISABLE_PUT_OBJECT_MD5_VALIDATION_PROPERTY;
-
 /**
  * Generate buckets via the s3 interface.
  *
@@ -57,7 +55,6 @@ public class S3BucketGenerator extends S3EntityGenerator
 
     timer = getMetrics().timer("bucket-create");
 
-    System.setProperty(DISABLE_PUT_OBJECT_MD5_VALIDATION_PROPERTY, "true");
     runTests(this::createBucket);
 
     return null;

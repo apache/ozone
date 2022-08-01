@@ -34,7 +34,7 @@ public class S3EntityGenerator extends BaseFreonGenerator {
           defaultValue = "http://localhost:9878")
   private String endpoint;
 
-  private AmazonS3 getS3;
+  private AmazonS3 s3;
 
   protected void s3ClientInit() {
     init();
@@ -52,7 +52,7 @@ public class S3EntityGenerator extends BaseFreonGenerator {
       amazonS3ClientBuilder.withRegion(Regions.DEFAULT_REGION);
     }
 
-    getS3 = amazonS3ClientBuilder.build();
+    s3 = amazonS3ClientBuilder.build();
   }
 
   public String getEndpoint() {
@@ -60,6 +60,6 @@ public class S3EntityGenerator extends BaseFreonGenerator {
   }
 
   public AmazonS3 getS3() {
-    return getS3;
+    return s3;
   }
 }
