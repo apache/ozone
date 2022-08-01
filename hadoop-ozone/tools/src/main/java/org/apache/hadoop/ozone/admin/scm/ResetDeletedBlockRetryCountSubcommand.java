@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.admin.scm;
 
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
@@ -30,7 +31,9 @@ import java.util.List;
  */
 @CommandLine.Command(
     name = "resetDeletedBlockRetryCount",
-    description = "Reset deleted block transactions whose retry count is -1")
+    description = "Reset deleted block transactions whose retry count is -1",
+    mixinStandardHelpOptions = true,
+    versionProvider = HddsVersionProvider.class)
 public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
 
   @CommandLine.ArgGroup(multiplicity = "1")
