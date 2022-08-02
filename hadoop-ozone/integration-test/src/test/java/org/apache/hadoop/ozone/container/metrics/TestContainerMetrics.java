@@ -125,11 +125,11 @@ public class TestContainerMetrics {
       client.connect();
 
       // Create container
-      ContainerCommandRequestProto request = ContainerTestHelper
-          .getCreateContainerRequest(containerID, pipeline);
-      ContainerCommandResponseProto response = client.sendCommand(request);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS,
-          response.getResult());
+//      ContainerCommandRequestProto request = ContainerTestHelper
+//          .getCreateContainerRequest(containerID, pipeline);
+//      ContainerCommandResponseProto response = client.sendCommand(request);
+//      Assert.assertEquals(ContainerProtos.Result.SUCCESS,
+//          response.getResult());
 
       // Write Chunk
       BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
