@@ -261,7 +261,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // If container does not exist, create one for WriteChunk and
         // PutSmallFile request
         responseProto = createContainer(msg);
-        metrics.incContainerOpsLatencies(Type.CreateContainer);
         if (responseProto.getResult() != Result.SUCCESS) {
           StorageContainerException sce = new StorageContainerException(
               "ContainerID " + containerID + " creation failed",
@@ -313,6 +312,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
     responseProto = handler.handle(msg, container, dispatcherContext);
     if (responseProto != null) {
+      metrics.incContainerOpsMetrics(Type.CreateContainer);
       metrics.incContainerOpsLatencies(cmdType,
           System.currentTimeMillis() - startTime);
 
