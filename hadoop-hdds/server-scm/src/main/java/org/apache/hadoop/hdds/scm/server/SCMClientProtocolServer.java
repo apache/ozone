@@ -790,7 +790,6 @@ public class SCMClientProtocolServer implements
     try {
       int count = scm.getScmBlockManager().getDeletedBlockLog().
           resetCount(txIDs);
-      scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
       auditMap.put("txIDs", txIDs.toString());
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.RESET_DELETED_BLOCK_RETRY_COUNT, auditMap));
