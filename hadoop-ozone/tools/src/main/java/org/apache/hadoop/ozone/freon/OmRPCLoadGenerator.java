@@ -105,7 +105,7 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
     timer.time(() -> {
       EchoRPCResponse resp = client.echoRPCReq(payloadReq,
               payloadRespSize);
-      return resp;
+      return null;
     });
   }
 }
