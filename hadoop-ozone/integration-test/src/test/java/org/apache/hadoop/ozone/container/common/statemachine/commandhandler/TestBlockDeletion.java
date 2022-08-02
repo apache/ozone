@@ -259,7 +259,7 @@ public class TestBlockDeletion {
     }, 2000, 30000);
 
     // Few containers with deleted blocks
-    Assertions.assertTrue(!containerIdsWithDeletedBlocks.isEmpty());
+    Assertions.assertFalse(containerIdsWithDeletedBlocks.isEmpty());
     // Containers in the DN and SCM should have same delete transactionIds
     matchContainerTransactionIds();
     // Containers in the DN and SCM should have same delete transactionIds
@@ -278,8 +278,8 @@ public class TestBlockDeletion {
         return false;
       }
     }, 500, 10000);
-    Assertions.assertTrue(metrics.getNumBlockDeletionTransactionCreated() ==
-            metrics.getNumBlockDeletionTransactionCompleted());
+    Assertions.assertEquals(metrics.getNumBlockDeletionTransactionCreated(),
+        metrics.getNumBlockDeletionTransactionCompleted());
     Assertions.assertTrue(metrics.getNumBlockDeletionCommandSent() >=
         metrics.getNumBlockDeletionCommandSuccess() +
             metrics.getBNumBlockDeletionCommandFailure());
@@ -385,9 +385,9 @@ public class TestBlockDeletion {
           Assertions.assertEquals(HddsProtos.LifeCycleState.DELETED,
               container.getState());
           try {
-            Assertions.assertTrue(scm.getScmMetadataStore().getContainerTable()
-                .get(container.containerID()).getState() ==
-                HddsProtos.LifeCycleState.DELETED);
+            Assertions.assertEquals(HddsProtos.LifeCycleState.DELETED,
+                scm.getScmMetadataStore().getContainerTable()
+                    .get(container.containerID()).getState());
           } catch (IOException e) {
             Assertions.fail(
                 "Container from SCM DB should be marked as DELETED");
