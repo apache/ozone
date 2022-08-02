@@ -93,6 +93,7 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
       runTests(this::sendRPCReq);
     }
     printReport();
+    client.close();
     return null;
   }
   private void sendRPCReq(long l) throws Exception {
