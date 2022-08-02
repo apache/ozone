@@ -258,8 +258,8 @@ public final class HAUtils {
       // Get the table name with TransactionInfo as the value. The transaction
       // info table name are different in SCM and SCM.
 
-      // In case, a new table gets added where the value is TransactionInfo, this
-      // logic may not work.
+      // In case, a new table gets added where the value is TransactionInfo,
+      // this logic may not work.
 
       Table<String, TransactionInfo> transactionInfoTable =
           getTransactionInfoTable(dbStore, definition);
