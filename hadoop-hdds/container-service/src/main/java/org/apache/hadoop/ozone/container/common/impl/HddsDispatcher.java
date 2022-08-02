@@ -261,6 +261,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // If container does not exist, create one for WriteChunk and
         // PutSmallFile request
         responseProto = createContainer(msg);
+        metrics.incContainerOpsMetrics(Type.CreateContainer);
         if (responseProto.getResult() != Result.SUCCESS) {
           StorageContainerException sce = new StorageContainerException(
               "ContainerID " + containerID + " creation failed",
