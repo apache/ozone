@@ -36,6 +36,7 @@ import org.rocksdb.WriteOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -201,7 +202,7 @@ public final class RocksDatabase {
    *
    * @see Checkpoint
    */
-  final class RocksCheckpoint {
+  final class RocksCheckpoint implements Closeable {
     private final Checkpoint checkpoint;
 
     private RocksCheckpoint() {
@@ -219,6 +220,11 @@ public final class RocksDatabase {
 
     public long getLatestSequenceNumber() {
       return RocksDatabase.this.getLatestSequenceNumber();
+    }
+
+    @Override
+    public void close() throws IOException {
+      checkpoint.close();
     }
   }
 
