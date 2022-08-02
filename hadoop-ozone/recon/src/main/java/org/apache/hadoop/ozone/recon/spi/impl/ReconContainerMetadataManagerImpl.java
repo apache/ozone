@@ -216,23 +216,24 @@ public class ReconContainerMetadataManagerImpl
   public void batchStoreContainerReplicaHistory(
       Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap)
       throws IOException {
-    BatchOperation batchOperation = containerDbStore.initBatchOperation();
+    try (BatchOperation batchOperation =
+             containerDbStore.initBatchOperation()) {
+      for (Map.Entry<Long, Map<UUID, ContainerReplicaHistory>> entry :
+          replicaHistoryMap.entrySet()) {
+        final long containerId = entry.getKey();
+        final Map<UUID, ContainerReplicaHistory> tsMap = entry.getValue();
 
-    for (Map.Entry<Long, Map<UUID, ContainerReplicaHistory>> entry :
-        replicaHistoryMap.entrySet()) {
-      final long containerId = entry.getKey();
-      final Map<UUID, ContainerReplicaHistory> tsMap = entry.getValue();
+        List<ContainerReplicaHistory> tsList = new ArrayList<>();
+        for (Map.Entry<UUID, ContainerReplicaHistory> e : tsMap.entrySet()) {
+          tsList.add(e.getValue());
+        }
 
-      List<ContainerReplicaHistory> tsList = new ArrayList<>();
-      for (Map.Entry<UUID, ContainerReplicaHistory> e : tsMap.entrySet()) {
-        tsList.add(e.getValue());
+        containerReplicaHistoryTable.putWithBatch(batchOperation, containerId,
+            new ContainerReplicaHistoryList(tsList));
       }
 
-      containerReplicaHistoryTable.putWithBatch(batchOperation, containerId,
-          new ContainerReplicaHistoryList(tsList));
+      containerDbStore.commitBatchOperation(batchOperation);
     }
-
-    containerDbStore.commitBatchOperation(batchOperation);
   }
 
   /**

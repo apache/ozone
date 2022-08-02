@@ -232,17 +232,18 @@ public class NSSummaryTask implements ReconOmTask {
 
   private void writeNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
-    nsSummaryMap.keySet().forEach((Long key) -> {
-      try {
-        reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation,
-            key, nsSummaryMap.get(key));
-      } catch (IOException e) {
-        LOG.error("Unable to write Namespace Summary data in Recon DB.",
-            e);
-      }
-    });
-    reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
+    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      nsSummaryMap.keySet().forEach((Long key) -> {
+        try {
+          reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation,
+              key, nsSummaryMap.get(key));
+        } catch (IOException e) {
+          LOG.error("Unable to write Namespace Summary data in Recon DB.",
+              e);
+        }
+      });
+      reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
+    }
   }
 
   private void handlePutKeyEvent(OmKeyInfo keyInfo, Map<Long,

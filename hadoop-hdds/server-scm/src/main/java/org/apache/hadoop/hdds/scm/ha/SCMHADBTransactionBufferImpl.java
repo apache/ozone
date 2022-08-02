@@ -138,5 +138,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
   @Override
   public void close() throws IOException {
+    if (currentBatchOperation != null) {
+      currentBatchOperation.close();
+    }
   }
 }
