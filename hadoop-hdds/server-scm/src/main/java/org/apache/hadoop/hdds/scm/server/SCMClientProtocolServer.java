@@ -795,10 +795,10 @@ public class SCMClientProtocolServer implements
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.RESET_DELETED_BLOCK_RETRY_COUNT, auditMap));
       return count;
-    } catch (IOException ex) {
+    } catch (TimeoutException | IOException ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.RESET_DELETED_BLOCK_RETRY_COUNT, auditMap, ex));
-      throw ex;
+      throw new IOException(ex);
     }
   }
 

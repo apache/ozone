@@ -79,7 +79,7 @@ public interface DeletedBlockLog extends Closeable {
    * @param txIDs transactionId list to be reset
    * @return num of successful reset
    */
-  int resetCount(List<Long> txIDs);
+  int resetCount(List<Long> txIDs) throws IOException, TimeoutException;
 
   /**
    * Commits a transaction means to delete all footprints of a transaction

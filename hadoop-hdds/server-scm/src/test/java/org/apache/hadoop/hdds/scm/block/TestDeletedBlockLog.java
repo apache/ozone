@@ -225,7 +225,8 @@ public class TestDeletedBlockLog {
     deletedBlockLog.onFlush();
   }
 
-  private void resetCount(List<Long> txIDs) throws IOException {
+  private void resetCount(List<Long> txIDs)
+      throws IOException, TimeoutException {
     deletedBlockLog.resetCount(txIDs);
     scmHADBTransactionBuffer.flush();
     deletedBlockLog.onFlush();
