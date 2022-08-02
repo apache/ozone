@@ -30,11 +30,11 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -44,6 +44,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NEW_NODE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.PRE_CHECK_COMPLETED;
@@ -64,7 +65,8 @@ public class BackgroundPipelineCreator implements SCMService {
    * SCMService related variables.
    * 1) after leaving safe mode, BackgroundPipelineCreator needs to
    *    wait for a while before really take effect.
-   * 2) NewNodeHandler, NonHealthyToHealthyNodeHandler, PreCheckComplete
+   * 2) NewNodeHandler, NodeAddressUpdateHandler,
+   *    NonHealthyToHealthyNodeHandler, PreCheckComplete
    *    will trigger a one-shot run of BackgroundPipelineCreator,
    *    no matter in safe mode or not.
    */
@@ -84,13 +86,15 @@ public class BackgroundPipelineCreator implements SCMService {
   private static final String THREAD_NAME = "RatisPipelineUtilsThread";
   private final AtomicBoolean running = new AtomicBoolean(false);
   private final long intervalInMillis;
+  private final Clock clock;
 
 
   BackgroundPipelineCreator(PipelineManager pipelineManager,
-      ConfigurationSource conf, SCMContext scmContext) {
+      ConfigurationSource conf, SCMContext scmContext, Clock clock) {
     this.pipelineManager = pipelineManager;
     this.conf = conf;
     this.scmContext = scmContext;
+    this.clock = clock;
 
     this.createPipelineInSafeMode = conf.getBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
@@ -105,9 +109,6 @@ public class BackgroundPipelineCreator implements SCMService {
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
-
-    // start RatisPipelineUtilsThread
-    start();
   }
 
   /**
@@ -156,6 +157,10 @@ public class BackgroundPipelineCreator implements SCMService {
       LOG.warn("Interrupted during join {}.", THREAD_NAME);
       Thread.currentThread().interrupt();
     }
+  }
+
+  public boolean isRunning() {
+    return running.get();
   }
 
   private void run() {
@@ -247,7 +252,7 @@ public class BackgroundPipelineCreator implements SCMService {
         // transition from PAUSING to RUNNING
         if (serviceStatus != ServiceStatus.RUNNING) {
           LOG.info("Service {} transitions to RUNNING.", getServiceName());
-          lastTimeToBeReadyInMillis = Time.monotonicNow();
+          lastTimeToBeReadyInMillis = clock.millis();
           serviceStatus = ServiceStatus.RUNNING;
         }
       } else {
@@ -265,8 +270,9 @@ public class BackgroundPipelineCreator implements SCMService {
       return;
     }
     if (event == NEW_NODE_HANDLER_TRIGGERED
-        || event == UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
-        || event == PRE_CHECK_COMPLETED) {
+            || event == NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED
+            || event == UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
+            || event == PRE_CHECK_COMPLETED) {
       LOG.info("trigger a one-shot run on {}.", THREAD_NAME);
 
       serviceLock.lock();
@@ -295,7 +301,7 @@ public class BackgroundPipelineCreator implements SCMService {
       // If safe mode is off, then this SCMService starts to run with a delay.
       return serviceStatus == ServiceStatus.RUNNING && (
           createPipelineInSafeMode ||
-          Time.monotonicNow() - lastTimeToBeReadyInMillis >= waitTimeInMillis);
+          clock.millis() - lastTimeToBeReadyInMillis >= waitTimeInMillis);
     } finally {
       serviceLock.unlock();
     }

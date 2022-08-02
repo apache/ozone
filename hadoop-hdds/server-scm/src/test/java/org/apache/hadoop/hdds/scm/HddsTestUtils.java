@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -88,6 +89,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Stateless helper functions for Hdds tests.
@@ -396,7 +398,7 @@ public final class HddsTestUtils {
   }
 
   public static void openAllRatisPipelines(PipelineManager pipelineManager)
-      throws IOException {
+      throws IOException, TimeoutException {
     // Pipeline is created by background thread
     for (ReplicationFactor factor : ReplicationFactor.values()) {
       // Trigger the processed pipeline report event
@@ -531,7 +533,7 @@ public final class HddsTestUtils {
 
   public static org.apache.hadoop.hdds.scm.container.ContainerInfo
       allocateContainer(ContainerManager containerManager)
-      throws IOException {
+      throws IOException, TimeoutException {
     return containerManager
         .allocateContainer(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
@@ -540,7 +542,8 @@ public final class HddsTestUtils {
   }
 
   public static void closeContainer(ContainerManager containerManager,
-        ContainerID id) throws IOException, InvalidStateTransitionException {
+        ContainerID id) throws IOException,
+      InvalidStateTransitionException, TimeoutException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(
@@ -555,7 +558,8 @@ public final class HddsTestUtils {
    * @throws IOException
    */
   public static void quasiCloseContainer(ContainerManager containerManager,
-       ContainerID id) throws IOException, InvalidStateTransitionException {
+       ContainerID id) throws IOException,
+      InvalidStateTransitionException, TimeoutException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(
@@ -574,10 +578,23 @@ public final class HddsTestUtils {
    */
   public static StorageContainerManager getScmSimple(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
-    SCMConfigurator configurator = new SCMConfigurator();
     // The default behaviour whether ratis will be enabled or not
     // in SCM will be inferred from ozone-default.xml.
-    // conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    return getScmSimple(conf, new SCMConfigurator());
+  }
+
+  /**
+   * Construct and returns StorageContainerManager instance using the given
+   * configuration and service configurator.
+   *
+   * @param conf OzoneConfiguration
+   * @return StorageContainerManager instance
+   * @throws IOException
+   * @throws AuthenticationException
+   */
+  public static StorageContainerManager getScmSimple(OzoneConfiguration conf,
+      SCMConfigurator configurator) throws IOException,
+      AuthenticationException {
     return StorageContainerManager.createSCM(conf, configurator);
   }
 
@@ -623,6 +640,7 @@ public final class HddsTestUtils {
       String scmId = UUID.randomUUID().toString();
       scmStore.setClusterId(clusterId);
       scmStore.setScmId(scmId);
+      scmStore.setSCMHAFlag(SCMHAUtils.isSCMHAEnabled(conf));
       // writes the version file properties
       scmStore.initialize();
     }

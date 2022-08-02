@@ -33,7 +33,9 @@ public enum HDDSLayoutFeature implements LayoutFeature {
       "families)"),
   SCM_HA(2, "Storage Container Manager HA"),
   ERASURE_CODED_STORAGE_SUPPORT(3, "Ozone version with built in support for"
-      + " Erasure Coded block data storage.");
+      + " Erasure Coded block data storage."),
+  DATANODE_SCHEMA_V3(4, "Datanode RocksDB Schema Version 3 (one rocksdb " +
+      "per disk)");
 
   //////////////////////////////  //////////////////////////////
 

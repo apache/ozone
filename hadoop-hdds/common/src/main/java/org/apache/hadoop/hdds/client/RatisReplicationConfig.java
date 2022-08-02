@@ -119,4 +119,9 @@ public final class RatisReplicationConfig
   public String toString() {
     return REPLICATION_TYPE.name() + "/" + replicationFactor;
   }
+
+  @Override
+  public String configFormat() {
+    return toString();
+  }
 }

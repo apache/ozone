@@ -49,9 +49,12 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Crea
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.FinalizeNewLayoutVersionCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconstructECContainersCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.RefreshVolumeUsageCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionSupervisor;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
@@ -96,6 +99,7 @@ public class DatanodeStateMachine implements Closeable {
   private volatile Thread stateMachineThread = null;
   private Thread cmdProcessThread = null;
   private final ReplicationSupervisor supervisor;
+  private final ECReconstructionSupervisor ecReconstructionSupervisor;
 
   private JvmPauseMonitor jvmPauseMonitor;
   private CertificateClient dnCertClient;
@@ -178,6 +182,13 @@ public class DatanodeStateMachine implements Closeable {
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);
 
+    ECReconstructionCoordinator ecReconstructionCoordinator =
+        new ECReconstructionCoordinator(conf, certClient);
+    ecReconstructionSupervisor =
+        new ECReconstructionSupervisor(container.getContainerSet(), context,
+            replicationConfig.getReplicationMaxStreams(),
+            ecReconstructionCoordinator);
+
 
     // When we add new handlers just adding a new handler here should do the
     // trick.
@@ -187,6 +198,8 @@ public class DatanodeStateMachine implements Closeable {
             conf, dnConf.getBlockDeleteThreads(),
             dnConf.getBlockDeleteQueueLimit()))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor))
+        .addHandler(new ReconstructECContainersCommandHandler(conf,
+            ecReconstructionSupervisor))
         .addHandler(new DeleteContainerCommandHandler(
             dnConf.getContainerDeleteThreads()))
         .addHandler(new ClosePipelineCommandHandler())
@@ -299,8 +312,8 @@ public class DatanodeStateMachine implements Closeable {
           try {
             Thread.sleep(nextHB.get() - now);
           } catch (InterruptedException e) {
-            //triggerHeartbeat is called during the sleep
-            Thread.currentThread().interrupt();
+            // TriggerHeartbeat is called during the sleep. Don't need to set
+            // the interrupted state to true.
           }
         }
       }
@@ -318,8 +331,8 @@ public class DatanodeStateMachine implements Closeable {
   public void handleFatalVolumeFailures() {
     LOG.error("DatanodeStateMachine Shutdown due to too many bad volumes, "
         + "check " + DatanodeConfiguration.FAILED_DATA_VOLUMES_TOLERATED_KEY
-        + " and "
-        + DatanodeConfiguration.FAILED_METADATA_VOLUMES_TOLERATED_KEY);
+        + " and " + DatanodeConfiguration.FAILED_METADATA_VOLUMES_TOLERATED_KEY
+        + " and " + DatanodeConfiguration.FAILED_DB_VOLUMES_TOLERATED_KEY);
     hddsDatanodeStopService.stopService();
   }
 
@@ -360,6 +373,9 @@ public class DatanodeStateMachine implements Closeable {
     if (cmdProcessThread != null) {
       cmdProcessThread.interrupt();
     }
+    if (layoutVersionManager != null) {
+      layoutVersionManager.close();
+    }
     context.setState(DatanodeStates.getLastState());
     replicationSupervisorMetrics.unRegister();
     executorService.shutdown();
@@ -375,6 +391,10 @@ public class DatanodeStateMachine implements Closeable {
       LOG.error("Error attempting to shutdown.", e);
       executorService.shutdownNow();
       Thread.currentThread().interrupt();
+    }
+
+    if (ecReconstructionSupervisor != null) {
+      ecReconstructionSupervisor.close();
     }
 
     if (connectionManager != null) {
@@ -679,5 +699,9 @@ public class DatanodeStateMachine implements Closeable {
   }
   public UpgradeFinalizer<DatanodeStateMachine> getUpgradeFinalizer() {
     return upgradeFinalizer;
+  }
+
+  public ConfigurationSource getConf() {
+    return conf;
   }
 }

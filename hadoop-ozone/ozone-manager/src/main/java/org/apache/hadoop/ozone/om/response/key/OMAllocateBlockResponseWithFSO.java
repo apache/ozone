@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
@@ -39,10 +38,16 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 @CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE, BUCKET_TABLE})
 public class OMAllocateBlockResponseWithFSO extends OMAllocateBlockResponse {
 
+  private long volumeId;
+  private long bucketId;
+
   public OMAllocateBlockResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, long clientID,
-      @Nonnull OmBucketInfo omBucketInfo, @Nonnull BucketLayout bucketLayout) {
-    super(omResponse, omKeyInfo, clientID, omBucketInfo, bucketLayout);
+      @Nonnull BucketLayout bucketLayout, @Nonnull long volumeId,
+      @Nonnull long bucketId) {
+    super(omResponse, omKeyInfo, clientID, bucketLayout);
+    this.volumeId = volumeId;
+    this.bucketId = bucketId;
   }
 
   /**
@@ -59,12 +64,7 @@ public class OMAllocateBlockResponseWithFSO extends OMAllocateBlockResponse {
       BatchOperation batchOperation) throws IOException {
 
     OMFileRequest.addToOpenFileTable(omMetadataManager, batchOperation,
-            getOmKeyInfo(), getClientID());
-
-    // update bucket usedBytes.
-    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-            omMetadataManager.getBucketKey(getOmKeyInfo().getVolumeName(),
-                    getOmKeyInfo().getBucketName()), getOmBucketInfo());
+            getOmKeyInfo(), getClientID(), volumeId, bucketId);
   }
 }
 

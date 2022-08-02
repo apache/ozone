@@ -166,8 +166,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
           .getMultipartInfoTable().get(multipartKey);
 
-      // Check for directory exists with same name, if it exists throw error. 
-      checkDirectoryAlreadyExists(ozoneManager, volumeName, bucketName, keyName,
+      // Check for directory exists with same name for the LEGACY_FS,
+      // if it exists throw error.
+      checkDirectoryAlreadyExists(ozoneManager, omBucketInfo, keyName,
           omMetadataManager);
 
       if (multipartKeyInfo == null) {
@@ -222,24 +223,27 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         RepeatedOmKeyInfo oldKeyVersionsToDelete = null;
         OmKeyInfo keyToDelete =
             omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
+        long usedBytesDiff = 0;
+        boolean isNamespaceUpdate = false;
         if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
           oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
               keyToDelete, omMetadataManager,
               trxnLogIndex, ozoneManager.isRatisEnabled());
-        }
-        long usedBytesDiff = 0;
-        if (keyToDelete != null) {
           long numCopy = keyToDelete.getReplicationConfig().getRequiredNodes();
           usedBytesDiff -= keyToDelete.getDataSize() * numCopy;
+        } else {
+          checkBucketQuotaInNamespace(omBucketInfo, 1L);
+          omBucketInfo.incrUsedNamespace(1L);
+          isNamespaceUpdate = true;
         }
 
-        String dbBucketKey = null;
+        String dbBucketKey = omMetadataManager.getBucketKey(
+            omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
         if (usedBytesDiff != 0) {
           omBucketInfo.incrUsedBytes(usedBytesDiff);
-          dbBucketKey = omMetadataManager.getBucketKey(
-              omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
-        } else {
-          // If no bucket size changed, prevent from updating bucket object
+        } else if (!isNamespaceUpdate) {
+          // If no bucket size and Namespace changed, prevent from updating
+          // bucket object.
           omBucketInfo = null;
         }
 
@@ -258,9 +262,11 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
                 .setKey(keyName)
                 .setHash(DigestUtils.sha256Hex(keyName)));
 
+        long volumeId = omMetadataManager.getVolumeId(volumeName);
         omClientResponse =
             getOmClientResponse(multipartKey, omResponse, dbMultipartOpenKey,
-                omKeyInfo, unUsedParts, omBucketInfo, oldKeyVersionsToDelete);
+                omKeyInfo, unUsedParts, omBucketInfo, oldKeyVersionsToDelete,
+                volumeId);
 
         result = Result.SUCCESS;
       } else {
@@ -295,10 +301,12 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         createErrorOMResponse(omResponse, exception), getBucketLayout());
   }
 
+  @SuppressWarnings("parameternumber")
   protected OMClientResponse getOmClientResponse(String multipartKey,
       OMResponse.Builder omResponse, String dbMultipartOpenKey,
       OmKeyInfo omKeyInfo,  List<OmKeyInfo> unUsedParts,
-      OmBucketInfo omBucketInfo, RepeatedOmKeyInfo oldKeyVersionsToDelete) {
+      OmBucketInfo omBucketInfo, RepeatedOmKeyInfo oldKeyVersionsToDelete,
+      long volumeId) {
 
     return new S3MultipartUploadCompleteResponse(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts,
@@ -306,11 +314,16 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   }
 
   protected void checkDirectoryAlreadyExists(OzoneManager ozoneManager,
-      String volumeName, String bucketName, String keyName,
+      OmBucketInfo omBucketInfo, String keyName,
       OMMetadataManager omMetadataManager) throws IOException {
-    if (ozoneManager.getEnableFileSystemPaths()) {
-      if (checkDirectoryAlreadyExists(volumeName, bucketName, keyName,
-              omMetadataManager)) {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("BucketName: {}, BucketLayout: {}",
+          omBucketInfo.getBucketName(), omBucketInfo.getBucketLayout());
+    }
+    if (omBucketInfo.getBucketLayout()
+        .shouldNormalizePaths(ozoneManager.getEnableFileSystemPaths())) {
+      if (checkDirectoryAlreadyExists(omBucketInfo.getVolumeName(),
+          omBucketInfo.getBucketName(), keyName, omMetadataManager)) {
         throw new OMException("Can not Complete MPU for file: " + keyName +
                 " as there is already directory in the given path",
                 NOT_A_FILE);
@@ -503,8 +516,13 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             OMException.ResultCodes.INVALID_PART);
       }
 
-      OmKeyInfo currentPartKeyInfo = OmKeyInfo
-          .getFromProtobuf(partKeyInfo.getPartKeyInfo());
+      OmKeyInfo currentPartKeyInfo = null;
+      try {
+        currentPartKeyInfo =
+            OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+      } catch (IOException ioe) {
+        throw new OMException(ioe, OMException.ResultCodes.INTERNAL_ERROR);
+      }
 
       // Except for last part all parts should have minimum size.
       if (currentPartCount != partsListSize) {
@@ -589,6 +607,35 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             + " an Erasure Coded replication type. Rejecting the request,"
             + " please finalize the cluster upgrade and then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  /**
+   * Validates S3 MPU complete requests.
+   * We do not want to allow older clients to upload MPU keys to buckets which
+   * use non LEGACY layouts.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CompleteMultiPartUpload
+  )
+  public static OMRequest blockMPUCompleteWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    if (req.getCompleteMultiPartUploadRequest().hasKeyArgs()) {
+      KeyArgs keyArgs = req.getCompleteMultiPartUploadRequest().getKeyArgs();
+
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
       }
     }
     return req;

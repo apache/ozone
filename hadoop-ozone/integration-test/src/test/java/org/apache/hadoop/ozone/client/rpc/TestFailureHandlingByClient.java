@@ -54,7 +54,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -267,10 +267,10 @@ public class TestFailureHandlingByClient {
         ((KeyValueContainer) cluster.getHddsDatanode(block1DNs.get(2))
             .getDatanodeStateMachine().getContainer().getContainerSet()
             .getContainer(containerId1)).getContainerData();
-    try (ReferenceCountedDB containerDb1 = BlockUtils.getDB(containerData1,
-        conf)) {
+    try (DBHandle containerDb1 = BlockUtils.getDB(containerData1, conf)) {
       BlockData blockData1 = containerDb1.getStore().getBlockDataTable().get(
-          Long.toString(locationList.get(0).getBlockID().getLocalID()));
+          containerData1.blockKey(locationList.get(0).getBlockID()
+              .getLocalID()));
       // The first Block could have 1 or 2 chunkSize of data
       int block1NumChunks = blockData1.getChunks().size();
       Assert.assertTrue(block1NumChunks >= 1);
@@ -286,10 +286,10 @@ public class TestFailureHandlingByClient {
         ((KeyValueContainer) cluster.getHddsDatanode(block2DNs.get(0))
             .getDatanodeStateMachine().getContainer().getContainerSet()
             .getContainer(containerId2)).getContainerData();
-    try (ReferenceCountedDB containerDb2 = BlockUtils.getDB(containerData2,
-        conf)) {
+    try (DBHandle containerDb2 = BlockUtils.getDB(containerData2, conf)) {
       BlockData blockData2 = containerDb2.getStore().getBlockDataTable().get(
-          Long.toString(locationList.get(1).getBlockID().getLocalID()));
+          containerData2.blockKey(locationList.get(1).getBlockID()
+              .getLocalID()));
       // The second Block should have 0.5 chunkSize of data
       Assert.assertEquals(block2ExpectedChunkCount,
           blockData2.getChunks().size());

@@ -23,7 +23,7 @@ import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VALIDATE_IN_PREFINALIZE;
 import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_2;
 import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_3;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -41,20 +41,17 @@ import org.apache.hadoop.hdds.upgrade.test.MockComponent.MockDnUpgradeAction;
 import org.apache.hadoop.hdds.upgrade.test.MockComponent.MockScmUpgradeAction;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Class to test upgrade related actions.
  */
 public class TestUpgradeFinalizerActions {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
-
   @Test
-  public void testRunPrefinalizeStateActions() throws IOException {
+  public void testRunPrefinalizeStateActions(@TempDir File file)
+      throws IOException {
 
     VERSION_2.addAction(VALIDATE_IN_PREFINALIZE,
         new MockScmUpgradeAction());
@@ -64,7 +61,6 @@ public class TestUpgradeFinalizerActions {
 
     MockComponent mockObj = mock(MockComponent.class);
 
-    File file = folder.newFolder();
     File scmCurrent = Paths.get(file.toString(), "scm", "current")
         .toFile();
     assertTrue(scmCurrent.mkdirs());
@@ -88,7 +84,7 @@ public class TestUpgradeFinalizerActions {
   }
 
   @Test
-  public void testValidationFailureWorks() throws Exception {
+  public void testValidationFailureWorks(@TempDir File file) throws Exception {
     VERSION_2.addAction(VALIDATE_IN_PREFINALIZE,
         new MockFailingUpgradeAction());
     MockLayoutVersionManager lvm = new MockLayoutVersionManager(1);
@@ -96,7 +92,6 @@ public class TestUpgradeFinalizerActions {
 
     MockComponent mockObj = mock(MockComponent.class);
 
-    File file = folder.newFolder();
     File scmCurrent = Paths.get(file.toString(), "scm", "current")
         .toFile();
     assertTrue(scmCurrent.mkdirs());
@@ -135,7 +130,7 @@ public class TestUpgradeFinalizerActions {
     }
 
     @Override
-    public void finalizeUpgrade(MockComponent c) {
+    public void finalizeLayoutFeature(LayoutFeature lf, MockComponent c) {
       return;
     }
 

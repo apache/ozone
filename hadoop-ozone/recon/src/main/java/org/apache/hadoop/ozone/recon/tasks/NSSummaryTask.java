@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.tasks;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -35,7 +36,9 @@ import javax.inject.Inject;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
@@ -81,6 +84,7 @@ public class NSSummaryTask implements ReconOmTask {
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     final Collection<String> taskTables = getTaskTables();
+    Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, ? extends
@@ -106,22 +110,22 @@ public class NSSummaryTask implements ReconOmTask {
 
           switch (action) {
           case PUT:
-            writeOmKeyInfoOnNamespaceDB(updatedKeyInfo);
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
             break;
 
           case DELETE:
-            deleteOmKeyInfoOnNamespaceDB(updatedKeyInfo);
+            handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
             break;
 
           case UPDATE:
             if (oldKeyInfo != null) {
               // delete first, then put
-              deleteOmKeyInfoOnNamespaceDB(oldKeyInfo);
+              handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
             } else {
               LOG.warn("Update event does not have the old keyInfo for {}.",
                       updatedKey);
             }
-            writeOmKeyInfoOnNamespaceDB(updatedKeyInfo);
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
             break;
 
           default:
@@ -137,22 +141,22 @@ public class NSSummaryTask implements ReconOmTask {
 
           switch (action) {
           case PUT:
-            writeOmDirectoryInfoOnNamespaceDB(updatedDirectoryInfo);
+            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
             break;
 
           case DELETE:
-            deleteOmDirectoryInfoOnNamespaceDB(updatedDirectoryInfo);
+            handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
             break;
 
           case UPDATE:
             if (oldDirectoryInfo != null) {
               // delete first, then put
-              deleteOmDirectoryInfoOnNamespaceDB(oldDirectoryInfo);
+              handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
             } else {
               LOG.warn("Update event does not have the old dirInfo for {}.",
                       updatedKey);
             }
-            writeOmDirectoryInfoOnNamespaceDB(updatedDirectoryInfo);
+            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
             break;
 
           default:
@@ -166,12 +170,21 @@ public class NSSummaryTask implements ReconOmTask {
         return new ImmutablePair<>(getTaskName(), false);
       }
     }
+
+    try {
+      writeNSSummariesToDB(nsSummaryMap);
+    } catch (IOException e) {
+      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+      return new ImmutablePair<>(getTaskName(), false);
+    }
+
     LOG.info("Completed a process run of NSSummaryTask");
     return new ImmutablePair<>(getTaskName(), true);
   }
 
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+    Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
     try {
       // reinit Recon RocksDB's namespace CF.
@@ -184,7 +197,7 @@ public class NSSummaryTask implements ReconOmTask {
       while (dirTableIter.hasNext()) {
         Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();
         OmDirectoryInfo directoryInfo = kv.getValue();
-        writeOmDirectoryInfoOnNamespaceDB(directoryInfo);
+        handlePutDirEvent(directoryInfo, nsSummaryMap);
       }
 
       // Get fileTable used by FSO
@@ -196,7 +209,7 @@ public class NSSummaryTask implements ReconOmTask {
       while (keyTableIter.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
         OmKeyInfo keyInfo = kv.getValue();
-        writeOmKeyInfoOnNamespaceDB(keyInfo);
+        handlePutKeyEvent(keyInfo, nsSummaryMap);
       }
 
     } catch (IOException ioEx) {
@@ -205,16 +218,43 @@ public class NSSummaryTask implements ReconOmTask {
       return new ImmutablePair<>(getTaskName(), false);
     }
 
+    try {
+      writeNSSummariesToDB(nsSummaryMap);
+    } catch (IOException e) {
+      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+      return new ImmutablePair<>(getTaskName(), false);
+    }
     LOG.info("Completed a reprocess run of NSSummaryTask");
     return new ImmutablePair<>(getTaskName(), true);
   }
 
-  private void writeOmKeyInfoOnNamespaceDB(OmKeyInfo keyInfo)
-          throws IOException {
+  private void writeNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap)
+      throws IOException {
+    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    nsSummaryMap.keySet().forEach((Long key) -> {
+      try {
+        reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation,
+            key, nsSummaryMap.get(key));
+      } catch (IOException e) {
+        LOG.error("Unable to write Namespace Summary data in Recon DB.",
+            e);
+      }
+    });
+    reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
+  }
+
+  private void handlePutKeyEvent(OmKeyInfo keyInfo, Map<Long,
+      NSSummary> nsSummaryMap) throws IOException {
     long parentObjectId = keyInfo.getParentObjectID();
-    NSSummary nsSummary = reconNamespaceSummaryManager
-            .getNSSummary(parentObjectId);
+    // Try to get the NSSummary from our local map that maps NSSummaries to IDs
+    NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
+      // If we don't have it in this batch we try to get it from the DB
+      nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
+    }
+    if (nsSummary == null) {
+      // If we don't have it locally and in the DB we create a new instance
+      // as this is a new ID
       nsSummary = new NSSummary();
     }
     int numOfFile = nsSummary.getNumOfFiles();
@@ -227,38 +267,56 @@ public class NSSummaryTask implements ReconOmTask {
 
     ++fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
-    reconNamespaceSummaryManager.storeNSSummary(parentObjectId, nsSummary);
+    nsSummaryMap.put(parentObjectId, nsSummary);
   }
 
-  private void writeOmDirectoryInfoOnNamespaceDB(OmDirectoryInfo directoryInfo)
+  private void handlePutDirEvent(OmDirectoryInfo directoryInfo,
+                                 Map<Long, NSSummary> nsSummaryMap)
           throws IOException {
     long parentObjectId = directoryInfo.getParentObjectID();
     long objectId = directoryInfo.getObjectID();
     // write the dir name to the current directory
     String dirName = directoryInfo.getName();
-    NSSummary curNSSummary =
-            reconNamespaceSummaryManager.getNSSummary(objectId);
+    // Try to get the NSSummary from our local map that maps NSSummaries to IDs
+    NSSummary curNSSummary = nsSummaryMap.get(objectId);
     if (curNSSummary == null) {
+      // If we don't have it in this batch we try to get it from the DB
+      curNSSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
+    }
+    if (curNSSummary == null) {
+      // If we don't have it locally and in the DB we create a new instance
+      // as this is a new ID
       curNSSummary = new NSSummary();
     }
     curNSSummary.setDirName(dirName);
-    reconNamespaceSummaryManager.storeNSSummary(objectId, curNSSummary);
+    nsSummaryMap.put(objectId, curNSSummary);
 
-    // write the child dir list to the parent directory
-    NSSummary nsSummary = reconNamespaceSummaryManager
-            .getNSSummary(parentObjectId);
+    // Write the child dir list to the parent directory
+    // Try to get the NSSummary from our local map that maps NSSummaries to IDs
+    NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
+      // If we don't have it in this batch we try to get it from the DB
+      nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
+    }
+    if (nsSummary == null) {
+      // If we don't have it locally and in the DB we create a new instance
+      // as this is a new ID
       nsSummary = new NSSummary();
     }
     nsSummary.addChildDir(objectId);
-    reconNamespaceSummaryManager.storeNSSummary(parentObjectId, nsSummary);
+    nsSummaryMap.put(parentObjectId, nsSummary);
   }
 
-  private void deleteOmKeyInfoOnNamespaceDB(OmKeyInfo keyInfo)
+  private void handleDeleteKeyEvent(OmKeyInfo keyInfo,
+                                    Map<Long, NSSummary> nsSummaryMap)
           throws IOException {
     long parentObjectId = keyInfo.getParentObjectID();
-    NSSummary nsSummary = reconNamespaceSummaryManager
-            .getNSSummary(parentObjectId);
+    // Try to get the NSSummary from our local map that maps NSSummaries to IDs
+    NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
+    if (nsSummary == null) {
+      // If we don't have it in this batch we try to get it from the DB
+      nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
+    }
 
     // Just in case the OmKeyInfo isn't correctly written.
     if (nsSummary == null) {
@@ -279,15 +337,20 @@ public class NSSummaryTask implements ReconOmTask {
     nsSummary.setSizeOfFiles(sizeOfFile - dataSize);
     --fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
-    reconNamespaceSummaryManager.storeNSSummary(parentObjectId, nsSummary);
+    nsSummaryMap.put(parentObjectId, nsSummary);
   }
 
-  private void deleteOmDirectoryInfoOnNamespaceDB(OmDirectoryInfo directoryInfo)
+  private void handleDeleteDirEvent(OmDirectoryInfo directoryInfo,
+                                    Map<Long, NSSummary> nsSummaryMap)
           throws IOException {
     long parentObjectId = directoryInfo.getParentObjectID();
     long objectId = directoryInfo.getObjectID();
-    NSSummary nsSummary = reconNamespaceSummaryManager
-            .getNSSummary(parentObjectId);
+    // Try to get the NSSummary from our local map that maps NSSummaries to IDs
+    NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
+    if (nsSummary == null) {
+      // If we don't have it in this batch we try to get it from the DB
+      nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
+    }
 
     // Just in case the OmDirectoryInfo isn't correctly written.
     if (nsSummary == null) {
@@ -296,7 +359,7 @@ public class NSSummaryTask implements ReconOmTask {
     }
 
     nsSummary.removeChildDir(objectId);
-    reconNamespaceSummaryManager.storeNSSummary(parentObjectId, nsSummary);
+    nsSummaryMap.put(parentObjectId, nsSummary);
   }
 }
 

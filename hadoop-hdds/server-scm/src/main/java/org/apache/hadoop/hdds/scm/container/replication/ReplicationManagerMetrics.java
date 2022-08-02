@@ -18,7 +18,6 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.base.CaseFormat;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -53,9 +52,20 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       "InflightReplication",
       "Tracked inflight container replication requests.");
 
+  private static final MetricsInfo INFLIGHT_REPLICATION_SKIPPED = Interns.info(
+      "InflightReplicationSkipped",
+      "Tracked inflight container replication requests skipped" +
+          " due to the configured limit.");
+
   private static final MetricsInfo INFLIGHT_DELETION = Interns.info(
       "InflightDeletion",
       "Tracked inflight container deletion requests.");
+
+  private static final MetricsInfo INFLIGHT_DELETION_SKIPPED = Interns.info(
+      "InflightDeletionSkipped",
+      "Tracked inflight container deletion requests skipped" +
+          " due to the configured limit.");
+
 
   private static final MetricsInfo INFLIGHT_MOVE = Interns.info(
       "InflightMove",
@@ -119,6 +129,14 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   @Metric("Time elapsed for deletion")
   private MutableRate deletionTime;
 
+  @Metric("Number of inflight replication skipped" +
+      " due to the configured limit.")
+  private MutableCounterLong numInflightReplicationSkipped;
+
+  @Metric("Number of inflight replication skipped" +
+      " due to the configured limit.")
+  private MutableCounterLong numInflightDeletionSkipped;
+
   private MetricsRegistry registry;
 
   private ReplicationManager replicationManager;
@@ -139,7 +157,9 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector.addRecord(METRICS_SOURCE_NAME)
         .addGauge(INFLIGHT_REPLICATION, getInflightReplication())
+        .addGauge(INFLIGHT_REPLICATION_SKIPPED, getInflightReplicationSkipped())
         .addGauge(INFLIGHT_DELETION, getInflightDeletion())
+        .addGauge(INFLIGHT_DELETION_SKIPPED, getInflightDeletionSkipped())
         .addGauge(INFLIGHT_MOVE, getInflightMove());
 
     ReplicationManagerReport report = replicationManager.getContainerReport();
@@ -218,12 +238,35 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     this.deletionTime.add(millis);
   }
 
+  public void incrInflightSkipped(InflightType type) {
+    switch (type) {
+    case REPLICATION:
+      this.numInflightReplicationSkipped.incr();
+      return;
+    case DELETION:
+      this.numInflightDeletionSkipped.incr();
+      return;
+    default:
+      throw new IllegalArgumentException("Unexpected type " + type);
+    }
+  }
+
   public long getInflightReplication() {
-    return replicationManager.getInflightReplication().size();
+    return replicationManager.getLegacyReplicationManager()
+        .getInflightCount(InflightType.REPLICATION);
+  }
+
+  public long getInflightReplicationSkipped() {
+    return this.numInflightReplicationSkipped.value();
   }
 
   public long getInflightDeletion() {
-    return replicationManager.getInflightDeletion().size();
+    return replicationManager.getLegacyReplicationManager()
+        .getInflightCount(InflightType.DELETION);
+  }
+
+  public long getInflightDeletionSkipped() {
+    return this.numInflightDeletionSkipped.value();
   }
 
   public long getInflightMove() {

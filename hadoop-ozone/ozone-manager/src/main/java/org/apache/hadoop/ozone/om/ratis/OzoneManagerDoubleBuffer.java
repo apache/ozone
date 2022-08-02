@@ -383,14 +383,13 @@ public final class OzoneManagerDoubleBuffer {
           ExitUtils.terminate(1, message, ex, LOG);
         } else {
           LOG.info("OMDoubleBuffer flush thread {} is interrupted and will "
-              + "exit. {}", Thread.currentThread().getName(),
-                  Thread.currentThread().getName());
+              + "exit.", Thread.currentThread().getName());
         }
       } catch (IOException ex) {
         terminate(ex);
       } catch (Throwable t) {
-        final String s = "OMDoubleBuffer flush thread" +
-            Thread.currentThread().getName() + "encountered Throwable error";
+        final String s = "OMDoubleBuffer flush thread " +
+            Thread.currentThread().getName() + " encountered Throwable error";
         ExitUtils.terminate(2, s, t, LOG);
       }
     }
@@ -439,7 +438,7 @@ public final class OzoneManagerDoubleBuffer {
    * @param flushedTransactionsSize
    */
   private void updateMetrics(
-      long flushedTransactionsSize) {
+      int flushedTransactionsSize) {
     ozoneManagerDoubleBufferMetrics.incrTotalNumOfFlushOperations();
     ozoneManagerDoubleBufferMetrics.incrTotalSizeOfFlushedTransactions(
         flushedTransactionsSize);
@@ -453,6 +452,7 @@ public final class OzoneManagerDoubleBuffer {
           .setMaxNumberOfTransactionsFlushedInOneIteration(
               flushedTransactionsSize);
     }
+    ozoneManagerDoubleBufferMetrics.updateQueueSize(flushedTransactionsSize);
   }
 
   /**

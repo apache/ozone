@@ -61,26 +61,30 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     long txnId = 50;
     long objectId = parentID + 1;
     String fileName = OzoneFSUtils.getFileName(keyName);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
     String dbMultipartKey = omMetadataManager.getMultipartKey(volumeName,
             bucketName, keyName, multipartUploadID);
-    String dbMultipartOpenKey = omMetadataManager.getMultipartKey(parentID,
-            fileName, multipartUploadID);
+    String dbMultipartOpenKey = omMetadataManager.getMultipartKey(volumeId,
+            bucketId, parentID, fileName, multipartUploadID);
     long clientId = Time.now();
 
     // add MPU entry to OpenFileTable
     List<OmDirectoryInfo> parentDirInfos = new ArrayList<>();
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponseFSO =
         createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
-            keyName, multipartUploadID, parentDirInfos);
+            keyName, multipartUploadID, parentDirInfos, volumeId, bucketId);
 
     s3InitiateMultipartUploadResponseFSO.addToDBBatch(omMetadataManager,
         batchOperation);
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    String dbOpenKey = omMetadataManager.getOpenFileName(parentID, fileName,
-            clientId);
-    String dbKey = omMetadataManager.getOzonePathKey(parentID, fileName);
+    String dbOpenKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
+            parentID, fileName, clientId);
+    String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+            parentID, fileName);
     OmKeyInfo omKeyInfoFSO =
             OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
@@ -190,16 +194,19 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
           throws Exception {
 
     String multipartUploadID = UUID.randomUUID().toString();
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
 
     String fileName = OzoneFSUtils.getFileName(keyName);
     String dbMultipartKey = omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
-    String dbMultipartOpenKey = omMetadataManager.getMultipartKey(parentID,
-        fileName, multipartUploadID);
+    String dbMultipartOpenKey = omMetadataManager.getMultipartKey(volumeId,
+            bucketId, parentID, fileName, multipartUploadID);
 
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponseFSO =
             addS3InitiateMultipartUpload(volumeName, bucketName, keyName,
-                    multipartUploadID);
+                    multipartUploadID, volumeId, bucketId);
 
     // Add some dummy parts for testing.
     // Not added any key locations, as this just test is to see entries are
@@ -237,8 +244,8 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
             batchOperation);
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
-    String dbKey = omMetadataManager.getOzonePathKey(parentID,
-          omKeyInfoFSO.getFileName());
+    String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+            parentID, omKeyInfoFSO.getFileName());
     Assert.assertNotNull(
         omMetadataManager.getKeyTable(getBucketLayout()).get(dbKey));
     Assert.assertNull(
@@ -256,14 +263,18 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
       OmMultipartKeyInfo omMultipartKeyInfo,
       int deleteEntryCount) throws IOException {
 
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+
     PartKeyInfo part1 = createPartKeyInfoFSO(volumeName, bucketName, parentID,
         fileName, 1);
 
     addPart(1, part1, omMultipartKeyInfo);
 
     long clientId = Time.now();
-    String openKey = omMetadataManager.getOpenFileName(parentID, fileName,
-            clientId);
+    String openKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
+            parentID, fileName, clientId);
 
     S3MultipartUploadCommitPartResponse s3MultipartUploadCommitPartResponse =
             createS3CommitMPUResponseFSO(volumeName, bucketName, parentID,
@@ -302,11 +313,13 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
 
   private S3InitiateMultipartUploadResponse addS3InitiateMultipartUpload(
           String volumeName, String bucketName, String keyName,
-          String multipartUploadID) throws IOException {
+          String multipartUploadID, long volumeId,
+          long bucketId) throws IOException {
 
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponseFSO =
-            createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
-                    keyName, multipartUploadID, new ArrayList<>());
+        createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
+            keyName, multipartUploadID, new ArrayList<>(), volumeId,
+            bucketId);
 
     s3InitiateMultipartUploadResponseFSO.addToDBBatch(omMetadataManager,
             batchOperation);

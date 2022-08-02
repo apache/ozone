@@ -153,7 +153,7 @@ public class TestOmBucketReadWriteFileOps {
             "-r", String.valueOf(parameterBuilder.fileCountForRead),
             "-w", String.valueOf(parameterBuilder.fileCountForWrite),
             "-g", String.valueOf(parameterBuilder.fileSizeInBytes),
-            "-b", String.valueOf(parameterBuilder.bufferSize),
+            "--buffer", String.valueOf(parameterBuilder.bufferSize),
             "-l", String.valueOf(parameterBuilder.length),
             "-c", String.valueOf(parameterBuilder.totalThreadCount),
             "-T", String.valueOf(parameterBuilder.readThreadPercentage),
