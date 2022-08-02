@@ -45,14 +45,12 @@ public class RDBSstFileLoader implements DumpFileLoader, Closeable {
     if (externalFile.length() == 0) {
       return;
     }
-    IngestExternalFileOptions ingestOptions = new IngestExternalFileOptions()
-        .setIngestBehind(false);
-    try {
+    try (IngestExternalFileOptions ingestOptions
+             = new IngestExternalFileOptions()) {
+      ingestOptions.setIngestBehind(false);
       db.ingestExternalFile(family,
           Collections.singletonList(externalFile.getAbsolutePath()),
           ingestOptions);
-    } finally {
-      ingestOptions.close();
     }
   }
 
