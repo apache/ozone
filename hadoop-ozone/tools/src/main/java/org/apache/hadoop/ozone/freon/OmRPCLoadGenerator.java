@@ -89,11 +89,16 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
               MAX_SIZE_KB);
     }
     timer = getMetrics().timer("rpc-payload");
-    for (int i = 0; i < getThreadNo(); i++) {
-      runTests(this::sendRPCReq);
+    try {
+      for (int i = 0; i < getThreadNo(); i++) {
+        runTests(this::sendRPCReq);
+      }
+      printReport();
+    } finally {
+      if (client != null) {
+        client.close();
+      }
     }
-    printReport();
-    client.close();
     return null;
   }
   private void sendRPCReq(long l) throws Exception {
