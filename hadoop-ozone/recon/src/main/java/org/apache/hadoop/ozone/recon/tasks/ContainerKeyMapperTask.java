@@ -196,40 +196,42 @@ public class ContainerKeyMapperTask implements ReconOmTask {
                             Map<Long, Long> containerKeyCountMap,
                             List<ContainerKeyPrefix> deletedContainerKeyList)
       throws IOException {
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
-    containerKeyMap.keySet().forEach((ContainerKeyPrefix key) -> {
-      try {
-        reconContainerMetadataManager
-            .batchStoreContainerKeyMapping(rdbBatchOperation, key,
-                containerKeyMap.get(key));
-      } catch (IOException e) {
-        LOG.error("Unable to write Container Key Prefix data in Recon DB.",
-            e);
-      }
-    });
+    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      containerKeyMap.keySet().forEach((ContainerKeyPrefix key) -> {
+        try {
+          reconContainerMetadataManager
+              .batchStoreContainerKeyMapping(rdbBatchOperation, key,
+                  containerKeyMap.get(key));
+        } catch (IOException e) {
+          LOG.error("Unable to write Container Key Prefix data in Recon DB.",
+              e);
+        }
+      });
 
-    containerKeyCountMap.keySet().forEach((Long key) -> {
-      try {
-        reconContainerMetadataManager
-            .batchStoreContainerKeyCounts(rdbBatchOperation, key,
-                containerKeyCountMap.get(key));
-      } catch (IOException e) {
-        LOG.error("Unable to write Container Key Prefix data in Recon DB.",
-            e);
-      }
-    });
 
-    deletedContainerKeyList.forEach((ContainerKeyPrefix key) -> {
-      try {
-        reconContainerMetadataManager
-            .batchDeleteContainerMapping(rdbBatchOperation, key);
-      } catch (IOException e) {
-        LOG.error("Unable to write Container Key Prefix data in Recon DB.",
-            e);
-      }
-    });
+      containerKeyCountMap.keySet().forEach((Long key) -> {
+        try {
+          reconContainerMetadataManager
+              .batchStoreContainerKeyCounts(rdbBatchOperation, key,
+                  containerKeyCountMap.get(key));
+        } catch (IOException e) {
+          LOG.error("Unable to write Container Key Prefix data in Recon DB.",
+              e);
+        }
+      });
 
-    reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
+      deletedContainerKeyList.forEach((ContainerKeyPrefix key) -> {
+        try {
+          reconContainerMetadataManager
+              .batchDeleteContainerMapping(rdbBatchOperation, key);
+        } catch (IOException e) {
+          LOG.error("Unable to write Container Key Prefix data in Recon DB.",
+              e);
+        }
+      });
+
+      reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
+    }
   }
 
   /**
