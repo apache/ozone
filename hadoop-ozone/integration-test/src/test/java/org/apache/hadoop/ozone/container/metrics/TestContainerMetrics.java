@@ -124,13 +124,6 @@ public class TestContainerMetrics {
       server.start();
       client.connect();
 
-      // Create container
-//      ContainerCommandRequestProto request = ContainerTestHelper
-//          .getCreateContainerRequest(containerID, pipeline);
-//      ContainerCommandResponseProto response = client.sendCommand(request);
-//      Assert.assertEquals(ContainerProtos.Result.SUCCESS,
-//          response.getResult());
-
       // Write Chunk
       BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
       ContainerTestHelper.getWriteChunkRequest(
@@ -138,7 +131,7 @@ public class TestContainerMetrics {
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper.getWriteChunkRequest(
               pipeline, blockID, 1024);
-      response = client.sendCommand(writeChunkRequest);
+      ContainerCommandResponseProto response = client.sendCommand(writeChunkRequest);
       Assert.assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
 
