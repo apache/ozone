@@ -815,18 +815,19 @@ public class NSSummaryEndpoint {
   private List<OmVolumeArgs> listVolumes() throws IOException {
     List<OmVolumeArgs> result = new ArrayList<>();
     Table volumeTable = omMetadataManager.getVolumeTable();
-    TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
-        iterator = volumeTable.iterator();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
+        iterator = volumeTable.iterator()) {
 
-    while (iterator.hasNext()) {
-      Table.KeyValue<String, OmVolumeArgs> kv = iterator.next();
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmVolumeArgs> kv = iterator.next();
 
-      OmVolumeArgs omVolumeArgs = kv.getValue();
-      if (omVolumeArgs != null) {
-        result.add(omVolumeArgs);
+        OmVolumeArgs omVolumeArgs = kv.getValue();
+        if (omVolumeArgs != null) {
+          result.add(omVolumeArgs);
+        }
       }
+      return result;
     }
-    return result;
   }
 
   /**
@@ -844,30 +845,31 @@ public class NSSummaryEndpoint {
 
     Table bucketTable = omMetadataManager.getBucketTable();
 
-    TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
-        iterator = bucketTable.iterator();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
+        iterator = bucketTable.iterator()) {
 
-    if (volumeName != null) {
-      if (!volumeExists(volumeName)) {
-        return result;
+      if (volumeName != null) {
+        if (!volumeExists(volumeName)) {
+          return result;
+        }
+        seekPrefix = omMetadataManager.getVolumeKey(volumeName + OM_KEY_PREFIX);
       }
-      seekPrefix = omMetadataManager.getVolumeKey(volumeName + OM_KEY_PREFIX);
-    }
 
-    while (iterator.hasNext()) {
-      Table.KeyValue<String, OmBucketInfo> kv = iterator.next();
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmBucketInfo> kv = iterator.next();
 
-      String key = kv.getKey();
-      OmBucketInfo omBucketInfo = kv.getValue();
+        String key = kv.getKey();
+        OmBucketInfo omBucketInfo = kv.getValue();
 
-      if (omBucketInfo != null) {
-        // We should return only the keys, whose keys match with the seek prefix
-        if (key.startsWith(seekPrefix)) {
-          result.add(omBucketInfo);
+        if (omBucketInfo != null) {
+          // We should return only the keys, whose keys match with the seek prefix
+          if (key.startsWith(seekPrefix)) {
+            result.add(omBucketInfo);
+          }
         }
       }
+      return result;
     }
-    return result;
   }
 
   private long calculateDUForVolume(String volumeName)
@@ -876,20 +878,21 @@ public class NSSummaryEndpoint {
 
     Table keyTable = omMetadataManager.getFileTable();
 
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = keyTable.iterator();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+        iterator = keyTable.iterator()) {
 
-    while (iterator.hasNext()) {
-      Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-      OmKeyInfo keyInfo = kv.getValue();
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+        OmKeyInfo keyInfo = kv.getValue();
 
-      if (keyInfo != null) {
-        if (volumeName.equals(keyInfo.getVolumeName())) {
-          result += getKeySizeWithReplication(keyInfo);
+        if (keyInfo != null) {
+          if (volumeName.equals(keyInfo.getVolumeName())) {
+            result += getKeySizeWithReplication(keyInfo);
+          }
         }
       }
+      return result;
     }
-    return result;
   }
 
   // FileTable's key is in the format of "parentId/fileName"
@@ -897,38 +900,39 @@ public class NSSummaryEndpoint {
   private long calculateDUUnderObject(long parentId) throws IOException {
     Table keyTable = omMetadataManager.getFileTable();
 
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = keyTable.iterator();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+        iterator = keyTable.iterator()) {
 
-    String seekPrefix = parentId + OM_KEY_PREFIX;
-    iterator.seek(seekPrefix);
-    long totalDU = 0L;
-    // handle direct keys
-    while (iterator.hasNext()) {
-      Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-      String dbKey = kv.getKey();
-      // since the RocksDB is ordered, seek until the prefix isn't matched
-      if (!dbKey.startsWith(seekPrefix)) {
-        break;
+      String seekPrefix = parentId + OM_KEY_PREFIX;
+      iterator.seek(seekPrefix);
+      long totalDU = 0L;
+      // handle direct keys
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+        String dbKey = kv.getKey();
+        // since the RocksDB is ordered, seek until the prefix isn't matched
+        if (!dbKey.startsWith(seekPrefix)) {
+          break;
+        }
+        OmKeyInfo keyInfo = kv.getValue();
+        if (keyInfo != null) {
+          totalDU += getKeySizeWithReplication(keyInfo);
+        }
       }
-      OmKeyInfo keyInfo = kv.getValue();
-      if (keyInfo != null) {
-        totalDU += getKeySizeWithReplication(keyInfo);
+
+      // handle nested keys (DFS)
+      NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
+      // empty bucket
+      if (nsSummary == null) {
+        return 0;
       }
-    }
 
-    // handle nested keys (DFS)
-    NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
-    // empty bucket
-    if (nsSummary == null) {
-      return 0;
+      Set<Long> subDirIds = nsSummary.getChildDir();
+      for (long subDirId : subDirIds) {
+        totalDU += calculateDUUnderObject(subDirId);
+      }
+      return totalDU;
     }
-
-    Set<Long> subDirIds = nsSummary.getChildDir();
-    for (long subDirId: subDirIds) {
-      totalDU += calculateDUUnderObject(subDirId);
-    }
-    return totalDU;
   }
 
   /**
@@ -948,43 +952,44 @@ public class NSSummaryEndpoint {
                                 String normalizedPath) throws IOException {
 
     Table keyTable = omMetadataManager.getFileTable();
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = keyTable.iterator();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+          iterator = keyTable.iterator()) {
 
-    String seekPrefix = parentId + OM_KEY_PREFIX;
-    iterator.seek(seekPrefix);
+      String seekPrefix = parentId + OM_KEY_PREFIX;
+      iterator.seek(seekPrefix);
 
-    long keyDataSizeWithReplica = 0L;
+      long keyDataSizeWithReplica = 0L;
 
-    while (iterator.hasNext()) {
-      Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-      String dbKey = kv.getKey();
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+        String dbKey = kv.getKey();
 
-      if (!dbKey.startsWith(seekPrefix)) {
-        break;
-      }
-      OmKeyInfo keyInfo = kv.getValue();
-      if (keyInfo != null) {
-        DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
-        String subpath = buildSubpath(normalizedPath,
-            keyInfo.getFileName());
-        diskUsage.setSubpath(subpath);
-        diskUsage.setKey(true);
-        diskUsage.setSize(keyInfo.getDataSize());
-
-        if (withReplica) {
-          long keyDU = getKeySizeWithReplication(keyInfo);
-          keyDataSizeWithReplica += keyDU;
-          diskUsage.setSizeWithReplica(keyDU);
+        if (!dbKey.startsWith(seekPrefix)) {
+          break;
         }
-        // list the key as a subpath
-        if (listFile) {
-          duData.add(diskUsage);
+        OmKeyInfo keyInfo = kv.getValue();
+        if (keyInfo != null) {
+          DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
+          String subpath = buildSubpath(normalizedPath,
+              keyInfo.getFileName());
+          diskUsage.setSubpath(subpath);
+          diskUsage.setKey(true);
+          diskUsage.setSize(keyInfo.getDataSize());
+
+          if (withReplica) {
+            long keyDU = getKeySizeWithReplication(keyInfo);
+            keyDataSizeWithReplica += keyDU;
+            diskUsage.setSizeWithReplica(keyDU);
+          }
+          // list the key as a subpath
+          if (listFile) {
+            duData.add(diskUsage);
+          }
         }
       }
+
+      return keyDataSizeWithReplica;
     }
-
-    return keyDataSizeWithReplica;
   }
 
   private long getKeySizeWithReplication(OmKeyInfo keyInfo) {
