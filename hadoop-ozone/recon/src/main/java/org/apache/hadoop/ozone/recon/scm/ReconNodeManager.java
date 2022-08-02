@@ -317,7 +317,7 @@ public class ReconNodeManager extends SCMNodeManager {
         iterator = nodeDB.iterator()) {
       while (iterator.hasNext()) {
         iterator.next();
-        nodeCount ++;
+        nodeCount++;
       }
       return nodeCount;
     }

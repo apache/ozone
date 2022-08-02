@@ -191,8 +191,8 @@ public class NSSummaryTask implements ReconOmTask {
       reconNamespaceSummaryManager.clearNSSummaryTable();
 
       Table dirTable = omMetadataManager.getDirectoryTable();
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
-              dirTableIter = dirTable.iterator()) {
+      try (TableIterator<String, ? extends Table.KeyValue<String,
+          OmDirectoryInfo>> dirTableIter = dirTable.iterator()) {
 
         while (dirTableIter.hasNext()) {
           Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();

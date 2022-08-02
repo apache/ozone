@@ -862,7 +862,8 @@ public class NSSummaryEndpoint {
         OmBucketInfo omBucketInfo = kv.getValue();
 
         if (omBucketInfo != null) {
-          // We should return only the keys, whose keys match with the seek prefix
+          // We should return only the keys, whose keys match with the
+          // seek prefix
           if (key.startsWith(seekPrefix)) {
             result.add(omBucketInfo);
           }
