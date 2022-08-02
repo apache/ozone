@@ -54,15 +54,16 @@ OzoneManager 支持两种元数据布局格式：简单布局格式和基于前�
 ![FSO Rename](PrefixFSO-Rename.png)
 
 ## 配置
-该特性默认未启用，可以通过在 `ozone-site.xml` 进行如下配置来启用：
+
+可以在 `ozone-site.xml` 中加入以下配置来设定创建桶时，客户端未指定桶样式时的默认的桶样式：
+可用的值有 `OBJECT_STORE`, `FILE_SYSTEM_OPTIMIZED` 和 `LEGACY`.
+
+若该配置的值为空，则默认值为 `LEGACY`.
 
 ```XML
+
 <property>
-   <name>ozone.om.enable.filesystem.paths</name>
-   <value>true</value>
-</property>
-<property>
-   <name>ozone.om.metadata.layout</name>
-   <value>PREFIX</value>
+    <name>ozone.default.bucket.layout</name>
+    <value/>
 </property>
 ```
