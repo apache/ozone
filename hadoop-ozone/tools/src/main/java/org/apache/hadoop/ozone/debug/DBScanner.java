@@ -199,10 +199,13 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
     final List<ColumnFamilyHandle> columnFamilyHandleList =
         new ArrayList<>();
-    RocksDB rocksDB = RocksDB.openReadOnly(parent.getDbPath(),
-            cfs, columnFamilyHandleList);
-    this.printAppropriateTable(columnFamilyHandleList,
-           rocksDB, parent.getDbPath());
+    try (RocksDB rocksDB = RocksDB.openReadOnly(parent.getDbPath(),
+            cfs, columnFamilyHandleList)) {
+      this.printAppropriateTable(columnFamilyHandleList,
+          rocksDB, parent.getDbPath());
+    } finally {
+      columnFamilyHandleList.forEach(ColumnFamilyHandle::close);
+    }
     return null;
   }
 
@@ -231,8 +234,9 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         if (columnFamilyHandle == null) {
           throw new IllegalArgumentException("columnFamilyHandle is null");
         }
-        RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle);
-        scannedObjects = displayTable(iterator, columnFamilyDefinition);
+        try (RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle)) {
+          scannedObjects = displayTable(iterator, columnFamilyDefinition);
+        }
       }
     } else {
       System.out.println("Incorrect db Path");
