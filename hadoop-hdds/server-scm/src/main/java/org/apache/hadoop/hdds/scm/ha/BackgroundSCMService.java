@@ -100,8 +100,9 @@ public final class BackgroundSCMService implements SCMService {
         if (shouldRun()) {
           try {
             periodicalTask.run();
-          } catch (Exception e) {
-            log.error("Unhandled exception in {}.", getServiceName(), e);
+          } catch (Throwable e) {
+            log.error("Caught Unhandled exception in {}. The task will be " +
+                "re-tried in {}ms", getServiceName(), intervalInMillis, e);
           }
         }
         synchronized (this) {
