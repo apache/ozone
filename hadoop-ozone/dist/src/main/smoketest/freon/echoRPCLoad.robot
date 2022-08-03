@@ -22,19 +22,19 @@ Test Timeout        5 minutes
 ${PREFIX}    ${EMPTY}
 
 *** Test Cases ***
-Ozone Echo RPC Load Generator with request payload and response layload
+Ozone Echo RPC Load Generator with request payload and response payload
 #    Freon RPCL      prefix=rpcl${PREFIX} -plrq=10 -plrp=10
-    Freon RPCL      -plrq=10 -plrp=10
+    Freon RPCL      --payload-req=10 --payload-resp=10
 
-Ozone Echo RPC Load Generator with request payload and empty response layload
+Ozone Echo RPC Load Generator with request payload and empty response payload
 #    Freon RPCL      prefix=rpcl${PREFIX} -plrq=10
-    Freon RPCL      -plrq=10
+    Freon RPCL      --payload-req=10
 
-Ozone Echo RPC Load Generator with empty request payload and response layload
+Ozone Echo RPC Load Generator with empty request payload and response payload
 #    Freon RPCL      prefix=rpcl${PREFIX} -plrp=10
-    Freon RPCL      -plrp=10
+    Freon RPCL      --payload-resp=10
 
-Ozone Echo RPC Load Generator with empty request payload and empty response layload
+Ozone Echo RPC Load Generator with empty request payload and empty response payload
 #    Freon RPCL      prefix=rpcl${PREFIX}
     Freon RPCL
 
