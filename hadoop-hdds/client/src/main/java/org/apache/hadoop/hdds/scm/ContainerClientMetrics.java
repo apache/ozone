@@ -65,16 +65,14 @@ public final class ContainerClientMetrics {
 
   @VisibleForTesting
   public static ContainerClientMetrics newInstance() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME,
+    return DefaultMetricsSystem.instance().register(SOURCE_NAME,
         "Ozone Client Metrics", new ContainerClientMetrics());
   }
 
   public static synchronized void release() {
     referenceCount--;
     if (referenceCount == 0) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      ms.unregisterSource(SOURCE_NAME);
+      DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
       instance = null;
     }
   }
