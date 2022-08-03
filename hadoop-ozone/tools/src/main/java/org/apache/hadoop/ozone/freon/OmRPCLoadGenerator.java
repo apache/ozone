@@ -99,7 +99,7 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
 
   private void sendRPCReq(long l) throws Exception {
     timer.time(() -> {
-      EchoRPCResponse resp = client.echoRPCReq(payloadReq,
+      EchoRPCResponse resp = client.echoRPCReq(payloadReqBytes,
               payloadRespSize);
       return null;
     });
