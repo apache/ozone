@@ -711,6 +711,33 @@ message PrefixInfo {
     optional uint64 updateID = 5;
 }
 
+/**
+ * SnapshotStatus - snapshot states.
+ * Snapshot in one of : active, deleted, or reclaimed state
+ */
+enum SnapshotStatusProto {
+  SNAPSHOT_ACTIVE = 1;
+  SNAPSHOT_DELETED = 2;
+  SNAPSHOT_RECLAIMED = 3;
+}
+
+/**
+ * SnapshotInfo table entry for Bucket/Volume snapshot metadata
+ */
+message SnapshotInfo {
+  required string snapshotID = 1;
+  required string name = 2;
+  required string volumeName = 3;
+  required string bucketName = 4;
+  required SnapshotStatusProto snapshotStatus = 5;
+  required uint64 creationTime = 6;
+  required uint64 deletionTime = 7;
+  required string pathPreviousSnapshotID = 8;
+  required string globalPreviousSnapshotID = 9;
+  required string snapshotPath = 10;
+  required string checkpointDir = 11;
+ }
+
 message OzoneObj {
   enum ObjectType {
     VOLUME = 1;
