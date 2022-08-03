@@ -23,6 +23,7 @@ import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.OmMReader;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -90,7 +91,9 @@ public class TestOMDirectoryCreateRequest {
     auditLogger = Mockito.mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
-    when(ozoneManager.resolveBucketLink(any(KeyArgs.class),
+    OmMReader omMReader = Mockito.mock(OmMReader.class);
+    when(ozoneManager.getOmMReader()).thenReturn(omMReader);
+    when(omMReader.resolveBucketLink(any(KeyArgs.class),
         any(OMClientRequest.class)))
         .thenReturn(new ResolvedBucket(Pair.of("", ""), Pair.of("", "")));
   }

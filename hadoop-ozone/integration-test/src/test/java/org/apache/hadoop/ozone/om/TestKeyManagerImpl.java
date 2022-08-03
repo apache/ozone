@@ -611,6 +611,10 @@ public class TestKeyManagerImpl {
       }
     }
     Assert.assertEquals(2, matchEntries);
+    // cleanup
+    writeClient.removeAcl(ozPrefix1, ozAcl1);
+    writeClient.removeAcl(ozPrefix1, ozAcl2);
+    writeClient.removeAcl(ozPrefix1, ozAcl3);
   }
 
   @Test
@@ -635,7 +639,7 @@ public class TestKeyManagerImpl {
     // add acl with invalid prefix name
     exception.expect(OMException.class);
     exception.expectMessage("Invalid prefix name");
-    prefixManager.addAcl(ozInvalidPrefix, ozAcl1);
+    writeClient.addAcl(ozInvalidPrefix, ozAcl1);
 
     OzoneObj ozPrefix1 = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -645,27 +649,27 @@ public class TestKeyManagerImpl {
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();
 
-    prefixManager.addAcl(ozPrefix1, ozAcl1);
-    List<OzoneAcl> ozAclGet = prefixManager.getAcl(ozPrefix1);
+    writeClient.addAcl(ozPrefix1, ozAcl1);
+    List<OzoneAcl> ozAclGet = writeClient.getAcl(ozPrefix1);
     Assert.assertEquals(1, ozAclGet.size());
     Assert.assertEquals(ozAcl1, ozAclGet.get(0));
 
     // get acl with invalid prefix name
     exception.expect(OMException.class);
     exception.expectMessage("Invalid prefix name");
-    prefixManager.getAcl(ozInvalidPrefix);
+    writeClient.getAcl(ozInvalidPrefix);
 
     // set acl with invalid prefix name
     List<OzoneAcl> ozoneAcls = new ArrayList<OzoneAcl>();
     ozoneAcls.add(ozAcl1);
     exception.expect(OMException.class);
     exception.expectMessage("Invalid prefix name");
-    prefixManager.setAcl(ozInvalidPrefix, ozoneAcls);
+    writeClient.setAcl(ozInvalidPrefix, ozoneAcls);
 
     // remove acl with invalid prefix name
     exception.expect(OMException.class);
     exception.expectMessage("Invalid prefix name");
-    prefixManager.removeAcl(ozInvalidPrefix, ozAcl1);
+    writeClient.removeAcl(ozInvalidPrefix, ozAcl1);
   }
 
   @Test
@@ -686,7 +690,7 @@ public class TestKeyManagerImpl {
 
     OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
         ACLType.READ, ACCESS);
-    prefixManager.addAcl(ozPrefix1, ozAcl1);
+    writeClient.addAcl(ozPrefix1, ozAcl1);
 
     OzoneObj ozFile1 = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -717,6 +721,8 @@ public class TestKeyManagerImpl {
     for (int i = 0; i < 6; i++) {
       Assert.assertEquals(null, prefixInfos.get(i));
     }
+    // cleanup
+    writeClient.removeAcl(ozPrefix1, ozAcl1);
   }
 
   @Test

@@ -123,7 +123,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     boolean deleteStatus = true;
     try {
       ResolvedBucket bucket =
-          ozoneManager.resolveBucketLink(Pair.of(volumeName, bucketName), this);
+          ozoneManager.getOmMReader()
+          .resolveBucketLink(Pair.of(volumeName, bucketName), this);
       bucket.audit(auditMap);
       volumeName = bucket.realVolume();
       bucketName = bucket.realBucket();

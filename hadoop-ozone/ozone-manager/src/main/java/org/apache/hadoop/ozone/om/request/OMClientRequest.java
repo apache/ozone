@@ -213,8 +213,9 @@ public abstract class OMClientRequest implements RequestAuditor {
       OzoneObj.StoreType storeType, IAccessAuthorizer.ACLType aclType,
       String vol, String bucket, String key) throws IOException {
     checkAcls(ozoneManager, resType, storeType, aclType, vol, bucket, key,
-        ozoneManager.getVolumeOwner(vol, aclType, resType),
-        ozoneManager.getBucketOwner(vol, bucket, aclType, resType));
+        ozoneManager.getOmMReader().getVolumeOwner(vol, aclType, resType),
+        ozoneManager.getOmMReader()
+        .getBucketOwner(vol, bucket, aclType, resType));
   }
 
   /**
@@ -251,9 +252,11 @@ public abstract class OMClientRequest implements RequestAuditor {
 
     // check Acl
     if (ozoneManager.getAclsEnabled()) {
-      String volumeOwner = ozoneManager.getVolumeOwner(obj.getVolumeName(),
+      String volumeOwner = ozoneManager.getOmMReader().getVolumeOwner(
+          obj.getVolumeName(),
           contextBuilder.getAclRights(), obj.getResourceType());
-      String bucketOwner = ozoneManager.getBucketOwner(obj.getVolumeName(),
+      String bucketOwner = ozoneManager.getOmMReader().getBucketOwner(
+          obj.getVolumeName(),
           obj.getBucketName(), contextBuilder.getAclRights(),
           obj.getResourceType());
       UserGroupInformation currentUser = createUGI();
@@ -269,7 +272,7 @@ public abstract class OMClientRequest implements RequestAuditor {
       } else {
         contextBuilder.setOwnerName(bucketOwner);
       }
-      if (ozoneManager.isNativeAuthorizerEnabled()) {
+      if (ozoneManager.getOmMReader().isNativeAuthorizerEnabled()) {
         if (aclType == IAccessAuthorizer.ACLType.CREATE ||
                 aclType == IAccessAuthorizer.ACLType.DELETE ||
                 aclType == IAccessAuthorizer.ACLType.WRITE_ACL) {
@@ -296,8 +299,8 @@ public abstract class OMClientRequest implements RequestAuditor {
               .setAclRights(parentAclRight)
               .setOwnerName(volumeOwner)
               .build();
-      ozoneManager.checkAcls(volumeObj, volumeContext, true);
-      ozoneManager.checkAcls(obj, contextBuilder.build(), true);
+      ozoneManager.getOmMReader().checkAcls(volumeObj, volumeContext, true);
+      ozoneManager.getOmMReader().checkAcls(obj, contextBuilder.build(), true);
     }
   }
 
@@ -357,7 +360,8 @@ public abstract class OMClientRequest implements RequestAuditor {
       String bucketOwner)
       throws IOException {
 
-    OzoneAclUtils.checkAllAcls(ozoneManager, resType, storeType, aclType,
+    OzoneAclUtils.checkAllAcls(ozoneManager.getOmMReader(),
+            resType, storeType, aclType,
             vol, bucket, key, volOwner, bucketOwner, createUGI(),
             getRemoteAddress(), getHostName());
   }
