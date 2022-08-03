@@ -357,8 +357,8 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_CONTAINER_COPY_WORKDIR =
       "hdds.datanode.replication.work.dir";
-  public static final String OZONE_CONTAINER_COPY_SPREAD_VOLUMES_ENABLED
-      = "hdds.datanode.replication.spread.volumes.enabled";
+  public static final String OZONE_CONTAINER_COPY_SPREAD_VOLUMES_ENABLED =
+      "hdds.datanode.replication.spread.volumes.enabled";
   public static final boolean
       OZONE_CONTAINER_COPY_SPREAD_VOLUMES_ENABLED_DEFAULT = false;
 

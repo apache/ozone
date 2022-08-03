@@ -1561,6 +1561,15 @@
   </property>
 
   <property>
+    <name>hdds.datanode.replication.spread.volumes.enabled</name>
+    <value>false</value>
+    <tag>DATANODE</tag>
+    <description>Spread container-copy directory on different volumes to
+      mitigate impaction on IO performance.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.scm.safemode.pipeline.creation</name>
     <value>true</value>
     <tag>HDDS,SCM,OPERATION</tag>
