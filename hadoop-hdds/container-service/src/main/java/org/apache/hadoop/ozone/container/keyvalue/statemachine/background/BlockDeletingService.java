@@ -198,16 +198,22 @@ public class BlockDeletingService extends BackgroundService {
       if (ozoneContainer.getWriteChannel() instanceof XceiverServerRatis) {
         XceiverServerRatis ratisServer =
             (XceiverServerRatis) ozoneContainer.getWriteChannel();
-        PipelineID pipelineID;
-        try {
-          pipelineID = PipelineID.valueOf(
-              UUID.fromString(containerData.getOriginPipelineId()));
-        } catch (IllegalArgumentException e) {
-          // If the pipeline id is not a valid uuid, just mark for deletion.
-          // TODO: This is a workaround for EC containers.
+        final String originPipelineId = containerData.getOriginPipelineId();
+        if (originPipelineId == null || originPipelineId.isEmpty()) {
+          // In case the pipelineID is empty, just mark it for deletion.
+          // TODO: currently EC container goes through this path.
           return true;
         }
-        // in case te ratis group does not exist, just mark it for deletion.
+        UUID pipelineUUID;
+        try {
+          pipelineUUID = UUID.fromString(originPipelineId);
+        } catch (IllegalArgumentException e) {
+          LOG.warn("Invalid pipelineID {} for container {}",
+              originPipelineId, containerData.getContainerID());
+          return false;
+        }
+        PipelineID pipelineID = PipelineID.valueOf(pipelineUUID);
+        // in case the ratis group does not exist, just mark it for deletion.
         if (!ratisServer.isExist(pipelineID.getProtobuf())) {
           return true;
         }
