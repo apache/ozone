@@ -71,7 +71,7 @@ Freon OMBR
 Freon RPCL
 #    [arguments]    ${prefix}=rpcl    ${n}=1    ${threads}=1    ${args}=${EMPTY}
     [arguments]    ${n}=1    ${threads}=1    ${args}=${EMPTY}
-#    ${result} =        Execute          ozone freon rpcl -t ${threads} -n${n} -p ${prefix} ${args}
-    ${result} =        Execute          ozone freon rpcl -t ${threads} -n${n} ${args}
+    ${result} =        Execute          ozone freon rpcl -t ${threads} -n${n} -p ${prefix} ${args}
+#    ${result} =        Execute          ozone freon rpcl -t ${threads} -n${n} ${args}
                        Should contain   ${result}   Successful executions: ${n}
 
