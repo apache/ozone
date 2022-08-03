@@ -108,7 +108,7 @@ public class TestOmSnapshotInfo {
         snapshotInfoEntryActual.getBucketName());
     Assert.assertEquals(snapshotInfoEntryExpected.getSnapshotStatus(),
         snapshotInfoEntryActual.getSnapshotStatus());
-
+    Assert.assertEquals(snapshotInfoEntryExpected, snapshotInfoEntryActual);
   }
 
   @Test
@@ -129,6 +129,6 @@ public class TestOmSnapshotInfo {
         snapshotInfoActual.getBucketName());
     Assert.assertEquals(snapshotInfoExpected.getSnapshotStatus(),
         snapshotInfoActual.getSnapshotStatus());
-
+    Assert.assertEquals(snapshotInfoExpected, snapshotInfoActual);
   }
 }

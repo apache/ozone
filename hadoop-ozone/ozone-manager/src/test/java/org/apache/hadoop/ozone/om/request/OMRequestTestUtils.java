@@ -1062,6 +1062,20 @@ public final class OMRequestTestUtils {
   }
 
   /**
+   * Create OMRequest for Create Snapshot.
+   * @param name
+   * @param snapshotPath
+   */
+  public static OMRequest createSnapshotRequest(String name,
+      String snapshotPath) {
+    return OMRequest.newBuilder().setCreateSnapshotRequest(
+            OzoneManagerProtocolProtos.CreateSnapshotRequest.newBuilder()
+                .setName(name).setSnapshotPath(snapshotPath))
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateSnapshot)
+        .setClientId(UUID.randomUUID().toString()).build();
+  }
+
+  /**
    * Add the Key information to OzoneManager DB and cache.
    * @param omMetadataManager
    * @param omKeyInfo

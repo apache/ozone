@@ -630,6 +630,19 @@ public interface OzoneManagerProtocol
   }
 
   /**
+   * Create snapshot.
+   * @param name name to be used
+   * @param snapshotPath snapshotPath to use
+   * @return name used
+   * @throws IOException
+   */
+  default String createSnapshot(String name,
+      String snapshotPath) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented");
+  }
+
+  /**
    * Assign admin role to a user identified by an accessId in a tenant.
    * @param accessId access ID.
    * @param tenantId tenant name.

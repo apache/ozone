@@ -908,6 +908,20 @@ public class RpcClient implements ClientProtocol {
   }
 
   /**
+   * Create Snapshot.
+   * @param name name to be used
+   * @param snapshotPath snapshotPath to use
+   * @throws IOException
+   */
+  @Override
+  public String createSnapshot(String name,
+      String snapshotPath) throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(snapshotPath),
+        "snapshotPath can't be null or empty.");
+    return ozoneManagerClient.createSnapshot(name, snapshotPath);
+  }
+
+  /**
    * Assign admin role to an accessId in a tenant.
    * @param accessId access ID.
    * @param tenantId tenant name.
