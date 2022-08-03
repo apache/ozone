@@ -34,6 +34,7 @@ import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.ZoneId;
 
+import java.util.Objects;
 import java.util.UUID;
 import java.util.Arrays;
 import java.util.Map;
@@ -500,5 +501,34 @@ public final class SnapshotInfo implements Auditable {
         .setBucketName(getBucketNameFromPath(snapshotPath))
         .setCheckpointDir(getCheckpointDirName(name, snapshotPath));
     return builder.build();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    SnapshotInfo that = (SnapshotInfo) o;
+    return creationTime == that.creationTime &&
+        deletionTime == that.deletionTime &&
+        snapshotID.equals(that.snapshotID) &&
+        name.equals(that.name) && volumeName.equals(that.volumeName) &&
+        bucketName.equals(that.bucketName) &&
+        snapshotStatus == that.snapshotStatus &&
+        pathPreviousSnapshotID.equals(that.pathPreviousSnapshotID) &&
+        globalPreviousSnapshotID.equals(that.globalPreviousSnapshotID) &&
+        snapshotPath.equals(that.snapshotPath) &&
+        checkpointDir.equals(that.checkpointDir);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(snapshotID, name, volumeName, bucketName,
+        snapshotStatus,
+        creationTime, deletionTime, pathPreviousSnapshotID,
+        globalPreviousSnapshotID, snapshotPath, checkpointDir);
   }
 }
