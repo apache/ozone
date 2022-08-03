@@ -98,7 +98,11 @@ public final class BackgroundSCMService implements SCMService {
     while (running.get()) {
       try {
         if (shouldRun()) {
-          periodicalTask.run();
+          try {
+            periodicalTask.run();
+          } catch (Exception e) {
+            log.error("Unhandled exception in {}.", getServiceName(), e);
+          }
         }
         synchronized (this) {
           if (!runImmediately) {
