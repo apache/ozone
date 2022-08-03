@@ -203,8 +203,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
             cfs, columnFamilyHandleList)) {
       this.printAppropriateTable(columnFamilyHandleList,
           rocksDB, parent.getDbPath());
-    } finally {
-      columnFamilyHandleList.forEach(ColumnFamilyHandle::close);
     }
     return null;
   }

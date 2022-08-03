@@ -70,8 +70,6 @@ public class DropTable implements Callable<Void>, SubcommandWithParent {
             + parent.getDbPath());
         rocksDB.dropColumnFamily(toBeDeletedCf);
       }
-    } finally {
-      columnFamilyHandleList.forEach(ColumnFamilyHandle::close);
     }
     return null;
   }
