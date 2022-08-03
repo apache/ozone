@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.container.common;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +36,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
-import java.util.stream.Stream;
 
 /**
  * Helper class for handling /tmp/container_delete_service
@@ -132,7 +133,12 @@ public class CleanUpManager {
     ListIterator<File> leftoversListIt = getDeleteLeftovers();
 
     while (leftoversListIt.hasNext()) {
-      FileUtils.deleteDirectory(leftoversListIt.next());
+      File file = leftoversListIt.next();
+      if (file.isDirectory()) {
+        FileUtils.deleteDirectory(file);
+      } else {
+        FileUtils.delete(file);
+      }
     }
   }
 

@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.conf.Configurable;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -51,6 +52,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClie
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.metrics2.util.MBeans;
@@ -63,6 +65,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -126,10 +129,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   public void cleanTmpDir() {
-    DatanodeConfiguration datanodeConfig =
-        getConf().getObject(DatanodeConfiguration.class);
-    if (datanodeConfig.getContainerSchemaV3Enabled()) {
-      CleanUpManager cleanUpManager = new CleanUpManager(getConf());
+    if (VersionedDatanodeFeatures.isFinalized(
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
+      CleanUpManager cleanUpManager = new CleanUpManager(conf);
       if (!cleanUpManager.tmpDirIsEmpty()) {
         try {
           cleanUpManager.cleanTmpDir();
@@ -156,7 +158,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   /**
-   * Create an Datanode instance based on the supplied command-line arguments.
+   * Create a Datanode instance based on the supplied command-line arguments.
    *
    * @param args        command line arguments.
    * @param printBanner if true, then log a verbose startup message.
