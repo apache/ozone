@@ -668,7 +668,7 @@ public class TestDatanodeUpgradeToScmHA {
     DownloadAndImportReplicator replicator =
         new DownloadAndImportReplicator(dsm.getContainer().getContainerSet(),
             dsm.getContainer().getController(),
-            new SimpleContainerDownloader(conf, null),
+            new SimpleContainerDownloader(conf, null, null),
             new TarContainerPacker());
 
     File tempFile = tempFolder.newFile();

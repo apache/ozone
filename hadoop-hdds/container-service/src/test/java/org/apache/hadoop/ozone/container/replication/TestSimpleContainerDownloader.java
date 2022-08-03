@@ -18,11 +18,14 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -31,13 +34,23 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 /**
  * Test SimpleContainerDownloader.
  */
 public class TestSimpleContainerDownloader {
+
+  @Rule
+  public final TemporaryFolder tempDir = new TemporaryFolder();
 
   private static final String SUCCESS_PATH = "downloaded";
 
@@ -106,7 +119,7 @@ public class TestSimpleContainerDownloader {
     final List<DatanodeDetails> datanodes = createDatanodes();
 
     SimpleContainerDownloader downloader =
-        new SimpleContainerDownloader(new OzoneConfiguration(), null) {
+        new SimpleContainerDownloader(new OzoneConfiguration(), null, null) {
 
           @Override
           protected CompletableFuture<Path> downloadContainer(
@@ -133,6 +146,42 @@ public class TestSimpleContainerDownloader {
             + "used.");
   }
 
+  @Test
+  public void testGetWorkingDirectory()
+      throws Exception {
+
+    //GIVEN
+    List<DatanodeDetails> datanodes = createDatanodes();
+
+    // Default container copy directory
+    OzoneConfiguration conf = new OzoneConfiguration();
+    VolumeSet volumeSet = getVolumeSet(datanodes.get(0), conf);
+
+    SimpleContainerDownloader downloader =
+        new SimpleContainerDownloader(conf, null, volumeSet);
+
+    Assert.assertEquals(downloader.getWorkingDirectory(),
+        Paths.get(System.getProperty("java.io.tmpdir"))
+            .resolve(SimpleContainerDownloader.CONTAINER_COPY_DIR));
+
+    // Spread container copy directory
+    conf = new OzoneConfiguration();
+    conf.setBoolean(OzoneConfigKeys.OZONE_CONTAINER_COPY_SPREAD_VOLUMES_ENABLED,
+        true);
+    volumeSet = getVolumeSet(datanodes.get(0), conf);
+
+    downloader =
+        new SimpleContainerDownloader(conf, null, volumeSet);
+
+    Path firstDi = downloader.getWorkingDirectory();
+    Path secondDi = downloader.getWorkingDirectory();
+
+    Assert.assertNotEquals(firstDi,
+        Paths.get(System.getProperty("java.io.tmpdir"))
+            .resolve(SimpleContainerDownloader.CONTAINER_COPY_DIR));
+    Assert.assertNotEquals(firstDi, secondDi);
+  }
+
   /**
    * Creates downloader which fails with datanodes in the arguments.
    *
@@ -149,7 +198,7 @@ public class TestSimpleContainerDownloader {
     final List<DatanodeDetails> datanodes =
         Arrays.asList(failedDatanodes);
 
-    return new SimpleContainerDownloader(conf, null) {
+    return new SimpleContainerDownloader(conf, null, null) {
 
       //for retry testing we use predictable list of datanodes.
       @Override
@@ -191,5 +240,22 @@ public class TestSimpleContainerDownloader {
     datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
     datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
     return datanodes;
+  }
+
+  private VolumeSet getVolumeSet(DatanodeDetails datanodeDetails,
+      OzoneConfiguration conf) throws IOException {
+    String clusterId = UUID.randomUUID().toString();
+    int volumeNum = 3;
+    File[] hddsVolumeDirs = new File[volumeNum];
+    StringBuilder hddsDirs = new StringBuilder();
+    for (int i = 0; i < volumeNum; i++) {
+      hddsVolumeDirs[i] = tempDir.newFolder();
+      hddsDirs.append(hddsVolumeDirs[i]).append(",");
+    }
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, hddsDirs.toString());
+    VolumeSet hddsVolumeSet = new MutableVolumeSet(
+        datanodeDetails.getUuidString(), clusterId, conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    return hddsVolumeSet;
   }
 }
