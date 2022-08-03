@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.freon;
 
 import com.codahale.metrics.Timer;
+import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -30,8 +31,8 @@ import picocli.CommandLine.Option;
 /**
  * Utility to generate RPC request to OM with or without payload.
  */
-@Command(name = "om-rpc-load",
-        aliases = "rpcl",
+@Command(name = "om-echo",
+        aliases = "ome",
         description =
                 "Generate echo RPC request to the OM " +
                         "with or without layload. " +
@@ -47,16 +48,16 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
   private Timer timer;
   private OzoneConfiguration configuration;
   private OzoneManagerProtocolClientSideTranslatorPB client;
-  private byte[] payloadReq;
+  private byte[] payloadReqBytes = new byte[0];
   private int payloadRespSize;
-  @Option(names = {"-plrq", "--payload-req"},
+  @Option(names = {"--payload-req"},
           description =
                   "Specifies the size of payload in KB in RPC request. " +
                           "Max size is 2097151 KB",
           defaultValue = "0")
   private int payloadReqSizeKB = 0;
 
-  @Option(names = {"-plrp", "--payload-resp"},
+  @Option(names = {"--payload-resp"},
           description =
                   "Specifies the size of payload in KB in RPC response. " +
                           "Max size is 2097151 KB",
@@ -64,36 +65,20 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
   private int payloadRespSizeKB = 0;
   @Override
   public Void call() throws Exception {
-    if (payloadReqSizeKB < 0 || payloadRespSizeKB < 0) {
-      throw new IllegalArgumentException(
-              "RPC request or response payload can't be negative value."
-      );
-    }
+    Preconditions.checkArgument(payloadReqSizeKB >= 0,
+            "OM echo request payload size should be positive value or zero.");
+    Preconditions.checkArgument(payloadRespSizeKB >= 0,
+            "OM echo response payload size should be positive value or zero.");
 
     configuration = createOzoneConfiguration();
     client = createOmClient(configuration, null);
     init();
-    if (payloadReqSizeKB > 0) {
-      //To avoid integer overflow, we cap the payload by max 2048000 KB
-      int payloadReqSize = Math.min(
-              Math.toIntExact(payloadReqSizeKB *
-                      RPC_PAYLOAD_MULTIPLICATION_FACTOR),
-              MAX_SIZE_KB);
-      payloadReq = RandomUtils.nextBytes(payloadReqSize);
-    }
-    if (payloadRespSizeKB > 0) {
-      //To avoid integer overflow, we cap the payload by max 2048000 KB
-      payloadRespSize = Math.min(
-              Math.toIntExact(payloadRespSizeKB *
-                      RPC_PAYLOAD_MULTIPLICATION_FACTOR),
-              MAX_SIZE_KB);
-    }
+    payloadReqBytes = RandomUtils.nextBytes(
+            calculateMaxPayloadSize(payloadReqSizeKB));
+    payloadRespSize = calculateMaxPayloadSize(payloadRespSizeKB);
     timer = getMetrics().timer("rpc-payload");
     try {
-      for (int i = 0; i < getThreadNo(); i++) {
-        runTests(this::sendRPCReq);
-      }
-      printReport();
+      runTests(this::sendRPCReq);
     } finally {
       if (client != null) {
         client.close();
@@ -101,6 +86,17 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
     }
     return null;
   }
+
+  private int calculateMaxPayloadSize(int payloadSizeKB) {
+    if (payloadSizeKB > 0) {
+      return Math.min(
+              Math.toIntExact(payloadSizeKB *
+                      RPC_PAYLOAD_MULTIPLICATION_FACTOR),
+              MAX_SIZE_KB);
+    }
+    return 0;
+  }
+
   private void sendRPCReq(long l) throws Exception {
     timer.time(() -> {
       EchoRPCResponse resp = client.echoRPCReq(payloadReq,
