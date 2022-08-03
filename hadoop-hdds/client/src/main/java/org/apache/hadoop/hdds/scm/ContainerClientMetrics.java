@@ -41,6 +41,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Metrics(about = "Client Metrics", context = OzoneConsts.OZONE)
 public final class ContainerClientMetrics {
   private static ContainerClientMetrics instance;
+  private static int referenceCount = 0;
 
   private static final String SOURCE_NAME =
       ContainerClientMetrics.class.getSimpleName();
@@ -49,19 +50,33 @@ public final class ContainerClientMetrics {
   private MutableCounterLong totalWriteChunkCalls;
   @Metric
   private MutableCounterLong totalWriteChunkBytes;
-  private Map<PipelineID, MutableCounterLong> writeChunkCallsByPipeline;
-  private Map<PipelineID, MutableCounterLong> writeChunkBytesByPipeline;
-  private Map<UUID, MutableCounterLong> writeChunksCallsByLeaders;
-  private MetricsRegistry registry;
+  private final Map<PipelineID, MutableCounterLong> writeChunkCallsByPipeline;
+  private final Map<PipelineID, MutableCounterLong> writeChunkBytesByPipeline;
+  private final Map<UUID, MutableCounterLong> writeChunksCallsByLeaders;
+  private final MetricsRegistry registry;
 
-  public static synchronized ContainerClientMetrics create() {
+  public static synchronized ContainerClientMetrics acquire() {
     if (instance == null) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      ContainerClientMetrics clientMetrics = ms.register(SOURCE_NAME,
-          "Ozone Client Metrics", new ContainerClientMetrics());
-      instance = clientMetrics;
+      instance = newInstance();
     }
+    referenceCount++;
     return instance;
+  }
+
+  @VisibleForTesting
+  public static ContainerClientMetrics newInstance() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    return ms.register(SOURCE_NAME,
+        "Ozone Client Metrics", new ContainerClientMetrics());
+  }
+
+  public static synchronized void release() {
+    referenceCount--;
+    if (referenceCount == 0) {
+      MetricsSystem ms = DefaultMetricsSystem.instance();
+      ms.unregisterSource(SOURCE_NAME);
+      instance = null;
+    }
   }
 
   private ContainerClientMetrics() {
@@ -71,10 +86,7 @@ public final class ContainerClientMetrics {
     writeChunksCallsByLeaders = new ConcurrentHashMap<>();
   }
 
-  public void unregister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
-  }
+
 
   public void recordWriteChunk(Pipeline pipeline, long chunkSizeBytes) {
     writeChunkCallsByPipeline.computeIfAbsent(pipeline.getId(),

@@ -333,7 +333,7 @@ public class RpcClient implements ClientProtocol {
     this.byteBufferPool = new ElasticByteBufferPool();
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, this::getECReconstructExecutor);
-    this.clientMetrics = ContainerClientMetrics.create();
+    this.clientMetrics = ContainerClientMetrics.acquire();
   }
 
   public XceiverClientFactory getXceiverClientManager() {
@@ -1443,7 +1443,7 @@ public class RpcClient implements ClientProtocol {
     IOUtils.cleanupWithLogger(LOG, ozoneManagerClient, xceiverClientManager);
     keyProviderCache.invalidateAll();
     keyProviderCache.cleanUp();
-    clientMetrics.unregister();
+    ContainerClientMetrics.release();
   }
 
   @Deprecated

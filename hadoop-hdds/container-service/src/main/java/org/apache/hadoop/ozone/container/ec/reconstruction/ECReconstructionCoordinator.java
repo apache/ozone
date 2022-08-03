@@ -104,10 +104,8 @@ public class ECReconstructionCoordinator implements Closeable {
   private final ContainerClientMetrics clientMetrics;
 
   public ECReconstructionCoordinator(ConfigurationSource conf,
-                                     CertificateClient certificateClient,
-                                     ContainerClientMetrics clientMetrics)
+                                     CertificateClient certificateClient)
       throws IOException {
-    this.clientMetrics = clientMetrics;
     this.containerOperationClient = new ECContainerOperationClient(conf,
         certificateClient);
     this.byteBufferPool = new ElasticByteBufferPool();
@@ -122,6 +120,7 @@ public class ECReconstructionCoordinator implements Closeable {
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, () -> ecReconstructExecutor);
     tokenHelper = new TokenHelper(conf, certificateClient);
+    this.clientMetrics = ContainerClientMetrics.acquire();
   }
 
   public void reconstructECContainerGroup(long containerID,

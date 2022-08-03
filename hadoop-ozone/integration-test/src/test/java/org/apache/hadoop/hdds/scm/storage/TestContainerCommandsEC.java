@@ -391,8 +391,7 @@ public class TestContainerCommandsEC {
         new XceiverClientManager(config);
     createKeyAndWriteData(keyString, bucket);
     ECReconstructionCoordinator coordinator =
-        new ECReconstructionCoordinator(config, certClient,
-            ContainerClientMetrics.create());
+        new ECReconstructionCoordinator(config, certClient);
 
     OzoneKeyDetails key = bucket.getKey(keyString);
     long conID = key.getOzoneKeyLocations().get(0).getContainerID();
@@ -567,8 +566,7 @@ public class TestContainerCommandsEC {
 
     Assert.assertThrows(IOException.class, () -> {
       ECReconstructionCoordinator coordinator =
-          new ECReconstructionCoordinator(config, certClient,
-              ContainerClientMetrics.create());
+          new ECReconstructionCoordinator(config, certClient);
       coordinator.reconstructECContainerGroup(conID,
           (ECReplicationConfig) containerPipeline.getReplicationConfig(),
           sourceNodeMap, targetNodeMap);

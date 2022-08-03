@@ -36,7 +36,7 @@ public class TestContainerClientMetrics {
 
   @Test
   public void testRecordChunkMetrics() {
-    ContainerClientMetrics metrics = ContainerClientMetrics.create();
+    ContainerClientMetrics metrics = ContainerClientMetrics.newInstance();
     PipelineID pipelineId1 = PipelineID.randomId();
     UUID leaderId1 = UUID.randomUUID();
     PipelineID pipelineId2 = PipelineID.randomId();
