@@ -262,7 +262,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // PutSmallFile request
         responseProto = createContainer(msg);
         metrics.incContainerOpsMetrics(Type.CreateContainer);
-        metrics.incContainerOpsLatencies(cmdType,
+        metrics.incContainerOpsLatencies(Type.CreateContainer,
                 System.currentTimeMillis() - startTime);
 
         if (responseProto.getResult() != Result.SUCCESS) {
