@@ -166,6 +166,35 @@ public final class ReplicationTestUtil {
     };
   }
 
+  public static PlacementPolicy getSameNodeTestPlacementPolicy(
+      final NodeManager nodeManager, final OzoneConfiguration conf,
+      DatanodeDetails nodeToReturn) {
+    return new SCMCommonPlacementPolicy(nodeManager, conf) {
+      @Override
+      protected List<DatanodeDetails> chooseDatanodesInternal(
+          List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
+          long metadataSizeRequired, long dataSizeRequired)
+          throws SCMException {
+        if (nodesRequiredToChoose > 1) {
+          throw new IllegalArgumentException("Only one node is allowed");
+        }
+        if (excludedNodes.contains(nodeToReturn)) {
+          throw new SCMException("Insufficient Nodes available to choose",
+              SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
+        }
+        List<DatanodeDetails> dns = new ArrayList<>();
+        dns.add(nodeToReturn);
+        return dns;
+      }
+
+      @Override
+      public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes) {
+        return null;
+      }
+    };
+  }
+
   public static PlacementPolicy getNoNodesTestPlacementPolicy(
       final NodeManager nodeManager, final OzoneConfiguration conf) {
     return new SCMCommonPlacementPolicy(nodeManager, conf) {

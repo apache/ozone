@@ -151,6 +151,7 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
               tempReplicaSet, r, replicationFactor)) {
             DeleteContainerCommand deleteCommand =
                 new DeleteContainerCommand(container.getContainerID(), true);
+            deleteCommand.setReplicaIndex(r.getReplicaIndex());
             commands.put(r.getDatanodeDetails(), deleteCommand);
             it.remove();
             tempReplicaSet.remove(r);

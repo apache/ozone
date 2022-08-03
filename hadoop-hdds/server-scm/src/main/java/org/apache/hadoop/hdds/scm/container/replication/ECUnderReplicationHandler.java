@@ -112,6 +112,10 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           container.getContainerID(), currentUnderRepRes);
       return emptyMap();
     }
+    List<DatanodeDetails> excludedNodes = replicas.stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toList());
+
     ContainerHealthResult.UnderReplicatedHealthResult containerHealthResult =
         ((ContainerHealthResult.UnderReplicatedHealthResult)
             currentUnderRepRes);
@@ -154,8 +158,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                 " The missing indexes are {}", id, missingIndexes);
         // We have source nodes.
         if (sources.size() >= repConfig.getData()) {
-          final List<DatanodeDetails> selectedDatanodes =
-              getTargetDatanodes(replicas, container, missingIndexes.size());
+          final List<DatanodeDetails> selectedDatanodes = getTargetDatanodes(
+              excludedNodes, container, missingIndexes.size());
+          excludedNodes.addAll(selectedDatanodes);
 
           List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
               sourceDatanodesWithIndex = new ArrayList<>();
@@ -186,15 +191,17 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       Set<Integer> decomIndexes = replicaCount.decommissioningOnlyIndexes(true);
       if (decomIndexes.size() > 0) {
         final List<DatanodeDetails> selectedDatanodes =
-            getTargetDatanodes(replicas, container, decomIndexes.size());
+            getTargetDatanodes(excludedNodes, container, decomIndexes.size());
+        excludedNodes.addAll(selectedDatanodes);
         Iterator<DatanodeDetails> iterator = selectedDatanodes.iterator();
         // In this case we need to do one to one copy.
         for (ContainerReplica replica : replicas) {
           if (decomIndexes.contains(replica.getReplicaIndex())) {
             if (!iterator.hasNext()) {
-              LOG.warn("Couldn't find the enough targets. Available source"
-                  + " nodes: {}, the target nodes: {} and the decommission"
-                  + " indexes: {}", replicas, selectedDatanodes, decomIndexes);
+              LOG.warn("Couldn't find enough targets. Available source"
+                  + " nodes: {}, the target nodes: {}, excluded nodes: {} and"
+                  + "  the decommission indexes: {}",
+                  replicas, selectedDatanodes, excludedNodes, decomIndexes);
               break;
             }
             DatanodeDetails decommissioningSrcNode
@@ -216,23 +223,24 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           id, ex);
       throw ex;
     }
+    if (commands.size() == 0) {
+      LOG.warn("Container {} is under replicated, but no commands were " +
+          "created to correct it", id);
+    }
     return commands;
   }
 
   private List<DatanodeDetails> getTargetDatanodes(
-      Set<ContainerReplica> replicas, ContainerInfo container,
+      List<DatanodeDetails> excludedNodes, ContainerInfo container,
       int requiredNodes) throws IOException {
     // We should ensure that the target datanode has enough space
     // for a complete container to be created, but since the container
     // size may be changed smaller than origin, we should be defensive.
     final long dataSizeRequired =
         Math.max(container.getUsedBytes(), currentContainerSize);
-    final List<DatanodeDetails> excludeList =
-        replicas.stream().map(ContainerReplica::getDatanodeDetails)
-            .collect(Collectors.toList());
-
     return containerPlacement
-        .chooseDatanodes(excludeList, null, requiredNodes, 0, dataSizeRequired);
+        .chooseDatanodes(excludedNodes, null, requiredNodes, 0,
+            dataSizeRequired);
   }
 
   private static byte[] int2byte(List<Integer> src) {

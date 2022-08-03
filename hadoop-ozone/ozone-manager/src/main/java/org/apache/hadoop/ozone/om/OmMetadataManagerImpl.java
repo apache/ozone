@@ -1233,7 +1233,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
         if (kv != null) {
           RepeatedOmKeyInfo infoList = kv.getValue();
-          for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
+          for (OmKeyInfo info : infoList.cloneOmKeyInfoList()) {
             // Add all blocks from all versions of the key to the deletion list
             for (OmKeyLocationInfoGroup keyLocations :
                 info.getKeyLocationVersions()) {
