@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.collect.ImmutableList;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -29,6 +30,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -45,6 +47,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyMap;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 
 /**
  * Handles the EC Under replication processing and forming the respective SCM
@@ -143,17 +146,8 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       // We got the missing indexes, this is excluded any decommissioning
       // indexes. Find the good source nodes.
       if (missingIndexes.size() > 0) {
-        Map<Integer, ContainerReplica> sources = replicas.stream().filter(r -> r
-            .getState() == StorageContainerDatanodeProtocolProtos
-            .ContainerReplicaProto.State.CLOSED)
-            // Exclude stale and dead nodes. This is particularly important for
-            // maintenance nodes, as the replicas will remain present in the
-            // container manager, even when they go dead.
-            .filter(r -> ReplicationManager
-                .getNodeStatus(r.getDatanodeDetails(), nodeManager).isHealthy())
-            .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
-            .collect(
-                Collectors.toMap(ContainerReplica::getReplicaIndex, x -> x));
+        Map<Integer, Pair<ContainerReplica, NodeStatus>> sources =
+            filterSources(replicas, deletionInFlight);
         LOG.debug("Missing indexes detected for the container {}." +
                 " The missing indexes are {}", id, missingIndexes);
         // We have source nodes.
@@ -164,12 +158,12 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
 
           List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
               sourceDatanodesWithIndex = new ArrayList<>();
-          for (ContainerReplica srcReplica : sources.values()) {
+          for (Pair<ContainerReplica, NodeStatus> src : sources.values()) {
             sourceDatanodesWithIndex.add(
                 new ReconstructECContainersCommand
                     .DatanodeDetailsAndReplicaIndex(
-                    srcReplica.getDatanodeDetails(),
-                    srcReplica.getReplicaIndex()));
+                    src.getLeft().getDatanodeDetails(),
+                    src.getLeft().getReplicaIndex()));
           }
 
           final ReconstructECContainersCommand reconstructionCommand =
@@ -228,6 +222,36 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           "created to correct it", id);
     }
     return commands;
+  }
+
+  private Map<Integer, Pair<ContainerReplica, NodeStatus>> filterSources(
+      Set<ContainerReplica> replicas, List<DatanodeDetails> deletionInFlight) {
+    return replicas.stream().filter(r -> r
+            .getState() == StorageContainerDatanodeProtocolProtos
+            .ContainerReplicaProto.State.CLOSED)
+        // Exclude stale and dead nodes. This is particularly important for
+        // maintenance nodes, as the replicas will remain present in the
+        // container manager, even when they go dead.
+        .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
+        .map(r -> Pair.of(r, ReplicationManager
+            .getNodeStatus(r.getDatanodeDetails(), nodeManager)))
+        .filter(pair -> pair.getRight().isHealthy())
+        // If there are multiple nodes online for a given index, we just
+        // pick any IN_SERVICE one. At the moment, the input streams cannot
+        // handle multiple replicas for the same index, so if we passed them
+        // all through they would not get used anyway.
+        // If neither of the nodes are in service, we just pass one through,
+        // as it will be decommission or maintenance.
+        .collect(Collectors.toMap(
+            pair -> pair.getLeft().getReplicaIndex(),
+            pair -> pair,
+            (p1, p2) -> {
+              if (p1.getRight().getOperationalState() == IN_SERVICE) {
+                return p1;
+              } else {
+                return p2;
+              }
+            }));
   }
 
   private List<DatanodeDetails> getTargetDatanodes(
