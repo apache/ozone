@@ -147,32 +147,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       // indexes. Find the good source nodes.
       if (missingIndexes.size() > 0) {
         Map<Integer, Pair<ContainerReplica, NodeStatus>> sources =
-            replicas.stream().filter(r -> r
-            .getState() == StorageContainerDatanodeProtocolProtos
-            .ContainerReplicaProto.State.CLOSED)
-            // Exclude stale and dead nodes. This is particularly important for
-            // maintenance nodes, as the replicas will remain present in the
-            // container manager, even when they go dead.
-            .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
-            .map(r -> Pair.of(r, ReplicationManager
-                .getNodeStatus(r.getDatanodeDetails(), nodeManager)))
-            .filter(pair -> pair.getRight().isHealthy())
-            // If there are multiple nodes online for a given index, we just
-            // pick any IN_SERVICE one. At the moment, the input streams cannot
-            // handle multiple replicas for the same index, so if we passed them
-            // all through they would not get used anyway.
-            // If neither of the nodes are in service, we just pass one through,
-            // as it will be decommission or maintenance.
-            .collect(Collectors.toMap(
-                pair -> pair.getLeft().getReplicaIndex(),
-                pair -> pair,
-                (p1, p2) -> {
-                  if (p1.getRight().getOperationalState() == IN_SERVICE) {
-                    return p1;
-                  } else {
-                    return p2;
-                  }
-                }));
+            filterSources(replicas, deletionInFlight);
         LOG.debug("Missing indexes detected for the container {}." +
                 " The missing indexes are {}", id, missingIndexes);
         // We have source nodes.
@@ -247,6 +222,36 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           "created to correct it", id);
     }
     return commands;
+  }
+
+  private Map<Integer, Pair<ContainerReplica, NodeStatus>> filterSources(
+      Set<ContainerReplica> replicas, List<DatanodeDetails> deletionInFlight) {
+    return replicas.stream().filter(r -> r
+            .getState() == StorageContainerDatanodeProtocolProtos
+            .ContainerReplicaProto.State.CLOSED)
+        // Exclude stale and dead nodes. This is particularly important for
+        // maintenance nodes, as the replicas will remain present in the
+        // container manager, even when they go dead.
+        .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
+        .map(r -> Pair.of(r, ReplicationManager
+            .getNodeStatus(r.getDatanodeDetails(), nodeManager)))
+        .filter(pair -> pair.getRight().isHealthy())
+        // If there are multiple nodes online for a given index, we just
+        // pick any IN_SERVICE one. At the moment, the input streams cannot
+        // handle multiple replicas for the same index, so if we passed them
+        // all through they would not get used anyway.
+        // If neither of the nodes are in service, we just pass one through,
+        // as it will be decommission or maintenance.
+        .collect(Collectors.toMap(
+            pair -> pair.getLeft().getReplicaIndex(),
+            pair -> pair,
+            (p1, p2) -> {
+              if (p1.getRight().getOperationalState() == IN_SERVICE) {
+                return p1;
+              } else {
+                return p2;
+              }
+            }));
   }
 
   private List<DatanodeDetails> getTargetDatanodes(
