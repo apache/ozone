@@ -153,6 +153,7 @@ public class TestResetDeletedBlockRetryCountShell {
     // reset the given txIds list, only these transactions should be available
     c.parseArgs("-l", "1,2,3,4,5");
     subcommand.execute(scmClient);
+    getSCMLeader().getScmHAManager().asSCMHADBTransactionBuffer().flush();
     LOG.info("Valid num of txns: {}", deletedBlockLog.
         getNumOfValidTransactions());
     Assertions.assertEquals(5, deletedBlockLog.getNumOfValidTransactions());
@@ -160,6 +161,7 @@ public class TestResetDeletedBlockRetryCountShell {
     // reset all the result expired txIds, all transactions should be available
     c.parseArgs("-a");
     subcommand.execute(scmClient);
+    getSCMLeader().getScmHAManager().asSCMHADBTransactionBuffer().flush();
     LOG.info("Valid num of txns: {}", deletedBlockLog.
         getNumOfValidTransactions());
     Assertions.assertEquals(30, deletedBlockLog.getNumOfValidTransactions());
