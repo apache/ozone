@@ -24,19 +24,22 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.container.common.CleanUpManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ServicePlugin;
 
-import org.junit.jupiter.api.AfterEach;
+import org.junit.After;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.mockito.Mockito.*;
+
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Test class for {@link HddsDatanodeService}.
@@ -47,7 +50,7 @@ public class TestHddsDatanodeService {
   private HddsDatanodeService service;
   private String[] args = new String[] {};
 
-  @BeforeEach
+  @Before
   public void setUp() {
     testDir = GenericTestUtils.getRandomizedTestDir();
     conf = new OzoneConfiguration();
@@ -66,26 +69,28 @@ public class TestHddsDatanodeService {
     conf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, volumeDir);
   }
 
-  @AfterEach
-  public void tearDown() {
+  @After
+  public void tearDown() throws IOException {
     FileUtil.fullyDelete(testDir);
   }
 
   @Test
   public void testStartup() throws IOException {
     service = HddsDatanodeService.createHddsDatanodeService(args);
-    service.start(conf);
+    HddsDatanodeService datanodeService = spy(service);
+    datanodeService.start(conf);
 
-    assertNotNull(service.getDatanodeDetails());
-    assertNotNull(service.getDatanodeDetails().getHostName());
-    assertFalse(service.getDatanodeStateMachine().isDaemonStopped());
-    assertNotNull(service.getCRLStore());
+    assertNotNull(datanodeService.getDatanodeDetails());
+    assertNotNull(datanodeService.getDatanodeDetails().getHostName());
+    assertFalse(datanodeService.getDatanodeStateMachine().isDaemonStopped());
+    assertNotNull(datanodeService.getCRLStore());
 
-    service.stop();
+    datanodeService.stop();
+    verify(datanodeService, times(2)).cleanTmpDir();
     // CRL store must be stopped when the service stops
-    assertNull(service.getCRLStore().getStore());
-    service.join();
-    service.close();
+    assertNull(datanodeService.getCRLStore().getStore());
+    datanodeService.join();
+    datanodeService.close();
   }
 
   static class MockService implements ServicePlugin {

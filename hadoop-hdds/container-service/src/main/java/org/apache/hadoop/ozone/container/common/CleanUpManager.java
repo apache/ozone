@@ -20,11 +20,9 @@ package org.apache.hadoop.ozone.container.common;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,12 +43,17 @@ public class CleanUpManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(CleanUpManager.class);
+
   private final DatanodeConfiguration datanodeConf;
 
   public CleanUpManager(ConfigurationSource configurationSource) {
     this.datanodeConf =
         configurationSource.getObject(DatanodeConfiguration.class);
     tmpDirInit();
+  }
+
+  public DatanodeConfiguration getDatanodeConf() {
+    return datanodeConf;
   }
 
   public boolean checkContainerSchemaV3Enabled(
@@ -64,7 +67,7 @@ public class CleanUpManager {
   }
 
   private void tmpDirInit() {
-    String tmpDir = datanodeConf.getDiskTmpDirectoryPath();
+    String tmpDir = datanodeConf.getTmpDeleteDirectoryPath();
     Path tmpDirPath = Paths.get(tmpDir);
 
     if (Files.notExists(tmpDirPath)) {
@@ -78,7 +81,7 @@ public class CleanUpManager {
 
   public boolean renameDir(KeyValueContainerData keyValueContainerData)
       throws IOException {
-    String tmpDirPath = datanodeConf.getDiskTmpDirectoryPath();
+    String tmpDirPath = datanodeConf.getTmpDeleteDirectoryPath();
 
     String containerPath = keyValueContainerData.getContainerPath();
     File container = new File(containerPath);
@@ -103,7 +106,7 @@ public class CleanUpManager {
   public ListIterator<File> getDeleteLeftovers() {
     List<File> leftovers = new ArrayList<File>();
 
-    String tmpDirPath = datanodeConf.getDiskTmpDirectoryPath();
+    String tmpDirPath = datanodeConf.getTmpDeleteDirectoryPath();
     File tmpDir = new File(tmpDirPath);
 
     for (File file : tmpDir.listFiles()) {
@@ -147,7 +150,7 @@ public class CleanUpManager {
    * @throws IOException
    */
   public void deleteTmpDir() throws IOException {
-    String deleteDirPath = datanodeConf.getDiskTmpDirectoryPath();
+    String deleteDirPath = datanodeConf.getTmpDeleteDirectoryPath();
     File deleteDir = new File(deleteDirPath);
     File tmpDir = deleteDir.getParentFile();
     FileUtils.deleteDirectory(tmpDir);
