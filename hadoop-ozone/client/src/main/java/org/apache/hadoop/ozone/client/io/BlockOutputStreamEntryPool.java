@@ -120,13 +120,7 @@ public class BlockOutputStreamEntryPool {
     return new ExcludeList();
   }
 
-  /**
-   * A constructor for testing purpose only.
-   *
-   * @see KeyOutputStream#KeyOutputStream()
-   */
-  @VisibleForTesting
-  BlockOutputStreamEntryPool() {
+  BlockOutputStreamEntryPool(ContainerClientMetrics clientMetrics) {
     streamEntries = new ArrayList<>();
     omClient = null;
     keyArgs = null;
@@ -144,7 +138,7 @@ public class BlockOutputStreamEntryPool {
     currentStreamIndex = 0;
     openID = -1;
     excludeList = new ExcludeList();
-    clientMetrics = ContainerClientMetrics.newInstance();
+    this.clientMetrics = clientMetrics;
   }
 
   /**

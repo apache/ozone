@@ -21,7 +21,9 @@ package org.apache.hadoop.hdds.scm;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.junit.Before;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 
 import java.util.Collections;
@@ -33,10 +35,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * Test ContainerClientMetrics.
  */
 public class TestContainerClientMetrics {
+  @Before
+  public void setup() {
+    while (ContainerClientMetrics.instance != null) {
+      ContainerClientMetrics.release();
+    }
+  }
 
   @Test
   public void testRecordChunkMetrics() {
-    ContainerClientMetrics metrics = ContainerClientMetrics.newInstance();
+    ContainerClientMetrics metrics = ContainerClientMetrics.acquire();
     PipelineID pipelineId1 = PipelineID.randomId();
     UUID leaderId1 = UUID.randomUUID();
     PipelineID pipelineId2 = PipelineID.randomId();
@@ -71,6 +79,21 @@ public class TestContainerClientMetrics {
         metrics.getWriteChunksCallsByLeaders().get(leaderId1).value());
     assertEquals(1,
         metrics.getWriteChunksCallsByLeaders().get(leaderId2).value());
+  }
+
+  @Test(expected = IllegalStateException.class)
+  public void testReleaseWithoutUse() {
+    ContainerClientMetrics.release();
+  }
+
+  @Test
+  public void testAcquireAndRelease() {
+    ContainerClientMetrics acquired = ContainerClientMetrics.acquire();
+    Assertions.assertNotNull(acquired);
+    ContainerClientMetrics.release();
+    Assertions.assertNull(ContainerClientMetrics.instance);
+    acquired = ContainerClientMetrics.acquire();
+    Assertions.assertNotNull(acquired);
   }
 
   private Pipeline createPipeline(PipelineID piplineId, UUID leaderId) {

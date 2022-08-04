@@ -89,6 +89,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   }
 
   private ECKeyOutputStream(Builder builder) {
+    super(builder.getClientMetrics());
     this.config = builder.getClientConfig();
     this.bufferPool = builder.getByteBufferPool();
     // For EC, cell/chunk size and buffer size can be same for now.

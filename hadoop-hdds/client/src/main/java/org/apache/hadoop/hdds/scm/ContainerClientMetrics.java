@@ -39,7 +39,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Metrics(about = "Client Metrics", context = OzoneConsts.OZONE)
 public final class ContainerClientMetrics {
-  private static ContainerClientMetrics instance;
+  @VisibleForTesting
+  static ContainerClientMetrics instance;
   private static int referenceCount = 0;
 
   private static final String SOURCE_NAME =
@@ -56,19 +57,17 @@ public final class ContainerClientMetrics {
 
   public static synchronized ContainerClientMetrics acquire() {
     if (instance == null) {
-      instance = newInstance();
+      instance = DefaultMetricsSystem.instance().register(SOURCE_NAME,
+          "Ozone Client Metrics", new ContainerClientMetrics());
     }
     referenceCount++;
     return instance;
   }
 
-  @VisibleForTesting
-  public static ContainerClientMetrics newInstance() {
-    return DefaultMetricsSystem.instance().register(SOURCE_NAME,
-        "Ozone Client Metrics", new ContainerClientMetrics());
-  }
-
   public static synchronized void release() {
+    if (instance == null) {
+      throw new IllegalStateException("This metrics class is not used.");
+    }
     referenceCount--;
     if (referenceCount == 0) {
       DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
@@ -82,8 +81,6 @@ public final class ContainerClientMetrics {
     writeChunkBytesByPipeline = new ConcurrentHashMap<>();
     writeChunksCallsByLeaders = new ConcurrentHashMap<>();
   }
-
-
 
   public void recordWriteChunk(Pipeline pipeline, long chunkSizeBytes) {
     writeChunkCallsByPipeline.computeIfAbsent(pipeline.getId(),

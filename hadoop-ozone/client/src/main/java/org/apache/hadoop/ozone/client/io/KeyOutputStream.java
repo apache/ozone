@@ -90,11 +90,7 @@ public class KeyOutputStream extends OutputStream {
 
   private long clientID;
 
-  /**
-   * A constructor for testing purpose only.
-   */
-  @VisibleForTesting
-  public KeyOutputStream() {
+  public KeyOutputStream(ContainerClientMetrics clientMetrics) {
     closed = false;
     this.retryPolicyMap = HddsClientUtils.getExceptionList()
         .stream()
@@ -102,7 +98,7 @@ public class KeyOutputStream extends OutputStream {
             e -> RetryPolicies.TRY_ONCE_THEN_FAIL));
     retryCount = 0;
     offset = 0;
-    blockOutputStreamEntryPool = new BlockOutputStreamEntryPool();
+    blockOutputStreamEntryPool = new BlockOutputStreamEntryPool(clientMetrics);
   }
 
   @VisibleForTesting

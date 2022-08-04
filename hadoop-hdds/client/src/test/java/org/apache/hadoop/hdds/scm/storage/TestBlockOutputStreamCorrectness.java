@@ -112,7 +112,7 @@ public class TestBlockOutputStreamCorrectness {
         bufferPool,
         config,
         null,
-        ContainerClientMetrics.newInstance());
+        ContainerClientMetrics.acquire());
     return outputStream;
   }
 
