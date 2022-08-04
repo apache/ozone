@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
@@ -124,13 +123,6 @@ public class TestContainerMetrics {
       server.start();
       client.connect();
 
-      // Create container
-      ContainerCommandRequestProto request = ContainerTestHelper
-          .getCreateContainerRequest(containerID, pipeline);
-      ContainerCommandResponseProto response = client.sendCommand(request);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS,
-          response.getResult());
-
       // Write Chunk
       BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
       ContainerTestHelper.getWriteChunkRequest(
@@ -138,7 +130,8 @@ public class TestContainerMetrics {
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper.getWriteChunkRequest(
               pipeline, blockID, 1024);
-      response = client.sendCommand(writeChunkRequest);
+      ContainerCommandResponseProto response =
+              client.sendCommand(writeChunkRequest);
       Assert.assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
 

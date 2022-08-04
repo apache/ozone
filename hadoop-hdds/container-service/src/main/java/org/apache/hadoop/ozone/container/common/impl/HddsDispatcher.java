@@ -66,6 +66,7 @@ import com.google.protobuf.ServiceException;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -191,7 +192,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
     ContainerType containerType;
     ContainerCommandResponseProto responseProto = null;
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
     Type cmdType = msg.getCmdType();
     long containerID = msg.getContainerID();
     metrics.incContainerOpsMetrics(cmdType);
@@ -261,6 +262,10 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // If container does not exist, create one for WriteChunk and
         // PutSmallFile request
         responseProto = createContainer(msg);
+        metrics.incContainerOpsMetrics(Type.CreateContainer);
+        metrics.incContainerOpsLatencies(Type.CreateContainer,
+                Time.monotonicNow() - startTime);
+
         if (responseProto.getResult() != Result.SUCCESS) {
           StorageContainerException sce = new StorageContainerException(
               "ContainerID " + containerID + " creation failed",
@@ -313,7 +318,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     responseProto = handler.handle(msg, container, dispatcherContext);
     if (responseProto != null) {
       metrics.incContainerOpsLatencies(cmdType,
-          System.currentTimeMillis() - startTime);
+              Time.monotonicNow() - startTime);
 
       // If the request is of Write Type and the container operation
       // is unsuccessful, it implies the applyTransaction on the container
