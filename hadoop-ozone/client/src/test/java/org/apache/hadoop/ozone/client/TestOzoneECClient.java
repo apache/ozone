@@ -263,7 +263,7 @@ public class TestOzoneECClient {
 
   @Test
   public void testChunksInSingleWriteOpWithOffset() throws IOException {
-    testMultipleChunksInSingleWriteOp(100 ,12, 11);
+    testMultipleChunksInSingleWriteOp(100, 12, 11);
   }
 
   @Test
@@ -286,8 +286,8 @@ public class TestOzoneECClient {
     }
     final OzoneBucket bucket = writeIntoECKey(offset, numChunks * chunkSize,
             inputData, keyName, new DefaultReplicationConfig(ReplicationType.EC,
-            new ECReplicationConfig(dataBlocks, parityBlocks,
-                ECReplicationConfig.EcCodec.RS, chunkSize)));
+                    new ECReplicationConfig(dataBlocks, parityBlocks,
+                            ECReplicationConfig.EcCodec.RS, chunkSize)));
     OzoneKey key = bucket.getKey(keyName);
     validateContent(offset, numChunks * chunkSize, inputData, bucket, key);
   }
@@ -1157,7 +1157,7 @@ public class TestOzoneECClient {
   }
 
   private OzoneBucket writeIntoECKey(byte[] data, String key,
-     DefaultReplicationConfig defaultReplicationConfig) throws IOException {
+      DefaultReplicationConfig defaultReplicationConfig) throws IOException {
     return writeIntoECKey(0, data.length, data, key, defaultReplicationConfig);
   }
   private OzoneBucket writeIntoECKey(int offset, int length, byte[] data,
@@ -1168,12 +1168,13 @@ public class TestOzoneECClient {
   }
 
   private OzoneBucket writeIntoECKey(byte[][] chunks, String key,
-     DefaultReplicationConfig defaultReplicationConfig) throws IOException {
+      DefaultReplicationConfig defaultReplicationConfig) throws IOException {
     int[] offsets = new int[chunks.length];
     Arrays.fill(offsets, 0);
     int[] lengths = Arrays.stream(chunks)
             .mapToInt(chunk -> chunk.length).toArray();
-    return writeIntoECKey(offsets, lengths, chunks, key, defaultReplicationConfig);
+    return writeIntoECKey(offsets, lengths, chunks,
+            key, defaultReplicationConfig);
   }
 
   private OzoneBucket writeIntoECKey(int[] offsets, int[] lengths,
