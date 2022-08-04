@@ -90,7 +90,7 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
   private int calculateMaxPayloadSize(int payloadSizeKB) {
     if (payloadSizeKB > 0) {
       return Math.min(
-              Math.toIntExact(payloadSizeKB *
+              Math.toIntExact((long)payloadSizeKB *
                       RPC_PAYLOAD_MULTIPLICATION_FACTOR),
               MAX_SIZE_KB);
     }
