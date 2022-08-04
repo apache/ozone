@@ -18,6 +18,21 @@
 
 package org.apache.hadoop.ozone.debug;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.kohsuke.MetaInfServices;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksIterator;
+import picocli.CommandLine;
+
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -30,21 +45,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.Callable;
-
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
-import org.apache.hadoop.hdds.utils.db.DBDefinition;
-import org.apache.hadoop.ozone.OzoneConsts;
-
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import org.kohsuke.MetaInfServices;
-import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksIterator;
-import picocli.CommandLine;
 
 /**
  * Parser for scm.db file.
@@ -231,7 +231,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         if (columnFamilyHandle == null) {
           throw new IllegalArgumentException("columnFamilyHandle is null");
         }
-        RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle);
+        RocksIterator iterator = ManagedRocksIterator.from(rocksDB,
+            rocksDB.newIterator(columnFamilyHandle));
         scannedObjects = displayTable(iterator, columnFamilyDefinition);
       }
     } else {

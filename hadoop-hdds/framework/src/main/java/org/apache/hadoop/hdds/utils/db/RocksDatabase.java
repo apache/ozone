@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.rocksdb.Checkpoint;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -479,14 +480,18 @@ public final class RocksDatabase {
   }
 
   public RocksIterator newIterator(ColumnFamily family) {
-    return db.newIterator(family.getHandle());
+    return managed(db.newIterator(family.getHandle()));
   }
 
   public RocksIterator newIterator(ColumnFamily family, boolean fillCache) {
     try (ReadOptions readOptions = new ReadOptions()) {
       readOptions.setFillCache(fillCache);
-      return db.newIterator(family.getHandle(), readOptions);
+      return managed(db.newIterator(family.getHandle(), readOptions));
     }
+  }
+
+  private RocksIterator managed(RocksIterator iterator) {
+    return ManagedRocksIterator.from(db, iterator);
   }
 
   public void batchWrite(WriteBatch writeBatch, WriteOptions options)
