@@ -318,7 +318,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     responseProto = handler.handle(msg, container, dispatcherContext);
     if (responseProto != null) {
       metrics.incContainerOpsLatencies(cmdType,
-          System.currentTimeMillis() - startTime);
+              Time.monotonicNow() - startTime);
 
       // If the request is of Write Type and the container operation
       // is unsuccessful, it implies the applyTransaction on the container
