@@ -20,20 +20,21 @@ package org.apache.hadoop.ozone.s3.signature;
 import java.time.LocalDate;
 import java.util.Collection;
 
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
 import org.apache.hadoop.util.StringUtils;
 
 import com.google.common.annotations.VisibleForTesting;
+
 import static java.time.temporal.ChronoUnit.DAYS;
+
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
+
 import static org.apache.commons.lang3.StringUtils.isEmpty;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.AWS4_SIGNING_ALGORITHM;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,25 +67,23 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
    * /aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date,
    * Signature
    * =db81b057718d7c1b3b8dffa29933099551c51d787b3b13b9e0f9ebed45982bf2
-   *
-   * @throws OS3Exception
    */
   @SuppressWarnings("StringSplitter")
   @Override
-  public SignatureInfo parseSignature() throws OS3Exception {
+  public SignatureInfo parseSignature() throws MalformedResourceException {
     if (authHeader == null || !authHeader.startsWith("AWS4")) {
       return null;
     }
     int firstSep = authHeader.indexOf(' ');
     if (firstSep < 0) {
-      throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
+      throw new MalformedResourceException(authHeader);
     }
 
     //split the value parts of the authorization header
     String[] split = authHeader.substring(firstSep + 1).trim().split(", *");
 
     if (split.length != 3) {
-      throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
+      throw new MalformedResourceException(authHeader);
     }
 
     String algorithm = parseAlgorithm(authHeader.substring(0, firstSep));
@@ -108,7 +107,7 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
    * Validate Signed headers.
    */
   private String parseSignedHeaders(String signedHeadersStr)
-      throws OS3Exception {
+      throws MalformedResourceException {
     if (isNotEmpty(signedHeadersStr)
         && signedHeadersStr.startsWith(SIGNEDHEADERS)) {
       String parsedSignedHeaders =
@@ -116,37 +115,39 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
       Collection<String> signedHeaders =
           StringUtils.getStringCollection(parsedSignedHeaders, ";");
       if (signedHeaders.size() == 0) {
-        LOG.error("No signed headers found. Authheader:{}", authHeader);
-        throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
+        throw new MalformedResourceException("No signed headers found.",
+            authHeader);
       }
       return parsedSignedHeaders;
     } else {
-      LOG.error("No signed headers found. Authheader:{}", authHeader);
-      throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
+      throw new MalformedResourceException("No signed headers found.",
+          authHeader);
     }
   }
 
   /**
    * Validate signature.
    */
-  private String parseSignature(String signature) throws OS3Exception {
+  private String parseSignature(String signature)
+      throws MalformedResourceException {
     if (signature.startsWith(SIGNATURE)) {
       String parsedSignature = signature.substring(SIGNATURE.length());
       if (isEmpty(parsedSignature)) {
-        LOG.error("Signature can't be empty: {}", signature);
-        throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
+        throw new MalformedResourceException(
+            "Signature can't be empty: " + signature,
+            authHeader);
       }
       try {
         Hex.decodeHex(parsedSignature);
       } catch (DecoderException e) {
-        LOG.error("Signature:{} should be in hexa-decimal encoding.",
-            signature);
-        throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
+        throw new MalformedResourceException(
+            "Signature:" + signature + " should be in hexa-decimal encoding.",
+            authHeader);
       }
       return parsedSignature;
     } else {
-      LOG.error("No signature found: {}", signature);
-      throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
+      throw new MalformedResourceException("No signature found: " + signature,
+          authHeader);
     }
   }
 
@@ -154,7 +155,7 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
    * Validate credentials.
    */
   private Credential parseCredentials(String credential)
-      throws OS3Exception {
+      throws MalformedResourceException {
     Credential credentialObj = null;
     if (isNotEmpty(credential) && credential.startsWith(CREDENTIAL)) {
       credential = credential.substring(CREDENTIAL.length());
@@ -162,58 +163,63 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
       // security comes, it needs to be completed.
       credentialObj = new Credential(credential);
     } else {
-      throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
+      throw new MalformedResourceException(authHeader);
     }
 
     if (credentialObj.getAccessKeyID().isEmpty()) {
-      LOG.error("AWS access id shouldn't be empty. credential:{}",
-          credential);
-      throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
+      throw new MalformedResourceException(
+          "AWS access id shouldn't be empty. credential: " + credential,
+          authHeader);
     }
     if (credentialObj.getAwsRegion().isEmpty()) {
-      LOG.error("AWS region shouldn't be empty. credential:{}", credential);
-      throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
+      throw new MalformedResourceException(
+          "AWS region shouldn't be empty. credential: " + credential,
+          authHeader);
     }
     if (credentialObj.getAwsRequest().isEmpty()) {
-      LOG.error("AWS request shouldn't be empty. credential:{}", credential);
-      throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
+      throw new MalformedResourceException(
+          "AWS request shouldn't be empty. credential:" + credential,
+          authHeader);
     }
     if (credentialObj.getAwsService().isEmpty()) {
-      LOG.error("AWS service shouldn't be empty. credential:{}",
-          credential);
-      throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
+      throw new MalformedResourceException(
+          "AWS service shouldn't be empty. credential:" + credential,
+          authHeader);
     }
 
     // Date should not be empty and within valid range.
     if (!credentialObj.getDate().isEmpty()) {
       validateDateRange(credentialObj);
     } else {
-      LOG.error("AWS date shouldn't be empty. credential:{}", credential);
-      throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
+      throw new MalformedResourceException(
+          "AWS date shouldn't be empty. credential:{}" + credential,
+          authHeader);
     }
     return credentialObj;
   }
 
   @VisibleForTesting
-  public void validateDateRange(Credential credentialObj) throws OS3Exception {
+  public void validateDateRange(Credential credentialObj)
+      throws MalformedResourceException {
     LocalDate date = LocalDate.parse(credentialObj.getDate(), DATE_FORMATTER);
     LocalDate now = LocalDate.now();
     if (date.isBefore(now.minus(1, DAYS)) ||
         date.isAfter(now.plus(1, DAYS))) {
-      LOG.error("AWS date not in valid range. Date:{} should not be older " +
-          "than 1 day(i.e yesterday) and greater than 1 day(i.e " +
-          "tomorrow).", date);
-      throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
+      throw new MalformedResourceException(
+          "AWS date not in valid range. Date: " + date + " should not be older "
+              + "than 1 day(i.e yesterday) and greater than 1 day(i.e " +
+              "tomorrow).", authHeader);
     }
   }
 
   /**
    * Validate if algorithm is in expected format.
    */
-  private String parseAlgorithm(String algorithm) throws OS3Exception {
+  private String parseAlgorithm(String algorithm)
+      throws MalformedResourceException {
     if (isEmpty(algorithm) || !algorithm.equals(AWS4_SIGNING_ALGORITHM)) {
-      LOG.error("Unexpected hash algorithm. Algo:{}", algorithm);
-      throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
+      throw new MalformedResourceException("Unexpected hash algorithm. Algo:"
+          + algorithm, authHeader);
     }
     return algorithm;
   }

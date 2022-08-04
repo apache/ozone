@@ -23,9 +23,7 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Context;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -38,6 +36,7 @@ import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
@@ -46,10 +45,10 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.s3.ClientIpFilter.CLIENT_IP_HEADER;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 
 /**
@@ -252,7 +251,7 @@ public abstract class EndpointBase implements Auditor {
       builder.setUser(s3Auth.getAccessID());
     }
     if (context != null) {
-      builder.atIp(getClientIpAddress());
+      builder.atIp(AuditUtils.getClientIpAddress(context));
     }
     return builder;
   }
@@ -284,28 +283,26 @@ public abstract class EndpointBase implements Auditor {
     return client;
   }
 
+  protected ClientProtocol getClientProtocol() {
+    return getClient().getProxy();
+  }
+
   @VisibleForTesting
   public S3GatewayMetrics getMetrics() {
     return S3GatewayMetrics.create();
   }
 
-  public String getClientIpAddress() {
-    return context.getHeaderString(CLIENT_IP_HEADER);
+  protected Map<String, String> getAuditParameters() {
+    return AuditUtils.getAuditParameters(context);
   }
 
-  protected Map<String, String> getAuditParameters() {
-    Map<String, String> res = new HashMap<>();
-    if (context != null) {
-      for (Map.Entry<String, List<String>> entry :
-          context.getUriInfo().getPathParameters().entrySet()) {
-        res.put(entry.getKey(), entry.getValue().toString());
+  protected void auditWriteFailure(AuditAction action, Throwable ex) {
+    AUDIT.logWriteFailure(
+        buildAuditMessageForFailure(action, getAuditParameters(), ex));
+  }
 
-      }
-      for (Map.Entry<String, List<String>> entry :
-          context.getUriInfo().getQueryParameters().entrySet()) {
-        res.put(entry.getKey(), entry.getValue().toString());
-      }
-    }
-    return res;
+  protected void auditReadFailure(AuditAction action, Exception ex) {
+    AUDIT.logReadFailure(
+        buildAuditMessageForFailure(action, getAuditParameters(), ex));
   }
 }

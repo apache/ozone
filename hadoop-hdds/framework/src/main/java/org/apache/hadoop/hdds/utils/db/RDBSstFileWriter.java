@@ -37,10 +37,11 @@ public class RDBSstFileWriter implements DumpFileWriter, Closeable {
   private SstFileWriter sstFileWriter;
   private File sstFile;
   private AtomicLong keyCounter;
+  private Options emptyOption = new Options();
 
   public RDBSstFileWriter() {
     EnvOptions envOptions = new EnvOptions();
-    this.sstFileWriter = new SstFileWriter(envOptions, new Options());
+    this.sstFileWriter = new SstFileWriter(envOptions, emptyOption);
     this.keyCounter = new AtomicLong(0);
   }
 
@@ -83,6 +84,7 @@ public class RDBSstFileWriter implements DumpFileWriter, Closeable {
       } finally {
         sstFileWriter.close();
         sstFileWriter = null;
+        emptyOption.close();
       }
 
       keyCounter.set(0);

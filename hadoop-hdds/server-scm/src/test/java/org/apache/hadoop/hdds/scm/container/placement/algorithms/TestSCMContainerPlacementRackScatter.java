@@ -106,6 +106,9 @@ public class TestSCMContainerPlacementRackScatter {
       DatanodeDetails datanodeDetails =
           MockDatanodeDetails.createDatanodeDetails(
           hostname + i, rack + (i / NODE_PER_RACK));
+
+      datanodes.add(datanodeDetails);
+      cluster.add(datanodeDetails);
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           datanodeDetails, NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultLayoutVersionProto());
@@ -121,9 +124,6 @@ public class TestSCMContainerPlacementRackScatter {
           new ArrayList<>(Arrays.asList(storage1)));
       datanodeInfo.updateMetaDataStorageReports(
           new ArrayList<>(Arrays.asList(metaStorage1)));
-
-      datanodes.add(datanodeDetails);
-      cluster.add(datanodeDetails);
       dnInfos.add(datanodeInfo);
     }
 

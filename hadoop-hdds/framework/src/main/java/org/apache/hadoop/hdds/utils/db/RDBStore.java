@@ -283,9 +283,18 @@ public class RDBStore implements DBStore {
       throw new IllegalArgumentException("Illegal count for getUpdatesSince.");
     }
     DBUpdatesWrapper dbUpdatesWrapper = new DBUpdatesWrapper();
-    try {
-      TransactionLogIterator transactionLogIterator =
-          db.getUpdatesSince(sequenceNumber);
+    try (TransactionLogIterator transactionLogIterator =
+        db.getUpdatesSince(sequenceNumber)) {
+
+      // If Recon's sequence number is out-of-date and the iterator is invalid,
+      // throw SNNFE and let Recon fall back to full snapshot.
+      // This could happen after OM restart.
+      if (db.getLatestSequenceNumber() != sequenceNumber &&
+          !transactionLogIterator.isValid()) {
+        throw new SequenceNumberNotFoundException(
+            "Invalid transaction log iterator when getting updates since "
+                + "sequence number " + sequenceNumber);
+      }
 
       // Only the first record needs to be checked if its seq number <
       // ( 1 + passed_in_sequence_number). For example, if seqNumber passed
@@ -298,29 +307,41 @@ public class RDBStore implements DBStore {
       while (transactionLogIterator.isValid()) {
         TransactionLogIterator.BatchResult result =
             transactionLogIterator.getBatch();
-        long currSequenceNumber = result.sequenceNumber();
-        if (checkValidStartingSeqNumber &&
-            currSequenceNumber > 1 + sequenceNumber) {
-          throw new SequenceNumberNotFoundException("Unable to read data from" +
-              " RocksDB wal to get delta updates. It may have already been" +
-              "flushed to SSTs.");
-        }
-        // If the above condition was not satisfied, then it is OK to reset
-        // the flag.
-        checkValidStartingSeqNumber = false;
-        if (currSequenceNumber <= sequenceNumber) {
-          transactionLogIterator.next();
-          continue;
-        }
-        dbUpdatesWrapper.addWriteBatch(result.writeBatch().data(),
-            result.sequenceNumber());
-        if (currSequenceNumber - sequenceNumber >= limitCount) {
-          break;
+        try {
+          long currSequenceNumber = result.sequenceNumber();
+          if (checkValidStartingSeqNumber &&
+              currSequenceNumber > 1 + sequenceNumber) {
+            throw new SequenceNumberNotFoundException("Unable to read data from"
+                + " RocksDB wal to get delta updates. It may have already been"
+                + " flushed to SSTs.");
+          }
+          // If the above condition was not satisfied, then it is OK to reset
+          // the flag.
+          checkValidStartingSeqNumber = false;
+          if (currSequenceNumber <= sequenceNumber) {
+            transactionLogIterator.next();
+            continue;
+          }
+          dbUpdatesWrapper.addWriteBatch(result.writeBatch().data(),
+              result.sequenceNumber());
+          if (currSequenceNumber - sequenceNumber >= limitCount) {
+            break;
+          }
+        } finally {
+          result.writeBatch().close();
         }
         transactionLogIterator.next();
       }
+    } catch (SequenceNumberNotFoundException e) {
+      LOG.warn("Unable to get delta updates since sequenceNumber {}. "
+              + "This exception will be thrown to the client",
+          sequenceNumber, e);
+      // Throw the exception back to Recon. Expect Recon to fall back to
+      // full snapshot.
+      throw e;
     } catch (RocksDBException | IOException e) {
-      LOG.error("Unable to get delta updates since sequenceNumber {} ",
+      LOG.error("Unable to get delta updates since sequenceNumber {}. "
+              + "This exception will not be thrown to the client ",
           sequenceNumber, e);
     }
     dbUpdatesWrapper.setLatestSequenceNumber(db.getLatestSequenceNumber());

@@ -97,7 +97,7 @@ public class TestContainerMetrics {
       VolumeSet volumeSet = new MutableVolumeSet(
           datanodeDetails.getUuidString(), conf,
           null, StorageVolume.VolumeType.DATA_VOLUME, null);
-      ContainerSet containerSet = new ContainerSet();
+      ContainerSet containerSet = new ContainerSet(1000);
       DatanodeStateMachine stateMachine = Mockito.mock(
           DatanodeStateMachine.class);
       StateContext context = Mockito.mock(StateContext.class);
@@ -134,10 +134,10 @@ public class TestContainerMetrics {
       // Write Chunk
       BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
       ContainerTestHelper.getWriteChunkRequest(
-          pipeline, blockID, 1024, null);
+          pipeline, blockID, 1024);
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper.getWriteChunkRequest(
-              pipeline, blockID, 1024, null);
+              pipeline, blockID, 1024);
       response = client.sendCommand(writeChunkRequest);
       Assert.assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());

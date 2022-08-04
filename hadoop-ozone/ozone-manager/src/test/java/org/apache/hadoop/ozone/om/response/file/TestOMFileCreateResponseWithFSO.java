@@ -62,10 +62,10 @@ public class TestOMFileCreateResponseWithFSO extends TestOMKeyCreateResponse {
   @NotNull
   @Override
   protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
-      OmBucketInfo bucketInfo, OMResponse response) {
+      OmBucketInfo bucketInfo, OMResponse response) throws IOException {
 
     return new OMFileCreateResponseWithFSO(response, keyInfo,
-        new ArrayList<>(), clientID, bucketInfo);
+        new ArrayList<>(), clientID, bucketInfo, getVolumeId());
   }
 
   @Override

@@ -28,6 +28,10 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ServicePlugin;
 
 import org.junit.After;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -50,6 +54,13 @@ public class TestHddsDatanodeService {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
     conf.setClass(OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY, MockService.class,
         ServicePlugin.class);
+
+    // Tokens only work if security is enabled.  Here we're testing that a
+    // misconfig in unsecure cluster does not prevent datanode from starting up.
+    // see HDDS-7055
+    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, false);
+    conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
+    conf.setBoolean(HDDS_CONTAINER_TOKEN_ENABLED, true);
 
     String volumeDir = testDir + "/disk1";
     conf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, volumeDir);

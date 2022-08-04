@@ -122,6 +122,7 @@ public class KeyValueContainerData extends ContainerData {
     this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
     this.schemaVersion = source.getSchemaVersion();
+    this.replicaIndex = source.getReplicaIndex();
   }
 
   /**
@@ -267,6 +268,7 @@ public class KeyValueContainerData extends ContainerData {
     builder.setContainerID(this.getContainerID());
     builder.setContainerPath(this.getContainerPath());
     builder.setState(this.getState());
+    builder.setBlockCount(this.getBlockCount());
 
     for (Map.Entry<String, String> entry : getMetadata().entrySet()) {
       ContainerProtos.KeyValue.Builder keyValBuilder =

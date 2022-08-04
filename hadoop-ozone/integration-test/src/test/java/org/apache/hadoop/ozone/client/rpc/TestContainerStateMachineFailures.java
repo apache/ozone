@@ -615,8 +615,7 @@ public class TestContainerStateMachineFailures {
         ByteString data = ByteString.copyFromUtf8("hello");
         ContainerProtos.ContainerCommandRequestProto.Builder writeChunkRequest =
             ContainerTestHelper.newWriteChunkRequestBuilder(pipeline,
-                omKeyLocationInfo.getBlockID(), data.size(), random.nextInt()
-            );
+                omKeyLocationInfo.getBlockID(), data.size());
         writeChunkRequest.setWriteChunk(writeChunkRequest.getWriteChunkBuilder()
                 .setData(data));
         xceiverClient.sendCommand(writeChunkRequest.build());

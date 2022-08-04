@@ -168,8 +168,9 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
               .setKeyLocation(blockLocation).build());
+      long volumeId = omMetadataManager.getVolumeId(volumeName);
       omClientResponse = getOmClientResponse(clientID, omResponse,
-              openKeyInfo, omBucketInfo.copyObject());
+              openKeyInfo, omBucketInfo.copyObject(), volumeId);
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
               volumeName, bucketName, openKeyName);
     } catch (IOException ex) {
@@ -227,8 +228,8 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
   @NotNull
   private OMClientResponse getOmClientResponse(long clientID,
       OMResponse.Builder omResponse, OmKeyInfo openKeyInfo,
-      OmBucketInfo omBucketInfo) {
+      OmBucketInfo omBucketInfo, long volumeId) {
     return new OMAllocateBlockResponseWithFSO(omResponse.build(), openKeyInfo,
-            clientID, getBucketLayout());
+            clientID, getBucketLayout(), volumeId, omBucketInfo.getObjectID());
   }
 }

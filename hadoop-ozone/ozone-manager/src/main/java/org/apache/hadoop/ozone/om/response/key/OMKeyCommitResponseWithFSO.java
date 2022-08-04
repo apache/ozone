@@ -44,13 +44,16 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
     BUCKET_TABLE})
 public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
 
+  private long volumeId;
+
   public OMKeyCommitResponseWithFSO(@Nonnull OMResponse omResponse,
                                @Nonnull OmKeyInfo omKeyInfo,
                                String ozoneKeyName, String openKeyName,
                                @Nonnull OmBucketInfo omBucketInfo,
-                               RepeatedOmKeyInfo deleteKeys) {
+                               RepeatedOmKeyInfo deleteKeys, long volumeId) {
     super(omResponse, omKeyInfo, ozoneKeyName, openKeyName,
             omBucketInfo, deleteKeys);
+    this.volumeId = volumeId;
   }
 
   /**
@@ -72,7 +75,7 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
         .deleteWithBatch(batchOperation, getOpenKeyName());
 
     OMFileRequest.addToFileTable(omMetadataManager, batchOperation,
-            getOmKeyInfo());
+            getOmKeyInfo(), volumeId, getOmBucketInfo().getObjectID());
 
     updateDeletedTable(omMetadataManager, batchOperation);
 

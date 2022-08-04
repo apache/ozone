@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -61,7 +62,7 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public Pipeline createPipeline(ReplicationConfig replicationConfig)
-      throws IOException {
+      throws IOException, TimeoutException {
     return createPipeline(replicationConfig, Collections.emptyList(),
         Collections.emptyList());
   }
@@ -69,7 +70,7 @@ public class MockPipelineManager implements PipelineManager {
   @Override
   public Pipeline createPipeline(ReplicationConfig replicationConfig,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
-      throws IOException {
+      throws IOException, TimeoutException {
     final List<DatanodeDetails> nodes = Stream.generate(
         MockDatanodeDetails::randomDatanodeDetails)
         .limit(replicationConfig.getRequiredNodes())
@@ -205,14 +206,14 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public void openPipeline(final PipelineID pipelineId)
-      throws IOException {
+      throws IOException, TimeoutException {
     stateManager.updatePipelineState(
         pipelineId.getProtobuf(), HddsProtos.PipelineState.PIPELINE_OPEN);
   }
 
   @Override
   public void closePipeline(final Pipeline pipeline, final boolean onTimeout)
-      throws IOException {
+      throws IOException, TimeoutException {
     stateManager.updatePipelineState(pipeline.getId().getProtobuf(),
         HddsProtos.PipelineState.PIPELINE_CLOSED);
   }
@@ -259,7 +260,7 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public void deactivatePipeline(final PipelineID pipelineID)
-      throws IOException {
+      throws IOException, TimeoutException {
     stateManager.updatePipelineState(pipelineID.getProtobuf(),
         HddsProtos.PipelineState.PIPELINE_DORMANT);
   }
@@ -313,5 +314,10 @@ public class MockPipelineManager implements PipelineManager {
   @Override
   public void releaseWriteLock() {
 
+  }
+
+  @Override
+  public boolean isPipelineCreationFrozen() {
+    return false;
   }
 }

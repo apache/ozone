@@ -89,6 +89,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Stateless helper functions for Hdds tests.
@@ -397,7 +398,7 @@ public final class HddsTestUtils {
   }
 
   public static void openAllRatisPipelines(PipelineManager pipelineManager)
-      throws IOException {
+      throws IOException, TimeoutException {
     // Pipeline is created by background thread
     for (ReplicationFactor factor : ReplicationFactor.values()) {
       // Trigger the processed pipeline report event
@@ -532,7 +533,7 @@ public final class HddsTestUtils {
 
   public static org.apache.hadoop.hdds.scm.container.ContainerInfo
       allocateContainer(ContainerManager containerManager)
-      throws IOException {
+      throws IOException, TimeoutException {
     return containerManager
         .allocateContainer(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
@@ -541,7 +542,8 @@ public final class HddsTestUtils {
   }
 
   public static void closeContainer(ContainerManager containerManager,
-        ContainerID id) throws IOException, InvalidStateTransitionException {
+        ContainerID id) throws IOException,
+      InvalidStateTransitionException, TimeoutException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(
@@ -556,7 +558,8 @@ public final class HddsTestUtils {
    * @throws IOException
    */
   public static void quasiCloseContainer(ContainerManager containerManager,
-       ContainerID id) throws IOException, InvalidStateTransitionException {
+       ContainerID id) throws IOException,
+      InvalidStateTransitionException, TimeoutException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(

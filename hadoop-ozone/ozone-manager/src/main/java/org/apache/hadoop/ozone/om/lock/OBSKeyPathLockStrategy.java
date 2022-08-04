@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om.lock;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.hashcodegenerator.StringOMHashCodeGeneratorImpl;
+import org.apache.hadoop.ozone.om.hashcodegenerator.OMHashCodeGenerator;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 
 import java.io.IOException;
@@ -31,6 +33,11 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.KEY_PATH
  * KEY_PATH_LOCK.
  */
 public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
+
+  // TODO: need to make this pluggable and allow users to configure the
+  //  preferred hash code generation mechanism.
+  private OMHashCodeGenerator omHashCodeGenerator =
+      new StringOMHashCodeGeneratorImpl();
 
   @Override
   public boolean acquireWriteLock(OMMetadataManager omMetadataManager,
@@ -45,8 +52,11 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
     Preconditions.checkArgument(acquiredLock,
         "BUCKET_LOCK should be acquired!");
 
+    String resourceName = omMetadataManager.getLock()
+        .generateResourceName(KEY_PATH_LOCK, volumeName, bucketName, keyName);
+    int resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
     acquiredLock = omMetadataManager.getLock()
-        .acquireWriteLock(KEY_PATH_LOCK, volumeName, bucketName, keyName);
+        .acquireWriteHashedLock(KEY_PATH_LOCK, String.valueOf(resourceHashCode));
 
     return acquiredLock;
   }
@@ -55,8 +65,11 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
   public void releaseWriteLock(OMMetadataManager omMetadataManager,
                                String volumeName, String bucketName,
                                String keyName) throws IOException {
+    String resourceName = omMetadataManager.getLock()
+        .generateResourceName(KEY_PATH_LOCK, volumeName, bucketName, keyName);
+    int resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
     omMetadataManager.getLock()
-        .releaseWriteLock(KEY_PATH_LOCK, volumeName, bucketName, keyName);
+        .releaseWriteHashedLock(KEY_PATH_LOCK, String.valueOf(resourceHashCode));
 
     omMetadataManager.getLock()
         .releaseReadLock(BUCKET_LOCK, volumeName, bucketName);
@@ -77,8 +90,11 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
     Preconditions.checkArgument(acquiredLock,
         "BUCKET_LOCK should be acquired!");
 
+    String resourceName = omMetadataManager.getLock()
+        .generateResourceName(KEY_PATH_LOCK, volumeName, bucketName, keyName);
+    int resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
     acquiredLock = omMetadataManager.getLock()
-        .acquireReadLock(KEY_PATH_LOCK, volumeName, bucketName, keyName);
+        .acquireReadHashedLock(KEY_PATH_LOCK, String.valueOf(resourceHashCode));
 
     return acquiredLock;
   }
@@ -87,8 +103,11 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
   public void releaseReadLock(OMMetadataManager omMetadataManager,
                               String volumeName, String bucketName,
                               String keyName) throws IOException {
+    String resourceName = omMetadataManager.getLock()
+        .generateResourceName(KEY_PATH_LOCK, volumeName, bucketName, keyName);
+    int resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
     omMetadataManager.getLock()
-        .releaseReadLock(KEY_PATH_LOCK, volumeName, bucketName, keyName);
+        .releaseReadHashedLock(KEY_PATH_LOCK, String.valueOf(resourceHashCode));
 
     omMetadataManager.getLock()
         .releaseReadLock(BUCKET_LOCK, volumeName, bucketName);

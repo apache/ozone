@@ -187,6 +187,30 @@ public final class OzoneConfigKeys {
   public static final int OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT
       = 10;
 
+  /**
+   * Configuration properties for Ozone Recovering Container Scrubbing Service.
+   */
+  public static final String
+      OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT =
+      "ozone.recovering.container.scrubbing.service.timeout";
+
+  // 300s for default
+  public static final String
+      OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT_DEFAULT = "300s";
+
+  public static final String
+      OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS =
+      "ozone.recovering.container.scrubbing.service.workers";
+  public static final int
+      OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS_DEFAULT = 10;
+
+  public static final String
+      OZONE_RECOVERING_CONTAINER_TIMEOUT =
+      "ozone.recovering.container.timeout";
+  public static final String
+      OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT = "20m";
+
+
   public static final String OZONE_KEY_PREALLOCATION_BLOCKS_MAX =
       "ozone.key.preallocation.max.blocks";
   public static final int OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT
