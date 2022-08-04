@@ -20,22 +20,23 @@ Test Timeout        5 minutes
 
 *** Variables ***
 ${PREFIX}    ${EMPTY}
+${n}    1
 
 *** Test Cases ***
 Ozone Echo RPC Load Generator with request payload and response payload
-#    Freon RPCL      prefix=rpcl${PREFIX} -plrq=10 -plrp=10
-    Freon RPCL      --payload-req=10 --payload-resp=10
+    ${result} =        Execute          ozone freon ome -t=1 -n=${n} --payload-req=1 --payload-resp=1
+                       Should contain   ${result}   Successful executions: ${n}
 
 Ozone Echo RPC Load Generator with request payload and empty response payload
-#    Freon RPCL      prefix=rpcl${PREFIX} -plrq=10
-    Freon RPCL      --payload-req=10
+    ${result} =        Execute          ozone freon ome -t=1 -n=${n} --payload-req=1
+                       Should contain   ${result}   Successful executions: ${n}
 
 Ozone Echo RPC Load Generator with empty request payload and response payload
-#    Freon RPCL      prefix=rpcl${PREFIX} -plrp=10
-    Freon RPCL      --payload-resp=10
+    ${result} =        Execute          ozone freon ome -t=1 -n=${n} --payload-resp=1
+                       Should contain   ${result}   Successful executions: ${n}
 
 Ozone Echo RPC Load Generator with empty request payload and empty response payload
-#    Freon RPCL      prefix=rpcl${PREFIX}
-    Freon RPCL
+    ${result} =        Execute          ozone freon ome -t=1 -n=${n}
+                       Should contain   ${result}   Successful executions: ${n}
 
 
