@@ -21,10 +21,10 @@ package org.apache.hadoop.ozone.container.common.utils.db;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.DBOptions;
 import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.LRUCache;
 
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -138,7 +138,7 @@ public abstract class DatanodeDBProfile {
           .getStorageSize(HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE,
               HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT,
               StorageUnit.BYTES);
-      blockBasedTableConfig.setBlockCache(new LRUCache(cacheSize));
+      blockBasedTableConfig.setBlockCache(new ManagedLRUCache(cacheSize));
       return blockBasedTableConfig;
     }
   }

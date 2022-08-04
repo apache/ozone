@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.rocksdb.Checkpoint;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -97,7 +99,7 @@ public final class RocksDatabase {
    */
   public static List<byte[]> listColumnFamiliesEmptyOptions(final String path)
       throws RocksDBException {
-    try (Options emptyOptions = new Options()) {
+    try (Options emptyOptions = new ManagedOptions()) {
       return RocksDB.listColumnFamilies(emptyOptions, path);
     }
   }
@@ -514,5 +516,11 @@ public final class RocksDatabase {
   @Override
   public String toString() {
     return name;
+  }
+
+  @Override
+  protected void finalize() throws Throwable {
+    ManagedRocksObjectUtils.assertClosed(this);
+    super.finalize();
   }
 }

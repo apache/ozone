@@ -20,6 +20,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.DBOptions;
@@ -130,7 +131,7 @@ public final class DBConfigFromFile {
           getOptionsFileNameFromDB(dbFileName));
 
       if (optionsFile.toFile().exists()) {
-        options = new DBOptions();
+        options = new ManagedDBOptions();
         try {
           OptionsUtil.loadOptionsFromFile(optionsFile.toString(),
               env, options, cfDescs, true);

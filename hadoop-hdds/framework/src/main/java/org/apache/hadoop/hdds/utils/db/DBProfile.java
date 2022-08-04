@@ -20,12 +20,14 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedBloomFilter;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
 import org.rocksdb.BlockBasedTableConfig;
-import org.rocksdb.BloomFilter;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.CompactionStyle;
 import org.rocksdb.DBOptions;
-import org.rocksdb.LRUCache;
 
 import java.math.BigDecimal;
 
@@ -51,7 +53,7 @@ public enum DBProfile {
       // Write Buffer Size -- set to 128 MB
       final long writeBufferSize = toLong(StorageUnit.MB.toBytes(128));
 
-      return new ColumnFamilyOptions()
+      return new ManagedColumnFamilyOptions()
           .setLevelCompactionDynamicLevelBytes(true)
           .setWriteBufferSize(writeBufferSize)
           .setTableFormatConfig(getBlockBasedTableConfig());
@@ -64,7 +66,7 @@ public enum DBProfile {
       final long bytesPerSync = toLong(StorageUnit.MB.toBytes(1.00));
       final boolean createIfMissing = true;
       final boolean createMissingColumnFamilies = true;
-      return new DBOptions()
+      return new ManagedDBOptions()
           .setIncreaseParallelism(Runtime.getRuntime().availableProcessors())
           .setMaxBackgroundCompactions(maxBackgroundCompactions)
           .setMaxBackgroundFlushes(maxBackgroundFlushes)
@@ -82,10 +84,10 @@ public enum DBProfile {
       final long blockSize = toLong(StorageUnit.KB.toBytes(16));
 
       return new BlockBasedTableConfig()
-          .setBlockCache(new LRUCache(blockCacheSize))
+          .setBlockCache(new ManagedLRUCache(blockCacheSize))
           .setBlockSize(blockSize)
           .setPinL0FilterAndIndexBlocksInCache(true)
-          .setFilterPolicy(new BloomFilter());
+          .setFilterPolicy(new ManagedBloomFilter());
     }
 
   },

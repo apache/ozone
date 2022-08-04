@@ -41,6 +41,9 @@ import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
+
+import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyOptions;
@@ -180,7 +183,7 @@ public final class DBStoreBuilder {
       rocksDBOption = getDefaultDBOptions(tableConfigs);
     }
 
-    WriteOptions writeOptions = new WriteOptions();
+    WriteOptions writeOptions = new ManagedWriteOptions();
     writeOptions.setSync(rocksDBConfiguration.getSyncOption());
 
     File dbFile = getDBFile();
@@ -312,7 +315,7 @@ public final class DBStoreBuilder {
 
     // Create statistics.
     if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
-      Statistics statistics = new Statistics();
+      Statistics statistics = new ManagedStatistics();
       statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
       dbOptions = dbOptions.setStatistics(statistics);
     }

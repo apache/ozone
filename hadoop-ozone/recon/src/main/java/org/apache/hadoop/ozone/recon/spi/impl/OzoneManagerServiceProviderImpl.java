@@ -31,6 +31,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -422,7 +423,7 @@ public class OzoneManagerServiceProviderImpl
           writeBatch.iterate(omdbUpdatesHandler);
           try (RDBBatchOperation rdbBatchOperation =
                    new RDBBatchOperation(writeBatch)) {
-            try (WriteOptions wOpts = new WriteOptions()) {
+            try (WriteOptions wOpts = new ManagedWriteOptions()) {
               rdbBatchOperation.commit(rocksDB, wOpts);
             }
           }

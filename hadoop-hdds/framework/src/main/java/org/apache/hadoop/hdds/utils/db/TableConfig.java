@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.StringUtils;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyOptions;
 
@@ -63,7 +64,7 @@ public class TableConfig {
    */
   public ColumnFamilyDescriptor getDescriptor() {
     return  new ColumnFamilyDescriptor(StringUtils.string2Bytes(name),
-        new ColumnFamilyOptions(columnFamilyOptions));
+        new ManagedColumnFamilyOptions(columnFamilyOptions));
   }
 
   /**
