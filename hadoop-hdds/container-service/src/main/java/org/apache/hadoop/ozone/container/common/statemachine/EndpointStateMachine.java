@@ -57,7 +57,7 @@ public class EndpointStateMachine
   private boolean isPassive;
   private final ExecutorService executorService;
 
-  private static final String RECONN_TYPE = "Reconn";
+  private static final String RECON_TYPE = "Recon";
 
   private static final String SCM_TYPE = "SCM";
 
@@ -351,7 +351,7 @@ public class EndpointStateMachine
   public String getType() {
     if (endPoint.getUnderlyingProxyObject()
             instanceof ReconDatanodeProtocolPB) {
-      return RECONN_TYPE;
+      return RECON_TYPE;
     }
     return SCM_TYPE;
   }
