@@ -289,10 +289,11 @@ public class TestECKeyOutputStream {
     final OzoneBucket bucket = getOzoneBucket();
     String keyName =
             String.format("testMultipleChunksInSingleWriteOpOffset" +
-                    "%dBufferChunks%dNumChunks", offset, bufferChunks, numChunks);
+                    "%dBufferChunks%dNumChunks", offset, bufferChunks,
+                    numChunks);
     try (OzoneOutputStream out = bucket.createKey(keyName, 4096,
-            new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
-                    chunkSize), new HashMap<>())) {
+        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+            chunkSize), new HashMap<>())) {
       out.write(inputData, offset, numChunks * chunkSize);
     }
 
