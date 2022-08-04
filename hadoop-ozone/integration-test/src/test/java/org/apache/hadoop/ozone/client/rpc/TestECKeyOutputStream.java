@@ -282,7 +282,7 @@ public class TestECKeyOutputStream {
     testMultipleChunksInSingleWriteOp(21);
   }
 
-  public void testMultipleChunksInSingleWriteOp(int offset,
+  private void testMultipleChunksInSingleWriteOp(int offset,
                                                 int bufferChunks, int numChunks)
           throws IOException {
     byte[] inputData = getInputBytes(offset, bufferChunks, numChunks);
@@ -301,7 +301,7 @@ public class TestECKeyOutputStream {
             bucket.getKey(keyName));
   }
 
-  public void testMultipleChunksInSingleWriteOp(int numChunks)
+  private void testMultipleChunksInSingleWriteOp(int numChunks)
       throws IOException {
     testMultipleChunksInSingleWriteOp(0, numChunks, numChunks);
   }
