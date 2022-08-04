@@ -56,7 +56,8 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
         .generateResourceName(KEY_PATH_LOCK, volumeName, bucketName, keyName);
     int resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
     acquiredLock = omMetadataManager.getLock()
-        .acquireWriteHashedLock(KEY_PATH_LOCK, String.valueOf(resourceHashCode));
+        .acquireWriteHashedLock(KEY_PATH_LOCK,
+            String.valueOf(resourceHashCode));
 
     return acquiredLock;
   }
@@ -68,8 +69,8 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
     String resourceName = omMetadataManager.getLock()
         .generateResourceName(KEY_PATH_LOCK, volumeName, bucketName, keyName);
     int resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
-    omMetadataManager.getLock()
-        .releaseWriteHashedLock(KEY_PATH_LOCK, String.valueOf(resourceHashCode));
+    omMetadataManager.getLock().releaseWriteHashedLock(KEY_PATH_LOCK,
+        String.valueOf(resourceHashCode));
 
     omMetadataManager.getLock()
         .releaseReadLock(BUCKET_LOCK, volumeName, bucketName);
