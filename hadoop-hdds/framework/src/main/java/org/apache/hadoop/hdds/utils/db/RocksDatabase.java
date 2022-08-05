@@ -523,7 +523,7 @@ public final class RocksDatabase {
 
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
+    ManagedRocksObjectUtils.assertClosed(db);
     super.finalize();
   }
 

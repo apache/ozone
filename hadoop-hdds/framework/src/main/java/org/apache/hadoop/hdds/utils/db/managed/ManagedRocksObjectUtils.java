@@ -18,7 +18,6 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.rocksdb.RocksObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,15 +32,7 @@ public final class ManagedRocksObjectUtils {
   private static final Logger LOG =
       LoggerFactory.getLogger(ManagedRocksObjectUtils.class);
 
-  public static void assertClosed(RocksDatabase rocksDb) {
-    ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
-    if (!rocksDb.isClosed()) {
-      ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
-      LOG.warn("{} is not closed properly", rocksDb.getClass().getSimpleName());
-    }
-  }
-
-  static void assertClosed(RocksObject rocksObject) {
+  public static void assertClosed(RocksObject rocksObject) {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
     if (rocksObject.isOwningHandle()) {
       ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
