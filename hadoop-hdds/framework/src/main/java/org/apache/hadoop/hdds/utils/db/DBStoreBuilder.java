@@ -51,7 +51,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.InfoLogLevel;
-import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -315,7 +314,7 @@ public final class DBStoreBuilder {
 
     // Create statistics.
     if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
-      Statistics statistics = new ManagedStatistics();
+      ManagedStatistics statistics = new ManagedStatistics();
       statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
       dbOptions.setStatistics(statistics);
     }
