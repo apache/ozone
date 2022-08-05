@@ -1223,6 +1223,25 @@ public class LegacyReplicationManager {
       } else {
         LOG.warn("Cannot replicate container {}, no healthy replica found.",
             container.containerID());
+        if (rmConf.isContainerUnrecoverableCleanupEnabled()) {
+          replicas.stream().filter(rp -> rp.getState().equals(State.UNHEALTHY))
+              .forEach(rp -> {
+                sendDeleteCommand(container, rp.getDatanodeDetails(), true);
+                LOG.info("Send deleteCmd to force delete the unhealthy " +
+                    "replica {}", rp);
+              });
+          // manually reset these as the container is unhealthy and won't update
+          // through {@link updateRatisContainerStats}.
+          container.setNumberOfKeys(0);
+          container.setUsedBytes(0);
+          try {
+            containerManager.updateContainerState(container.containerID(),
+                HddsProtos.LifeCycleEvent.DELETE);
+          } catch (InvalidStateTransitionException | TimeoutException ex) {
+            LOG.error("Exception while updating container {} state to DELETE," +
+                " current state is {}", container, container.getState());
+          }
+        }
       }
     } catch (IOException | IllegalStateException ex) {
       LOG.warn("Exception while replicating container {}.",
@@ -1764,6 +1783,19 @@ public class LegacyReplicationManager {
     )
     private int containerInflightDeletionLimit = 0;
 
+    @Config(key = "container.unrecoverable.cleanup.enabled",
+        type = ConfigType.BOOLEAN,
+        defaultValue = "false",
+        tags = {SCM, OZONE},
+        description = "This property is used to clean up " +
+            "closed unrecoverable container."
+    )
+    private boolean containerUnrecoverableCleanupEnabled = false;
+
+    public void setContainerUnrecoverableCleanupEnabled(boolean enabled) {
+      this.containerUnrecoverableCleanupEnabled = enabled;
+    }
+
     public void setContainerInflightReplicationLimit(int replicationLimit) {
       this.containerInflightReplicationLimit = replicationLimit;
     }
@@ -1782,6 +1814,10 @@ public class LegacyReplicationManager {
 
     public int getContainerInflightDeletionLimit() {
       return containerInflightDeletionLimit;
+    }
+
+    public boolean isContainerUnrecoverableCleanupEnabled() {
+      return containerUnrecoverableCleanupEnabled;
     }
 
     public long getInterval() {
