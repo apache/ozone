@@ -933,8 +933,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       return resp;
     }
     byte[] payloadBytes = new byte[0];
-    //To avoid integer overflow, we cap the payload by max 2048000 KB
-
     int payloadRespSize = Math.min(
             req.getEchoRPCRequest().getPayloadSizeResp()
                     * RPC_PAYLOAD_MULTIPLICATION_FACTOR, MAX_SIZE_KB);

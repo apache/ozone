@@ -23,7 +23,6 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -99,7 +98,7 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
 
   private void sendRPCReq(long l) throws Exception {
     timer.time(() -> {
-      EchoRPCResponse resp = client.echoRPCReq(payloadReqBytes,
+      client.echoRPCReq(payloadReqBytes,
               payloadRespSize);
       return null;
     });
