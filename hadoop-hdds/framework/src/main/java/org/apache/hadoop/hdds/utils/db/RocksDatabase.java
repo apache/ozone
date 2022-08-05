@@ -291,8 +291,8 @@ public final class RocksDatabase {
 
   private final AtomicBoolean isClosed = new AtomicBoolean();
 
-  private RocksDatabase(File dbFile, ManagedRocksDB db, ManagedDBOptions dbOptions,
-      ManagedWriteOptions writeOptions,
+  private RocksDatabase(File dbFile, ManagedRocksDB db,
+      ManagedDBOptions dbOptions, ManagedWriteOptions writeOptions,
       List<ColumnFamilyDescriptor> descriptors,
       Map<String, ColumnFamily> columnFamilies) {
     this.name = getClass().getSimpleName() + "[" + dbFile + "]";
@@ -397,7 +397,8 @@ public final class RocksDatabase {
   public Supplier<byte[]> keyMayExistHolder(ColumnFamily family,
       byte[] key) {
     final Holder<byte[]> out = new Holder<>();
-    return db.get().keyMayExist(family.getHandle(), key, out) ? out::getValue : null;
+    return db.get().keyMayExist(family.getHandle(), key, out) ?
+        out::getValue : null;
   }
 
   public ColumnFamily getColumnFamily(String key) {

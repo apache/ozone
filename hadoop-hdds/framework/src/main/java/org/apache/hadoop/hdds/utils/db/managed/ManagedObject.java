@@ -20,8 +20,6 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.rocksdb.RocksObject;
 
-import java.io.IOException;
-
 /**
  * General template for a managed RocksObject.
  * @param <T>

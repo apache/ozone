@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.rocksdb.Checkpoint;
-import org.rocksdb.RocksDB;
 
 /**
  * Managed RocksIterator.
