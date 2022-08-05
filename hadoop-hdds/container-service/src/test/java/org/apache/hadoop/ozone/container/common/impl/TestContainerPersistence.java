@@ -23,9 +23,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.ListIterator;
 
-import org.apache.commons.io.FileExistsException;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -47,8 +52,8 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -317,16 +322,17 @@ public class TestContainerPersistence {
         .containsKey(testContainerID2));
 
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
-      CleanUpManager cleanUpManager = new CleanUpManager(conf);
 
       KeyValueContainerData container1Data =
           (KeyValueContainerData) container1.getContainerData();
+      KeyValueContainerData container2Data =
+          (KeyValueContainerData) container2.getContainerData();
+
+      HddsVolume hddsVolume = container1Data.getVolume();
+      CleanUpManager cleanUpManager = new CleanUpManager(conf, hddsVolume);
 
       // Rename container1 dir
       Assert.assertTrue(cleanUpManager.renameDir(container1Data));
-
-      KeyValueContainerData container2Data =
-          (KeyValueContainerData) container2.getContainerData();
 
       // Rename container2 dir
       Assert.assertTrue(cleanUpManager.renameDir(container2Data));

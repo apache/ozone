@@ -22,6 +22,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,10 +48,13 @@ public class CleanUpManager {
 
   private final DatanodeConfiguration datanodeConf;
 
-  public CleanUpManager(ConfigurationSource configurationSource) {
+  private String tmpPath;
+
+  public CleanUpManager(ConfigurationSource configurationSource,
+                        HddsVolume hddsVolume) {
     this.datanodeConf =
         configurationSource.getObject(DatanodeConfiguration.class);
-    tmpDirInit();
+    tmpDirInit(hddsVolume);
   }
 
   public DatanodeConfiguration getDatanodeConf() {
@@ -58,17 +63,22 @@ public class CleanUpManager {
 
   public boolean checkContainerSchemaV3Enabled(
       KeyValueContainerData keyValueContainerData) {
-    if (keyValueContainerData.getSchemaVersion()
-        .equals(OzoneConsts.SCHEMA_V3)) {
-      return true;
-    } else {
-      return false;
-    }
+    return (keyValueContainerData.getSchemaVersion()
+        .equals(OzoneConsts.SCHEMA_V3));
   }
 
-  private void tmpDirInit() {
+  private void tmpDirInit(HddsVolume hddsVolume) {
+    //(String) path of /tmp from the datanode config
     String tmpDir = datanodeConf.getTmpDeleteDirectoryPath();
-    Path tmpDirPath = Paths.get(tmpDir);
+
+    // HddsVolume root directory path
+    String hddsRoot = hddsVolume.getHddsRootDir().toString();
+
+    // HddsVolume path
+    String volPath = HddsVolumeUtil.getHddsRoot(hddsRoot);
+
+    tmpPath = volPath + tmpDir;
+    Path tmpDirPath = Paths.get(tmpPath);
 
     if (Files.notExists(tmpDirPath)) {
       try {
@@ -81,17 +91,15 @@ public class CleanUpManager {
 
   public boolean renameDir(KeyValueContainerData keyValueContainerData)
       throws IOException {
-    String tmpDirPath = datanodeConf.getTmpDeleteDirectoryPath();
-
     String containerPath = keyValueContainerData.getContainerPath();
     File container = new File(containerPath);
     String containerDirName = container.getName();
 
-    String destinationDirPath = tmpDirPath + "/" + containerDirName;
+    String destinationDirPath = tmpPath + "/" + containerDirName;
 
     boolean success = container.renameTo(new File(destinationDirPath));
 
-    if (success == true) {
+    if (success) {
       keyValueContainerData.setMetadataPath(destinationDirPath + "/metadata");
       keyValueContainerData.setChunksPath(destinationDirPath + "/chunks");
     }
@@ -106,8 +114,7 @@ public class CleanUpManager {
   public ListIterator<File> getDeleteLeftovers() {
     List<File> leftovers = new ArrayList<File>();
 
-    String tmpDirPath = datanodeConf.getTmpDeleteDirectoryPath();
-    File tmpDir = new File(tmpDirPath);
+    File tmpDir = new File(tmpPath);
 
     for (File file : tmpDir.listFiles()) {
       leftovers.add(file);
@@ -121,11 +128,7 @@ public class CleanUpManager {
   public boolean tmpDirIsEmpty() {
     ListIterator<File> leftoversListIt = getDeleteLeftovers();
 
-    if (!leftoversListIt.hasNext()) {
-      return true;
-    } else {
-      return false;
-    }
+    return leftoversListIt.hasNext();
   }
 
   /**
@@ -150,8 +153,7 @@ public class CleanUpManager {
    * @throws IOException
    */
   public void deleteTmpDir() throws IOException {
-    String deleteDirPath = datanodeConf.getTmpDeleteDirectoryPath();
-    File deleteDir = new File(deleteDirPath);
+    File deleteDir = new File(tmpPath);
     File tmpDir = deleteDir.getParentFile();
     FileUtils.deleteDirectory(tmpDir);
   }

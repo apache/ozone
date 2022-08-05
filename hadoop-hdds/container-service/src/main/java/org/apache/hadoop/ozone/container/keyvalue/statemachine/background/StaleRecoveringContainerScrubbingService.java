@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.ozone.container.common.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.slf4j.Logger;
@@ -92,9 +93,12 @@ public class StaleRecoveringContainerScrubbingService
       Container container = containerSet.getContainer(containerID);
       KeyValueContainerData keyValueContainerData =
           (KeyValueContainerData) container.getContainerData();
+      HddsVolume hddsVolume = keyValueContainerData.getVolume();
+
       KeyValueContainer keyValueContainer = (KeyValueContainer) container;
       ConfigurationSource configurationSource = keyValueContainer.getConfig();
-      CleanUpManager cleanUpManager = new CleanUpManager(configurationSource);
+      CleanUpManager cleanUpManager =
+          new CleanUpManager(configurationSource, hddsVolume);
 
       if (cleanUpManager.checkContainerSchemaV3Enabled(keyValueContainerData)) {
         cleanUpManager.renameDir(keyValueContainerData);

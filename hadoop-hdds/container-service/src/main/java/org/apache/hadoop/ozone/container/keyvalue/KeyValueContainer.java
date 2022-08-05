@@ -295,7 +295,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public void delete() throws StorageContainerException {
-    CleanUpManager cleanUpManager = new CleanUpManager(config);
+    HddsVolume hddsVolume = containerData.getVolume();
+    CleanUpManager cleanUpManager = new CleanUpManager(config, hddsVolume);
     long containerId = containerData.getContainerID();
     try {
       KeyValueContainerUtil.removeContainer(containerData, config);
@@ -306,14 +307,16 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         try {
           cleanUpManager.cleanTmpDir();
         } catch (IOException e) {
-          LOG.error("Failed to clean up artifacts left in the tmp directory", e);
+          LOG.error("Failed to clean up artifacts " +
+              "left in the tmp directory", e);
         }
       } else {
         onFailure(containerData.getVolume());
         String errMsg = String.format("Failed to cleanup container. ID: %d",
             containerId);
         LOG.error(errMsg, ex);
-        throw new StorageContainerException(errMsg, ex, CONTAINER_INTERNAL_ERROR);
+        throw new StorageContainerException(errMsg, ex,
+            CONTAINER_INTERNAL_ERROR);
       }
     }
   }

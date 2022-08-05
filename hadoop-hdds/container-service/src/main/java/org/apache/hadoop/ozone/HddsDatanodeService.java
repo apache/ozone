@@ -32,7 +32,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -59,7 +58,6 @@ import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.container.common.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -131,12 +129,17 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   public void cleanTmpDir() {
     if (VersionedDatanodeFeatures.isFinalized(
         HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
-      CleanUpManager cleanUpManager = new CleanUpManager(conf);
-      if (!cleanUpManager.tmpDirIsEmpty()) {
-        try {
-          cleanUpManager.cleanTmpDir();
-        } catch (IOException ex) {
-          LOG.error("Error cleaning /tmp/container_delete_service", ex);
+      MutableVolumeSet volumeSet =
+          getDatanodeStateMachine().getContainer().getVolumeSet();
+      for (StorageVolume storageVolume : volumeSet.getVolumesList()) {
+        HddsVolume hddsVolume = (HddsVolume) storageVolume;
+        CleanUpManager cleanUpManager = new CleanUpManager(conf, hddsVolume);
+        if (!cleanUpManager.tmpDirIsEmpty()) {
+          try {
+            cleanUpManager.cleanTmpDir();
+          } catch (IOException ex) {
+            LOG.error("Error cleaning /tmp/container_delete_service", ex);
+          }
         }
       }
     }
@@ -583,7 +586,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   @Override
   public void stop() {
     cleanTmpDir();
-
     if (!isStopped.getAndSet(true)) {
       if (plugins != null) {
         for (ServicePlugin plugin : plugins) {
