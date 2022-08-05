@@ -39,12 +39,13 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Metrics(about = "Client Metrics", context = OzoneConsts.OZONE)
 public final class ContainerClientMetrics {
+  private static ContainerClientMetrics instance;
   @VisibleForTesting
-  static ContainerClientMetrics instance;
-  private static int referenceCount = 0;
+  static int referenceCount = 0;
 
   private static final String SOURCE_NAME =
       ContainerClientMetrics.class.getSimpleName();
+  private static int instanceCount = 0;
 
   @Metric
   private MutableCounterLong totalWriteChunkCalls;
@@ -57,7 +58,9 @@ public final class ContainerClientMetrics {
 
   public static synchronized ContainerClientMetrics acquire() {
     if (instance == null) {
-      instance = DefaultMetricsSystem.instance().register(SOURCE_NAME,
+      instanceCount++;
+      instance = DefaultMetricsSystem.instance().register(
+          SOURCE_NAME + instanceCount,
           "Ozone Client Metrics", new ContainerClientMetrics());
     }
     referenceCount++;
@@ -70,7 +73,8 @@ public final class ContainerClientMetrics {
     }
     referenceCount--;
     if (referenceCount == 0) {
-      DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+      DefaultMetricsSystem.instance().unregisterSource(
+          SOURCE_NAME + instanceCount);
       instance = null;
     }
   }

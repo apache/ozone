@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class TestContainerClientMetrics {
   @Before
   public void setup() {
-    while (ContainerClientMetrics.instance != null) {
+    while (ContainerClientMetrics.referenceCount > 0) {
       ContainerClientMetrics.release();
     }
   }
@@ -88,12 +88,20 @@ public class TestContainerClientMetrics {
 
   @Test
   public void testAcquireAndRelease() {
-    ContainerClientMetrics acquired = ContainerClientMetrics.acquire();
-    Assertions.assertNotNull(acquired);
+    Assertions.assertNotNull(ContainerClientMetrics.acquire());
+    Assertions.assertEquals(1, ContainerClientMetrics.referenceCount);
     ContainerClientMetrics.release();
-    Assertions.assertNull(ContainerClientMetrics.instance);
-    acquired = ContainerClientMetrics.acquire();
-    Assertions.assertNotNull(acquired);
+    Assertions.assertEquals(0, ContainerClientMetrics.referenceCount);
+
+    Assertions.assertNotNull(ContainerClientMetrics.acquire());
+    Assertions.assertNotNull(ContainerClientMetrics.acquire());
+    Assertions.assertEquals(2, ContainerClientMetrics.referenceCount);
+    ContainerClientMetrics.release();
+    ContainerClientMetrics.release();
+    Assertions.assertEquals(0, ContainerClientMetrics.referenceCount);
+
+    ContainerClientMetrics.acquire();
+    Assertions.assertNotNull(ContainerClientMetrics.acquire());
   }
 
   private Pipeline createPipeline(PipelineID piplineId, UUID leaderId) {
