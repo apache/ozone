@@ -17,18 +17,18 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.rocksdb.RocksIterator;
+import org.rocksdb.Checkpoint;
+import org.rocksdb.RocksDB;
 
 /**
  * Managed RocksIterator.
  */
-public class ManagedRocksIterator extends ManagedObject<RocksIterator> {
-
-  public ManagedRocksIterator(RocksIterator original) {
+public class ManagedCheckpoint extends ManagedObject<Checkpoint> {
+  public ManagedCheckpoint(Checkpoint original) {
     super(original);
   }
 
-  public static ManagedRocksIterator managed(RocksIterator iterator) {
-    return new ManagedRocksIterator(iterator);
+  public static ManagedCheckpoint create(RocksDB rocksDB) {
+    return new ManagedCheckpoint(Checkpoint.create(rocksDB));
   }
 }

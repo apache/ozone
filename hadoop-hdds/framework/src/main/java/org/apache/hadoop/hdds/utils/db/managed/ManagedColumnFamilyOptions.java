@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.rocksdb.ColumnFamilyOptions;
+import org.rocksdb.TableFormatConfig;
 
 /**
  * Managed ColumnFamilyOptions.
@@ -30,6 +31,13 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
 
   public ManagedColumnFamilyOptions(ColumnFamilyOptions columnFamilyOptions) {
     super(columnFamilyOptions);
+  }
+
+  @Override
+  public ManagedColumnFamilyOptions setTableFormatConfig(
+      TableFormatConfig tableFormatConfig) {
+    super.setTableFormatConfig(tableFormatConfig);
+    return this;
   }
 
   @Override

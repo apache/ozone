@@ -18,15 +18,13 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.rocksdb.WriteOptions;
+import org.rocksdb.IngestExternalFileOptions;
 
 /**
- * Managed WriteBatch.
+ * Managed IngestExternalFileOptions.
  */
-public class ManagedWriteOptions extends WriteOptions {
-  public ManagedWriteOptions() {
-    super();
-  }
+public class ManagedIngestExternalFileOptions extends
+    IngestExternalFileOptions {
 
   @Override
   protected void finalize() throws Throwable {

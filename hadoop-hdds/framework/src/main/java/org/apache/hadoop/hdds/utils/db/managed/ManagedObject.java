@@ -18,19 +18,33 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.rocksdb.WriteOptions;
+import org.rocksdb.RocksObject;
+
+import java.io.IOException;
 
 /**
- * Managed WriteBatch.
+ * General template for a managed RocksObject.
+ * @param <T>
  */
-public class ManagedWriteOptions extends WriteOptions {
-  public ManagedWriteOptions() {
-    super();
+class ManagedObject<T extends RocksObject> implements AutoCloseable {
+  private final T original;
+
+  ManagedObject(T original) {
+    this.original = original;
+  }
+
+  public T get() {
+    return original;
+  }
+
+  @Override
+  public void close() throws IOException {
+    original.close();
   }
 
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
+    ManagedRocksObjectUtils.assertClosed(original);
     super.finalize();
   }
 }

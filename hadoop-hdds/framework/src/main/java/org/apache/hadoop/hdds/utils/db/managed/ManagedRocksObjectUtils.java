@@ -38,7 +38,6 @@ public final class ManagedRocksObjectUtils {
     if (!rocksDb.isClosed()) {
       ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
       LOG.warn("{} is not closed properly", rocksDb.getClass().getSimpleName());
-      rocksDb.close();
     }
   }
 
@@ -48,7 +47,6 @@ public final class ManagedRocksObjectUtils {
       ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
       LOG.warn("{} is not closed properly",
           rocksObject.getClass().getSimpleName());
-      rocksObject.close();
     }
   }
 
@@ -58,7 +56,6 @@ public final class ManagedRocksObjectUtils {
       ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
       LOG.warn("{} is not closed properly",
           rocksObject.getClass().getSimpleName(), stack);
-      rocksObject.close();
     }
   }
 }

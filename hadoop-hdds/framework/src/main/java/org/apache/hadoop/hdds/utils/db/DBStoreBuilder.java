@@ -42,17 +42,16 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
 
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.DBOptions;
 import org.rocksdb.InfoLogLevel;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
-import org.rocksdb.WriteOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,18 +73,18 @@ public final class DBStoreBuilder {
   public static final DBProfile HDDS_DEFAULT_DB_PROFILE = DBProfile.DISK;
 
   // the DBOptions used if the caller does not specify.
-  private final DBOptions defaultDBOptions;
+  private final ManagedDBOptions defaultDBOptions;
   // The DBOptions specified by the caller.
-  private DBOptions rocksDBOption;
+  private ManagedDBOptions rocksDBOption;
   // The column family options that will be used for any column families
   // added by name only (without specifying options).
-  private ColumnFamilyOptions defaultCfOptions;
+  private ManagedColumnFamilyOptions defaultCfOptions;
   private String dbname;
   private Path dbPath;
   // Maps added column family names to the column family options they were
   // added with. Value will be null if the column family was not added with
   // any options. On build, this will be replaced with defaultCfOptions.
-  private Map<String, ColumnFamilyOptions> cfOptions;
+  private Map<String, ManagedColumnFamilyOptions> cfOptions;
   private ConfigurationSource configuration;
   private CodecRegistry registry;
   private String rocksDbStat;
@@ -183,7 +182,7 @@ public final class DBStoreBuilder {
       rocksDBOption = getDefaultDBOptions(tableConfigs);
     }
 
-    WriteOptions writeOptions = new ManagedWriteOptions();
+    ManagedWriteOptions writeOptions = new ManagedWriteOptions();
     writeOptions.setSync(rocksDBConfiguration.getSyncOption());
 
     File dbFile = getDBFile();
@@ -205,7 +204,7 @@ public final class DBStoreBuilder {
   }
 
   public DBStoreBuilder addTable(String tableName,
-      ColumnFamilyOptions options) {
+      ManagedColumnFamilyOptions options) {
     cfOptions.put(tableName, options);
     return this;
   }
@@ -215,13 +214,13 @@ public final class DBStoreBuilder {
     return this;
   }
 
-  public DBStoreBuilder setDBOptions(DBOptions option) {
+  public DBStoreBuilder setDBOptions(ManagedDBOptions option) {
     rocksDBOption = option;
     return this;
   }
 
   public DBStoreBuilder setDefaultCFOptions(
-      ColumnFamilyOptions options) {
+      ManagedColumnFamilyOptions options) {
     defaultCfOptions = options;
     return this;
   }
@@ -238,8 +237,8 @@ public final class DBStoreBuilder {
   }
 
   /**
-   * Set the {@link DBOptions} and default {@link ColumnFamilyOptions} based
-   * on {@code prof}.
+   * Set the {@link ManagedDBOptions} and default
+   * {@link ManagedColumnFamilyOptions} based on {@code prof}.
    */
   public DBStoreBuilder setProfile(DBProfile prof) {
     setDBOptions(prof.getDBOptions());
@@ -260,10 +259,10 @@ public final class DBStoreBuilder {
     cfOptions.putIfAbsent(DEFAULT_COLUMN_FAMILY_NAME,
         defaultCfOptions);
 
-    for (Map.Entry<String, ColumnFamilyOptions> entry:
+    for (Map.Entry<String, ManagedColumnFamilyOptions> entry:
         cfOptions.entrySet()) {
       String name = entry.getKey();
-      ColumnFamilyOptions options = entry.getValue();
+      ManagedColumnFamilyOptions options = entry.getValue();
 
       if (options == null) {
         LOG.debug("using default column family options for table: {}", name);
@@ -277,10 +276,10 @@ public final class DBStoreBuilder {
   }
 
   /**
-   * Attempts to get RocksDB {@link DBOptions} from an ini config file. If
-   * that file does not exist, the value of {@code defaultDBOptions}  is used
-   * instead.
-   * After an {@link DBOptions} is chosen, it will have the logging level
+   * Attempts to get RocksDB {@link ManagedDBOptions} from an ini config
+   * file. If that file does not exist, the value of {@code defaultDBOptions}
+   * is used instead.
+   * After an {@link ManagedDBOptions} is chosen, it will have the logging level
    * specified by builder's {@link RocksDBConfiguration} applied to it. It
    * will also have statistics added if they are not turned off in the
    * builder's {@link ConfigurationSource}.
@@ -288,11 +287,12 @@ public final class DBStoreBuilder {
    * @param tableConfigs Configurations for each column family, used when
    * reading DB options from the ini file.
    *
-   * @return The {@link DBOptions} that should be used as the default value
-   * for this builder if one is not specified by the caller.
+   * @return The {@link ManagedDBOptions} that should be used as the default
+   * value for this builder if one is not specified by the caller.
    */
-  private DBOptions getDefaultDBOptions(Collection<TableConfig> tableConfigs) {
-    DBOptions dbOptions = getDBOptionsFromFile(tableConfigs);
+  private ManagedDBOptions getDefaultDBOptions(
+      Collection<TableConfig> tableConfigs) {
+    ManagedDBOptions dbOptions = getDBOptionsFromFile(tableConfigs);
 
     if (dbOptions == null) {
       dbOptions = defaultDBOptions;
@@ -317,20 +317,21 @@ public final class DBStoreBuilder {
     if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
       Statistics statistics = new ManagedStatistics();
       statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
-      dbOptions = dbOptions.setStatistics(statistics);
+      dbOptions.setStatistics(statistics);
     }
 
     return dbOptions;
   }
 
   /**
-   * Attempts to construct a {@link DBOptions} object from the configuration
-   * directory with name equal to {@code database name}.ini, where {@code
-   * database name} is the property set by
+   * Attempts to construct a {@link ManagedDBOptions} object from the
+   * configuration directory with name equal to {@code database name}.ini,
+   * where {@code database name} is the property set by
    * {@link DBStoreBuilder#setName(String)}.
    */
-  private DBOptions getDBOptionsFromFile(Collection<TableConfig> tableConfigs) {
-    DBOptions option = null;
+  private ManagedDBOptions getDBOptionsFromFile(
+      Collection<TableConfig> tableConfigs) {
+    ManagedDBOptions option = null;
 
     List<ColumnFamilyDescriptor> columnFamilyDescriptors = new ArrayList<>();
 

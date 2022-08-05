@@ -18,15 +18,12 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.rocksdb.WriteOptions;
+import org.rocksdb.FlushOptions;
 
 /**
- * Managed WriteBatch.
+ * Managed FlushOptions.
  */
-public class ManagedWriteOptions extends WriteOptions {
-  public ManagedWriteOptions() {
-    super();
-  }
+public class ManagedFlushOptions extends FlushOptions {
 
   @Override
   protected void finalize() throws Throwable {

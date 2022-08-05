@@ -18,13 +18,13 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.rocksdb.WriteOptions;
+import org.rocksdb.ReadOptions;
 
 /**
  * Managed WriteBatch.
  */
-public class ManagedWriteOptions extends WriteOptions {
-  public ManagedWriteOptions() {
+public class ManagedReadOptions extends ReadOptions {
+  public ManagedReadOptions() {
     super();
   }
 

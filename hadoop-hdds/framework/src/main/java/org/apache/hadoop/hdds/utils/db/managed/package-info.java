@@ -18,14 +18,14 @@
  */
 
 /**
- * RocksDB is deprecating RocksObject's finalizer that cleans up native
+ * RocksDB is deprecating the RocksObject's finalizer that cleans up native
  * resources. In fact, the finalizer is removed in the new version of RocksDB
  * as per https://github.com/facebook/rocksdb/commit/99d86252b. That poses a
- * requirement for the applications to explicitly close RocksObject instances
- * themselves to avoid leaking native resources. The general approach is to
- * close RocksObjects with try-with-resource statement. Yet, this is not always
- * an option in Ozone and for cases that RocksObjects can be closed immediately,
- * we need a mechanism to manage and detect leaks.
+ * requirement for RocksDb's applications to explicitly close RocksObject
+ * instances themselves to avoid leaking native resources. The general approach
+ * is to close RocksObjects with try-with-resource statement.
+ * Yet, this is not always an easy option in Ozone we need a mechanism to
+ * manage and detect leaks.
  *
  * This package contains wrappers and utilities to catch RocksObject
  * instantiates in Ozone, intercept their finalizers and assert if the created

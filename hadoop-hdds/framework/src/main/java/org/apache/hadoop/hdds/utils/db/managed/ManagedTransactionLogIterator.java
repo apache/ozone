@@ -18,19 +18,19 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.rocksdb.WriteOptions;
+import org.rocksdb.TransactionLogIterator;
 
 /**
- * Managed WriteBatch.
+ * Managed TransactionLogIterator.
  */
-public class ManagedWriteOptions extends WriteOptions {
-  public ManagedWriteOptions() {
-    super();
+public class ManagedTransactionLogIterator
+    extends ManagedObject<TransactionLogIterator> {
+  public ManagedTransactionLogIterator(TransactionLogIterator original) {
+    super(original);
   }
 
-  @Override
-  protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
-    super.finalize();
+  public static ManagedTransactionLogIterator managed(
+      TransactionLogIterator iterator) {
+    return new ManagedTransactionLogIterator(iterator);
   }
 }
