@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.kohsuke.MetaInfServices;
@@ -198,7 +199,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
     final List<ColumnFamilyHandle> columnFamilyHandleList =
         new ArrayList<>();
-    RocksDB rocksDB = RocksDB.openReadOnly(parent.getDbPath(),
+    ManagedRocksDB rocksDB = ManagedRocksDB.openReadOnly(parent.getDbPath(),
             cfs, columnFamilyHandleList);
     this.printAppropriateTable(columnFamilyHandleList,
            rocksDB, parent.getDbPath());
@@ -207,7 +208,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   private void printAppropriateTable(
           List<ColumnFamilyHandle> columnFamilyHandleList,
-          RocksDB rocksDB, String dbPath) throws IOException {
+          ManagedRocksDB rocksDB, String dbPath) throws IOException {
     if (limit < 1 && limit != -1) {
       throw new IllegalArgumentException(
               "List length should be a positive number. Only allowed negative" +
@@ -231,7 +232,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           throw new IllegalArgumentException("columnFamilyHandle is null");
         }
         ManagedRocksIterator iterator = new ManagedRocksIterator(
-            rocksDB.newIterator(columnFamilyHandle));
+            rocksDB.get().newIterator(columnFamilyHandle));
         scannedObjects = displayTable(iterator, columnFamilyDefinition);
       }
     } else {

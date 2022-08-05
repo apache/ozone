@@ -41,15 +41,16 @@ import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
+import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.InfoLogLevel;
-import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
@@ -59,15 +60,14 @@ import org.slf4j.LoggerFactory;
  * DBStore Builder.
  */
 public final class DBStoreBuilder {
-
   private static final Logger LOG =
       LoggerFactory.getLogger(DBStoreBuilder.class);
 
   public static final Logger ROCKS_DB_LOGGER =
-      LoggerFactory.getLogger(RocksDB.class);
+      LoggerFactory.getLogger(ManagedRocksDB.ORIGINAL_CLASS);
 
   private static final String DEFAULT_COLUMN_FAMILY_NAME =
-      StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY);
+      StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY);
 
   // DB PKIProfile used by ROCKDB instances.
   public static final DBProfile HDDS_DEFAULT_DB_PROFILE = DBProfile.DISK;

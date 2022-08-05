@@ -28,7 +28,7 @@ public class ManagedCheckpoint extends ManagedObject<Checkpoint> {
     super(original);
   }
 
-  public static ManagedCheckpoint create(RocksDB rocksDB) {
-    return new ManagedCheckpoint(Checkpoint.create(rocksDB));
+  public static ManagedCheckpoint create(ManagedRocksDB rocksDB) {
+    return new ManagedCheckpoint(Checkpoint.create(rocksDB.get()));
   }
 }

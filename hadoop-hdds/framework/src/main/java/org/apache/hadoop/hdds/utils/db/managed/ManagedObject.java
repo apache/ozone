@@ -38,7 +38,7 @@ class ManagedObject<T extends RocksObject> implements AutoCloseable {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     original.close();
   }
 

@@ -32,7 +32,7 @@ public final class ManagedRocksObjectUtils {
   private static final Logger LOG =
       LoggerFactory.getLogger(ManagedRocksObjectUtils.class);
 
-  public static void assertClosed(RocksObject rocksObject) {
+  static void assertClosed(RocksObject rocksObject) {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
     if (rocksObject.isOwningHandle()) {
       ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();

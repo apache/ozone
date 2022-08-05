@@ -23,7 +23,8 @@ import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
-import org.rocksdb.RocksDB;
+
+import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
 /**
  * This class allows support of the schema version one RocksDB layout for
@@ -45,7 +46,7 @@ public class DatanodeSchemaOneDBDefinition
   public static final DBColumnFamilyDefinition<String, BlockData>
       BLOCK_DATA =
       new DBColumnFamilyDefinition<>(
-          StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+          StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY),
           String.class,
           new SchemaOneKeyCodec(),
           BlockData.class,
@@ -54,7 +55,7 @@ public class DatanodeSchemaOneDBDefinition
   public static final DBColumnFamilyDefinition<String, Long>
         METADATA =
         new DBColumnFamilyDefinition<>(
-            StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+            StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY),
             String.class,
             new SchemaOneKeyCodec(),
             Long.class,
@@ -63,7 +64,7 @@ public class DatanodeSchemaOneDBDefinition
   public static final DBColumnFamilyDefinition<String, ChunkInfoList>
         DELETED_BLOCKS =
         new DBColumnFamilyDefinition<>(
-            StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+            StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY),
             String.class,
             new SchemaOneKeyCodec(),
             ChunkInfoList.class,
