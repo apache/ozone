@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDB;
 import picocli.CommandLine;
 
 import java.io.FileOutputStream;
