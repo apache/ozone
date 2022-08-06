@@ -33,14 +33,15 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMBean;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.hadoop.metrics2.util.MBeans;
 
 import com.google.common.base.Preconditions;
 import org.apache.ratis.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.rocksdb.DBOptions;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.TransactionLogIterator;
-import org.rocksdb.WriteOptions;
+import org.rocksdb.TransactionLogIterator.BatchResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,14 +60,14 @@ public class RDBStore implements DBStore {
   private final RDBMetrics rdbMetrics;
 
   @VisibleForTesting
-  public RDBStore(File dbFile, DBOptions options,
+  public RDBStore(File dbFile, ManagedDBOptions options,
                   Set<TableConfig> families) throws IOException {
-    this(dbFile, options, new WriteOptions(), families, new CodecRegistry(),
-        false);
+    this(dbFile, options, new ManagedWriteOptions(), families,
+        new CodecRegistry(), false);
   }
 
-  public RDBStore(File dbFile, DBOptions dbOptions,
-      WriteOptions writeOptions, Set<TableConfig> families,
+  public RDBStore(File dbFile, ManagedDBOptions dbOptions,
+                  ManagedWriteOptions writeOptions, Set<TableConfig> families,
                   CodecRegistry registry, boolean readOnly)
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
@@ -283,14 +284,14 @@ public class RDBStore implements DBStore {
       throw new IllegalArgumentException("Illegal count for getUpdatesSince.");
     }
     DBUpdatesWrapper dbUpdatesWrapper = new DBUpdatesWrapper();
-    try (TransactionLogIterator transactionLogIterator =
+    try (ManagedTransactionLogIterator logIterator =
         db.getUpdatesSince(sequenceNumber)) {
 
       // If Recon's sequence number is out-of-date and the iterator is invalid,
       // throw SNNFE and let Recon fall back to full snapshot.
       // This could happen after OM restart.
       if (db.getLatestSequenceNumber() != sequenceNumber &&
-          !transactionLogIterator.isValid()) {
+          !logIterator.get().isValid()) {
         throw new SequenceNumberNotFoundException(
             "Invalid transaction log iterator when getting updates since "
                 + "sequence number " + sequenceNumber);
@@ -304,9 +305,8 @@ public class RDBStore implements DBStore {
 
       boolean checkValidStartingSeqNumber = true;
 
-      while (transactionLogIterator.isValid()) {
-        TransactionLogIterator.BatchResult result =
-            transactionLogIterator.getBatch();
+      while (logIterator.get().isValid()) {
+        BatchResult result = logIterator.get().getBatch();
         try {
           long currSequenceNumber = result.sequenceNumber();
           if (checkValidStartingSeqNumber &&
@@ -319,7 +319,7 @@ public class RDBStore implements DBStore {
           // the flag.
           checkValidStartingSeqNumber = false;
           if (currSequenceNumber <= sequenceNumber) {
-            transactionLogIterator.next();
+            logIterator.get().next();
             continue;
           }
           dbUpdatesWrapper.addWriteBatch(result.writeBatch().data(),
@@ -330,7 +330,7 @@ public class RDBStore implements DBStore {
         } finally {
           result.writeBatch().close();
         }
-        transactionLogIterator.next();
+        logIterator.get().next();
       }
     } catch (SequenceNumberNotFoundException e) {
       LOG.warn("Unable to get delta updates since sequenceNumber {}. "
