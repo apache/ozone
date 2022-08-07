@@ -46,9 +46,9 @@ public interface ReplicationConfig {
   ) {
     switch (type) {
     case RATIS:
-      return new RatisReplicationConfig(factor);
+      return RatisReplicationConfig.getInstance(factor);
     case STAND_ALONE:
-      return new StandaloneReplicationConfig(factor);
+      return StandaloneReplicationConfig.getInstance(factor);
     default:
       throw new UnsupportedOperationException(
           "Not supported replication: " + type);
@@ -159,6 +159,21 @@ public interface ReplicationConfig {
     replication = Objects.toString(replication,
         config.get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT));
 
+    return parseWithoutFallback(type, replication, config);
+  }
+
+  static ReplicationConfig parseWithoutFallback(ReplicationType type,
+      String replication, ConfigurationSource config) {
+
+    if (replication == null) {
+      throw new IllegalArgumentException(
+          "Replication can't be null. Replication type passed was : " + type);
+    }
+    if (type == null) {
+      throw new IllegalArgumentException(
+          "Replication type must be specified for: " + replication);
+    }
+
     ReplicationConfig replicationConfig;
     switch (type) {
     case RATIS:
@@ -167,14 +182,20 @@ public interface ReplicationConfig {
       try {
         factor = ReplicationFactor.valueOf(Integer.parseInt(replication));
       } catch (NumberFormatException ex) {
-        factor = ReplicationFactor.valueOf(replication);
+        try {
+          factor = ReplicationFactor.valueOf(replication);
+        } catch (IllegalArgumentException e) {
+          throw new IllegalArgumentException(replication +
+              " is not supported for " + type + " replication type", e);
+        }
       }
       replicationConfig = fromTypeAndFactor(type, factor);
       break;
     case EC:
-      return new ECReplicationConfig(replication);
+      replicationConfig = new ECReplicationConfig(replication);
+      break;
     default:
-      throw new RuntimeException("Replication type" + type + " can not"
+      throw new RuntimeException("Replication type " + type + " can not "
           + "be parsed.");
     }
 
@@ -199,5 +220,7 @@ public interface ReplicationConfig {
    * Returns the replication option in string format.
    */
   String getReplication();
+
+  String configFormat();
 
 }

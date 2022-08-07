@@ -20,15 +20,15 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests for PipelineStateMap.
@@ -38,12 +38,12 @@ public class TestPipelineStateMap {
 
   private PipelineStateMap map;
 
-  @Before
+  @BeforeEach
   public void setup() {
     map = new PipelineStateMap();
   }
 
-  @After
+  @AfterEach
   public void teardown() throws IOException {
   }
 
@@ -73,9 +73,11 @@ public class TestPipelineStateMap {
     map.addPipeline(p);
     map.updatePipelineState(p.getId(), Pipeline.PipelineState.CLOSED);
 
-    assertEquals(2, map.getPipelineCount(new StandaloneReplicationConfig(ONE),
+    assertEquals(2, map.getPipelineCount(
+        StandaloneReplicationConfig.getInstance(ONE),
         Pipeline.PipelineState.OPEN));
-    assertEquals(1, map.getPipelineCount(new RatisReplicationConfig(THREE),
+    assertEquals(1, map.getPipelineCount(
+        RatisReplicationConfig.getInstance(THREE),
         Pipeline.PipelineState.OPEN));
     assertEquals(2, map.getPipelineCount(new ECReplicationConfig(3, 2),
         Pipeline.PipelineState.OPEN));
@@ -83,9 +85,11 @@ public class TestPipelineStateMap {
     assertEquals(0, map.getPipelineCount(new ECReplicationConfig(6, 3),
         Pipeline.PipelineState.OPEN));
 
-    assertEquals(1, map.getPipelineCount(new StandaloneReplicationConfig(ONE),
+    assertEquals(1, map.getPipelineCount(
+        StandaloneReplicationConfig.getInstance(ONE),
         Pipeline.PipelineState.CLOSED));
-    assertEquals(1, map.getPipelineCount(new RatisReplicationConfig(THREE),
+    assertEquals(1, map.getPipelineCount(
+        RatisReplicationConfig.getInstance(THREE),
         Pipeline.PipelineState.CLOSED));
     assertEquals(1, map.getPipelineCount(new ECReplicationConfig(3, 2),
         Pipeline.PipelineState.CLOSED));

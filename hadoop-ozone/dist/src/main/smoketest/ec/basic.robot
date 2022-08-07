@@ -18,23 +18,10 @@ Documentation       Test EC shell commands
 Library             OperatingSystem
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
+Resource            lib.resource
 Suite Setup         Prepare For Tests
 
-*** Variables ***
-${SCM}       scm
-
-*** Keywords ***
-
-Prepare For Tests
-    ${random} =         Generate Random String  5  [NUMBERS]
-    Set Suite Variable  ${prefix}  ${random}
-    Execute             dd if=/dev/urandom of=/tmp/1mb bs=1048576 count=1
-    Execute             dd if=/dev/urandom of=/tmp/2mb bs=1048576 count=2
-    Execute             dd if=/dev/urandom of=/tmp/3mb bs=1048576 count=3
-    Execute             dd if=/dev/urandom of=/tmp/100mb bs=1048576 count=100
-
 *** Test Cases ***
-
 Test Bucket Creation
     ${result} =     Execute             ozone sh volume create /${prefix}vol1
                     Should not contain  ${result}       Failed
@@ -75,3 +62,21 @@ Test EC Key Ratis Bucket
                     Execute                             ozone sh key put --replication=rs-3-2-1024k --type=EC /${prefix}vol1/${prefix}ratis/${prefix}1mbEC /tmp/1mb
                     Key Should Match Local File         /${prefix}vol1/${prefix}ratis/${prefix}1mbEC    /tmp/1mb
                     Verify Key EC Replication Config    /${prefix}vol1/${prefix}ratis/${prefix}1mbEC    RS    3    2    1048576
+
+Test RATIS or STAND_ALONE Type with EC Replication
+    ${message} =    Execute And Ignore Error    ozone sh bucket create --replication=rs-3-2-1024k --type=RATIS /${prefix}vol1/${prefix}foo
+                    Should contain              ${message}          RATIS
+                    Should contain              ${message}          rs-3-2-1024k
+                    Should contain              ${message}          not supported
+    ${message} =    Execute And Ignore Error    ozone sh key put --replication=rs-6-3-1024k --type=RATIS /${prefix}vol1/${prefix}foo/${prefix}bar /tmp/1mb
+                    Should contain              ${message}          RATIS
+                    Should contain              ${message}          rs-6-3-1024k
+                    Should contain              ${message}          not supported
+    ${message} =    Execute And Ignore Error    ozone sh bucket create --replication=rs-6-3-1024k --type=STAND_ALONE /${prefix}vol1/${prefix}foo
+                    Should contain              ${message}          STAND_ALONE
+                    Should contain              ${message}          rs-6-3-1024k
+                    Should contain              ${message}          not supported
+    ${message} =    Execute And Ignore Error    ozone sh key put --replication=rs-3-2-1024k --type=STAND_ALONE /${prefix}vol1/${prefix}foo/${prefix}bar /tmp/1mb
+                    Should contain              ${message}          STAND_ALONE
+                    Should contain              ${message}          rs-3-2-1024k
+                    Should contain              ${message}          not supported

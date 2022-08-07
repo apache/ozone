@@ -17,10 +17,10 @@
  */
 package org.apache.hadoop.hdds.conf;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,13 +40,13 @@ public class TestGeneratedConfigurationOverwrite {
 
   private OzoneConfiguration conf;
 
-  @Before
+  @BeforeEach
   public void overwriteConfigFile() throws Exception {
     Files.move(generatedConfigurationPath, generatedConfigurationPathBak);
     conf = new OzoneConfiguration();
   }
 
-  @After
+  @AfterEach
   public void recoverConfigFile() throws Exception {
     Files.move(generatedConfigurationPathBak, generatedConfigurationPath);
   }
@@ -54,13 +54,13 @@ public class TestGeneratedConfigurationOverwrite {
   @Test
   public void getConfigurationObject() {
     // Check Config Type of String
-    Assert.assertNotNull(
+    Assertions.assertNotNull(
         conf.getObject(SimpleConfiguration.class).getBindHost());
     // Check Config Type of Int
-    Assert.assertNotEquals(
+    Assertions.assertNotEquals(
         conf.getObject(SimpleConfiguration.class).getPort(), 0);
     // Check Config Type of Time
-    Assert.assertNotEquals(
+    Assertions.assertNotEquals(
         conf.getObject(SimpleConfiguration.class).getWaitTime(), 0);
   }
 }

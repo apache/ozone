@@ -31,7 +31,7 @@ import org.junit.Test;
  */
 public class TestOzoneConfigUtil {
   private ReplicationConfig ratis3ReplicationConfig =
-      new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE);
+      RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
   private HddsProtos.ReplicationType noneType = HddsProtos.ReplicationType.NONE;
   private HddsProtos.ReplicationFactor zeroFactor =
       HddsProtos.ReplicationFactor.ZERO;

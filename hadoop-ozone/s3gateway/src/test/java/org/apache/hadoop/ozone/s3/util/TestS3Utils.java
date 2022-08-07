@@ -32,9 +32,9 @@ public class TestS3Utils {
   private ReplicationConfig ecReplicationConfig =
       new ECReplicationConfig("rs-3-2-1024K");
   private ReplicationConfig ratis3ReplicationConfig =
-      new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE);
+      RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
   private ReplicationConfig ratis1ReplicationConfig =
-      new RatisReplicationConfig(HddsProtos.ReplicationFactor.ONE);
+      RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
 
   @Test
   public void testResolveClientSideRepConfigWhenBucketHasEC()

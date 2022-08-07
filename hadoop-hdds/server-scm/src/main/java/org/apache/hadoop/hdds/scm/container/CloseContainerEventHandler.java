@@ -18,9 +18,11 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -80,8 +82,17 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
           .getContainer(containerID);
       // Send close command to datanodes, if the container is in CLOSING state
       if (container.getState() == LifeCycleState.CLOSING) {
+        boolean force = false;
+        // Any container that is not of type RATIS should be moved to CLOSED
+        // immediately on the DNs. Setting force to true, avoids the container
+        // going into the QUASI_CLOSED state, which is only applicable for RATIS
+        // containers.
+        if (container.getReplicationConfig().getReplicationType()
+            != HddsProtos.ReplicationType.RATIS) {
+          force = true;
+        }
         SCMCommand<?> command = new CloseContainerCommand(
-            containerID.getId(), container.getPipelineID());
+            containerID.getId(), container.getPipelineID(), force);
         command.setTerm(scmContext.getTermOfLeader());
         command.setEncodedToken(getContainerToken(containerID));
 
@@ -96,7 +107,8 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
     } catch (NotLeaderException nle) {
       LOG.warn("Skip sending close container command,"
           + " since current SCM is not leader.", nle);
-    } catch (IOException | InvalidStateTransitionException ex) {
+    } catch (IOException | InvalidStateTransitionException |
+             TimeoutException ex) {
       LOG.error("Failed to close the container {}.", containerID, ex);
     }
   }

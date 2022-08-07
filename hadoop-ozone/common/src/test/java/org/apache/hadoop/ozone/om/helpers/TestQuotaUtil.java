@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -35,7 +36,7 @@ public class TestQuotaUtil {
 
   @Test
   public void testRatisThreeReplication() {
-    RatisReplicationConfig repConfig = new RatisReplicationConfig(THREE);
+    ReplicationConfig repConfig = RatisReplicationConfig.getInstance(THREE);
     long replicatedSize =
         QuotaUtil.getReplicatedSize(123 * ONE_MB, repConfig);
     Assert.assertEquals(123 * ONE_MB * 3, replicatedSize);
@@ -43,7 +44,7 @@ public class TestQuotaUtil {
 
   @Test
   public void testRatisOneReplication() {
-    RatisReplicationConfig repConfig = new RatisReplicationConfig(ONE);
+    ReplicationConfig repConfig = RatisReplicationConfig.getInstance(ONE);
     long replicatedSize =
         QuotaUtil.getReplicatedSize(123 * ONE_MB, repConfig);
     Assert.assertEquals(123 * ONE_MB, replicatedSize);

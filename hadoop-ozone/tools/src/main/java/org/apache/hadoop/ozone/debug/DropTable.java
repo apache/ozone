@@ -19,9 +19,9 @@
 package org.apache.hadoop.ozone.debug;
 
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDB;
 import picocli.CommandLine;
 
 import java.nio.charset.StandardCharsets;
@@ -52,7 +52,7 @@ public class DropTable implements Callable<Void>, SubcommandWithParent {
         RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
     final List<ColumnFamilyHandle> columnFamilyHandleList =
         new ArrayList<>();
-    try (RocksDB rocksDB = RocksDB.open(
+    try (ManagedRocksDB rocksDB = ManagedRocksDB.open(
         parent.getDbPath(), cfs, columnFamilyHandleList)) {
       byte[] nameBytes = tableName.getBytes(StandardCharsets.UTF_8);
       ColumnFamilyHandle toBeDeletedCf = null;
@@ -68,7 +68,7 @@ public class DropTable implements Callable<Void>, SubcommandWithParent {
       } else {
         System.out.println(tableName + " will be deleted from DB "
             + parent.getDbPath());
-        rocksDB.dropColumnFamily(toBeDeletedCf);
+        rocksDB.get().dropColumnFamily(toBeDeletedCf);
       }
     }
     return null;

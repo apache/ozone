@@ -24,7 +24,10 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
@@ -51,19 +54,24 @@ public class Gateway extends GenericCli {
   private static final Logger LOG = LoggerFactory.getLogger(Gateway.class);
 
   private S3GatewayHttpServer httpServer;
+  private S3GatewayMetrics metrics;
+  private OzoneConfiguration ozoneConfiguration;
 
   public static void main(String[] args) throws Exception {
+    OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
+            new OzoneConfiguration());
     new Gateway().run(args);
   }
 
   @Override
   public Void call() throws Exception {
-    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
+    ozoneConfiguration = createOzoneConfiguration();
     TracingUtil.initTracing("S3gateway", ozoneConfiguration);
     OzoneConfigurationHolder.setConfiguration(ozoneConfiguration);
     UserGroupInformation.setConfiguration(ozoneConfiguration);
     loginS3GUser(ozoneConfiguration);
     httpServer = new S3GatewayHttpServer(ozoneConfiguration, "s3gateway");
+    metrics = S3GatewayMetrics.create();
     start();
 
     ShutdownHookManager.get().addShutdownHook(() -> {
@@ -83,12 +91,14 @@ public class Gateway extends GenericCli {
         Gateway.class, originalArgs, LOG);
 
     LOG.info("Starting Ozone S3 gateway");
+    HddsServerUtil.initializeMetrics(ozoneConfiguration, "S3Gateway");
     httpServer.start();
   }
 
   public void stop() throws Exception {
     LOG.info("Stopping Ozone S3 gateway");
     httpServer.stop();
+    S3GatewayMetrics.unRegister();
   }
 
   private static void loginS3GUser(OzoneConfiguration conf)

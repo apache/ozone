@@ -215,7 +215,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE && pipeline
         .getType() != HddsProtos.ReplicationType.EC) {
       pipeline = Pipeline.newBuilder(pipeline)
-          .setReplicationConfig(new StandaloneReplicationConfig(
+          .setReplicationConfig(StandaloneReplicationConfig.getInstance(
               ReplicationConfig
                   .getLegacyFactor(pipeline.getReplicationConfig())))
           .build();
@@ -229,10 +229,17 @@ public class BlockInputStream extends BlockExtendedInputStream {
             blockID.getContainerID());
       }
 
-      DatanodeBlockID datanodeBlockID = blockID
-          .getDatanodeBlockIDProtobuf();
+      DatanodeBlockID.Builder blkIDBuilder =
+          DatanodeBlockID.newBuilder().setContainerID(blockID.getContainerID())
+              .setLocalID(blockID.getLocalID())
+              .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
+
+      int replicaIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
+      if (replicaIndex > 0) {
+        blkIDBuilder.setReplicaIndex(replicaIndex);
+      }
       GetBlockResponseProto response = ContainerProtocolCalls
-          .getBlock(xceiverClient, datanodeBlockID, token);
+          .getBlock(xceiverClient, blkIDBuilder.build(), token);
 
       chunks = response.getBlockData().getChunksList();
       success = true;

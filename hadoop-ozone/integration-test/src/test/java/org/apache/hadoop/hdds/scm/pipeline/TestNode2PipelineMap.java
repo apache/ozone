@@ -38,6 +38,7 @@ import org.junit.Test;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 
 import org.junit.Rule;
 import org.junit.rules.Timeout;
@@ -74,7 +75,7 @@ public class TestNode2PipelineMap {
     containerManager = scm.getContainerManager();
     pipelineManager = scm.getPipelineManager();
     ContainerInfo containerInfo = containerManager.allocateContainer(
-        new RatisReplicationConfig(
+        RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "testOwner");
     ratisContainer = new ContainerWithPipeline(containerInfo,
         pipelineManager.getPipeline(containerInfo.getPipelineID()));
@@ -93,7 +94,7 @@ public class TestNode2PipelineMap {
 
   @Test
   public void testPipelineMap() throws IOException,
-      InvalidStateTransitionException {
+      InvalidStateTransitionException, TimeoutException {
 
     Set<ContainerID> set = pipelineManager
         .getContainersInPipeline(ratisContainer.getPipeline().getId());

@@ -21,10 +21,10 @@ package org.apache.hadoop.ozone.container.common.utils.db;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
 import org.rocksdb.BlockBasedTableConfig;
-import org.rocksdb.DBOptions;
-import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.LRUCache;
 
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -40,13 +40,13 @@ public abstract class DatanodeDBProfile {
   /**
    * Returns DBOptions to be used for rocksDB in datanodes.
    */
-  public abstract DBOptions getDBOptions();
+  public abstract ManagedDBOptions getDBOptions();
 
   /**
    * Returns ColumnFamilyOptions to be used for rocksDB column families in
    * datanodes.
    */
-  public abstract ColumnFamilyOptions getColumnFamilyOptions(
+  public abstract ManagedColumnFamilyOptions getColumnFamilyOptions(
       ConfigurationSource config);
 
   /**
@@ -72,12 +72,12 @@ public abstract class DatanodeDBProfile {
         new StorageBasedProfile(DBProfile.SSD);
 
     @Override
-    public DBOptions getDBOptions() {
+    public ManagedDBOptions getDBOptions() {
       return SSD_STORAGE_BASED_PROFILE.getDBOptions();
     }
 
     @Override
-    public ColumnFamilyOptions getColumnFamilyOptions(
+    public ManagedColumnFamilyOptions getColumnFamilyOptions(
         ConfigurationSource config) {
       return SSD_STORAGE_BASED_PROFILE.getColumnFamilyOptions(config);
     }
@@ -91,12 +91,12 @@ public abstract class DatanodeDBProfile {
         new StorageBasedProfile(DBProfile.DISK);
 
     @Override
-    public DBOptions getDBOptions() {
+    public ManagedDBOptions getDBOptions() {
       return DISK_STORAGE_BASED_PROFILE.getDBOptions();
     }
 
     @Override
-    public ColumnFamilyOptions getColumnFamilyOptions(
+    public ManagedColumnFamilyOptions getColumnFamilyOptions(
         ConfigurationSource config) {
       return DISK_STORAGE_BASED_PROFILE.getColumnFamilyOptions(config);
     }
@@ -106,7 +106,7 @@ public abstract class DatanodeDBProfile {
    * Base profile for datanode storage disks.
    */
   private static final class StorageBasedProfile {
-    private final AtomicReference<ColumnFamilyOptions> cfOptions =
+    private final AtomicReference<ManagedColumnFamilyOptions> cfOptions =
         new AtomicReference<>();
     private final DBProfile baseProfile;
 
@@ -114,11 +114,11 @@ public abstract class DatanodeDBProfile {
       baseProfile = profile;
     }
 
-    private DBOptions getDBOptions() {
+    private ManagedDBOptions getDBOptions() {
       return baseProfile.getDBOptions();
     }
 
-    private ColumnFamilyOptions getColumnFamilyOptions(
+    private ManagedColumnFamilyOptions getColumnFamilyOptions(
         ConfigurationSource config) {
       cfOptions.updateAndGet(op -> op != null ? op :
           baseProfile.getColumnFamilyOptions()
@@ -138,7 +138,7 @@ public abstract class DatanodeDBProfile {
           .getStorageSize(HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE,
               HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT,
               StorageUnit.BYTES);
-      blockBasedTableConfig.setBlockCache(new LRUCache(cacheSize));
+      blockBasedTableConfig.setBlockCache(new ManagedLRUCache(cacheSize));
       return blockBasedTableConfig;
     }
   }

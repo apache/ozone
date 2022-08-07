@@ -122,7 +122,8 @@ public class RatisPipelineProvider
           getPipelineStateManager().getPipelines(
               replicationConfig, PipelineState.CLOSED).size()) >
           (pipelineNumberLimit - getPipelineStateManager()
-              .getPipelines(new RatisReplicationConfig(ReplicationFactor.ONE))
+              .getPipelines(RatisReplicationConfig
+                  .getInstance(ReplicationFactor.ONE))
               .size());
     }
 
@@ -175,8 +176,7 @@ public class RatisPipelineProvider
     Pipeline pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(PipelineState.ALLOCATED)
-        .setReplicationConfig(new RatisReplicationConfig(
-            factor))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(factor))
         .setNodes(dns)
         .setSuggestedLeaderId(
             suggestedLeader != null ? suggestedLeader.getUuid() : null)

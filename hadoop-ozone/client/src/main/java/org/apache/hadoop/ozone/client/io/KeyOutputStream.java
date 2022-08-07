@@ -553,9 +553,17 @@ public class KeyOutputStream extends OutputStream {
     private OzoneClientConfig clientConfig;
     private ReplicationConfig replicationConfig;
 
+    public String getMultipartUploadID() {
+      return multipartUploadID;
+    }
+
     public Builder setMultipartUploadID(String uploadID) {
       this.multipartUploadID = uploadID;
       return this;
+    }
+
+    public int getMultipartNumber() {
+      return multipartNumber;
     }
 
     public Builder setMultipartNumber(int partNumber) {
@@ -563,9 +571,17 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+    public OpenKeySession getOpenHandler() {
+      return openHandler;
+    }
+
     public Builder setHandler(OpenKeySession handler) {
       this.openHandler = handler;
       return this;
+    }
+
+    public XceiverClientFactory getXceiverManager() {
+      return xceiverManager;
     }
 
     public Builder setXceiverClientManager(XceiverClientFactory manager) {
@@ -573,9 +589,17 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+    public OzoneManagerProtocol getOmClient() {
+      return omClient;
+    }
+
     public Builder setOmClient(OzoneManagerProtocol client) {
       this.omClient = client;
       return this;
+    }
+
+    public int getChunkSize() {
+      return chunkSize;
     }
 
     public Builder setChunkSize(int size) {
@@ -583,9 +607,17 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+    public String getRequestID() {
+      return requestID;
+    }
+
     public Builder setRequestID(String id) {
       this.requestID = id;
       return this;
+    }
+
+    public boolean isMultipartKey() {
+      return isMultipartKey;
     }
 
     public Builder setIsMultipartKey(boolean isMultipart) {
@@ -593,9 +625,17 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+    public OzoneClientConfig getClientConfig() {
+      return clientConfig;
+    }
+
     public Builder setConfig(OzoneClientConfig config) {
       this.clientConfig = config;
       return this;
+    }
+
+    public boolean isUnsafeByteBufferConversionEnabled() {
+      return unsafeByteBufferConversion;
     }
 
     public Builder enableUnsafeByteBufferConversion(boolean enabled) {
@@ -603,6 +643,9 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+    public ReplicationConfig getReplicationConfig() {
+      return replicationConfig;
+    }
 
     public Builder setReplicationConfig(ReplicationConfig replConfig) {
       this.replicationConfig = replConfig;

@@ -134,7 +134,7 @@ public class TestVolumeOwner {
               .setBucketName(getTestBucketName(j))
               .setKeyName(getTestKeyName(k))
               .setReplicationConfig(
-                  new StandaloneReplicationConfig(
+                  StandaloneReplicationConfig.getInstance(
                       HddsProtos.ReplicationFactor.ONE))
               .setDataSize(0);
           if (k == 0) {

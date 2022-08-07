@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -171,7 +171,7 @@ public abstract class TestInputStreamBase {
   }
 
   byte[] writeKey(String keyName, int dataLength) throws Exception {
-    ReplicationConfig repConfig = new RatisReplicationConfig(THREE);
+    ReplicationConfig repConfig = RatisReplicationConfig.getInstance(THREE);
     return writeKey(keyName, repConfig, dataLength);
   }
 
@@ -190,7 +190,7 @@ public abstract class TestInputStreamBase {
 
   byte[] writeRandomBytes(String keyName, int dataLength)
       throws Exception {
-    ReplicationConfig repConfig = new RatisReplicationConfig(THREE);
+    ReplicationConfig repConfig = RatisReplicationConfig.getInstance(THREE);
     return writeRandomBytes(keyName, repConfig, dataLength);
   }
 

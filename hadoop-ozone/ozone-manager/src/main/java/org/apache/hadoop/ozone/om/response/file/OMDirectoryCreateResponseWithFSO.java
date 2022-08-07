@@ -47,17 +47,20 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
   private OmDirectoryInfo dirInfo;
   private List<OmDirectoryInfo> parentDirInfos;
   private Result result;
+  private long volumeId;
+  private long bucketId;
 
   public OMDirectoryCreateResponseWithFSO(@Nonnull OMResponse omResponse,
-                                          @Nonnull OmDirectoryInfo dirInfo,
-                                          @Nonnull
-                                              List<OmDirectoryInfo> pDirInfos,
-                                          @Nonnull Result result, @Nonnull
-                                          BucketLayout bucketLayout) {
+      @Nonnull long volumeId, @Nonnull long bucketId,
+      @Nonnull OmDirectoryInfo dirInfo,
+      @Nonnull List<OmDirectoryInfo> pDirInfos, @Nonnull Result result,
+      @Nonnull BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
     this.dirInfo = dirInfo;
     this.parentDirInfos = pDirInfos;
     this.result = result;
+    this.volumeId = volumeId;
+    this.bucketId = bucketId;
   }
 
   /**
@@ -83,7 +86,8 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
       if (parentDirInfos != null) {
         for (OmDirectoryInfo parentDirInfo : parentDirInfos) {
           String parentKey = omMetadataManager
-                  .getOzonePathKey(parentDirInfo.getParentObjectID(),
+                  .getOzonePathKey(volumeId, bucketId,
+                          parentDirInfo.getParentObjectID(),
                           parentDirInfo.getName());
           LOG.debug("putWithBatch parent : dir {} info : {}", parentKey,
                   parentDirInfo);
@@ -92,7 +96,7 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
         }
       }
 
-      String dirKey = omMetadataManager.getOzonePathKey(
+      String dirKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
               dirInfo.getParentObjectID(), dirInfo.getName());
       omMetadataManager.getDirectoryTable().putWithBatch(batchOperation, dirKey,
               dirInfo);

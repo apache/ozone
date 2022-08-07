@@ -33,25 +33,28 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 
 /**
  * Response for create file request - prefix layout.
  */
-@CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE, OPEN_FILE_TABLE})
+@CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE, OPEN_FILE_TABLE,
+    BUCKET_TABLE})
 public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
 
   private List<OmDirectoryInfo> parentDirInfos;
+  private long volumeId;
 
   public OMFileCreateResponseWithFSO(@Nonnull OMResponse omResponse,
-                                @Nonnull OmKeyInfo omKeyInfo,
-                                @Nonnull List<OmDirectoryInfo> parentDirInfos,
-                                long openKeySessionID,
-                                @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull OmKeyInfo omKeyInfo,
+      @Nonnull List<OmDirectoryInfo> parentDirInfos, long openKeySessionID,
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull long volumeId) {
     super(omResponse, omKeyInfo, new ArrayList<>(), openKeySessionID,
         omBucketInfo);
     this.parentDirInfos = parentDirInfos;
+    this.volumeId = volumeId;
   }
 
   /**
@@ -74,7 +77,9 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
      */
     if (parentDirInfos != null) {
       for (OmDirectoryInfo parentDirInfo : parentDirInfos) {
-        String parentKey = parentDirInfo.getPath();
+        String parentKey = omMetadataMgr.getOzonePathKey(volumeId,
+            getOmBucketInfo().getObjectID(), parentDirInfo.getParentObjectID(),
+            parentDirInfo.getName());
         if (LOG.isDebugEnabled()) {
           LOG.debug("putWithBatch adding parent : key {} info : {}", parentKey,
                   parentDirInfo);
@@ -85,12 +90,7 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
     }
 
     OMFileRequest.addToOpenFileTable(omMetadataMgr, batchOp, getOmKeyInfo(),
-            getOpenKeySessionID());
-
-    // update bucket usedBytes.
-    omMetadataMgr.getBucketTable().putWithBatch(batchOp,
-            omMetadataMgr.getBucketKey(getOmKeyInfo().getVolumeName(),
-                    getOmKeyInfo().getBucketName()), getOmBucketInfo());
+        getOpenKeySessionID(), volumeId, getOmBucketInfo().getObjectID());
   }
 
   @Override

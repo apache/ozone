@@ -94,7 +94,7 @@ public class TestContainerDeletionChoosingPolicy {
         RandomContainerDeletionChoosingPolicy.class.getName());
     List<StorageLocation> pathLists = new LinkedList<>();
     pathLists.add(StorageLocation.parse(containerDir.getAbsolutePath()));
-    containerSet = new ContainerSet();
+    containerSet = new ContainerSet(1000);
 
     int numContainers = 10;
     for (int i = 0; i < numContainers; i++) {
@@ -156,7 +156,7 @@ public class TestContainerDeletionChoosingPolicy {
         TopNOrderedContainerDeletionChoosingPolicy.class.getName());
     List<StorageLocation> pathLists = new LinkedList<>();
     pathLists.add(StorageLocation.parse(containerDir.getAbsolutePath()));
-    containerSet = new ContainerSet();
+    containerSet = new ContainerSet(1000);
 
     int numContainers = 10;
     Random random = new Random();
@@ -232,7 +232,7 @@ public class TestContainerDeletionChoosingPolicy {
     Mockito.when(ozoneContainer.getWriteChannel()).thenReturn(null);
     blockDeletingService = new BlockDeletingService(ozoneContainer,
         SERVICE_INTERVAL_IN_MILLISECONDS, SERVICE_TIMEOUT_IN_MILLISECONDS,
-        TimeUnit.MILLISECONDS, conf);
+        TimeUnit.MILLISECONDS, 10, conf);
     return blockDeletingService;
 
   }

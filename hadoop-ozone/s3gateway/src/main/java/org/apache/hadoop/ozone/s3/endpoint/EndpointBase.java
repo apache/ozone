@@ -19,15 +19,24 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.Context;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.function.Function;
 
-import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.ozone.audit.AuditAction;
+import org.apache.hadoop.ozone.audit.AuditEventStatus;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLoggerType;
+import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
@@ -35,6 +44,8 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,14 +54,20 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 /**
  * Basic helpers for all the REST endpoints.
  */
-public abstract class EndpointBase {
+public abstract class EndpointBase implements Auditor {
 
   @Inject
   private OzoneClient client;
   @Inject
   private S3Auth s3Auth;
+  @Context
+  private ContainerRequestContext context;
+
   private static final Logger LOG =
       LoggerFactory.getLogger(EndpointBase.class);
+
+  protected static final AuditLogger AUDIT =
+      new AuditLogger(AuditLoggerType.S3GLOGGER);
 
   protected OzoneBucket getBucket(OzoneVolume volume, String bucketName)
       throws OS3Exception, IOException {
@@ -60,6 +77,12 @@ public abstract class EndpointBase {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
+      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3Auth.getAccessID(), ex);
+      } else if (ex.getResult() == ResultCodes.TIMEOUT ||
+          ex.getResult() == ResultCodes.INTERNAL_ERROR) {
+        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
       } else {
         throw ex;
       }
@@ -74,9 +97,9 @@ public abstract class EndpointBase {
   @PostConstruct
   public void initialization() {
     LOG.debug("S3 access id: {}", s3Auth.getAccessID());
-    getClient().getObjectStore().
-        getClientProxy().
-        setTheadLocalS3Auth(s3Auth);
+    getClient().getObjectStore()
+        .getClientProxy()
+        .setThreadLocalS3Auth(s3Auth);
     init();
   }
 
@@ -91,8 +114,14 @@ public abstract class EndpointBase {
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND
           || ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
+      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3Auth.getAccessID(), ex);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
+      } else if (ex.getResult() == ResultCodes.TIMEOUT ||
+          ex.getResult() == ResultCodes.INTERNAL_ERROR) {
+        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
       } else {
         throw ex;
       }
@@ -101,9 +130,7 @@ public abstract class EndpointBase {
   }
 
   protected OzoneVolume getVolume() throws IOException {
-    String s3VolumeName = HddsClientUtils.getS3VolumeName(
-        client.getConfiguration());
-    return client.getObjectStore().getVolume(s3VolumeName);
+    return client.getObjectStore().getS3Volume();
   }
 
   /**
@@ -118,8 +145,15 @@ public abstract class EndpointBase {
     try {
       client.getObjectStore().createS3Bucket(bucketName);
     } catch (OMException ex) {
+      getMetrics().incCreateBucketFailure();
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
+      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3Auth.getAccessID(), ex);
+      } else if (ex.getResult() == ResultCodes.TIMEOUT ||
+          ex.getResult() == ResultCodes.INTERNAL_ERROR) {
+        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
       } else if (ex.getResult() != ResultCodes.BUCKET_ALREADY_EXISTS) {
         // S3 does not return error for bucket already exists, it just
         // returns the location.
@@ -134,15 +168,23 @@ public abstract class EndpointBase {
    * @param s3BucketName - S3 Bucket Name.
    * @throws  IOException in case the bucket cannot be deleted.
    */
-  public void deleteS3Bucket(String s3BucketName)
+  protected void deleteS3Bucket(String s3BucketName)
       throws IOException, OS3Exception {
     try {
       client.getObjectStore().deleteS3Bucket(s3BucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, s3BucketName, ex);
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3BucketName, ex);
+      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3Auth.getAccessID(), ex);
+      } else if (ex.getResult() == ResultCodes.TIMEOUT ||
+          ex.getResult() == ResultCodes.INTERNAL_ERROR) {
+        throw newError(S3ErrorTable.INTERNAL_ERROR, s3BucketName, ex);
+      } else {
+        throw ex;
       }
-      throw ex;
     }
   }
 
@@ -154,7 +196,7 @@ public abstract class EndpointBase {
    * @param prefix Bucket prefix to match
    * @return {@code Iterator<OzoneBucket>}
    */
-  public Iterator<? extends OzoneBucket> listS3Buckets(String prefix)
+  protected Iterator<? extends OzoneBucket> listS3Buckets(String prefix)
       throws IOException, OS3Exception {
     return iterateBuckets(volume -> volume.listBuckets(prefix));
   }
@@ -169,7 +211,7 @@ public abstract class EndpointBase {
    * @param previousBucket Buckets are listed after this bucket
    * @return {@code Iterator<OzoneBucket>}
    */
-  public Iterator<? extends OzoneBucket> listS3Buckets(String prefix,
+  protected Iterator<? extends OzoneBucket> listS3Buckets(String prefix,
       String previousBucket) throws IOException, OS3Exception {
     return iterateBuckets(volume -> volume.listBuckets(prefix, previousBucket));
   }
@@ -183,12 +225,54 @@ public abstract class EndpointBase {
       if (e.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
         return Collections.emptyIterator();
       } else  if (e.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, "listBuckets", e);
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            "listBuckets", e);
+      } else if (e.getResult() == ResultCodes.INVALID_TOKEN) {
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            s3Auth.getAccessID(), e);
+      } else if (e.getResult() == ResultCodes.TIMEOUT ||
+          e.getResult() == ResultCodes.INTERNAL_ERROR) {
+        throw newError(S3ErrorTable.INTERNAL_ERROR,
+            "listBuckets", e);
       } else {
         throw e;
       }
     }
   }
+
+  private AuditMessage.Builder auditMessageBaseBuilder(AuditAction op,
+      Map<String, String> auditMap) {
+    AuditMessage.Builder builder = new AuditMessage.Builder()
+        .forOperation(op)
+        .withParams(auditMap);
+    if (s3Auth != null &&
+        s3Auth.getAccessID() != null &&
+        !s3Auth.getAccessID().isEmpty()) {
+      builder.setUser(s3Auth.getAccessID());
+    }
+    if (context != null) {
+      builder.atIp(AuditUtils.getClientIpAddress(context));
+    }
+    return builder;
+  }
+
+  @Override
+  public AuditMessage buildAuditMessageForSuccess(AuditAction op,
+      Map<String, String> auditMap) {
+    AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
+        .withResult(AuditEventStatus.SUCCESS);
+    return builder.build();
+  }
+
+  @Override
+  public AuditMessage buildAuditMessageForFailure(AuditAction op,
+      Map<String, String> auditMap, Throwable throwable) {
+    AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
+        .withResult(AuditEventStatus.FAILURE)
+        .withException(throwable);
+    return builder.build();
+  }
+
 
   @VisibleForTesting
   public void setClient(OzoneClient ozoneClient) {
@@ -197,5 +281,28 @@ public abstract class EndpointBase {
 
   public OzoneClient getClient() {
     return client;
+  }
+
+  protected ClientProtocol getClientProtocol() {
+    return getClient().getProxy();
+  }
+
+  @VisibleForTesting
+  public S3GatewayMetrics getMetrics() {
+    return S3GatewayMetrics.create();
+  }
+
+  protected Map<String, String> getAuditParameters() {
+    return AuditUtils.getAuditParameters(context);
+  }
+
+  protected void auditWriteFailure(AuditAction action, Throwable ex) {
+    AUDIT.logWriteFailure(
+        buildAuditMessageForFailure(action, getAuditParameters(), ex));
+  }
+
+  protected void auditReadFailure(AuditAction action, Exception ex) {
+    AUDIT.logReadFailure(
+        buildAuditMessageForFailure(action, getAuditParameters(), ex));
   }
 }

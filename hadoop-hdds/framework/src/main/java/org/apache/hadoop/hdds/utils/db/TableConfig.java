@@ -23,15 +23,20 @@ import org.apache.hadoop.hdds.StringUtils;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.ColumnFamilyOptions;
 
 /**
  * Class that maintains Table Configuration.
  */
 public class TableConfig {
+  static TableConfig newTableConfig(byte[] bytes) {
+    return new TableConfig(StringUtils.bytes2String(bytes),
+        DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE.getColumnFamilyOptions());
+  }
+
   private final String name;
-  private final ColumnFamilyOptions columnFamilyOptions;
+  private final ManagedColumnFamilyOptions columnFamilyOptions;
 
 
   /**
@@ -39,7 +44,8 @@ public class TableConfig {
    * @param name - Name of the Table.
    * @param columnFamilyOptions - Column Family options.
    */
-  public TableConfig(String name, ColumnFamilyOptions columnFamilyOptions) {
+  public TableConfig(String name,
+                     ManagedColumnFamilyOptions columnFamilyOptions) {
     this.name = name;
     this.columnFamilyOptions = columnFamilyOptions;
   }
@@ -57,15 +63,15 @@ public class TableConfig {
    * @return ColumnFamilyDescriptor
    */
   public ColumnFamilyDescriptor getDescriptor() {
-    return  new ColumnFamilyDescriptor(StringUtils.string2Bytes(name),
-        columnFamilyOptions);
+    return new ColumnFamilyDescriptor(StringUtils.string2Bytes(name),
+        new ManagedColumnFamilyOptions(columnFamilyOptions));
   }
 
   /**
    * Returns Column family options for this Table.
    * @return  ColumnFamilyOptions used for the Table.
    */
-  public ColumnFamilyOptions getColumnFamilyOptions() {
+  public ManagedColumnFamilyOptions getColumnFamilyOptions() {
     return columnFamilyOptions;
   }
 

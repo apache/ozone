@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -194,12 +195,61 @@ public class TestECKeyOutputStream {
   }
 
   @Test
+  public void testOverwriteECKeyWithRatisKey() throws Exception {
+    String myBucket = UUID.randomUUID().toString();
+    OzoneVolume volume = objectStore.getVolume(volumeName);
+    final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
+    volume.createBucket(myBucket, bucketArgs.build());
+    OzoneBucket bucket = volume.getBucket(myBucket);
+    createKeyAndCheckReplicationConfig(keyString, bucket,
+        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+            chunkSize));
+
+    //Overwrite with RATIS/THREE
+    createKeyAndCheckReplicationConfig(keyString, bucket,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+
+    //Overwrite with RATIS/ONE
+    createKeyAndCheckReplicationConfig(keyString, bucket,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
+  }
+
+  @Test
+  public void testOverwriteRatisKeyWithECKey() throws Exception {
+    String myBucket = UUID.randomUUID().toString();
+    OzoneVolume volume = objectStore.getVolume(volumeName);
+    final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
+    volume.createBucket(myBucket, bucketArgs.build());
+    OzoneBucket bucket = volume.getBucket(myBucket);
+
+    createKeyAndCheckReplicationConfig(keyString, bucket,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+    // Overwrite with EC key
+    createKeyAndCheckReplicationConfig(keyString, bucket,
+        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+            chunkSize));
+  }
+
+  private void createKeyAndCheckReplicationConfig(String keyName,
+      OzoneBucket bucket, ReplicationConfig replicationConfig)
+      throws IOException {
+    try (OzoneOutputStream out = bucket
+        .createKey(keyName, inputSize, replicationConfig, new HashMap<>())) {
+      for (int i = 0; i < inputChunks.length; i++) {
+        out.write(inputChunks[i]);
+      }
+    }
+    OzoneKeyDetails key = bucket.getKey(keyName);
+    Assert.assertEquals(replicationConfig, key.getReplicationConfig());
+  }
+
+  @Test
   public void testCreateRatisKeyAndWithECBucketDefaults() throws Exception {
     OzoneBucket bucket = getOzoneBucket();
-    try (OzoneOutputStream out = bucket
-        .createKey("testCreateRatisKeyAndWithECBucketDefaults", 2000,
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE),
-            new HashMap<>())) {
+    try (OzoneOutputStream out = bucket.createKey(
+        "testCreateRatisKeyAndWithECBucketDefaults", 2000,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        new HashMap<>())) {
       Assert.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
       for (int i = 0; i < inputChunks.length; i++) {
         out.write(inputChunks[i]);
@@ -210,6 +260,11 @@ public class TestECKeyOutputStream {
   @Test
   public void test13ChunksInSingleWriteOp() throws IOException {
     testMultipleChunksInSingleWriteOp(13);
+  }
+
+  @Test
+  public void testChunksInSingleWriteOpWithOffset() throws IOException {
+    testMultipleChunksInSingleWriteOp(11, 25, 19);
   }
 
   @Test
@@ -227,22 +282,32 @@ public class TestECKeyOutputStream {
     testMultipleChunksInSingleWriteOp(21);
   }
 
-  public void testMultipleChunksInSingleWriteOp(int numChunks)
-      throws IOException {
-    byte[] inputData = getInputBytes(numChunks);
+  private void testMultipleChunksInSingleWriteOp(int offset,
+                                                int bufferChunks, int numChunks)
+          throws IOException {
+    byte[] inputData = getInputBytes(offset, bufferChunks, numChunks);
     final OzoneBucket bucket = getOzoneBucket();
-    String keyName = "testMultipleChunksInSingleWriteOp" + numChunks;
+    String keyName =
+            String.format("testMultipleChunksInSingleWriteOpOffset" +
+                    "%dBufferChunks%dNumChunks", offset, bufferChunks,
+                    numChunks);
     try (OzoneOutputStream out = bucket.createKey(keyName, 4096,
         new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
             chunkSize), new HashMap<>())) {
-      out.write(inputData);
+      out.write(inputData, offset, numChunks * chunkSize);
     }
 
-    validateContent(inputData, bucket, bucket.getKey(keyName));
+    validateContent(offset, numChunks * chunkSize, inputData, bucket,
+            bucket.getKey(keyName));
+  }
+
+  private void testMultipleChunksInSingleWriteOp(int numChunks)
+      throws IOException {
+    testMultipleChunksInSingleWriteOp(0, numChunks, numChunks);
   }
 
   @Test
-  public void testECContainerKeysCount()
+  public void testECContainerKeysCountAndNumContainerReplicas()
       throws IOException, InterruptedException, TimeoutException {
     byte[] inputData = getInputBytes(1);
     final OzoneBucket bucket = getOzoneBucket();
@@ -270,8 +335,9 @@ public class TestECKeyOutputStream {
 
     GenericTestUtils.waitFor(() -> {
       try {
-        return containerOperationClient.getContainer(currentKeyContainerID)
-            .getNumberOfKeys() == 1;
+        return (containerOperationClient.getContainer(currentKeyContainerID)
+            .getNumberOfKeys() == 1) && (containerOperationClient
+            .getContainerReplicas(currentKeyContainerID).size() == 5);
       } catch (IOException exception) {
         Assert.fail("Unexpected exception " + exception);
         return false;
@@ -281,11 +347,18 @@ public class TestECKeyOutputStream {
   }
 
   private void validateContent(byte[] inputData, OzoneBucket bucket,
+                               OzoneKey key) throws IOException {
+    validateContent(0, inputData.length, inputData, bucket, key);
+  }
+
+  private void validateContent(int offset, int length, byte[] inputData,
+                               OzoneBucket bucket,
       OzoneKey key) throws IOException {
     try (OzoneInputStream is = bucket.readKey(key.getName())) {
-      byte[] fileContent = new byte[inputData.length];
-      Assert.assertEquals(inputData.length, is.read(fileContent));
-      Assert.assertEquals(new String(inputData, UTF_8),
+      byte[] fileContent = new byte[length];
+      Assert.assertEquals(length, is.read(fileContent));
+      Assert.assertEquals(new String(Arrays.copyOfRange(inputData, offset,
+                      offset + length), UTF_8),
           new String(fileContent, UTF_8));
     }
   }
@@ -359,9 +432,13 @@ public class TestECKeyOutputStream {
   }
 
   private byte[] getInputBytes(int numChunks) {
-    byte[] inputData = new byte[numChunks * chunkSize];
+    return getInputBytes(0, numChunks, numChunks);
+  }
+
+  private byte[] getInputBytes(int offset, int bufferChunks, int numChunks) {
+    byte[] inputData = new byte[offset + bufferChunks * chunkSize];
     for (int i = 0; i < numChunks; i++) {
-      int start = (i * chunkSize);
+      int start = offset + (i * chunkSize);
       Arrays.fill(inputData, start, start + chunkSize - 1,
           String.valueOf(i % 9).getBytes(UTF_8)[0]);
     }

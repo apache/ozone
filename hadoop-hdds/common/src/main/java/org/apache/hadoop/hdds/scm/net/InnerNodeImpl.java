@@ -138,7 +138,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       return true;
     }
     Node child = childrenMap.values().iterator().next();
-    return child instanceof InnerNode ? false : true;
+    return !(child instanceof InnerNode);
   }
 
   /**
@@ -473,8 +473,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
         continue;
       }
       if (excludedScopes != null && excludedScopes.size() > 0) {
-        if (excludedScopes.stream().anyMatch(scope ->
-            node.getNetworkFullPath().startsWith(scope))) {
+        if (excludedScopes.stream().anyMatch(node::isDescendant)) {
           continue;
         }
       }

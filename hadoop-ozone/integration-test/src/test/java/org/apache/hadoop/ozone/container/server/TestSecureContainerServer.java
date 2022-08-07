@@ -67,7 +67,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 
@@ -80,8 +80,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getCreateContainerRequest;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestBlockID;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestContainerID;
-import static org.apache.hadoop.ozone.container.ContainerTestHelper.newDeleteBlockRequestBuilder;
-import static org.apache.hadoop.ozone.container.ContainerTestHelper.newDeleteChunkRequestBuilder;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newGetBlockRequestBuilder;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newGetCommittedBlockLengthBuilder;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newPutBlockRequestBuilder;
@@ -174,7 +172,7 @@ public class TestSecureContainerServer {
 
   private static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf) throws IOException {
-    ContainerSet containerSet = new ContainerSet();
+    ContainerSet containerSet = new ContainerSet(1000);
     conf.set(HDDS_DATANODE_DIR_KEY,
         Paths.get(TEST_DIR, "dfs", "data", "hdds",
             RandomStringUtils.randomAlphabetic(4)).toString());
@@ -223,7 +221,7 @@ public class TestSecureContainerServer {
     final ContainerDispatcher dispatcher = createDispatcher(dn,
         UUID.randomUUID(), conf);
     return XceiverServerRatis.newXceiverServerRatis(dn, conf, dispatcher,
-        new ContainerController(new ContainerSet(), Maps.newHashMap()),
+        new ContainerController(new ContainerSet(1000), Maps.newHashMap()),
         caClient, null);
   }
 
@@ -279,7 +277,7 @@ public class TestSecureContainerServer {
       String encodedToken = token.encodeToUrlString();
 
       ContainerCommandRequestProto.Builder writeChunk =
-          newWriteChunkRequestBuilder(pipeline, blockID, 1024, 0);
+          newWriteChunkRequestBuilder(pipeline, blockID, 1024);
       assertRequiresToken(client, encodedToken, writeChunk);
 
       ContainerCommandRequestProto.Builder putBlock =
@@ -297,14 +295,6 @@ public class TestSecureContainerServer {
       ContainerCommandRequestProto.Builder getCommittedBlockLength =
           newGetCommittedBlockLengthBuilder(pipeline, putBlock.getPutBlock());
       assertRequiresToken(client, encodedToken, getCommittedBlockLength);
-
-      ContainerCommandRequestProto.Builder deleteChunk =
-          newDeleteChunkRequestBuilder(pipeline, writeChunk.getWriteChunk());
-      assertRequiresToken(client, encodedToken, deleteChunk);
-
-      ContainerCommandRequestProto.Builder deleteBlock =
-          newDeleteBlockRequestBuilder(pipeline, putBlock.getPutBlock());
-      assertRequiresToken(client, encodedToken, deleteBlock);
     } finally {
       stopServer.accept(pipeline);
       servers.forEach(XceiverServerSpi::stop);

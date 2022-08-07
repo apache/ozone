@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.debug.DBScanner;
 import org.apache.hadoop.ozone.debug.RDBParser;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -43,7 +44,6 @@ import java.util.List;
 import java.util.ArrayList;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 
 /**
@@ -94,7 +94,8 @@ public class TestOmLDBCli {
           HddsProtos.ReplicationFactor.ONE);
       String key = "key" + (i);
       Table<byte[], byte[]> keyTable = dbStore.getTable("keyTable");
-      byte[] arr = value.getProtobuf(CURRENT_VERSION).toByteArray();
+      byte[] arr = value
+          .getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray();
       keyTable.put(key.getBytes(UTF_8), arr);
     }
     rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());

@@ -23,7 +23,8 @@ package org.apache.hadoop.ozone.audit;
 public enum AuditLoggerType {
   DNLOGGER("DNAudit"),
   OMLOGGER("OMAudit"),
-  SCMLOGGER("SCMAudit");
+  SCMLOGGER("SCMAudit"),
+  S3GLOGGER("S3GAudit");
 
   private String type;
 

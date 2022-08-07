@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.util.Time;
@@ -206,7 +207,11 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OMKeyCommitRequest omKeyCommitRequest =
             getOmKeyCommitRequest(modifiedOmRequest);
 
-    String ozoneKey = getOzonePathKey();
+    final long volumeId = 100L;
+    final long bucketID = 1000L;
+    final String fileName = OzoneFSUtils.getFileName(keyName);
+    final String ozoneKey = omMetadataManager.getOzonePathKey(volumeId,
+            bucketID, bucketID, fileName);
 
     // Key should not be there in key table, as validateAndUpdateCache is
     // still not called.
@@ -263,6 +268,48 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
             .get(ozoneKey);
 
     Assert.assertNull(omKeyInfo);
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithBucketQuotaExceeds()
+      throws Exception {
+
+    OMRequest modifiedOmRequest =
+        doPreExecute(createCommitKeyRequest());
+
+    OMKeyCommitRequest omKeyCommitRequest =
+        getOmKeyCommitRequest(modifiedOmRequest);
+
+    KeyArgs keyArgs = modifiedOmRequest.getCommitKeyRequest().getKeyArgs();
+
+    // Append new blocks
+    List<OmKeyLocationInfo> allocatedLocationList =
+        keyArgs.getKeyLocationsList().stream()
+            .map(OmKeyLocationInfo::getFromProtobuf)
+            .collect(Collectors.toList());
+
+
+    OMRequestTestUtils.addVolumeToDB(volumeName, OzoneConsts.OZONE,
+        omMetadataManager);
+    OmBucketInfo.Builder bucketBuilder = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setBucketLayout(omKeyCommitRequest.getBucketLayout())
+        .setQuotaInBytes(0L);
+    OMRequestTestUtils.addBucketToDB(omMetadataManager, bucketBuilder);
+
+    addKeyToOpenKeyTable(allocatedLocationList);
+
+    OMClientResponse omClientResponse =
+        omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
+            100L, ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED,
+        omClientResponse.getOMResponse().getStatus());
+
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
+        .get(omMetadataManager.getBucketKey(volumeName, bucketName));
+    Assert.assertEquals(0, bucketInfo.getUsedNamespace());
   }
 
   @Test

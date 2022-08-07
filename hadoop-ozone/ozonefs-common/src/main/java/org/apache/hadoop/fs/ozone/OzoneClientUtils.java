@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -34,6 +33,8 @@ import org.apache.hadoop.ozone.client.checksum.ReplicatedFileChecksumHelper;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
 import java.io.IOException;
 import java.util.Set;
@@ -95,7 +96,7 @@ public final class OzoneClientUtils {
    */
   public static ReplicationConfig resolveClientSideReplicationConfig(
       short replication, ReplicationConfig clientConfiguredReplConfig,
-      ReplicationConfig bucketReplConfig, OzoneConfiguration config) {
+      ReplicationConfig bucketReplConfig, ConfigurationSource config) {
     ReplicationConfig clientDeterminedReplConfig = null;
 
     boolean isECBucket = bucketReplConfig != null && bucketReplConfig
@@ -165,7 +166,7 @@ public final class OzoneClientUtils {
    */
   public static ReplicationConfig validateAndGetClientReplicationConfig(
       ReplicationType userPassedType, String userPassedReplication,
-      OzoneConfiguration clientSideConfig) {
+      ConfigurationSource clientSideConfig) {
     // Priority 1: User passed replication config values.
     // Priority 2: Client side configured replication config values.
     /* if above two are not available, we should just return null and clients
@@ -206,8 +207,20 @@ public final class OzoneClientUtils {
     if (keyName.length() == 0) {
       return null;
     }
-    BaseFileChecksumHelper helper = new ReplicatedFileChecksumHelper(
-        volume, bucket, keyName, length, rpcClient);
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volume.getName())
+        .setBucketName(bucket.getName()).setKeyName(keyName)
+        .setRefreshPipeline(true).setSortDatanodesInPipeline(true)
+        .setLatestVersionLocation(true).build();
+    OmKeyInfo keyInfo = rpcClient.getOzoneManagerClient().lookupKey(keyArgs);
+
+    // TODO: return null util ECFileChecksum is implemented.
+    if (keyInfo.getReplicationConfig()
+        .getReplicationType() == HddsProtos.ReplicationType.EC) {
+      return null;
+    }
+    BaseFileChecksumHelper helper =
+        new ReplicatedFileChecksumHelper(volume, bucket, keyName, length,
+            combineMode, rpcClient, keyInfo);
     helper.compute();
     return helper.getFileChecksum();
   }

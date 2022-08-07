@@ -19,6 +19,8 @@ package org.apache.ozone.erasurecode.rawcoder;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.io.erasurecode.ErasureCoderOptions;
+import org.apache.hadoop.io.erasurecode.rawcoder.HadoopNativeECAccessorUtil;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -29,48 +31,33 @@ import java.nio.ByteBuffer;
 @InterfaceAudience.Private
 public class NativeRSRawDecoder extends AbstractNativeRawDecoder {
 
-  static {
-    ErasureCodeNative.checkNativeCodeLoaded();
-  }
+  private org.apache.hadoop.io.erasurecode.rawcoder.NativeRSRawDecoder
+      hadoopNativeRSRawDecoder;
 
   public NativeRSRawDecoder(ECReplicationConfig ecReplicationConfig) {
     super(ecReplicationConfig);
-    decoderLock.writeLock().lock();
-    try {
-      initImpl(ecReplicationConfig.getData(), ecReplicationConfig.getParity());
-    } finally {
-      decoderLock.writeLock().unlock();
-    }
+    hadoopNativeRSRawDecoder =
+        new org.apache.hadoop.io.erasurecode.rawcoder.NativeRSRawDecoder(
+            new ErasureCoderOptions(ecReplicationConfig.getData(),
+                ecReplicationConfig.getParity()));
   }
 
   @Override
-  protected void performDecodeImpl(
-      ByteBuffer[] inputs, int[] inputOffsets, int dataLen, int[] erased,
-      ByteBuffer[] outputs, int[] outputOffsets) throws IOException {
-    decodeImpl(inputs, inputOffsets, dataLen, erased, outputs, outputOffsets);
+  protected void performDecodeImpl(ByteBuffer[] inputs, int[] inputOffsets,
+      int dataLen, int[] erased, ByteBuffer[] outputs, int[] outputOffsets)
+      throws IOException {
+    HadoopNativeECAccessorUtil
+        .performDecodeImpl(hadoopNativeRSRawDecoder, inputs,
+            inputOffsets, dataLen, erased, outputs, outputOffsets);
   }
 
   @Override
   public void release() {
-    decoderLock.writeLock().lock();
-    try {
-      destroyImpl();
-    } finally {
-      decoderLock.writeLock().unlock();
-    }
+    hadoopNativeRSRawDecoder.release();
   }
 
   @Override
   public boolean preferDirectBuffer() {
-    return true;
+    return hadoopNativeRSRawDecoder.preferDirectBuffer();
   }
-
-  private native void initImpl(int numDataUnits, int numParityUnits);
-
-  private native void decodeImpl(
-          ByteBuffer[] inputs, int[] inputOffsets, int dataLen, int[] erased,
-          ByteBuffer[] outputs, int[] outputOffsets) throws IOException;
-
-  private native void destroyImpl();
-
 }

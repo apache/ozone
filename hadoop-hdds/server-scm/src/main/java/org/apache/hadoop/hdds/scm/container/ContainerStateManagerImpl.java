@@ -220,27 +220,29 @@ public final class ContainerStateManagerImpl
    * @throws IOException in case of error while loading the containers
    */
   private void initialize() throws IOException {
-    TableIterator<ContainerID, ? extends KeyValue<ContainerID, ContainerInfo>>
-        iterator = containerStore.iterator();
+    try (TableIterator<ContainerID,
+        ? extends KeyValue<ContainerID, ContainerInfo>> iterator =
+             containerStore.iterator()) {
 
-    while (iterator.hasNext()) {
-      final ContainerInfo container = iterator.next().getValue();
-      Preconditions.checkNotNull(container);
-      containers.addContainer(container);
-      if (container.getState() == LifeCycleState.OPEN) {
-        try {
-          pipelineManager.addContainerToPipelineSCMStart(
-              container.getPipelineID(), container.containerID());
-        } catch (PipelineNotFoundException ex) {
-          LOG.warn("Found container {} which is in OPEN state with " +
-                  "pipeline {} that does not exist. Marking container for " +
-                  "closing.", container, container.getPipelineID());
+      while (iterator.hasNext()) {
+        final ContainerInfo container = iterator.next().getValue();
+        Preconditions.checkNotNull(container);
+        containers.addContainer(container);
+        if (container.getState() == LifeCycleState.OPEN) {
           try {
-            updateContainerState(container.containerID().getProtobuf(),
-                LifeCycleEvent.FINALIZE);
-          } catch (InvalidStateTransitionException e) {
-            // This cannot happen.
-            LOG.warn("Unable to finalize Container {}.", container);
+            pipelineManager.addContainerToPipelineSCMStart(
+                container.getPipelineID(), container.containerID());
+          } catch (PipelineNotFoundException ex) {
+            LOG.warn("Found container {} which is in OPEN state with " +
+                "pipeline {} that does not exist. Marking container for " +
+                "closing.", container, container.getPipelineID());
+            try {
+              updateContainerState(container.containerID().getProtobuf(),
+                  LifeCycleEvent.FINALIZE);
+            } catch (InvalidStateTransitionException e) {
+              // This cannot happen.
+              LOG.warn("Unable to finalize Container {}.", container);
+            }
           }
         }
       }
@@ -277,10 +279,10 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public ContainerInfo getContainer(final HddsProtos.ContainerID id) {
+  public ContainerInfo getContainer(final ContainerID id) {
     lock.readLock().lock();
     try {
-      return containers.getContainerInfo(ContainerID.getFromProtobuf(id));
+      return containers.getContainerInfo(id);
     } finally {
       lock.readLock().unlock();
     }
@@ -326,11 +328,10 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public boolean contains(final HddsProtos.ContainerID id) {
+  public boolean contains(ContainerID id) {
     lock.readLock().lock();
     try {
-      // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
-      return containers.contains(ContainerID.getFromProtobuf(id));
+      return containers.contains(id);
     } finally {
       lock.readLock().unlock();
     }
@@ -370,35 +371,32 @@ public final class ContainerStateManagerImpl
 
 
   @Override
-  public Set<ContainerReplica> getContainerReplicas(
-      final HddsProtos.ContainerID id) {
+  public Set<ContainerReplica> getContainerReplicas(final ContainerID id) {
     lock.readLock().lock();
     try {
-      return containers.getContainerReplicas(
-          ContainerID.getFromProtobuf(id));
+      return containers.getContainerReplicas(id);
     } finally {
       lock.readLock().unlock();
     }
   }
 
   @Override
-  public void updateContainerReplica(final HddsProtos.ContainerID id,
+  public void updateContainerReplica(final ContainerID id,
                                      final ContainerReplica replica) {
     lock.writeLock().lock();
     try {
-      containers.updateContainerReplica(ContainerID.getFromProtobuf(id),
-          replica);
+      containers.updateContainerReplica(id, replica);
     } finally {
       lock.writeLock().unlock();
     }
   }
 
   @Override
-  public void removeContainerReplica(final HddsProtos.ContainerID id,
+  public void removeContainerReplica(final ContainerID id,
                                      final ContainerReplica replica) {
     lock.writeLock().lock();
     try {
-      containers.removeContainerReplica(ContainerID.getFromProtobuf(id),
+      containers.removeContainerReplica(id,
           replica);
     } finally {
       lock.writeLock().unlock();

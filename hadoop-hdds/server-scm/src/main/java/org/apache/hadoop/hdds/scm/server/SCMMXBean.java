@@ -80,4 +80,7 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
    */
   String getPrimordialNode();
 
+  String getRatisLogDirectory();
+
+  String getRocksDbDirectory();
 }
