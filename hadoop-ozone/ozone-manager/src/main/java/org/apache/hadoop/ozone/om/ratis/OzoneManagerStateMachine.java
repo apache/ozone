@@ -46,6 +46,8 @@ import org.apache.hadoop.ozone.om.hashcodegenerator.StringOMHashCodeGeneratorImp
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
+import org.apache.hadoop.ozone.om.ratis.utils.BasicOMStateMachineThreadIndexerImpl;
+import org.apache.hadoop.ozone.om.ratis.utils.OMStateMachineThreadIndexer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -106,6 +108,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private boolean enableKeyPathLock;
   private boolean enableFileSystemPaths;
   private OMHashCodeGenerator omHashCodeGenerator;
+  private OMStateMachineThreadIndexer omStateMachineThreadIndexer;
 
   // Map which contains index and term for the ratis transactions which are
   // stateMachine entries which are received through applyTransaction.
@@ -140,6 +143,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
         ozoneManagerDoubleBuffer);
     this.omHashCodeGenerator = new StringOMHashCodeGeneratorImpl();
+    this.omStateMachineThreadIndexer =
+        new BasicOMStateMachineThreadIndexerImpl();
 
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat("OM StateMachine ApplyTransaction Thread - %d").build();
@@ -405,19 +410,17 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
       if (bucketLayout == BucketLayout.OBJECT_STORE) {
         // TODO: LOG debug
-        int size = multipleExecutors.size();
-        int i =
-            (((omHashCodeGenerator.getHashCode(resourceName) % size) + size) %
-                size);
+        int i = omStateMachineThreadIndexer.getOMStateMachineThreadIndex(
+            omHashCodeGenerator.getHashCode(resourceName),
+            multipleExecutors.size());
         return multipleExecutors.get(i);
       } else if (!enableFileSystemPathsFlag &&
           bucketLayout == BucketLayout.LEGACY) {
         // old pre-created bucket with enableFileSystemPaths = false.
         // TODO: LOG debug
-        int size = multipleExecutors.size();
-        int i =
-            (((omHashCodeGenerator.getHashCode(resourceName) % size) + size) %
-                size);
+        int i = omStateMachineThreadIndexer.getOMStateMachineThreadIndex(
+            omHashCodeGenerator.getHashCode(resourceName),
+            multipleExecutors.size());
         return multipleExecutors.get(i);
       }
     }
