@@ -94,7 +94,7 @@ public class ECReplicationConfig implements ReplicationConfig {
    * @param string
    */
   public ECReplicationConfig(String string) {
-    final Matcher matcher = STRING_FORMAT.matcher(string);
+    final Matcher matcher = STRING_FORMAT.matcher(string.toLowerCase());
     if (!matcher.matches()) {
       throw new IllegalArgumentException("EC replication config should be " +
           "defined in the form rs-3-2-1024k, rs-6-3-1024; or rs-10-4-1024k." +
