@@ -233,6 +233,7 @@ public class TestECUnderReplicationHandler {
             replicas, 1, 0, sameNodePolicy));
   }
 
+  @Test
   public void testUnderAndOverReplication() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 1),
@@ -240,7 +241,7 @@ public class TestECUnderReplicationHandler {
             Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
     Map<DatanodeDetails, SCMCommand<?>> cmds =
         testUnderReplicationWithMissingIndexes(ImmutableList.of(2, 3),
-            availableReplicas, 0, policy);
+            availableReplicas, 0, 0, policy);
     Assertions.assertEquals(1, cmds.size());
     ReconstructECContainersCommand cmd =
         (ReconstructECContainersCommand) cmds.values().iterator().next();
