@@ -65,6 +65,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -209,16 +210,26 @@ public class TestDeletedBlockLog {
 
   private void addTransactions(Map<Long, List<Long>> containerBlocksMap,
       boolean shouldFlush)
-      throws IOException {
+      throws IOException, TimeoutException {
     deletedBlockLog.addTransactions(containerBlocksMap);
     if (shouldFlush) {
       scmHADBTransactionBuffer.flush();
     }
   }
 
-  private void incrementCount(List<Long> txIDs) throws IOException {
+  private void incrementCount(List<Long> txIDs)
+      throws IOException, TimeoutException {
     deletedBlockLog.incrementCount(txIDs);
     scmHADBTransactionBuffer.flush();
+    // mock scmHADBTransactionBuffer does not flush deletedBlockLog
+    deletedBlockLog.onFlush();
+  }
+
+  private void resetCount(List<Long> txIDs)
+      throws IOException, TimeoutException {
+    deletedBlockLog.resetCount(txIDs);
+    scmHADBTransactionBuffer.flush();
+    deletedBlockLog.onFlush();
   }
 
   private void commitTransactions(
@@ -262,7 +273,7 @@ public class TestDeletedBlockLog {
   }
 
   private List<DeletedBlocksTransaction> getTransactions(
-      int maximumAllowedBlocksNum) throws IOException {
+      int maximumAllowedBlocksNum) throws IOException, TimeoutException {
     DatanodeDeletedBlockTransactions transactions =
         deletedBlockLog.getTransactions(maximumAllowedBlocksNum);
     List<DeletedBlocksTransaction> txns = new LinkedList<>();
@@ -327,6 +338,44 @@ public class TestDeletedBlockLog {
     // If all TXs are failed, getTransactions call will always return nothing.
     blocks = getTransactions(40 * BLOCKS_PER_TXN);
     Assertions.assertEquals(blocks.size(), 0);
+  }
+
+  @Test
+  public void testResetCount() throws Exception {
+    int maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
+
+    // Create 30 TXs in the log.
+    addTransactions(generateData(30), true);
+
+    // This will return all TXs, total num 30.
+    List<DeletedBlocksTransaction> blocks =
+        getTransactions(40 * BLOCKS_PER_TXN);
+    List<Long> txIDs = blocks.stream().map(DeletedBlocksTransaction::getTxID)
+        .collect(Collectors.toList());
+
+    for (int i = 0; i < maxRetry; i++) {
+      incrementCount(txIDs);
+    }
+
+    // Increment another time so it exceed the maxRetry.
+    // On this call, count will be set to -1 which means TX eventually fails.
+    incrementCount(txIDs);
+    blocks = getTransactions(40 * BLOCKS_PER_TXN);
+    for (DeletedBlocksTransaction block : blocks) {
+      Assertions.assertEquals(-1, block.getCount());
+    }
+
+    // If all TXs are failed, getTransactions call will always return nothing.
+    blocks = getTransactions(40 * BLOCKS_PER_TXN);
+    Assertions.assertEquals(0, blocks.size());
+
+    // Reset the retry count, these transactions should be accessible.
+    resetCount(txIDs);
+    blocks = getTransactions(40 * BLOCKS_PER_TXN);
+    for (DeletedBlocksTransaction block : blocks) {
+      Assertions.assertEquals(0, block.getCount());
+    }
+    Assertions.assertEquals(30, blocks.size());
   }
 
   @Test
@@ -432,7 +481,8 @@ public class TestDeletedBlockLog {
   }
 
   @Test
-  public void testDeletedBlockTransactions() throws IOException {
+  public void testDeletedBlockTransactions()
+      throws IOException, TimeoutException {
     int txNum = 10;
     List<DeletedBlocksTransaction> blocks;
     DatanodeDetails dnId1 = dnList.get(0), dnId2 = dnList.get(1);

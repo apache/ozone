@@ -97,6 +97,7 @@ public class TestKeyValueContainerData {
     kvData.setContainerDBType(containerDBType);
     kvData.setChunksPath(path);
     kvData.setMetadataPath(path);
+    kvData.setReplicaIndex(4);
     kvData.incrReadBytes(10);
     kvData.incrWriteBytes(10);
     kvData.incrReadCount();
@@ -121,6 +122,12 @@ public class TestKeyValueContainerData {
     assertEquals(datanodeId.toString(), kvData.getOriginNodeId());
     assertEquals(VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion(conf),
         kvData.getSchemaVersion());
+
+    KeyValueContainerData newKvData = new KeyValueContainerData(kvData);
+    assertEquals(kvData.getReplicaIndex(), newKvData.getReplicaIndex());
+    assertEquals(0, newKvData.getNumPendingDeletionBlocks());
+    assertEquals(0, newKvData.getDeleteTransactionId());
+    assertEquals(kvData.getSchemaVersion(), newKvData.getSchemaVersion());
   }
 
 }

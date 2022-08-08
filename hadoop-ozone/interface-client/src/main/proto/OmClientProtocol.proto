@@ -121,8 +121,8 @@ enum Type {
   SetS3Secret = 106;
 
   SetRangerServiceVersion = 107;
-
-  CreateSnapshot = 109;
+  RangerBGSync = 109;
+  CreateSnapshot = 110;
 }
 
 message OMRequest {
@@ -226,9 +226,8 @@ message OMRequest {
   optional SetS3SecretRequest               SetS3SecretRequest             = 106;
 
   optional SetRangerServiceVersionRequest   SetRangerServiceVersionRequest = 107;
-
-  // skips over 108, purgeDirectoriesRequest
-  optional CreateSnapshotRequest             CreateSnapshotRequest         = 109;
+  optional RangerBGSyncRequest              RangerBGSyncRequest            = 109;
+  optional CreateSnapshotRequest            CreateSnapshotRequest          = 110;
 }
 
 message OMResponse {
@@ -325,8 +324,8 @@ message OMResponse {
   optional SetS3SecretResponse               SetS3SecretResponse           = 106;
 
   optional SetRangerServiceVersionResponse   SetRangerServiceVersionResponse = 107;
-
-  optional CreateSnapshotResponse            CreateSnapshotResponse          = 109;
+  optional RangerBGSyncResponse              RangerBGSyncResponse          = 109;
+  optional CreateSnapshotResponse            CreateSnapshotResponse        = 110;
 }
 
 enum Status {
@@ -1288,6 +1287,14 @@ message DBUpdatesResponse {
     required uint64 sequenceNumber = 1;
     repeated bytes data = 2;
     optional uint64 latestSequenceNumber = 3;
+}
+
+message RangerBGSyncRequest {
+    optional bool noWait = 1;
+}
+
+message RangerBGSyncResponse {
+    optional bool runSuccess = 1;
 }
 
 message FinalizeUpgradeRequest {

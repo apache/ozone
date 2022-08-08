@@ -631,8 +631,19 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         }
       }
 
+      boolean isBucketLink = false;
+      // check for bucket link
+      if (ofsPath.isBucket()) {
+        isBucketLink = adapterImpl.getBucket(ofsPath, false)
+            .isLink();
+      }
 
-      result = innerDelete(f, recursive);
+      // if link, don't delete contents
+      if (isBucketLink) {
+        result = true;
+      } else {
+        result = innerDelete(f, recursive);
+      }
 
       // Handle delete bucket
       if (ofsPath.isBucket()) {

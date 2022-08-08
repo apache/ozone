@@ -32,14 +32,21 @@ import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.ratis.util.ExitUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.concurrent.Executors;
 
 /**
  * Class to initiate SCM finalization and query its progress.
  */
 public class FinalizationManagerImpl implements FinalizationManager {
+  private static final Logger LOG = LoggerFactory
+      .getLogger(FinalizationManagerImpl.class);
+
   private SCMUpgradeFinalizer upgradeFinalizer;
   private SCMUpgradeFinalizationContext context;
   private SCMStorageConfig storage;
@@ -132,6 +139,37 @@ public class FinalizationManagerImpl implements FinalizationManager {
   @Override
   public FinalizationCheckpoint getCheckpoint() {
     return finalizationStateManager.getFinalizationCheckpoint();
+  }
+
+  @Override
+  public void reinitialize(Table<String, String> finalizationStore)
+      throws IOException {
+    finalizationStateManager.reinitialize(finalizationStore);
+  }
+
+  @Override
+  public void onLeaderReady() {
+    // Launch a background thread to drive finalization.
+    Executors.newSingleThreadExecutor().submit(() -> {
+      FinalizationCheckpoint currentCheckpoint = getCheckpoint();
+      if (currentCheckpoint.hasCrossed(
+          FinalizationCheckpoint.FINALIZATION_STARTED) &&
+          !currentCheckpoint.hasCrossed(
+              FinalizationCheckpoint.FINALIZATION_COMPLETE)) {
+        LOG.info("SCM became leader. Resuming upgrade finalization from" +
+            " current checkpoint {}.", currentCheckpoint);
+        try {
+          finalizeUpgrade("resume-finalization-as-leader");
+        } catch (IOException ex) {
+          ExitUtils.terminate(1,
+              "Resuming upgrade finalization failed on SCM leader change.",
+              ex, true, LOG);
+        }
+      } else if (LOG.isDebugEnabled()) {
+        LOG.debug("SCM became leader. No upgrade finalization action" +
+            " required for current checkpoint {}", currentCheckpoint);
+      }
+    });
   }
 
   /**

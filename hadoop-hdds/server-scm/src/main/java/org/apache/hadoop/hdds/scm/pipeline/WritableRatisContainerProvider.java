@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 /**
@@ -64,7 +65,7 @@ public class WritableRatisContainerProvider
   @Override
   public ContainerInfo getContainer(final long size,
       ReplicationConfig repConfig, String owner, ExcludeList excludeList)
-      throws IOException {
+      throws IOException, TimeoutException {
     /*
       Here is the high level logic.
 

@@ -129,15 +129,19 @@ public class TestChunkUtils {
         Path path = Files.createTempFile(PREFIX, String.valueOf(i));
         paths.add(path);
         executor.execute(() -> {
-          ChunkUtils.processFileExclusively(path, () -> {
-            try {
-              Thread.sleep(perThreadWait);
-            } catch (InterruptedException e) {
-              e.printStackTrace();
-            }
-            processed.incrementAndGet();
-            return null;
-          });
+          try {
+            ChunkUtils.processFileExclusively(path, () -> {
+              try {
+                Thread.sleep(perThreadWait);
+              } catch (InterruptedException e) {
+                e.printStackTrace();
+              }
+              processed.incrementAndGet();
+              return null;
+            });
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
         });
       }
       try {

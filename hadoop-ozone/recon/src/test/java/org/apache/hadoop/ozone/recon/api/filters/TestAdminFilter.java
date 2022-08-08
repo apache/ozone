@@ -28,8 +28,8 @@ import org.apache.hadoop.ozone.recon.api.NodeEndpoint;
 import org.apache.hadoop.ozone.recon.api.PipelineEndpoint;
 import org.apache.hadoop.ozone.recon.api.TaskStatusService;
 import org.apache.hadoop.ozone.recon.api.UtilizationEndpoint;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
@@ -62,7 +62,7 @@ public class TestAdminFilter {
     Set<Class<?>> allEndpoints =
         reflections.getTypesAnnotatedWith(Path.class);
 
-    Assert.assertFalse(allEndpoints.isEmpty());
+    Assertions.assertFalse(allEndpoints.isEmpty());
 
     // If an endpoint is added, it must be explicitly added to this set or be
     // marked with @AdminOnly for this test to pass.
@@ -74,23 +74,21 @@ public class TestAdminFilter {
     nonAdminEndpoints.add(PipelineEndpoint.class);
     nonAdminEndpoints.add(TaskStatusService.class);
 
-    Assert.assertTrue(allEndpoints.containsAll(nonAdminEndpoints));
+    Assertions.assertTrue(allEndpoints.containsAll(nonAdminEndpoints));
 
     Set<Class<?>> adminEndpoints = Sets.difference(allEndpoints,
         nonAdminEndpoints);
 
     for (Class<?> endpoint: nonAdminEndpoints) {
-      Assert.assertFalse(String.format("Endpoint class %s has been " +
-              "declared as non admin in this test, but is marked as " +
-              "@AdminOnly.", endpoint),
-          endpoint.isAnnotationPresent(AdminOnly.class));
+      Assertions.assertFalse(endpoint.isAnnotationPresent(AdminOnly.class),
+          String.format("Endpoint class %s has been declared as non admin " +
+              "in this test, but is marked as @AdminOnly.", endpoint));
     }
 
     for (Class<?> endpoint: adminEndpoints) {
-      Assert.assertTrue(String.format("Endpoint class %s must be marked as " +
-              "@AdminOnly or explicitly declared as non admin in this test.",
-          endpoint),
-          endpoint.isAnnotationPresent(AdminOnly.class));
+      Assertions.assertTrue(endpoint.isAnnotationPresent(AdminOnly.class),
+          String.format("Endpoint class %s must be marked as @AdminOnly " +
+              "or explicitly declared as non admin in this test.", endpoint));
     }
   }
 

@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -95,7 +96,7 @@ public class PipelineReportHandler implements
         // pipeline report on followers.
       } catch (PipelineNotFoundException e) {
         LOGGER.error("Could not find pipeline {}", report.getPipelineID());
-      } catch (IOException e) {
+      } catch (IOException | TimeoutException e) {
         LOGGER.error("Could not process pipeline report={} from dn={}.",
             report, dn, e);
       }
@@ -103,7 +104,8 @@ public class PipelineReportHandler implements
   }
 
   protected void processPipelineReport(PipelineReport report,
-      DatanodeDetails dn, EventPublisher publisher) throws IOException {
+      DatanodeDetails dn, EventPublisher publisher)
+      throws IOException, TimeoutException {
     PipelineID pipelineID = PipelineID.getFromProtobuf(report.getPipelineID());
     Pipeline pipeline;
     try {

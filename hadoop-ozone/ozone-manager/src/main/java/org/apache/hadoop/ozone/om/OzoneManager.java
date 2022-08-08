@@ -73,6 +73,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.om.multitenant.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
@@ -264,6 +265,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
@@ -406,7 +408,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static boolean testReloadConfigFlag = false;
   private static boolean testSecureOmFlag = false;
 
-  private OzoneLockProvider ozoneLockProvider;
+  private final OzoneLockProvider ozoneLockProvider;
 
   /**
    * OM Startup mode.
@@ -526,6 +528,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // verifies that the SCM info in the OM Version file is correct.
     scmBlockClient = getScmBlockClient(configuration);
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient);
+    this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
+        getEnableFileSystemPaths());
 
     // For testing purpose only, not hit scm from om as Hadoop UGI can't login
     // two principals in the same JVM.
@@ -813,7 +817,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     throw new OMException("S3 multi-tenancy feature is not enabled. Please "
         + "set ozone.om.multitenancy.enabled to true and restart all OMs.",
-        ResultCodes.FEATURE_NOT_ENABLED);
+        FEATURE_NOT_ENABLED);
   }
 
   /**
@@ -1541,9 +1545,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (omState == State.BOOTSTRAPPING) {
       bootstrap(omNodeDetails);
     }
-
-    ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
-        getEnableFileSystemPaths());
 
     omState = State.RUNNING;
   }
@@ -3079,6 +3080,53 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public ServiceInfoEx getServiceInfo() throws IOException {
     return new ServiceInfoEx(getServiceList(), caCertPem, caCertPemList);
+  }
+
+  @Override
+  public boolean triggerRangerBGSync(boolean noWait) throws IOException {
+
+    // OM should be leader and ready.
+    // This check should always pass if called from a client since there
+    // is a leader check somewhere before entering this method.
+    if (!isLeaderReady()) {
+      // And even if we could allow followers to trigger sync, checkLeader()
+      // calls inside the sync would quit the sync anyway.
+      throw new OMException("OM is not leader or not ready", INVALID_REQUEST);
+    }
+
+    final UserGroupInformation ugi = getRemoteUser();
+    // Check Ozone admin privilege
+    if (!isAdmin(ugi)) {
+      throw new OMException("Only Ozone admins are allowed to trigger "
+          + "Ranger background sync manually", PERMISSION_DENIED);
+    }
+
+    // Check if MT manager is inited
+    final OMMultiTenantManager mtManager = getMultiTenantManager();
+    if (mtManager == null) {
+      throw new OMException("S3 Multi-Tenancy is not enabled",
+          FEATURE_NOT_ENABLED);
+    }
+
+    // Check if Ranger BG sync task is inited
+    final OMRangerBGSyncService bgSync = mtManager.getOMRangerBGSyncService();
+    if (bgSync == null) {
+      throw new OMException("Ranger background sync service is not initialized",
+          FEATURE_NOT_ENABLED);
+    }
+
+    // Trigger Ranger BG Sync
+    if (noWait) {
+      final Thread t = new Thread(bgSync::triggerRangerSyncOnce);
+      t.start();
+      LOG.info("User '{}' manually triggered Multi-Tenancy Ranger Sync "
+          + "in a new thread, tid={}", ugi, t.getId());
+      return true;
+    } else {
+      LOG.info("User '{}' manually triggered Multi-Tenancy Ranger Sync", ugi);
+      // Block in the handler thread
+      return bgSync.triggerRangerSyncOnce();
+    }
   }
 
   @Override

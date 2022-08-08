@@ -79,7 +79,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <ratis.thirdparty.version>1.0.0</ratis.thirdparty.version>
 
     <!-- Apache Ranger plugin version -->
-    <ranger.version>3.0.0-SNAPSHOT</ranger.version>
+    <ranger.version>2.3.0</ranger.version>
 
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
@@ -201,11 +201,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <grpc.protobuf-compile.version>3.19.2</grpc.protobuf-compile.version>
     <os-maven-plugin.version>1.5.0.Final</os-maven-plugin.version>
 
-    <netty.version>4.1.74.Final</netty.version>
-    <io.grpc.version>1.44.0</io.grpc.version>
-    <tcnative.version>2.0.48.Final</tcnative.version> <!-- See table for correct version -->
-    <!-- Table for netty, grpc & tcnative version combinations  -->
-    <!-- https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty -->
+    <netty.version>4.1.79.Final</netty.version>
+    <io.grpc.version>1.48.1</io.grpc.version>
 
     <!-- define the Java language version used by the compiler -->
     <javac.version>1.8</javac.version>
@@ -256,7 +253,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
      -->
     <checkstyle.version>9.3</checkstyle.version>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
-    <aws-java-sdk.version>1.12.124</aws-java-sdk.version>
+    <aws-java-sdk.version>1.12.261</aws-java-sdk.version>
     <hsqldb.version>2.3.4</hsqldb.version>
     <frontend-maven-plugin.version>1.12.0</frontend-maven-plugin.version>
     <!-- the version of Hadoop declared in the version resources; can be overridden
@@ -270,6 +267,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <aspectj.version>1.9.7</aspectj.version>
     <aspectj-plugin.version>1.14.0</aspectj-plugin.version>
+    <restrict-imports.enforcer.version>2.0.0</restrict-imports.enforcer.version>
   </properties>
 
 
@@ -1829,6 +1827,56 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               </requireJavaVersion>
             </rules>
           </configuration>
+          <dependencies>
+            <dependency>
+              <groupId>de.skuzzle.enforcer</groupId>
+              <artifactId>restrict-imports-enforcer-rule</artifactId>
+              <version>${restrict-imports.enforcer.version}</version>
+            </dependency>
+          </dependencies>
+          <executions>
+            <execution>
+              <id>banned-rocksdb-imports</id>
+              <phase>process-sources</phase>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <configuration>
+                <rules>
+                  <RestrictImports>
+                    <includeTestCode>false</includeTestCode>
+                    <reason>Use managed RocksObjects under org.apache.hadoop.hdds.utils.db.managed instead.</reason>
+                    <!-- By default, ban all the classes in org.rocksdb -->
+                    <bannedImport>org.rocksdb.**</bannedImport>
+                    <allowedImports>
+                      <!-- Allow non-RocksObject classes. -->
+                      <allowedImport>org.rocksdb.BlockBasedTableConfig</allowedImport>
+                      <allowedImport>org.rocksdb.ColumnFamilyDescriptor</allowedImport>
+                      <allowedImport>org.rocksdb.CompactionStyle</allowedImport>
+                      <allowedImport>org.rocksdb.HistogramData</allowedImport>
+                      <allowedImport>org.rocksdb.HistogramType</allowedImport>
+                      <allowedImport>org.rocksdb.Holder</allowedImport>
+                      <allowedImport>org.rocksdb.InfoLogLevel</allowedImport>
+                      <allowedImport>org.rocksdb.OptionsUtil</allowedImport>
+                      <allowedImport>org.rocksdb.RocksDBException</allowedImport>
+                      <allowedImport>org.rocksdb.StatsLevel</allowedImport>
+                      <allowedImport>org.rocksdb.TransactionLogIterator.BatchResult</allowedImport>
+                      <allowedImport>org.rocksdb.TickerType</allowedImport>
+
+                      <!-- Allow RocksObjects whose native pointer is managed by RocksDB. -->
+                      <allowedImport>org.rocksdb.ColumnFamilyHandle</allowedImport>
+                      <allowedImport>org.rocksdb.Env</allowedImport>
+                      <allowedImport>org.rocksdb.Statistics</allowedImport>
+
+                      <!-- Allow RocksDB constants and static methods to be used. -->
+                      <allowedImport>org.rocksdb.RocksDB.*</allowedImport>
+                    </allowedImports>
+                    <exclusion>org.apache.hadoop.hdds.utils.db.managed.*</exclusion>
+                  </RestrictImports>
+                </rules>
+              </configuration>
+            </execution>
+          </executions>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>

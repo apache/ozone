@@ -98,7 +98,7 @@ public class TestCloseContainerCommandHandler {
         pipelineID.getId().toString(), null);
 
     container = new KeyValueContainer(data, new OzoneConfiguration());
-    containerSet = new ContainerSet();
+    containerSet = new ContainerSet(1000);
     containerSet.addContainer(container);
 
     containerHandler = mock(Handler.class);

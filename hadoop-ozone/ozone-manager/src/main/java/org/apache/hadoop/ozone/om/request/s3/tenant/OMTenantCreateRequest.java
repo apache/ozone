@@ -259,6 +259,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
       // TODO: dedup OMVolumeCreateRequest
       omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
+      omVolumeArgs.setQuotaInBytes(OzoneConsts.QUOTA_RESET);
+      omVolumeArgs.setQuotaInNamespace(OzoneConsts.QUOTA_RESET);
       omVolumeArgs.setObjectID(
           ozoneManager.getObjectIdFromTxId(transactionLogIndex));
       omVolumeArgs.setUpdateID(transactionLogIndex,

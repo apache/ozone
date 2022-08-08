@@ -132,15 +132,31 @@ OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,recon,s3g,kdc,localhost,127.0.0.1
 
+# Multi-Tenancy configs
 OZONE-SITE.XML_ozone.om.multitenancy.enabled=true
-OZONE-SITE.XML_ozone.om.ranger.https-address=http://ranger:6080
+OZONE-SITE.XML_ozone.om.ranger.service=cm_ozone
 
+# Note: Ranger address and credentials here doesn't matter when OM uses
+# InMemoryMultiTenantAccessController (used when dev flag is set).
+# But the values can't be empty otherwise OM config check would report failure.
+OZONE-SITE.XML_ozone.om.ranger.https-address=https://ranger:6182
 OZONE-SITE.XML_ozone.om.ranger.https.admin.api.user=admin
-OZONE-SITE.XML_ozone.om.ranger.https.admin.api.passwd=passwd
+OZONE-SITE.XML_ozone.om.ranger.https.admin.api.passwd=Passwd1
 
-# Note: ozone.om.kerberos.principal and ozone.om.kerberos.keytab.file
-# (which are required for the Multi-Tenancy Ranger Java client) are already
-# properly defined above.
+# ozone.om.kerberos.principal and ozone.om.kerberos.keytab.file
+# (can be used for the RangerClient) are already defined above.
 
 OZONE-SITE.XML_ozone.om.multitenancy.ranger.sync.interval=30s
 OZONE-SITE.XML_ozone.om.multitenancy.ranger.sync.timeout=10s
+
+# Use InMemoryMultiTenantAccessController as we don't have Ranger Admin Server here.
+# This is fine with one OM. But for OM HA, each OM would have its own in-memory
+# "Ranger" state as a result.
+# New OM leader's in-memory "Ranger" state won't be consistent with OM DB until
+# a BG sync run has successfully finished because only previously leader OM
+# pushes updates to Ranger.
+#
+# Potential TODO: We could trigger BG sync automatically during OM leadership
+# change or let all OMs write to AccessController if this dev flag is set.
+#
+OZONE-SITE.XML_ozone.om.tenant.dev.skip.ranger=true

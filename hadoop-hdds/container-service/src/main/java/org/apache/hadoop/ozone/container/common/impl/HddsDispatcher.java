@@ -66,6 +66,7 @@ import com.google.protobuf.ServiceException;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -191,7 +192,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
     ContainerType containerType;
     ContainerCommandResponseProto responseProto = null;
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
     Type cmdType = msg.getCmdType();
     long containerID = msg.getContainerID();
     metrics.incContainerOpsMetrics(cmdType);
@@ -250,12 +251,21 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       /**
        * Create Container should happen only as part of Write_Data phase of
        * writeChunk.
+       * In EC, we are doing empty putBlock. In the partial stripe writes, if
+       * file size is less than chunkSize*(ECData-1), we are making empty block
+       * to get the container created in non writing nodes. If replica index is
+       * >0 then we know it's for ec container.
        */
       if (container == null && ((isWriteStage || isCombinedStage)
-          || cmdType == Type.PutSmallFile)) {
+          || cmdType == Type.PutSmallFile
+          || cmdType == Type.PutBlock)) {
         // If container does not exist, create one for WriteChunk and
         // PutSmallFile request
         responseProto = createContainer(msg);
+        metrics.incContainerOpsMetrics(Type.CreateContainer);
+        metrics.incContainerOpsLatencies(Type.CreateContainer,
+                Time.monotonicNow() - startTime);
+
         if (responseProto.getResult() != Result.SUCCESS) {
           StorageContainerException sce = new StorageContainerException(
               "ContainerID " + containerID + " creation failed",
@@ -264,7 +274,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           return ContainerUtils.logAndReturnError(LOG, sce, msg);
         }
         Preconditions.checkArgument(isWriteStage && container2BCSIDMap != null
-            || dispatcherContext == null);
+            || dispatcherContext == null
+            || cmdType == Type.PutBlock);
         if (container2BCSIDMap != null) {
           // adds this container to list of containers created in the pipeline
           // with initial BCSID recorded as 0.
@@ -307,7 +318,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     responseProto = handler.handle(msg, container, dispatcherContext);
     if (responseProto != null) {
       metrics.incContainerOpsLatencies(cmdType,
-          System.currentTimeMillis() - startTime);
+              Time.monotonicNow() - startTime);
 
       // If the request is of Write Type and the container operation
       // is unsuccessful, it implies the applyTransaction on the container
@@ -414,6 +425,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     if (containerRequest.hasWriteChunk()) {
       createRequest.setReplicaIndex(
           containerRequest.getWriteChunk().getBlockID().getReplicaIndex());
+    }
+
+    if (containerRequest.hasPutBlock()) {
+      createRequest.setReplicaIndex(
+          containerRequest.getPutBlock().getBlockData().getBlockID()
+              .getReplicaIndex());
     }
 
     ContainerCommandRequestProto.Builder requestBuilder =
