@@ -22,6 +22,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -49,6 +50,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
@@ -70,7 +72,8 @@ public class TestECUnderReplicationHandler {
     nodeManager = new MockNodeManager(true, 10) {
       @Override
       public NodeStatus getNodeStatus(DatanodeDetails dd) {
-        return NodeStatus.inServiceHealthy();
+        return new NodeStatus(
+            dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY, 0);
       }
     };
     conf = SCMTestUtils.getConf();
@@ -167,6 +170,54 @@ public class TestECUnderReplicationHandler {
         testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
             availableReplicas, 2, noNodesPolicy));
 
+  }
+
+  @Test
+  public void testSameNodeIsNotReused() throws IOException {
+    DatanodeDetails newDn = MockDatanodeDetails.randomDatanodeDetails();
+    PlacementPolicy sameNodePolicy = ReplicationTestUtil
+        .getSameNodeTestPlacementPolicy(nodeManager, conf, newDn);
+    // Just have a missing index, this should return OK.
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1),
+            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
+            Pair.of(IN_SERVICE, 4));
+    // Passing zero for decommIndexes, as we don't expect the decom command to
+    // get created due to the placement policy returning an already used node
+    testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
+        availableReplicas, 0, sameNodePolicy);
+
+    // Now add a decommissioning index - we should get an exception as the
+    // placement policy should throw. It will have used up the node for
+    // reconstruction, and hence no nodes will be found to fix the decommission
+    // index.
+    Set<ContainerReplica> replicas = ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1),
+            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
+            Pair.of(IN_SERVICE, 4));
+    assertThrows(SCMException.class, () ->
+        testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
+            replicas, 1, sameNodePolicy));
+  }
+
+  public void testUnderAndOverReplication() throws IOException {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 1),
+            Pair.of(IN_MAINTENANCE, 1), Pair.of(IN_MAINTENANCE, 1),
+            Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
+    Map<DatanodeDetails, SCMCommand<?>> cmds =
+        testUnderReplicationWithMissingIndexes(ImmutableList.of(2, 3),
+            availableReplicas, 0, policy);
+    Assertions.assertEquals(1, cmds.size());
+    ReconstructECContainersCommand cmd =
+        (ReconstructECContainersCommand) cmds.values().iterator().next();
+    // Ensure that all source nodes are IN_SERVICE, we should not have picked
+    // the non in-service nodes for index 1.
+    for (ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex s
+        : cmd.getSources()) {
+      Assertions.assertEquals(
+          IN_SERVICE, s.getDnDetails().getPersistedOpState());
+    }
   }
 
   public Map<DatanodeDetails, SCMCommand<?>>

@@ -18,6 +18,20 @@
 
 package org.apache.hadoop.ozone.debug;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.kohsuke.MetaInfServices;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyHandle;
+import picocli.CommandLine;
+
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -30,21 +44,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.Callable;
-
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
-import org.apache.hadoop.hdds.utils.db.DBDefinition;
-import org.apache.hadoop.ozone.OzoneConsts;
-
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import org.kohsuke.MetaInfServices;
-import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksIterator;
-import picocli.CommandLine;
 
 /**
  * Parser for scm.db file.
@@ -88,10 +87,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   private List<Object> scannedObjects;
 
-  private static List<Object> displayTable(RocksIterator iterator,
+  private static List<Object> displayTable(ManagedRocksIterator iterator,
       DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
     List<Object> outputs = new ArrayList<>();
-    iterator.seekToFirst();
+    iterator.get().seekToFirst();
 
     Writer fileWriter = null;
     PrintWriter printWriter = null;
@@ -101,17 +100,17 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
             new FileOutputStream(fileName), StandardCharsets.UTF_8);
         printWriter = new PrintWriter(fileWriter);
       }
-      while (iterator.isValid()) {
+      while (iterator.get().isValid()) {
         StringBuilder result = new StringBuilder();
         if (withKey) {
           Object key = dbColumnFamilyDefinition.getKeyCodec()
-              .fromPersistedFormat(iterator.key());
+              .fromPersistedFormat(iterator.get().key());
           Gson gson = new GsonBuilder().setPrettyPrinting().create();
           result.append(gson.toJson(key));
           result.append(" -> ");
         }
         Object o = dbColumnFamilyDefinition.getValueCodec()
-            .fromPersistedFormat(iterator.value());
+            .fromPersistedFormat(iterator.get().value());
         outputs.add(o);
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         result.append(gson.toJson(o));
@@ -121,7 +120,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           System.out.println(result.toString());
         }
         limit--;
-        iterator.next();
+        iterator.get().next();
         if (limit == 0) {
           break;
         }
@@ -199,7 +198,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
     final List<ColumnFamilyHandle> columnFamilyHandleList =
         new ArrayList<>();
-    RocksDB rocksDB = RocksDB.openReadOnly(parent.getDbPath(),
+    ManagedRocksDB rocksDB = ManagedRocksDB.openReadOnly(parent.getDbPath(),
             cfs, columnFamilyHandleList);
     this.printAppropriateTable(columnFamilyHandleList,
            rocksDB, parent.getDbPath());
@@ -208,7 +207,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   private void printAppropriateTable(
           List<ColumnFamilyHandle> columnFamilyHandleList,
-          RocksDB rocksDB, String dbPath) throws IOException {
+          ManagedRocksDB rocksDB, String dbPath) throws IOException {
     if (limit < 1 && limit != -1) {
       throw new IllegalArgumentException(
               "List length should be a positive number. Only allowed negative" +
@@ -231,7 +230,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         if (columnFamilyHandle == null) {
           throw new IllegalArgumentException("columnFamilyHandle is null");
         }
-        RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle);
+        ManagedRocksIterator iterator = new ManagedRocksIterator(
+            rocksDB.get().newIterator(columnFamilyHandle));
         scannedObjects = displayTable(iterator, columnFamilyDefinition);
       }
     } else {
