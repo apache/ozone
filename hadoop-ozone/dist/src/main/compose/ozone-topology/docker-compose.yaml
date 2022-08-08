@@ -155,9 +155,8 @@ services:
      ports:
        - 9888:9888
      env_file:
-       - docker-config
+       - ./docker-config
      environment:
-       OZONE-SITE.XML_ozone.replication: ${OZONE_REPLICATION_FACTOR:-1}
        OZONE_OPTS:
      command: [ "/opt/hadoop/bin/ozone","recon" ]
      networks:
