@@ -17,10 +17,10 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import org.rocksdb.EnvOptions;
-import org.rocksdb.Options;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.SstFileWriter;
 
 import java.io.Closeable;
 import java.io.File;
@@ -34,14 +34,15 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.toIOException;
  */
 public class RDBSstFileWriter implements DumpFileWriter, Closeable {
 
-  private SstFileWriter sstFileWriter;
+  private ManagedSstFileWriter sstFileWriter;
   private File sstFile;
   private AtomicLong keyCounter;
-  private final EnvOptions emptyEnvOptions = new EnvOptions();
-  private final Options emptyOption = new Options();
+  ManagedEnvOptions emptyEnvOptions = new ManagedEnvOptions();
+  private ManagedOptions emptyOption = new ManagedOptions();
 
   public RDBSstFileWriter() {
-    this.sstFileWriter = new SstFileWriter(emptyEnvOptions, emptyOption);
+    ManagedEnvOptions envOptions = new ManagedEnvOptions();
+    this.sstFileWriter = new ManagedSstFileWriter(emptyEnvOptions, emptyOption);
     this.keyCounter = new AtomicLong(0);
   }
 

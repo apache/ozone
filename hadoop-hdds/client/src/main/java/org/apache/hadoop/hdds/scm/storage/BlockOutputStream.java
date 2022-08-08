@@ -761,4 +761,12 @@ public class BlockOutputStream extends OutputStream {
     adjustBuffersOnException();
     throw getIoException();
   }
+
+  /**
+   * Get the Replication Index.
+   * @return replicationIndex
+   */
+  public int getReplicationIndex() {
+    return replicationIndex;
+  }
 }

@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -30,8 +30,8 @@ import picocli.CommandLine.Option;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Iterator;
 
 /**
  * Synthetic read/write key operations workload generator tool.
@@ -128,12 +128,10 @@ public class OmBucketReadWriteKeyOps extends AbstractOmBucketReadWriteOps {
   @Override
   protected int getReadCount(int readCount, String readPath)
       throws IOException {
-    Iterator<? extends OzoneKey> ozoneKeyIterator = bucket.listKeys(
-        OzoneConsts.OM_KEY_PREFIX + readPath + OzoneConsts.OM_KEY_PREFIX);
-    while (ozoneKeyIterator.hasNext()) {
-      ozoneKeyIterator.next();
-      ++readCount;
-    }
+    List<OzoneFileStatus> ozoneFileStatusList = bucket.listStatus(
+        OzoneConsts.OM_KEY_PREFIX + readPath + OzoneConsts.OM_KEY_PREFIX, true,
+        "/", keyCountForRead);
+    readCount += ozoneFileStatusList.size();
     return readCount;
   }
 

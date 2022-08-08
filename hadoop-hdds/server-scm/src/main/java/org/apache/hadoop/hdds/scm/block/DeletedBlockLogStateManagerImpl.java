@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -207,6 +208,38 @@ public class DeletedBlockLogStateManagerImpl
         skippingRetryTxIDs.add(txID);
       }
     }
+  }
+
+  @Override
+  public int resetRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
+      throws IOException {
+    Objects.requireNonNull(txIDs, "txIds cannot be null.");
+    int resetCount = 0;
+    for (long txId: txIDs) {
+      try {
+        DeletedBlocksTransaction transaction = deletedTable.get(txId);
+        if (transaction == null) {
+          LOG.warn("txId {} is not found in deletedTable.", txId);
+          continue;
+        }
+        if (transaction.getCount() != -1) {
+          LOG.warn("txId {} has already been reset in deletedTable.", txId);
+          continue;
+        }
+        transactionBuffer.addToBuffer(deletedTable, txId,
+            transaction.toBuilder().setCount(0).build());
+        resetCount += 1;
+        if (LOG.isDebugEnabled()) {
+          LOG.info("Reset deleted block Txn retry count to 0 in container {}" +
+              " with txnId {} ", transaction.getContainerID(), txId);
+        }
+      } catch (IOException ex) {
+        LOG.error("Could not reset deleted block transaction {}.", txId, ex);
+        throw ex;
+      }
+    }
+    LOG.info("Reset in total {} deleted block Txn retry count", resetCount);
+    return resetCount;
   }
 
   public void onFlush() {
