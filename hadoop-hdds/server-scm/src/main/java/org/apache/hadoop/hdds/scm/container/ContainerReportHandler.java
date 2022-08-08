@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Handles container reports from datanode.
@@ -231,7 +232,8 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
     try {
       processContainerReplica(
           datanodeDetails, container, replicaProto, publisher);
-    } catch (IOException | InvalidStateTransitionException e) {
+    } catch (IOException | InvalidStateTransitionException |
+             TimeoutException e) {
       LOG.error("Exception while processing container report for container" +
               " {} from datanode {}.", replicaProto.getContainerID(),
           datanodeDetails, e);

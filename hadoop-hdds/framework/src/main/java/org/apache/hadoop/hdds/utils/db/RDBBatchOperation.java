@@ -19,8 +19,8 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
-import org.rocksdb.WriteBatch;
-import org.rocksdb.WriteOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 
 import java.io.IOException;
 
@@ -29,13 +29,13 @@ import java.io.IOException;
  */
 public class RDBBatchOperation implements BatchOperation {
 
-  private final WriteBatch writeBatch;
+  private final ManagedWriteBatch writeBatch;
 
   public RDBBatchOperation() {
-    writeBatch = new WriteBatch();
+    writeBatch = new ManagedWriteBatch();
   }
 
-  public RDBBatchOperation(WriteBatch writeBatch) {
+  public RDBBatchOperation(ManagedWriteBatch writeBatch) {
     this.writeBatch = writeBatch;
   }
 
@@ -43,7 +43,7 @@ public class RDBBatchOperation implements BatchOperation {
     db.batchWrite(writeBatch);
   }
 
-  public void commit(RocksDatabase db, WriteOptions writeOptions)
+  public void commit(RocksDatabase db, ManagedWriteOptions writeOptions)
       throws IOException {
     db.batchWrite(writeBatch, writeOptions);
   }

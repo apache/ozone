@@ -151,12 +151,17 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
               tempReplicaSet, r, replicationFactor)) {
             DeleteContainerCommand deleteCommand =
                 new DeleteContainerCommand(container.getContainerID(), true);
+            deleteCommand.setReplicaIndex(r.getReplicaIndex());
             commands.put(r.getDatanodeDetails(), deleteCommand);
             it.remove();
             tempReplicaSet.remove(r);
           }
         }
       });
+      if (commands.size() == 0) {
+        LOG.info("With the current state of avilable replicas {}, no" +
+            " commands to process due to over replication.", replicas);
+      }
       return commands;
     }
 

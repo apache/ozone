@@ -328,6 +328,7 @@ public class SCMStateMachine extends BaseStateMachine {
           .isLeaderReady()) {
         scm.getScmContext().setLeaderReady();
         scm.getSCMServiceManager().notifyStatusChanged();
+        scm.getFinalizationManager().onLeaderReady();
       }
 
       // Means all transactions before this term have been applied.

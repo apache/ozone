@@ -167,6 +167,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.dir.du.reserved.percent</name>
+    <value/>
+    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
+    <description>Percentage of volume that should be reserved. This space is left free for other usage.
+      The value should be between 0-1. Such as 0.1 which means 10% of volume space will be reserved.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.volume.choosing.policy</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>

@@ -27,13 +27,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.multitenant.AccessPolicy.AccessGrantType.ALLOW;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ_ACL;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 
 import java.io.IOException;
@@ -69,14 +63,15 @@ import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.CachedTenantState;
 import org.apache.hadoop.ozone.om.multitenant.CachedTenantState.CachedAccessIdInfo;
-import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizer;
-import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerDummyPlugin;
-import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerRangerPlugin;
+import org.apache.hadoop.ozone.om.multitenant.InMemoryMultiTenantAccessController;
+import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController;
+import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Policy;
+import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Role;
 import org.apache.hadoop.ozone.om.multitenant.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.multitenant.OzoneOwnerPrincipal;
 import org.apache.hadoop.ozone.om.multitenant.OzoneTenant;
-import org.apache.hadoop.ozone.om.multitenant.OzoneTenantRolePrincipal;
 import org.apache.hadoop.ozone.om.multitenant.RangerAccessPolicy;
+import org.apache.hadoop.ozone.om.multitenant.RangerClientMultiTenantAccessController;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -107,7 +102,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   private final Map<String, CachedTenantState> tenantCache;
   private final ReentrantReadWriteLock tenantCacheLock;
   private final OMRangerBGSyncService omRangerBGSyncService;
-  private MultiTenantAccessAuthorizer authorizer;
+  private final MultiTenantAccessController accessController;
   private final AuthorizerLock authorizerLock;
   /**
    * Authorizer operations. Meant to be called in tenant preExecute.
@@ -130,27 +125,18 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
     loadTenantCacheFromDB();
 
-    boolean devSkipRanger =
-        conf.getBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, false);
+    boolean devSkipRanger = conf.getBoolean(
+        OZONE_OM_TENANT_DEV_SKIP_RANGER, false);
+
     if (devSkipRanger) {
-      this.authorizer = new MultiTenantAccessAuthorizerDummyPlugin();
+      this.accessController = new InMemoryMultiTenantAccessController();
     } else {
-      this.authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
-    }
-    try {
-      this.authorizer.init(conf);
-    } catch (OMException ex) {
-      if (ex.getResult().equals(INTERNAL_ERROR)) {
-        LOG.error("Failed to initialize {}, falling back to dummy authorizer",
-            authorizer.getClass().getSimpleName());
-        this.authorizer = new MultiTenantAccessAuthorizerDummyPlugin();
-      } else {
-        throw ex;
-      }
+      this.accessController = new RangerClientMultiTenantAccessController(conf);
     }
 
     cacheOp = new CacheOp(tenantCache, tenantCacheLock);
-    authorizerOp = new AuthorizerOp(authorizer, tenantCache, tenantCacheLock);
+    authorizerOp = new AuthorizerOp(accessController,
+        tenantCache, tenantCacheLock);
 
     // Define the internal time unit for the config
     final TimeUnit internalTimeUnit = TimeUnit.SECONDS;
@@ -168,7 +154,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         internalTimeUnit);
     // Initialize the Ranger Sync Thread
     omRangerBGSyncService = new OMRangerBGSyncService(ozoneManager, this,
-        authorizer, rangerSyncInterval, internalTimeUnit, rangerSyncTimeout);
+        accessController, rangerSyncInterval, internalTimeUnit,
+        rangerSyncTimeout);
 
     // Start the Ranger Sync Thread
     this.start();
@@ -214,14 +201,14 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    */
   public class AuthorizerOp implements TenantOp {
 
-    private final MultiTenantAccessAuthorizer authorizer;
+    private final MultiTenantAccessController accessController;
     private final Map<String, CachedTenantState> tenantCache;
     private final ReentrantReadWriteLock tenantCacheLock;
 
-    AuthorizerOp(MultiTenantAccessAuthorizer authorizer,
+    AuthorizerOp(MultiTenantAccessController accessController,
         Map<String, CachedTenantState> tenantCache,
         ReentrantReadWriteLock tenantCacheLock) {
-      this.authorizer = authorizer;
+      this.accessController = accessController;
       this.tenantCache = tenantCache;
       this.tenantCacheLock = tenantCacheLock;
     }
@@ -282,40 +269,56 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       Tenant tenant = new OzoneTenant(tenantId);
 
       try {
-        // Create admin role first
-        String adminRoleId = authorizer.createRole(adminRoleName, null);
-        tenant.addTenantAccessRole(adminRoleId);
+        // Create empty admin role first
+        Role adminRole = new Role.Builder()
+            .setName(adminRoleName)
+            .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
+            .build();
+        adminRole = accessController.createRole(adminRole);
+        // Sanity check. Response role name should be equal to the one we sent.
+        Preconditions.checkState(adminRole.getName().equals(adminRoleName));
+        tenant.addTenantAccessRole(adminRoleName);
 
-        // Then create user role, and add admin role as its delegated admin
-        String userRoleId = authorizer.createRole(userRoleName, adminRoleName);
-        tenant.addTenantAccessRole(userRoleId);
+        // Then create user role with the admin role as its delegated admin
+        Role userRole = new Role.Builder()
+            .setName(userRoleName)
+            .addRole(adminRoleName, true)
+            .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
+            .build();
+        userRole = accessController.createRole(userRole);
+        // Sanity check. Response role name should be equal to the one we sent.
+        Preconditions.checkState(userRole.getName().equals(userRoleName));
+        tenant.addTenantAccessRole(userRoleName);
 
         BucketNameSpace bucketNameSpace = tenant.getTenantBucketNameSpace();
-        // Bucket namespace is volume
+        // Bucket namespace is volume.
+        // Note at the moment we only support one volume for each tenant.
         for (OzoneObj volume : bucketNameSpace.getBucketNameSpaceObjects()) {
           String volumeName = volume.getVolumeName();
 
-          final OzoneTenantRolePrincipal userRole =
-              new OzoneTenantRolePrincipal(userRoleName);
-          final OzoneTenantRolePrincipal adminRole =
-              new OzoneTenantRolePrincipal(adminRoleName);
-
           // Allow Volume List access
-          AccessPolicy tenantVolumeAccessPolicy = newDefaultVolumeAccessPolicy(
-              volumeName, userRole, adminRole);
-          tenantVolumeAccessPolicy.setPolicyID(
-              authorizer.createAccessPolicy(tenantVolumeAccessPolicy));
-          tenant.addTenantAccessPolicy(tenantVolumeAccessPolicy);
+          Policy volumePolicy =
+              OMMultiTenantManager.getDefaultVolumeAccessPolicy(
+                  tenantId, volumeName, userRoleName, adminRoleName);
+          volumePolicy = accessController.createPolicy(volumePolicy);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Created volume policy: {}", volumePolicy);
+          }
+          // TODO: Review if this tenant object is useful.
+          tenant.addTenantAccessPolicy(volumePolicy.getName());
 
           // Allow Bucket Create within Volume
-          AccessPolicy tenantBucketCreatePolicy =
-              newDefaultBucketAccessPolicy(volumeName, userRole);
-          tenantBucketCreatePolicy.setPolicyID(
-              authorizer.createAccessPolicy(tenantBucketCreatePolicy));
-          tenant.addTenantAccessPolicy(tenantBucketCreatePolicy);
+          Policy bucketPolicy =
+              OMMultiTenantManager.getDefaultBucketAccessPolicy(
+                  tenantId, volumeName, userRoleName);
+          bucketPolicy = accessController.createPolicy(bucketPolicy);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Created bucket policy: {}", bucketPolicy);
+          }
+          // TODO: Review if this tenant object is useful.
+          tenant.addTenantAccessPolicy(bucketPolicy.getName());
         }
 
-        // Does NOT update tenant cache here
       } catch (IOException e) {
         // Expect the sync thread to restore the admin role later if op succeeds
         throw new OMException(e, TENANT_AUTHORIZER_ERROR);
@@ -330,16 +333,27 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       LOG.info("Deleting tenant policies and roles from Ranger: {}", tenant);
 
       try {
-        for (AccessPolicy policy : tenant.getTenantAccessPolicies()) {
-          authorizer.deletePolicyByName(policy.getPolicyName());
+        for (String policyName : tenant.getTenantAccessPolicies()) {
+          accessController.deletePolicy(policyName);
         }
 
         for (String roleName : tenant.getTenantRoles()) {
-          authorizer.deleteRoleByName(roleName);
+          accessController.deleteRole(roleName);
         }
       } catch (IOException e) {
         // Expect the sync thread to restore the admin role later if op succeeds
         throw new OMException(e, TENANT_AUTHORIZER_ERROR);
+      }
+    }
+
+    /**
+     * Helper method to check roleId presence in a Role.
+     */
+    private void checkRoleIdExistence(Role role) throws IOException {
+      if (!role.getId().isPresent()) {
+        final String errMsg = String.format("Received no role ID in: %s", role);
+        LOG.error(errMsg);
+        throw new IOException(errMsg);
       }
     }
 
@@ -374,21 +388,34 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         Preconditions.checkNotNull(cachedTenantState,
             "Cache entry for tenant '" + tenantId + "' does not exist");
 
-        // Does NOT update tenant cache here
-
         final String tenantUserRoleName =
             tenantCache.get(tenantId).getTenantUserRoleName();
-        final OzoneTenantRolePrincipal tenantUserRolePrincipal =
-            new OzoneTenantRolePrincipal(tenantUserRoleName);
-        String roleJsonStr = authorizer.getRole(tenantUserRolePrincipal);
-        final String roleId =
-            authorizer.assignUserToRole(userPrincipal, roleJsonStr, false);
+        // Get tenant user role from Ranger
+        Role userRole = accessController.getRole(tenantUserRoleName);
+        checkRoleIdExistence(userRole);
+        final long roleId = userRole.getId().get();
+
+        // Sanity check user existence in tenant, but won't throw
+        if (userRole.getUsersMap().containsKey(userPrincipal)) {
+          LOG.warn("User '{}' is already assigned to tenant '{}'",
+              userPrincipal, tenantId);
+        }
+
+        // Add user (not accessId) to the role
+        userRole = new Role.Builder(userRole)
+            .addUser(userPrincipal, false)
+            .build();
+        // Push updated role to Ranger
+        userRole = accessController.updateRole(roleId, userRole);
 
         if (LOG.isDebugEnabled()) {
-          LOG.debug("roleId that the user is assigned to: {}", roleId);
+          LOG.debug("Updated user role: {}", userRole);
         }
 
       } catch (IOException e) {
+        // If the user name doesn't exist in Ranger, it throws 400 Bad Request
+        // with message: user with name: USERNAME does not exist
+
         // Expect the sync thread to restore the user role later if op succeeds
         throw new OMException(e, TENANT_AUTHORIZER_ERROR);
       } finally {
@@ -414,15 +441,29 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
         final String userPrincipal = omDBAccessIdInfo.getUserPrincipal();
 
-        // Delete user from role in Ranger
         final String tenantUserRoleName =
             tenantCache.get(tenantId).getTenantUserRoleName();
-        final OzoneTenantRolePrincipal tenantUserRolePrincipal =
-            new OzoneTenantRolePrincipal(tenantUserRoleName);
-        String roleJsonStr = authorizer.getRole(tenantUserRolePrincipal);
-        final String roleId =
-            authorizer.revokeUserFromRole(userPrincipal, roleJsonStr);
-        Preconditions.checkNotNull(roleId);
+        // Get tenant user role from Ranger
+        Role userRole = accessController.getRole(tenantUserRoleName);
+        checkRoleIdExistence(userRole);
+        final long roleId = userRole.getId().get();
+
+        // Sanity check user existence in tenant, but won't throw
+        if (!userRole.getUsersMap().containsKey(userPrincipal)) {
+          LOG.warn("User '{}' is not assigned to tenant '{}'",
+              userPrincipal, tenantId);
+        }
+
+        // Remove user from role
+        userRole = new Role.Builder(userRole)
+            .removeUser(userPrincipal)
+            .build();
+        // Push updated role to ranger
+        userRole = accessController.updateRole(roleId, userRole);
+
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Updated user role: {}", userRole);
+        }
 
         // Does NOT update tenant cache here
       } catch (IOException e) {
@@ -443,22 +484,34 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       try {
         // tenant name is needed to retrieve role name
         final String tenantId = getTenantForAccessIDThrowIfNotFound(accessId);
-
         final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
-
         final String tenantAdminRoleName =
             cachedTenantState.getTenantAdminRoleName();
-        final OzoneTenantRolePrincipal existingAdminRole =
-            new OzoneTenantRolePrincipal(tenantAdminRoleName);
-
-        final String roleJsonStr = authorizer.getRole(existingAdminRole);
         final String userPrincipal = getUserNameGivenAccessId(accessId);
-        // Update Ranger. Add user principal (not accessId!) to the role
-        final String roleId = authorizer.assignUserToRole(
-            userPrincipal, roleJsonStr, delegated);
-        assert (roleId != null);
 
-        // Does NOT update tenant cache here
+        // Get tenant admin role from Ranger
+        Role adminRole = accessController.getRole(tenantAdminRoleName);
+        checkRoleIdExistence(adminRole);
+
+        // Sanity check user existence in tenant, but won't throw
+        // TODO: Or throw if user is already in admin role?
+        if (adminRole.getUsersMap().containsKey(userPrincipal)) {
+          LOG.warn("User '{}' is already admin in tenant '{}'",
+              userPrincipal, tenantId);
+        }
+
+        final long roleId = adminRole.getId().get();
+        // Add user principal (not accessId!) to admin role
+        adminRole = new Role.Builder(adminRole)
+            .addUser(userPrincipal, delegated)
+            .build();
+        // Push updated role to Ranger
+        adminRole = accessController.updateRole(roleId, adminRole);
+
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Updated admin role: {}", adminRole);
+        }
+
       } catch (IOException e) {
         // Expect the sync thread to restore the admin role later if op succeeds
         throw new OMException(e, TENANT_AUTHORIZER_ERROR);
@@ -477,21 +530,34 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       try {
         // tenant name is needed to retrieve role name
         final String tenantId = getTenantForAccessIDThrowIfNotFound(accessId);
-
         final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
         final String tenantAdminRoleName =
             cachedTenantState.getTenantAdminRoleName();
-        final OzoneTenantRolePrincipal existingAdminRole =
-            new OzoneTenantRolePrincipal(tenantAdminRoleName);
-
-        final String roleJsonStr = authorizer.getRole(existingAdminRole);
         final String userPrincipal = getUserNameGivenAccessId(accessId);
-        // Update Ranger. Add user principal (not accessId!) to the role
-        final String roleId = authorizer.revokeUserFromRole(
-            userPrincipal, roleJsonStr);
-        assert (roleId != null);
 
-        // Does NOT update tenant cache here
+        // Get tenant admin role from Ranger
+        Role adminRole = accessController.getRole(tenantAdminRoleName);
+        checkRoleIdExistence(adminRole);
+        final long roleId = adminRole.getId().get();
+
+        // Sanity check user existence in tenant, but won't throw
+        // TODO: Or throw if user is not in admin role?
+        if (!adminRole.getUsersMap().containsKey(userPrincipal)) {
+          LOG.warn("User '{}' is not admin in tenant '{}'",
+              userPrincipal, tenantId);
+        }
+
+        // Add user principal (not accessId!) to admin role
+        adminRole = new Role.Builder(adminRole)
+            .removeUser(userPrincipal)
+            .build();
+        // Push updated role to Ranger
+        adminRole = accessController.updateRole(roleId, adminRole);
+
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Updated admin role: {}", adminRole);
+        }
+
       } catch (IOException e) {
         // Expect the sync thread to restore the admin role later if op succeeds
         throw new OMException(e, TENANT_AUTHORIZER_ERROR);
@@ -538,7 +604,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     @Override
     public void deleteTenant(Tenant tenant) throws IOException {
 
-      final String tenantId = tenant.getTenantId();
+      final String tenantId = tenant.getTenantName();
 
       tenantCacheLock.writeLock().lock();
       try {
@@ -787,41 +853,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     return optionalTenant.get();
   }
 
-  public AccessPolicy newDefaultVolumeAccessPolicy(String tenantId,
-      OzoneTenantRolePrincipal userRole, OzoneTenantRolePrincipal adminRole)
-      throws IOException {
-
-    final String volumeAccessPolicyName =
-        OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantId);
-    AccessPolicy policy = new RangerAccessPolicy(volumeAccessPolicyName);
-    OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(VOLUME).setStoreType(OZONE).setVolumeName(tenantId)
-        .setBucketName("").setKeyName("").build();
-    // Tenant users have READ, LIST and READ_ACL access on the volume
-    policy.addAccessPolicyElem(obj, userRole, READ, ALLOW);
-    policy.addAccessPolicyElem(obj, userRole, LIST, ALLOW);
-    policy.addAccessPolicyElem(obj, userRole, READ_ACL, ALLOW);
-    // Tenant admins have ALL access on the volume
-    policy.addAccessPolicyElem(obj, adminRole, ALL, ALLOW);
-    return policy;
-  }
-
-  public AccessPolicy newDefaultBucketAccessPolicy(String tenantId,
-      OzoneTenantRolePrincipal userRole) throws IOException {
-
-    final String bucketAccessPolicyName =
-        OMMultiTenantManager.getDefaultBucketPolicyName(tenantId);
-    AccessPolicy policy = new RangerAccessPolicy(bucketAccessPolicyName);
-    OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(BUCKET).setStoreType(OZONE).setVolumeName(tenantId)
-        .setBucketName("*").setKeyName("").build();
-    // Tenant users have permission to CREATE buckets
-    policy.addAccessPolicyElem(obj, userRole, CREATE, ALLOW);
-    // Bucket owner have ALL access on their own buckets
-    policy.addAccessPolicyElem(obj, new OzoneOwnerPrincipal(), ALL, ALLOW);
-    return policy;
-  }
-
   // TODO: This policy doesn't seem necessary as the bucket-level policy has
   //  already granted the key-level access.
   //  Not sure if that is the intended behavior in Ranger though.
@@ -830,8 +861,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       String bucketName) throws IOException {
     AccessPolicy policy = new RangerAccessPolicy(
         // principal already contains volume name
-        volumeName + " - KeyAccess");
-    // TODO: Double check the policy
+        volumeName + "-KeyAccess");
+
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
         .setResType(KEY).setStoreType(OZONE).setVolumeName(volumeName)
         .setBucketName("*").setKeyName("*").build();
@@ -844,17 +875,34 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     return conf;
   }
 
-  public void loadTenantCacheFromDB() {
-    final Table<String, OmDBAccessIdInfo> tenantAccessIdTable =
-        omMetadataManager.getTenantAccessIdTable();
-    final TableIterator<String, ? extends KeyValue<String, OmDBAccessIdInfo>>
-        accessIdTableIter = tenantAccessIdTable.iterator();
-    int userCount = 0;
-
+  private void loadTenantCacheFromDB() {
+    // First load each tenant as a key into the cache.
     final Table<String, OmDBTenantState> tenantStateTable =
         omMetadataManager.getTenantStateTable();
+    try (TableIterator<String, ? extends KeyValue<String, OmDBTenantState>>
+        tenantStateTableIter = tenantStateTable.iterator()) {
+      while (tenantStateTableIter.hasNext()) {
+        final KeyValue<String, OmDBTenantState> next =
+            tenantStateTableIter.next();
 
-    try {
+        final String tenantId = next.getKey();
+        final OmDBTenantState tenantState = next.getValue();
+
+        tenantCache.put(tenantId, new CachedTenantState(tenantId,
+            tenantState.getUserRoleName(), tenantState.getAdminRoleName()));
+      }
+    } catch (IOException ex) {
+      // Do not allow an inconsistent OM to start up.
+      throw new RuntimeException(
+          "Error while building tenant state cache from DB.", ex);
+    }
+
+    // Next use the access ID table to fill in membership info for each tenant.
+    int userCount = 0;
+    final Table<String, OmDBAccessIdInfo> tenantAccessIdTable =
+        omMetadataManager.getTenantAccessIdTable();
+    try (TableIterator<String, ? extends KeyValue<String, OmDBAccessIdInfo>>
+          accessIdTableIter = tenantAccessIdTable.iterator()) {
       while (accessIdTableIter.hasNext()) {
         final KeyValue<String, OmDBAccessIdInfo> next =
             accessIdTableIter.next();
@@ -866,19 +914,11 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         final String userPrincipal = value.getUserPrincipal();
         final boolean isAdmin = value.getIsAdmin();
 
-        final OmDBTenantState tenantState = tenantStateTable.get(tenantId);
         // If the TenantState doesn't exist, it means the accessId entry is
         //  orphaned or incorrect, likely metadata inconsistency
-        Preconditions.checkNotNull(tenantState,
+        CachedTenantState cachedTenantState = tenantCache.get(tenantId);
+        Preconditions.checkNotNull(cachedTenantState,
             "OmDBTenantState should have existed for " + tenantId);
-
-        final String tenantUserRoleName = tenantState.getUserRoleName();
-        final String tenantAdminRoleName = tenantState.getAdminRoleName();
-
-        // Enter tenant cache entry when it is the first hit for this tenant
-        final CachedTenantState cachedTenantState = tenantCache.computeIfAbsent(
-            tenantId, k -> new CachedTenantState(
-                tenantId, tenantUserRoleName, tenantAdminRoleName));
 
         cachedTenantState.getAccessIdInfoMap().put(accessId,
             new CachedAccessIdInfo(userPrincipal, isAdmin));
@@ -887,7 +927,9 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       LOG.info("Loaded {} tenants and {} tenant users from the database",
           tenantCache.size(), userCount);
     } catch (IOException ex) {
-      LOG.error("Error while loading user list", ex);
+      // Do not allow an inconsistent OM to start up.
+      throw new RuntimeException(
+          "Error while building tenant user cache from DB.", ex);
     }
   }
 
@@ -1013,10 +1055,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
     final Tenant tenantObj = new OzoneTenant(tenantState.getTenantId());
 
-    tenantObj.addTenantAccessPolicy(
-        new RangerAccessPolicy(tenantState.getBucketNamespacePolicyName()));
-    tenantObj.addTenantAccessPolicy(
-        new RangerAccessPolicy(tenantState.getBucketNamespaceName()));
+    tenantObj.addTenantAccessPolicy(tenantState.getBucketNamespacePolicyName());
+    tenantObj.addTenantAccessPolicy(tenantState.getBucketPolicyName());
 
     tenantObj.addTenantAccessRole(tenantState.getUserRoleName());
     tenantObj.addTenantAccessRole(tenantState.getAdminRoleName());

@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -43,6 +44,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -68,6 +70,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.mockito.Mockito.mock;
@@ -88,6 +91,8 @@ public class TestContainerBalancer {
   private StorageContainerManager scm;
   private OzoneConfiguration conf;
   private PlacementPolicy placementPolicy;
+  private PlacementPolicy ecPlacementPolicy;
+  private PlacementPolicyValidateProxy placementPolicyValidateProxy;
   private ContainerBalancerConfiguration balancerConfiguration;
   private List<DatanodeUsageInfo> nodesInCluster;
   private List<Double> nodeUtilizations;
@@ -102,12 +107,14 @@ public class TestContainerBalancer {
   private static final ThreadLocalRandom RANDOM = ThreadLocalRandom.current();
 
   private StatefulServiceStateManager serviceStateManager;
+  private static final long STORAGE_UNIT = OzoneConsts.GB;
 
   /**
    * Sets up configuration values and creates a mock cluster.
    */
   @BeforeEach
-  public void setup() throws IOException, NodeNotFoundException {
+  public void setup() throws IOException, NodeNotFoundException,
+      TimeoutException {
     conf = new OzoneConfiguration();
     scm = Mockito.mock(StorageContainerManager.class);
     containerManager = Mockito.mock(ContainerManager.class);
@@ -121,18 +128,24 @@ public class TestContainerBalancer {
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setIterations(1);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeEnteringTarget(50 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
     conf.setFromObject(balancerConfiguration);
     GenericTestUtils.setLogLevel(ContainerBalancer.LOG, Level.DEBUG);
 
     averageUtilization = createCluster();
     mockNodeManager = new MockNodeManager(datanodeToContainersMap);
 
+    NetworkTopology clusterMap = mockNodeManager.getClusterNetworkTopologyMap();
+
     placementPolicy = ContainerPlacementPolicyFactory
-        .getPolicy(conf, mockNodeManager,
-            mockNodeManager.getClusterNetworkTopologyMap(), true,
+        .getPolicy(conf, mockNodeManager, clusterMap, true,
             SCMContainerPlacementMetrics.create());
+    ecPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(
+        conf, mockNodeManager, clusterMap,
+        true, SCMContainerPlacementMetrics.create());
+    placementPolicyValidateProxy = new PlacementPolicyValidateProxy(
+        placementPolicy, ecPlacementPolicy);
 
     Mockito.when(replicationManager
         .isContainerReplicatingOrDeleting(Mockito.any(ContainerID.class)))
@@ -168,6 +181,8 @@ public class TestContainerBalancer {
     when(scm.getConfiguration()).thenReturn(conf);
     when(scm.getStatefulServiceStateManager()).thenReturn(serviceStateManager);
     when(scm.getSCMServiceManager()).thenReturn(scmServiceManager);
+    when(scm.getPlacementPolicyValidateProxy())
+        .thenReturn(placementPolicyValidateProxy);
 
     /*
     When StatefulServiceStateManager#saveConfiguration is called, save to
@@ -214,7 +229,7 @@ public class TestContainerBalancer {
   public void
       initializeIterationShouldUpdateUnBalancedNodesWhenThresholdChanges()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException, TimeoutException {
     List<DatanodeUsageInfo> expectedUnBalancedNodes;
     List<DatanodeUsageInfo> unBalancedNodesAccordingToBalancer;
 
@@ -257,7 +272,7 @@ public class TestContainerBalancer {
   @Test
   public void unBalancedNodesListShouldBeEmptyWhenClusterIsBalanced()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException, TimeoutException {
     balancerConfiguration.setThreshold(99.99);
     startBalancer(balancerConfiguration);
 
@@ -276,11 +291,11 @@ public class TestContainerBalancer {
   @Test
   public void containerBalancerShouldObeyMaxDatanodesToInvolveLimit()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException, TimeoutException {
     int percent = 20;
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(
         percent);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setThreshold(1);
     balancerConfiguration.setIterations(1);
     startBalancer(balancerConfiguration);
@@ -301,7 +316,7 @@ public class TestContainerBalancer {
   @Test
   public void containerBalancerShouldSelectOnlyClosedContainers()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException, TimeoutException {
     // make all containers open, balancer should not select any of them
     for (ContainerInfo containerInfo : cidToInfoMap.values()) {
       containerInfo.setState(HddsProtos.LifeCycleState.OPEN);
@@ -343,17 +358,18 @@ public class TestContainerBalancer {
   @Test
   public void containerBalancerShouldObeyMaxSizeToMoveLimit()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException, TimeoutException {
     balancerConfiguration.setThreshold(1);
-    balancerConfiguration.setMaxSizeToMovePerIteration(10 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMovePerIteration(10 * STORAGE_UNIT);
     balancerConfiguration.setIterations(1);
     startBalancer(balancerConfiguration);
 
     sleepWhileBalancing(500);
 
     // balancer should not have moved more size than the limit
-    Assertions.assertFalse(containerBalancer.getSizeMovedPerIteration() >
-        10 * OzoneConsts.GB);
+    Assertions.assertFalse(
+        containerBalancer.getSizeScheduledForMoveInLatestIteration() >
+        10 * STORAGE_UNIT);
 
     long size = containerBalancer.getMetrics()
         .getDataSizeMovedGBInLatestIteration();
@@ -365,9 +381,9 @@ public class TestContainerBalancer {
   @Test
   public void targetDatanodeShouldNotAlreadyContainSelectedContainer()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException, TimeoutException {
     balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     startBalancer(balancerConfiguration);
 
@@ -394,9 +410,9 @@ public class TestContainerBalancer {
   @Test
   public void containerMoveSelectionShouldFollowPlacementPolicy()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException, TimeoutException {
     balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     startBalancer(balancerConfiguration);
 
@@ -437,11 +453,12 @@ public class TestContainerBalancer {
   @Test
   public void targetDatanodeShouldBeInServiceHealthy()
       throws NodeNotFoundException, IllegalContainerBalancerStateException,
-      IOException, InvalidContainerBalancerConfigurationException {
+      IOException, InvalidContainerBalancerConfigurationException,
+      TimeoutException {
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeEnteringTarget(50 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
     startBalancer(balancerConfiguration);
 
     // waiting for balance completed.
@@ -466,11 +483,11 @@ public class TestContainerBalancer {
   @Test
   public void selectedContainerShouldNotAlreadyHaveBeenSelected()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException, TimeoutException {
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeEnteringTarget(50 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
 
     startBalancer(balancerConfiguration);
 
@@ -494,11 +511,11 @@ public class TestContainerBalancer {
   @Test
   public void balancerShouldNotSelectConfiguredExcludeContainers()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException, TimeoutException {
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeEnteringTarget(50 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
     balancerConfiguration.setExcludeContainers("1, 4, 5");
 
     startBalancer(balancerConfiguration);
@@ -523,13 +540,13 @@ public class TestContainerBalancer {
   @Test
   public void balancerShouldObeyMaxSizeEnteringTargetLimit()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException, TimeoutException {
     conf.set("ozone.scm.container.size", "1MB");
     balancerConfiguration =
         conf.getObject(ContainerBalancerConfiguration.class);
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
 
     // no containers should be selected when the limit is just 2 MB
     balancerConfiguration.setMaxSizeEnteringTarget(2 * OzoneConsts.MB);
@@ -557,14 +574,14 @@ public class TestContainerBalancer {
   @Test
   public void testMetrics()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException, TimeoutException {
     conf.set("hdds.datanode.du.refresh.period", "1ms");
     balancerConfiguration.setBalancingInterval(Duration.ofMillis(2));
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setIterations(1);
-    balancerConfiguration.setMaxSizeEnteringTarget(6 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(6 * STORAGE_UNIT);
     // deliberately set max size per iteration to a low value, 6 GB
-    balancerConfiguration.setMaxSizeToMovePerIteration(6 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMovePerIteration(6 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
 
     startBalancer(balancerConfiguration);
@@ -590,11 +607,11 @@ public class TestContainerBalancer {
   @Test
   public void balancerShouldFollowExcludeAndIncludeDatanodesConfigurations()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException, TimeoutException {
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setIterations(1);
-    balancerConfiguration.setMaxSizeEnteringTarget(10 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
 
     // only these nodes should be included
@@ -663,11 +680,12 @@ public class TestContainerBalancer {
   public void checkIterationResult()
       throws NodeNotFoundException, IOException,
       IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException,
+      TimeoutException {
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setIterations(1);
-    balancerConfiguration.setMaxSizeEnteringTarget(10 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
 
     startBalancer(balancerConfiguration);
@@ -691,7 +709,7 @@ public class TestContainerBalancer {
             Mockito.any(DatanodeDetails.class)))
         .thenReturn(CompletableFuture.completedFuture(
             MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY));
-    balancerConfiguration.setMaxSizeToMovePerIteration(10 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMovePerIteration(10 * STORAGE_UNIT);
 
     startBalancer(balancerConfiguration);
     sleepWhileBalancing(1000);
@@ -706,7 +724,8 @@ public class TestContainerBalancer {
   public void checkIterationResultTimeout()
       throws NodeNotFoundException, IOException,
       IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException,
+      TimeoutException {
 
     Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
             Mockito.any(DatanodeDetails.class),
@@ -715,8 +734,8 @@ public class TestContainerBalancer {
 
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setIterations(1);
-    balancerConfiguration.setMaxSizeEnteringTarget(10 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMoveTimeout(Duration.ofMillis(1000));
 
@@ -743,7 +762,7 @@ public class TestContainerBalancer {
   public void checkIterationResultTimeoutFromReplicationManager()
       throws NodeNotFoundException, IOException,
       IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException, TimeoutException {
     CompletableFuture<MoveResult> future
         = CompletableFuture.supplyAsync(() ->
         MoveResult.REPLICATION_FAIL_TIME_OUT);
@@ -757,8 +776,8 @@ public class TestContainerBalancer {
 
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setIterations(1);
-    balancerConfiguration.setMaxSizeEnteringTarget(10 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMoveTimeout(Duration.ofMillis(1000));
 
@@ -773,7 +792,7 @@ public class TestContainerBalancer {
   @Test
   public void testStartAndImmediateStopForDeadlock()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException, TimeoutException {
     startBalancer(balancerConfiguration);
     stopBalancer();
     Assertions.assertFalse(containerBalancer.isBalancerRunning());
@@ -852,7 +871,7 @@ public class TestContainerBalancer {
 
       // use node utilization and used space to determine node capacity
       if (nodeUtilizations.get(i) == 0) {
-        datanodeCapacity = OzoneConsts.GB * RANDOM.nextInt(10, 60);
+        datanodeCapacity = STORAGE_UNIT * RANDOM.nextInt(10, 60);
       } else {
         datanodeCapacity = (long) (datanodeUsedSpace / nodeUtilizations.get(i));
       }
@@ -909,7 +928,7 @@ public class TestContainerBalancer {
                 .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setState(HddsProtos.LifeCycleState.CLOSED)
         .setOwner("TestContainerBalancer")
-        .setUsedBytes(OzoneConsts.GB * multiple)
+        .setUsedBytes(STORAGE_UNIT * multiple)
         .build();
   }
 
@@ -963,7 +982,7 @@ public class TestContainerBalancer {
 
   private void startBalancer(ContainerBalancerConfiguration config)
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException {
+      InvalidContainerBalancerConfigurationException, TimeoutException {
     containerBalancer.startBalancer(config);
   }
 
@@ -972,7 +991,8 @@ public class TestContainerBalancer {
       if (containerBalancer.isBalancerRunning()) {
         containerBalancer.stopBalancer();
       }
-    } catch (IOException | IllegalContainerBalancerStateException e) {
+    } catch (IOException | IllegalContainerBalancerStateException |
+             TimeoutException e) {
       LOG.warn("Failed to stop balancer", e);
     }
   }

@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
@@ -139,6 +140,10 @@ public class TestECOverReplicationHandler {
     int totalDeleteCommandNum =
         index2excessNum.values().stream().reduce(0, Integer::sum);
     Assert.assertEquals(totalDeleteCommandNum, commands.size());
+
+    // Each command should have a non-zero replica index
+    commands.forEach((datanode, command) -> Assert.assertNotEquals(0,
+        ((DeleteContainerCommand)command).getReplicaIndex()));
 
     // command num of each index should be equal to the excess num
     // of this index

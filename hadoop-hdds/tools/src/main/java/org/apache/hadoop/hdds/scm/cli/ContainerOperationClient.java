@@ -611,6 +611,11 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.getScmInfo().getRatisPeerRoles();
   }
 
+  @Override
+  public int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException {
+    return storageContainerLocationClient.resetDeletedBlockRetryCount(txIDs);
+  }
+
   /**
    * Get Datanode Usage information by ipaddress or uuid.
    *
