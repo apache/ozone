@@ -570,4 +570,9 @@ public class ClientProtocolStub implements ClientProtocol {
       String volumeName, String bucketName, String keyName) throws IOException {
     return null;
   }
+
+  @Override
+  public String createSnapshot(String name, String snapshotPath) throws IOException {
+    return "";
+  }
 }
