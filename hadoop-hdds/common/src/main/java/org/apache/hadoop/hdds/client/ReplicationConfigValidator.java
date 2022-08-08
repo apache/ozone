@@ -30,7 +30,7 @@ import java.util.regex.Pattern;
  * Validator to check if replication config is enabled.
  */
 @ConfigGroup(prefix = "ozone.replication")
-public class ReplicationConfigValidator {
+public class ReplicationConfigValidator { //For Legacy replication type: standalone, RETIS
 
   @Config(key = "allowed-configs",
       defaultValue = "^((STANDALONE|RATIS)/(ONE|THREE))|(EC/(3-2|6-3|10-4))$",
@@ -54,13 +54,6 @@ public class ReplicationConfigValidator {
       if (!validationRegexp.matcher(
           replicationConfig.configFormat()).matches()) {
         String replication = replicationConfig.getReplication();
-        if (HddsProtos.ReplicationType.EC ==
-                replicationConfig.getReplicationType()) {
-          ECReplicationConfig ecConfig =
-              (ECReplicationConfig) replicationConfig;
-          replication =  ecConfig.getCodec() + "-" + ecConfig.getData() +
-              "-" + ecConfig.getParity() + "-{CHUNK_SIZE}";
-        }
         throw new IllegalArgumentException("Invalid replication config " +
             "for type " + replicationConfig.getReplicationType() +
             " and replication " + replication);

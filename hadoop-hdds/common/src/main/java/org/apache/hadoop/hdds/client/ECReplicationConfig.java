@@ -33,6 +33,8 @@ import java.util.stream.Collectors;
 public class ECReplicationConfig implements ReplicationConfig {
 
   public static final String EC_REPLICATION_PARAMS_DELIMITER = "-";
+  public static final String EC_REPLICATION_PATTERN
+          = "^((STANDALONE|RATIS)/(ONE|THREE))|(EC/(3-2|6-3|10-4))$";
 
   /**
    * Enum defining the allowed list of ECCodecs.
@@ -58,7 +60,7 @@ public class ECReplicationConfig implements ReplicationConfig {
   //   RS-3-2-2048
   //   XOR-10-4-4096K
   private static final Pattern STRING_FORMAT
-      = Pattern.compile("([a-zA-Z]+)-(\\d+)-(\\d+)-(\\d+)((?:k|K))?");
+      = Pattern.compile(EC_REPLICATION_PATTERN);
 
   private int data;
 

@@ -32,6 +32,8 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.SetSpaceQuotaOptions;
 import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -44,6 +46,8 @@ import java.io.IOException;
 @Command(name = "create",
     description = "creates a bucket in a given volume")
 public class CreateBucketHandler extends BucketHandler {
+  static final Logger LOG =
+          LoggerFactory.getLogger(CreateBucketHandler.class);
 
   @Option(names = {"--bucketkey", "-k"},
       description = "bucket encryption key name")
