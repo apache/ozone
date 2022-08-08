@@ -451,3 +451,16 @@ message ContainerBalancerConfigurationProto {
     required bool shouldRun = 18;
     optional int32 nextIterationIndex = 19;
 }
+
+message DiskBalancerConfigurationProto {
+    optional string threshold = 1;
+    optional string diskBandwidth = 2;
+    optional int32 parallelThread = 3;
+}
+
+message DatanodeDiskBalancerInfoProto {
+    optional DatanodeDetailsProto node = 1;
+    optional string currentVolumeDensitySum = 2;
+    optional bool diskBalancerRunning = 3;
+    optional DiskBalancerConfigurationProto diskBalancerConf = 4;
+}

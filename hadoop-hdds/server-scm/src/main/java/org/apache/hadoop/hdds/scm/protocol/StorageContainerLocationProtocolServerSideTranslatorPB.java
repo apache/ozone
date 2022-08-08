@@ -37,6 +37,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeAdminErrorResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeUsageInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerReportResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesRequestProto;
@@ -646,6 +648,22 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
               request.getGetContainerReplicasRequest(),
               request.getVersion()))
           .build();
+      case DatanodeDiskBalancerReport:
+        return ScmContainerLocationResponse.newBuilder()
+          .setCmdType(request.getCmdType())
+          .setStatus(Status.OK)
+          .setDatanodeDiskBalancerReportResponse(getDatanodeDiskBalancerReport(
+              request.getDatanodeDiskBalancerReportRequest(),
+              request.getVersion()))
+          .build();
+      case DatanodeDiskBalancerStatus:
+        return ScmContainerLocationResponse.newBuilder()
+          .setCmdType(request.getCmdType())
+          .setStatus(Status.OK)
+          .setDatanodeDiskBalancerStatusResponse(getDatanodeDiskBalancerStatus(
+              request.getDatanodeDiskBalancerStatusRequest(),
+              request.getVersion()))
+          .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -1137,5 +1155,25 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return GetContainerCountResponseProto.newBuilder()
       .setContainerCount(impl.getContainerCount())
       .build();
+  }
+
+  public DatanodeDiskBalancerReportResponseProto getDatanodeDiskBalancerReport(
+      StorageContainerLocationProtocolProtos.
+          DatanodeDiskBalancerReportRequestProto request, int clientVersion)
+      throws IOException {
+    return DatanodeDiskBalancerReportResponseProto.newBuilder()
+        .addAllReport(impl.getDiskBalancerReport(request.getCount(),
+            clientVersion))
+        .build();
+  }
+
+  public DatanodeDiskBalancerStatusResponseProto getDatanodeDiskBalancerStatus(
+      StorageContainerLocationProtocolProtos.
+          DatanodeDiskBalancerStatusRequestProto request, int clientVersion)
+      throws IOException {
+    return DatanodeDiskBalancerStatusResponseProto.newBuilder()
+        .addAllStatus(impl.getDiskBalancerStatus(
+            Optional.of(request.getHostsList()), clientVersion))
+        .build();
   }
 }
