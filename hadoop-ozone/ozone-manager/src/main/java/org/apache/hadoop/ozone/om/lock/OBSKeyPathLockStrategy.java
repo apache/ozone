@@ -54,7 +54,7 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
 
     String resourceName = omMetadataManager.getLock()
         .generateResourceName(KEY_PATH_LOCK, volumeName, bucketName, keyName);
-    int resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
+    long resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
     acquiredLock = omMetadataManager.getLock()
         .acquireWriteHashedLock(KEY_PATH_LOCK,
             String.valueOf(resourceHashCode));
@@ -68,7 +68,7 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
                                String keyName) throws IOException {
     String resourceName = omMetadataManager.getLock()
         .generateResourceName(KEY_PATH_LOCK, volumeName, bucketName, keyName);
-    int resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
+    long resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
     omMetadataManager.getLock().releaseWriteHashedLock(KEY_PATH_LOCK,
         String.valueOf(resourceHashCode));
 
@@ -93,7 +93,7 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
 
     String resourceName = omMetadataManager.getLock()
         .generateResourceName(KEY_PATH_LOCK, volumeName, bucketName, keyName);
-    int resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
+    long resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
     acquiredLock = omMetadataManager.getLock()
         .acquireReadHashedLock(KEY_PATH_LOCK, String.valueOf(resourceHashCode));
 
@@ -106,7 +106,7 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
                               String keyName) throws IOException {
     String resourceName = omMetadataManager.getLock()
         .generateResourceName(KEY_PATH_LOCK, volumeName, bucketName, keyName);
-    int resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
+    long resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
     omMetadataManager.getLock()
         .releaseReadHashedLock(KEY_PATH_LOCK, String.valueOf(resourceHashCode));
 
