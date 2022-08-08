@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -92,6 +93,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
   private final RatisSnapshotInfo snapshotInfo;
   private final ExecutorService executorService;
+  private final List<ThreadPoolExecutor> multipleExecutors;
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
   private final AtomicInteger statePausedCount = new AtomicInteger(0);
@@ -108,7 +110,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
 
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
-      boolean isTracingEnabled) throws IOException {
+                                  boolean isTracingEnabled,
+                                  List<ThreadPoolExecutor> multipleExecutors)
+      throws IOException {
     this.omRatisServer = ratisServer;
     this.isTracingEnabled = isTracingEnabled;
     this.ozoneManager = omRatisServer.getOzoneManager();
@@ -125,6 +129,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat("OM StateMachine ApplyTransaction Thread - %d").build();
     this.executorService = HadoopExecutors.newSingleThreadExecutor(build);
+    this.multipleExecutors = multipleExecutors;
     this.installSnapshotExecutor = HadoopExecutors.newSingleThreadExecutor();
   }
 

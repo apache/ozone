@@ -258,6 +258,14 @@
     </description>
   </property>
   <property>
+    <name>om.num.concurrent.write.threads</name>
+    <value>10</value>
+    <tag>OZONE, OM</tag>
+    <description>Maximum number of threads in the thread pool used for
+      execution of write operations based on the hashing mechanism.
+    </description>
+  </property>
+  <property>
     <name>dfs.container.ratis.leader.pending.bytes.limit</name>
     <value>1GB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
