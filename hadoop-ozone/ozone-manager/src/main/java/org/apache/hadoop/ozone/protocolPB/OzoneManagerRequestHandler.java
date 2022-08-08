@@ -18,12 +18,14 @@
 package org.apache.hadoop.ozone.protocolPB;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import com.google.protobuf.ServiceException;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -136,6 +138,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       LoggerFactory.getLogger(OzoneManagerRequestHandler.class);
   private final OzoneManager impl;
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
+  private static final int RPC_PAYLOAD_MULTIPLICATION_FACTOR = 1024;
+  private static final int MAX_SIZE_KB = 2097151;
 
   public OzoneManagerRequestHandler(OzoneManager om,
       OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer) {
@@ -914,6 +918,31 @@ public class OzoneManagerRequestHandler implements RequestHandler {
           .clearGetFileStatusResponse()
           .build();
     }
+    return resp;
+  }
+
+  @RequestFeatureValidator(
+          conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+          processingPhase = RequestProcessingPhase.POST_PROCESS,
+          requestType = Type.EchoRPC
+  )
+  public static OMResponse echoRPC(
+          OMRequest req, OMResponse resp, ValidationContext ctx)
+          throws ServiceException {
+    if (!resp.hasEchoRPCResponse()) {
+      return resp;
+    }
+    byte[] payloadBytes = new byte[0];
+    int payloadRespSize = Math.min(
+            req.getEchoRPCRequest().getPayloadSizeResp()
+                    * RPC_PAYLOAD_MULTIPLICATION_FACTOR, MAX_SIZE_KB);
+    if (payloadRespSize > 0) {
+      payloadBytes = RandomUtils.nextBytes(payloadRespSize);
+    }
+    resp = resp.toBuilder()
+            .setMessage(new String(payloadBytes, StandardCharsets.UTF_8))
+            .clearEchoRPCResponse()
+            .build();
     return resp;
   }
 
