@@ -190,9 +190,6 @@ public interface ReplicationConfig {
         }
       }
       replicationConfig = fromTypeAndFactor(type, factor);
-      ReplicationConfigValidator legacyValidator =
-          config.getObject(ReplicationConfigValidator.class);
-      legacyValidator.validate(replicationConfig);
       break;
     case EC:
       replicationConfig = new ECReplicationConfig(replication);
@@ -202,6 +199,9 @@ public interface ReplicationConfig {
           + "be parsed.");
     }
 
+    ReplicationConfigValidator legacyValidator =
+            config.getObject(ReplicationConfigValidator.class);
+    legacyValidator.validate(replicationConfig);
 
     return replicationConfig;
   }
