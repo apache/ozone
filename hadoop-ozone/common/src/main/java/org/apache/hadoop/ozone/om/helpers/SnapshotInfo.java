@@ -451,14 +451,14 @@ public final class SnapshotInfo implements Auditable {
   /**
    * Get the name of the checkpoint directory.
    */
-  public static String getCheckpointDirName(String name, String snapshotPath) {
-    return SEPARATOR + getTableKey(name, snapshotPath);
+  public static String getCheckpointDirName(String snapshotId) {
+    return SEPARATOR + snapshotId;
   }
   /**
    * Get the name of the checkpoint directory, (non-static).
    */
   public String getCheckpointDirName() {
-    return getCheckpointDirName(name, snapshotPath);
+    return getCheckpointDirName(getSnapshotID());
   }
 
   /**
@@ -499,7 +499,7 @@ public final class SnapshotInfo implements Auditable {
         .setSnapshotPath(snapshotPath)
         .setVolumeName(getVolumeNameFromPath(snapshotPath))
         .setBucketName(getBucketNameFromPath(snapshotPath))
-        .setCheckpointDir(getCheckpointDirName(name, snapshotPath));
+        .setCheckpointDir(getCheckpointDirName(id));
     return builder.build();
   }
 

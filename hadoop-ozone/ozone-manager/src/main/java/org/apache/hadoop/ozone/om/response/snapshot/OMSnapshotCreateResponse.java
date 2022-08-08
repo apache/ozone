@@ -62,13 +62,13 @@ public class OMSnapshotCreateResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // Create the snapshot checkpoint
-    SnapshotManager.createSnapshot(
-        omMetadataManager, SnapshotInfo.newInstance(name, snapshotPath));
-
     SnapshotInfo snapshotInfo =
         SnapshotInfo.getFromProtobuf(
         getOMResponse().getCreateSnapshotResponse().getSnapshotInfo());
+
+    // Create the snapshot checkpoint
+    SnapshotManager.createSnapshot(omMetadataManager, snapshotInfo);
+
     String key = SnapshotInfo.getTableKey(name, snapshotPath);
 
     // Add to db
