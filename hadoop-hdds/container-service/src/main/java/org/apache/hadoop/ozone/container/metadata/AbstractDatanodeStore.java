@@ -30,13 +30,13 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
-import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.DBOptions;
-import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +69,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       LoggerFactory.getLogger(AbstractDatanodeStore.class);
   private volatile DBStore store;
   private final AbstractDatanodeDBDefinition dbDef;
-  private final ColumnFamilyOptions cfOptions;
+  private final ManagedColumnFamilyOptions cfOptions;
 
   private static DatanodeDBProfile dbProfile;
   private final boolean openReadOnly;
@@ -101,7 +101,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   public void start(ConfigurationSource config)
       throws IOException {
     if (this.store == null) {
-      DBOptions options = dbProfile.getDBOptions();
+      ManagedDBOptions options = dbProfile.getDBOptions();
       options.setCreateIfMissing(true);
       options.setCreateMissingColumnFamilies(true);
 
@@ -116,7 +116,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
               OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
 
       if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
-        Statistics statistics = new Statistics();
+        ManagedStatistics statistics = new ManagedStatistics();
         statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
         options.setStatistics(statistics);
       }

@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.node;
 
 import java.io.IOException;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -91,7 +92,7 @@ public class HealthyReadOnlyNodeHandler
             HddsProtos.NodeState.HEALTHY_READONLY,
             datanodeDetails.getUuidString());
         pipelineManager.closePipeline(pipeline, true);
-      } catch (IOException ex) {
+      } catch (IOException | TimeoutException ex) {
         LOG.error("Failed to close pipeline {} which uses HEALTHY READONLY " +
             "datanode {}: ", pipelineID, datanodeDetails, ex);
       }

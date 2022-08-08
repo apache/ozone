@@ -531,7 +531,7 @@ public class TestOzoneContainer {
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
         ContainerTestHelper.getWriteChunkRequest(client.getPipeline(),
-            blockID, dataLen, null);
+            blockID, dataLen);
     ContainerProtos.ContainerCommandResponseProto response =
         client.sendCommand(writeChunkRequest);
     Assert.assertNotNull(response);

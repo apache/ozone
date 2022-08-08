@@ -78,6 +78,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
   public void write(byte[] b, int off, int len) throws IOException {
     this.currentChunkRspFuture =
         writeChunkToContainer(ChunkBuffer.wrap(ByteBuffer.wrap(b, off, len)));
+    updateWrittenDataLength(len);
   }
 
   public CompletableFuture<ContainerProtos.ContainerCommandResponseProto> write(

@@ -146,7 +146,7 @@ public class TestSchemaTwoBackwardsCompatibility {
     blockManager = new BlockManagerImpl(conf);
     chunkManager = new FilePerBlockStrategy(true, blockManager, volumeSet);
 
-    containerSet = new ContainerSet();
+    containerSet = new ContainerSet(1000);
     keyValueHandler = new KeyValueHandler(conf, datanodeUuid,
         containerSet, volumeSet, ContainerMetrics.create(conf), c -> { });
     ozoneContainer = mock(OzoneContainer.class);

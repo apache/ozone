@@ -438,7 +438,7 @@ public final class OzoneManagerDoubleBuffer {
    * @param flushedTransactionsSize
    */
   private void updateMetrics(
-      long flushedTransactionsSize) {
+      int flushedTransactionsSize) {
     ozoneManagerDoubleBufferMetrics.incrTotalNumOfFlushOperations();
     ozoneManagerDoubleBufferMetrics.incrTotalSizeOfFlushedTransactions(
         flushedTransactionsSize);
@@ -452,6 +452,7 @@ public final class OzoneManagerDoubleBuffer {
           .setMaxNumberOfTransactionsFlushedInOneIteration(
               flushedTransactionsSize);
     }
+    ozoneManagerDoubleBufferMetrics.updateQueueSize(flushedTransactionsSize);
   }
 
   /**

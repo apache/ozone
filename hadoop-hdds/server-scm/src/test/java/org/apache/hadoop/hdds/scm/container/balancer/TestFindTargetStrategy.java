@@ -160,7 +160,8 @@ public class TestFindTargetStrategy {
 
 
     FindTargetGreedyByNetworkTopology findTargetGreedyByNetworkTopology =
-        new FindTargetGreedyByNetworkTopology(null, null, null, newCluster);
+        new FindTargetGreedyByNetworkTopology(
+            null, null, null, newCluster);
 
     findTargetGreedyByNetworkTopology.reInitialize(
         overUtilizedDatanodes, null, null);

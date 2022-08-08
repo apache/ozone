@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -228,7 +229,7 @@ public class ContainerHealthTask extends ReconScmTask {
     } catch (InvalidStateTransitionException e) {
       LOG.error("Failed to transition Container state while processing " +
           "container in Container Health task", e);
-    } catch (IOException e) {
+    } catch (IOException | TimeoutException e) {
       LOG.error("Got exception while processing container in" +
           " Container Health task", e);
     }

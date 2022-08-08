@@ -21,7 +21,7 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -45,7 +45,7 @@ import java.util.stream.Collectors;
 public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
   private Logger logger;
   private ContainerManager containerManager;
-  private PlacementPolicy placementPolicy;
+  private PlacementPolicyValidateProxy placementPolicyValidateProxy;
   private Map<DatanodeDetails, Long> sizeEnteringNode;
   private NodeManager nodeManager;
   private ContainerBalancerConfiguration config;
@@ -54,11 +54,11 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
 
   protected AbstractFindTargetGreedy(
       ContainerManager containerManager,
-      PlacementPolicy placementPolicy,
+      PlacementPolicyValidateProxy placementPolicyValidateProxy,
       NodeManager nodeManager) {
     sizeEnteringNode = new HashMap<>();
     this.containerManager = containerManager;
-    this.placementPolicy = placementPolicy;
+    this.placementPolicyValidateProxy = placementPolicyValidateProxy;
     this.nodeManager = nodeManager;
   }
 
@@ -162,10 +162,8 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
             .filter(datanodeDetails -> !datanodeDetails.equals(source))
             .collect(Collectors.toList());
     replicaList.add(target);
-    ContainerPlacementStatus placementStatus =
-        placementPolicy.validateContainerPlacement(replicaList,
-        containerInfo.getReplicationConfig().getRequiredNodes());
-
+    ContainerPlacementStatus placementStatus = placementPolicyValidateProxy
+        .validateContainerPlacement(replicaList, containerInfo);
     return placementStatus.isPolicySatisfied();
   }
 
