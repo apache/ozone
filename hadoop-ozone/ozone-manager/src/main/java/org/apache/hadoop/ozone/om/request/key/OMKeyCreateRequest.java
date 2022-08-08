@@ -198,8 +198,13 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     omMetrics.incNumKeyAllocates();
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    OzoneLockStrategy ozoneLockStrategy = ozoneManager.getOzoneLockProvider()
-        .createLockStrategy(getBucketLayout());
+    OzoneLockStrategy ozoneLockStrategy = null;
+    try {
+      ozoneLockStrategy =
+          getOzoneLockStrategy(ozoneManager, volumeName, bucketName);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
     OmKeyInfo omKeyInfo = null;
     OmBucketInfo omBucketInfo = null;
     final List< OmKeyLocationInfo > locations = new ArrayList<>();
