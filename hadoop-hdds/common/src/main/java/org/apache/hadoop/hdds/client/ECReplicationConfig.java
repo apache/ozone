@@ -34,7 +34,7 @@ public class ECReplicationConfig implements ReplicationConfig {
 
   public static final String EC_REPLICATION_PARAMS_DELIMITER = "-";
   public static final String EC_REPLICATION_PATTERN
-          = "^rs-2|6-3|10-\\d{4}(k|K)?$";
+          = "^(EC/(3-2|6-3|10-4))$";
 
   /**
    * Enum defining the allowed list of ECCodecs.
