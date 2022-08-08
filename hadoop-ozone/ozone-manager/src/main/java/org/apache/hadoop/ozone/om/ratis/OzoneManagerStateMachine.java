@@ -41,7 +41,12 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.hashcodegenerator.OMHashCodeGenerator;
+import org.apache.hadoop.ozone.om.hashcodegenerator.StringOMHashCodeGeneratorImpl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
@@ -71,6 +76,7 @@ import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.METADATA_ERROR;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
@@ -97,6 +103,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
   private final AtomicInteger statePausedCount = new AtomicInteger(0);
+  private boolean enableKeyPathLock;
+  private boolean enableFileSystemPaths;
+  private OMHashCodeGenerator omHashCodeGenerator;
 
   // Map which contains index and term for the ratis transactions which are
   // stateMachine entries which are received through applyTransaction.
@@ -121,10 +130,16 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     loadSnapshotInfoFromDB();
 
     this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-
+    this.enableKeyPathLock = ozoneManager.getConfiguration().getBoolean(
+        OMConfigKeys.OZONE_OM_KEY_PATH_LOCK_ENABLED,
+        OMConfigKeys.OZONE_OM_KEY_PATH_LOCK_ENABLED_DEFAULT);
+    this.enableFileSystemPaths =
+        ozoneManager.getConfiguration()
+            .getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+                OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
         ozoneManagerDoubleBuffer);
-
+    this.omHashCodeGenerator = new StringOMHashCodeGeneratorImpl();
 
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat("OM StateMachine ApplyTransaction Thread - %d").build();
@@ -326,7 +341,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
 
       CompletableFuture<OMResponse> future = CompletableFuture.supplyAsync(
-          () -> runCommand(request, trxLogIndex), executorService);
+          () -> runCommand(request, trxLogIndex),
+          getExecutorService(request, enableKeyPathLock,
+              enableFileSystemPaths));
       future.thenApply(omResponse -> {
         if (!omResponse.getSuccess()) {
           // When INTERNAL_ERROR or METADATA_ERROR it is considered as
@@ -358,6 +375,57 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     } catch (Exception e) {
       return completeExceptionally(e);
     }
+  }
+
+  private ExecutorService getExecutorService(OMRequest request,
+                                             boolean enableKeyPathLockFlag,
+                                             boolean enableFileSystemPathsFlag)
+      throws IOException {
+    if (enableKeyPathLockFlag) {
+      OzoneManagerRatisUtils.OmKeyPathArgsInfo omKeyPathArgsInfo =
+          OzoneManagerRatisUtils.getKeyPathInfo(request);
+      if (omKeyPathArgsInfo == null) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("OMRequest is not a key specific request.");
+        }
+        return executorService;
+      }
+
+      String resourceName = OzoneManagerLock.generateResourceName(
+          OzoneManagerLock.Resource.KEY_PATH_LOCK,
+          omKeyPathArgsInfo.getVolName(), omKeyPathArgsInfo.getBuckName(),
+          omKeyPathArgsInfo.getKeyName());
+
+      // Get the bucket layout of the bucket being accessed by this request.
+      // While doing this we make sure we are resolving the real bucket in case
+      // of link buckets.
+      BucketLayout bucketLayout =
+          getBucketLayout(ozoneManager.getMetadataManager(),
+              omKeyPathArgsInfo.getVolName(), omKeyPathArgsInfo.getBuckName());
+
+      if (bucketLayout == BucketLayout.OBJECT_STORE) {
+        // TODO: LOG debug
+        int size = multipleExecutors.size();
+        int i =
+            (((omHashCodeGenerator.getHashCode(resourceName) % size) + size) %
+                size);
+        return multipleExecutors.get(i);
+      } else if (!enableFileSystemPathsFlag &&
+          bucketLayout == BucketLayout.LEGACY) {
+        // old pre-created bucket with enableFileSystemPaths = false.
+        // TODO: LOG debug
+        int size = multipleExecutors.size();
+        int i =
+            (((omHashCodeGenerator.getHashCode(resourceName) % size) + size) %
+                size);
+        return multipleExecutors.get(i);
+      }
+    }
+
+    // key_path_lock optimization disabled, will return regular executor
+    // service.
+    // TODO: LOG warn
+    return executorService;
   }
 
   /**
