@@ -30,18 +30,18 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.WriteBatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Class used to listen on OM RocksDB updates.
  */
-public class OMDBUpdatesHandler extends WriteBatch.Handler {
+public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBUpdatesHandler.class);
