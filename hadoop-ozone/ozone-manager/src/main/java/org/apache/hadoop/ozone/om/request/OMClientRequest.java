@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -55,7 +54,6 @@ import java.net.InetAddress;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 
 /**
@@ -565,15 +563,5 @@ public abstract class OMClientRequest implements RequestAuditor {
     } else {
       throw new OMException("Invalid KeyPath " + path, INVALID_KEY_NAME);
     }
-  }
-
-  protected OzoneLockStrategy getOzoneLockStrategy(OzoneManager ozoneManager,
-                                                   String volumeName,
-                                                   String bucketName)
-      throws IOException {
-    return ozoneManager.getOzoneLockProvider()
-        .createLockStrategy(
-            getBucketLayout(ozoneManager.getMetadataManager(), volumeName,
-                bucketName));
   }
 }
