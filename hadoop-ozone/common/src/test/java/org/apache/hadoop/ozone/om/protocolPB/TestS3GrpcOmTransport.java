@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.protocolPB;
 
 import static org.apache.hadoop.ozone.ClientVersion.CURRENT_VERSION;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT;
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.Mockito.mock;
 
@@ -48,6 +49,8 @@ import com.google.protobuf.ServiceException;
 import org.apache.ratis.protocol.RaftPeerId;
 
 import static org.junit.Assert.fail;
+import static org.apache.hadoop.ozone.om.OMConfigKeys
+    .OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
 
 /**
  * Tests for GrpcOmTransport client.
@@ -76,6 +79,8 @@ public class TestS3GrpcOmTransport {
   private String omServiceId;
   private UserGroupInformation ugi;
   private ManagedChannel channel;
+
+  private String serverName;
 
 
   private ServiceException createNotLeaderException() {
@@ -126,7 +131,7 @@ public class TestS3GrpcOmTransport {
   @Before
   public void setUp() throws Exception {
     // Generate a unique in-process server name.
-    String serverName = InProcessServerBuilder.generateName();
+    serverName = InProcessServerBuilder.generateName();
 
     // Create a server, add service, start,
     // and register for automatic graceful shutdown.
@@ -212,6 +217,41 @@ public class TestS3GrpcOmTransport {
     // OMFailoverProvider returns Fail retry due to #attempts >
     // max failovers
 
+    try {
+      final OMResponse resp = client.submitRequest(omRequest);
+      fail();
+    } catch (Exception e) {
+      Assert.assertTrue(true);
+    }
+  }
+
+  @Test
+  public void testGrpcFailoverExceedMaxMesgLen() throws Exception {
+    ServiceListRequest req = ServiceListRequest.newBuilder().build();
+
+    final OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(Type.ServiceList)
+        .setVersion(CURRENT_VERSION)
+        .setClientId("test")
+        .setServiceListRequest(req)
+        .build();
+
+    conf.setInt(OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH, 1);
+    client = new GrpcOmTransport(conf, ugi, omServiceId);
+    int maxSize = conf.getInt(OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH,
+        OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT);
+    channel = grpcCleanup.register(
+        InProcessChannelBuilder
+            .forName(serverName)
+            .maxInboundMetadataSize(maxSize)
+            .directExecutor().build());
+    client.startClient(channel);
+
+    doFailover = true;
+    // GrpcOMFailoverProvider returns Fail retry due to mesg response
+    // len > 0, causing RESOURCE_EXHAUSTED exception.
+    // This exception should cause failover to NOT retry,
+    // rather to fail.
     try {
       final OMResponse resp = client.submitRequest(omRequest);
       fail();

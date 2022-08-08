@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.ozone.scm;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -66,7 +66,7 @@ public class TestSCMMXBean {
   @Rule
   public Timeout timeout = Timeout.seconds(300);
 
-  public static final Log LOG = LogFactory.getLog(TestSCMMXBean.class);
+  public static final Logger LOG = LoggerFactory.getLogger(TestSCMMXBean.class);
   private static int numOfDatanodes = 3;
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;

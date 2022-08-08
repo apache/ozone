@@ -107,6 +107,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
@@ -438,7 +439,8 @@ public class TestStorageContainerManager {
       StorageContainerManager scm,
       DeletedBlockLog delLog,
       Map<String, OmKeyInfo> keyLocations,
-      TestStorageContainerManagerHelper helper) throws IOException {
+      TestStorageContainerManagerHelper helper)
+      throws IOException, TimeoutException {
     // These keys will be written into a bunch of containers,
     // gets a set of container names, verify container containerBlocks
     // on datanodes.
@@ -831,7 +833,7 @@ public class TestStorageContainerManager {
   private void addTransactions(StorageContainerManager scm,
       DeletedBlockLog delLog,
       Map<Long, List<Long>> containerBlocksMap)
-      throws IOException {
+      throws IOException, TimeoutException {
     delLog.addTransactions(containerBlocksMap);
     if (SCMHAUtils.isSCMHAEnabled(scm.getConfiguration())) {
       scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();

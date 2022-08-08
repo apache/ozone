@@ -148,6 +148,9 @@ public class OzoneManagerLock implements OmLock {
     return lock(resource, resourceName, manager::readLock, READ_LOCK);
   }
 
+  public boolean acquireReadHashedLock(Resource resource, String resourceName) {
+    return lock(resource, resourceName, manager::readLock, READ_LOCK);
+  }
 
   /**
    * Acquire write lock on resource.
@@ -169,6 +172,11 @@ public class OzoneManagerLock implements OmLock {
   @Override
   public boolean acquireWriteLock(Resource resource, String... resources) {
     String resourceName = generateResourceName(resource, resources);
+    return lock(resource, resourceName, manager::writeLock, WRITE_LOCK);
+  }
+
+  public boolean acquireWriteHashedLock(Resource resource,
+                                        String resourceName) {
     return lock(resource, resourceName, manager::writeLock, WRITE_LOCK);
   }
 
@@ -245,7 +253,7 @@ public class OzoneManagerLock implements OmLock {
    * @param resource
    * @param resources
    */
-  private String generateResourceName(Resource resource, String... resources) {
+  public String generateResourceName(Resource resource, String... resources) {
     if (resources.length == 1 && resource != Resource.BUCKET_LOCK) {
       return OzoneManagerLockUtil.generateResourceLockName(resource,
           resources[0]);
@@ -394,6 +402,10 @@ public class OzoneManagerLock implements OmLock {
     unlock(resource, resourceName, manager::writeUnlock, WRITE_LOCK);
   }
 
+  public void releaseWriteHashedLock(Resource resource, String resourceName) {
+    unlock(resource, resourceName, manager::writeUnlock, WRITE_LOCK);
+  }
+
   /**
    * Release read lock on resource.
    * @param resource - Type of the resource.
@@ -405,6 +417,10 @@ public class OzoneManagerLock implements OmLock {
   @Override
   public void releaseReadLock(Resource resource, String... resources) {
     String resourceName = generateResourceName(resource, resources);
+    unlock(resource, resourceName, manager::readUnlock, READ_LOCK);
+  }
+
+  public void releaseReadHashedLock(Resource resource, String resourceName) {
     unlock(resource, resourceName, manager::readUnlock, READ_LOCK);
   }
 

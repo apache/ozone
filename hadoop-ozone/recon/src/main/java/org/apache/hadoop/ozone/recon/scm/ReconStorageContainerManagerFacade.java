@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -363,7 +364,7 @@ public class ReconStorageContainerManagerFacade
       List<Pipeline> pipelinesFromScm = scmServiceProvider.getPipelines();
       LOG.info("Obtained {} pipelines from SCM.", pipelinesFromScm.size());
       pipelineManager.initializePipelines(pipelinesFromScm);
-    } catch (IOException ioEx) {
+    } catch (IOException | TimeoutException ioEx) {
       LOG.error("Exception encountered while getting pipelines from SCM.",
           ioEx);
     }

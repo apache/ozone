@@ -54,6 +54,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.collections.CollectionUtils.intersection;
@@ -124,7 +125,8 @@ public class TestRatisPipelineProvider {
   }
 
   private void createPipelineAndAssertions(
-      HddsProtos.ReplicationFactor factor) throws IOException {
+      HddsProtos.ReplicationFactor factor)
+      throws IOException, TimeoutException {
     Pipeline pipeline = provider.create(RatisReplicationConfig
         .getInstance(factor));
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
@@ -359,7 +361,7 @@ public class TestRatisPipelineProvider {
   private void addPipeline(
       List<DatanodeDetails> dns,
       Pipeline.PipelineState open, ReplicationConfig replicationConfig)
-      throws IOException {
+      throws IOException, TimeoutException {
     Pipeline openPipeline = Pipeline.newBuilder()
         .setReplicationConfig(replicationConfig)
         .setNodes(dns)

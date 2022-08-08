@@ -309,7 +309,7 @@ public class TestLegacyReplicationManager {
    * any action on OPEN containers.
    */
   @Test
-  public void testOpenContainer() throws IOException {
+  public void testOpenContainer() throws IOException, TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.OPEN);
     containerStateManager.addContainer(container.getProtobuf());
     replicationManager.processAll();
@@ -324,7 +324,7 @@ public class TestLegacyReplicationManager {
    * to all the datanodes.
    */
   @Test
-  public void testClosingContainer() throws IOException {
+  public void testClosingContainer() throws IOException, TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
     final ContainerID id = container.containerID();
 
@@ -371,7 +371,8 @@ public class TestLegacyReplicationManager {
    * datanodes.
    */
   @Test
-  public void testQuasiClosedContainerWithTwoOpenReplica() throws IOException {
+  public void testQuasiClosedContainerWithTwoOpenReplica()
+      throws IOException, TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
@@ -412,7 +413,8 @@ public class TestLegacyReplicationManager {
    * the container, ReplicationManager will not do anything.
    */
   @Test
-  public void testHealthyQuasiClosedContainer() throws IOException {
+  public void testHealthyQuasiClosedContainer()
+      throws IOException, TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
@@ -451,7 +453,7 @@ public class TestLegacyReplicationManager {
    */
   @Test
   public void testQuasiClosedContainerWithUnhealthyReplica()
-      throws IOException {
+      throws IOException, TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
     container.setUsedBytes(100);
     final ContainerID id = container.containerID();
@@ -565,7 +567,8 @@ public class TestLegacyReplicationManager {
    * deletes the excess replicas.
    */
   @Test
-  public void testOverReplicatedQuasiClosedContainer() throws IOException {
+  public void testOverReplicatedQuasiClosedContainer()
+      throws IOException, TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
     container.setUsedBytes(101);
     final ContainerID id = container.containerID();
@@ -655,7 +658,7 @@ public class TestLegacyReplicationManager {
    */
   @Test
   public void testOverReplicatedQuasiClosedContainerWithUnhealthyReplica()
-      throws IOException {
+      throws IOException, TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
@@ -726,7 +729,8 @@ public class TestLegacyReplicationManager {
    * under replicated.
    */
   @Test
-  public void testUnderReplicatedQuasiClosedContainer() throws IOException {
+  public void testUnderReplicatedQuasiClosedContainer()
+      throws IOException, TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
     container.setUsedBytes(100);
     final ContainerID id = container.containerID();
@@ -946,7 +950,7 @@ public class TestLegacyReplicationManager {
    * highest BCSID.
    */
   @Test
-  public void testQuasiClosedToClosed() throws IOException {
+  public void testQuasiClosedToClosed() throws IOException, TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
     final ContainerID id = container.containerID();
     final Set<ContainerReplica> replicas = getReplicas(id, State.QUASI_CLOSED,
@@ -980,7 +984,8 @@ public class TestLegacyReplicationManager {
    * CLOSED and healthy.
    */
   @Test
-  public void testHealthyClosedContainer() throws IOException {
+  public void testHealthyClosedContainer()
+      throws IOException, TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
     final ContainerID id = container.containerID();
     final Set<ContainerReplica> replicas = getReplicas(id, State.CLOSED,
@@ -1009,7 +1014,8 @@ public class TestLegacyReplicationManager {
    * ReplicationManager should close the unhealthy OPEN container.
    */
   @Test
-  public void testUnhealthyOpenContainer() throws IOException {
+  public void testUnhealthyOpenContainer()
+      throws IOException, TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.OPEN);
     final ContainerID id = container.containerID();
     final Set<ContainerReplica> replicas = getReplicas(id, State.OPEN,
@@ -1041,7 +1047,8 @@ public class TestLegacyReplicationManager {
    * ReplicationManager should skip send close command to unhealthy replica.
    */
   @Test
-  public void testCloseUnhealthyReplica() throws IOException {
+  public void testCloseUnhealthyReplica()
+      throws IOException, TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
     final ContainerID id = container.containerID();
     final Set<ContainerReplica> replicas = getReplicas(id, State.UNHEALTHY,
@@ -1073,7 +1080,8 @@ public class TestLegacyReplicationManager {
   }
 
   @Test
-  public void additionalReplicaScheduledWhenMisReplicated() throws IOException {
+  public void additionalReplicaScheduledWhenMisReplicated()
+      throws IOException, TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
     container.setUsedBytes(100);
     final ContainerID id = container.containerID();
@@ -1155,7 +1163,8 @@ public class TestLegacyReplicationManager {
   }
 
   @Test
-  public void overReplicatedButRemovingMakesMisReplicated() throws IOException {
+  public void overReplicatedButRemovingMakesMisReplicated()
+      throws IOException, TimeoutException {
     // In this test, the excess replica should not be removed.
     final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
     final ContainerID id = container.containerID();
@@ -1211,7 +1220,8 @@ public class TestLegacyReplicationManager {
   }
 
   @Test
-  public void testOverReplicatedAndPolicySatisfied() throws IOException {
+  public void testOverReplicatedAndPolicySatisfied()
+      throws IOException, TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
@@ -1255,8 +1265,8 @@ public class TestLegacyReplicationManager {
   }
 
   @Test
-  public void testOverReplicatedAndPolicyUnSatisfiedAndDeleted() throws
-      IOException {
+  public void testOverReplicatedAndPolicyUnSatisfiedAndDeleted()
+      throws IOException, TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
@@ -1305,7 +1315,8 @@ public class TestLegacyReplicationManager {
    * decommissioned replicas.
    */
   @Test
-  public void testUnderReplicatedDueToDecommission() throws IOException {
+  public void testUnderReplicatedDueToDecommission()
+      throws IOException, TimeoutException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
     addReplica(container, new NodeStatus(DECOMMISSIONING, HEALTHY), CLOSED);
@@ -1319,12 +1330,13 @@ public class TestLegacyReplicationManager {
    * are decommissioning.
    */
   @Test
-  public void testUnderReplicatedDueToAllDecommission() throws IOException {
+  public void testUnderReplicatedDueToAllDecommission()
+      throws IOException, TimeoutException {
     runTestUnderReplicatedDueToAllDecommission(3);
   }
 
   Void runTestUnderReplicatedDueToAllDecommission(int expectedReplication)
-      throws IOException {
+      throws IOException, TimeoutException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, new NodeStatus(DECOMMISSIONING, HEALTHY), CLOSED);
     addReplica(container, new NodeStatus(DECOMMISSIONING, HEALTHY), CLOSED);
@@ -1365,7 +1377,8 @@ public class TestLegacyReplicationManager {
    * correctly replicated with decommissioned replicas still present.
    */
   @Test
-  public void testCorrectlyReplicatedWithDecommission() throws IOException {
+  public void testCorrectlyReplicatedWithDecommission()
+      throws IOException, TimeoutException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
     addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
@@ -1380,7 +1393,8 @@ public class TestLegacyReplicationManager {
    * is not met for maintenance.
    */
   @Test
-  public void testUnderReplicatedDueToMaintenance() throws IOException {
+  public void testUnderReplicatedDueToMaintenance()
+      throws IOException, TimeoutException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
     addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
@@ -1436,7 +1450,8 @@ public class TestLegacyReplicationManager {
    * are going into maintenance.
    */
   @Test
-  public void testUnderReplicatedDueToAllMaintenance() throws IOException {
+  public void testUnderReplicatedDueToAllMaintenance()
+      throws IOException, TimeoutException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
     addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
@@ -1450,7 +1465,8 @@ public class TestLegacyReplicationManager {
    * replica are available.
    */
   @Test
-  public void testCorrectlyReplicatedWithMaintenance() throws IOException {
+  public void testCorrectlyReplicatedWithMaintenance()
+      throws IOException, TimeoutException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
     addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
@@ -1466,7 +1482,7 @@ public class TestLegacyReplicationManager {
    */
   @Test
   public void testUnderReplicatedWithDecommissionAndMaintenance()
-      throws IOException {
+      throws IOException, TimeoutException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, new NodeStatus(DECOMMISSIONED, HEALTHY), CLOSED);
     addReplica(container, new NodeStatus(DECOMMISSIONED, HEALTHY), CLOSED);
@@ -1482,7 +1498,7 @@ public class TestLegacyReplicationManager {
    */
   @Test
   public void testContainerWithMissingReplicas()
-      throws IOException {
+      throws IOException, TimeoutException {
     createContainer(LifeCycleState.CLOSED);
     assertReplicaScheduled(0);
     assertUnderReplicatedCount(1);
@@ -1496,7 +1512,7 @@ public class TestLegacyReplicationManager {
    */
   @Test
   public void testOverReplicatedClosedContainerWithDecomAndMaint()
-      throws IOException {
+      throws IOException, TimeoutException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, NodeStatus.inServiceHealthy(), CLOSED);
     addReplica(container, new NodeStatus(DECOMMISSIONED, HEALTHY), CLOSED);
@@ -1542,7 +1558,8 @@ public class TestLegacyReplicationManager {
    * scheduled.
    */
   @Test
-  public void testUnderReplicatedNotHealthySource() throws IOException {
+  public void testUnderReplicatedNotHealthySource()
+      throws IOException, TimeoutException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, NodeStatus.inServiceStale(), CLOSED);
     addReplica(container, new NodeStatus(DECOMMISSIONED, STALE), CLOSED);
@@ -1558,7 +1575,7 @@ public class TestLegacyReplicationManager {
    */
   @Test
   public void testMove() throws IOException, NodeNotFoundException,
-      InterruptedException, ExecutionException {
+      InterruptedException, ExecutionException, TimeoutException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     ContainerID id = container.containerID();
     ContainerReplica dn1 = addReplica(container,
@@ -1600,7 +1617,7 @@ public class TestLegacyReplicationManager {
    */
   @Test
   public void testMoveCrashAndRestart() throws IOException,
-      NodeNotFoundException, InterruptedException {
+      NodeNotFoundException, InterruptedException, TimeoutException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     ContainerID id = container.containerID();
     ContainerReplica dn1 = addReplica(container,
@@ -1694,7 +1711,7 @@ public class TestLegacyReplicationManager {
   @Test
   public void testMoveNotDeleteSrcIfPolicyNotSatisfied()
       throws IOException, NodeNotFoundException,
-      InterruptedException, ExecutionException {
+      InterruptedException, ExecutionException, TimeoutException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     ContainerID id = container.containerID();
     ContainerReplica dn1 = addReplica(container,
@@ -1736,7 +1753,8 @@ public class TestLegacyReplicationManager {
    */
   @Test
   public void testDnBecameUnhealthyWhenMoving() throws IOException,
-      NodeNotFoundException, InterruptedException, ExecutionException {
+      NodeNotFoundException, InterruptedException, ExecutionException,
+      TimeoutException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     ContainerID id = container.containerID();
     ContainerReplica dn1 = addReplica(container,
@@ -1779,7 +1797,7 @@ public class TestLegacyReplicationManager {
   @Test
   public void testMovePrerequisites() throws IOException, NodeNotFoundException,
       InterruptedException, ExecutionException,
-      InvalidStateTransitionException {
+      InvalidStateTransitionException, TimeoutException {
     //all conditions is met
     final ContainerInfo container = createContainer(LifeCycleState.OPEN);
     ContainerID id = container.containerID();
@@ -1895,7 +1913,8 @@ public class TestLegacyReplicationManager {
   }
 
   @Test
-  public void testReplicateCommandTimeout() throws IOException {
+  public void testReplicateCommandTimeout()
+      throws IOException, TimeoutException {
     long timeout = new ReplicationManagerConfiguration().getEventTimeout();
 
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
@@ -1915,8 +1934,8 @@ public class TestLegacyReplicationManager {
   }
 
   @Test
-  public void testDeleteCommandTimeout() throws
-      IOException, InterruptedException {
+  public void testDeleteCommandTimeout()
+      throws IOException, TimeoutException {
     long timeout = new ReplicationManagerConfiguration().getEventTimeout();
 
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
@@ -1983,13 +2002,13 @@ public class TestLegacyReplicationManager {
   }
 
   private ContainerInfo createContainer(LifeCycleState containerState)
-      throws IOException {
+      throws IOException, TimeoutException {
     return createContainer(containerState, CONTAINER_USED_BYTES_DEFAULT,
         CONTAINER_NUM_KEYS_DEFAULT);
   }
 
   private ContainerInfo createContainer(LifeCycleState containerState,
-      long usedBytes, long numKeys) throws IOException {
+      long usedBytes, long numKeys) throws IOException, TimeoutException {
     final ContainerInfo container = getContainer(containerState);
     container.setUsedBytes(usedBytes);
     container.setNumberOfKeys(numKeys);

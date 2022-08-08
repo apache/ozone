@@ -92,6 +92,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RepeatedKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
@@ -207,6 +209,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         ServiceListResponse serviceListResponse = getServiceList(
             request.getServiceListRequest());
         responseBuilder.setServiceListResponse(serviceListResponse);
+        break;
+      case RangerBGSync:
+        RangerBGSyncResponse rangerBGSyncResponse = triggerRangerBGSync(
+            request.getRangerBGSyncRequest());
+        responseBuilder.setRangerBGSyncResponse(rangerBGSyncResponse);
         break;
       case DBUpdates:
         DBUpdatesResponse dbUpdatesResponse = getOMDBUpdates(
@@ -871,6 +878,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     rb.setStatus(impl.getFileStatus(omKeyArgs).getProtobuf(clientVersion));
 
     return rb.build();
+  }
+
+  private RangerBGSyncResponse triggerRangerBGSync(
+      RangerBGSyncRequest rangerBGSyncRequest) throws IOException {
+
+    boolean res = impl.triggerRangerBGSync(rangerBGSyncRequest.getNoWait());
+
+    return RangerBGSyncResponse.newBuilder().setRunSuccess(res).build();
   }
 
   @RequestFeatureValidator(

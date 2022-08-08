@@ -89,7 +89,7 @@ public interface AccessPolicy {
    * @param id This would be policy-ID that an external/native authorizer
    *           could return.
    */
-  void setPolicyID(String id);
+  void setPolicyName(String id);
 
   String getPolicyID();
 

@@ -423,7 +423,8 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     if (index < 1 || index > repConfig.getRequiredNodes()) {
       throw new IllegalArgumentException("Replica Index in " + setName
           + " for containerID " + containerInfo.getContainerID()
-          + "must be between 1 and " + repConfig.getRequiredNodes());
+          + "must be between 1 and " + repConfig.getRequiredNodes()
+          + ". But the given index is: " + index);
     }
   }
 }
