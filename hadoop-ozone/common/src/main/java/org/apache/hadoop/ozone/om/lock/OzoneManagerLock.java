@@ -148,6 +148,7 @@ public class OzoneManagerLock implements OmLock {
     return lock(resource, resourceName, manager::readLock, READ_LOCK);
   }
 
+  @Override
   public boolean acquireReadHashedLock(Resource resource, String resourceName) {
     return lock(resource, resourceName, manager::readLock, READ_LOCK);
   }
@@ -175,6 +176,7 @@ public class OzoneManagerLock implements OmLock {
     return lock(resource, resourceName, manager::writeLock, WRITE_LOCK);
   }
 
+  @Override
   public boolean acquireWriteHashedLock(Resource resource,
                                         String resourceName) {
     return lock(resource, resourceName, manager::writeLock, WRITE_LOCK);
@@ -253,6 +255,7 @@ public class OzoneManagerLock implements OmLock {
    * @param resource
    * @param resources
    */
+  @Override
   public String generateResourceName(Resource resource, String... resources) {
     if (resources.length == 1 && resource != Resource.BUCKET_LOCK) {
       return OzoneManagerLockUtil.generateResourceLockName(resource,
@@ -402,6 +405,7 @@ public class OzoneManagerLock implements OmLock {
     unlock(resource, resourceName, manager::writeUnlock, WRITE_LOCK);
   }
 
+  @Override
   public void releaseWriteHashedLock(Resource resource, String resourceName) {
     unlock(resource, resourceName, manager::writeUnlock, WRITE_LOCK);
   }
@@ -420,6 +424,7 @@ public class OzoneManagerLock implements OmLock {
     unlock(resource, resourceName, manager::readUnlock, READ_LOCK);
   }
 
+  @Override
   public void releaseReadHashedLock(Resource resource, String resourceName) {
     unlock(resource, resourceName, manager::readUnlock, READ_LOCK);
   }
