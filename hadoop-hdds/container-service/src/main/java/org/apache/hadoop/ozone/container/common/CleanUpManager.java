@@ -71,13 +71,15 @@ public class CleanUpManager {
     //(String) path of /tmp from the datanode config
     String tmpDir = datanodeConf.getTmpDeleteDirectoryPath();
 
+    String clusterId = hddsVolume.getClusterID();
+
     // HddsVolume root directory path
     String hddsRoot = hddsVolume.getHddsRootDir().toString();
 
     // HddsVolume path
     String volPath = HddsVolumeUtil.getHddsRoot(hddsRoot);
 
-    tmpPath = volPath + tmpDir;
+    tmpPath = volPath + "/" + clusterId + tmpDir;
     Path tmpDirPath = Paths.get(tmpPath);
 
     if (Files.notExists(tmpDirPath)) {
@@ -128,7 +130,7 @@ public class CleanUpManager {
   public boolean tmpDirIsEmpty() {
     ListIterator<File> leftoversListIt = getDeleteLeftovers();
 
-    return leftoversListIt.hasNext();
+    return !leftoversListIt.hasNext();
   }
 
   /**
