@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 import java.util.regex.Pattern;
 
@@ -30,8 +29,8 @@ import java.util.regex.Pattern;
  * Validator to check if replication config is enabled.
  */
 @ConfigGroup(prefix = "ozone.replication")
-public class ReplicationConfigValidator { //For Legacy replication type: standalone, RETIS
-
+public class ReplicationConfigValidator {
+  //For Legacy replication type: standalone, RETIS
   @Config(key = "allowed-configs",
       defaultValue = "^((STANDALONE|RATIS)/(ONE|THREE))|(EC/(3-2|6-3|10-4))$",
       type = ConfigType.STRING,
