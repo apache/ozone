@@ -197,6 +197,29 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   }
 
   /**
+   * Gets a set containing all maintenance only indexes. These are replicas
+   * that are only on maintenance nodes, without any copies on healthy nodes.
+   *
+   * @param includePendingAdd true if any indexes that are pending an add
+   * {@link ContainerReplicaOp.PendingOpType#ADD} should be excluded
+   * @return set containing maintenance only indexes or empty set if none are
+   * in maintenance
+   */
+  public Set<Integer> maintenanceOnlyIndexes(boolean includePendingAdd) {
+    Set<Integer> maintenanceOnlyIndexes =
+        new HashSet<>(maintenanceOnlyIndexes());
+
+    // Now we have a set of maintenance only indexes. Remove any pending add
+    // as they should eventually recover.
+    if (includePendingAdd) {
+      for (Integer i : pendingAdd) {
+        maintenanceOnlyIndexes.remove(i);
+      }
+    }
+    return maintenanceOnlyIndexes;
+  }
+
+  /**
    * Return true if there are insufficient replicas to recover this container.
    * Ie, less than EC Datanum containers are present.
    * @return True if the container cannot be recovered, false otherwise.
@@ -280,8 +303,8 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
    * copied to an in-service node to meet the redundancy guarantee.
    * @return
    */
-  public int additionalMaintenanceCopiesNeeded() {
-    List<Integer> maintenanceOnly = maintenanceOnlyIndexes();
+  public int additionalMaintenanceCopiesNeeded(boolean includePendingAdd) {
+    Set<Integer> maintenanceOnly = maintenanceOnlyIndexes(includePendingAdd);
     return Math.max(0, maintenanceOnly.size() - getMaxMaintenance());
   }
 
