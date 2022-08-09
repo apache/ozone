@@ -71,8 +71,6 @@ public final class DBStoreBuilder {
   // DB PKIProfile used by ROCKDB instances.
   public static final DBProfile HDDS_DEFAULT_DB_PROFILE = DBProfile.DISK;
 
-  // the DBOptions used if the caller does not specify.
-  private final ManagedDBOptions defaultDBOptions;
   // The DBOptions specified by the caller.
   private ManagedDBOptions rocksDBOption;
   // The column family options that will be used for any column families
@@ -90,6 +88,7 @@ public final class DBStoreBuilder {
   private RocksDBConfiguration rocksDBConfiguration;
   // Flag to indicate if the RocksDB should be opened readonly.
   private boolean openReadOnly = false;
+  private final DBProfile defaultCfProfile;
 
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
@@ -130,12 +129,9 @@ public final class DBStoreBuilder {
 
     // Get default DBOptions and ColumnFamilyOptions from the default DB
     // profile.
-    DBProfile dbProfile = this.configuration.getEnum(HDDS_DB_PROFILE,
+    defaultCfProfile = this.configuration.getEnum(HDDS_DB_PROFILE,
           HDDS_DEFAULT_DB_PROFILE);
-    LOG.debug("Default DB profile:{}", dbProfile);
-
-    defaultDBOptions = dbProfile.getDBOptions();
-    setDefaultCFOptions(dbProfile.getColumnFamilyOptions());
+    LOG.debug("Default DB profile:{}", defaultCfProfile);
   }
 
   private void applyDBDefinition(DBDefinition definition) {
@@ -177,20 +173,24 @@ public final class DBStoreBuilder {
 
     Set<TableConfig> tableConfigs = makeTableConfigs();
 
-    if (rocksDBOption == null) {
-      rocksDBOption = getDefaultDBOptions(tableConfigs);
+    try {
+      if (rocksDBOption == null) {
+        rocksDBOption = getDefaultDBOptions(tableConfigs);
+      }
+
+      ManagedWriteOptions writeOptions = new ManagedWriteOptions();
+      writeOptions.setSync(rocksDBConfiguration.getSyncOption());
+
+      File dbFile = getDBFile();
+      if (!dbFile.getParentFile().exists()) {
+        throw new IOException("The DB destination directory should exist.");
+      }
+
+      return new RDBStore(dbFile, rocksDBOption, writeOptions, tableConfigs,
+          registry, openReadOnly);
+    } finally {
+      tableConfigs.forEach(TableConfig::close);
     }
-
-    ManagedWriteOptions writeOptions = new ManagedWriteOptions();
-    writeOptions.setSync(rocksDBConfiguration.getSyncOption());
-
-    File dbFile = getDBFile();
-    if (!dbFile.getParentFile().exists()) {
-      throw new IOException("The DB destination directory should exist.");
-    }
-
-    return new RDBStore(dbFile, rocksDBOption, writeOptions, tableConfigs,
-        registry, openReadOnly);
   }
 
   public DBStoreBuilder setName(String name) {
@@ -256,7 +256,7 @@ public final class DBStoreBuilder {
 
     // If default column family was not added, add it with the default options.
     cfOptions.putIfAbsent(DEFAULT_COLUMN_FAMILY_NAME,
-        defaultCfOptions);
+        getDefaultCfOptions());
 
     for (Map.Entry<String, ManagedColumnFamilyOptions> entry:
         cfOptions.entrySet()) {
@@ -265,13 +265,20 @@ public final class DBStoreBuilder {
 
       if (options == null) {
         LOG.debug("using default column family options for table: {}", name);
-        tableConfigs.add(new TableConfig(name, defaultCfOptions));
+        tableConfigs.add(new TableConfig(name, getDefaultCfOptions()));
       } else {
         tableConfigs.add(new TableConfig(name, options));
       }
     }
 
     return tableConfigs;
+  }
+
+  private ManagedColumnFamilyOptions getDefaultCfOptions() {
+    if (defaultCfOptions != null) {
+      return defaultCfOptions;
+    }
+    return defaultCfProfile.getColumnFamilyOptions();
   }
 
   /**
@@ -294,7 +301,7 @@ public final class DBStoreBuilder {
     ManagedDBOptions dbOptions = getDBOptionsFromFile(tableConfigs);
 
     if (dbOptions == null) {
-      dbOptions = defaultDBOptions;
+      dbOptions = defaultCfProfile.getDBOptions();
       LOG.debug("Using RocksDB DBOptions from default profile.");
     }
 
@@ -348,6 +355,8 @@ public final class DBStoreBuilder {
           }
         } catch (IOException ex) {
           LOG.info("Unable to read RocksDB DBOptions from {}", dbname, ex);
+        } finally {
+          columnFamilyDescriptors.forEach(d -> d.getOptions().close());
         }
       }
     }
