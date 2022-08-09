@@ -341,12 +341,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquireLock) {
-        try {
-          ozoneLockStrategy.releaseWriteLock(omMetadataManager, volumeName,
-              bucketName, keyName);
-        } catch (IOException e) {
-          e.printStackTrace();
-        }
+        ozoneLockStrategy.releaseWriteLock(omMetadataManager, volumeName,
+            bucketName, keyName);
       }
     }
 
