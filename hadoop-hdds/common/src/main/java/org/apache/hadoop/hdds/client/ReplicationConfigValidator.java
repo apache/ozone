@@ -63,7 +63,7 @@ public class ReplicationConfigValidator {
         }
         throw new IllegalArgumentException("Invalid replication config " +
             "for type " + replicationConfig.getReplicationType() +
-            " and replication " + replication + ", Supported data-parity are 3-2,6-3,10-4");
+            " and replication " + replication + ". Supported data-parity are 3-2,6-3,10-4");
       }
     }
     return replicationConfig;
