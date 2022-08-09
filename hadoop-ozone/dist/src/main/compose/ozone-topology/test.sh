@@ -27,6 +27,8 @@ execute_robot_test scm basic/basic.robot
 
 execute_robot_test scm topology/cli.robot
 
+execute_robot_test scm recon
+
 # Ensure data can be read even when a full rack
 # is stopped.
 execute_robot_test scm topology/loaddata.robot
