@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -55,8 +54,6 @@ import static org.apache.hadoop.ozone.om.KeyManagerImpl.getRemoteUser;
 import static org.apache.hadoop.ozone.om.OzoneManager.getS3Auth;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -396,7 +393,7 @@ public class OmMReader implements Auditor {
       checkAcls(ResourceType.BUCKET, StoreType.OZONE, type,
           volumeName, bucketName, null, userGroupInformation,
           remoteAddress, hostName, true,
-          getVolumeOwner(volumeName, type, ResourceType.BUCKET));
+          ozoneManager.getVolumeOwner(volumeName, type, ResourceType.BUCKET));
     }
 
     return resolveBucketLink(
@@ -449,8 +446,8 @@ public class OmMReader implements Auditor {
     }
 
     InetAddress remoteIp = ProtobufRpcEngine.Server.getRemoteIp();
-    String volumeOwner = getVolumeOwner(vol, acl, resType);
-    String bucketOwner = getBucketOwner(vol, bucket, acl, resType);
+    String volumeOwner = ozoneManager.getVolumeOwner(vol, acl, resType);
+    String bucketOwner = ozoneManager.getBucketOwner(vol, bucket, acl, resType);
 
     OzoneAclUtils.checkAllAcls(this, resType, store, acl,
         vol, bucket, key, volumeOwner, bucketOwner,
@@ -526,89 +523,6 @@ public class OmMReader implements Auditor {
     }
   }
 
-
-  public String getVolumeOwner(String vol, ACLType type, ResourceType resType)
-      throws OMException {
-    String volOwnerName = null;
-    if (!vol.equals(OzoneConsts.OZONE_ROOT) &&
-        !(type == ACLType.CREATE && resType == ResourceType.VOLUME)) {
-      volOwnerName = getVolumeOwner(vol);
-    }
-    return volOwnerName;
-  }
-
-  private String getVolumeOwner(String volume) throws OMException {
-    Boolean lockAcquired = metadataManager.getLock().acquireReadLock(
-        VOLUME_LOCK, volume);
-    String dbVolumeKey = metadataManager.getVolumeKey(volume);
-    OmVolumeArgs volumeArgs = null;
-    try {
-      volumeArgs = metadataManager.getVolumeTable().get(dbVolumeKey);
-    } catch (IOException ioe) {
-      if (ioe instanceof OMException) {
-        throw (OMException)ioe;
-      } else {
-        throw new OMException("getVolumeOwner for Volume " + volume + " failed",
-            ResultCodes.INTERNAL_ERROR);
-      }
-    } finally {
-      if (lockAcquired) {
-        metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volume);
-      }
-    }
-    if (volumeArgs != null) {
-      return volumeArgs.getOwnerName();
-    } else {
-      throw new OMException("Volume " + volume + " is not found",
-          OMException.ResultCodes.VOLUME_NOT_FOUND);
-    }
-  }
-
-  /**
-   * Return the owner of a given bucket.
-   *
-   * @return String
-   */
-  public String getBucketOwner(String volume, String bucket, ACLType type,
-       ResourceType resType) throws OMException {
-    String bucketOwner = null;
-    if ((resType != ResourceType.VOLUME) &&
-        !(type == ACLType.CREATE && resType == ResourceType.BUCKET)) {
-      bucketOwner = getBucketOwner(volume, bucket);
-    }
-    return bucketOwner;
-  }
-
-  private String getBucketOwner(String volume, String bucket)
-      throws OMException {
-
-    Boolean lockAcquired = metadataManager.getLock().acquireReadLock(
-            BUCKET_LOCK, volume, bucket);
-    String dbBucketKey = metadataManager.getBucketKey(volume, bucket);
-    OmBucketInfo bucketInfo = null;
-    try {
-      bucketInfo = metadataManager.getBucketTable().get(dbBucketKey);
-    } catch (IOException ioe) {
-      if (ioe instanceof OMException) {
-        throw (OMException)ioe;
-      } else {
-        throw new OMException("getBucketOwner for Bucket " + volume + "/" +
-            bucket  + " failed: " + ioe.getMessage(),
-            ResultCodes.INTERNAL_ERROR);
-      }
-    } finally {
-      if (lockAcquired) {
-        metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volume, bucket);
-      }
-    }
-    if (bucketInfo != null) {
-      return bucketInfo.getOwner();
-    } else {
-      throw new OMException("Bucket not found", ResultCodes.BUCKET_NOT_FOUND);
-    }
-  }
-
-  
   /**
    * Returns an instance of {@link IAccessAuthorizer}.
    * Looks up the configuration to see if there is custom class specified.

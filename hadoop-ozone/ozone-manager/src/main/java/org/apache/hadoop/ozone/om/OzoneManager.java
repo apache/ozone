@@ -260,6 +260,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.getRaftGroupIdFromOmServiceId;
@@ -2342,10 +2343,91 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           UserGroupInformation.createRemoteUser(userName),
           ProtobufRpcEngine.Server.getRemoteIp(),
           ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
-          false, omMReader.getVolumeOwner(vol, acl, resType));
+          false, getVolumeOwner(vol, acl, resType));
     } catch (OMException ex) {
       // Should not trigger exception here at all
       return false;
+    }
+  }
+
+  public String getVolumeOwner(String vol, ACLType type, ResourceType resType)
+      throws OMException {
+    String volOwnerName = null;
+    if (!vol.equals(OzoneConsts.OZONE_ROOT) &&
+        !(type == ACLType.CREATE && resType == ResourceType.VOLUME)) {
+      volOwnerName = getVolumeOwner(vol);
+    }
+    return volOwnerName;
+  }
+
+  private String getVolumeOwner(String volume) throws OMException {
+    Boolean lockAcquired = metadataManager.getLock().acquireReadLock(
+        VOLUME_LOCK, volume);
+    String dbVolumeKey = metadataManager.getVolumeKey(volume);
+    OmVolumeArgs volumeArgs = null;
+    try {
+      volumeArgs = metadataManager.getVolumeTable().get(dbVolumeKey);
+    } catch (IOException ioe) {
+      if (ioe instanceof OMException) {
+        throw (OMException)ioe;
+      } else {
+        throw new OMException("getVolumeOwner for Volume " + volume + " failed",
+            ResultCodes.INTERNAL_ERROR);
+      }
+    } finally {
+      if (lockAcquired) {
+        metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volume);
+      }
+    }
+    if (volumeArgs != null) {
+      return volumeArgs.getOwnerName();
+    } else {
+      throw new OMException("Volume " + volume + " is not found",
+          OMException.ResultCodes.VOLUME_NOT_FOUND);
+    }
+  }
+
+  /**
+   * Return the owner of a given bucket.
+   *
+   * @return String
+   */
+  public String getBucketOwner(String volume, String bucket, ACLType type,
+       ResourceType resType) throws OMException {
+    String bucketOwner = null;
+    if ((resType != ResourceType.VOLUME) &&
+        !(type == ACLType.CREATE && resType == ResourceType.BUCKET)) {
+      bucketOwner = getBucketOwner(volume, bucket);
+    }
+    return bucketOwner;
+  }
+
+  private String getBucketOwner(String volume, String bucket)
+      throws OMException {
+
+    Boolean lockAcquired = metadataManager.getLock().acquireReadLock(
+            BUCKET_LOCK, volume, bucket);
+    String dbBucketKey = metadataManager.getBucketKey(volume, bucket);
+    OmBucketInfo bucketInfo = null;
+    try {
+      bucketInfo = metadataManager.getBucketTable().get(dbBucketKey);
+    } catch (IOException ioe) {
+      if (ioe instanceof OMException) {
+        throw (OMException)ioe;
+      } else {
+        throw new OMException("getBucketOwner for Bucket " + volume + "/" +
+            bucket  + " failed: " + ioe.getMessage(),
+            ResultCodes.INTERNAL_ERROR);
+      }
+    } finally {
+      if (lockAcquired) {
+        metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volume, bucket);
+      }
+    }
+    if (bucketInfo != null) {
+      return bucketInfo.getOwner();
+    } else {
+      throw new OMException("Bucket not found", ResultCodes.BUCKET_NOT_FOUND);
     }
   }
 

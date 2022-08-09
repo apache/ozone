@@ -359,8 +359,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (ozoneManager.getAclsEnabled()) {
       checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE,
           aclType, volume, bucket, key, volumeOwner,
-          ozoneManager.getOmMReader()
-          .getBucketOwner(volume, bucket, aclType, resourceType));
+          ozoneManager.getBucketOwner(volume, bucket, aclType, resourceType));
     }
   }
 
