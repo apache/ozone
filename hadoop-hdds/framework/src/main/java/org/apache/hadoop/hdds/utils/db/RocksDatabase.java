@@ -77,11 +77,20 @@ public final class RocksDatabase {
    *
    * @return a list of column families.
    */
-  private static List<TableConfig> getColumnFamilies(File file)
-      throws RocksDBException {
+  private static List<TableConfig> getColumnFamilies(
+      File file, Set<TableConfig> families) throws RocksDBException {
+
+    // This logic has been added to support old column families that have
+    // been removed, or those that may have been created in a future version.
+    // TODO : Revisit this logic during upgrade implementation.
+    Set<String> existingFamilyNames = families.stream()
+        .map(TableConfig::getName)
+        .collect(Collectors.toSet());
     final List<TableConfig> columnFamilies = listColumnFamiliesEmptyOptions(
         file.getAbsolutePath())
         .stream()
+        .map(TableConfig::toName)
+        .filter(name -> !existingFamilyNames.contains(name))
         .map(TableConfig::newTableConfig)
         .collect(Collectors.toList());
     if (LOG.isDebugEnabled()) {
@@ -112,12 +121,8 @@ public final class RocksDatabase {
     ManagedRocksDB db = null;
     final Map<String, ColumnFamily> columnFamilies = new HashMap<>();
     try {
-      // This logic has been added to support old column families that have
-      // been removed, or those that may have been created in a future version.
-      // TODO : Revisit this logic during upgrade implementation.
-      final Stream<TableConfig> extra = getColumnFamilies(dbFile).stream()
-          .filter(extraColumnFamily(families));
-      descriptors = Stream.concat(families.stream(), extra)
+      final List<TableConfig> extra = getColumnFamilies(dbFile, families);
+      descriptors = Stream.concat(families.stream(), extra.stream())
           .map(TableConfig::getDescriptor)
           .collect(Collectors.toList());
 
@@ -183,16 +188,6 @@ public final class RocksDatabase {
     } catch (Throwable t) {
       LOG.error("Failed to close " + name, t);
     }
-  }
-
-  static Predicate<TableConfig> extraColumnFamily(Set<TableConfig> families) {
-    return f -> {
-      if (families.contains(f)) {
-        return false;
-      }
-      LOG.info("Found an extra column family in existing DB: {}", f);
-      return true;
-    };
   }
 
   public boolean isClosed() {
