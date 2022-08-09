@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -153,24 +152,11 @@ public class TestSimpleContainerDownloader {
     //GIVEN
     List<DatanodeDetails> datanodes = createDatanodes();
 
-    // Default container copy directory
+    // Spread container copy directory
     OzoneConfiguration conf = new OzoneConfiguration();
     VolumeSet volumeSet = getVolumeSet(datanodes.get(0), conf);
 
     SimpleContainerDownloader downloader =
-        new SimpleContainerDownloader(conf, null, volumeSet);
-
-    Assert.assertEquals(downloader.getWorkingDirectory(),
-        Paths.get(System.getProperty("java.io.tmpdir"))
-            .resolve(SimpleContainerDownloader.CONTAINER_COPY_DIR));
-
-    // Spread container copy directory
-    conf = new OzoneConfiguration();
-    conf.setBoolean(OzoneConfigKeys.OZONE_CONTAINER_COPY_SPREAD_VOLUMES_ENABLED,
-        true);
-    volumeSet = getVolumeSet(datanodes.get(0), conf);
-
-    downloader =
         new SimpleContainerDownloader(conf, null, volumeSet);
 
     Path firstDi = downloader.getWorkingDirectory();

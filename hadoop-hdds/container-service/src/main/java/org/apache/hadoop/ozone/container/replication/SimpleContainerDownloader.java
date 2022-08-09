@@ -65,7 +65,6 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   private Path defaultWorkingDirectory;
   private final SecurityConfig securityConfig;
   private final CertificateClient certClient;
-  private final boolean spreadVolumes;
   private final VolumeSet volumeSet;
   private VolumeChoosingPolicy volumeChoosingPolicy = null;
   private long containerSize;
@@ -79,21 +78,16 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     securityConfig = new SecurityConfig(conf);
     this.certClient = certClient;
     this.volumeSet = volumeSet;
-    this.spreadVolumes = conf.getBoolean(
-        OzoneConfigKeys.OZONE_CONTAINER_COPY_SPREAD_VOLUMES_ENABLED,
-        OzoneConfigKeys.OZONE_CONTAINER_COPY_SPREAD_VOLUMES_ENABLED_DEFAULT);
-    if (spreadVolumes) {
-      try {
-        this.volumeChoosingPolicy = conf.getClass(
-            HDDS_DATANODE_VOLUME_CHOOSING_POLICY, RoundRobinVolumeChoosingPolicy
-                .class, VolumeChoosingPolicy.class).newInstance();
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-      this.containerSize = (long) conf.getStorageSize(
-          ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-          ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+    try {
+      this.volumeChoosingPolicy = conf.getClass(
+          HDDS_DATANODE_VOLUME_CHOOSING_POLICY, RoundRobinVolumeChoosingPolicy
+              .class, VolumeChoosingPolicy.class).newInstance();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
+    this.containerSize = (long) conf.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
   }
 
   @Override
@@ -175,18 +169,16 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   }
 
   public Path getWorkingDirectory() {
-    if (spreadVolumes) {
-      try {
-        // Use containerSize * 2 to store source and dest file
-        HddsVolume volume = volumeChoosingPolicy.chooseVolume(
-            StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-            containerSize * 2);
-        return Paths.get(volume.getStorageDir().getAbsolutePath()).
-            resolve(CONTAINER_COPY_DIR);
-      } catch (IOException e) {
-        LOG.error("Exception when spreading copy directory, using default " +
-            "working directory", e);
-      }
+    try {
+      // Use containerSize * 2 to store source and dest file
+      HddsVolume volume = volumeChoosingPolicy.chooseVolume(
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
+          containerSize * 2);
+      return Paths.get(volume.getStorageDir().getAbsolutePath()).
+          resolve(CONTAINER_COPY_DIR);
+    } catch (IOException e) {
+      LOG.error("Exception when spreading copy directory, using default " +
+          "working directory", e);
     }
     return defaultWorkingDirectory;
   }
