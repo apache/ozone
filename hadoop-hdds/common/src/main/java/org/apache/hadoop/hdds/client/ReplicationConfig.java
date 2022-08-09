@@ -199,9 +199,9 @@ public interface ReplicationConfig {
           + "be parsed.");
     }
 
-    ReplicationConfigValidator legacyValidator =
-            config.getObject(ReplicationConfigValidator.class);
-    legacyValidator.validate(replicationConfig);
+    ReplicationConfigValidator validator =
+        config.getObject(ReplicationConfigValidator.class);
+    validator.validate(replicationConfig);
 
     return replicationConfig;
   }

@@ -58,7 +58,7 @@ public class ECReplicationConfig implements ReplicationConfig {
   //   RS-3-2-2048
   //   XOR-10-4-4096K
   private static final Pattern STRING_FORMAT
-      = Pattern.compile("\"([a-zA-Z]+)-(\\\\d+)-(\\\\d+)-(\\\\d+)((?:k|K))?\"");
+      = Pattern.compile("([a-zA-Z]+)-(\\d+)-(\\d+)-(\\d+)((?:k|K))?");
 
   private int data;
 
@@ -92,7 +92,7 @@ public class ECReplicationConfig implements ReplicationConfig {
    * @param string
    */
   public ECReplicationConfig(String string) {
-    final Matcher matcher = STRING_FORMAT.matcher(string.toUpperCase());
+    final Matcher matcher = STRING_FORMAT.matcher(string);
     if (!matcher.matches()) {
       throw new IllegalArgumentException("EC replication config should be " +
           "defined in the form rs-3-2-1024k, rs-6-3-1024; or rs-10-4-1024k." +

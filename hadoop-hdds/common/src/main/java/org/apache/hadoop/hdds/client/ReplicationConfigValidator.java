@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 import java.util.regex.Pattern;
 
@@ -30,6 +31,7 @@ import java.util.regex.Pattern;
  */
 @ConfigGroup(prefix = "ozone.replication")
 public class ReplicationConfigValidator {
+
   @Config(key = "allowed-configs",
       defaultValue = "^((STANDALONE|RATIS)/(ONE|THREE))|(EC/(3-2|6-3|10-4))$",
       type = ConfigType.STRING,
@@ -55,9 +57,9 @@ public class ReplicationConfigValidator {
         if (HddsProtos.ReplicationType.EC ==
                 replicationConfig.getReplicationType()) {
           ECReplicationConfig ecConfig =
-                  (ECReplicationConfig) replicationConfig;
+              (ECReplicationConfig) replicationConfig;
           replication =  ecConfig.getCodec() + "-" + ecConfig.getData() +
-                  "-" + ecConfig.getParity() + "-{CHUNK_SIZE}";
+              "-" + ecConfig.getParity() + "-{CHUNK_SIZE}";
         }
         throw new IllegalArgumentException("Invalid replication config " +
             "for type " + replicationConfig.getReplicationType() +
