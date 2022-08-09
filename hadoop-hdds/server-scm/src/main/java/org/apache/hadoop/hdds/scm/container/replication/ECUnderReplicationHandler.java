@@ -43,6 +43,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -102,14 +103,16 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         new ECContainerReplicaCount(container, replicas, pendingOps,
             remainingMaintenanceRedundancy);
 
-    ContainerHealthResult currentUnderRepRes = ecContainerHealthCheck
+    Optional<ContainerHealthResult> currentUnderRepRes = ecContainerHealthCheck
         .checkHealth(container, replicas, pendingOps,
-            remainingMaintenanceRedundancy);
+            remainingMaintenanceRedundancy,
+            Optional.of(ContainerHealthResult.HealthState.UNDER_REPLICATED));
 
     LOG.debug("Handling under-replicated EC container: {}", container);
-    if (currentUnderRepRes
-        .getHealthState() != ContainerHealthResult.HealthState
-        .UNDER_REPLICATED) {
+    if (currentUnderRepRes.map(containerHealthResult ->
+                    containerHealthResult.getHealthState()
+                    != ContainerHealthResult.HealthState.UNDER_REPLICATED)
+            .orElse(true)) {
       LOG.info("The container {} state changed and it's not in under"
               + " replication any more. Current state is: {}",
           container.getContainerID(), currentUnderRepRes);
@@ -121,7 +124,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
 
     ContainerHealthResult.UnderReplicatedHealthResult containerHealthResult =
         ((ContainerHealthResult.UnderReplicatedHealthResult)
-            currentUnderRepRes);
+            currentUnderRepRes.get());
     if (containerHealthResult.isSufficientlyReplicatedAfterPending()) {
       LOG.info("The container {} with replicas {} is sufficiently replicated",
           container.getContainerID(), replicaCount.getReplicas());

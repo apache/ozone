@@ -32,10 +32,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyMap;
 
@@ -74,23 +75,26 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult result, int remainingMaintenanceRedundancy) {
     ContainerInfo container = result.getContainerInfo();
-    ContainerHealthResult currentUnderRepRes = ecContainerHealthCheck
+    Optional<ContainerHealthResult> currentUnderRepRes = ecContainerHealthCheck
         .checkHealth(container, replicas, pendingOps,
-            remainingMaintenanceRedundancy);
+            remainingMaintenanceRedundancy,
+                Optional.of(ContainerHealthResult.HealthState.OVER_REPLICATED));
     LOG.debug("Handling over-replicated EC container: {}", container);
 
     //sanity check
-    if (currentUnderRepRes.getHealthState() !=
-        ContainerHealthResult.HealthState.OVER_REPLICATED) {
+    if (currentUnderRepRes.map(containerHealthResult ->
+                    containerHealthResult.getHealthState()
+                    != ContainerHealthResult.HealthState.OVER_REPLICATED)
+            .orElse(true)) {
       LOG.info("The container {} state changed and it's not in over"
-              + " replication any more. Current state is: {}",
-          container.getContainerID(), currentUnderRepRes);
+                      + " replication any more. Current state is: {}",
+              container.getContainerID(), currentUnderRepRes);
       return emptyMap();
     }
 
     ContainerHealthResult.OverReplicatedHealthResult containerHealthResult =
         ((ContainerHealthResult.OverReplicatedHealthResult)
-            currentUnderRepRes);
+            currentUnderRepRes.get());
     if (containerHealthResult.isSufficientlyReplicatedAfterPending()) {
       LOG.info("The container {} with replicas {} will be corrected " +
               "by the pending delete", container.getContainerID(), replicas);
@@ -123,8 +127,7 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
         deletionInFlight.add(op.getTarget());
       }
     }
-    Map<Integer, List<ContainerReplica>> index2replicas = new HashMap<>();
-    replicas.stream()
+    Map<Integer, List<ContainerReplica>> index2replicas = replicas.stream()
         .filter(r -> overReplicatedIndexes.contains(r.getReplicaIndex()))
         .filter(r -> r
             .getState() == StorageContainerDatanodeProtocolProtos
@@ -132,16 +135,12 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
         .filter(r -> ReplicationManager
             .getNodeStatus(r.getDatanodeDetails(), nodeManager).isHealthy())
         .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
-        .forEach(r -> {
-          int index = r.getReplicaIndex();
-          index2replicas.computeIfAbsent(index, k -> new LinkedList<>());
-          index2replicas.get(index).add(r);
-        });
+        .collect(Collectors.groupingBy(ContainerReplica::getReplicaIndex));
 
     if (index2replicas.size() > 0) {
       final Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
-      final int replicationFactor =
-          container.getReplicationConfig().getRequiredNodes();
+      final int replicationFactor = replicaCount
+              .getAvailableIndexes(true).size();
       index2replicas.values().forEach(l -> {
         Iterator<ContainerReplica> it = l.iterator();
         Set<ContainerReplica> tempReplicaSet = new HashSet<>(replicas);

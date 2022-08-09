@@ -20,7 +20,10 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -43,7 +46,20 @@ public class ECContainerHealthCheck implements ContainerHealthCheck {
   //        be better handled elsewhere?
 
   @Override
-  public ContainerHealthResult checkHealth(ContainerInfo container,
+  public Optional<ContainerHealthResult> checkHealth(ContainerInfo container,
+        Set<ContainerReplica> replicas,
+        List<ContainerReplicaOp> replicaPendingOps,
+        int remainingRedundancyForMaintenance,
+        Optional<ContainerHealthResult.HealthState> healthStateFilter) {
+    return this.checkHealth(container, replicas, replicaPendingOps,
+            remainingRedundancyForMaintenance).stream()
+            .filter(containerHealthResult ->
+            healthStateFilter.orElse(containerHealthResult.getHealthState())
+            == containerHealthResult.getHealthState()).findFirst();
+  }
+
+  @Override
+  public List<ContainerHealthResult> checkHealth(ContainerInfo container,
       Set<ContainerReplica> replicas,
       List<ContainerReplicaOp> replicaPendingOps,
       int remainingRedundancyForMaintenance) {
@@ -53,7 +69,7 @@ public class ECContainerHealthCheck implements ContainerHealthCheck {
 
     ECReplicationConfig repConfig =
         (ECReplicationConfig) container.getReplicationConfig();
-
+    List<ContainerHealthResult> containerHealthResults = new ArrayList<>();
     if (!replicaCount.isSufficientlyReplicated(false)) {
       List<Integer> missingIndexes = replicaCount.unavailableIndexes(false);
       int remainingRedundancy = repConfig.getParity();
@@ -67,20 +83,23 @@ public class ECContainerHealthCheck implements ContainerHealthCheck {
         dueToDecommission = false;
         remainingRedundancy = repConfig.getParity() - missingIndexes.size();
       }
-      return new ContainerHealthResult.UnderReplicatedHealthResult(
-          container, remainingRedundancy, dueToDecommission,
-          replicaCount.isSufficientlyReplicated(true),
-          replicaCount.isUnrecoverable());
+      containerHealthResults.add(
+              new ContainerHealthResult.UnderReplicatedHealthResult(
+              container, remainingRedundancy, dueToDecommission,
+              replicaCount.isSufficientlyReplicated(true),
+              replicaCount.isUnrecoverable()));
     }
 
     if (replicaCount.isOverReplicated(false)) {
       List<Integer> overRepIndexes = replicaCount.overReplicatedIndexes(false);
-      return new ContainerHealthResult
+      containerHealthResults.add(new ContainerHealthResult
           .OverReplicatedHealthResult(container, overRepIndexes.size(),
-          !replicaCount.isOverReplicated(true));
+          !replicaCount.isOverReplicated(true)));
     }
 
-    // No issues detected, so return healthy.
-    return new ContainerHealthResult.HealthyResult(container);
+    // If No issues detected, return healthy.
+    return containerHealthResults.size() > 0 ? containerHealthResults :
+            Collections
+            .singletonList(new ContainerHealthResult.HealthyResult(container));
   }
 }

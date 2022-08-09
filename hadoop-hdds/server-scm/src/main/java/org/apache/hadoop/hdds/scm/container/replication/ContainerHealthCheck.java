@@ -20,6 +20,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -28,8 +29,14 @@ import java.util.Set;
  */
 public interface ContainerHealthCheck {
 
-  ContainerHealthResult checkHealth(
+  Optional<ContainerHealthResult> checkHealth(
       ContainerInfo container, Set<ContainerReplica> replicas,
       List<ContainerReplicaOp> replicaPendingOps,
-      int remainingRedundancyForMaintenance);
+      int remainingRedundancyForMaintenance,
+      Optional<ContainerHealthResult.HealthState> healthStateFilter);
+
+  List<ContainerHealthResult> checkHealth(
+          ContainerInfo container, Set<ContainerReplica> replicas,
+          List<ContainerReplicaOp> replicaPendingOps,
+          int remainingRedundancyForMaintenance);
 }

@@ -342,6 +342,10 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     return indexes;
   }
 
+  public Set<Integer> getAvailableIndexes(boolean includeDelete) {
+    return getHealthyWithDelete(includeDelete).keySet();
+  }
+
   private Map<Integer, Integer> getHealthyWithDelete(boolean includeDelete) {
     final Map<Integer, Integer> availableIndexes;
     if (includeDelete) {

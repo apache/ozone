@@ -32,6 +32,7 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
@@ -62,9 +63,9 @@ public class TestECContainerHealthCheck {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), 1, 2, 3, 4, 5);
-    ContainerHealthResult result = healthCheck.checkHealth(container, replicas,
-        Collections.emptyList(), 2);
-    Assert.assertEquals(HealthState.HEALTHY, result.getHealthState());
+    Optional<ContainerHealthResult> result = healthCheck.checkHealth(container,
+            replicas, Collections.emptyList(), 2, Optional.empty());
+    Assert.assertEquals(HealthState.HEALTHY, result.get().getHealthState());
   }
 
   @Test
@@ -72,10 +73,14 @@ public class TestECContainerHealthCheck {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), 1, 2, 4, 5);
-    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
-        healthCheck.checkHealth(container, replicas,
-            Collections.emptyList(), 2);
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    List<ContainerHealthResult> results =
+            healthCheck.checkHealth(container, replicas,
+                    Collections.emptyList(), 2);
+    Assert.assertEquals(1, results.size());
+    Assert.assertEquals(HealthState.UNDER_REPLICATED,
+            results.get(0).getHealthState());
+    UnderReplicatedHealthResult result =
+            (UnderReplicatedHealthResult) results.get(0);
     Assert.assertEquals(1, result.getRemainingRedundancy());
     Assert.assertFalse(result.isSufficientlyReplicatedAfterPending());
     Assert.assertFalse(result.underReplicatedDueToDecommission());
@@ -89,9 +94,13 @@ public class TestECContainerHealthCheck {
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(ContainerReplicaOp.create(
         ADD, MockDatanodeDetails.randomDatanodeDetails(), 3));
-    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
-        healthCheck.checkHealth(container, replicas, pending, 2);
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    List<ContainerHealthResult> results =
+            healthCheck.checkHealth(container, replicas, pending, 2);
+    Assert.assertEquals(1, results.size());
+    Assert.assertEquals(HealthState.UNDER_REPLICATED,
+            results.get(0).getHealthState());
+    UnderReplicatedHealthResult result =
+            (UnderReplicatedHealthResult) results.get(0);
     Assert.assertEquals(1, result.getRemainingRedundancy());
     Assert.assertTrue(result.isSufficientlyReplicatedAfterPending());
     Assert.assertFalse(result.underReplicatedDueToDecommission());
@@ -105,10 +114,14 @@ public class TestECContainerHealthCheck {
         Pair.of(IN_SERVICE, 3), Pair.of(DECOMMISSIONING, 4),
         Pair.of(DECOMMISSIONED, 5));
 
-    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
-        healthCheck.checkHealth(container, replicas, Collections.emptyList(),
-            2);
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    List<ContainerHealthResult> results =
+            healthCheck.checkHealth(container, replicas,
+                    Collections.emptyList(), 2);
+    Assert.assertEquals(1, results.size());
+    Assert.assertEquals(HealthState.UNDER_REPLICATED,
+            results.get(0).getHealthState());
+    UnderReplicatedHealthResult result =
+            (UnderReplicatedHealthResult) results.get(0);
     Assert.assertEquals(2, result.getRemainingRedundancy());
     Assert.assertFalse(result.isSufficientlyReplicatedAfterPending());
     Assert.assertTrue(result.underReplicatedDueToDecommission());
@@ -125,9 +138,14 @@ public class TestECContainerHealthCheck {
     pending.add(ContainerReplicaOp.create(
         ADD, MockDatanodeDetails.randomDatanodeDetails(), 5));
 
-    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
-        healthCheck.checkHealth(container, replicas, pending, 2);
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    List<ContainerHealthResult> results =
+            healthCheck.checkHealth(container, replicas,
+                    pending, 2);
+    Assert.assertEquals(1, results.size());
+    Assert.assertEquals(HealthState.UNDER_REPLICATED,
+            results.get(0).getHealthState());
+    UnderReplicatedHealthResult result =
+            (UnderReplicatedHealthResult) results.get(0);
     Assert.assertEquals(2, result.getRemainingRedundancy());
     Assert.assertTrue(result.isSufficientlyReplicatedAfterPending());
     Assert.assertTrue(result.underReplicatedDueToDecommission());
@@ -143,9 +161,13 @@ public class TestECContainerHealthCheck {
     pending.add(ContainerReplicaOp.create(
         ADD, MockDatanodeDetails.randomDatanodeDetails(), 3));
 
-    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
-        healthCheck.checkHealth(container, replicas, pending, 2);
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    List<ContainerHealthResult> results =
+            healthCheck.checkHealth(container, replicas, pending, 2);
+    Assert.assertEquals(1, results.size());
+    Assert.assertEquals(HealthState.UNDER_REPLICATED,
+            results.get(0).getHealthState());
+    UnderReplicatedHealthResult result =
+            (UnderReplicatedHealthResult) results.get(0);
     Assert.assertEquals(1, result.getRemainingRedundancy());
     Assert.assertFalse(result.isSufficientlyReplicatedAfterPending());
     Assert.assertFalse(result.underReplicatedDueToDecommission());
@@ -157,10 +179,14 @@ public class TestECContainerHealthCheck {
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2));
 
-    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
+    List<ContainerHealthResult> results =
         healthCheck.checkHealth(container, replicas,
             Collections.emptyList(), 2);
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    Assert.assertEquals(1, results.size());
+    Assert.assertEquals(HealthState.UNDER_REPLICATED,
+            results.get(0).getHealthState());
+    UnderReplicatedHealthResult result =
+            (UnderReplicatedHealthResult) results.get(0);
     Assert.assertEquals(-1, result.getRemainingRedundancy());
     Assert.assertFalse(result.isSufficientlyReplicatedAfterPending());
     Assert.assertFalse(result.underReplicatedDueToDecommission());
@@ -182,9 +208,13 @@ public class TestECContainerHealthCheck {
     pending.add(ContainerReplicaOp.create(
         DELETE, MockDatanodeDetails.randomDatanodeDetails(), 2));
 
-    OverReplicatedHealthResult result = (OverReplicatedHealthResult)
+    List<ContainerHealthResult> results =
         healthCheck.checkHealth(container, replicas, pending, 2);
-    Assert.assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
+    Assert.assertEquals(1, results.size());
+    OverReplicatedHealthResult result =
+            (OverReplicatedHealthResult)results.get(0);
+    Assert.assertEquals(HealthState.OVER_REPLICATED,
+            results.get(0).getHealthState());
     Assert.assertEquals(2, result.getExcessRedundancy());
     Assert.assertTrue(result.isSufficientlyReplicatedAfterPending());
   }
@@ -198,9 +228,9 @@ public class TestECContainerHealthCheck {
         Pair.of(IN_SERVICE, 5),
         Pair.of(IN_MAINTENANCE, 1), Pair.of(IN_MAINTENANCE, 2));
 
-    ContainerHealthResult result = healthCheck.checkHealth(container, replicas,
-        Collections.emptyList(), 2);
-    Assert.assertEquals(HealthState.HEALTHY, result.getHealthState());
+    Optional<ContainerHealthResult> result = healthCheck.checkHealth(container,
+            replicas, Collections.emptyList(), 2, Optional.empty());
+    Assert.assertEquals(HealthState.HEALTHY, result.get().getHealthState());
   }
 
   @Test
@@ -211,11 +241,19 @@ public class TestECContainerHealthCheck {
         Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2));
 
-    ContainerHealthResult result = healthCheck.checkHealth(container, replicas,
-        Collections.emptyList(), 2);
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    List<ContainerHealthResult> results = healthCheck.checkHealth(container,
+            replicas, Collections.emptyList(), 2);
+    Assert.assertEquals(2, results.size());
+    Assert.assertEquals(HealthState.UNDER_REPLICATED,
+            results.get(0).getHealthState());
     Assert.assertEquals(1,
-        ((UnderReplicatedHealthResult)result).getRemainingRedundancy());
+        ((UnderReplicatedHealthResult)results.get(0)).getRemainingRedundancy());
+    Assert.assertEquals(HealthState.OVER_REPLICATED,
+            results.get(1).getHealthState());
+    OverReplicatedHealthResult result =
+            (OverReplicatedHealthResult)results.get(1);
+    Assert.assertEquals(2, result.getExcessRedundancy());
+    Assert.assertFalse(result.isSufficientlyReplicatedAfterPending());
   }
 
 }

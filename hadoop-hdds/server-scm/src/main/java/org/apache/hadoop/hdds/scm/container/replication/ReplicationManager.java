@@ -52,6 +52,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -382,7 +383,8 @@ public class ReplicationManager implements SCMService {
     return scmContext.getTermOfLeader();
   }
 
-  protected ContainerHealthResult processContainer(ContainerInfo containerInfo,
+  protected List<ContainerHealthResult> processContainer(
+      ContainerInfo containerInfo,
       Queue<ContainerHealthResult.UnderReplicatedHealthResult> underRep,
       Queue<ContainerHealthResult.OverReplicatedHealthResult> overRep,
       ReplicationManagerReport report) throws ContainerNotFoundException {
@@ -396,40 +398,44 @@ public class ReplicationManager implements SCMService {
         report.incrementAndSample(
             HealthState.OPEN_UNHEALTHY, containerID);
         eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
-        return new ContainerHealthResult.UnHealthyResult(containerInfo);
+        return Collections.singletonList(
+               new ContainerHealthResult.UnHealthyResult(containerInfo));
       }
-      return new ContainerHealthResult.HealthyResult(containerInfo);
+      return Collections.singletonList(
+             new ContainerHealthResult.HealthyResult(containerInfo));
     }
 
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerID);
-    ContainerHealthResult health = ecContainerHealthCheck
+    List<ContainerHealthResult> healthResults = ecContainerHealthCheck
         .checkHealth(containerInfo, replicas, pendingOps, 0);
       // TODO - should the report have a HEALTHY state, rather than just bad
       //        states? It would need to be added to legacy RM too.
-    if (health.getHealthState()
-        == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
-      report.incrementAndSample(HealthState.UNDER_REPLICATED, containerID);
-      ContainerHealthResult.UnderReplicatedHealthResult underHealth
-          = ((ContainerHealthResult.UnderReplicatedHealthResult) health);
-      if (underHealth.isUnrecoverable()) {
-        // TODO - do we need a new health state for unrecoverable EC?
-        report.incrementAndSample(HealthState.MISSING, containerID);
-      }
-      if (!underHealth.isSufficientlyReplicatedAfterPending() &&
-          !underHealth.isUnrecoverable()) {
-        underRep.add(underHealth);
-      }
-    } else if (health.getHealthState()
-        == ContainerHealthResult.HealthState.OVER_REPLICATED) {
-      report.incrementAndSample(HealthState.OVER_REPLICATED, containerID);
-      ContainerHealthResult.OverReplicatedHealthResult overHealth
-          = ((ContainerHealthResult.OverReplicatedHealthResult) health);
-      if (!overHealth.isSufficientlyReplicatedAfterPending()) {
-        overRep.add(overHealth);
+    for (ContainerHealthResult health: healthResults) {
+      if (health.getHealthState()
+          == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
+        report.incrementAndSample(HealthState.UNDER_REPLICATED, containerID);
+        ContainerHealthResult.UnderReplicatedHealthResult underHealth
+            = ((ContainerHealthResult.UnderReplicatedHealthResult) health);
+        if (underHealth.isUnrecoverable()) {
+          // TODO - do we need a new health state for unrecoverable EC?
+          report.incrementAndSample(HealthState.MISSING, containerID);
+        }
+        if (!underHealth.isSufficientlyReplicatedAfterPending() &&
+            !underHealth.isUnrecoverable()) {
+          underRep.add(underHealth);
+        }
+      } else if (health.getHealthState()
+          == ContainerHealthResult.HealthState.OVER_REPLICATED) {
+        report.incrementAndSample(HealthState.OVER_REPLICATED, containerID);
+        ContainerHealthResult.OverReplicatedHealthResult overHealth
+            = ((ContainerHealthResult.OverReplicatedHealthResult) health);
+        if (!overHealth.isSufficientlyReplicatedAfterPending()) {
+          overRep.add(overHealth);
+        }
       }
     }
-    return health;
+    return healthResults;
   }
 
   /**
