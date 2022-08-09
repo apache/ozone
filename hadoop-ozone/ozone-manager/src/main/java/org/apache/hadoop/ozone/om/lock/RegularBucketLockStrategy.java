@@ -33,12 +33,16 @@ public class RegularBucketLockStrategy implements OzoneLockStrategy {
   @Override
   public boolean acquireWriteLock(OMMetadataManager omMetadataManager,
                                   String volumeName, String bucketName,
-                                  String keyName) throws IOException {
+                                  String keyName) {
     boolean acquiredLock;
 
     acquiredLock = omMetadataManager.getLock()
         .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName);
-    OMFileRequest.validateBucket(omMetadataManager, volumeName, bucketName);
+    try {
+      OMFileRequest.validateBucket(omMetadataManager, volumeName, bucketName);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
 
     return acquiredLock;
   }
@@ -46,7 +50,7 @@ public class RegularBucketLockStrategy implements OzoneLockStrategy {
   @Override
   public void releaseWriteLock(OMMetadataManager omMetadataManager,
                                String volumeName, String bucketName,
-                               String keyName) throws IOException {
+                               String keyName) {
     omMetadataManager.getLock()
         .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName);
 
@@ -56,12 +60,16 @@ public class RegularBucketLockStrategy implements OzoneLockStrategy {
   @Override
   public boolean acquireReadLock(OMMetadataManager omMetadataManager,
                                  String volumeName, String bucketName,
-                                 String keyName) throws IOException {
+                                 String keyName) {
     boolean acquiredLock;
 
     acquiredLock = omMetadataManager.getLock()
         .acquireReadLock(BUCKET_LOCK, volumeName, bucketName);
-    OMFileRequest.validateBucket(omMetadataManager, volumeName, bucketName);
+    try {
+      OMFileRequest.validateBucket(omMetadataManager, volumeName, bucketName);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
 
     return acquiredLock;
   }
@@ -69,7 +77,7 @@ public class RegularBucketLockStrategy implements OzoneLockStrategy {
   @Override
   public void releaseReadLock(OMMetadataManager omMetadataManager,
                               String volumeName, String bucketName,
-                              String keyName) throws IOException {
+                              String keyName) {
     omMetadataManager.getLock()
         .releaseReadLock(BUCKET_LOCK, volumeName, bucketName);
 

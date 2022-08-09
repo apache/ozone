@@ -19,8 +19,6 @@ package org.apache.hadoop.ozone.om.lock;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 
-import java.io.IOException;
-
 /**
  * This is a common strategy interface for all concrete lock strategies. The
  * interface declares methods (for acquiring/releasing a read/write lock) the
@@ -31,16 +29,15 @@ import java.io.IOException;
  */
 public interface OzoneLockStrategy {
   boolean acquireWriteLock(OMMetadataManager omMetadataManager,
-                           String volumeName, String bucketName, String keyName)
-      throws IOException;
+                           String volumeName, String bucketName,
+                           String keyName);
 
   void releaseWriteLock(OMMetadataManager omMetadataManager, String volumeName,
-                        String bucketName, String keyName) throws IOException;
+                        String bucketName, String keyName);
 
   boolean acquireReadLock(OMMetadataManager omMetadataManager,
-                          String volumeName, String bucketName, String keyName)
-      throws IOException;
+                          String volumeName, String bucketName, String keyName);
 
   void releaseReadLock(OMMetadataManager omMetadataManager, String volumeName,
-                       String bucketName, String keyName) throws IOException;
+                       String bucketName, String keyName);
 }
