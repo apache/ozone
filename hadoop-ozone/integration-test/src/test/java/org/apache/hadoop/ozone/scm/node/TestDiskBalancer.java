@@ -85,9 +85,8 @@ public class TestDiskBalancer {
 
     assertEquals(2, reportProtoList.size());
     Assert.assertTrue(
-        Double.parseDouble(reportProtoList.get(0).getCurrentVolumeDensitySum())
-        >= Double.parseDouble(
-            reportProtoList.get(1).getCurrentVolumeDensitySum()));
+        reportProtoList.get(0).getCurrentVolumeDensitySum()
+        >= reportProtoList.get(1).getCurrentVolumeDensitySum());
   }
 
   @Test

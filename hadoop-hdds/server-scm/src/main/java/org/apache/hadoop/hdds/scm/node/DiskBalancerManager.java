@@ -80,13 +80,13 @@ public class DiskBalancerManager {
       double volumeDensitySum =
           getVolumeDataDensitySumForDatanodeDetails(datanodeDetails);
       reportList.add(HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
-          .setCurrentVolumeDensitySum(String.valueOf(volumeDensitySum))
+          .setCurrentVolumeDensitySum(volumeDensitySum)
           .setNode(datanodeDetails.toProto(clientVersion))
           .build());
     }
 
-    reportList.sort((t1, t2) -> t2.getCurrentVolumeDensitySum().
-        compareTo(t1.getCurrentVolumeDensitySum()));
+    reportList.sort((t1, t2) -> Double.compare(t2.getCurrentVolumeDensitySum(),
+        t1.getCurrentVolumeDensitySum()));
     return reportList.stream().limit(count).collect(Collectors.toList());
   }
 
@@ -110,7 +110,7 @@ public class DiskBalancerManager {
         double volumeDensitySum =
             getVolumeDataDensitySumForDatanodeDetails(datanodeDetails);
         statusList.add(HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
-            .setCurrentVolumeDensitySum(String.valueOf(volumeDensitySum))
+            .setCurrentVolumeDensitySum(volumeDensitySum)
             .setDiskBalancerRunning(isRunning(datanodeDetails))
             .setDiskBalancerConf(statusMap.getOrDefault(datanodeDetails,
                     DiskBalancerStatus.DUMMY_STATUS)
