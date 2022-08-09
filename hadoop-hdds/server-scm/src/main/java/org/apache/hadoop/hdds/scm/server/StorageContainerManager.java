@@ -1605,6 +1605,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.error("Storage Container Manager HTTP server stop failed.", ex);
     }
 
+    LOG.info("Stopping SCM LayoutVersionManager Service.");
+    scmLayoutVersionManager.close();
+
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().stop();
     }
