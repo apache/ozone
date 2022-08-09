@@ -47,12 +47,12 @@ public final class DiskBalancerConfiguration {
 
   @Config(key = "max.disk.throughputInMBPerSec", type = ConfigType.AUTO,
       defaultValue = "10", tags = {ConfigTag.BALANCER},
-      description = "The max balance speed")
+      description = "The max balance speed.")
   private String diskBandwidth = "10";
 
   @Config(key = "parallel.thread", type = ConfigType.AUTO,
       defaultValue = "5", tags = {ConfigTag.BALANCER},
-      description = "The max parallel balance thread count")
+      description = "The max parallel balance thread count.")
   private int parallelThread = 5;
 
   /**
@@ -93,7 +93,7 @@ public final class DiskBalancerConfiguration {
   /**
    * Sets the disk bandwidth value for Disk Balancer.
    *
-   * @param
+   * @param diskBandwidth the bandwidth to control balance speed
    */
   public void setDiskBandwidth(double diskBandwidth) {
     if (diskBandwidth <= 0d) {
@@ -115,7 +115,7 @@ public final class DiskBalancerConfiguration {
   /**
    * Sets the parallel thread for Disk Balancer.
    *
-   * @param
+   * @param parallelThread the parallel thread count
    */
   public void setParallelThread(int parallelThread) {
     if (parallelThread <= 0) {

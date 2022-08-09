@@ -41,8 +41,7 @@ import java.util.List;
 import static org.junit.Assert.assertEquals;
 
 /**
- * This class tests container operations (TODO currently only supports create)
- * from cblock clients.
+ * This class tests disk balancer operations.
  */
 public class TestDiskBalancer {
 
