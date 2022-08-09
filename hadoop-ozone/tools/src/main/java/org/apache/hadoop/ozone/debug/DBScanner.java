@@ -198,8 +198,9 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
     final List<ColumnFamilyHandle> columnFamilyHandleList =
         new ArrayList<>();
-    try (ManagedRocksDB rocksDB = ManagedRocksDB.openReadOnly(parent.getDbPath(),
-            cfs, columnFamilyHandleList)) {
+    try (ManagedRocksDB rocksDB =
+             ManagedRocksDB.openReadOnly(parent.getDbPath(), cfs,
+                 columnFamilyHandleList)) {
       this.printAppropriateTable(columnFamilyHandleList,
           rocksDB, parent.getDbPath());
     }

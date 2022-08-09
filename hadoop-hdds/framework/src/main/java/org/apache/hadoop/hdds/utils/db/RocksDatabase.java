@@ -90,7 +90,7 @@ public final class RocksDatabase {
         file.getAbsolutePath())
         .stream()
         .map(TableConfig::toName)
-        .filter(name -> !existingFamilyNames.contains(name))
+        .filter(familyName -> !existingFamilyNames.contains(familyName))
         .map(TableConfig::newTableConfig)
         .collect(Collectors.toList());
     if (LOG.isDebugEnabled()) {
