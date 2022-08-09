@@ -124,10 +124,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     }
   }
 
-  public ConfigurationSource getConfig() {
-    return config;
-  }
-
   @Override
   public void create(VolumeSet volumeSet, VolumeChoosingPolicy
       volumeChoosingPolicy, String clusterId) throws StorageContainerException {
@@ -296,28 +292,19 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   @Override
   public void delete() throws StorageContainerException {
     HddsVolume hddsVolume = containerData.getVolume();
-    CleanUpManager cleanUpManager = new CleanUpManager(config, hddsVolume);
+    CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
     long containerId = containerData.getContainerID();
     try {
       KeyValueContainerUtil.removeContainer(containerData, config);
     } catch (StorageContainerException ex) {
       throw ex;
     } catch (IOException ex) {
-      if (cleanUpManager.checkContainerSchemaV3Enabled(containerData)) {
-        try {
-          cleanUpManager.cleanTmpDir();
-        } catch (IOException e) {
-          LOG.error("Failed to clean up artifacts " +
-              "left in the tmp directory", e);
-        }
-      } else {
-        onFailure(containerData.getVolume());
-        String errMsg = String.format("Failed to cleanup container. ID: %d",
-            containerId);
-        LOG.error(errMsg, ex);
-        throw new StorageContainerException(errMsg, ex,
-            CONTAINER_INTERNAL_ERROR);
-      }
+      cleanUpManager.cleanTmpDir();
+      onFailure(containerData.getVolume());
+      String errMsg = String.format("Failed to cleanup container. ID: %d",
+          containerId);
+      LOG.error(errMsg, ex);
+      throw new StorageContainerException(errMsg, ex, CONTAINER_INTERNAL_ERROR);
     }
   }
 

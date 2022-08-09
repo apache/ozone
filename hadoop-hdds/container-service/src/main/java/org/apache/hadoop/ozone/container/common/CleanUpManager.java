@@ -19,12 +19,10 @@
 package org.apache.hadoop.ozone.container.common;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,41 +44,14 @@ public class CleanUpManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(CleanUpManager.class);
 
-  private final DatanodeConfiguration datanodeConf;
+  private static final String TMP_DELETE_SERVICE_DIR =
+      "/tmp/container_delete_service";
 
   private String tmpPath;
 
-  public CleanUpManager(ConfigurationSource configurationSource,
-                        HddsVolume hddsVolume) {
-    this.datanodeConf =
-        configurationSource.getObject(DatanodeConfiguration.class);
-    tmpDirInit(hddsVolume);
-  }
+  public CleanUpManager(HddsVolume hddsVolume) {
 
-  public DatanodeConfiguration getDatanodeConf() {
-    return datanodeConf;
-  }
-
-  public boolean checkContainerSchemaV3Enabled(
-      KeyValueContainerData keyValueContainerData) {
-    return (keyValueContainerData.getSchemaVersion()
-        .equals(OzoneConsts.SCHEMA_V3));
-  }
-
-  private void tmpDirInit(HddsVolume hddsVolume) {
-    //(String) path of /tmp from the datanode config
-    String tmpDir = datanodeConf.getTmpDeleteDirectoryPath();
-
-    String clusterId = hddsVolume.getClusterID();
-
-    // HddsVolume root directory path
-    String hddsRoot = hddsVolume.getHddsRootDir().toString();
-
-    // HddsVolume path
-    String volPath = HddsVolumeUtil.getHddsRoot(hddsRoot);
-
-    tmpPath = volPath + "/" + clusterId + tmpDir;
-    Path tmpDirPath = Paths.get(tmpPath);
+    Path tmpDirPath = getTmpDirPath(hddsVolume);
 
     if (Files.notExists(tmpDirPath)) {
       try {
@@ -91,8 +62,56 @@ public class CleanUpManager {
     }
   }
 
-  public boolean renameDir(KeyValueContainerData keyValueContainerData)
-      throws IOException {
+  private Path getTmpDirPath(HddsVolume hddsVolume) {
+    StringBuilder stringBuilder = new StringBuilder();
+
+    // HddsVolume root directory path
+    String hddsRoot = hddsVolume.getHddsRootDir().toString();
+
+    // HddsVolume path
+    String volPath = HddsVolumeUtil.getHddsRoot(hddsRoot);
+
+    stringBuilder.append(volPath);
+    stringBuilder.append("/");
+
+    String clusterId = hddsVolume.getClusterID();
+
+    // Volume has already been initialized with its contents.
+    // If clusterId = null, that's because we are in a previous version
+    // and scmId has been used.
+    // Check the existing files for the id.
+    if (clusterId == null) {
+      List<File> volFiles = new ArrayList<>();
+      File vol = new File(volPath);
+
+      for (File file : vol.listFiles()) {
+        volFiles.add(file);
+      }
+
+      if (volFiles.size() == 1) {
+        File idDir = volFiles.get(0);
+        clusterId = idDir.getName();
+      }
+    }
+
+    String pathId = "";
+    try {
+      pathId = VersionedDatanodeFeatures.ScmHA
+          .chooseContainerPathID(hddsVolume, clusterId);
+    } catch (IOException ex) {
+      LOG.error("Failed to get the container path Id", ex);
+    }
+
+    stringBuilder.append(pathId);
+    stringBuilder.append(TMP_DELETE_SERVICE_DIR);
+
+    this.tmpPath = stringBuilder.toString();
+    Path tmpDirPath = Paths.get(tmpPath);
+
+    return tmpDirPath;
+  }
+
+  public boolean renameDir(KeyValueContainerData keyValueContainerData) {
     String containerPath = keyValueContainerData.getContainerPath();
     File container = new File(containerPath);
     String containerDirName = container.getName();
@@ -137,15 +156,20 @@ public class CleanUpManager {
    * Delete all files under the /tmp/container_delete_service.
    * @throws IOException
    */
-  public void cleanTmpDir() throws IOException {
+  public void cleanTmpDir() {
     ListIterator<File> leftoversListIt = getDeleteLeftovers();
 
     while (leftoversListIt.hasNext()) {
       File file = leftoversListIt.next();
-      if (file.isDirectory()) {
-        FileUtils.deleteDirectory(file);
-      } else {
-        FileUtils.delete(file);
+      try {
+        if (file.isDirectory()) {
+          FileUtils.deleteDirectory(file);
+        } else {
+          FileUtils.delete(file);
+        }
+      } catch (IOException ex) {
+        LOG.error("Failed to delete directory or file inside " +
+            "/tmp/container_delete_service.", ex);
       }
     }
   }

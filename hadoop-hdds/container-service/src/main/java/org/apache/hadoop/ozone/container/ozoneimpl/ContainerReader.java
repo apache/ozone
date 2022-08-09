@@ -214,13 +214,10 @@ public class ContainerReader implements Runnable {
         if (kvContainer.getContainerState() == RECOVERING) {
           if (shouldDeleteRecovering) {
             CleanUpManager cleanUpManager =
-                new CleanUpManager(config, hddsVolume);
+                new CleanUpManager(hddsVolume);
             KeyValueContainerData keyValueContainerData =
                 (KeyValueContainerData) containerData;
-            if (cleanUpManager
-                .checkContainerSchemaV3Enabled(keyValueContainerData)) {
-              cleanUpManager.renameDir(keyValueContainerData);
-            }
+            cleanUpManager.renameDir(keyValueContainerData);
             kvContainer.delete();
             LOG.info("Delete recovering container {}.",
                 kvContainer.getContainerData().getContainerID());

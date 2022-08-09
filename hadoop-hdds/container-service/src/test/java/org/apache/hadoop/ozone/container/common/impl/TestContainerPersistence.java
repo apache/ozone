@@ -271,10 +271,34 @@ public class TestContainerPersistence {
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID2));
 
+    KeyValueContainerData container1Data =
+        (KeyValueContainerData) container1.getContainerData();
+    KeyValueContainerData container2Data =
+        (KeyValueContainerData) container2.getContainerData();
+
+    HddsVolume hddsVolume = container1Data.getVolume();
+    CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
+
+    // Rename container1 dir
+    Assert.assertTrue(cleanUpManager.renameDir(container1Data));
+
+    // Rename container2 dir
+    Assert.assertTrue(cleanUpManager.renameDir(container2Data));
+
     container1.delete();
     containerSet.removeContainer(testContainerID1);
     Assert.assertFalse(containerSet.getContainerMapCopy()
         .containsKey(testContainerID1));
+
+    Assert.assertFalse(cleanUpManager.tmpDirIsEmpty());
+
+    ListIterator<File> iterator = cleanUpManager.getDeleteLeftovers();
+    Assert.assertTrue(iterator.hasNext());
+
+    File metadata2Dir = container2.getContainerFile().getParentFile();
+    File container2Dir = metadata2Dir.getParentFile();
+
+    Assert.assertEquals(container2Dir, iterator.next());
 
     // With schema v3, we don't have a container dedicated db,
     // so skip check the behaviors related to it.
@@ -290,6 +314,7 @@ public class TestContainerPersistence {
     someKey1.setChunks(new LinkedList<ContainerProtos.ChunkInfo>());
     blockManager.putBlock(container1, someKey1);
 
+    // TODO: Refactor the code, that block never gets executed.
     // Deleting a non-empty container should fail.
     BlockID blockID2 = ContainerTestHelper.getTestBlockID(testContainerID2);
     BlockData someKey2 = new BlockData(blockID2);
@@ -302,67 +327,6 @@ public class TestContainerPersistence {
     container2.delete();
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID2));
-  }
-
-  @Test
-  public void testDeleteContainerWithSchemaV3Enabled()
-      throws Exception {
-    long testContainerID1 = getTestContainerID();
-    Thread.sleep(100);
-    long testContainerID2 = getTestContainerID();
-
-    Container container1 = addContainer(containerSet, testContainerID1);
-    container1.close();
-
-    Container container2 = addContainer(containerSet, testContainerID2);
-
-    Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID1));
-    Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID2));
-
-    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
-
-      KeyValueContainerData container1Data =
-          (KeyValueContainerData) container1.getContainerData();
-      KeyValueContainerData container2Data =
-          (KeyValueContainerData) container2.getContainerData();
-
-      HddsVolume hddsVolume = container1Data.getVolume();
-      CleanUpManager cleanUpManager = new CleanUpManager(conf, hddsVolume);
-
-      // Rename container1 dir
-      Assert.assertTrue(cleanUpManager.renameDir(container1Data));
-
-      // Rename container2 dir
-      Assert.assertTrue(cleanUpManager.renameDir(container2Data));
-
-      // Delete
-      container1.delete();
-
-      Assert.assertFalse(cleanUpManager.tmpDirIsEmpty());
-
-      ListIterator<File> iterator = cleanUpManager.getDeleteLeftovers();
-
-      File metadata2Dir = container2.getContainerFile().getParentFile();
-      File container2Dir = metadata2Dir.getParentFile();
-
-      Assert.assertTrue(iterator.hasNext());
-      Assert.assertEquals(container2Dir, iterator.next());
-
-      container2.delete();
-
-      // Remove container from containerSet
-      containerSet.removeContainer(testContainerID1);
-      Assert.assertFalse(containerSet.getContainerMapCopy()
-          .containsKey(testContainerID1));
-
-      // '/tmp/container_delete_service' is empty
-      Assert.assertTrue(cleanUpManager.tmpDirIsEmpty());
-
-      // Delete /tmp/container_delete_service from system
-      cleanUpManager.deleteTmpDir();
-    }
   }
 
   @Test

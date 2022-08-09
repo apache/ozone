@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.statemachine.background;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -27,7 +26,6 @@ import org.apache.hadoop.ozone.container.common.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,16 +92,10 @@ public class StaleRecoveringContainerScrubbingService
       KeyValueContainerData keyValueContainerData =
           (KeyValueContainerData) container.getContainerData();
       HddsVolume hddsVolume = keyValueContainerData.getVolume();
-
-      KeyValueContainer keyValueContainer = (KeyValueContainer) container;
-      ConfigurationSource configurationSource = keyValueContainer.getConfig();
       CleanUpManager cleanUpManager =
-          new CleanUpManager(configurationSource, hddsVolume);
+          new CleanUpManager(hddsVolume);
 
-      if (cleanUpManager.checkContainerSchemaV3Enabled(keyValueContainerData)) {
-        cleanUpManager.renameDir(keyValueContainerData);
-      }
-
+      cleanUpManager.renameDir(keyValueContainerData);
       containerSet.getContainer(containerID).delete();
       containerSet.removeContainer(containerID);
       LOG.info("Delete stale recovering container {}", containerID);

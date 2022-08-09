@@ -51,7 +51,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClie
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.metrics2.util.MBeans;
@@ -63,7 +62,6 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -127,20 +125,13 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   public void cleanTmpDir() {
-    if (VersionedDatanodeFeatures.isFinalized(
-        HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
-      MutableVolumeSet volumeSet =
-          getDatanodeStateMachine().getContainer().getVolumeSet();
-      for (StorageVolume storageVolume : volumeSet.getVolumesList()) {
-        HddsVolume hddsVolume = (HddsVolume) storageVolume;
-        CleanUpManager cleanUpManager = new CleanUpManager(conf, hddsVolume);
-        if (!cleanUpManager.tmpDirIsEmpty()) {
-          try {
-            cleanUpManager.cleanTmpDir();
-          } catch (IOException ex) {
-            LOG.error("Error cleaning /tmp/container_delete_service", ex);
-          }
-        }
+    MutableVolumeSet volumeSet =
+        getDatanodeStateMachine().getContainer().getVolumeSet();
+    for (StorageVolume storageVolume : volumeSet.getVolumesList()) {
+      HddsVolume hddsVolume = (HddsVolume) storageVolume;
+      CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
+      if (!cleanUpManager.tmpDirIsEmpty()) {
+        cleanUpManager.cleanTmpDir();
       }
     }
   }
