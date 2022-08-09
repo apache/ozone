@@ -392,13 +392,21 @@ public interface ScmClient extends Closeable {
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException;
 
+  /**
+   * Get DiskBalancer status.
+   * @param count top datanodes that need balancing
+   * @return List of DatanodeDiskBalancerInfo.
+   * @throws IOException
+   */
   List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerReport(
       int count) throws IOException;
 
   /**
    * Get DiskBalancer status.
-   * If hosts is not null, return status of hosts;
-   * If hosts is null, return status of all datanodes in balancing.
+   * @param hosts If hosts is not null, return status of hosts; If hosts is
+   *              null, return status of all datanodes in balancing.
+   * @return List of DatanodeDiskBalancerInfo.
+   * @throws IOException
    */
   List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
       Optional<List<String>> hosts) throws IOException;
