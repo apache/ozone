@@ -36,6 +36,10 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
   @Override
   public ManagedColumnFamilyOptions setTableFormatConfig(
       TableFormatConfig tableFormatConfig) {
+    // Close the previous TableFormatConfig before overwriting.
+    if (tableFormatConfig() instanceof ManagedBlockBasedTableConfig) {
+      ((ManagedBlockBasedTableConfig) tableFormatConfig()).close();
+    }
     super.setTableFormatConfig(tableFormatConfig);
     return this;
   }
@@ -44,5 +48,14 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
   protected void finalize() throws Throwable {
     ManagedRocksObjectUtils.assertClosed(this);
     super.finalize();
+  }
+
+  public static void closeDeeply(ColumnFamilyOptions options) {
+    // Close ColumnFamilyOptions and all the child resources.
+    // See org.apache.hadoop.hdds.utils.db.DBProfile.getColumnFamilyOptions
+    if (options.tableFormatConfig() instanceof ManagedBlockBasedTableConfig) {
+      ((ManagedBlockBasedTableConfig) options.tableFormatConfig()).close();
+    }
+    options.close();
   }
 }

@@ -21,12 +21,10 @@ package org.apache.hadoop.ozone.container.common.utils.db;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
-import org.rocksdb.BlockBasedTableConfig;
-
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT;
@@ -122,9 +120,9 @@ public abstract class DatanodeDBProfile {
               .setTableFormatConfig(getBlockBasedTableConfig(config));
     }
 
-    private BlockBasedTableConfig getBlockBasedTableConfig(
+    private ManagedBlockBasedTableConfig getBlockBasedTableConfig(
         ConfigurationSource config) {
-      BlockBasedTableConfig blockBasedTableConfig =
+      ManagedBlockBasedTableConfig blockBasedTableConfig =
           baseProfile.getBlockBasedTableConfig();
       if (config == null) {
         return blockBasedTableConfig;

@@ -47,12 +47,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.StringUtils.bytes2String;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions.closeDeeply;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator.managed;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator.managed;
 import static org.rocksdb.RocksDB.listColumnFamilies;
@@ -149,7 +149,7 @@ public final class RocksDatabase {
   }
 
   private static void close(ColumnFamilyDescriptor d) {
-    runWithTryCatch(() -> d.getOptions().close(), new Object() {
+    runWithTryCatch(() -> closeDeeply(d.getOptions()), new Object() {
       @Override
       public String toString() {
         return d.getClass() + ":" + bytes2String(d.getName());

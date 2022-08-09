@@ -1850,7 +1850,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     <bannedImport>org.rocksdb.**</bannedImport>
                     <allowedImports>
                       <!-- Allow non-RocksObject classes. -->
-                      <allowedImport>org.rocksdb.BlockBasedTableConfig</allowedImport>
                       <allowedImport>org.rocksdb.ColumnFamilyDescriptor</allowedImport>
                       <allowedImport>org.rocksdb.CompactionStyle</allowedImport>
                       <allowedImport>org.rocksdb.HistogramData</allowedImport>
