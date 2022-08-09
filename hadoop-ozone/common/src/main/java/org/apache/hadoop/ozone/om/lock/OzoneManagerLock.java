@@ -77,7 +77,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK;
  * <br>
  */
 
-public class OzoneManagerLock implements OmLock {
+public class OzoneManagerLock {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerLock.class);
@@ -118,7 +118,6 @@ public class OzoneManagerLock implements OmLock {
    * should be bucket name. For remaining all resource only one param should
    * be passed.
    */
-  @Override
   @Deprecated
   public boolean acquireLock(Resource resource, String... resources) {
     String resourceName = generateResourceName(resource, resources);
@@ -142,13 +141,11 @@ public class OzoneManagerLock implements OmLock {
    * should be bucket name. For remaining all resource only one param should
    * be passed.
    */
-  @Override
   public boolean acquireReadLock(Resource resource, String... resources) {
     String resourceName = generateResourceName(resource, resources);
     return lock(resource, resourceName, manager::readLock, READ_LOCK);
   }
 
-  @Override
   public boolean acquireReadHashedLock(Resource resource, String resourceName) {
     return lock(resource, resourceName, manager::readLock, READ_LOCK);
   }
@@ -170,13 +167,11 @@ public class OzoneManagerLock implements OmLock {
    * should be bucket name. For remaining all resource only one param should
    * be passed.
    */
-  @Override
   public boolean acquireWriteLock(Resource resource, String... resources) {
     String resourceName = generateResourceName(resource, resources);
     return lock(resource, resourceName, manager::writeLock, WRITE_LOCK);
   }
 
-  @Override
   public boolean acquireWriteHashedLock(Resource resource,
                                         String resourceName) {
     return lock(resource, resourceName, manager::writeLock, WRITE_LOCK);
@@ -255,7 +250,6 @@ public class OzoneManagerLock implements OmLock {
    * @param resource
    * @param resources
    */
-  @Override
   public String generateResourceName(Resource resource, String... resources) {
     if (resources.length == 1 && resource != Resource.BUCKET_LOCK) {
       return OzoneManagerLockUtil.generateResourceLockName(resource,
@@ -296,7 +290,6 @@ public class OzoneManagerLock implements OmLock {
    * @param firstUser
    * @param secondUser
    */
-  @Override
   public boolean acquireMultiUserLock(String firstUser, String secondUser) {
     Resource resource = Resource.USER_LOCK;
     firstUser = generateResourceName(resource, firstUser);
@@ -361,7 +354,6 @@ public class OzoneManagerLock implements OmLock {
    * @param firstUser
    * @param secondUser
    */
-  @Override
   public void releaseMultiUserLock(String firstUser, String secondUser) {
     Resource resource = Resource.USER_LOCK;
     firstUser = generateResourceName(resource, firstUser);
@@ -399,13 +391,11 @@ public class OzoneManagerLock implements OmLock {
    * should be bucket name. For remaining all resource only one param should
    * be passed.
    */
-  @Override
   public void releaseWriteLock(Resource resource, String... resources) {
     String resourceName = generateResourceName(resource, resources);
     unlock(resource, resourceName, manager::writeUnlock, WRITE_LOCK);
   }
 
-  @Override
   public void releaseWriteHashedLock(Resource resource, String resourceName) {
     unlock(resource, resourceName, manager::writeUnlock, WRITE_LOCK);
   }
@@ -418,13 +408,11 @@ public class OzoneManagerLock implements OmLock {
    * should be bucket name. For remaining all resource only one param should
    * be passed.
    */
-  @Override
   public void releaseReadLock(Resource resource, String... resources) {
     String resourceName = generateResourceName(resource, resources);
     unlock(resource, resourceName, manager::readUnlock, READ_LOCK);
   }
 
-  @Override
   public void releaseReadHashedLock(Resource resource, String resourceName) {
     unlock(resource, resourceName, manager::readUnlock, READ_LOCK);
   }
@@ -437,7 +425,6 @@ public class OzoneManagerLock implements OmLock {
    * should be bucket name. For remaining all resource only one param should
    * be passed.
    */
-  @Override
   @Deprecated
   public void releaseLock(Resource resource, String... resources) {
     String resourceName = generateResourceName(resource, resources);
@@ -509,7 +496,6 @@ public class OzoneManagerLock implements OmLock {
    * @param resourceName resource lock name
    * @return readHoldCount
    */
-  @Override
   @VisibleForTesting
   public int getReadHoldCount(String resourceName) {
     return manager.getReadHoldCount(resourceName);
@@ -522,7 +508,6 @@ public class OzoneManagerLock implements OmLock {
    *
    * @return String representation of object
    */
-  @Override
   @VisibleForTesting
   public String getReadLockWaitingTimeMsStat() {
     return omLockMetrics.getReadLockWaitingTimeMsStat();
@@ -534,7 +519,6 @@ public class OzoneManagerLock implements OmLock {
    *
    * @return longest read lock waiting time (ms)
    */
-  @Override
   @VisibleForTesting
   public long getLongestReadLockWaitingTimeMs() {
     return omLockMetrics.getLongestReadLockWaitingTimeMs();
@@ -547,7 +531,6 @@ public class OzoneManagerLock implements OmLock {
    *
    * @return String representation of object
    */
-  @Override
   @VisibleForTesting
   public String getReadLockHeldTimeMsStat() {
     return omLockMetrics.getReadLockHeldTimeMsStat();
@@ -559,7 +542,6 @@ public class OzoneManagerLock implements OmLock {
    *
    * @return longest read lock held time (ms)
    */
-  @Override
   @VisibleForTesting
   public long getLongestReadLockHeldTimeMs() {
     return omLockMetrics.getLongestReadLockHeldTimeMs();
@@ -571,7 +553,6 @@ public class OzoneManagerLock implements OmLock {
    * @param resourceName resource lock name
    * @return writeHoldCount
    */
-  @Override
   @VisibleForTesting
   public int getWriteHoldCount(String resourceName) {
     return manager.getWriteHoldCount(resourceName);
@@ -585,7 +566,6 @@ public class OzoneManagerLock implements OmLock {
    * @return {@code true} if the current thread holds the write lock and
    *         {@code false} otherwise
    */
-  @Override
   @VisibleForTesting
   public boolean isWriteLockedByCurrentThread(String resourceName) {
     return manager.isWriteLockedByCurrentThread(resourceName);
@@ -598,7 +578,6 @@ public class OzoneManagerLock implements OmLock {
    *
    * @return String representation of object
    */
-  @Override
   @VisibleForTesting
   public String getWriteLockWaitingTimeMsStat() {
     return omLockMetrics.getWriteLockWaitingTimeMsStat();
@@ -610,7 +589,6 @@ public class OzoneManagerLock implements OmLock {
    *
    * @return longest write lock waiting time (ms)
    */
-  @Override
   @VisibleForTesting
   public long getLongestWriteLockWaitingTimeMs() {
     return omLockMetrics.getLongestWriteLockWaitingTimeMs();
@@ -623,7 +601,6 @@ public class OzoneManagerLock implements OmLock {
    *
    * @return String representation of object
    */
-  @Override
   @VisibleForTesting
   public String getWriteLockHeldTimeMsStat() {
     return omLockMetrics.getWriteLockHeldTimeMsStat();
@@ -635,7 +612,6 @@ public class OzoneManagerLock implements OmLock {
    *
    * @return longest write lock held time (ms)
    */
-  @Override
   @VisibleForTesting
   public long getLongestWriteLockHeldTimeMs() {
     return omLockMetrics.getLongestWriteLockHeldTimeMs();
@@ -644,12 +620,10 @@ public class OzoneManagerLock implements OmLock {
   /**
    * Unregisters OMLockMetrics source.
    */
-  @Override
   public void cleanup() {
     omLockMetrics.unRegister();
   }
 
-  @Override
   public OMLockMetrics getOMLockMetrics() {
     return omLockMetrics;
   }
