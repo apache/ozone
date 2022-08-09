@@ -42,10 +42,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeAdminErrorResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeUsageInfoRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeUsageInfoResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerReportRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerReportResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerStatusRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerStatusResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerInfoType;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerInfoRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesResponseProto;
@@ -1012,33 +1011,35 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerReport(
       int count, int clientVersion) throws IOException {
-    DatanodeDiskBalancerReportRequestProto request =
-        DatanodeDiskBalancerReportRequestProto.newBuilder()
+    DatanodeDiskBalancerInfoRequestProto request =
+        DatanodeDiskBalancerInfoRequestProto.newBuilder()
+            .setInfoType(DatanodeDiskBalancerInfoType.report)
             .setCount(count)
             .build();
 
-    DatanodeDiskBalancerReportResponseProto response =
-        submitRequest(Type.DatanodeDiskBalancerReport,
-            builder -> builder.setDatanodeDiskBalancerReportRequest(request))
-            .getDatanodeDiskBalancerReportResponse();
+    DatanodeDiskBalancerInfoResponseProto response =
+        submitRequest(Type.DatanodeDiskBalancerInfo,
+            builder -> builder.setDatanodeDiskBalancerInfoRequest(request))
+            .getDatanodeDiskBalancerInfoResponse();
 
-    return response.getReportList();
+    return response.getInfoList();
   }
 
   @Override
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
       Optional<List<String>> hosts, int clientVersion) throws IOException {
-    DatanodeDiskBalancerStatusRequestProto.Builder requestBuilder =
-        DatanodeDiskBalancerStatusRequestProto.newBuilder();
+    DatanodeDiskBalancerInfoRequestProto.Builder requestBuilder =
+        DatanodeDiskBalancerInfoRequestProto.newBuilder()
+            .setInfoType(DatanodeDiskBalancerInfoType.status);
     hosts.ifPresent(requestBuilder::addAllHosts);
-    DatanodeDiskBalancerStatusRequestProto request = requestBuilder.build();
+    DatanodeDiskBalancerInfoRequestProto request = requestBuilder.build();
 
-    DatanodeDiskBalancerStatusResponseProto response =
-        submitRequest(Type.DatanodeDiskBalancerStatus,
-            builder -> builder.setDatanodeDiskBalancerStatusRequest(request))
-            .getDatanodeDiskBalancerStatusResponse();
+    DatanodeDiskBalancerInfoResponseProto response =
+        submitRequest(Type.DatanodeDiskBalancerInfo,
+            builder -> builder.setDatanodeDiskBalancerInfoRequest(request))
+            .getDatanodeDiskBalancerInfoResponse();
 
-    return response.getStatusList();
+    return response.getInfoList();
   }
 
   @Override

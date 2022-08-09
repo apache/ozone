@@ -397,6 +397,8 @@ public interface ScmClient extends Closeable {
 
   /**
    * Get DiskBalancer status.
+   * If hosts is not null, return status of hosts;
+   * If hosts is null, return status of all datanodes in balancing.
    */
   List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
       Optional<List<String>> hosts) throws IOException;

@@ -37,8 +37,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeAdminErrorResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeUsageInfoResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerReportResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerStatusResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesRequestProto;
@@ -648,20 +647,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
               request.getGetContainerReplicasRequest(),
               request.getVersion()))
           .build();
-      case DatanodeDiskBalancerReport:
+      case DatanodeDiskBalancerInfo:
         return ScmContainerLocationResponse.newBuilder()
           .setCmdType(request.getCmdType())
           .setStatus(Status.OK)
-          .setDatanodeDiskBalancerReportResponse(getDatanodeDiskBalancerReport(
-              request.getDatanodeDiskBalancerReportRequest(),
-              request.getVersion()))
-          .build();
-      case DatanodeDiskBalancerStatus:
-        return ScmContainerLocationResponse.newBuilder()
-          .setCmdType(request.getCmdType())
-          .setStatus(Status.OK)
-          .setDatanodeDiskBalancerStatusResponse(getDatanodeDiskBalancerStatus(
-              request.getDatanodeDiskBalancerStatusRequest(),
+          .setDatanodeDiskBalancerInfoResponse(getDatanodeDiskBalancerInfo(
+              request.getDatanodeDiskBalancerInfoRequest(),
               request.getVersion()))
           .build();
       default:
@@ -1157,23 +1148,25 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       .build();
   }
 
-  public DatanodeDiskBalancerReportResponseProto getDatanodeDiskBalancerReport(
+  public DatanodeDiskBalancerInfoResponseProto getDatanodeDiskBalancerInfo(
       StorageContainerLocationProtocolProtos.
-          DatanodeDiskBalancerReportRequestProto request, int clientVersion)
+          DatanodeDiskBalancerInfoRequestProto request, int clientVersion)
       throws IOException {
-    return DatanodeDiskBalancerReportResponseProto.newBuilder()
-        .addAllReport(impl.getDiskBalancerReport(request.getCount(),
-            clientVersion))
-        .build();
-  }
-
-  public DatanodeDiskBalancerStatusResponseProto getDatanodeDiskBalancerStatus(
-      StorageContainerLocationProtocolProtos.
-          DatanodeDiskBalancerStatusRequestProto request, int clientVersion)
-      throws IOException {
-    return DatanodeDiskBalancerStatusResponseProto.newBuilder()
-        .addAllStatus(impl.getDiskBalancerStatus(
-            Optional.of(request.getHostsList()), clientVersion))
+    List<HddsProtos.DatanodeDiskBalancerInfoProto> infoProtoList;
+    switch (request.getInfoType()) {
+    case report:
+      infoProtoList = impl.getDiskBalancerReport(request.getCount(),
+          clientVersion);
+      break;
+    case status:
+      infoProtoList = impl.getDiskBalancerStatus(
+          Optional.of(request.getHostsList()), clientVersion);
+      break;
+    default:
+      infoProtoList = null;
+    }
+    return DatanodeDiskBalancerInfoResponseProto.newBuilder()
+        .addAllInfo(infoProtoList)
         .build();
   }
 }

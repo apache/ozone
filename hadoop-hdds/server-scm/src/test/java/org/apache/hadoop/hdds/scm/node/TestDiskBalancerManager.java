@@ -73,12 +73,25 @@ public class TestDiskBalancerManager {
 
   @Test
   public void testDatanodeDiskBalancerStatus() throws IOException {
+    diskBalancerManager.addRunningDatanode(nodeManager.getAllNodes().get(0));
+
+    // Simulate users asking all status of 3 datanodes
     List<String> dns = nodeManager.getAllNodes().stream().map(
         DatanodeDetails::getIpAddress).collect(
         Collectors.toList());
-    diskBalancerManager.addRunningDatanode(nodeManager.getAllNodes().get(0));
 
     List<HddsProtos.DatanodeDiskBalancerInfoProto> statusProtoList =
+        diskBalancerManager.getDiskBalancerStatus(Optional.of(dns),
+            ClientVersion.CURRENT_VERSION);
+
+    Assertions.assertEquals(3, statusProtoList.size());
+
+    // Simulate users asking status of 1 datanodes
+    dns = nodeManager.getAllNodes().stream().map(
+        DatanodeDetails::getIpAddress).limit(1).collect(
+        Collectors.toList());
+
+    statusProtoList =
         diskBalancerManager.getDiskBalancerStatus(Optional.of(dns),
             ClientVersion.CURRENT_VERSION);
 

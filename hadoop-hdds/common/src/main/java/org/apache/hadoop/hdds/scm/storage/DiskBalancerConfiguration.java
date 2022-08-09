@@ -43,12 +43,12 @@ public final class DiskBalancerConfiguration {
           "utilization of the volume(used space to capacity ratio) differs" +
           " from the utilization of the datanode(used space to capacity ratio" +
           " of the entire datanode) no more than the threshold.")
-  private String threshold = "10";
+  private double threshold = 10d;
 
   @Config(key = "max.disk.throughputInMBPerSec", type = ConfigType.AUTO,
       defaultValue = "10", tags = {ConfigTag.BALANCER},
       description = "The max balance speed.")
-  private String diskBandwidth = "10";
+  private double diskBandwidth = 10;
 
   @Config(key = "parallel.thread", type = ConfigType.AUTO,
       defaultValue = "5", tags = {ConfigTag.BALANCER},
@@ -61,11 +61,11 @@ public final class DiskBalancerConfiguration {
    * @return percentage value in the range 0 to 100
    */
   public double getThreshold() {
-    return Double.parseDouble(threshold);
+    return threshold;
   }
 
   public double getThresholdAsRatio() {
-    return Double.parseDouble(threshold) / 100;
+    return threshold / 100;
   }
 
   /**
@@ -78,7 +78,7 @@ public final class DiskBalancerConfiguration {
       throw new IllegalArgumentException(
           "Threshold must be a percentage(double) in the range 0 to 100.");
     }
-    this.threshold = String.valueOf(threshold);
+    this.threshold = threshold;
   }
 
   /**
@@ -87,7 +87,7 @@ public final class DiskBalancerConfiguration {
    * @return max disk bandwidth per second
    */
   public double getDiskBandwidth() {
-    return Double.parseDouble(diskBandwidth);
+    return diskBandwidth;
   }
 
   /**
@@ -100,7 +100,7 @@ public final class DiskBalancerConfiguration {
       throw new IllegalArgumentException(
           "diskBandwidth must be a value larger than 0.");
     }
-    this.diskBandwidth = String.valueOf(diskBandwidth);
+    this.diskBandwidth = diskBandwidth;
   }
 
   /**
@@ -152,10 +152,10 @@ public final class DiskBalancerConfiguration {
     DiskBalancerConfiguration config =
         ozoneConfiguration.getObject(DiskBalancerConfiguration.class);
     if (proto.hasThreshold()) {
-      config.setThreshold(Double.parseDouble(proto.getThreshold()));
+      config.setThreshold(proto.getThreshold());
     }
     if (proto.hasDiskBandwidth()) {
-      config.setDiskBandwidth(Double.parseDouble(proto.getDiskBandwidth()));
+      config.setDiskBandwidth(proto.getDiskBandwidth());
     }
     if (proto.hasParallelThread()) {
       config.setParallelThread(proto.getParallelThread());

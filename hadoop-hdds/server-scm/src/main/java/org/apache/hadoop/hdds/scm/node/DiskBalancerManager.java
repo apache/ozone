@@ -31,10 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -93,35 +90,45 @@ public class DiskBalancerManager {
     return reportList.stream().limit(count).collect(Collectors.toList());
   }
 
+  /**
+   * If hosts is not null, return status of hosts;
+   * If hosts is null, return status of all datanodes in balancing.
+   */
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
       Optional<List<String>> hosts, int clientVersion) throws IOException {
     List<HddsProtos.DatanodeDiskBalancerInfoProto> statusList =
         new ArrayList<>();
     List<DatanodeDetails> filterDns = null;
-
     if (hosts.isPresent() && !hosts.get().isEmpty()) {
-      filterDns = mapHostnamesToDatanodes(hosts.get());
+      filterDns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts.get(),
+          useHostnames);
     }
 
     for (DatanodeDetails datanodeDetails: nodeManager.getNodes(IN_SERVICE,
         HddsProtos.NodeState.HEALTHY)) {
-      if ((filterDns != null && !filterDns.isEmpty() &&
-          filterDns.contains(datanodeDetails) &&
-          statusMap.containsKey(datanodeDetails)) ||
-          isRunning(datanodeDetails)) {
+      if (shouldReturnDatanode(filterDns, datanodeDetails)) {
         double volumeDensitySum =
             getVolumeDataDensitySumForDatanodeDetails(datanodeDetails);
         statusList.add(HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
             .setCurrentVolumeDensitySum(String.valueOf(volumeDensitySum))
             .setDiskBalancerRunning(isRunning(datanodeDetails))
-            .setDiskBalancerConf(statusMap.get(datanodeDetails)
+            .setDiskBalancerConf(statusMap.getOrDefault(datanodeDetails,
+                    DiskBalancerStatus.DUMMY_STATUS)
                 .getDiskBalancerConfiguration().toProtobufBuilder())
             .setNode(datanodeDetails.toProto(clientVersion))
             .build());
       }
     }
-
     return statusList;
+  }
+
+  private boolean shouldReturnDatanode(List<DatanodeDetails> hosts,
+      DatanodeDetails datanodeDetails) {
+    if (hosts == null || hosts.isEmpty()) {
+      return isRunning(datanodeDetails);
+    } else {
+      return hosts.contains(datanodeDetails);
+    }
   }
 
   /**
@@ -153,76 +160,6 @@ public class DiskBalancerManager {
         .mapToDouble(Double::valueOf).sum();
 
     return volumeDensitySum;
-  }
-
-  private List<DatanodeDetails> mapHostnamesToDatanodes(List<String> hosts)
-      throws InvalidHostStringException {
-    List<DatanodeDetails> results = new LinkedList<>();
-    for (String hostString : hosts) {
-      NodeDecommissionManager.HostDefinition
-          host = new NodeDecommissionManager.HostDefinition(hostString);
-      InetAddress addr;
-      try {
-        addr = InetAddress.getByName(host.getHostname());
-      } catch (UnknownHostException e) {
-        throw new InvalidHostStringException("Unable to resolve host "
-            + host.getRawHostname(), e);
-      }
-      String dnsName;
-      if (useHostnames) {
-        dnsName = addr.getHostName();
-      } else {
-        dnsName = addr.getHostAddress();
-      }
-      List<DatanodeDetails> found = nodeManager.getNodesByAddress(dnsName);
-      if (found.size() == 0) {
-        throw new InvalidHostStringException("Host " + host.getRawHostname()
-            + " (" + dnsName + ") is not running any datanodes registered"
-            + " with SCM."
-            + " Please check the host name.");
-      } else if (found.size() == 1) {
-        if (host.getPort() != -1 &&
-            !validateDNPortMatch(host.getPort(), found.get(0))) {
-          throw new InvalidHostStringException("Host " + host.getRawHostname()
-              + " is running a datanode registered with SCM,"
-              + " but the port number doesn't match."
-              + " Please check the port number.");
-        }
-        results.add(found.get(0));
-      } else if (found.size() > 1) {
-        DatanodeDetails match = null;
-        for (DatanodeDetails dn : found) {
-          if (validateDNPortMatch(host.getPort(), dn)) {
-            match = dn;
-            break;
-          }
-        }
-        if (match == null) {
-          throw new InvalidHostStringException("Host " + host.getRawHostname()
-              + " is running multiple datanodes registered with SCM,"
-              + " but no port numbers match."
-              + " Please check the port number.");
-        }
-        results.add(match);
-      }
-    }
-    return results;
-  }
-
-  /**
-   * Check if the passed port is used by the given DatanodeDetails object. If
-   * it is, return true, otherwise return false.
-   * @param port Port number to check if it is used by the datanode
-   * @param dn Datanode to check if it is using the given port
-   * @return True if port is used by the datanode. False otherwise.
-   */
-  private boolean validateDNPortMatch(int port, DatanodeDetails dn) {
-    for (DatanodeDetails.Port p : dn.getPorts()) {
-      if (p.getValue() == port) {
-        return true;
-      }
-    }
-    return false;
   }
 
   private boolean isRunning(DatanodeDetails datanodeDetails) {
