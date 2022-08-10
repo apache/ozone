@@ -252,20 +252,19 @@ public class ContainerKeyMapperTask implements ReconOmTask {
                                       List<ContainerKeyPrefix>
                                           deletedContainerKeyList)
       throws IOException {
-
-    TableIterator<ContainerKeyPrefix, ? extends
-        Table.KeyValue<ContainerKeyPrefix, Integer>> containerIterator =
-        reconContainerMetadataManager.getContainerTableIterator();
-
     Set<ContainerKeyPrefix> keysToBeDeleted = new HashSet<>();
+    try (TableIterator<ContainerKeyPrefix,
+        ? extends Table.KeyValue<ContainerKeyPrefix, Integer>> containerIterator
+             = reconContainerMetadataManager.getContainerTableIterator()) {
 
-    // Check if we have keys in this container in the DB
-    while (containerIterator.hasNext()) {
-      Table.KeyValue<ContainerKeyPrefix, Integer> keyValue =
-          containerIterator.next();
-      String keyPrefix = keyValue.getKey().getKeyPrefix();
-      if (keyPrefix.equals(key)) {
-        keysToBeDeleted.add(keyValue.getKey());
+      // Check if we have keys in this container in the DB
+      while (containerIterator.hasNext()) {
+        Table.KeyValue<ContainerKeyPrefix, Integer> keyValue =
+            containerIterator.next();
+        String keyPrefix = keyValue.getKey().getKeyPrefix();
+        if (keyPrefix.equals(key)) {
+          keysToBeDeleted.add(keyValue.getKey());
+        }
       }
     }
 

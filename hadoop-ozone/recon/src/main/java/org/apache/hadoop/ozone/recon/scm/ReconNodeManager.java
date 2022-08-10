@@ -101,10 +101,9 @@ public class ReconNodeManager extends SCMNodeManager {
   }
 
   private void loadExistingNodes() {
-    try {
+    try (TableIterator<UUID, ? extends Table.KeyValue<UUID, DatanodeDetails>>
+             iterator = nodeDB.iterator()) {
       int nodeCount = 0;
-      TableIterator<UUID, ? extends Table.KeyValue<UUID, DatanodeDetails>>
-          iterator = nodeDB.iterator();
       while (iterator.hasNext()) {
         DatanodeDetails datanodeDetails = iterator.next().getValue();
         register(datanodeDetails, null, null,
