@@ -300,9 +300,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       // Starting HDDS Daemons
       datanodeStateMachine.startDaemon();
 
-      // Checking and deleting leftovers in /tmp/container_delete_service
-      cleanTmpDir();
-
       //for standalone, follower only test we can start the datanode (==raft
       // rings)
       //manually. In normal case it's handled by the initial SCM handshake.

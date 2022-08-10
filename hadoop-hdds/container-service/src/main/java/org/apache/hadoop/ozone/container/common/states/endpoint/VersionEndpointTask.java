@@ -22,8 +22,10 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -50,6 +52,17 @@ public class VersionEndpointTask implements
     this.rpcEndPoint = rpcEndPoint;
     this.configuration = conf;
     this.ozoneContainer = container;
+  }
+
+  public void cleanTmpDir() {
+    MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
+    for (StorageVolume storageVolume : volumeSet.getVolumesList()) {
+      HddsVolume hddsVolume = (HddsVolume) storageVolume;
+      CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
+      if (!cleanUpManager.tmpDirIsEmpty()) {
+        cleanUpManager.cleanTmpDir();
+      }
+    }
   }
 
   /**
@@ -94,6 +107,9 @@ public class VersionEndpointTask implements
             rpcEndPoint.getState().getNextState();
         rpcEndPoint.setState(nextState);
         rpcEndPoint.zeroMissedCount();
+
+        //clean /tmp/container_delete_service
+        cleanTmpDir();
       } else {
         LOG.debug("Cannot execute GetVersion task as endpoint state machine " +
             "is in {} state", rpcEndPoint.getState());

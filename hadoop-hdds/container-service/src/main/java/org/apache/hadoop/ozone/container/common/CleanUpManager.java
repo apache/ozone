@@ -75,23 +75,9 @@ public class CleanUpManager {
     stringBuilder.append("/");
 
     String clusterId = hddsVolume.getClusterID();
-
-    // Volume has already been initialized with its contents.
-    // If clusterId = null, that's because we are in a previous version
-    // and scmId has been used.
-    // Check the existing files for the id.
+    
     if (clusterId == null) {
-      List<File> volFiles = new ArrayList<>();
-      File vol = new File(volPath);
-
-      for (File file : vol.listFiles()) {
-        volFiles.add(file);
-      }
-
-      if (volFiles.size() == 1) {
-        File idDir = volFiles.get(0);
-        clusterId = idDir.getName();
-      }
+      //get clusterId with another way
     }
 
     String pathId = "";
