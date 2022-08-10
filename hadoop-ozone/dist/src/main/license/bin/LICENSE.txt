@@ -209,6 +209,7 @@ See licenses/ for text of these licenses.
 EPL
 =====================
 
+   org.eclipse.jetty:jetty-client
    org.eclipse.jetty:jetty-http
    org.eclipse.jetty:jetty-io
    org.eclipse.jetty:jetty-security
@@ -231,6 +232,7 @@ CDDL
 =====================
 
    com.sun.istack:istack-commons-runtime
+   com.sun.jersey:jersey-client
    com.sun.jersey:jersey-core
    com.sun.jersey:jersey-json
    com.sun.jersey:jersey-server
@@ -265,6 +267,7 @@ CDDL
 Apache License
 =====================
 
+   com.carrotsearch:hppc
    com.fasterxml.jackson.core:jackson-annotations
    com.fasterxml.jackson.core:jackson-core
    com.fasterxml.jackson.core:jackson-databind
@@ -354,6 +357,7 @@ Apache License
 MIT
 =====================
 
+   com.kstruct:gethostname4j
    net.sf.jopt-simple:jopt-simple
    org.codehaus.mojo:animal-sniffer-annotations
    org.slf4j:slf4j-api
@@ -437,6 +441,13 @@ angular-route-1.8.0.min.js
 angular-nvd3-1.0.9.min.js
 angular-1.8.0.min.js
 jquery-3.5.1.min.js
+
+
+LGPL 2.1
+=====================
+
+   net.java.dev.jna:jna
+   net.java.dev.jna:jna-platform
 
 --------------------------------------------------------------------------------
 recon server uses a huge number of javascript and css dependencies. See the
