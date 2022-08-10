@@ -347,10 +347,6 @@ public class TestReplicationConfig {
     ReplicationConfig.fromProtoTypeAndFactor(
         ReplicationType.valueOf(type), ReplicationFactor.valueOf(factor));
 
-    // CHAINED replication type is not supported by ReplicationConfig.
-    assertThrows(RuntimeException.class,
-        () -> ReplicationConfig.parse(
-            org.apache.hadoop.hdds.client.ReplicationType.CHAINED, "", conf));
   }
 
   private void validate(ReplicationConfig replicationConfig,

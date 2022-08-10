@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 public enum ReplicationType {
   RATIS,
   STAND_ALONE,
-  CHAINED,
   EC;
 
   public static ReplicationType fromProto(
@@ -39,8 +38,6 @@ public enum ReplicationType {
       return ReplicationType.RATIS;
     case STAND_ALONE:
       return ReplicationType.STAND_ALONE;
-    case CHAINED:
-      return ReplicationType.CHAINED;
     case EC:
       return ReplicationType.EC;
     default:
@@ -59,8 +56,6 @@ public enum ReplicationType {
       return HddsProtos.ReplicationType.RATIS;
     case STAND_ALONE:
       return HddsProtos.ReplicationType.STAND_ALONE;
-    case CHAINED:
-      return HddsProtos.ReplicationType.CHAINED;
     case EC:
       return HddsProtos.ReplicationType.EC;
     default:

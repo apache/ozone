@@ -802,8 +802,6 @@ public class PipelineManagerImpl implements PipelineManager {
         }
       }
       return;
-    case CHAINED:
-      // Not supported.
     default:
       // Not supported.
       return;
