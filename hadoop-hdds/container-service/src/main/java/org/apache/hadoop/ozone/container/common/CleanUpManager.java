@@ -75,7 +75,7 @@ public class CleanUpManager {
     stringBuilder.append("/");
 
     String clusterId = hddsVolume.getClusterID();
-    
+
     if (clusterId == null) {
       //get clusterId with another way
     }
