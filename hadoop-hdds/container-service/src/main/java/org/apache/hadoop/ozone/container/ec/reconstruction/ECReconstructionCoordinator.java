@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -100,9 +101,11 @@ public class ECReconstructionCoordinator implements Closeable {
 
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final TokenHelper tokenHelper;
+  private final ContainerClientMetrics clientMetrics;
 
   public ECReconstructionCoordinator(ConfigurationSource conf,
-      CertificateClient certificateClient) throws IOException {
+                                     CertificateClient certificateClient)
+      throws IOException {
     this.containerOperationClient = new ECContainerOperationClient(conf,
         certificateClient);
     this.byteBufferPool = new ElasticByteBufferPool();
@@ -117,6 +120,7 @@ public class ECReconstructionCoordinator implements Closeable {
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, () -> ecReconstructExecutor);
     tokenHelper = new TokenHelper(conf, certificateClient);
+    this.clientMetrics = ContainerClientMetrics.acquire();
   }
 
   public void reconstructECContainerGroup(long containerID,
@@ -242,7 +246,7 @@ public class ECReconstructionCoordinator implements Closeable {
                 this.containerOperationClient.getXceiverClientManager(),
                 this.containerOperationClient
                     .singleNodePipeline(datanodeDetails, repConfig), bufferPool,
-                configuration, blockLocationInfo.getToken());
+                configuration, blockLocationInfo.getToken(), clientMetrics);
         bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
         // Make sure it's clean. Don't want to reuse the erroneously returned
         // buffers from the pool.
