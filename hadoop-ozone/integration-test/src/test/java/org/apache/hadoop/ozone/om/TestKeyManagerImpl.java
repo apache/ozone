@@ -1015,17 +1015,17 @@ public class TestKeyManagerImpl {
     String keyNameDir1 = "dir1";
     OmKeyArgs keyArgsDir1 =
         createBuilder().setKeyName(keyNameDir1).build();
-    writeClient.createDirectory(keyArgsDir1);
+    addDirectory(keyArgsDir1);
 
     String keyNameDir1Subdir1 = "dir1" + OZONE_URI_DELIMITER + "subdir1";
     OmKeyArgs keyArgsDir1Subdir1 =
         createBuilder().setKeyName(keyNameDir1Subdir1).build();
-    writeClient.createDirectory(keyArgsDir1Subdir1);
+    addDirectory(keyArgsDir1Subdir1);
 
     String keyNameDir2 = "dir2";
     OmKeyArgs keyArgsDir2 =
         createBuilder().setKeyName(keyNameDir2).build();
-    writeClient.createDirectory(keyArgsDir2);
+    addDirectory(keyArgsDir2);
 
     OmKeyArgs rootDirArgs = createKeyArgs("");
     // Test listStatus with recursive=false, should only have dirs under root
@@ -1539,5 +1539,20 @@ public class TestKeyManagerImpl {
 
   private static BucketLayout getDefaultBucketLayout() {
     return BucketLayout.DEFAULT;
+  }
+
+  private static void addDirectory(OmKeyArgs keyArgs) throws Exception {
+    OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
+        .setVolumeName(keyArgs.getVolumeName())
+        .setBucketName(keyArgs.getBucketName())
+        .setKeyName(keyArgs.getKeyName() + "/")
+        .setFileName(OzoneFSUtils.getFileName(keyArgs.getKeyName()))
+        .setOmKeyLocationInfos(null)
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setDataSize(0)
+        .setReplicationConfig(keyArgs.getReplicationConfig())
+        .setFileEncryptionInfo(null).build();
+    OMRequestTestUtils.addKeyToTable(false, false, omKeyInfo, 1000L, 0L, metadataManager);
   }
 }
