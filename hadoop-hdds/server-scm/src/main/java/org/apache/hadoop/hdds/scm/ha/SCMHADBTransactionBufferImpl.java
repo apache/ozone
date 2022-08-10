@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -24,10 +25,19 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_MONITOR_SERVICE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_MONITOR_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_MONITOR_SERVICE_TIMEOUT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_MONITOR_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 /**
@@ -42,6 +52,9 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   private BatchOperation currentBatchOperation;
   private TransactionInfo latestTrxInfo;
   private SnapshotInfo latestSnapshot;
+  private long lastFlushTime;
+  private AtomicLong bufferSize;
+  private SCMHADBTransactionBufferMonitorService monitorService;
 
   public SCMHADBTransactionBufferImpl(StorageContainerManager scm)
       throws IOException {
@@ -57,12 +70,14 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   public <KEY, VALUE> void addToBuffer(
       Table<KEY, VALUE> table, KEY key, VALUE value) throws IOException {
     table.putWithBatch(getCurrentBatchOperation(), key, value);
+    bufferSize.incrementAndGet();
   }
 
   @Override
   public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
       throws IOException {
     table.deleteWithBatch(getCurrentBatchOperation(), key);
+    bufferSize.incrementAndGet();
   }
 
   @Override
@@ -91,7 +106,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public void flush() throws IOException {
+  public synchronized void flush() throws IOException {
     // write latest trx info into trx table in the same batch
     Table<String, TransactionInfo> transactionInfoTable
         = metadataStore.getTransactionInfoTable();
@@ -109,6 +124,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     Preconditions.checkArgument(
         deletedBlockLog instanceof DeletedBlockLogImpl);
     ((DeletedBlockLogImpl) deletedBlockLog).onFlush();
+    bufferSize.set(0);
+    lastFlushTime = Time.monotonicNow();
   }
 
   @Override
@@ -129,6 +146,28 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
               .build();
     }
     latestSnapshot = latestTrxInfo.toSnapshotInfo();
+
+    if (monitorService == null) {
+      OzoneConfiguration conf = scm.getConfiguration();
+      long serviceInterval = conf.getTimeDuration(
+          OZONE_SCM_HA_DBTRANSACTIONBUFFER_MONITOR_SERVICE_INTERVAL,
+          OZONE_SCM_HA_DBTRANSACTIONBUFFER_MONITOR_SERVICE_INTERVAL_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      long serviceTimeout = conf.getTimeDuration(
+          OZONE_SCM_HA_DBTRANSACTIONBUFFER_MONITOR_SERVICE_TIMEOUT,
+          OZONE_SCM_HA_DBTRANSACTIONBUFFER_MONITOR_SERVICE_TIMEOUT_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      long flushTimeout = conf.getTimeDuration(
+          OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL,
+          OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      monitorService = new SCMHADBTransactionBufferMonitorService(
+          this, serviceInterval, serviceTimeout, TimeUnit.MILLISECONDS,
+          flushTimeout);
+      monitorService.start();
+    }
+    lastFlushTime = Time.monotonicNow();
+    bufferSize = new AtomicLong(0);
   }
 
   @Override
@@ -138,5 +177,17 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
   @Override
   public void close() throws IOException {
+    if (monitorService != null) {
+      monitorService.shutdown();
+    }
   }
+
+  public long getBufferSize() {
+    return bufferSize.get();
+  }
+
+  public long getLastFlushTime() {
+    return lastFlushTime;
+  }
+
 }

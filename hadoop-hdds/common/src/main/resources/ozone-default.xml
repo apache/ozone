@@ -3145,6 +3145,39 @@
     <description>Deadline for SCM DB checkpoint interval.</description>
   </property>
 
+  <property>
+    <name>ozone.scm.ha.dbtransactionbuffer.flush.interval</name>
+    <value>60s</value>
+    <tag>SCM, OZONE, HA</tag>
+    <description>
+      SCMHADBTransactionbuffer flush interval, if elapses more than
+      this time since the last flush, the background monitor will trigger flush
+      the non-empty buffer into DB.
+      Unit could be defined with postfix (ns,ms,s,m,h,d).
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.dbtransactionbuffer.monitor.service.timeout</name>
+    <value>300s</value>
+    <tag>SCM, OZONE, HA</tag>
+    <description>
+      A timeout value of SCMHADBTransactionBufferMonitorService. If this is set
+      greater than 0, the service will stop waiting for the flush after
+      this time.
+      Unit could be defined with postfix (ns,ms,s,m,h,d).
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.dbtransactionbuffer.monitor.service.interval</name>
+    <value>30s</value>
+    <tag>SCM, OZONE, HA</tag>
+    <description>
+      Time interval of the SCMHADBTransactionBufferMonitorService.
+      The service runs on each SCM periodically (if ratis enabled), checks
+      the pending transaction buffer and then flushes it.
+      Unit could be defined with postfix (ns,ms,s,m,h,d).
+    </description>
+  </property>
 
   <property>
     <name>ozone.s3g.kerberos.keytab.file</name>

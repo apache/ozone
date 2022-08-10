@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
+import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -72,6 +72,9 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys
     .OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_MONITOR_SERVICE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_MONITOR_SERVICE_TIMEOUT;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
@@ -102,11 +105,16 @@ public class TestDeletedBlockLog {
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    conf.setLong(OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL, 5000);
+    conf.setLong(OZONE_SCM_HA_DBTRANSACTIONBUFFER_MONITOR_SERVICE_INTERVAL,
+        2000);
+    conf.setLong(OZONE_SCM_HA_DBTRANSACTIONBUFFER_MONITOR_SERVICE_TIMEOUT,
+        30 * 1000L);
+
     scm = HddsTestUtils.getScm(conf);
     containerManager = Mockito.mock(ContainerManager.class);
     containerTable = scm.getScmMetadataStore().getContainerTable();
-    scmHADBTransactionBuffer =
-        new SCMHADBTransactionBufferStub(scm.getScmMetadataStore().getStore());
+    scmHADBTransactionBuffer = new SCMHADBTransactionBufferImpl(scm);
     metrics = Mockito.mock(ScmBlockDeletingServiceMetrics.class);
     deletedBlockLog = new DeletedBlockLogImpl(conf,
         containerManager,
@@ -467,7 +475,7 @@ public class TestDeletedBlockLog {
     // close db and reopen it again to make sure
     // currentTxnID = 50
     deletedBlockLog.close();
-    new DeletedBlockLogImpl(conf,
+    deletedBlockLog = new DeletedBlockLogImpl(conf,
         containerManager,
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
@@ -478,6 +486,22 @@ public class TestDeletedBlockLog {
     blocks = getTransactions(BLOCKS_PER_TXN * 40);
     Assertions.assertEquals(0, blocks.size());
     //Assertions.assertEquals((long)deletedBlockLog.getCurrentTXID(), 50L);
+  }
+
+  @Test
+  public void testTimeTriggeredFlush() throws Exception {
+    addTransactions(generateData(50), false);
+    // txns are invisible until transaction buffer flush.
+    List<DeletedBlocksTransaction> blocks =
+        getTransactions(BLOCKS_PER_TXN * 50);
+    Assertions.assertEquals(0, blocks.size());
+
+    // Sleep more than the ozone.scm.ha.dbtransactionbuffer.flush.interval,
+    // buffer shall be flushed, and transactions now be visible
+    Thread.sleep(6000);
+
+    blocks = getTransactions(BLOCKS_PER_TXN * 50);
+    Assertions.assertEquals(50, blocks.size());
   }
 
   @Test

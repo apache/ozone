@@ -575,6 +575,24 @@ public final class ScmConfigKeys {
   public static final boolean
       OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = false;
 
+  // SCMHADBTransactionBufferFlushMonitorService related
+  public static final String OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL =
+      "ozone.scm.ha.dbtransactionbuffer.flush.interval";
+  public static final long
+      OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT = 60 * 1000L;
+  public static final String
+      OZONE_SCM_HA_DBTRANSACTIONBUFFER_MONITOR_SERVICE_TIMEOUT =
+      "ozone.scm.ha.dbtransactionbuffer.monitor.service.timeout";
+  public static final long
+      OZONE_SCM_HA_DBTRANSACTIONBUFFER_MONITOR_SERVICE_TIMEOUT_DEFAULT =
+      300 * 1000L;
+  public static final String
+      OZONE_SCM_HA_DBTRANSACTIONBUFFER_MONITOR_SERVICE_INTERVAL =
+      "ozone.scm.ha.dbtransactionbuffer.monitor.service.interval";
+  public static final long
+      OZONE_SCM_HA_DBTRANSACTIONBUFFER_MONITOR_SERVICE_INTERVAL_DEFAULT =
+      30 * 1000L;
+
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_SCMAUDIT =
       "ozone.audit.log.debug.cmd.list.scmaudit";
   /**
