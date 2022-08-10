@@ -1553,6 +1553,7 @@ public class TestKeyManagerImpl {
         .setDataSize(0)
         .setReplicationConfig(keyArgs.getReplicationConfig())
         .setFileEncryptionInfo(null).build();
-    OMRequestTestUtils.addKeyToTable(false, false, omKeyInfo, 1000L, 0L, metadataManager);
+    OMRequestTestUtils.addKeyToTable(false, false, omKeyInfo,
+        1000L, 0L, metadataManager);
   }
 }
