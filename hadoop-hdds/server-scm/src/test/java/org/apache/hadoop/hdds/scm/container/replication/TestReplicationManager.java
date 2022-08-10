@@ -220,7 +220,7 @@ public class TestReplicationManager {
     Assert.assertEquals(0, underRep.size());
     Assert.assertEquals(0, overRep.size());
     Assert.assertTrue(((ContainerHealthResult.UnderReplicatedHealthResult)
-        result).isSufficientlyReplicatedAfterPending());
+        result.get(0)).isSufficientlyReplicatedAfterPending());
     // As the container is still under replicated, as the pending have not
     // completed yet, the container is still marked as under-replciated in the
     // report.
