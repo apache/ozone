@@ -23,7 +23,6 @@ import org.rocksdb.RocksIterator;
  * Managed RocksIterator.
  */
 public class ManagedRocksIterator extends ManagedObject<RocksIterator> {
-
   public ManagedRocksIterator(RocksIterator original) {
     super(original);
   }
