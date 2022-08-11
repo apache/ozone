@@ -58,6 +58,9 @@ public interface ChunkBuffer {
 
   /** Wrap the given list of {@link ByteBuffer}s as a {@link ChunkBuffer}. */
   static ChunkBuffer wrap(List<ByteBuffer> buffers) {
+    if (buffers.size() == 1) {
+      return wrap(buffers.get(0));
+    }
     return new ChunkBufferImplWithByteBufferList(buffers);
   }
 
@@ -91,8 +94,7 @@ public interface ChunkBuffer {
 
   /** Similar to {@link ByteBuffer#put(byte[])}. */
   default ChunkBuffer put(byte b) {
-    byte[] buf = new byte[1];
-    buf[0] = (byte) b;
+    final byte[] buf = {b};
     return put(buf, 0, 1);
   }
 
@@ -116,7 +118,6 @@ public interface ChunkBuffer {
 
   /**
    * Iterate the buffer from the current position to the current limit.
-   *
    * Upon the iteration complete,
    * the buffer's position will be equal to its limit.
    *
