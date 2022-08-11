@@ -22,14 +22,13 @@ import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
-import com.google.common.collect.Lists;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
-import org.apache.hadoop.ozone.common.utils.BufferUtils;
+import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
@@ -147,7 +146,7 @@ public class FilePerBlockStrategy implements ChunkManager {
   }
 
   @Override
-  public ChunkBuffer readChunk(Container container, BlockID blockID,
+  public ChunkBufferToByteString readChunk(Container container, BlockID blockID,
       ChunkInfo info, DispatcherContext dispatcherContext)
       throws StorageContainerException {
 
@@ -172,12 +171,8 @@ public class FilePerBlockStrategy implements ChunkManager {
     long bufferCapacity =  ChunkManager.getBufferCapacityForChunkRead(info,
         defaultReadBufferCapacity);
 
-    ByteBuffer[] dataBuffers = BufferUtils.assignByteBuffers(len,
-        bufferCapacity);
-
-    ChunkUtils.readData(chunkFile, dataBuffers, offset, len, volume);
-
-    return ChunkBuffer.wrap(Lists.newArrayList(dataBuffers));
+    return ChunkUtils.readData(
+        chunkFile, bufferCapacity, offset, len, volume);
   }
 
   @Override

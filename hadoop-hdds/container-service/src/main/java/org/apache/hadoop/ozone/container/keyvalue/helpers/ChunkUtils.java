@@ -32,7 +32,10 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.FileAttribute;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
@@ -42,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.util.Time;
@@ -59,6 +63,10 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
+import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
+import org.apache.ratis.thirdparty.io.netty.buffer.PooledByteBufAllocator;
+import org.apache.ratis.thirdparty.io.netty.handler.stream.ChunkedNioFile;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -192,6 +200,15 @@ public final class ChunkUtils {
   public static void readData(File file, ByteBuffer[] buffers,
       long offset, long len, HddsVolume volume)
       throws StorageContainerException {
+    readData(file, offset, len, volume,
+        channel -> channel.position(offset).read(buffers));
+    Arrays.stream(buffers).forEach(ByteBuffer::flip);
+  }
+
+  private static void readData(File file, long offset, long len,
+      HddsVolume volume,
+      CheckedFunction<FileChannel, Long, Exception> readMethod)
+      throws StorageContainerException {
 
     final Path path = file.toPath();
     final long startTime = Time.monotonicNow();
@@ -202,10 +219,14 @@ public final class ChunkUtils {
         try (FileChannel channel = open(path, READ_OPTIONS, NO_ATTRIBUTES);
              FileLock ignored = channel.lock(offset, len, true)) {
 
-          return channel.position(offset).read(buffers);
-        } catch (IOException e) {
+          return readMethod.apply(channel);
+        } catch (Exception e) {
           onFailure(volume);
-          throw new UncheckedIOException(e);
+          if (e instanceof IOException) {
+            throw new UncheckedIOException((IOException) e);
+          } else {
+            throw new IllegalStateException(e);
+          }
         }
       });
     } catch (UncheckedIOException e) {
@@ -227,10 +248,40 @@ public final class ChunkUtils {
         bytesRead, offset, file);
 
     validateReadSize(len, bytesRead);
+  }
 
-    for (ByteBuffer buf : buffers) {
-      buf.flip();
-    }
+  public static ChunkBufferToByteString readData(File file, long chunkSize,
+      long offset, long length, HddsVolume volume)
+      throws StorageContainerException {
+    final List<ByteBuf> buffers = ChunkUtils.readDataNettyChunkedNioFile(
+        file, Math.toIntExact(chunkSize), offset, length, volume);
+    return ChunkBufferToByteString.wrap(buffers);
+  }
+
+  /**
+   * Read data from the given file using {@link ChunkedNioFile}.
+   *
+   * @return a list of {@link ByteBuf} containing the data.
+   */
+  private static List<ByteBuf> readDataNettyChunkedNioFile(
+      File file, int chunkSize,
+      long offset, long length, HddsVolume volume)
+      throws StorageContainerException {
+
+    final List<ByteBuf> buffers = new ArrayList<>(
+        Math.toIntExact((length - 1) / chunkSize) + 1);
+    readData(file, offset, length, volume, channel -> {
+      final ChunkedNioFile f = new ChunkedNioFile(
+          channel, offset, length, chunkSize);
+      long readLen = 0;
+      while (readLen < length) {
+        final ByteBuf buf = f.readChunk(PooledByteBufAllocator.DEFAULT);
+        readLen += buf.readableBytes();
+        buffers.add(buf);
+      }
+      return readLen;
+    });
+    return buffers;
   }
 
   /**

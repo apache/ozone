@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -43,6 +44,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -450,9 +452,10 @@ public class TestContainerPersistence {
     // Read chunk via ReadChunk call.
     for (int x = 0; x < chunkCount; x++) {
       ChunkInfo info = chunks.get(x);
-      ChunkBuffer data = chunkManager
+      final ChunkBufferToByteString data = chunkManager
           .readChunk(container, blockID, info, getDispatcherContext());
-      ChecksumData checksumData = checksum.computeChecksum(data);
+      final ChecksumData checksumData = checksum.computeChecksum(
+          Collections.singletonList(data.toByteString()));
       Assert.assertEquals(info.getChecksumData(), checksumData);
     }
   }
