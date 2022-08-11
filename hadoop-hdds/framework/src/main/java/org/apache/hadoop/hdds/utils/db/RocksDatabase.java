@@ -77,7 +77,7 @@ public final class RocksDatabase {
    *
    * @return a list of column families.
    */
-  private static List<TableConfig> getColumnFamilies(
+  private static List<TableConfig> getExtraColumnFamilies(
       File file, Set<TableConfig> families) throws RocksDBException {
 
     // This logic has been added to support old column families that have
@@ -90,7 +90,7 @@ public final class RocksDatabase {
         file.getAbsolutePath())
         .stream()
         .map(TableConfig::toName)
-        .filter(name -> !existingFamilyNames.contains(name))
+        .filter(familyName -> !existingFamilyNames.contains(familyName))
         .map(TableConfig::newTableConfig)
         .collect(Collectors.toList());
     if (LOG.isDebugEnabled()) {
@@ -121,7 +121,7 @@ public final class RocksDatabase {
     ManagedRocksDB db = null;
     final Map<String, ColumnFamily> columnFamilies = new HashMap<>();
     try {
-      final List<TableConfig> extra = getColumnFamilies(dbFile, families);
+      final List<TableConfig> extra = getExtraColumnFamilies(dbFile, families);
       descriptors = Stream.concat(families.stream(), extra.stream())
           .map(TableConfig::getDescriptor)
           .collect(Collectors.toList());
@@ -400,7 +400,7 @@ public final class RocksDatabase {
     return columnFamilies.get(key);
   }
 
-  public Collection<ColumnFamily> getColumnFamilies() {
+  public Collection<ColumnFamily> getExtraColumnFamilies() {
     return Collections.unmodifiableCollection(columnFamilies.values());
   }
 
