@@ -99,10 +99,10 @@ public abstract class BucketHandler {
       throws IOException;
 
   /**
-   *
+   * Fixing the existing path and appending the next level entity to it.
    * @param path
    * @param nextLevel
-   * @return
+   * @return subpath
    */
   public static String buildSubpath(String path, String nextLevel) {
     String subpath = path;

@@ -51,7 +51,7 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.tasks.FSONSSummaryTask;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -79,7 +79,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Test for FSONSSummary REST APIs.
+ * Test for NSSummary REST APIs with FSO.
  * We tested on a mini file system with the following setting:
  *                vol
  *             /       \
@@ -101,7 +101,7 @@ import static org.mockito.Mockito.when;
  * This is a test for the Rest APIs only. We have tested NSSummaryTask before,
  * so there is no need to test process() on DB's updates
  */
-public class TestFSONSSummaryEndpoint {
+public class TestNSSummaryEndpointWithFSO {
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
@@ -366,9 +366,9 @@ public class TestFSONSSummaryEndpoint {
 
     // populate OM DB and reprocess into Recon RocksDB
     populateOMDB();
-    FSONSSummaryTask fsoNSSummaryTask =
-        new FSONSSummaryTask(reconNamespaceSummaryManager);
-    fsoNSSummaryTask.reprocess(reconOMMetadataManager);
+    NSSummaryTaskWithFSO nSSummaryTaskWithFso =
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager);
+    nSSummaryTaskWithFso.reprocess(reconOMMetadataManager);
   }
 
   @Test

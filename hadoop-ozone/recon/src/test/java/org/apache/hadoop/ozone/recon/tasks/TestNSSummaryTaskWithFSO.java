@@ -52,10 +52,10 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirT
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 
 /**
- * Test for FSONSSummaryTask.
+ * Test for NSSummaryTaskWithFSO.
  */
 @RunWith(Enclosed.class)
-public final class TestFSONSSummaryTask {
+public final class TestNSSummaryTaskWithFSO {
 
   @ClassRule
   public static final TemporaryFolder TEMPORARY_FOLDER = new TemporaryFolder();
@@ -63,7 +63,7 @@ public final class TestFSONSSummaryTask {
   private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private static OMMetadataManager omMetadataManager;
   private static ReconOMMetadataManager reconOMMetadataManager;
-  private static FSONSSummaryTask fsoNSSummaryTask;
+  private static NSSummaryTaskWithFSO nSSummaryTaskWithFso;
 
   // Object names in FSO-enabled format
   private static final String VOL = "vol";
@@ -112,7 +112,7 @@ public final class TestFSONSSummaryTask {
   private static Set<Long> bucketTwoAns = new HashSet<>();
   private static Set<Long> dirOneAns = new HashSet<>();
 
-  private TestFSONSSummaryTask() {
+  private TestNSSummaryTaskWithFSO() {
   }
 
   @BeforeClass
@@ -141,12 +141,12 @@ public final class TestFSONSSummaryTask {
 
     populateOMDB();
 
-    fsoNSSummaryTask = new FSONSSummaryTask(
+    nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager);
   }
 
   /**
-   * Nested class for testing FSONSSummaryTask reprocess.
+   * Nested class for testing NSSummaryTaskWithFSO reprocess.
    */
   public static class TestReprocess {
 
@@ -165,7 +165,7 @@ public final class TestFSONSSummaryTask {
 
       // Verify commit
       Assert.assertNotNull(reconNamespaceSummaryManager.getNSSummary(-1L));
-      fsoNSSummaryTask.reprocess(reconOMMetadataManager);
+      nSSummaryTaskWithFso.reprocess(reconOMMetadataManager);
       Assert.assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
 
       nsSummaryForBucket1 =
@@ -261,7 +261,7 @@ public final class TestFSONSSummaryTask {
   }
 
   /**
-   * Nested class for testing FSONSSummaryTask process.
+   * Nested class for testing NSSummaryTaskWithFSO process.
    */
   public static class TestProcess {
     private static OMDBUpdateEvent keyEvent1;
@@ -273,8 +273,8 @@ public final class TestFSONSSummaryTask {
     private static OMDBUpdateEvent keyEvent7;
     @BeforeClass
     public static void setUp() throws IOException {
-      fsoNSSummaryTask.reprocess(reconOMMetadataManager);
-      fsoNSSummaryTask.process(processEventBatch());
+      nSSummaryTaskWithFso.reprocess(reconOMMetadataManager);
+      nSSummaryTaskWithFso.process(processEventBatch());
     }
 
     private static OMUpdateEventBatch processEventBatch() throws IOException {

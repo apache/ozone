@@ -44,25 +44,25 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 /**
  * Class for handling FSO specific tasks.
  */
-public class FSONSSummaryTask extends NSSummaryTask {
+public class NSSummaryTaskWithFSO extends NSSummaryTask {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(FSONSSummaryTask.class);
+      LoggerFactory.getLogger(NSSummaryTaskWithFSO.class);
 
   @Inject
-  public FSONSSummaryTask(ReconNamespaceSummaryManager
+  public NSSummaryTaskWithFSO(ReconNamespaceSummaryManager
                             reconNamespaceSummaryManager) {
     super(reconNamespaceSummaryManager);
   }
 
   @Override
   public String getTaskName() {
-    return "FSONSSummaryTask";
+    return "NSSummaryTaskWithFSO";
   }
 
   // We only listen to updates from FSO-enabled KeyTable(FileTable) and DirTable
   public Collection<String> getTaskTables() {
-    return Arrays.asList(new String[]{FILE_TABLE, DIRECTORY_TABLE});
+    return Arrays.asList(FILE_TABLE, DIRECTORY_TABLE);
   }
 
   @Override
@@ -163,7 +163,7 @@ public class FSONSSummaryTask extends NSSummaryTask {
       return new ImmutablePair<>(getTaskName(), false);
     }
 
-    LOG.info("Completed a process run of FSONSSummaryTask");
+    LOG.info("Completed a process run of NSSummaryTaskWithFSO");
     return new ImmutablePair<>(getTaskName(), true);
   }
 
@@ -210,7 +210,7 @@ public class FSONSSummaryTask extends NSSummaryTask {
       LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
       return new ImmutablePair<>(getTaskName(), false);
     }
-    LOG.info("Completed a reprocess run of FSONSSummaryTask");
+    LOG.info("Completed a reprocess run of NSSummaryTaskWithFSO");
     return new ImmutablePair<>(getTaskName(), true);
   }
 }
