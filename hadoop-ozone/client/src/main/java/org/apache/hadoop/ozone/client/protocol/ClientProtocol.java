@@ -960,11 +960,13 @@ public interface ClientProtocol {
 
   /**
    * Create snapshot.
-   * @param name name to be used
-   * @param snapshotPath snapshotPath to use
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name to be used
    * @return name used
    * @throws IOException
    */
-  String createSnapshot(String name, String snapshotPath) throws IOException;
+  String createSnapshot(String volumeName,
+      String bucketName, String snapshotName) throws IOException;
   
 }

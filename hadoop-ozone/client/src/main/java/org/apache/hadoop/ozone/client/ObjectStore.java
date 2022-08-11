@@ -543,9 +543,9 @@ public class ObjectStore {
    * @return name used
    * @throws IOException
    */
-  public String createSnapshot(String name,
-      String snapshotPath) throws IOException {
-    return proxy.createSnapshot(name, snapshotPath);
+  public String createSnapshot(String volumeName,
+      String bucketName, String snapshotName) throws IOException {
+    return proxy.createSnapshot(volumeName, bucketName, snapshotName);
   }
 
 

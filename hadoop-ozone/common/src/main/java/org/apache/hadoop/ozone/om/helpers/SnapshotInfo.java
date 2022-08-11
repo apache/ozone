@@ -36,7 +36,6 @@ import java.time.ZoneId;
 
 import java.util.Objects;
 import java.util.UUID;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.LinkedHashMap;
 
@@ -93,7 +92,6 @@ public final class SnapshotInfo implements Auditable {
   }
 
   public static final String SNAPSHOT_FLAG = "snapshot";
-  private static final String DELIMITER = "_";
   private static final String SEPARATOR = "-";
   private static final long UNDELETED_TIME = -1;
   private static final String INITIAL_SNAPSHOT_ID =
@@ -391,47 +389,6 @@ public final class SnapshotInfo implements Auditable {
 
     return osib.build();
   }
-
-  /**
-   * Get volume from snapshot path.
-   */
-  private static String getVolumeNameFromPath(String path) {
-    String volumeName = null;
-    String[] names = path.split(OM_KEY_PREFIX);
-    if (names.length > 0) {
-      volumeName = names[0];
-    }
-    return volumeName;
-  }
-
-  /**
-   * Get bucket from snapshot path.
-   */
-  private static String getBucketNameFromPath(String path) {
-    String bucketName = null;
-    String[] names = path.split(OM_KEY_PREFIX);
-    if (names.length > 1) {
-      bucketName = names[1];
-    }
-    return bucketName;
-  }
-
-  /**
-   * Get directory from snapshot path.
-   * Note that snapshot on directories is not supported yet;
-   *  this is only used to confirm that snapshotPath doesn't
-   *  contain a directory
-   */
-  public String getDirName() {
-    String dirName = null;
-    String[] names = snapshotPath.split(OM_KEY_PREFIX);
-    if (names.length > 2) {
-      dirName = String.join(OM_KEY_PREFIX,
-          Arrays.copyOfRange(names, 2, names.length));
-    }
-    return dirName;
-  }
-
   /**
    * Get the name of the lock resource for this snapshot.
    */
@@ -464,8 +421,8 @@ public final class SnapshotInfo implements Auditable {
   /**
    * Get the table key for this snapshot.
    */
-  public static String getTableKey(String name, String snapshotPath) {
-    return snapshotPath.replaceAll(OM_KEY_PREFIX, SEPARATOR) + DELIMITER + name;
+  public String getTableKey() {
+    return OM_KEY_PREFIX + snapshotPath + OM_KEY_PREFIX + name;
   }
 
   /**
@@ -483,22 +440,23 @@ public final class SnapshotInfo implements Auditable {
   /**
    * Factory for making standard instance.
    */
-  public static SnapshotInfo newInstance(String name, String snapshotPath) {
+  public static SnapshotInfo newInstance(String volumeName,
+      String bucketName, String snapshotName) {
     SnapshotInfo.Builder builder = new SnapshotInfo.Builder();
     String id = UUID.randomUUID().toString();
     long initialTime = Time.now();
-    if (StringUtils.isBlank(name)) {
-      name = generateName(initialTime); 
+    if (StringUtils.isBlank(snapshotName)) {
+      snapshotName = generateName(initialTime);
     }
     builder.setSnapshotID(id)
-        .setName(name)
+        .setName(snapshotName)
         .setCreationTime(initialTime)
         .setDeletionTime(UNDELETED_TIME)
         .setPathPreviousSnapshotID(INITIAL_SNAPSHOT_ID)
         .setGlobalPreviousSnapshotID(INITIAL_SNAPSHOT_ID)
-        .setSnapshotPath(snapshotPath)
-        .setVolumeName(getVolumeNameFromPath(snapshotPath))
-        .setBucketName(getBucketNameFromPath(snapshotPath))
+        .setSnapshotPath(volumeName + OM_KEY_PREFIX + bucketName)
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
         .setCheckpointDir(getCheckpointDirName(id));
     return builder.build();
   }

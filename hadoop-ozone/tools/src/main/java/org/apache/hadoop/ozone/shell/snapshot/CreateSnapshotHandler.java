@@ -17,9 +17,11 @@
  */
 package org.apache.hadoop.ozone.shell.snapshot;
 
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
+import org.apache.hadoop.ozone.shell.bucket.BucketUri;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -31,22 +33,31 @@ import java.io.IOException;
     description = "create snapshot")
 public class CreateSnapshotHandler extends Handler {
 
-  @CommandLine.Parameters(description =
-      "snapshotPath, (currently only bucket allowed)",
-      index = "0", arity = "1..1")
-  private String snapshotPath;
+  @CommandLine.Mixin
+  private BucketUri snapshotPath;
+
 
   @CommandLine.Parameters(description = "optional snapshot name",
       index = "1", arity = "0..1")
-  private String name;
+  private String snapshotName;
+
+  @Override
+  protected OzoneAddress getAddress() {
+    return snapshotPath.getValue();
+  }
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
-    String newName = client.getObjectStore().createSnapshot(name, snapshotPath);
+    String volumeName = snapshotPath.getValue().getVolumeName();
+    String bucketName = snapshotPath.getValue().getBucketName();
+    OmUtils.validateSnapshotName(snapshotName);
+    String newName = client.getObjectStore()
+        .createSnapshot(volumeName, bucketName, snapshotName);
     if (isVerbose()) {
-      out().format("created snapshot '%s %s'.%n", snapshotPath, newName);
+      out().format("created snapshot '%s/%s %s'.%n", volumeName, bucketName,
+          newName);
     }
   }
 }

@@ -78,10 +78,9 @@ public class TestOMSnapshotCreateResponse {
   public void testAddToDBBatch() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    String name = UUID.randomUUID().toString();
-    String snapshotPath = volumeName + OM_KEY_PREFIX + bucketName;
+    String snapshotName = UUID.randomUUID().toString();
     SnapshotInfo snapshotInfo =
-        SnapshotInfo.newInstance(name, snapshotPath);
+        SnapshotInfo.newInstance(volumeName, bucketName, snapshotName);
 
     // confirm table is empty
     Assert.assertEquals(0,
@@ -96,7 +95,7 @@ public class TestOMSnapshotCreateResponse {
             .setCreateSnapshotResponse(
                 CreateSnapshotResponse.newBuilder()
                 .setSnapshotInfo(snapshotInfo.getProtobuf())
-                    .build()).build(), name, snapshotPath);
+                .build()).build(), volumeName, bucketName, snapshotName);
     omSnapshotCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
@@ -114,8 +113,7 @@ public class TestOMSnapshotCreateResponse {
     Table.KeyValue<String, SnapshotInfo> keyValue =
         omMetadataManager.getSnapshotInfoTable().iterator().next();
     SnapshotInfo storedInfo = keyValue.getValue();
-    Assert.assertEquals(SnapshotInfo
-        .getTableKey(name, snapshotPath), keyValue.getKey());
+    Assert.assertEquals(snapshotInfo.getTableKey(), keyValue.getKey());
     Assert.assertEquals(snapshotInfo, storedInfo);
   }
 }

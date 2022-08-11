@@ -36,15 +36,11 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TAB
 @CleanupTableInfo(cleanupTables = {SNAPSHOT_INFO_TABLE})
 public class OMSnapshotCreateResponse extends OMClientResponse {
 
-  private final String snapshotPath;
-  private final String name;
   @SuppressWarnings("checkstyle:parameternumber")
   public OMSnapshotCreateResponse(@Nonnull OMResponse omResponse,
-      @Nonnull String name, @Nonnull String snapshotPath
-  ) {
+      @Nonnull String volumeName, @Nonnull String bucketName,
+                                  @Nonnull String snapshotName) {
     super(omResponse);
-    this.snapshotPath = snapshotPath;
-    this.name = name;
   }
 
   /**
@@ -54,8 +50,6 @@ public class OMSnapshotCreateResponse extends OMClientResponse {
   public OMSnapshotCreateResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
     checkStatusNotOK();
-    snapshotPath = null;
-    name = null;
   }
 
   @Override
@@ -69,7 +63,7 @@ public class OMSnapshotCreateResponse extends OMClientResponse {
     // Create the snapshot checkpoint
     SnapshotManager.createSnapshot(omMetadataManager, snapshotInfo);
 
-    String key = SnapshotInfo.getTableKey(name, snapshotPath);
+    String key = snapshotInfo.getTableKey();
 
     // Add to db
     omMetadataManager.getSnapshotInfoTable().putWithBatch(batchOperation,

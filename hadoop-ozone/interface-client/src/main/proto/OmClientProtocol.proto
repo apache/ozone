@@ -1610,8 +1610,9 @@ message SetRangerServiceVersionRequest {
 }
 
 message CreateSnapshotRequest {
-  optional string name = 1;
-  required string snapshotPath = 2;
+  required string volumeName = 1;
+  required string bucketName = 2;
+  optional string snapshotName = 3;
 }
 
 message DeleteTenantRequest {
