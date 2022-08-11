@@ -50,6 +50,17 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
     return this;
   }
 
+  public synchronized ManagedColumnFamilyOptions closeAndSetTableFormatConfig(
+      TableFormatConfig tableFormatConfig) {
+    TableFormatConfig previous = tableFormatConfig();
+    if (previous instanceof ManagedBlockBasedTableConfig) {
+      ((ManagedBlockBasedTableConfig) previous).close();
+    }
+    setTableFormatConfig(tableFormatConfig);
+    return this;
+  }
+
+
   @Override
   protected void finalize() throws Throwable {
     ManagedRocksObjectUtils.assertClosed(this);
@@ -59,6 +70,7 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
   /**
    * Close ColumnFamilyOptions and its child resources.
    * See org.apache.hadoop.hdds.utils.db.DBProfile.getColumnFamilyOptions
+   *
    * @param options
    */
   public static void closeDeeply(ColumnFamilyOptions options) {

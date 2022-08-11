@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -275,10 +276,8 @@ public final class DBStoreBuilder {
   }
 
   private ManagedColumnFamilyOptions getDefaultCfOptions() {
-    if (defaultCfOptions != null) {
-      return defaultCfOptions;
-    }
-    return defaultCfProfile.getColumnFamilyOptions();
+    return Optional.ofNullable(defaultCfOptions)
+        .orElseGet(defaultCfProfile::getColumnFamilyOptions);
   }
 
   /**

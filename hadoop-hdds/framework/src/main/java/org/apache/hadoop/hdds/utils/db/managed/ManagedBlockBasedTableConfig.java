@@ -30,8 +30,18 @@ public class ManagedBlockBasedTableConfig extends BlockBasedTableConfig {
   private Cache blockCacheHolder;
   private AtomicBoolean closed = new AtomicBoolean(false);
 
+  public synchronized ManagedBlockBasedTableConfig closeAndSetBlockCache(
+      Cache blockCache) {
+    Cache previous = blockCacheHolder;
+    if (previous.isOwningHandle()) {
+      previous.close();
+    }
+    return setBlockCache(blockCache);
+  }
+
   @Override
-  public BlockBasedTableConfig setBlockCache(Cache blockCache) {
+  public synchronized ManagedBlockBasedTableConfig setBlockCache(
+      Cache blockCache) {
     // Close the previous Cache before overwriting.
     Cache previous = blockCacheHolder;
     if (previous != null && previous.isOwningHandle()) {
@@ -39,11 +49,8 @@ public class ManagedBlockBasedTableConfig extends BlockBasedTableConfig {
     }
 
     blockCacheHolder = blockCache;
-    return super.setBlockCache(blockCache);
-  }
-
-  public Cache blockCache() {
-    return blockCacheHolder;
+    super.setBlockCache(blockCache);
+    return this;
   }
 
   public boolean isClosed() {
