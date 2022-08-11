@@ -39,6 +39,7 @@ import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointType;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
@@ -166,7 +167,8 @@ public class SCMConnectionManager
           rpcProxy);
 
       EndpointStateMachine endPoint =
-          new EndpointStateMachine(address, rpcClient, this.conf);
+          new EndpointStateMachine(address, rpcClient, this.conf,
+              EndPointType.SCM);
       endPoint.setPassive(false);
       scmMachines.put(address, endPoint);
     } finally {
@@ -209,7 +211,8 @@ public class SCMConnectionManager
           new StorageContainerDatanodeProtocolClientSideTranslatorPB(rpcProxy);
 
       EndpointStateMachine endPoint =
-          new EndpointStateMachine(address, rpcClient, conf);
+          new EndpointStateMachine(address, rpcClient, conf,
+              EndPointType.RECON);
       endPoint.setPassive(true);
       scmMachines.put(address, endPoint);
     } finally {

@@ -49,6 +49,7 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointType;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.states.endpoint.HeartbeatEndpointTask;
 import org.apache.hadoop.ozone.container.common.states.endpoint.RegisterEndpointTask;
@@ -122,7 +123,7 @@ public class TestEndPoint {
   public void testGetVersion() throws Exception {
     try (EndpointStateMachine rpcEndPoint =
         createEndpoint(SCMTestUtils.getConf(),
-            serverAddress, 1000)) {
+            serverAddress, 1000, EndPointType.SCM)) {
       SCMVersionResponseProto responseProto = rpcEndPoint.getEndPoint()
           .getVersion(null);
       Assertions.assertNotNull(responseProto);
@@ -142,7 +143,7 @@ public class TestEndPoint {
     OzoneConfiguration conf = SCMTestUtils.getConf();
     conf.setFromObject(new ReplicationConfig().setPort(0));
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
-        serverAddress, 1000)) {
+        serverAddress, 1000, EndPointType.SCM)) {
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(
           datanodeDetails, conf, getContext(datanodeDetails), null);
@@ -170,7 +171,7 @@ public class TestEndPoint {
         true);
     conf.setFromObject(new ReplicationConfig().setPort(0));
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
-        serverAddress, 1000)) {
+        serverAddress, 1000, EndPointType.SCM)) {
       GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
           .captureLogs(VersionEndpointTask.LOG);
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
@@ -220,7 +221,7 @@ public class TestEndPoint {
     InetSocketAddress nonExistentServerAddress = SCMTestUtils
         .getReuseableAddress();
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
-        nonExistentServerAddress, 1000)) {
+        nonExistentServerAddress, 1000, EndPointType.SCM)) {
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(
@@ -248,7 +249,7 @@ public class TestEndPoint {
     OzoneConfiguration conf = SCMTestUtils.getConf();
 
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
-        serverAddress, (int) rpcTimeout)) {
+        serverAddress, (int) rpcTimeout, EndPointType.SCM)) {
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(
@@ -271,7 +272,7 @@ public class TestEndPoint {
   public void testRegister() throws Exception {
     DatanodeDetails nodeToRegister = randomDatanodeDetails();
     try (EndpointStateMachine rpcEndPoint = createEndpoint(
-        SCMTestUtils.getConf(), serverAddress, 1000)) {
+        SCMTestUtils.getConf(), serverAddress, 1000, EndPointType.SCM)) {
       SCMRegisteredResponseProto responseProto = rpcEndPoint.getEndPoint()
           .register(nodeToRegister.getExtendedProtoBufMessage(), HddsTestUtils
                   .createNodeReport(
@@ -308,10 +309,18 @@ public class TestEndPoint {
   private EndpointStateMachine registerTaskHelper(InetSocketAddress scmAddress,
       int rpcTimeout, boolean clearDatanodeDetails
   ) throws Exception {
+    return registerTaskHelper(scmAddress, rpcTimeout, clearDatanodeDetails,
+        EndpointStateMachine.EndPointType.SCM);
+  }
+
+  private EndpointStateMachine registerTaskHelper(InetSocketAddress scmAddress,
+      int rpcTimeout, boolean clearDatanodeDetails,
+      EndpointStateMachine.EndPointType type
+  ) throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
     EndpointStateMachine rpcEndPoint =
         createEndpoint(conf,
-            scmAddress, rpcTimeout);
+            scmAddress, rpcTimeout, type);
     rpcEndPoint.setState(EndpointStateMachine.EndPointStates.REGISTER);
     OzoneContainer ozoneContainer = mock(OzoneContainer.class);
     UUID datanodeID = UUID.randomUUID();
@@ -390,7 +399,7 @@ public class TestEndPoint {
     DatanodeDetails dataNode = randomDatanodeDetails();
     try (EndpointStateMachine rpcEndPoint =
         createEndpoint(SCMTestUtils.getConf(),
-            serverAddress, 1000)) {
+            serverAddress, 1000, EndPointType.SCM)) {
       SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(dataNode.getProtoBufMessage())
           .setNodeReport(HddsTestUtils.createNodeReport(
@@ -410,7 +419,7 @@ public class TestEndPoint {
     DatanodeDetails dataNode = randomDatanodeDetails();
     try (EndpointStateMachine rpcEndPoint =
         createEndpoint(SCMTestUtils.getConf(),
-            serverAddress, 1000)) {
+            serverAddress, 1000, EndPointType.SCM)) {
       // Add some scmCommands for heartbeat response
       addScmCommands();
 
@@ -492,7 +501,7 @@ public class TestEndPoint {
     try (DatanodeStateMachine stateMachine = new DatanodeStateMachine(
         randomDatanodeDetails(), conf, null, null, null);
         EndpointStateMachine rpcEndPoint =
-            createEndpoint(conf, scmAddress, rpcTimeout)) {
+            createEndpoint(conf, scmAddress, rpcTimeout, EndPointType.SCM)) {
       HddsProtos.DatanodeDetailsProto datanodeDetailsProto =
           randomDatanodeDetails().getProtoBufMessage();
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
@@ -537,6 +546,15 @@ public class TestEndPoint {
     scmServerImpl.setRpcResponseDelay(0);
     // 6s is introduced by DeleteBlocksCommandHandler#stop
     Assertions.assertTrue(end - start <= rpcTimeout + tolerance + 6000);
+  }
+
+  @Test
+  public void testEndpointType() throws Exception {
+    InetSocketAddress address = SCMTestUtils.getReuseableAddress();
+    try (EndpointStateMachine rpcEndpoint =
+             registerTaskHelper(address, 1000, true)) {
+      Assertions.assertEquals(rpcEndpoint.getType(), EndPointType.SCM);
+    }
   }
 
   private StateContext getContext(DatanodeDetails datanodeDetails) {

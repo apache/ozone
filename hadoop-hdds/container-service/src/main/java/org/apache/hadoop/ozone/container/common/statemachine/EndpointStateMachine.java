@@ -51,6 +51,7 @@ public class EndpointStateMachine
   private final Lock lock;
   private final ConfigurationSource conf;
   private EndPointStates state;
+  private EndPointType type;
   private VersionResponse version;
   private ZonedDateTime lastSuccessfulHeartbeat;
   private boolean isPassive;
@@ -62,8 +63,8 @@ public class EndpointStateMachine
    * @param endPoint - RPC endPoint.
    */
   public EndpointStateMachine(InetSocketAddress address,
-      StorageContainerDatanodeProtocolClientSideTranslatorPB endPoint,
-      ConfigurationSource conf) {
+        StorageContainerDatanodeProtocolClientSideTranslatorPB endPoint,
+        ConfigurationSource conf, EndPointType type) {
     this.endPoint = endPoint;
     this.missedCount = new AtomicLong(0);
     this.address = address;
@@ -75,6 +76,7 @@ public class EndpointStateMachine
             .setNameFormat("EndpointStateMachine task thread for "
                 + this.address + " - %d ")
             .build());
+    this.type = type;
   }
 
   /**
@@ -328,6 +330,42 @@ public class EndpointStateMachine
       }
       return getLastState();
     }
+  }
+
+  /**
+   * Service type of the Endpoint.
+   */
+  public enum EndPointType {
+    SCM(1),
+    RECON(2);
+    private final int value;
+
+    /**
+     * Constructs endPointType.
+     *
+     * @param value  state.
+     */
+    EndPointType(int value) {
+      this.value = value;
+    }
+
+    /**
+     * returns the numeric value associated with the endPoint.
+     *
+     * @return int.
+     */
+    public int getValue() {
+      return value;
+    }
+  }
+
+  public void setType(EndPointType type) {
+    this.type = type;
+  }
+
+  @Override
+  public EndPointType getType() {
+    return this.type;
   }
 
   @Override

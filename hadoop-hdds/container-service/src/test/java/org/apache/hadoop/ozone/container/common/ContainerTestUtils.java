@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointType;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -68,7 +69,8 @@ public final class ContainerTestUtils {
    * @throws Exception
    */
   public static EndpointStateMachine createEndpoint(Configuration conf,
-      InetSocketAddress address, int rpcTimeout) throws Exception {
+      InetSocketAddress address, int rpcTimeout, EndPointType type)
+      throws Exception {
     RPC.setProtocolEngine(conf, StorageContainerDatanodeProtocolPB.class,
         ProtobufRpcEngine.class);
     long version =
@@ -83,7 +85,7 @@ public final class ContainerTestUtils {
     StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
         new StorageContainerDatanodeProtocolClientSideTranslatorPB(rpcProxy);
     return new EndpointStateMachine(address, rpcClient,
-        new LegacyHadoopConfigurationSource(conf));
+        new LegacyHadoopConfigurationSource(conf), type);
   }
 
   public static OzoneContainer getOzoneContainer(

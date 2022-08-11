@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.container.common.ScmTestMock;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointType;
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.DbVolume;
@@ -623,7 +624,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
    */
   public void callVersionEndpointTask() throws Exception {
     try (EndpointStateMachine esm = ContainerTestUtils.createEndpoint(conf,
-        address, 1000)) {
+        address, 1000, EndPointType.SCM)) {
       VersionEndpointTask vet = new VersionEndpointTask(esm, conf,
           dsm.getContainer());
       esm.setState(EndpointStateMachine.EndPointStates.GETVERSION);

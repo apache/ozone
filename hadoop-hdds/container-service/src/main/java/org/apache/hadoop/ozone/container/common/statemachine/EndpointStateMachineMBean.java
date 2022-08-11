@@ -31,4 +31,6 @@ public interface EndpointStateMachineMBean {
   int getVersionNumber();
 
   long getLastSuccessfulHeartbeat();
+
+  EndpointStateMachine.EndPointType getType();
 }
