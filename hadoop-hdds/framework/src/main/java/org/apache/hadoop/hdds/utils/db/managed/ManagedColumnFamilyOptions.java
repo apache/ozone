@@ -36,10 +36,16 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
   @Override
   public ManagedColumnFamilyOptions setTableFormatConfig(
       TableFormatConfig tableFormatConfig) {
-    // Close the previous TableFormatConfig before overwriting.
-    if (tableFormatConfig() instanceof ManagedBlockBasedTableConfig) {
-      ((ManagedBlockBasedTableConfig) tableFormatConfig()).close();
+    TableFormatConfig previous = tableFormatConfig();
+    if (previous instanceof ManagedBlockBasedTableConfig) {
+      if (!((ManagedBlockBasedTableConfig) previous).isClosed()) {
+        throw new IllegalStateException("Overriding an unclosed value.");
+      }
+    } else if (previous != null) {
+      throw new UnsupportedOperationException("Overwrite is not supported for "
+          + previous.getClass());
     }
+
     super.setTableFormatConfig(tableFormatConfig);
     return this;
   }
@@ -50,11 +56,15 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
     super.finalize();
   }
 
+  /**
+   * Close ColumnFamilyOptions and its child resources.
+   * See org.apache.hadoop.hdds.utils.db.DBProfile.getColumnFamilyOptions
+   * @param options
+   */
   public static void closeDeeply(ColumnFamilyOptions options) {
-    // Close ColumnFamilyOptions and all the child resources.
-    // See org.apache.hadoop.hdds.utils.db.DBProfile.getColumnFamilyOptions
-    if (options.tableFormatConfig() instanceof ManagedBlockBasedTableConfig) {
-      ((ManagedBlockBasedTableConfig) options.tableFormatConfig()).close();
+    TableFormatConfig tableFormatConfig = options.tableFormatConfig();
+    if (tableFormatConfig instanceof ManagedBlockBasedTableConfig) {
+      ((ManagedBlockBasedTableConfig) tableFormatConfig).close();
     }
     options.close();
   }

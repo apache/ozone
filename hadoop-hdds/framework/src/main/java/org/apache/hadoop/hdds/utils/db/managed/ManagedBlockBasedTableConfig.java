@@ -20,22 +20,35 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.Cache;
+import org.rocksdb.Filter;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Managed BlockBasedTableConfig.
  */
 public class ManagedBlockBasedTableConfig extends BlockBasedTableConfig {
   private Cache blockCacheHolder;
+  private AtomicBoolean closed = new AtomicBoolean(false);
 
   @Override
   public BlockBasedTableConfig setBlockCache(Cache blockCache) {
     // Close the previous Cache before overwriting.
-    if (blockCacheHolder != null) {
-      blockCacheHolder.close();
+    Cache previous = blockCacheHolder;
+    if (previous != null && previous.isOwningHandle()) {
+      throw new IllegalStateException("Overriding an unclosed value.");
     }
 
     blockCacheHolder = blockCache;
     return super.setBlockCache(blockCache);
+  }
+
+  public Cache blockCache() {
+    return blockCacheHolder;
+  }
+
+  public boolean isClosed() {
+    return closed.get();
   }
 
   /**
@@ -43,11 +56,13 @@ public class ManagedBlockBasedTableConfig extends BlockBasedTableConfig {
    * See org.apache.hadoop.hdds.utils.db.DBProfile.getBlockBasedTableConfig
    */
   public void close() {
-    if (filterPolicy() != null) {
-      filterPolicy().close();
-    }
-    if (blockCacheHolder != null) {
-      blockCacheHolder.close();
+    if (closed.compareAndSet(false, true)) {
+      if (filterPolicy() != null) {
+        filterPolicy().close();
+      }
+      if (blockCacheHolder != null) {
+        blockCacheHolder.close();
+      }
     }
   }
 }

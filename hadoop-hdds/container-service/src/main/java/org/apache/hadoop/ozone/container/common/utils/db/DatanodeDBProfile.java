@@ -116,7 +116,13 @@ public abstract class DatanodeDBProfile {
 
     private ManagedColumnFamilyOptions getColumnFamilyOptions(
         ConfigurationSource config) {
-      return baseProfile.getColumnFamilyOptions()
+      ManagedColumnFamilyOptions cfOptions =
+          baseProfile.getColumnFamilyOptions();
+      if (cfOptions.tableFormatConfig() instanceof
+          ManagedBlockBasedTableConfig) {
+        ((ManagedBlockBasedTableConfig) cfOptions.tableFormatConfig()).close();
+      }
+      return cfOptions
               .setTableFormatConfig(getBlockBasedTableConfig(config));
     }
 
@@ -132,6 +138,9 @@ public abstract class DatanodeDBProfile {
           .getStorageSize(HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE,
               HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT,
               StorageUnit.BYTES);
+      if (blockBasedTableConfig.blockCache() != null) {
+        blockBasedTableConfig.blockCache().close();
+      }
       blockBasedTableConfig.setBlockCache(new ManagedLRUCache(cacheSize));
       return blockBasedTableConfig;
     }
