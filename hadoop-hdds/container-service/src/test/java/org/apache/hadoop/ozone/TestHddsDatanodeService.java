@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ServicePlugin;
 
@@ -87,7 +88,11 @@ public class TestHddsDatanodeService {
     assertNotNull(datanodeService.getCRLStore());
 
     datanodeService.stop();
-    verify(datanodeService, times(1)).cleanTmpDir();
+
+    if (VersionedDatanodeFeatures.SchemaV3
+        .isFinalizedAndEnabled(conf)) {
+      verify(datanodeService, times(1)).cleanTmpDir();
+    }
 
     // CRL store must be stopped when the service stops
     assertNull(datanodeService.getCRLStore().getStore());

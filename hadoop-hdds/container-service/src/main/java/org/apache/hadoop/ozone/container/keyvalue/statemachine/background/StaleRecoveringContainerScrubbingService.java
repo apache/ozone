@@ -95,7 +95,10 @@ public class StaleRecoveringContainerScrubbingService
       CleanUpManager cleanUpManager =
           new CleanUpManager(hddsVolume);
 
-      cleanUpManager.renameDir(keyValueContainerData);
+      if (cleanUpManager
+          .checkContainerSchemaV3Enabled(keyValueContainerData)) {
+        cleanUpManager.renameDir(keyValueContainerData);
+      }
       containerSet.getContainer(containerID).delete();
       containerSet.removeContainer(containerID);
       LOG.info("Delete stale recovering container {}", containerID);

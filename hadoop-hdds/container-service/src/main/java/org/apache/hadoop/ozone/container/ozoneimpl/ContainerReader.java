@@ -217,7 +217,10 @@ public class ContainerReader implements Runnable {
                 new CleanUpManager(hddsVolume);
             KeyValueContainerData keyValueContainerData =
                 (KeyValueContainerData) containerData;
-            cleanUpManager.renameDir(keyValueContainerData);
+            if (cleanUpManager
+                .checkContainerSchemaV3Enabled(keyValueContainerData)) {
+              cleanUpManager.renameDir(keyValueContainerData);
+            }
             kvContainer.delete();
             LOG.info("Delete recovering container {}.",
                 kvContainer.getContainerData().getContainerID());

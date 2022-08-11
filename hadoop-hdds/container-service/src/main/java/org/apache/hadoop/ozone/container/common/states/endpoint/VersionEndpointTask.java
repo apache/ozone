@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
@@ -108,8 +109,12 @@ public class VersionEndpointTask implements
         rpcEndPoint.setState(nextState);
         rpcEndPoint.zeroMissedCount();
 
-        //clean /tmp/container_delete_service
-        cleanTmpDir();
+        // Clean /tmp/container_delete_service,
+        // if SchemaV3 is enabled.
+        if (VersionedDatanodeFeatures.SchemaV3
+            .isFinalizedAndEnabled(configuration)) {
+          cleanTmpDir();
+        }
       } else {
         LOG.debug("Cannot execute GetVersion task as endpoint state machine " +
             "is in {} state", rpcEndPoint.getState());

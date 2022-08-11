@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -573,7 +574,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   @Override
   public void stop() {
-    cleanTmpDir();
+    if (VersionedDatanodeFeatures.SchemaV3
+        .isFinalizedAndEnabled(conf)) {
+      cleanTmpDir();
+    }
     if (!isStopped.getAndSet(true)) {
       if (plugins != null) {
         for (ServicePlugin plugin : plugins) {

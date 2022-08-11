@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.container.common;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -50,16 +52,27 @@ public class CleanUpManager {
   private String tmpPath;
 
   public CleanUpManager(HddsVolume hddsVolume) {
-
     Path tmpDirPath = getTmpDirPath(hddsVolume);
 
     if (Files.notExists(tmpDirPath)) {
       try {
         Files.createDirectories(tmpDirPath);
-      } catch (IOException e) {
-        LOG.error("Error creating /tmp/container_delete_service", e);
+      } catch (IOException ex) {
+        LOG.error("Error creating /tmp/container_delete_service", ex);
       }
     }
+  }
+
+  public boolean checkContainerSchemaV3Enabled(
+      KeyValueContainerData keyValueContainerData) {
+    return (keyValueContainerData.getSchemaVersion()
+        .equals(OzoneConsts.SCHEMA_V3));
+  }
+
+  public boolean checkContainerSchemaV3Enabled(
+      ConfigurationSource config) {
+    return VersionedDatanodeFeatures.SchemaV3
+        .isFinalizedAndEnabled(config);
   }
 
   private Path getTmpDirPath(HddsVolume hddsVolume) {
@@ -77,7 +90,7 @@ public class CleanUpManager {
     String clusterId = hddsVolume.getClusterID();
 
     if (clusterId == null) {
-      //get clusterId with another way
+      LOG.error("Volume has not been initialized, clusterId is null.");
     }
 
     String pathId = "";
@@ -119,7 +132,7 @@ public class CleanUpManager {
    * @return iterator to the list of the leftover files
    */
   public ListIterator<File> getDeleteLeftovers() {
-    List<File> leftovers = new ArrayList<File>();
+    List<File> leftovers = new ArrayList<>();
 
     File tmpDir = new File(tmpPath);
 

@@ -1245,7 +1245,10 @@ public class KeyValueHandler extends Handler {
               DELETE_ON_NON_EMPTY_CONTAINER);
         }
       }
-      cleanUpManager.renameDir(keyValueContainerData);
+      if (cleanUpManager
+          .checkContainerSchemaV3Enabled(keyValueContainerData)) {
+        cleanUpManager.renameDir(keyValueContainerData);
+      }
       long containerId = container.getContainerData().getContainerID();
       containerSet.removeContainer(containerId);
     } finally {
