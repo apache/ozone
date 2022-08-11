@@ -28,7 +28,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
  */
 public class VolumeIOStats {
   private String metricsSourceName = VolumeIOStats.class.getSimpleName();
-
+  private String storageDirectory;
   private @Metric MutableCounterLong readBytes;
   private @Metric MutableCounterLong readOpCount;
   private @Metric MutableCounterLong writeBytes;
@@ -44,8 +44,9 @@ public class VolumeIOStats {
   /**
    * @param identifier Typically, path to volume root. e.g. /data/hdds
    */
-  public VolumeIOStats(String identifier) {
+  public VolumeIOStats(String identifier, String storageDirectory) {
     this.metricsSourceName += '-' + identifier;
+    this.storageDirectory = storageDirectory;
     init();
   }
 
@@ -156,6 +157,8 @@ public class VolumeIOStats {
   public long getWriteTime() {
     return writeTime.value();
   }
-
-
+  @Metric(value = "Returns the storage directory name for the volume")
+  public String getStorageDirectory() {
+    return storageDirectory;
+  }
 }
