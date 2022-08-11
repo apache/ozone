@@ -37,7 +37,7 @@ public final class DiskBalancerConfiguration {
       LoggerFactory.getLogger(DiskBalancerConfiguration.class);
 
   @Config(key = "volume.density.threshold", type = ConfigType.AUTO,
-      defaultValue = "10", tags = {ConfigTag.BALANCER},
+      defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
       description = "Threshold is a percentage in the range of 0 to 100. A " +
           "datanode is considered balanced if for each volume, the " +
           "utilization of the volume(used space to capacity ratio) differs" +
@@ -46,17 +46,17 @@ public final class DiskBalancerConfiguration {
   private double threshold = 10d;
 
   @Config(key = "max.disk.throughputInMBPerSec", type = ConfigType.AUTO,
-      defaultValue = "10", tags = {ConfigTag.BALANCER},
+      defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
       description = "The max balance speed.")
   private double diskBandwidth = 10;
 
   @Config(key = "parallel.thread", type = ConfigType.AUTO,
-      defaultValue = "5", tags = {ConfigTag.BALANCER},
+      defaultValue = "5", tags = {ConfigTag.DISKBALANCER},
       description = "The max parallel balance thread count.")
   private int parallelThread = 5;
 
   /**
-   * Gets the threshold value for Container Balancer.
+   * Gets the threshold value for DiskBalancer.
    *
    * @return percentage value in the range 0 to 100
    */
