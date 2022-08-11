@@ -37,7 +37,10 @@ import java.util.concurrent.Callable;
  */
 @Command(name = "s3bg",
     aliases = "s3-bucket-generator",
-    description = "Create buckets via the s3 interface.",
+    description = "Create buckets via the s3 interface.\n" +
+        "Run following commands beforehand:\n" +
+        "kinit -k {user}/{instance}@EXAMPLE.COM -t /etc/security/keytabs/{keytab}\n" +
+        "eval $(ozone s3 getsecret -e)",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
