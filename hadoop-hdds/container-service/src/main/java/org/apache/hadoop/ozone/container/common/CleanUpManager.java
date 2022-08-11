@@ -63,13 +63,13 @@ public class CleanUpManager {
     }
   }
 
-  public boolean checkContainerSchemaV3Enabled(
+  public static boolean checkContainerSchemaV3Enabled(
       KeyValueContainerData keyValueContainerData) {
     return (keyValueContainerData.getSchemaVersion()
         .equals(OzoneConsts.SCHEMA_V3));
   }
 
-  public boolean checkContainerSchemaV3Enabled(
+  public static boolean checkContainerSchemaV3Enabled(
       ConfigurationSource config) {
     return VersionedDatanodeFeatures.SchemaV3
         .isFinalizedAndEnabled(config);

@@ -24,7 +24,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
+import org.apache.hadoop.ozone.container.common.CleanUpManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ServicePlugin;
 
@@ -89,8 +89,7 @@ public class TestHddsDatanodeService {
 
     datanodeService.stop();
 
-    if (VersionedDatanodeFeatures.SchemaV3
-        .isFinalizedAndEnabled(conf)) {
+    if (CleanUpManager.checkContainerSchemaV3Enabled(conf)) {
       verify(datanodeService, times(1)).cleanTmpDir();
     }
 

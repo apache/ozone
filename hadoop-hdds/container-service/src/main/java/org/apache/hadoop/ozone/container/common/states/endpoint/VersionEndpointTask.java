@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
@@ -111,8 +110,7 @@ public class VersionEndpointTask implements
 
         // Clean /tmp/container_delete_service,
         // if SchemaV3 is enabled.
-        if (VersionedDatanodeFeatures.SchemaV3
-            .isFinalizedAndEnabled(configuration)) {
+        if (CleanUpManager.checkContainerSchemaV3Enabled(configuration)) {
           cleanTmpDir();
         }
       } else {
