@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.Cache;
-import org.rocksdb.Filter;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
