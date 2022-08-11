@@ -36,11 +36,8 @@ public class NSSummary {
   private String dirName;
 
   public NSSummary() {
-    this.numOfFiles = 0;
-    this.sizeOfFiles = 0L;
-    this.fileSizeBucket = new int[ReconConstants.NUM_OF_BINS];
-    this.childDir = new HashSet<>();
-    this.dirName = "";
+    this(0, 0L, new int[ReconConstants.NUM_OF_BINS],
+         new HashSet<>(), "");
   }
 
   public NSSummary(int numOfFiles,
