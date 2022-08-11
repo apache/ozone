@@ -54,8 +54,6 @@ public abstract class BucketHandler {
 
   private final ReconOMMetadataManager omMetadataManager;
 
-  private final OzoneStorageContainerManager reconSCM;
-
   private final ContainerManager containerManager;
 
   public BucketHandler(
@@ -64,7 +62,6 @@ public abstract class BucketHandler {
           OzoneStorageContainerManager reconSCM) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.omMetadataManager = omMetadataManager;
-    this.reconSCM = reconSCM;
     this.containerManager = reconSCM.getContainerManager();
   }
 
