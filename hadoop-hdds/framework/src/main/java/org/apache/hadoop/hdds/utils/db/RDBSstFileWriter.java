@@ -38,12 +38,10 @@ public class RDBSstFileWriter implements DumpFileWriter, Closeable {
   private File sstFile;
   private AtomicLong keyCounter;
   private ManagedOptions emptyOption = new ManagedOptions();
-  private final EnvOptions emptyEnvOptions = new EnvOptions();
+  private final ManagedEnvOptions emptyEnvOptions = new ManagedEnvOptions();
 
   public RDBSstFileWriter() {
-    this.sstFileWriter = new SstFileWriter(emptyEnvOptions, emptyOption);
-    ManagedEnvOptions envOptions = new ManagedEnvOptions();
-    this.sstFileWriter = new ManagedSstFileWriter(envOptions, emptyOption);
+    this.sstFileWriter = new ManagedSstFileWriter(emptyEnvOptions, emptyOption);
     this.keyCounter = new AtomicLong(0);
   }
 
