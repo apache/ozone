@@ -29,24 +29,23 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
-
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 
@@ -62,13 +61,14 @@ public class KeyValueContainerCheck {
 
   private long containerID;
   private KeyValueContainerData onDiskContainerData; //loaded from fs/disk
+  private KeyValueContainer container;
   private ConfigurationSource checkConfig;
 
   private String metadataPath;
   private HddsVolume volume;
 
   public KeyValueContainerCheck(String metadataPath, ConfigurationSource conf,
-      long containerID, HddsVolume volume) {
+      long containerID, HddsVolume volume, KeyValueContainer container) {
     Preconditions.checkArgument(metadataPath != null);
 
     this.checkConfig = conf;
@@ -76,6 +76,7 @@ public class KeyValueContainerCheck {
     this.onDiskContainerData = null;
     this.metadataPath = metadataPath;
     this.volume = volume;
+    this.container = container;
   }
 
   /**
@@ -231,7 +232,7 @@ public class KeyValueContainerCheck {
     onDiskContainerData.setDbFile(dbFile);
 
     ContainerLayoutVersion layout = onDiskContainerData.getLayoutVersion();
-
+    container.readLock();
     try (DBHandle db = BlockUtils.getDB(onDiskContainerData, checkConfig);
         BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator(
             onDiskContainerData.getContainerID(),
@@ -265,6 +266,8 @@ public class KeyValueContainerCheck {
           }
         }
       }
+    } finally {
+      container.readUnlock();
     }
   }
 
