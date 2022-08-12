@@ -20,8 +20,11 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.format.DateTimeFormatter;
@@ -67,6 +70,12 @@ public class TestObjectGet {
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
 
+    ContainerRequestContext context;
+    context = Mockito.mock(ContainerRequestContext.class);
+    Mockito.when(context.getUriInfo()).thenReturn(Mockito.mock(UriInfo.class));
+    Mockito.when(context.getUriInfo().getQueryParameters())
+        .thenReturn(new MultivaluedHashMap<>());
+    rest.setContext(context);
     //WHEN
     Response response = rest.get("b1", "key1", null, 0, null, body);
 
