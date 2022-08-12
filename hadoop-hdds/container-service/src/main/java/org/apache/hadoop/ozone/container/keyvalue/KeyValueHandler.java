@@ -1217,11 +1217,6 @@ public class KeyValueHandler extends Handler {
 
   private void deleteInternal(Container container, boolean force)
       throws StorageContainerException {
-    KeyValueContainerData keyValueContainerData =
-        (KeyValueContainerData) container.getContainerData();
-    HddsVolume hddsVolume = keyValueContainerData.getVolume();
-    CleanUpManager cleanUpManager =
-        new CleanUpManager(hddsVolume);
     container.writeLock();
     try {
     // If force is false, we check container state.
@@ -1245,8 +1240,16 @@ public class KeyValueHandler extends Handler {
               DELETE_ON_NON_EMPTY_CONTAINER);
         }
       }
-      if (cleanUpManager
+      KeyValueContainerData keyValueContainerData =
+          (KeyValueContainerData) container.getContainerData();
+      if (CleanUpManager
           .checkContainerSchemaV3Enabled(keyValueContainerData)) {
+        HddsVolume hddsVolume = keyValueContainerData.getVolume();
+
+        // Initialize the directory
+        CleanUpManager cleanUpManager =
+            new CleanUpManager(hddsVolume);
+        // Rename
         cleanUpManager.renameDir(keyValueContainerData);
       }
       long containerId = container.getContainerData().getContainerID();

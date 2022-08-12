@@ -291,15 +291,17 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public void delete() throws StorageContainerException {
-    HddsVolume hddsVolume = containerData.getVolume();
-    CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
     long containerId = containerData.getContainerID();
     try {
       KeyValueContainerUtil.removeContainer(containerData, config);
     } catch (StorageContainerException ex) {
       throw ex;
     } catch (IOException ex) {
-      cleanUpManager.cleanTmpDir();
+      if (CleanUpManager.checkContainerSchemaV3Enabled(containerData)) {
+        HddsVolume hddsVolume = containerData.getVolume();
+        CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
+        cleanUpManager.cleanTmpDir();
+      }
       onFailure(containerData.getVolume());
       String errMsg = String.format("Failed to cleanup container. ID: %d",
           containerId);

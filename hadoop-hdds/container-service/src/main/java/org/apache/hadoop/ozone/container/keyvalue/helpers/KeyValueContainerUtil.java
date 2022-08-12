@@ -145,6 +145,8 @@ public final class KeyValueContainerUtil {
     if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
       BlockUtils.removeContainerFromDB(containerData, conf);
 
+      // Delete parent dir that has been moved to a new location,
+      // under <volume>/<clusterId>/tmp/container_delete_service
       File parentDir = containerMetaDataPath.getParentFile();
       FileUtils.deleteDirectory(parentDir);
     } else {

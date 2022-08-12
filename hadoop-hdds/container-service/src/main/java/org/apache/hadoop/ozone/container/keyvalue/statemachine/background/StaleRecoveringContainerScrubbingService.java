@@ -91,12 +91,11 @@ public class StaleRecoveringContainerScrubbingService
       Container container = containerSet.getContainer(containerID);
       KeyValueContainerData keyValueContainerData =
           (KeyValueContainerData) container.getContainerData();
-      HddsVolume hddsVolume = keyValueContainerData.getVolume();
-      CleanUpManager cleanUpManager =
-          new CleanUpManager(hddsVolume);
-
-      if (cleanUpManager
+      if (CleanUpManager
           .checkContainerSchemaV3Enabled(keyValueContainerData)) {
+        HddsVolume hddsVolume = keyValueContainerData.getVolume();
+        CleanUpManager cleanUpManager =
+            new CleanUpManager(hddsVolume);
         cleanUpManager.renameDir(keyValueContainerData);
       }
       containerSet.getContainer(containerID).delete();

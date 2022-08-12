@@ -80,6 +80,8 @@ import org.junit.Assert;
 
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeTrue;
+
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -308,6 +310,9 @@ public class TestContainerPersistence {
   @Test
   public void testDeleteContainerWithSchemaV3Enabled()
       throws Exception {
+    // Ignore the test if SchemaV3 disabled
+    assumeTrue(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
+
     long testContainerID1 = getTestContainerID();
     Thread.sleep(100);
     long testContainerID2 = getTestContainerID();
@@ -322,47 +327,46 @@ public class TestContainerPersistence {
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID2));
 
-    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
-      KeyValueContainerData container1Data =
-          (KeyValueContainerData) container1.getContainerData();
-      KeyValueContainerData container2Data =
-          (KeyValueContainerData) container2.getContainerData();
+    KeyValueContainerData container1Data =
+        (KeyValueContainerData) container1.getContainerData();
+    KeyValueContainerData container2Data =
+        (KeyValueContainerData) container2.getContainerData();
 
-      HddsVolume hddsVolume = container1Data.getVolume();
-      CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
+    HddsVolume hddsVolume = container1Data.getVolume();
+    CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
 
-      // Rename container1 dir
-      Assert.assertTrue(cleanUpManager.renameDir(container1Data));
+    // Rename container1 dir
+    Assert.assertTrue(cleanUpManager.renameDir(container1Data));
 
-      // Rename container2 dir
-      Assert.assertTrue(cleanUpManager.renameDir(container2Data));
+    // Rename container2 dir
+    Assert.assertTrue(cleanUpManager.renameDir(container2Data));
 
-      // Delete container1
-      container1.delete();
+    // Delete container1
+    container1.delete();
 
-      Assert.assertFalse(cleanUpManager.tmpDirIsEmpty());
+    Assert.assertFalse(cleanUpManager.tmpDirIsEmpty());
 
-      ListIterator<File> iterator = cleanUpManager.getDeleteLeftovers();
+    ListIterator<File> iterator = cleanUpManager.getDeleteLeftovers();
 
-      File metadata2Dir = container2.getContainerFile().getParentFile();
-      File container2Dir = metadata2Dir.getParentFile();
+    File metadata2Dir = container2.getContainerFile().getParentFile();
+    File container2Dir = metadata2Dir.getParentFile();
 
-      Assert.assertTrue(iterator.hasNext());
-      Assert.assertEquals(container2Dir, iterator.next());
+    Assert.assertTrue(iterator.hasNext());
+    Assert.assertEquals(container2Dir, iterator.next());
 
-      container2.delete();
+    container2.delete();
 
-      // Remove container from containerSet
-      containerSet.removeContainer(testContainerID1);
-      Assert.assertFalse(containerSet.getContainerMapCopy()
-          .containsKey(testContainerID1));
+    // Remove container from containerSet
+    containerSet.removeContainer(testContainerID1);
+    Assert.assertFalse(containerSet.getContainerMapCopy()
+        .containsKey(testContainerID1));
 
-      // '/tmp/delete_container_service' is empty
-      Assert.assertTrue(cleanUpManager.tmpDirIsEmpty());
+    // '/tmp/delete_container_service' is empty
+    Assert.assertTrue(cleanUpManager.tmpDirIsEmpty());
 
-      // Delete /tmp/delete_container_service from system
-      cleanUpManager.deleteTmpDir();
-    }
+    // Delete /tmp/delete_container_service from system
+    cleanUpManager.deleteTmpDir();
+
   }
 
   @Test

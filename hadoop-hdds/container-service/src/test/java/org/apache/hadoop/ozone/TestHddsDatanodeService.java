@@ -24,7 +24,6 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.container.common.CleanUpManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ServicePlugin;
 
@@ -36,10 +35,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.spy;
-
 import org.junit.Before;
 import org.junit.Test;
 
@@ -72,31 +67,25 @@ public class TestHddsDatanodeService {
   }
 
   @After
-  public void tearDown() throws IOException {
+  public void tearDown() {
     FileUtil.fullyDelete(testDir);
   }
 
   @Test
   public void testStartup() throws IOException {
     service = HddsDatanodeService.createHddsDatanodeService(args);
-    HddsDatanodeService datanodeService = spy(service);
-    datanodeService.start(conf);
+    service.start(conf);
 
-    assertNotNull(datanodeService.getDatanodeDetails());
-    assertNotNull(datanodeService.getDatanodeDetails().getHostName());
-    assertFalse(datanodeService.getDatanodeStateMachine().isDaemonStopped());
-    assertNotNull(datanodeService.getCRLStore());
+    assertNotNull(service.getDatanodeDetails());
+    assertNotNull(service.getDatanodeDetails().getHostName());
+    assertFalse(service.getDatanodeStateMachine().isDaemonStopped());
+    assertNotNull(service.getCRLStore());
 
-    datanodeService.stop();
-
-    if (CleanUpManager.checkContainerSchemaV3Enabled(conf)) {
-      verify(datanodeService, times(1)).cleanTmpDir();
-    }
-
+    service.stop();
     // CRL store must be stopped when the service stops
-    assertNull(datanodeService.getCRLStore().getStore());
-    datanodeService.join();
-    datanodeService.close();
+    assertNull(service.getCRLStore().getStore());
+    service.join();
+    service.close();
   }
 
   static class MockService implements ServicePlugin {
