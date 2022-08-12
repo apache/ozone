@@ -24,7 +24,6 @@ Suite Setup         Setup v4 headers
 
 *** Variables ***
 ${ENDPOINT_URL}         http://s3g:9878
-${SECURITY_ENABLED}     true
 
 *** Keywords ***
 #   Export access key and secret to the environment
