@@ -19,9 +19,11 @@ package org.apache.hadoop.ozone.client.checksum;
 
 import org.apache.hadoop.fs.CompositeCrcFileChecksum;
 import org.apache.hadoop.fs.FileChecksum;
+import org.apache.hadoop.fs.MD5MD5CRC32CastagnoliFileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.MD5Hash;
@@ -57,6 +59,7 @@ public abstract class BaseFileChecksumHelper {
 
   private ClientProtocol rpcClient;
   private OzoneClientConfig.ChecksumCombineMode combineMode;
+  private ContainerProtos.ChecksumType checksumType;
 
   private final DataOutputBuffer blockChecksumBuf = new DataOutputBuffer();
   private XceiverClientFactory xceiverClientFactory;
@@ -111,6 +114,10 @@ public abstract class BaseFileChecksumHelper {
     return combineMode;
   }
 
+  protected ContainerProtos.ChecksumType getChecksumType() {
+    return checksumType;
+  }
+
   protected XceiverClientFactory getXceiverClientFactory() {
     return xceiverClientFactory;
   }
@@ -137,6 +144,10 @@ public abstract class BaseFileChecksumHelper {
 
   protected void setBytesPerCRC(int bytesPerCRC) {
     this.bytesPerCRC = bytesPerCRC;
+  }
+
+  protected void setChecksumType(ContainerProtos.ChecksumType type) {
+    checksumType = type;
   }
 
   /**
@@ -242,8 +253,29 @@ public abstract class BaseFileChecksumHelper {
     //compute file MD5
     final MD5Hash fileMD5 = MD5Hash.digest(getBlockChecksumBuf().getData());
     // assume CRC32 for now
-    return new MD5MD5CRC32GzipFileChecksum(getBytesPerCRC(),
-        crcPerBlock, fileMD5);
+    switch (getChecksumType()) {
+    case CRC32:
+      return new MD5MD5CRC32GzipFileChecksum(getBytesPerCRC(),
+          crcPerBlock, fileMD5);
+    case CRC32C:
+      return new MD5MD5CRC32CastagnoliFileChecksum(getBytesPerCRC(),
+          crcPerBlock, fileMD5);
+    default:
+      throw new IllegalArgumentException("unexpected checksum type "
+          + getChecksumType());
+    }
+
+  }
+
+  DataChecksum.Type toHadoopChecksumType() {
+    switch (checksumType) {
+    case CRC32:
+      return DataChecksum.Type.CRC32;
+    case CRC32C:
+      return DataChecksum.Type.CRC32C;
+    default:
+      throw new IllegalArgumentException("unsupported checksum type");
+    }
   }
 
   FileChecksum makeCompositeCrcResult() throws IOException {
@@ -252,7 +284,7 @@ public abstract class BaseFileChecksumHelper {
       blockSizeHint = keyLocationInfos.get(0).getLength();
     }
     CrcComposer crcComposer =
-        CrcComposer.newCrcComposer(DataChecksum.Type.CRC32, blockSizeHint);
+        CrcComposer.newCrcComposer(toHadoopChecksumType(), blockSizeHint);
     byte[] blockChecksumBytes = blockChecksumBuf.getData();
 
     for (int i = 0; i < keyLocationInfos.size(); ++i) {
@@ -270,7 +302,7 @@ public abstract class BaseFileChecksumHelper {
 
     int compositeCrc = CrcUtil.readInt(crcComposer.digest(), 0);
     return new CompositeCrcFileChecksum(
-        compositeCrc, DataChecksum.Type.CRC32, bytesPerCRC);
+        compositeCrc, toHadoopChecksumType(), bytesPerCRC);
   }
 
   public FileChecksum getFileChecksum() {
