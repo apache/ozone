@@ -65,7 +65,9 @@ import picocli.CommandLine.Option;
         StreamingGenerator.class,
         SCMThroughputBenchmark.class,
         OmBucketReadWriteFileOps.class,
-        OmBucketReadWriteKeyOps.class},
+        OmBucketReadWriteKeyOps.class,
+        OmRPCLoadGenerator.class,
+    },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class Freon extends GenericCli {

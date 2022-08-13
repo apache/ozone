@@ -263,7 +263,7 @@ public class RDBStore implements DBStore {
   }
 
   public Collection<ColumnFamily> getColumnFamilies() {
-    return db.getColumnFamilies();
+    return db.getExtraColumnFamilies();
   }
 
   @Override

@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
@@ -120,6 +121,8 @@ public class BlockOutputStream extends OutputStream {
   private ChunkBuffer currentBuffer;
   private final Token<? extends TokenIdentifier> token;
   private int replicationIndex;
+  private Pipeline pipeline;
+  private final ContainerClientMetrics clientMetrics;
 
   /**
    * Creates a new BlockOutputStream.
@@ -135,7 +138,8 @@ public class BlockOutputStream extends OutputStream {
       Pipeline pipeline,
       BufferPool bufferPool,
       OzoneClientConfig config,
-      Token<? extends TokenIdentifier> token
+      Token<? extends TokenIdentifier> token,
+      ContainerClientMetrics clientMetrics
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
@@ -177,6 +181,8 @@ public class BlockOutputStream extends OutputStream {
     ioException = new AtomicReference<>(null);
     checksum = new Checksum(config.getChecksumType(),
         config.getBytesPerChecksum());
+    this.clientMetrics = clientMetrics;
+    this.pipeline = pipeline;
   }
 
   void refreshCurrentBuffer() {
@@ -694,7 +700,6 @@ public class BlockOutputStream extends OutputStream {
       LOG.debug("Writing chunk {} length {} at offset {}",
           chunkInfo.getChunkName(), effectiveChunkSize, offset);
     }
-
     try {
       XceiverClientReply asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
           blockID.get(), data, token, replicationIndex);
@@ -717,6 +722,7 @@ public class BlockOutputStream extends OutputStream {
             throw ce;
           });
       containerBlockData.addChunks(chunkInfo);
+      clientMetrics.recordWriteChunk(pipeline, chunkInfo.getLen());
       return validateFuture;
     } catch (IOException | ExecutionException e) {
       throw new IOException(EXCEPTION_MSG + e.toString(), e);
