@@ -177,25 +177,26 @@ public class NSSummaryTaskWithFSO extends NSSummaryTask {
 
       Table<String, OmDirectoryInfo> dirTable =
           omMetadataManager.getDirectoryTable();
-      TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
-              dirTableIter = dirTable.iterator();
-
-      while (dirTableIter.hasNext()) {
-        Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();
-        OmDirectoryInfo directoryInfo = kv.getValue();
-        handlePutDirEvent(directoryInfo, nsSummaryMap);
+      try (TableIterator<String,
+              ? extends Table.KeyValue<String, OmDirectoryInfo>>
+                dirTableIter = dirTable.iterator()) {
+        while (dirTableIter.hasNext()) {
+          Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();
+          OmDirectoryInfo directoryInfo = kv.getValue();
+          handlePutDirEvent(directoryInfo, nsSummaryMap);
+        }
       }
 
       // Get fileTable used by FSO
       Table<String, OmKeyInfo> keyTable = omMetadataManager.getFileTable();
 
-      TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-              keyTableIter = keyTable.iterator();
-
-      while (keyTableIter.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
-        OmKeyInfo keyInfo = kv.getValue();
-        handlePutKeyEvent(keyInfo, nsSummaryMap);
+      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+              keyTableIter = keyTable.iterator()) {
+        while (keyTableIter.hasNext()) {
+          Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
+          OmKeyInfo keyInfo = kv.getValue();
+          handlePutKeyEvent(keyInfo, nsSummaryMap);
+        }
       }
 
     } catch (IOException ioEx) {
