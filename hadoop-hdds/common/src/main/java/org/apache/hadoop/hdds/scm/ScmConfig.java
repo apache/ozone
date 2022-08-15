@@ -79,7 +79,7 @@ public class ScmConfig {
 
   @Config(key = "block.deletion.per-interval.max",
       type = ConfigType.INT,
-      defaultValue = "20000",
+      defaultValue = "100000",
       tags = { ConfigTag.SCM, ConfigTag.DELETION},
       description =
           "Maximum number of blocks which SCM processes during an interval. "
