@@ -61,7 +61,7 @@ public class NSSummaryEndpoint {
     this.omMetadataManager = omMetadataManager;
     this.reconSCM = reconSCM;
   }
-  
+
   /**
    * This endpoint will return the entity type and aggregate count of objects.
    * @param path the request path.
