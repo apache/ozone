@@ -34,7 +34,7 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
   }
 
   @Override
-  public ManagedColumnFamilyOptions setTableFormatConfig(
+  public synchronized ManagedColumnFamilyOptions setTableFormatConfig(
       TableFormatConfig tableFormatConfig) {
     TableFormatConfig previous = tableFormatConfig();
     if (previous instanceof ManagedBlockBasedTableConfig) {

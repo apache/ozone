@@ -3172,32 +3172,33 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // are flushed to the table. This should be acceptable for a list tenant
     // request.
 
-    final TableIterator<String, ? extends KeyValue<String, OmDBTenantState>>
-        iterator = tenantStateTable.iterator();
+    try (TableIterator<String, ? extends KeyValue<String, OmDBTenantState>>
+        iterator = tenantStateTable.iterator()) {
 
-    final List<TenantState> tenantStateList = new ArrayList<>();
+      final List<TenantState> tenantStateList = new ArrayList<>();
 
-    // Iterate table
-    while (iterator.hasNext()) {
-      final Table.KeyValue<String, OmDBTenantState> dbEntry = iterator.next();
-      final String tenantId = dbEntry.getKey();
-      final OmDBTenantState omDBTenantState = dbEntry.getValue();
-      assert (tenantId.equals(omDBTenantState.getTenantId()));
-      tenantStateList.add(TenantState.newBuilder()
-          .setTenantId(omDBTenantState.getTenantId())
-          .setBucketNamespaceName(omDBTenantState.getBucketNamespaceName())
-          .setUserRoleName(omDBTenantState.getUserRoleName())
-          .setAdminRoleName(omDBTenantState.getAdminRoleName())
-          .setBucketNamespacePolicyName(
-              omDBTenantState.getBucketNamespacePolicyName())
-          .setBucketPolicyName(omDBTenantState.getBucketPolicyName())
-          .build());
+      // Iterate table
+      while (iterator.hasNext()) {
+        final Table.KeyValue<String, OmDBTenantState> dbEntry = iterator.next();
+        final String tenantId = dbEntry.getKey();
+        final OmDBTenantState omDBTenantState = dbEntry.getValue();
+        assert (tenantId.equals(omDBTenantState.getTenantId()));
+        tenantStateList.add(TenantState.newBuilder()
+            .setTenantId(omDBTenantState.getTenantId())
+            .setBucketNamespaceName(omDBTenantState.getBucketNamespaceName())
+            .setUserRoleName(omDBTenantState.getUserRoleName())
+            .setAdminRoleName(omDBTenantState.getAdminRoleName())
+            .setBucketNamespacePolicyName(
+                omDBTenantState.getBucketNamespacePolicyName())
+            .setBucketPolicyName(omDBTenantState.getBucketPolicyName())
+            .build());
+      }
+
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          OMAction.LIST_TENANT, new LinkedHashMap<>()));
+
+      return new TenantStateList(tenantStateList);
     }
-
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-        OMAction.LIST_TENANT, new LinkedHashMap<>()));
-
-    return new TenantStateList(tenantStateList);
   }
 
   /**
