@@ -46,7 +46,10 @@ import picocli.CommandLine.Option;
  */
 @Command(name = "s3kg",
     aliases = "s3-key-generator",
-    description = "Create random keys via the s3 interface.",
+    description = "Create random keys via the s3 interface." +
+        "Command requires AWS authentication environment " +
+        "variables set, AWS_ACCESS_KEY_ID and " +
+        "AWS_SECRET_ACCESS_KEY",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
