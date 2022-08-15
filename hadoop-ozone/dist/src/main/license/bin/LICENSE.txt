@@ -330,6 +330,8 @@ Apache License
    log4j:log4j
    net.minidev:accessors-smart
    net.minidev:json-smart
+   net.java.dev.jna:jna
+   net.java.dev.jna:jna-platform
    org.bouncycastle:bcpkix-jdk15on
    org.bouncycastle:bcprov-jdk15on
    org.codehaus.jackson:jackson-core-asl
@@ -442,12 +444,6 @@ angular-nvd3-1.0.9.min.js
 angular-1.8.0.min.js
 jquery-3.5.1.min.js
 
-
-LGPL 2.1
-=====================
-
-   net.java.dev.jna:jna
-   net.java.dev.jna:jna-platform
 
 --------------------------------------------------------------------------------
 recon server uses a huge number of javascript and css dependencies. See the
