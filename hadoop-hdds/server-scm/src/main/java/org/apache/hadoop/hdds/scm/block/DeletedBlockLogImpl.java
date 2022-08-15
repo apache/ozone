@@ -425,7 +425,11 @@ public class DeletedBlockLogImpl
           DeletedBlocksTransaction txn = keyValue.getValue();
           final ContainerID id = ContainerID.valueOf(txn.getContainerID());
           try {
-            if (txn.getCount() > -1 && txn.getCount() <= maxRetry
+            if (containerManager.getContainer(id).isDeleted()) {
+              LOG.warn("Container: " + id + " was not deleted for the " +
+                  "transaction: " + txn);
+              txIDs.add(txn.getTxID());
+            } else if (txn.getCount() > -1 && txn.getCount() <= maxRetry
                 && !containerManager.getContainer(id).isOpen()) {
               numBlocksAdded += txn.getLocalIDCount();
               getTransaction(txn, transactions);
@@ -470,5 +474,10 @@ public class DeletedBlockLogImpl
       LOG.error("Delete Block Command is not executed yet.");
       return;
     }
+  }
+
+  private boolean canBeDeleted(ContainerID containerID)
+      throws ContainerNotFoundException {
+    return !containerManager.getContainer(containerID).isOpen();
   }
 }

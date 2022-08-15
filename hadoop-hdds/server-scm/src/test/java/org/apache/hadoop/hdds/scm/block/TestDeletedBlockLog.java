@@ -161,12 +161,13 @@ public class TestDeletedBlockLog {
     }).when(containerManager).updateDeleteTransactionId(anyObject());
   }
 
-  private void updateContainerMetadata(long cid) throws IOException {
+  private void updateContainerMetadata(long cid,
+      HddsProtos.LifeCycleState state) throws IOException {
     final ContainerInfo container =
         new ContainerInfo.Builder()
             .setContainerID(cid)
             .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
-            .setState(HddsProtos.LifeCycleState.CLOSED)
+            .setState(state)
             .setOwner("TestDeletedBlockLog")
             .setPipelineID(PipelineID.randomId())
             .build();
@@ -191,13 +192,18 @@ public class TestDeletedBlockLog {
   }
 
   private Map<Long, List<Long>> generateData(int dataSize) throws IOException {
+    return generateData(dataSize, HddsProtos.LifeCycleState.CLOSED);
+  }
+
+  private Map<Long, List<Long>> generateData(int dataSize,
+      HddsProtos.LifeCycleState state) throws IOException {
     Map<Long, List<Long>> blockMap = new HashMap<>();
     Random random = new Random(1);
     int continerIDBase = random.nextInt(100);
     int localIDBase = random.nextInt(1000);
     for (int i = 0; i < dataSize; i++) {
       long containerID = continerIDBase + i;
-      updateContainerMetadata(containerID);
+      updateContainerMetadata(containerID, state);
       List<Long> blocks = new ArrayList<>();
       for (int j = 0; j < BLOCKS_PER_TXN; j++)  {
         long localID = localIDBase + j;
@@ -525,6 +531,22 @@ public class TestDeletedBlockLog {
     // get should return two transactions for the same container
     blocks = getTransactions(txNum);
     Assertions.assertEquals(2, blocks.size());
+  }
+
+  @Test
+  public void testDeletedBlockTransactionsOfDeletedContainer()
+      throws IOException, TimeoutException {
+    int txNum = 10;
+    List<DeletedBlocksTransaction> blocks;
+
+    // Creates {TXNum} TX in the log.
+    Map<Long, List<Long>> deletedBlocks = generateData(txNum,
+        HddsProtos.LifeCycleState.DELETED);
+    addTransactions(deletedBlocks, true);
+
+    blocks = getTransactions(txNum * BLOCKS_PER_TXN);
+    // There should be no txn remaining
+    Assertions.assertEquals(0, blocks.size());
   }
 
   private void mockContainerInfo(long containerID, DatanodeDetails dd)
