@@ -71,7 +71,7 @@ public class TestObjectGet {
     client.getObjectStore().createS3Bucket("b1");
     OzoneBucket bucket = client.getObjectStore().getS3Bucket("b1");
     OzoneOutputStream keyStream =
-            bucket.createKey("key1", CONTENT.getBytes(UTF_8).length);
+        bucket.createKey("key1", CONTENT.getBytes(UTF_8).length);
     keyStream.write(CONTENT.getBytes(UTF_8));
     keyStream.close();
 
@@ -86,7 +86,7 @@ public class TestObjectGet {
     context = Mockito.mock(ContainerRequestContext.class);
     Mockito.when(context.getUriInfo()).thenReturn(Mockito.mock(UriInfo.class));
     Mockito.when(context.getUriInfo().getQueryParameters())
-            .thenReturn(new MultivaluedHashMap<>());
+        .thenReturn(new MultivaluedHashMap<>());
     rest.setContext(context);
   }
 
