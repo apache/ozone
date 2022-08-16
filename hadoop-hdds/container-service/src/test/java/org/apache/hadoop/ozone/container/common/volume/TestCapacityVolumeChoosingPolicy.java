@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.apache.ozone.test.GenericTestUtils.getTestDir;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests {@link CapacityVolumeChoosingPolicy}.
@@ -79,6 +80,7 @@ public class TestCapacityVolumeChoosingPolicy {
         .conf(CONF)
         .usageCheckFactory(factory3)
         .build();
+    vol3.incCommittedBytes(50);
 
     volumes.add(vol1);
     volumes.add(vol2);
@@ -118,17 +120,14 @@ public class TestCapacityVolumeChoosingPolicy {
   }
 
   @Test
-  public void testCapacityPolicyExceptionMessage() throws Exception {
-    int blockSize = 300;
-    try {
-      policy.chooseVolume(volumes, blockSize);
-      Assert.fail("expected to throw DiskOutOfSpaceException");
-    } catch (DiskOutOfSpaceException e) {
-      Assert.assertEquals("Not returning the expected message",
-          "Out of space: All volumes are less than the container size (="
-              + blockSize + " B).",
-          e.getMessage());
-    }
+  public void throwsDiskOutOfSpaceIfRequestMoreThanAvailable() {
+    Exception e = Assert.assertThrows(DiskOutOfSpaceException.class,
+        () -> policy.chooseVolume(volumes, 500));
+
+    String msg = e.getMessage();
+    assertTrue(msg,
+        msg.contains("No volumes have enough space for a new container.  " +
+            "Most available space: 250 bytes"));
   }
 
 }
