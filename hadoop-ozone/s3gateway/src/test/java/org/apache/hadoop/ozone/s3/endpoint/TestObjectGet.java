@@ -52,17 +52,25 @@ import static org.mockito.Mockito.doReturn;
 public class TestObjectGet {
 
   public static final String CONTENT = "0123456789";
-  public static final String ContentType = "video/mp4";
-  public static final String ContentLanguage = "en-CA";
-  public static final String Expires = "Wed, 21 Oct 2015 07:29:00 GMT";
-  public static final String CacheControl = "no-cache";
-  public static final String ContentDisposition = "inline";
-  public static final String ContentEncoding = "gzip";
+  public static final String CONTENT_TYPE1 = "video/mp4";
+  public static final String CONTENT_TYPE2 = "text/html; charset=UTF-8";
+  public static final String CONTENT_LANGUAGE1 = "en-CA";
+  public static final String CONTENT_LANGUAGE2 = "de-DE, en-CA";
+  public static final String EXPIRES1 = "Wed, 21 Oct 2015 07:29:00 GMT";
+  public static final String EXPIRES2 = "Wed, 21 Oct 2015 07:28:00 GMT";
+  public static final String CACHE_CONTROL1 = "no-cache";
+  public static final String CACHE_CONTROL2 = "max-age=604800";
+  public static final String CONTENT_DISPOSITION1 = "inline";
+  public static final String CONTENT_DISPOSITION2 = "attachment; "
+      + "filename=\"filename.jpg\"";
+  public static final String CONTENT_ENCODING1 = "gzip";
+  public static final String CONTENT_ENCODING2 = "compress";
 
-  HttpHeaders headers;
-  ObjectEndpoint rest;
-  OzoneClient client;
-  ByteArrayInputStream body;
+  private HttpHeaders headers;
+  private ObjectEndpoint rest;
+  private OzoneClient client;
+  private ByteArrayInputStream body;
+  private ContainerRequestContext context;
 
   @Before
   public void init() throws IOException {
@@ -82,7 +90,6 @@ public class TestObjectGet {
     rest.setHeaders(headers);
     body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
 
-    ContainerRequestContext context;
     context = Mockito.mock(ContainerRequestContext.class);
     Mockito.when(context.getUriInfo()).thenReturn(Mockito.mock(UriInfo.class));
     Mockito.when(context.getUriInfo().getQueryParameters())
@@ -113,35 +120,70 @@ public class TestObjectGet {
 
   @Test
   public void inheritRequestHeader() throws IOException, OS3Exception {
-    // set request header
-    doReturn(ContentType)
-        .when(headers).getHeaderString("Content-Type");
-    doReturn(ContentLanguage)
-        .when(headers).getHeaderString("Content-Language");
-    doReturn(Expires)
-        .when(headers).getHeaderString("Expires");
-    doReturn(CacheControl)
-        .when(headers).getHeaderString("Cache-Control");
-    doReturn(ContentDisposition)
-        .when(headers).getHeaderString("Content-Disposition");
-    doReturn(ContentEncoding)
-        .when(headers).getHeaderString("Content-Encoding");
+    setDefaultHeader();
 
-    ByteArrayInputStream body =
-            new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     Response response = rest.get("b1", "key1", null, 0, null, body);
 
-    Assert.assertEquals(ContentType,
+    Assert.assertEquals(CONTENT_TYPE1,
         response.getHeaderString("Content-Type"));
-    Assert.assertEquals(ContentLanguage,
+    Assert.assertEquals(CONTENT_LANGUAGE1,
         response.getHeaderString("Content-Language"));
-    Assert.assertEquals(Expires,
+    Assert.assertEquals(EXPIRES1,
         response.getHeaderString("Expires"));
-    Assert.assertEquals(CacheControl,
+    Assert.assertEquals(CACHE_CONTROL1,
         response.getHeaderString("Cache-Control"));
-    Assert.assertEquals(ContentDisposition,
+    Assert.assertEquals(CONTENT_DISPOSITION1,
         response.getHeaderString("Content-Disposition"));
-    Assert.assertEquals(ContentEncoding,
+    Assert.assertEquals(CONTENT_ENCODING1,
         response.getHeaderString("Content-Encoding"));
+  }
+
+  @Test
+  public void overrideResponseHeader() throws IOException, OS3Exception {
+    setDefaultHeader();
+
+    MultivaluedHashMap<String, String> queryParameter =
+        new MultivaluedHashMap<>();
+    // overrider request header
+    queryParameter.putSingle("response-content-type", CONTENT_TYPE2);
+    queryParameter.putSingle("response-content-language", CONTENT_LANGUAGE2);
+    queryParameter.putSingle("response-expires", EXPIRES2);
+    queryParameter.putSingle("response-cache-control", CACHE_CONTROL2);
+    queryParameter.putSingle("response-content-disposition",
+        CONTENT_DISPOSITION2);
+    queryParameter.putSingle("response-content-encoding", CONTENT_ENCODING2);
+
+    Mockito.when(context.getUriInfo().getQueryParameters())
+        .thenReturn(queryParameter);
+    body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    Response response = rest.get("b1", "key1", null, 0, null, body);
+
+    Assert.assertEquals(CONTENT_TYPE2,
+        response.getHeaderString("Content-Type"));
+    Assert.assertEquals(CONTENT_LANGUAGE2,
+        response.getHeaderString("Content-Language"));
+    Assert.assertEquals(EXPIRES2,
+        response.getHeaderString("Expires"));
+    Assert.assertEquals(CACHE_CONTROL2,
+        response.getHeaderString("Cache-Control"));
+    Assert.assertEquals(CONTENT_DISPOSITION2,
+        response.getHeaderString("Content-Disposition"));
+    Assert.assertEquals(CONTENT_ENCODING2,
+        response.getHeaderString("Content-Encoding"));
+  }
+
+  private void setDefaultHeader() {
+    doReturn(CONTENT_TYPE1)
+        .when(headers).getHeaderString("Content-Type");
+    doReturn(CONTENT_LANGUAGE1)
+        .when(headers).getHeaderString("Content-Language");
+    doReturn(EXPIRES1)
+        .when(headers).getHeaderString("Expires");
+    doReturn(CACHE_CONTROL1)
+        .when(headers).getHeaderString("Cache-Control");
+    doReturn(CONTENT_DISPOSITION1)
+        .when(headers).getHeaderString("Content-Disposition");
+    doReturn(CONTENT_ENCODING1)
+        .when(headers).getHeaderString("Content-Encoding");
   }
 }

@@ -366,7 +366,8 @@ public class ObjectEndpoint extends EndpointBase {
       MultivaluedMap<String, String> queryParams = context
           .getUriInfo().getQueryParameters();
 
-      for (Map.Entry<String, String> entry : overrideQueryParameter.entrySet()) {
+      for (Map.Entry<String, String> entry :
+          overrideQueryParameter.entrySet()) {
         String headerValue = headers.getHeaderString(entry.getKey());
 
         /* "Overriding Response Header" by query parameter, See:
