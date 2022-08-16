@@ -497,3 +497,16 @@ message CompactionLogEntryProto {
     repeated CompactionFileInfoProto outputFileIntoList = 4;
     optional string compactionReason = 5;
 }
+
+message DiskBalancerConfigurationProto {
+    optional double threshold = 1;
+    optional double diskBandwidth = 2;
+    optional int32 parallelThread = 3;
+}
+
+message DatanodeDiskBalancerInfoProto {
+    required DatanodeDetailsProto node = 1;
+    required double currentVolumeDensitySum = 2;
+    optional bool diskBalancerRunning = 3;
+    optional DiskBalancerConfigurationProto diskBalancerConf = 4;
+}
