@@ -39,10 +39,12 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import org.apache.commons.io.IOUtils;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.mockito.Mockito.doReturn;
 
 /**
  * Test get object.
@@ -50,32 +52,46 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class TestObjectGet {
 
   public static final String CONTENT = "0123456789";
+  public static final String ContentType = "video/mp4";
+  public static final String ContentLanguage = "en-CA";
+  public static final String Expires = "Wed, 21 Oct 2015 07:29:00 GMT";
+  public static final String CacheControl = "no-cache";
+  public static final String ContentDisposition = "inline";
+  public static final String ContentEncoding = "gzip";
 
-  @Test
-  public void get() throws IOException, OS3Exception {
+  HttpHeaders headers;
+  ObjectEndpoint rest;
+  OzoneClient client;
+  ByteArrayInputStream body;
+
+  @Before
+  public void init() throws IOException {
     //GIVEN
-    OzoneClient client = new OzoneClientStub();
+    client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket("b1");
     OzoneBucket bucket = client.getObjectStore().getS3Bucket("b1");
     OzoneOutputStream keyStream =
-        bucket.createKey("key1", CONTENT.getBytes(UTF_8).length);
+            bucket.createKey("key1", CONTENT.getBytes(UTF_8).length);
     keyStream.write(CONTENT.getBytes(UTF_8));
     keyStream.close();
 
-    ObjectEndpoint rest = new ObjectEndpoint();
+    rest = new ObjectEndpoint();
     rest.setClient(client);
     rest.setOzoneConfiguration(new OzoneConfiguration());
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    headers = Mockito.mock(HttpHeaders.class);
     rest.setHeaders(headers);
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
 
     ContainerRequestContext context;
     context = Mockito.mock(ContainerRequestContext.class);
     Mockito.when(context.getUriInfo()).thenReturn(Mockito.mock(UriInfo.class));
     Mockito.when(context.getUriInfo().getQueryParameters())
-        .thenReturn(new MultivaluedHashMap<>());
+            .thenReturn(new MultivaluedHashMap<>());
     rest.setContext(context);
+  }
+
+  @Test
+  public void get() throws IOException, OS3Exception {
     //WHEN
     Response response = rest.get("b1", "key1", null, 0, null, body);
 
@@ -93,5 +109,39 @@ public class TestObjectGet {
     DateTimeFormatter.RFC_1123_DATE_TIME
         .parse(response.getHeaderString("Last-Modified"));
 
+  }
+
+  @Test
+  public void inheritRequestHeader() throws IOException, OS3Exception {
+    // set request header
+    doReturn(ContentType)
+        .when(headers).getHeaderString("Content-Type");
+    doReturn(ContentLanguage)
+        .when(headers).getHeaderString("Content-Language");
+    doReturn(Expires)
+        .when(headers).getHeaderString("Expires");
+    doReturn(CacheControl)
+        .when(headers).getHeaderString("Cache-Control");
+    doReturn(ContentDisposition)
+        .when(headers).getHeaderString("Content-Disposition");
+    doReturn(ContentEncoding)
+        .when(headers).getHeaderString("Content-Encoding");
+
+    ByteArrayInputStream body =
+            new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    Response response = rest.get("b1", "key1", null, 0, null, body);
+
+    Assert.assertEquals(ContentType,
+        response.getHeaderString("Content-Type"));
+    Assert.assertEquals(ContentLanguage,
+        response.getHeaderString("Content-Language"));
+    Assert.assertEquals(Expires,
+        response.getHeaderString("Expires"));
+    Assert.assertEquals(CacheControl,
+        response.getHeaderString("Cache-Control"));
+    Assert.assertEquals(ContentDisposition,
+        response.getHeaderString("Content-Disposition"));
+    Assert.assertEquals(ContentEncoding,
+        response.getHeaderString("Content-Encoding"));
   }
 }

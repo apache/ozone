@@ -43,6 +43,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.mockito.Mockito.doReturn;
 
 public class TestOverrideResponseHeader {
+
   public static final String CONTENT = "0123456789";
   public static final String ContentType1 = "video/mp4";
   public static final String ContentType2 = "text/html; charset=UTF-8";
@@ -57,9 +58,9 @@ public class TestOverrideResponseHeader {
       + "filename=\"filename.jpg\"";
   public static final String ContentEncoding1 = "gzip";
   public static final String ContentEncoding2 = "compress";
+
   HttpHeaders headers;
   ContainerRequestContext context;
-
   ObjectEndpoint rest;
 
   @Before
@@ -87,32 +88,21 @@ public class TestOverrideResponseHeader {
     rest.setContext(context);
   }
 
-  private void setHeaders() {
-    doReturn(ContentType1).when(headers).getHeaderString("Content-Type");
-    doReturn(ContentLanguage1).when(headers).getHeaderString("Content-Language");
-    doReturn(Expires1).when(headers).getHeaderString("Expires");
-    doReturn(CacheControl1).when(headers).getHeaderString("Cache-Control");
-    doReturn(ContentDisposition1).when(headers).getHeaderString("Content-Disposition");
-    doReturn(ContentEncoding1).when(headers).getHeaderString("Content-Encoding");
-  }
-
-  @Test
-  public void testInheritRequestHeader() throws IOException, OS3Exception {
-    setHeaders();
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    Response response = rest.get("b1", "key1", null, 0, null, body);
-
-    Assert.assertEquals(ContentType1, response.getHeaderString("Content-Type"));
-    Assert.assertEquals(ContentLanguage1, response.getHeaderString("Content-Language"));
-    Assert.assertEquals(Expires1, response.getHeaderString("Expires"));
-    Assert.assertEquals(CacheControl1, response.getHeaderString("Cache-Control"));
-    Assert.assertEquals(ContentDisposition1, response.getHeaderString("Content-Disposition"));
-    Assert.assertEquals(ContentEncoding1, response.getHeaderString("Content-Encoding"));
-  }
-
   @Test
   public void testOverrideResponseHeader() throws IOException, OS3Exception {
+    // set Query parameter
+    doReturn(ContentType1)
+        .when(headers).getHeaderString("Content-Type");
+    doReturn(ContentLanguage1)
+        .when(headers).getHeaderString("Content-Language");
+    doReturn(Expires1)
+        .when(headers).getHeaderString("Expires");
+    doReturn(CacheControl1)
+        .when(headers).getHeaderString("Cache-Control");
+    doReturn(ContentDisposition1)
+        .when(headers).getHeaderString("Content-Disposition");
+    doReturn(ContentEncoding1)
+        .when(headers).getHeaderString("Content-Encoding");
 
     MultivaluedHashMap<String, String> queryParameter = new MultivaluedHashMap<>();
 
@@ -126,19 +116,22 @@ public class TestOverrideResponseHeader {
 
     Mockito.when(context.getUriInfo().getQueryParameters())
         .thenReturn(queryParameter);
-
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-
-    //WHEN
     Response response = rest.get("b1", "key1", null, 0, null, body);
 
-    Assert.assertEquals(ContentType2, response.getHeaderString("Content-Type"));
-    Assert.assertEquals(ContentLanguage2, response.getHeaderString("Content-Language"));
-    Assert.assertEquals(Expires2, response.getHeaderString("Expires"));
-    Assert.assertEquals(CacheControl2, response.getHeaderString("Cache-Control"));
-    Assert.assertEquals(ContentDisposition2, response.getHeaderString("Content-Disposition"));
-    Assert.assertEquals(ContentEncoding2, response.getHeaderString("Content-Encoding"));
+    Assert.assertEquals(ContentType2,
+        response.getHeaderString("Content-Type"));
+    Assert.assertEquals(ContentLanguage2,
+        response.getHeaderString("Content-Language"));
+    Assert.assertEquals(Expires2,
+        response.getHeaderString("Expires"));
+    Assert.assertEquals(CacheControl2,
+        response.getHeaderString("Cache-Control"));
+    Assert.assertEquals(ContentDisposition2,
+        response.getHeaderString("Content-Disposition"));
+    Assert.assertEquals(ContentEncoding2,
+        response.getHeaderString("Content-Encoding"));
 
   }
 }
