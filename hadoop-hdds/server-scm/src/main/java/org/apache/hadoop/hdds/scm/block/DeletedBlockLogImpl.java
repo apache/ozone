@@ -475,9 +475,4 @@ public class DeletedBlockLogImpl
       return;
     }
   }
-
-  private boolean canBeDeleted(ContainerID containerID)
-      throws ContainerNotFoundException {
-    return !containerManager.getContainer(containerID).isOpen();
-  }
 }
