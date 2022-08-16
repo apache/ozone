@@ -85,6 +85,7 @@ message ScmContainerLocationRequest {
   optional GetContainersOnDecomNodeRequestProto getContainersOnDecomNodeRequest = 46;
   optional GetMetricsRequestProto getMetricsRequest = 47;
   optional ContainerBalancerStatusInfoRequestProto containerBalancerStatusInfoRequest = 48;
+  optional DatanodeDiskBalancerInfoRequestProto DatanodeDiskBalancerInfoRequest = 49;
 }
 
 message ScmContainerLocationResponse {
@@ -141,6 +142,7 @@ message ScmContainerLocationResponse {
   optional GetContainersOnDecomNodeResponseProto getContainersOnDecomNodeResponse = 46;
   optional GetMetricsResponseProto getMetricsResponse = 47;
   optional ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfoResponse = 48;
+  optional DatanodeDiskBalancerInfoResponseProto DatanodeDiskBalancerInfoResponse = 49;
 
   enum Status {
     OK = 1;
@@ -196,6 +198,7 @@ enum Type {
   GetContainersOnDecomNode = 42;
   GetMetrics = 43;
   GetContainerBalancerStatusInfo = 44;
+  DatanodeDiskBalancerInfo = 45;
 }
 
 /**
@@ -359,6 +362,24 @@ message DatanodeUsageInfoRequestProto {
 
 message DatanodeUsageInfoResponseProto {
   repeated DatanodeUsageInfoProto info = 1;
+}
+
+enum DatanodeDiskBalancerInfoType{
+  report = 1;
+  status = 2;
+}
+
+/*
+  Datanode disk balancer status request message.
+*/
+message DatanodeDiskBalancerInfoRequestProto {
+  required DatanodeDiskBalancerInfoType infoType = 1;
+  optional uint32 count = 2;
+  repeated string hosts = 3;
+}
+
+message DatanodeDiskBalancerInfoResponseProto {
+  repeated DatanodeDiskBalancerInfoProto info = 1;
 }
 
 /*
