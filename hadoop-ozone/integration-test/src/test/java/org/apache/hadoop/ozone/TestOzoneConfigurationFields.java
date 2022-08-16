@@ -66,8 +66,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     xmlPrefixToSkipCompare.add("ipc.client.rpc-timeout.ms");
     xmlPropsToSkipCompare.add("ozone.om.leader.election.minimum.timeout" +
         ".duration"); // Deprecated config
-    // Deprecated config
-    xmlPropsToSkipCompare.add("hdds.datanode.replication.work.dir");
     configurationPropsToSkipCompare
         .add(ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION);
     // Currently replication and type configs moved to server side.
