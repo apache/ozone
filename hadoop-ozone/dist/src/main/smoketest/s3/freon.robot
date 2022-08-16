@@ -35,7 +35,6 @@ Setup aws credentials
 
 Access key id
     ${env_var}=         Get Environment Variable    AWS_ACCESS_KEY_ID
-    Log to Console      ${env_var}
 
 Freon S3BG
     [arguments]    ${prefix}=s3bg    ${n}=100    ${threads}=10   ${args}=${EMPTY}

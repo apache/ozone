@@ -49,4 +49,4 @@ OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1
 
-SECURITY_ENABLED=false
+export SECURITY_ENABLED=false
