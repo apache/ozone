@@ -77,6 +77,7 @@ public class TestVolumeIOStatsWithPrometheusSink {
             " metrics output"
     );
   }
+
   private String publishMetricsAndGetOutput() throws IOException {
     metrics.publishMetricsNow();
 

@@ -157,7 +157,8 @@ public class VolumeIOStats {
   public long getWriteTime() {
     return writeTime.value();
   }
-  @Metric(value = "Returns the storage directory name for the volume")
+
+  @Metric
   public String getStorageDirectory() {
     return storageDirectory;
   }
