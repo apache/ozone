@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
@@ -62,7 +61,6 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   public static final String CONTAINER_COPY_DIR = "container-copy";
 
   private ConfigurationSource conf;
-  private Path defaultWorkingDirectory;
   private final SecurityConfig securityConfig;
   private final CertificateClient certClient;
   private final VolumeSet volumeSet;
@@ -74,7 +72,6 @@ public class SimpleContainerDownloader implements ContainerDownloader {
       VolumeSet volumeSet) {
 
     this.conf = conf;
-    setDefaultWorkingDirectory();
     securityConfig = new SecurityConfig(conf);
     this.certClient = certClient;
     this.volumeSet = volumeSet;
@@ -156,29 +153,19 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     // noop
   }
 
-  private void setDefaultWorkingDirectory() {
-    String defaultWorkDirString =
-        conf.get(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR);
-
-    if (defaultWorkDirString == null) {
-      defaultWorkingDirectory = Paths.get(System.getProperty("java.io.tmpdir"))
-          .resolve(CONTAINER_COPY_DIR);
-    } else {
-      defaultWorkingDirectory = Paths.get(defaultWorkDirString);
-    }
-  }
-
   public Path getWorkingDirectory() {
+    Path defaultWorkingDirectory =
+        Paths.get(System.getProperty("java.io.tmpdir"));
     try {
       // Use containerSize * 2 to store source and dest file
       HddsVolume volume = volumeChoosingPolicy.chooseVolume(
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
           containerSize * 2);
-      return Paths.get(volume.getStorageDir().getAbsolutePath()).
-          resolve(CONTAINER_COPY_DIR);
+      return Paths.get(volume.getStorageDir().getParent()).resolve("tmp")
+          .resolve(CONTAINER_COPY_DIR);
     } catch (IOException e) {
       LOG.error("Exception when spreading copy directory, using default " +
-          "working directory", e);
+          "working directory {}", defaultWorkingDirectory.toAbsolutePath(), e);
     }
     return defaultWorkingDirectory;
   }

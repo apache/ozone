@@ -1554,11 +1554,9 @@
   <property>
     <name>hdds.datanode.replication.work.dir</name>
     <tag>DATANODE</tag>
-    <description>Default directory which is used during the container replication
-      betweeen datanodes. Should have enough space to store multiple container
-      (in compressed format), but doesn't require fast io access such as SSD.
-      Since spread container-copy directory on different volumes is enabled by
-      default, this config normally won't become effective.
+    <description>This configuration is deprecated. Default directory which is used
+      during the container replication betweeen datanodes. Replication work will
+      be spread to different volumes.
     </description>
   </property>
 
