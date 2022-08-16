@@ -476,4 +476,34 @@ public interface StorageContainerLocationProtocol extends Closeable {
       String scmId) throws IOException;
 
   String getMetrics(String query) throws IOException;
+
+  List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerReport(
+      int count, int clientVersion) throws IOException;
+
+  /**
+   * Get DiskBalancer status.
+   */
+  List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
+      Optional<List<String>> hosts, int clientVersion) throws IOException;
+
+  /**
+   * Start DiskBalancer.
+   */
+  void startDiskBalancer(
+      Optional<Double> threshold,
+      Optional<Double> bandwidth,
+      Optional<List<String>> hosts) throws IOException;
+
+  /**
+   * Stop DiskBalancer.
+   */
+  void stopDiskBalancer(Optional<List<String>> hosts) throws IOException;
+
+  /**
+   * Update DiskBalancer Configuration.
+   */
+  void updateDiskBalancerConfiguration(
+      Optional<Double> threshold,
+      Optional<Double> bandwidth,
+      Optional<List<String>> hosts) throws IOException;
 }

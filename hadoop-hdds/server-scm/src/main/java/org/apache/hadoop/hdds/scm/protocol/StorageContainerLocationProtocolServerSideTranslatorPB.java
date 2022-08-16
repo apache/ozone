@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeAdminErrorResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeUsageInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesRequestProto;
@@ -722,6 +723,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setGetMetricsResponse(getMetrics(request.getGetMetricsRequest()))
             .build();
+      case DatanodeDiskBalancerInfo:
+        return ScmContainerLocationResponse.newBuilder()
+          .setCmdType(request.getCmdType())
+          .setStatus(Status.OK)
+          .setDatanodeDiskBalancerInfoResponse(getDatanodeDiskBalancerInfo(
+              request.getDatanodeDiskBalancerInfoRequest(),
+              request.getVersion()))
+          .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -1293,7 +1302,29 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public DecommissionScmResponseProto decommissionScm(
       DecommissionScmRequestProto request) throws IOException {
     return impl.decommissionScm(
-        request.getScmId());
+            request.getScmId());
+  }
+
+  public DatanodeDiskBalancerInfoResponseProto getDatanodeDiskBalancerInfo(
+      StorageContainerLocationProtocolProtos.
+          DatanodeDiskBalancerInfoRequestProto request, int clientVersion)
+      throws IOException {
+    List<HddsProtos.DatanodeDiskBalancerInfoProto> infoProtoList;
+    switch (request.getInfoType()) {
+    case report:
+      infoProtoList = impl.getDiskBalancerReport(request.getCount(),
+          clientVersion);
+      break;
+    case status:
+      infoProtoList = impl.getDiskBalancerStatus(
+          Optional.of(request.getHostsList()), clientVersion);
+      break;
+    default:
+      infoProtoList = null;
+    }
+    return DatanodeDiskBalancerInfoResponseProto.newBuilder()
+        .addAllInfo(infoProtoList)
+        .build();
   }
 
   public GetMetricsResponseProto getMetrics(GetMetricsRequestProto request) throws IOException {

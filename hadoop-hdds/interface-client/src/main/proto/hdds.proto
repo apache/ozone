@@ -521,3 +521,16 @@ message InnerNode {
     optional uint32 numOfLeaves = 2;
     repeated ChildrenMap childrenMap = 3;
 }
+
+message DiskBalancerConfigurationProto {
+    optional double threshold = 1;
+    optional double diskBandwidth = 2;
+    optional int32 parallelThread = 3;
+}
+
+message DatanodeDiskBalancerInfoProto {
+    required DatanodeDetailsProto node = 1;
+    required double currentVolumeDensitySum = 2;
+    optional bool diskBalancerRunning = 3;
+    optional DiskBalancerConfigurationProto diskBalancerConf = 4;
+}
