@@ -32,12 +32,7 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.InetAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -65,115 +60,6 @@ public class NodeDecommissionManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(NodeDecommissionManager.class);
-
-  static class HostDefinition {
-    private String rawHostname;
-    private String hostname;
-    private int port;
-
-    HostDefinition(String hostname) throws InvalidHostStringException {
-      this.rawHostname = hostname;
-      parseHostname();
-    }
-
-    public String getRawHostname() {
-      return rawHostname;
-    }
-
-    public String getHostname() {
-      return hostname;
-    }
-
-    public int getPort() {
-      return port;
-    }
-
-    private void parseHostname() throws InvalidHostStringException {
-      try {
-        // A URI *must* have a scheme, so just create a fake one
-        URI uri = new URI("empty://" + rawHostname.trim());
-        this.hostname = uri.getHost();
-        this.port = uri.getPort();
-
-        if (this.hostname == null) {
-          throw new InvalidHostStringException("The string " + rawHostname +
-              " does not contain a value hostname or hostname:port definition");
-        }
-      } catch (URISyntaxException e) {
-        throw new InvalidHostStringException(
-            "Unable to parse the hoststring " + rawHostname, e);
-      }
-    }
-  }
-
-  private List<DatanodeDetails> mapHostnamesToDatanodes(List<String> hosts)
-      throws InvalidHostStringException {
-    List<DatanodeDetails> results = new LinkedList<>();
-    for (String hostString : hosts) {
-      HostDefinition host = new HostDefinition(hostString);
-      InetAddress addr;
-      try {
-        addr = InetAddress.getByName(host.getHostname());
-      } catch (UnknownHostException e) {
-        throw new InvalidHostStringException("Unable to resolve host "
-            + host.getRawHostname(), e);
-      }
-      String dnsName;
-      if (useHostnames) {
-        dnsName = addr.getHostName();
-      } else {
-        dnsName = addr.getHostAddress();
-      }
-      List<DatanodeDetails> found = nodeManager.getNodesByAddress(dnsName);
-      if (found.size() == 0) {
-        throw new InvalidHostStringException("Host " + host.getRawHostname()
-            + " (" + dnsName + ") is not running any datanodes registered"
-            + " with SCM."
-            + " Please check the host name.");
-      } else if (found.size() == 1) {
-        if (host.getPort() != -1 &&
-            !validateDNPortMatch(host.getPort(), found.get(0))) {
-          throw new InvalidHostStringException("Host " + host.getRawHostname()
-              + " is running a datanode registered with SCM,"
-              + " but the port number doesn't match."
-              + " Please check the port number.");
-        }
-        results.add(found.get(0));
-      } else if (found.size() > 1) {
-        DatanodeDetails match = null;
-        for (DatanodeDetails dn : found) {
-          if (validateDNPortMatch(host.getPort(), dn)) {
-            match = dn;
-            break;
-          }
-        }
-        if (match == null) {
-          throw new InvalidHostStringException("Host " + host.getRawHostname()
-              + " is running multiple datanodes registered with SCM,"
-              + " but no port numbers match."
-              + " Please check the port number.");
-        }
-        results.add(match);
-      }
-    }
-    return results;
-  }
-
-  /**
-   * Check if the passed port is used by the given DatanodeDetails object. If
-   * it is, return true, otherwise return false.
-   * @param port Port number to check if it is used by the datanode
-   * @param dn Datanode to check if it is using the given port
-   * @return True if port is used by the datanode. False otherwise.
-   */
-  private boolean validateDNPortMatch(int port, DatanodeDetails dn) {
-    for (DatanodeDetails.Port p : dn.getPorts()) {
-      if (p.getValue() == port) {
-        return true;
-      }
-    }
-    return false;
-  }
 
   public NodeDecommissionManager(OzoneConfiguration config, NodeManager nm,
              ContainerManager containerManager, SCMContext scmContext,
@@ -225,7 +111,8 @@ public class NodeDecommissionManager {
 
   public synchronized List<DatanodeAdminError> decommissionNodes(
       List<String> nodes) throws InvalidHostStringException {
-    List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes);
+    List<DatanodeDetails> dns = NodeUtils.mapHostnamesToDatanodes(nodeManager,
+        nodes, useHostnames);
     List<DatanodeAdminError> errors = new ArrayList<>();
     for (DatanodeDetails dn : dns) {
       try {
@@ -290,7 +177,8 @@ public class NodeDecommissionManager {
 
   public synchronized List<DatanodeAdminError> recommissionNodes(
       List<String> nodes) throws InvalidHostStringException {
-    List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes);
+    List<DatanodeDetails> dns = NodeUtils.mapHostnamesToDatanodes(nodeManager,
+        nodes, useHostnames);
     List<DatanodeAdminError> errors = new ArrayList<>();
     for (DatanodeDetails dn : dns) {
       try {
@@ -327,7 +215,8 @@ public class NodeDecommissionManager {
 
   public synchronized List<DatanodeAdminError> startMaintenanceNodes(
       List<String> nodes, int endInHours) throws InvalidHostStringException {
-    List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes);
+    List<DatanodeDetails> dns = NodeUtils.mapHostnamesToDatanodes(nodeManager,
+        nodes, useHostnames);
     List<DatanodeAdminError> errors = new ArrayList<>();
     for (DatanodeDetails dn : dns) {
       try {

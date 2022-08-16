@@ -496,4 +496,40 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.queryUpgradeFinalizationProgress(
         upgradeClientID, force, readonly);
   }
+
+  @Override
+  public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerReport(
+      int count) throws IOException {
+    return storageContainerLocationClient.getDiskBalancerReport(count,
+        ClientVersion.CURRENT_VERSION);
+  }
+
+  @Override
+  public void startDiskBalancer(Optional<Double> threshold,
+      Optional<Double> bandwidth, Optional<List<String>> hosts)
+      throws IOException {
+    storageContainerLocationClient.startDiskBalancer(threshold, bandwidth,
+        hosts);
+  }
+
+  @Override
+  public void stopDiskBalancer(Optional<List<String>> hosts)
+      throws IOException {
+    storageContainerLocationClient.stopDiskBalancer(hosts);
+  }
+
+  @Override
+  public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
+      Optional<List<String>> hosts) throws IOException {
+    return storageContainerLocationClient.getDiskBalancerStatus(hosts,
+        ClientVersion.CURRENT_VERSION);
+  }
+
+  @Override
+  public void updateDiskBalancerConfiguration(Optional<Double> threshold,
+      Optional<Double> bandwidth, Optional<List<String>> hosts)
+      throws IOException {
+    storageContainerLocationClient.updateDiskBalancerConfiguration(threshold,
+        bandwidth, hosts);
+  }
 }
