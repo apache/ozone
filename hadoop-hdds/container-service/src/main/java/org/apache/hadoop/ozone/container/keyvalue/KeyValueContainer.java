@@ -260,8 +260,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } catch (IOException ex) {
       onFailure(containerData.getVolume());
       throw new StorageContainerException("Error while creating/ updating " +
-          ".container file. ContainerID: " + containerId + " Container path: " +
-          containerFile.getAbsolutePath(), ex,
+          " container file. ContainerID: " + containerId +
+          " ,container path: " + containerFile.getAbsolutePath(), ex,
           CONTAINER_FILES_CREATE_ERROR);
     } finally {
       if (tempContainerFile != null && tempContainerFile.exists()) {
