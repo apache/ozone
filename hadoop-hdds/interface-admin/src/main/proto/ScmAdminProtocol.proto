@@ -80,6 +80,7 @@ message ScmContainerLocationRequest {
   optional ResetDeletedBlockRetryCountRequestProto resetDeletedBlockRetryCountRequest = 41;
   optional TransferLeadershipRequestProto  transferScmLeadershipRequest = 42;
   optional GetFailedDeletedBlocksTxnRequestProto getFailedDeletedBlocksTxnRequest = 43;
+  optional DatanodeDiskBalancerInfoRequestProto DatanodeDiskBalancerInfoRequest = 44;
 }
 
 message ScmContainerLocationResponse {
@@ -131,6 +132,7 @@ message ScmContainerLocationResponse {
   optional ResetDeletedBlockRetryCountResponseProto resetDeletedBlockRetryCountResponse = 41;
   optional TransferLeadershipResponseProto  transferScmLeadershipResponse = 42;
   optional GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxnResponse = 43;
+  optional DatanodeDiskBalancerInfoResponseProto DatanodeDiskBalancerInfoResponse = 44;
 
   enum Status {
     OK = 1;
@@ -181,6 +183,7 @@ enum Type {
   GetClosedContainerCount = 37;
   TransferLeadership = 38;
   GetFailedDeletedBlocksTransaction = 39;
+  DatanodeDiskBalancerInfo = 40;
 }
 
 /**
@@ -330,6 +333,24 @@ message DatanodeUsageInfoRequestProto {
 
 message DatanodeUsageInfoResponseProto {
   repeated DatanodeUsageInfoProto info = 1;
+}
+
+enum DatanodeDiskBalancerInfoType{
+  report = 1;
+  status = 2;
+}
+
+/*
+  Datanode disk balancer status request message.
+*/
+message DatanodeDiskBalancerInfoRequestProto {
+  required DatanodeDiskBalancerInfoType infoType = 1;
+  optional uint32 count = 2;
+  repeated string hosts = 3;
+}
+
+message DatanodeDiskBalancerInfoResponseProto {
+  repeated DatanodeDiskBalancerInfoProto info = 1;
 }
 
 /*

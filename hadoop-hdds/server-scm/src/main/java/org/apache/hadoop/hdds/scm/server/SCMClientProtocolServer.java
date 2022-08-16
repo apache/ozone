@@ -1212,6 +1212,56 @@ public class SCMClientProtocolServer implements
         ContainerID.valueOf(startContainerID), count, state);
   }
 
+  public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerReport(
+      int count, int clientVersion) throws IOException {
+    // check admin authorisation
+    try {
+      getScm().checkAdminAccess(getRemoteUser());
+    } catch (IOException e) {
+      LOG.error("Authorization failed", e);
+      throw e;
+    }
+
+    return scm.getDiskBalancerManager().getDiskBalancerReport(count,
+        clientVersion);
+  }
+
+  @Override
+  public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
+      Optional<List<String>> hosts, int clientVersion) throws IOException {
+    // check admin authorisation
+    try {
+      getScm().checkAdminAccess(getRemoteUser());
+    } catch (IOException e) {
+      LOG.error("Authorization failed", e);
+      throw e;
+    }
+
+    return scm.getDiskBalancerManager().getDiskBalancerStatus(hosts,
+        clientVersion);
+  }
+
+  @Override
+  public void startDiskBalancer(Optional<Double> threshold,
+      Optional<Double> bandwidth, Optional<List<String>> hosts)
+      throws IOException {
+    // TODO: Send message to datanodes
+  }
+
+  @Override
+  public void stopDiskBalancer(Optional<List<String>> hosts)
+      throws IOException {
+    // TODO: Send message to datanodes
+  }
+
+
+  @Override
+  public void updateDiskBalancerConfiguration(Optional<Double> threshold,
+      Optional<Double> bandwidth, Optional<List<String>> hosts)
+      throws IOException {
+    // TODO: Send message to datanodes
+  }
+
   /**
    * Queries a list of Node that match a set of statuses.
    *

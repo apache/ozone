@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.node.DiskBalancerManager;
 import org.apache.hadoop.hdds.scm.node.NodeAddressUpdateHandler;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManagerImpl;
@@ -234,6 +235,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private WritableContainerFactory writableContainerFactory;
   private FinalizationManager finalizationManager;
   private HDDSLayoutVersionManager scmLayoutVersionManager;
+  private DiskBalancerManager diskBalancerManager;
 
   private SCMMetadataStore scmMetadataStore;
   private CertificateStore certificateStore;
@@ -769,6 +771,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         .setSCMDBTransactionBuffer(scmHAManager.getDBTransactionBuffer())
         .setRatisServer(scmHAManager.getRatisServer())
         .build();
+    diskBalancerManager = new DiskBalancerManager(conf, eventQueue, scmContext,
+        scmNodeManager);
   }
 
   /**
@@ -1838,6 +1842,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public SCMServiceManager getSCMServiceManager() {
     return serviceManager;
+  }
+
+  public DiskBalancerManager getDiskBalancerManager() {
+    return diskBalancerManager;
   }
 
   /**
