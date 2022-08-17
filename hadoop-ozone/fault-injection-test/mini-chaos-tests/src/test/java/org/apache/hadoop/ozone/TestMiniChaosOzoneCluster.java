@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -100,15 +99,15 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   private static int failureInterval = 300; // 5 minute period between failures.
 
   @CommandLine.Mixin
-  private FreonReplicationOptions replication;
+  private static FreonReplicationOptions freonReplication = new FreonReplicationOptions();
 
   @Option(names = {"-l", "--layout"},
       description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}")
   private static AllowedBucketLayouts allowedBucketLayout =
       AllowedBucketLayouts.FILE_SYSTEM_OPTIMIZED;
 
-  private MiniOzoneChaosCluster cluster;
-  private MiniOzoneLoadGenerator loadGenerator;
+  private static MiniOzoneChaosCluster cluster;
+  private static MiniOzoneLoadGenerator loadGenerator;
 
   private static String omServiceId = null;
   private static String scmServiceId = null;
@@ -117,11 +116,8 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   private static final String SCM_SERVICE_ID = "scmChaosTest";
 
   @BeforeClass
-  public void init() throws Exception {
+  public static void init() throws Exception {
     OzoneConfiguration configuration = new OzoneConfiguration();
-
-    ReplicationConfig replicationConfig =
-        replication.fromParamsOrConfig(configuration);
 
     MiniOzoneChaosCluster.Builder chaosBuilder =
         new MiniOzoneChaosCluster.Builder(configuration);
@@ -147,8 +143,8 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
         BucketLayout.valueOf(allowedBucketLayout.toString());
     final BucketArgs.Builder builder = BucketArgs.newBuilder();
 
-    builder.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(replicationConfig));
+    freonReplication.fromParams(configuration).ifPresent(config ->
+            builder.setDefaultReplicationConfig(new DefaultReplicationConfig(config)));
     builder.setBucketLayout(bucketLayout);
 
     MiniOzoneLoadGenerator.Builder loadBuilder =
@@ -192,7 +188,7 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
    * Shutdown MiniDFSCluster.
    */
   @AfterClass
-  public void shutdown() {
+  public static void shutdown() {
     if (loadGenerator != null) {
       loadGenerator.shutdownLoadGenerator();
     }
