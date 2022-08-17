@@ -58,7 +58,6 @@ Setup v2 headers
                         Set Environment Variable   AWS_SECRET_ACCESS_KEY   ANYKEY
 
 Setup v4 headers
-    ${SECURITY_ENABLED} =       Get Environment Variable    SECURITY_ENABLED
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user    testuser    testuser.keytab
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Setup secure v4 headers
     Run Keyword if      '${SECURITY_ENABLED}' == 'false'    Setup dummy credentials for S3

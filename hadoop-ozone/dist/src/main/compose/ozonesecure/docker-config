@@ -124,7 +124,6 @@ KMS-SITE.XML_hadoop.kms.proxyuser.s3g.hosts=*
 #BYTEMAN_SCRIPT_URL=https://raw.githubusercontent.com/apache/hadoop/trunk/dev-support/byteman/hadooprpc.btm
 
 OZONE_DATANODE_SECURE_USER=root
-export SECURITY_ENABLED=true
 JAVA_HOME=/usr/lib/jvm/jre
 JSVC_HOME=/usr/bin
 

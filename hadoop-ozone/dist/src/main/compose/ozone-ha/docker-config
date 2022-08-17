@@ -48,5 +48,3 @@ OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om1,om2,om3,scm,s3g,recon,kdc,localhost,127.0.0.1
-
-export SECURITY_ENABLED=false
