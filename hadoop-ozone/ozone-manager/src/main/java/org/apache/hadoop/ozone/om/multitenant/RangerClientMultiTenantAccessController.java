@@ -154,15 +154,15 @@ public class RangerClientMultiTenantAccessController implements
       LOG.error("Request failure with no status provided.", rse);
     } else {
       switch (status.getStatusCode()) {
-        case HTTP_STATUS_CODE_UNAUTHORIZED:
-          LOG.error("Auth failure. Please double check Ranger-related configs");
-          break;
-        case HTTP_STATUS_CODE_BAD_REQUEST:
-          LOG.error("Request failure. If this is an assign-user operation, "
-                  + "check if the user name exists in Ranger.");
-          break;
-        default:
-          LOG.error("Other request failure. Status: {}", status);
+      case HTTP_STATUS_CODE_UNAUTHORIZED:
+        LOG.error("Auth failure. Please double check Ranger-related configs");
+        break;
+      case HTTP_STATUS_CODE_BAD_REQUEST:
+        LOG.error("Request failure. If this is an assign-user operation, "
+            + "check if the user name exists in Ranger.");
+        break;
+      default:
+        LOG.error("Other request failure. Status: {}", status);
       }
     }
   }
