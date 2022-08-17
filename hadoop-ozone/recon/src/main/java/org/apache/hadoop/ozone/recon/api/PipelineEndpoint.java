@@ -142,15 +142,14 @@ public class PipelineEndpoint {
           TreeMap<Double, Double> values = (TreeMap<Double, Double>)
                   m.getValues();
           if (!values.isEmpty()) {
-            electionCount += Optional.of(values.firstEntry().getValue()
-                    .longValue()).orElse(0L);
+            electionCount += values.firstEntry().getValue().longValue();
           }
         }
       }
     } catch (Exception ex) {
       if (LOG.isErrorEnabled()) {
-        LOG.error(String.format("Unable to get metrics value for " +
-                "ratis_leader_election_electionCount"), ex);
+        LOG.error("Unable to get metrics value for " +
+                "ratis_leader_election_electionCount", ex);
       }
     }
     return electionCount;
@@ -169,14 +168,13 @@ public class PipelineEndpoint {
         TreeMap<Double, Double> values = (TreeMap<Double, Double>)
                 metrics.get(0).getValues();
         if (!values.isEmpty()) {
-          return Optional.of(values.firstEntry().getValue().longValue())
-                  .orElse(0L);
+          return values.firstEntry().getValue().longValue();
         }
       }
     } catch (Exception ex) {
       if (LOG.isErrorEnabled()) {
-        LOG.error(String.format("Unable to get metrics value for " +
-                "ratis_leader_election_lastLeaderElectionElapsedTime"), ex);
+        LOG.error("Unable to get metrics value for " +
+                "ratis_leader_election_lastLeaderElectionElapsedTime", ex);
       }
     }
     return 0L;
