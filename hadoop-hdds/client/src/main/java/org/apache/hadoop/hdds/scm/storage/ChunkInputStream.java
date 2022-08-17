@@ -21,11 +21,14 @@ package org.apache.hadoop.hdds.scm.storage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
@@ -57,6 +60,8 @@ import org.slf4j.LoggerFactory;
  * container. Each chunk may contain multiple underlying {@link ByteBuffer}
  * instances.
  */
+@SuppressFBWarnings(value = "IS2_INCONSISTENT_SYNC",
+    justification = "All Public APIs are synchronized")
 public class ChunkInputStream extends InputStream
     implements Seekable, CanUnbuffer, ByteBufferReadable {
 
@@ -104,6 +109,8 @@ public class ChunkInputStream extends InputStream
   private final Token<? extends TokenIdentifier> token;
 
   private static final int EOF = -1;
+  private boolean smallBlock = false;
+  private BlockInputStream blockInputStream;
 
   ChunkInputStream(ChunkInfo chunkInfo, BlockID blockId,
       XceiverClientFactory xceiverClientFactory,
@@ -116,6 +123,22 @@ public class ChunkInputStream extends InputStream
     this.pipelineSupplier = pipelineSupplier;
     this.verifyChecksum = verifyChecksum;
     this.token = token;
+  }
+
+  ChunkInputStream(ChunkInfo chunkInfo, BlockID blockId,
+      BlockInputStream blockInputStream,
+      XceiverClientFactory xceiverClientFactory,
+      Supplier<Pipeline> pipelineSupplier,
+      boolean verifyChecksum, Token<? extends TokenIdentifier> token) {
+    this.chunkInfo = chunkInfo;
+    this.length = chunkInfo.getLen();
+    this.blockID = blockId;
+    this.xceiverClientFactory = xceiverClientFactory;
+    this.pipelineSupplier = pipelineSupplier;
+    this.verifyChecksum = verifyChecksum;
+    this.token = token;
+    this.blockInputStream = blockInputStream;
+    this.smallBlock = blockInputStream.isSmallBlock();
   }
 
   public synchronized long getRemaining() {
@@ -366,7 +389,7 @@ public class ChunkInputStream extends InputStream
     storePosition();
 
     long adjustedBuffersOffset, adjustedBuffersLen;
-    if (verifyChecksum) {
+    if (verifyChecksum && !smallBlock) {
       // Adjust the chunk offset and length to include required checksum
       // boundaries
       Pair<Long, Long> adjustedOffsetAndLength =
@@ -379,15 +402,19 @@ public class ChunkInputStream extends InputStream
       adjustedBuffersLen = len;
     }
 
-    // Adjust the chunkInfo so that only the required bytes are read from
-    // the chunk.
-    final ChunkInfo adjustedChunkInfo = ChunkInfo.newBuilder(chunkInfo)
-        .setOffset(chunkInfo.getOffset() + adjustedBuffersOffset)
-        .setLen(adjustedBuffersLen)
-        .build();
-
-    readChunkDataIntoBuffers(adjustedChunkInfo);
-    bufferOffsetWrtChunkData = adjustedBuffersOffset;
+    if (smallBlock) {
+      readChunkDataIntoBuffers(chunkInfo);
+      bufferOffsetWrtChunkData = 0;
+    } else {
+      // Adjust the chunkInfo so that only the required bytes are read from
+      // the chunk.
+      final ChunkInfo adjustedChunkInfo = ChunkInfo.newBuilder(chunkInfo)
+          .setOffset(chunkInfo.getOffset() + adjustedBuffersOffset)
+          .setLen(adjustedBuffersLen)
+          .build();
+      readChunkDataIntoBuffers(adjustedChunkInfo);
+      bufferOffsetWrtChunkData = adjustedBuffersOffset;
+    }
 
     // If the stream was seeked to position before, then the buffer
     // position should be adjusted as the reads happen at checksum boundaries.
@@ -401,7 +428,12 @@ public class ChunkInputStream extends InputStream
 
   private void readChunkDataIntoBuffers(ChunkInfo readChunkInfo)
       throws IOException {
-    buffers = readChunk(readChunkInfo);
+    if (smallBlock) {
+      buffers = readBlockWithChunk();
+    } else {
+      buffers = readChunk(readChunkInfo);
+    }
+
     buffersSize = readChunkInfo.getLen();
 
     bufferOffsets = new long[buffers.length];
@@ -425,12 +457,8 @@ public class ChunkInputStream extends InputStream
     ReadChunkResponseProto readChunkResponse;
 
     try {
-      List<CheckedBiFunction> validators =
-          ContainerProtocolCalls.getValidatorList();
-      validators.add(validator);
-
       readChunkResponse = ContainerProtocolCalls.readChunk(xceiverClient,
-          readChunkInfo, blockID, validators, token);
+          readChunkInfo, blockID, getValidators(), token);
 
     } catch (IOException e) {
       if (e instanceof StorageContainerException) {
@@ -452,23 +480,71 @@ public class ChunkInputStream extends InputStream
     }
   }
 
+  /**
+   * Send RPC call to get the small file from the container.
+   */
+  @VisibleForTesting
+  protected ByteBuffer[] readBlockWithChunk() throws IOException {
+    ContainerProtos.GetSmallFileResponseProto response;
+    try {
+      response = ContainerProtocolCalls.readSmallFile(
+          xceiverClient, blockID, getValidators(), token);
+      Preconditions.checkArgument(
+          chunkInfo.getChecksumData().getChecksumsCount() == 0 || allocated);
+      chunkInfo = response.getData().getChunkData();
+    } catch (IOException e) {
+      if (e instanceof StorageContainerException) {
+        throw e;
+      }
+      throw new IOException("Unexpected OzoneException: " + e.toString(), e);
+    }
+    ReadChunkResponseProto readChunkResponse = response.getData();
+    if (readChunkResponse.hasData()) {
+      return readChunkResponse.getData().asReadOnlyByteBufferList()
+          .toArray(new ByteBuffer[0]);
+    } else if (readChunkResponse.hasDataBuffers()) {
+      List<ByteString> buffersList = readChunkResponse.getDataBuffers()
+          .getBuffersList();
+      return BufferUtils.getReadOnlyByteBuffersArray(buffersList);
+    } else {
+      throw new IOException("Unexpected error while reading chunk data " +
+          "from container. No data returned.");
+    }
+  }
+
+  private List<CheckedBiFunction> getValidators() {
+    List<CheckedBiFunction> validators =
+        ContainerProtocolCalls.getValidatorList();
+    validators.add(validator);
+    return validators;
+  }
+
   private CheckedBiFunction<ContainerCommandRequestProto,
       ContainerCommandResponseProto, IOException> validator =
           (request, response) -> {
-            final ChunkInfo reqChunkInfo =
-                request.getReadChunk().getChunkData();
-
-            ReadChunkResponseProto readChunkResponse = response.getReadChunk();
             List<ByteString> byteStrings;
             boolean isV0 = false;
 
+            ChunkInfo targetChunkInfo;
+            ReadChunkResponseProto readChunkResponse;
+            if (request.hasReadChunk()) {
+              readChunkResponse = response.getReadChunk();
+              targetChunkInfo = request.getReadChunk().getChunkData();
+            } else if (request.hasGetSmallFile()) {
+              readChunkResponse = response.getGetSmallFile().getData();
+              targetChunkInfo = readChunkResponse.getChunkData();
+            } else {
+              throw new IOException("Unexpected Container Command Request: " +
+                  response.getCmdType());
+            }
+
             if (readChunkResponse.hasData()) {
               ByteString byteString = readChunkResponse.getData();
-              if (byteString.size() != reqChunkInfo.getLen()) {
+              if (byteString.size() != targetChunkInfo.getLen()) {
                 // Bytes read from chunk should be equal to chunk size.
                 throw new OzoneChecksumException(String.format(
                     "Inconsistent read for chunk=%s len=%d bytesRead=%d",
-                    reqChunkInfo.getChunkName(), reqChunkInfo.getLen(),
+                    targetChunkInfo.getChunkName(), targetChunkInfo.getLen(),
                     byteString.size()));
               }
               byteStrings = new ArrayList<>();
@@ -477,24 +553,22 @@ public class ChunkInputStream extends InputStream
             } else {
               byteStrings = readChunkResponse.getDataBuffers().getBuffersList();
               long buffersLen = BufferUtils.getBuffersLen(byteStrings);
-              if (buffersLen != reqChunkInfo.getLen()) {
+              if (buffersLen != targetChunkInfo.getLen()) {
                 // Bytes read from chunk should be equal to chunk size.
                 throw new OzoneChecksumException(String.format(
                     "Inconsistent read for chunk=%s len=%d bytesRead=%d",
-                    reqChunkInfo.getChunkName(), reqChunkInfo.getLen(),
+                    targetChunkInfo.getChunkName(), targetChunkInfo.getLen(),
                     buffersLen));
               }
             }
 
             if (verifyChecksum) {
               ChecksumData checksumData = ChecksumData.getFromProtoBuf(
-                  chunkInfo.getChecksumData());
-
+                  targetChunkInfo.getChecksumData());
               // ChecksumData stores checksum for each 'numBytesPerChecksum'
               // number of bytes in a list. Compute the index of the first
               // checksum to match with the read data
-
-              long relativeOffset = reqChunkInfo.getOffset() -
+              long relativeOffset = targetChunkInfo.getOffset() -
                   chunkInfo.getOffset();
               int bytesPerChecksum = checksumData.getBytesPerChecksum();
               int startIndex = (int) (relativeOffset / bytesPerChecksum);

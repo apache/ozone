@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
@@ -68,10 +69,10 @@ public class TestKeyInputStreamEC {
     BlockInputStreamFactory mockStreamFactory =
         mock(BlockInputStreamFactory.class);
     when(mockStreamFactory.create(any(), any(), any(), any(),
-        anyBoolean(), any(), any())).thenReturn(blockInputStream);
+        any(), any(), any())).thenReturn(blockInputStream);
 
     try (LengthInputStream kis = KeyInputStream.getFromOmKeyInfo(keyInfo,
-        null, true,  null, mockStreamFactory)) {
+        null, new OzoneClientConfig(), null, mockStreamFactory)) {
       byte[] buf = new byte[100];
       int readBytes = kis.read(buf, 0, 100);
       Assert.assertEquals(100, readBytes);

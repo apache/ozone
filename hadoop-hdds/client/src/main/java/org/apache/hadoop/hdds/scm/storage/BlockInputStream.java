@@ -31,10 +31,12 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -103,26 +105,30 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private int chunkIndexOfPrevPosition;
 
   private final Function<BlockID, Pipeline> refreshPipelineFunction;
+  private boolean smallBlock;
+  private final OzoneClientConfig clientConfig;
 
+  @SuppressWarnings("parameternumber")
   public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
-      Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
+      Token<OzoneBlockTokenIdentifier> token, OzoneClientConfig clientConfig,
       XceiverClientFactory xceiverClientFactory,
       Function<BlockID, Pipeline> refreshPipelineFunction) {
     this.blockID = blockId;
     this.length = blockLen;
     this.pipeline = pipeline;
     this.token = token;
-    this.verifyChecksum = verifyChecksum;
+    Preconditions.checkArgument(clientConfig != null);
+    this.verifyChecksum = clientConfig.isChecksumVerify();
     this.xceiverClientFactory = xceiverClientFactory;
     this.refreshPipelineFunction = refreshPipelineFunction;
+    this.smallBlock = (length <= clientConfig.getSmallBlockThreshold());
+    this.clientConfig = clientConfig;
   }
 
   public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
-                          Token<OzoneBlockTokenIdentifier> token,
-                          boolean verifyChecksum,
-                          XceiverClientFactory xceiverClientFactory
-  ) {
-    this(blockId, blockLen, pipeline, token, verifyChecksum,
+      Token<OzoneBlockTokenIdentifier> token, OzoneClientConfig clientConfig,
+      XceiverClientFactory xceiverClientFactory) {
+    this(blockId, blockLen, pipeline, token, clientConfig,
         xceiverClientFactory, null);
   }
   /**
@@ -130,8 +136,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
    * the Container and create the ChunkInputStreams for each Chunk in the Block.
    */
   public synchronized void initialize() throws IOException {
-
-    // Pre-check that the stream has not been intialized already
+    // Pre-check that the stream has not been initialized already
     if (initialized) {
       return;
     }
@@ -140,15 +145,28 @@ public class BlockInputStream extends BlockExtendedInputStream {
     IOException catchEx = null;
     do {
       try {
-        // If refresh returns new pipeline, retry with it.
-        // If we get IOException due to connectivity issue,
-        // retry according to retry policy.
-        chunks = getChunkInfos();
-        break;
+        if (smallBlock) {
+          ChunkInfo chunkInfo = ChunkInfo.newBuilder()
+              .setChunkName(blockID.getLocalID() + "_chunk_" + (chunkIndex + 1))
+              .setOffset(0L).setLen(length)
+              .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+                  .setBytesPerChecksum(clientConfig.getBytesPerChecksum())
+                  .setType(clientConfig.getChecksumType())
+                  .build())
+              .build();
+          chunks = new ArrayList<>();
+          chunks.add(chunkInfo);
+        } else {
+          // If refresh returns new pipeline, retry with it.
+          // If we get IOException due to connectivity issue,
+          // retry according to retry policy.
+          chunks = getChunkInfos();
+          break;
+        }
       } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException ex) {
-        refreshPipeline(ex);
+        handleReadError(ex);
         catchEx = ex;
       } catch (IOException ex) {
         LOG.debug("Retry to get chunk info fail", ex);
@@ -180,8 +198,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
       this.chunkIndex = 0;
 
       if (blockPosition > 0) {
-        // Stream was seeked to blockPosition before initialization. Seek to the
-        // blockPosition now.
+        // Stream was seeked to blockPosition before initialization. Seek to
+        // the blockPosition now.
         seek(blockPosition);
       }
     }
@@ -199,17 +217,15 @@ public class BlockInputStream extends BlockExtendedInputStream {
       } else {
         LOG.debug("New pipeline got for block {}", blockID);
         this.pipeline = newPipeline;
+        initPipelineAndClient();
       }
     } else {
       throw cause;
     }
   }
 
-  /**
-   * Send RPC call to get the block info from the container.
-   * @return List of chunks in this block.
-   */
-  protected List<ChunkInfo> getChunkInfos() throws IOException {
+  private void initPipelineAndClient() throws IOException {
+    // Initialize pipeline and client.
     // irrespective of the container state, we will always read via Standalone
     // protocol.
     if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE && pipeline
@@ -220,7 +236,18 @@ public class BlockInputStream extends BlockExtendedInputStream {
                   .getLegacyFactor(pipeline.getReplicationConfig())))
           .build();
     }
-    acquireClient();
+
+    xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
+  }
+
+  /**
+   * Send RPC call to get the block info from the container.
+   * @return List of chunks in this block.
+   */
+  protected List<ChunkInfo> getChunkInfos() throws IOException {
+
+    initPipelineAndClient();
+
     boolean success = false;
     List<ChunkInfo> chunks;
     try {
@@ -266,7 +293,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
-    return new ChunkInputStream(chunkInfo, blockID,
+    return new ChunkInputStream(chunkInfo, blockID, this,
         xceiverClientFactory, () -> pipeline, verifyChecksum, token);
   }
 
@@ -476,6 +503,10 @@ public class BlockInputStream extends BlockExtendedInputStream {
   @VisibleForTesting
   synchronized long getBlockPosition() {
     return blockPosition;
+  }
+
+  public boolean isSmallBlock() {
+    return this.smallBlock;
   }
 
   @Override

@@ -32,6 +32,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
@@ -91,21 +92,21 @@ public class KeyInputStream extends ExtendedInputStream {
    */
   public static LengthInputStream getFromOmKeyInfo(OmKeyInfo keyInfo,
       XceiverClientFactory xceiverClientFactory,
-      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      OzoneClientConfig clientConfig,
+      Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory) {
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
 
     KeyInputStream keyInputStream = new KeyInputStream();
     keyInputStream.initialize(keyInfo, keyLocationInfos,
-        xceiverClientFactory, verifyChecksum, retryFunction,
-        blockStreamFactory);
+        xceiverClientFactory, clientConfig, retryFunction, blockStreamFactory);
 
     return new LengthInputStream(keyInputStream, keyInputStream.length);
   }
 
   public static List<LengthInputStream> getStreamsFromKeyInfo(OmKeyInfo keyInfo,
-      XceiverClientFactory xceiverClientFactory, boolean verifyChecksum,
+      XceiverClientFactory xceiverClientFactory, OzoneClientConfig clientConfig,
       Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory) {
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
@@ -138,7 +139,7 @@ public class KeyInputStream extends ExtendedInputStream {
         partsToBlocksMap.entrySet()) {
       KeyInputStream keyInputStream = new KeyInputStream();
       keyInputStream.initialize(keyInfo, entry.getValue(),
-          xceiverClientFactory, verifyChecksum, retryFunction,
+          xceiverClientFactory, clientConfig, retryFunction,
           blockStreamFactory);
       lengthInputStreams.add(new LengthInputStream(keyInputStream,
           partsLengthMap.get(entry.getKey())));
@@ -150,7 +151,8 @@ public class KeyInputStream extends ExtendedInputStream {
   private synchronized void initialize(OmKeyInfo keyInfo,
       List<OmKeyLocationInfo> blockInfos,
       XceiverClientFactory xceiverClientFactory,
-      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      OzoneClientConfig clientConfig,
+      Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory) {
     this.key = keyInfo.getKeyName();
     this.blockOffsets = new long[blockInfos.size()];
@@ -166,7 +168,7 @@ public class KeyInputStream extends ExtendedInputStream {
       // pipeline info for a given OM Key location info.
       addStream(keyInfo.getReplicationConfig(), omKeyLocationInfo,
           xceiverClientFactory,
-          verifyChecksum, keyLocationInfo -> {
+          clientConfig, keyLocationInfo -> {
             OmKeyInfo newKeyInfo = retryFunction.apply(keyInfo);
             BlockID blockID = keyLocationInfo.getBlockID();
             List<OmKeyLocationInfo> collect =
@@ -196,12 +198,12 @@ public class KeyInputStream extends ExtendedInputStream {
    */
   private synchronized void addStream(ReplicationConfig repConfig,
       OmKeyLocationInfo blockInfo,
-      XceiverClientFactory xceiverClientFactory, boolean verifyChecksum,
+      XceiverClientFactory xceiverClientFactory, OzoneClientConfig clientConfig,
       Function<OmKeyLocationInfo, Pipeline> refreshPipelineFunction,
       BlockInputStreamFactory blockStreamFactory) {
     blockStreams.add(blockStreamFactory.create(repConfig, blockInfo,
         blockInfo.getPipeline(), blockInfo.getToken(),
-        verifyChecksum, xceiverClientFactory,
+        clientConfig, xceiverClientFactory,
         blockID -> refreshPipelineFunction.apply(blockInfo)));
   }
 

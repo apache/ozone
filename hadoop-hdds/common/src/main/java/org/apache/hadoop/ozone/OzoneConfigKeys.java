@@ -361,6 +361,8 @@ public final class OzoneConfigKeys {
 
   public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 16 * 1024;
 
+  public static final int OZONE_CLIENT_SMALL_BLOCK_THRESHOLD_MAX_SIZE = 4 * 1024 * 1024;
+
   public static final String OZONE_CLIENT_READ_TIMEOUT
           = "ozone.client.read.timeout";
   public static final String OZONE_CLIENT_READ_TIMEOUT_DEFAULT = "30s";

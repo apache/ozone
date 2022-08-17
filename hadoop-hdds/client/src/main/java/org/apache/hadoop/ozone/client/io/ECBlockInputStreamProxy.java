@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
@@ -58,6 +59,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   private boolean reconstructionReader = false;
   private List<DatanodeDetails> failedLocations = new ArrayList<>();
   private boolean closed = false;
+  private final OzoneClientConfig clientConfig;
 
   /**
    * Given the ECReplicationConfig and the block length, calculate how many
@@ -96,15 +98,16 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   }
 
   public ECBlockInputStreamProxy(ECReplicationConfig repConfig,
-      BlockLocationInfo blockInfo, boolean verifyChecksum,
+      BlockLocationInfo blockInfo, OzoneClientConfig clientConfig,
       XceiverClientFactory xceiverClientFactory, Function<BlockID,
       Pipeline> refreshFunction, ECBlockInputStreamFactory streamFactory) {
     this.repConfig = repConfig;
-    this.verifyChecksum = verifyChecksum;
+    this.verifyChecksum = clientConfig.isChecksumVerify();
     this.blockInfo = blockInfo;
     this.ecBlockInputStreamFactory = streamFactory;
     this.xceiverClientFactory = xceiverClientFactory;
     this.refreshFunction = refreshFunction;
+    this.clientConfig = clientConfig;
 
     setReaderType();
     createBlockReader();
@@ -118,7 +121,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
 
   private void createBlockReader() {
     blockReader = ecBlockInputStreamFactory.create(reconstructionReader,
-        failedLocations, repConfig, blockInfo, verifyChecksum,
+        failedLocations, repConfig, blockInfo, clientConfig,
         xceiverClientFactory, refreshFunction);
   }
 

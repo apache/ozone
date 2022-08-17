@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
@@ -68,21 +69,21 @@ public final class ECBlockInputStreamFactoryImpl implements
    *                        know are bad and should not be used.
    * @param repConfig The replication Config
    * @param blockInfo The blockInfo representing the block.
-   * @param verifyChecksum Whether to verify checksums or not.
+   * @param clientConfig Client config.
    * @param xceiverFactory Factory to create the xceiver in the client
    * @param refreshFunction Function to refresh the pipeline if needed
    * @return BlockExtendedInputStream of the correct type.
    */
   public BlockExtendedInputStream create(boolean missingLocations,
       List<DatanodeDetails> failedLocations, ReplicationConfig repConfig,
-      BlockLocationInfo blockInfo, boolean verifyChecksum,
+      BlockLocationInfo blockInfo, OzoneClientConfig clientConfig,
       XceiverClientFactory xceiverFactory,
       Function<BlockID, Pipeline> refreshFunction) {
     if (missingLocations) {
       // We create the reconstruction reader
       ECBlockReconstructedStripeInputStream sis =
           new ECBlockReconstructedStripeInputStream(
-              (ECReplicationConfig)repConfig, blockInfo, verifyChecksum,
+              (ECReplicationConfig)repConfig, blockInfo, clientConfig,
               xceiverFactory, refreshFunction, inputStreamFactory,
               byteBufferPool, ecReconstructExecutorSupplier.get());
       if (failedLocations != null) {
@@ -93,7 +94,7 @@ public final class ECBlockInputStreamFactoryImpl implements
     } else {
       // Otherwise create the more efficient non-reconstruction reader
       return new ECBlockInputStream((ECReplicationConfig)repConfig, blockInfo,
-          verifyChecksum, xceiverFactory, refreshFunction, inputStreamFactory);
+          clientConfig, xceiverFactory, refreshFunction, inputStreamFactory);
     }
   }
 

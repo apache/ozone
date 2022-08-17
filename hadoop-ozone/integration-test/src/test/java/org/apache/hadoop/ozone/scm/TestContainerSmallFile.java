@@ -102,7 +102,7 @@ public class TestContainerSmallFile {
     ContainerProtocolCalls.writeSmallFile(client, blockID,
         "data123".getBytes(UTF_8), null);
     ContainerProtos.GetSmallFileResponseProto response =
-        ContainerProtocolCalls.readSmallFile(client, blockID, null);
+        ContainerProtocolCalls.readSmallFile(client, blockID, null, null);
     String readData = response.getData().getDataBuffers().getBuffersList()
         .get(0).toStringUtf8();
     Assert.assertEquals("data123", readData);
@@ -127,7 +127,7 @@ public class TestContainerSmallFile {
         container.getContainerInfo().getContainerID());
     // Try to read a Key Container Name
     ContainerProtos.GetSmallFileResponseProto response =
-        ContainerProtocolCalls.readSmallFile(client, blockID, null);
+        ContainerProtocolCalls.readSmallFile(client, blockID, null, null);
     xceiverClientManager.releaseClient(client, false);
   }
 
@@ -154,7 +154,7 @@ public class TestContainerSmallFile {
     ContainerProtos.GetSmallFileResponseProto response =
         ContainerProtocolCalls.readSmallFile(client,
             ContainerTestHelper.getTestBlockID(
-                nonExistContainerID), null);
+                nonExistContainerID), null, null);
     xceiverClientManager.releaseClient(client, false);
   }
 
@@ -180,7 +180,7 @@ public class TestContainerSmallFile {
       blockID1.setBlockCommitSequenceId(bcsId + 1);
       //read a file with higher bcsId than the container bcsId
       ContainerProtocolCalls
-          .readSmallFile(client, blockID1, null);
+          .readSmallFile(client, blockID1, null, null);
       Assert.fail("Expected exception not thrown");
     } catch (StorageContainerException sce) {
       Assert
@@ -196,7 +196,7 @@ public class TestContainerSmallFile {
     try {
       blockID1.setBlockCommitSequenceId(bcsId + 1);
       //read a file with higher bcsId than the committed bcsId for the block
-      ContainerProtocolCalls.readSmallFile(client, blockID1, null);
+      ContainerProtocolCalls.readSmallFile(client, blockID1, null, null);
       Assert.fail("Expected exception not thrown");
     } catch (StorageContainerException sce) {
       Assert
@@ -204,7 +204,7 @@ public class TestContainerSmallFile {
     }
     blockID1.setBlockCommitSequenceId(bcsId);
     ContainerProtos.GetSmallFileResponseProto response =
-        ContainerProtocolCalls.readSmallFile(client, blockID1, null);
+        ContainerProtocolCalls.readSmallFile(client, blockID1, null, null);
     String readData = response.getData().getDataBuffers().getBuffersList()
         .get(0).toStringUtf8();
     Assert.assertEquals("data123", readData);

@@ -66,8 +66,8 @@ public class TestKeyInputStream extends TestInputStreamBase {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyInputStream.class);
 
-  public TestKeyInputStream(ContainerLayoutVersion layout) {
-    super(layout);
+  public TestKeyInputStream(ContainerLayoutVersion layout, long blockThreshold) {
+    super(layout, blockThreshold);
   }
 
   /**
@@ -283,8 +283,13 @@ public class TestKeyInputStream extends TestInputStreamBase {
 
     // Since we reading data from index 150 to 250 and the chunk boundary is
     // 100 bytes, we need to read 2 chunks.
-    Assert.assertEquals(readChunkCount + 2,
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
+    if (isSmallBlockRead(Math.min(dataLength, BLOCK_SIZE))) {
+      Assert.assertEquals(1, metrics.getContainerOpCountMetrics(
+          ContainerProtos.Type.GetSmallFile));
+    } else {
+      Assert.assertEquals(readChunkCount + 2,
+          metrics.getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
+    }
 
     keyInputStream.close();
 
@@ -376,7 +381,8 @@ public class TestKeyInputStream extends TestInputStreamBase {
 
     // Since we reading data from index 150 to 250 and the chunk boundary is
     // 100 bytes, we need to read 2 chunks.
-    Assert.assertEquals(readChunkCount + 2,
+    Assert.assertEquals(getSmallBlockThreshold() > CHUNK_SIZE ?
+            readChunkCount : readChunkCount + 2,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
 
     keyInputStream.close();

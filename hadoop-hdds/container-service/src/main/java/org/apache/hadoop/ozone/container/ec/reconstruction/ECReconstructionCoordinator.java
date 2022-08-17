@@ -220,9 +220,10 @@ public class ECReconstructionCoordinator implements Closeable {
       return;
     }
 
+    OzoneClientConfig clientConfig = new OzoneClientConfig();
     try (ECBlockReconstructedStripeInputStream sis
         = new ECBlockReconstructedStripeInputStream(
-        repConfig, blockLocationInfo, true,
+        repConfig, blockLocationInfo, clientConfig,
         this.containerOperationClient.getXceiverClientManager(), null,
         this.blockInputStreamFactory, byteBufferPool,
         this.ecReconstructExecutor)) {
@@ -230,12 +231,11 @@ public class ECReconstructionCoordinator implements Closeable {
       ECBlockOutputStream[] targetBlockStreams =
           new ECBlockOutputStream[toReconstructIndexes.size()];
       ByteBuffer[] bufs = new ByteBuffer[toReconstructIndexes.size()];
-      OzoneClientConfig configuration = new OzoneClientConfig();
       // TODO: Let's avoid unnecessary bufferPool creation. This pool actually
       //  not used in EC flows, but there are some dependencies on buffer pool.
       BufferPool bufferPool =
-          new BufferPool(configuration.getStreamBufferSize(),
-              (int) (configuration.getStreamBufferMaxSize() / configuration
+          new BufferPool(clientConfig.getStreamBufferSize(),
+              (int) (clientConfig.getStreamBufferMaxSize() / clientConfig
                   .getStreamBufferSize()),
               ByteStringConversion.createByteBufferConversion(false));
       for (int i = 0; i < toReconstructIndexes.size(); i++) {
@@ -246,7 +246,7 @@ public class ECReconstructionCoordinator implements Closeable {
                 this.containerOperationClient.getXceiverClientManager(),
                 this.containerOperationClient
                     .singleNodePipeline(datanodeDetails, repConfig), bufferPool,
-                configuration, blockLocationInfo.getToken(), clientMetrics);
+                clientConfig, blockLocationInfo.getToken(), clientMetrics);
         bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
         // Make sure it's clean. Don't want to reuse the erroneously returned
         // buffers from the pool.

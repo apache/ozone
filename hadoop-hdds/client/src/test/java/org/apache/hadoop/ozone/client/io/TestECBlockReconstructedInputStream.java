@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
@@ -74,7 +75,8 @@ public class TestECBlockReconstructedInputStream {
     BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
-    return new ECBlockReconstructedStripeInputStream(repConfig, keyInfo, true,
+    return new ECBlockReconstructedStripeInputStream(repConfig, keyInfo,
+        new OzoneClientConfig(),
         null, null, streamFactory, bufferPool, ecReconstructExecutor);
   }
 

@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
@@ -348,7 +349,7 @@ public class TestECBlockInputStreamProxy {
   private ECBlockInputStreamProxy createBISProxy(ECReplicationConfig rConfig,
       BlockLocationInfo blockInfo) {
     return new ECBlockInputStreamProxy(
-        rConfig, blockInfo, true, null, null, streamFactory);
+        rConfig, blockInfo, new OzoneClientConfig(), null, null, streamFactory);
   }
 
   private static class TestECBlockInputStreamFactory
@@ -377,7 +378,7 @@ public class TestECBlockInputStreamProxy {
     public BlockExtendedInputStream create(boolean missingLocations,
         List<DatanodeDetails> failedDatanodes,
         ReplicationConfig repConfig, BlockLocationInfo blockInfo,
-        boolean verifyChecksum, XceiverClientFactory xceiverFactory,
+        OzoneClientConfig clientConfig, XceiverClientFactory xceiverFactory,
         Function<BlockID, Pipeline> refreshFunction) {
       this.failedLocations = failedDatanodes;
       ByteBuffer wrappedBuffer =

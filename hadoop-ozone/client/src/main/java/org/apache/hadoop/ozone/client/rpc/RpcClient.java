@@ -1833,8 +1833,7 @@ public class RpcClient implements ClientProtocol {
     if (feInfo == null) {
       LengthInputStream lengthInputStream = KeyInputStream
           .getFromOmKeyInfo(keyInfo, xceiverClientManager,
-              clientConfig.isChecksumVerify(), retryFunction,
-              blockInputStreamFactory);
+              clientConfig, retryFunction, blockInputStreamFactory);
       try {
         Map< String, String > keyInfoMetadata = keyInfo.getMetadata();
         if (Boolean.valueOf(keyInfoMetadata.get(OzoneConsts.GDPR_FLAG))) {
@@ -1854,8 +1853,7 @@ public class RpcClient implements ClientProtocol {
       // Regular Key with FileEncryptionInfo
       LengthInputStream lengthInputStream = KeyInputStream
           .getFromOmKeyInfo(keyInfo, xceiverClientManager,
-              clientConfig.isChecksumVerify(), retryFunction,
-              blockInputStreamFactory);
+              clientConfig, retryFunction, blockInputStreamFactory);
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
       final CryptoInputStream cryptoIn =
           new CryptoInputStream(lengthInputStream.getWrappedStream(),
@@ -1866,8 +1864,7 @@ public class RpcClient implements ClientProtocol {
       // Multipart Key with FileEncryptionInfo
       List<LengthInputStream> lengthInputStreams = KeyInputStream
           .getStreamsFromKeyInfo(keyInfo, xceiverClientManager,
-              clientConfig.isChecksumVerify(), retryFunction,
-              blockInputStreamFactory);
+              clientConfig, retryFunction, blockInputStreamFactory);
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
 
       List<OzoneCryptoInputStream> cryptoInputStreams = new ArrayList<>();

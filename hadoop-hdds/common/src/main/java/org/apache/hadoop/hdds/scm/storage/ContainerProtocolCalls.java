@@ -573,8 +573,8 @@ public final class ContainerProtocolCalls  {
    * @throws IOException
    */
   public static GetSmallFileResponseProto readSmallFile(XceiverClientSpi client,
-      BlockID blockID,
-      Token<OzoneBlockTokenIdentifier> token) throws IOException {
+      BlockID blockID, List<CheckedBiFunction> validators,
+      Token<? extends TokenIdentifier> token) throws IOException {
     GetBlockRequestProto.Builder getBlock = GetBlockRequestProto
         .newBuilder()
         .setBlockID(blockID.getDatanodeBlockIDProtobuf());
@@ -596,7 +596,8 @@ public final class ContainerProtocolCalls  {
     }
     ContainerCommandRequestProto request = builder.build();
     ContainerCommandResponseProto response =
-        client.sendCommand(request, getValidatorList());
+        client.sendCommand(request, validators == null ?
+            getValidatorList() : validators);
     return response.getGetSmallFile();
   }
 

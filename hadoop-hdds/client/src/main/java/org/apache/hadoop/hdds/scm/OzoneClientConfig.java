@@ -184,11 +184,21 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private String fsDefaultBucketLayout = "FILE_SYSTEM_OPTIMIZED";
 
+  @Config(key = "small.block.threshold",
+      defaultValue = "0B",
+      type = ConfigType.SIZE,
+      description = "Block will be treated as small block if its size is " +
+          "smaller than this threshold. " +
+          " Default 0 disable the small block read.",
+      tags = ConfigTag.CLIENT)
+  private long smallBlockThreshold = 0;
+
   @PostConstruct
   private void validate() {
     Preconditions.checkState(streamBufferSize > 0);
     Preconditions.checkState(streamBufferFlushSize > 0);
     Preconditions.checkState(streamBufferMaxSize > 0);
+    Preconditions.checkState(smallBlockThreshold >= 0);
 
     Preconditions.checkArgument(bufferIncrement < streamBufferSize,
         "Buffer increment should be smaller than the size of the stream "
@@ -209,7 +219,16 @@ public class OzoneClientConfig {
       bytesPerChecksum =
           OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE;
     }
-
+    if (smallBlockThreshold >
+        OzoneConfigKeys.OZONE_CLIENT_SMALL_BLOCK_THRESHOLD_MAX_SIZE) {
+      LOG.warn("The small block threshold ({}) is not allowed to be greater " +
+              "than the maximum size ({}), resetting to the maximum size.",
+          smallBlockThreshold,
+          OzoneConfigKeys.OZONE_CLIENT_SMALL_BLOCK_THRESHOLD_MAX_SIZE);
+    }
+    Preconditions.checkState(smallBlockThreshold % bytesPerChecksum == 0,
+        "expected small block threshold(%s) to be a multiple of checksum size"
+            + "(%s)", smallBlockThreshold, bytesPerChecksum);
   }
 
   public long getStreamBufferFlushSize() {
@@ -324,5 +343,13 @@ public class OzoneClientConfig {
 
   public String getFsDefaultBucketLayout() {
     return fsDefaultBucketLayout;
+  }
+
+  public long getSmallBlockThreshold() {
+    return this.smallBlockThreshold;
+  }
+
+  public void setSmallBlockThreshold(long threshold) {
+    this.smallBlockThreshold = threshold;
   }
 }

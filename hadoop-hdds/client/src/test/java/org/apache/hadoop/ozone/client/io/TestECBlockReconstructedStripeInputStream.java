@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
@@ -735,7 +736,8 @@ public class TestECBlockReconstructedStripeInputStream {
 
   private ECBlockReconstructedStripeInputStream createInputStream(
       BlockLocationInfo keyInfo) {
-    return new ECBlockReconstructedStripeInputStream(repConfig, keyInfo, true,
+    return new ECBlockReconstructedStripeInputStream(repConfig, keyInfo,
+        new OzoneClientConfig(),
         null, null, streamFactory, bufferPool, ecReconstructExecutor);
   }
 

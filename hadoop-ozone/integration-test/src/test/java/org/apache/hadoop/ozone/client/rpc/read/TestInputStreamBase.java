@@ -18,6 +18,8 @@ package org.apache.hadoop.ozone.client.rpc.read;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -39,7 +41,6 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -70,6 +71,7 @@ public abstract class TestInputStreamBase {
   private String keyString;
 
   private ContainerLayoutVersion containerLayout;
+  final protected long smallBlockThreshold;
   private static final Random RAND = new Random();
 
   protected static final int CHUNK_SIZE = 1024 * 1024;          // 1MB
@@ -82,12 +84,21 @@ public abstract class TestInputStreamBase {
   public Timeout timeout = Timeout.seconds(300);
 
   @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
+  public static Collection<Object[]> layouts() {
+    return Arrays.asList(new Object[][] {
+        {ContainerLayoutVersion.FILE_PER_CHUNK, 0},
+        {ContainerLayoutVersion.FILE_PER_CHUNK, BYTES_PER_CHECKSUM},
+        {ContainerLayoutVersion.FILE_PER_CHUNK, CHUNK_SIZE},
+        {ContainerLayoutVersion.FILE_PER_BLOCK, 0},
+        {ContainerLayoutVersion.FILE_PER_BLOCK, BYTES_PER_CHECKSUM},
+        {ContainerLayoutVersion.FILE_PER_BLOCK, CHUNK_SIZE},
+    });
   }
 
-  public TestInputStreamBase(ContainerLayoutVersion layout) {
+  public TestInputStreamBase(ContainerLayoutVersion layout,
+      long blockThreshold) {
     this.containerLayout = layout;
+    this.smallBlockThreshold = blockThreshold;
   }
 
   /**
@@ -98,6 +109,7 @@ public abstract class TestInputStreamBase {
   public void init() throws Exception {
     OzoneClientConfig config = new OzoneClientConfig();
     config.setBytesPerChecksum(BYTES_PER_CHECKSUM);
+    config.setSmallBlockThreshold(smallBlockThreshold);
     conf.setFromObject(config);
 
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
@@ -217,5 +229,13 @@ public abstract class TestInputStreamBase {
       Assert.assertEquals("Read data at does not match the input data at " +
               "position " + (offset + i), expectedData[i], readData[i]);
     }
+  }
+
+  boolean isSmallBlockRead(int blockLen){
+    return smallBlockThreshold >= blockLen;
+  }
+
+  long getSmallBlockThreshold() {
+    return this.smallBlockThreshold;
   }
 }

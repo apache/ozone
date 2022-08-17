@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -49,6 +50,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       LoggerFactory.getLogger(ECBlockInputStream.class);
 
   private final ECReplicationConfig repConfig;
+  private final OzoneClientConfig clientConfig;
   private final int ecChunkSize;
   private final long stripeSize;
   private final BlockInputStreamFactory streamFactory;
@@ -107,12 +109,13 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   }
 
   public ECBlockInputStream(ECReplicationConfig repConfig,
-      BlockLocationInfo blockInfo, boolean verifyChecksum,
+      BlockLocationInfo blockInfo, OzoneClientConfig clientConfig,
       XceiverClientFactory xceiverClientFactory, Function<BlockID,
       Pipeline> refreshFunction, BlockInputStreamFactory streamFactory) {
     this.repConfig = repConfig;
+    this.clientConfig = clientConfig;
     this.ecChunkSize = repConfig.getEcChunkSize();
-    this.verifyChecksum = verifyChecksum;
+    this.verifyChecksum = clientConfig.isChecksumVerify();
     this.blockInfo = blockInfo;
     this.streamFactory = streamFactory;
     this.xceiverClientFactory = xceiverClientFactory;
@@ -183,8 +186,8 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       stream = streamFactory.create(
           StandaloneReplicationConfig.getInstance(
               HddsProtos.ReplicationFactor.ONE),
-          blkInfo, pipeline,
-          blockInfo.getToken(), verifyChecksum, xceiverClientFactory,
+          blkInfo, pipeline, blockInfo.getToken(), clientConfig,
+          xceiverClientFactory,
           ecPipelineRefreshFunction(locationIndex + 1, refreshFunction));
       blockStreams[locationIndex] = stream;
     }

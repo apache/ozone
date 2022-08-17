@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
@@ -46,13 +47,14 @@ public class TestBlockInputStreamFactoryImpl {
     BlockInputStreamFactory factory = new BlockInputStreamFactoryImpl();
     ReplicationConfig repConfig =
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+    OzoneClientConfig clientConfig = new OzoneClientConfig();
 
     BlockLocationInfo blockInfo = createKeyLocationInfo(repConfig, 3,
         1024 * 1024 * 10);
 
     BlockExtendedInputStream stream =
         factory.create(repConfig, blockInfo, blockInfo.getPipeline(),
-            blockInfo.getToken(), true, null, null);
+            blockInfo.getToken(), clientConfig, null, null);
     Assertions.assertTrue(stream instanceof BlockInputStream);
     Assertions.assertEquals(stream.getBlockID(), blockInfo.getBlockID());
     Assertions.assertEquals(stream.getLength(), blockInfo.getLength());
@@ -63,13 +65,14 @@ public class TestBlockInputStreamFactoryImpl {
     BlockInputStreamFactory factory = new BlockInputStreamFactoryImpl();
     ReplicationConfig repConfig =
         new ECReplicationConfig(3, 2);
+    OzoneClientConfig clientConfig = new OzoneClientConfig();
 
     BlockLocationInfo blockInfo =
         createKeyLocationInfo(repConfig, 5, 1024 * 1024 * 10);
 
     BlockExtendedInputStream stream =
         factory.create(repConfig, blockInfo, blockInfo.getPipeline(),
-            blockInfo.getToken(), true, null, null);
+            blockInfo.getToken(), clientConfig, null, null);
     Assertions.assertTrue(stream instanceof ECBlockInputStreamProxy);
     Assertions.assertEquals(stream.getBlockID(), blockInfo.getBlockID());
     Assertions.assertEquals(stream.getLength(), blockInfo.getLength());
