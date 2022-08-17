@@ -99,7 +99,8 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   private static int failureInterval = 300; // 5 minute period between failures.
 
   @CommandLine.Mixin
-  private static FreonReplicationOptions freonReplication = new FreonReplicationOptions();
+  private static FreonReplicationOptions freonReplication =
+          new FreonReplicationOptions();
 
   @Option(names = {"-l", "--layout"},
       description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}")
@@ -144,7 +145,8 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     final BucketArgs.Builder builder = BucketArgs.newBuilder();
 
     freonReplication.fromParams(configuration).ifPresent(config ->
-            builder.setDefaultReplicationConfig(new DefaultReplicationConfig(config)));
+            builder.setDefaultReplicationConfig(
+                    new DefaultReplicationConfig(config)));
     builder.setBucketLayout(bucketLayout);
 
     MiniOzoneLoadGenerator.Builder loadBuilder =
