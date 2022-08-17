@@ -161,8 +161,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
           // If we get IOException due to connectivity issue,
           // retry according to retry policy.
           chunks = getChunkInfos();
-          break;
         }
+        break;
       } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException ex) {

@@ -300,7 +300,7 @@ public class TestBlockInputStream {
     BlockInputStream blockInputStreamWithRetry =
         new DummyBlockInputStreamWithRetry(blockID, blockSize,
             MockPipeline.createSingleNodePipeline(), null,
-            clientConfig, null, chunks, chunkDataMap, isRefreshed,
+            clientConfig, clientFactory, chunks, chunkDataMap, isRefreshed,
             new IOException("unavailable"));
     try {
       Assert.assertFalse(isRefreshed.get());
@@ -460,6 +460,7 @@ public class TestBlockInputStream {
         pipeline, null, clientConfig, clientFactory, refreshPipeline) {
       @Override
       protected List<ChunkInfo> getChunkInfos() throws IOException {
+        acquireClient();
         return chunks;
       }
 

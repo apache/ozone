@@ -122,7 +122,7 @@ public class TestChunkInputStream extends TestInputStreamBase {
     chunk0Stream.read(new byte[1]);
 
     Assert.assertNull("ChunkInputStream did not release buffers after " +
-        "reaching EOF.", isSmallBlockRead?
+        "reaching EOF.", isSmallBlockRead ?
         chunk0Stream.getCachedBuffers()[expectedNumBuffers - 1] :
         chunk0Stream.getCachedBuffers());
   }
@@ -136,7 +136,7 @@ public class TestChunkInputStream extends TestInputStreamBase {
     int dataLength = CHUNK_SIZE;
     boolean isSmallBlockRead = isSmallBlockRead(dataLength);
     long cachedBufferCount = isSmallBlockRead ? Math.min(Math.min(
-        getSmallBlockThreshold(), BLOCK_SIZE), dataLength)/ BYTES_PER_CHECKSUM
+        getSmallBlockThreshold(), BLOCK_SIZE), dataLength) / BYTES_PER_CHECKSUM
         : 1;
 
     byte[] inputData = writeRandomBytes(keyName, dataLength);

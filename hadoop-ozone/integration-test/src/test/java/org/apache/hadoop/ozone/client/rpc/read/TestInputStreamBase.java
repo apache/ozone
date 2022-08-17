@@ -71,7 +71,7 @@ public abstract class TestInputStreamBase {
   private String keyString;
 
   private ContainerLayoutVersion containerLayout;
-  final protected long smallBlockThreshold;
+  private final long smallBlockThreshold;
   private static final Random RAND = new Random();
 
   protected static final int CHUNK_SIZE = 1024 * 1024;          // 1MB
@@ -231,7 +231,7 @@ public abstract class TestInputStreamBase {
     }
   }
 
-  boolean isSmallBlockRead(int blockLen){
+  boolean isSmallBlockRead(int blockLen) {
     return smallBlockThreshold >= blockLen;
   }
 

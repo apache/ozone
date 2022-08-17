@@ -66,7 +66,8 @@ public class TestKeyInputStream extends TestInputStreamBase {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyInputStream.class);
 
-  public TestKeyInputStream(ContainerLayoutVersion layout, long blockThreshold) {
+  public TestKeyInputStream(ContainerLayoutVersion layout,
+      long blockThreshold) {
     super(layout, blockThreshold);
   }
 
