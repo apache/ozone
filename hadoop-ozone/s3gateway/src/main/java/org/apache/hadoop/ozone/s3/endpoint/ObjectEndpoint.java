@@ -48,7 +48,6 @@ import java.text.ParseException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -136,8 +135,6 @@ public class ObjectEndpoint extends EndpointBase {
   @Context
   private HttpHeaders headers;
 
-
-  private List<String> customizableGetHeaders = new ArrayList<>();
   /*FOR the feature Overriding Response Header
   https://docs.aws.amazon.com/de_de/AmazonS3/latest/API/API_GetObject.html */
   private Map<String, String> overrideQueryParameter;
