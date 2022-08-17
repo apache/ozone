@@ -38,6 +38,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,6 +74,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.multitenant.OMRangerBGSyncService;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
@@ -255,6 +257,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
@@ -3236,8 +3239,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       final String bucketName, String keyName, String uploadID,
       int partNumberMarker, int maxParts)  throws IOException {
 
-    ResolvedBucket bucket = omMReader.resolveBucketLink(
-        Pair.of(volumeName, bucketName));
+    ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
 
     Map<String, String> auditMap = bucket.audit();
     auditMap.put(OzoneConsts.KEY, keyName);
@@ -3266,8 +3268,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public OmMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName, String prefix) throws IOException {
 
-    ResolvedBucket bucket = omMReader.resolveBucketLink(
-        Pair.of(volumeName, bucketName));
+    ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
 
     Map<String, String> auditMap = bucket.audit();
     auditMap.put(OzoneConsts.PREFIX, prefix);
@@ -3832,6 +3833,103 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     jvmPauseMonitor = new JvmPauseMonitor();
     jvmPauseMonitor.init(configuration);
     jvmPauseMonitor.start();
+  }
+
+  public ResolvedBucket resolveBucketLink(
+      OzoneManagerProtocolProtos.KeyArgs args,
+      OMClientRequest omClientRequest) throws IOException {
+    return resolveBucketLink(
+        Pair.of(args.getVolumeName(), args.getBucketName()), omClientRequest);
+  }
+
+  public ResolvedBucket resolveBucketLink(OmKeyArgs args)
+      throws IOException {
+    return resolveBucketLink(
+        Pair.of(args.getVolumeName(), args.getBucketName()));
+  }
+
+  public ResolvedBucket resolveBucketLink(Pair<String, String> requested,
+      OMClientRequest omClientRequest)
+      throws IOException {
+    Pair<String, String> resolved;
+    if (isAclEnabled) {
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+              omClientRequest.createUGI(), omClientRequest.getRemoteAddress(),
+              omClientRequest.getHostName());
+    } else {
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+          null, null, null);
+    }
+    return new ResolvedBucket(requested, resolved);
+  }
+
+  public ResolvedBucket resolveBucketLink(Pair<String, String> requested)
+      throws IOException {
+
+    Pair<String, String> resolved;
+    if (isAclEnabled) {
+      UserGroupInformation ugi = getRemoteUser();
+      if (getS3Auth() != null) {
+        ugi = UserGroupInformation.createRemoteUser(
+            OzoneAclUtils.accessIdToUserPrincipal(getS3Auth().getAccessId()));
+      }
+      InetAddress remoteIp = Server.getRemoteIp();
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+          ugi,
+          remoteIp,
+          remoteIp != null ? remoteIp.getHostName() :
+              omRpcAddress.getHostName());
+    } else {
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+          null, null, null);
+    }
+    return new ResolvedBucket(requested, resolved);
+  }
+
+  /**
+   * Resolves bucket symlinks. Read permission is required for following links.
+   *
+   * @param volumeAndBucket the bucket to be resolved (if it is a link)
+   * @param visited collects link buckets visited during the resolution to
+   *   avoid infinite loops
+   * @param {@link UserGroupInformation}
+   * @param remoteAddress
+   * @param hostName
+   * @return bucket location possibly updated with its actual volume and bucket
+   *   after following bucket links
+   * @throws IOException (most likely OMException) if ACL check fails, bucket is
+   *   not found, loop is detected in the links, etc.
+   */
+  private Pair<String, String> resolveBucketLink(
+      Pair<String, String> volumeAndBucket,
+      Set<Pair<String, String>> visited,
+      UserGroupInformation userGroupInformation,
+      InetAddress remoteAddress,
+      String hostName) throws IOException {
+
+    String volumeName = volumeAndBucket.getLeft();
+    String bucketName = volumeAndBucket.getRight();
+    OmBucketInfo info = bucketManager.getBucketInfo(volumeName, bucketName);
+    if (!info.isLink()) {
+      return volumeAndBucket;
+    }
+
+    if (!visited.add(volumeAndBucket)) {
+      throw new OMException("Detected loop in bucket links",
+          DETECTED_LOOP_IN_BUCKET_LINKS);
+    }
+
+    if (isAclEnabled) {
+      final ACLType type = ACLType.READ;
+      checkAcls(ResourceType.BUCKET, StoreType.OZONE, type,
+          volumeName, bucketName, null, userGroupInformation,
+          remoteAddress, hostName, true,
+          getVolumeOwner(volumeName, type, ResourceType.BUCKET));
+    }
+
+    return resolveBucketLink(
+        Pair.of(info.getSourceVolume(), info.getSourceBucket()),
+        visited, userGroupInformation, remoteAddress, hostName);
   }
 
   @VisibleForTesting

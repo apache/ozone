@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OmMReader;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -88,9 +87,7 @@ public class TestS3MultipartRequest {
     when(ozoneManager.getDefaultReplicationConfig()).thenReturn(
         ReplicationConfig.getDefault(ozoneConfiguration));
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
-    OmMReader omMReader = Mockito.mock(OmMReader.class);
-    when(ozoneManager.getOmMReader()).thenReturn(omMReader);
-    when(omMReader.resolveBucketLink(any(KeyArgs.class),
+    when(ozoneManager.resolveBucketLink(any(KeyArgs.class),
         any(OMClientRequest.class)))
         .thenAnswer(inv -> {
           KeyArgs args = (KeyArgs) inv.getArguments()[0];

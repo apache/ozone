@@ -88,7 +88,7 @@ public class OMTrashRecoverRequest extends OMKeyRequest {
     boolean acquireLock = false;
     OMClientResponse omClientResponse = null;
     try {
-      ResolvedBucket bucket = ozoneManager.getOmMReader().resolveBucketLink(
+      ResolvedBucket bucket = ozoneManager.resolveBucketLink(
           Pair.of(volumeName, destinationBucket), this);
       volumeName = bucket.realVolume();
       destinationBucket = bucket.realBucket();

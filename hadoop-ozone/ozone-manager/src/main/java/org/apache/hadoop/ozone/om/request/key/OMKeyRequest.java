@@ -117,8 +117,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected KeyArgs resolveBucketLink(
       OzoneManager ozoneManager, KeyArgs keyArgs,
       Map<String, String> auditMap) throws IOException {
-    ResolvedBucket bucket = ozoneManager.getOmMReader()
-        .resolveBucketLink(keyArgs, this);
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs, this);
     keyArgs = bucket.update(keyArgs);
     bucket.audit(auditMap);
     return keyArgs;
@@ -426,8 +425,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
         // If bucket is symlink, resolveBucketLink to figure out real
         // volume/bucket.
         if (bucketInfo.isLink()) {
-          ResolvedBucket resolvedBucket = ozoneManager.getOmMReader()
-              .resolveBucketLink(
+          ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
               Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
 
           bucketInfo = omMetadataManager.getBucketTable().get(
@@ -476,8 +474,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       acquireLock = omMetadataManager.getLock().acquireReadLock(
           BUCKET_LOCK, volumeName, bucketName);
       try {
-        ResolvedBucket resolvedBucket = ozoneManager.getOmMReader()
-            .resolveBucketLink(
+        ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
             Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
 
         // Get the DB key name for looking up keyInfo in OpenKeyTable with

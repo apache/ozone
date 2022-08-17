@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
-import org.apache.hadoop.ozone.om.OmMReader;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
@@ -127,10 +126,7 @@ public class TestCleanupTableInfo {
     OMMetadataManager metaMgr = createOMMetadataManagerSpy();
     when(om.getMetrics()).thenReturn(omMetrics);
     when(om.getMetadataManager()).thenReturn(metaMgr);
-    OmMReader omMReader = mock(OmMReader.class);
-    when(om.getOmMReader()).thenReturn(omMReader);
-    when(omMReader.resolveBucketLink(any(KeyArgs.class),
-        any(OMClientRequest.class)))
+    when(om.resolveBucketLink(any(KeyArgs.class), any(OMClientRequest.class)))
         .thenAnswer(
             invocationOnMock -> {
               Pair<String, String> pair =

@@ -31,28 +31,22 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.slf4j.Logger;
 import java.net.InetAddress;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.om.KeyManagerImpl.getRemoteUser;
 import static org.apache.hadoop.ozone.om.OzoneManager.getS3Auth;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
@@ -132,7 +126,7 @@ public class OmMReader implements Auditor {
    * @throws IOException
    */
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
-    ResolvedBucket bucket = resolveBucketLink(args);
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
 
     if (isAclEnabled) {
       checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
@@ -165,7 +159,7 @@ public class OmMReader implements Auditor {
       String startKey, long numEntries, boolean allowPartialPrefixes)
       throws IOException {
 
-    ResolvedBucket bucket = resolveBucketLink(args);
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
 
     if (isAclEnabled) {
       checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
@@ -196,7 +190,7 @@ public class OmMReader implements Auditor {
   }
   
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
-    ResolvedBucket bucket = resolveBucketLink(args);
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
 
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
@@ -221,7 +215,7 @@ public class OmMReader implements Auditor {
   }
 
   public OmKeyInfo lookupFile(OmKeyArgs args) throws IOException {
-    ResolvedBucket bucket = resolveBucketLink(args);
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
 
     if (isAclEnabled) {
       checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
@@ -253,7 +247,8 @@ public class OmMReader implements Auditor {
   public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
       String startKey, String keyPrefix, int maxKeys) throws IOException {
 
-    ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(
+        Pair.of(volumeName, bucketName));
 
     if (isAclEnabled) {
       checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
@@ -324,102 +319,6 @@ public class OmMReader implements Auditor {
             buildAuditMessageForSuccess(OMAction.GET_ACL, obj.toAuditMap()));
       }
     }
-  }
-
-  public ResolvedBucket resolveBucketLink(OmKeyArgs args)
-      throws IOException {
-    return resolveBucketLink(
-        Pair.of(args.getVolumeName(), args.getBucketName()));
-  }
-
-  public ResolvedBucket resolveBucketLink(Pair<String, String> requested)
-      throws IOException {
-
-    Pair<String, String> resolved;
-    if (isAclEnabled) {
-      UserGroupInformation ugi = getRemoteUser();
-      if (getS3Auth() != null) {
-        ugi = UserGroupInformation.createRemoteUser(
-            OzoneAclUtils.accessIdToUserPrincipal(getS3Auth().getAccessId()));
-      }
-      InetAddress remoteIp = Server.getRemoteIp();
-      resolved = resolveBucketLink(requested, new HashSet<>(),
-          ugi,
-          remoteIp,
-          remoteIp != null ? remoteIp.getHostName() :
-              ozoneManager.getOmRpcServerAddr().getHostName());
-    } else {
-      resolved = resolveBucketLink(requested, new HashSet<>(),
-          null, null, null);
-    }
-    return new ResolvedBucket(requested, resolved);
-  }
-
-  /**
-   * Resolves bucket symlinks. Read permission is required for following links.
-   *
-   * @param volumeAndBucket the bucket to be resolved (if it is a link)
-   * @param visited collects link buckets visited during the resolution to
-   *   avoid infinite loops
-   * @param userGroupInformation {@link UserGroupInformation}
-   * @param remoteAddress
-   * @param hostName
-   * @return bucket location possibly updated with its actual volume and bucket
-   *   after following bucket links
-   * @throws IOException (most likely OMException) if ACL check fails, bucket is
-   *   not found, loop is detected in the links, etc.
-   */
-  Pair<String, String> resolveBucketLink(
-      Pair<String, String> volumeAndBucket,
-      Set<Pair<String, String>> visited,
-      UserGroupInformation userGroupInformation,
-      InetAddress remoteAddress,
-      String hostName) throws IOException {
-
-    String volumeName = volumeAndBucket.getLeft();
-    String bucketName = volumeAndBucket.getRight();
-    OmBucketInfo info = bucketManager.getBucketInfo(volumeName, bucketName);
-    if (!info.isLink()) {
-      return volumeAndBucket;
-    }
-
-    if (!visited.add(volumeAndBucket)) {
-      throw new OMException("Detected loop in bucket links",
-          DETECTED_LOOP_IN_BUCKET_LINKS);
-    }
-
-    if (isAclEnabled) {
-      final ACLType type = ACLType.READ;
-      checkAcls(ResourceType.BUCKET, StoreType.OZONE, type,
-          volumeName, bucketName, null, userGroupInformation,
-          remoteAddress, hostName, true,
-          ozoneManager.getVolumeOwner(volumeName, type, ResourceType.BUCKET));
-    }
-
-    return resolveBucketLink(
-        Pair.of(info.getSourceVolume(), info.getSourceBucket()),
-        visited, userGroupInformation, remoteAddress, hostName);
-  }
-
-  public ResolvedBucket resolveBucketLink(KeyArgs args,
-      OMClientRequest omClientRequest) throws IOException {
-    return resolveBucketLink(
-        Pair.of(args.getVolumeName(), args.getBucketName()), omClientRequest);
-  }
-
-  public ResolvedBucket resolveBucketLink(Pair<String, String> requested,
-      OMClientRequest omClientRequest)
-      throws IOException {
-    Pair<String, String> resolved;
-    if (isAclEnabled) {
-      resolved = resolveBucketLink(requested, new HashSet<>(),
-              omClientRequest.createUGI(), omClientRequest.getRemoteAddress(),
-              omClientRequest.getHostName());
-    } else {
-      resolved = resolveBucketLink(requested, new HashSet<>(),
-          null, null, null);
-    }
-    return new ResolvedBucket(requested, resolved);
   }
 
   /**
