@@ -97,7 +97,7 @@ public class ECContainerHealthCheck implements ContainerHealthCheck {
           !replicaCount.isOverReplicated(true)));
     }
 
-    // If No issues detected, return healthy.
+    // If no issues detected, return healthy.
     return containerHealthResults.size() > 0 ? containerHealthResults :
             Collections
             .singletonList(new ContainerHealthResult.HealthyResult(container));

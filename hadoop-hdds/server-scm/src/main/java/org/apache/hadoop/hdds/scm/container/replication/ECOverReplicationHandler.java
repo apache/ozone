@@ -87,8 +87,8 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
                     != ContainerHealthResult.HealthState.OVER_REPLICATED)
             .orElse(true)) {
       LOG.info("The container {} state changed and it's not in over"
-                      + " replication any more. Current state is: {}",
-              container.getContainerID(), currentUnderRepRes);
+              + " replication any more. Current state is: {}",
+          container.getContainerID(), currentUnderRepRes);
       return emptyMap();
     }
 
