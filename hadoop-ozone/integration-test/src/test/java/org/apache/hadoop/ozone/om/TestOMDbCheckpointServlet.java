@@ -33,6 +33,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.Principal;
 import java.util.Collection;
+import java.util.Collections;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -176,6 +177,7 @@ public class TestOMDbCheckpointServlet {
         om.getMetrics().getDBCheckpointMetrics(),
         om.getAclsEnabled(),
         om.getOmAdminUsernames(),
+        om.getOmAdminGroups(),
         om.isSpnegoEnabled());
 
     doNothing().when(responseMock).setContentType("application/x-tgz");
@@ -219,6 +221,7 @@ public class TestOMDbCheckpointServlet {
         om.getMetrics().getDBCheckpointMetrics(),
         om.getAclsEnabled(),
         allowedUsers,
+        Collections.emptyList(),
         om.isSpnegoEnabled());
 
     omDbCheckpointServletMock.init();

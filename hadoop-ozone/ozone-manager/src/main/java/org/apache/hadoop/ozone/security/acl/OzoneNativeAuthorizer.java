@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.security.acl;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -31,7 +32,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
@@ -51,6 +54,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
   private KeyManager keyManager;
   private PrefixManager prefixManager;
   private Collection<String> ozAdmins;
+  private Set<String> ozAdminsGroups;
   private boolean allowListAllVolumes;
 
   public OzoneNativeAuthorizer() {
@@ -208,6 +212,14 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     return Collections.unmodifiableCollection(this.ozAdmins);
   }
 
+  public Set<String> getOzoneAdminsGroups() {
+    return Collections.unmodifiableSet(ozAdminsGroups);
+  }
+
+  public void setOzoneAdminGroups(Collection<String> ozAdminsGroups) {
+    this.ozAdminsGroups = new HashSet<>(ozAdminsGroups);
+  }
+
   public void setAllowListAllVolumes(boolean allowListAllVolumes) {
     this.allowListAllVolumes = allowListAllVolumes;
   }
@@ -230,13 +242,14 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
   private boolean isAdmin(UserGroupInformation callerUgi) {
     Preconditions.checkNotNull(callerUgi, "callerUgi should not be null!");
 
-    if (ozAdmins == null) {
-      return false;
+    if (ozAdmins != null && (ozAdmins.contains(callerUgi.getShortUserName()) ||
+        ozAdmins.contains(callerUgi.getUserName()) ||
+        ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD))) {
+      return true;
     }
 
-    if (ozAdmins.contains(callerUgi.getShortUserName()) ||
-        ozAdmins.contains(callerUgi.getUserName()) ||
-        ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
+    if (ozAdminsGroups != null &&
+        !Sets.intersection(ozAdminsGroups, new HashSet<>(callerUgi.getGroups())).isEmpty()) {
       return true;
     }
 

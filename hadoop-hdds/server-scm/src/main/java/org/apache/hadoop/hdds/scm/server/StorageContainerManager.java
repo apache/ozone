@@ -26,6 +26,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
+import com.google.common.collect.Sets;
 import com.google.protobuf.BlockingService;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -171,9 +172,11 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -249,6 +252,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * SCM super user.
    */
   private final Collection<String> scmAdminUsernames;
+
+  private final Set<String> scmAdminGroups;
   /**
    * SCM mxbean.
    */
@@ -394,6 +399,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (!scmAdminUsernames.contains(scmShortUsername)) {
       scmAdminUsernames.add(scmShortUsername);
     }
+
+    scmAdminGroups = new HashSet<>(conf.getTrimmedStringCollection(OzoneConfigKeys
+        .OZONE_ADMINISTRATORS_GROUPS));
 
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
         eventQueue);
@@ -1817,9 +1825,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (remoteUser != null
         && !scmAdminUsernames.contains(remoteUser.getUserName()) &&
         !scmAdminUsernames.contains(remoteUser.getShortUserName()) &&
-        !scmAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
+        !scmAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD) &&
+        Sets.intersection(scmAdminGroups, new HashSet<>(remoteUser.getGroups())).isEmpty()) {
       throw new AccessControlException(
-          "Access denied for user " + remoteUser.getUserName() +
+          "Access denied for user " + remoteUser.getUserName() + ", groups " + remoteUser.getGroups() +
               ". Superuser privilege is required.");
     }
   }

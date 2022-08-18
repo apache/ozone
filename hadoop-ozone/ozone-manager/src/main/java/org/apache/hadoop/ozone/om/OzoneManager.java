@@ -225,6 +225,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
@@ -334,6 +335,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * OM super user / admin list.
    */
   private final Collection<String> omAdminUsernames;
+  private final Collection<String> omAdminGroups;
 
   private final OMMetrics metrics;
   private final ProtocolMessageMetrics<ProtocolMessageEnum>
@@ -573,6 +575,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Get admin list
     omAdminUsernames = getOzoneAdminsFromConfig(configuration);
+    omAdminGroups = getOzoneAdminsGroupsFromConfig(configuration);
     instantiateServices(false);
 
     // Create special volume s3v which is required for S3G.
@@ -749,6 +752,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         authorizer.setKeyManager(keyManager);
         authorizer.setPrefixManager(prefixManager);
         authorizer.setOzoneAdmins(omAdminUsernames);
+        authorizer.setOzoneAdminGroups(omAdminGroups);
         authorizer.setAllowListAllVolumes(allowListAllVolumes);
       }
     } else {
@@ -4069,11 +4073,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return ozAdmins;
   }
 
+  Collection<String> getOzoneAdminsGroupsFromConfig(OzoneConfiguration conf) {
+    return conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS);
+  }
+
   /**
    * Return the list of Ozone administrators in effect.
    */
   Collection<String> getOmAdminUsernames() {
     return omAdminUsernames;
+  }
+
+  public Collection<String> getOmAdminGroups() {
+    return omAdminGroups;
   }
 
   /**
@@ -4085,7 +4097,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return false;
     } else {
       return isAdmin(callerUgi.getShortUserName())
-          || isAdmin(callerUgi.getUserName());
+          || isAdmin(callerUgi.getUserName())
+          || callerUgi.getGroups().stream().anyMatch(this::isAdminGroup);
     }
   }
 
@@ -4096,6 +4109,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } else {
       return omAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD) ||
           omAdminUsernames.contains(username);
+    }
+  }
+
+  public boolean isAdminGroup(String groupName) {
+    if (omAdminGroups == null) {
+      return false;
+    } else {
+      return omAdminGroups.contains(groupName);
     }
   }
 

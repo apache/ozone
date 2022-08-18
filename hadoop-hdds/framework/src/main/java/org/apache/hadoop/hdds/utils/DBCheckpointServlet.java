@@ -30,9 +30,11 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 
@@ -67,10 +69,12 @@ public class DBCheckpointServlet extends HttpServlet {
   private boolean aclEnabled;
   private boolean isSpnegoEnabled;
   private Collection<String> allowedUsers;
+  private Collection<String> allowedGroups;
 
   public void initialize(DBStore store, DBCheckpointMetrics metrics,
                          boolean omAclEnabled,
                          Collection<String> allowedAdminUsers,
+                         Collection<String> allowedAdminGroups,
                          boolean isSpnegoAuthEnabled)
       throws ServletException {
 
@@ -83,6 +87,7 @@ public class DBCheckpointServlet extends HttpServlet {
 
     this.aclEnabled = omAclEnabled;
     this.allowedUsers = allowedAdminUsers;
+    this.allowedGroups = allowedAdminGroups;
     this.isSpnegoEnabled = isSpnegoAuthEnabled;
   }
 
@@ -92,7 +97,8 @@ public class DBCheckpointServlet extends HttpServlet {
     if (aclEnabled && isSpnegoEnabled) {
       return allowedUsers.contains(OZONE_ADMINISTRATORS_WILDCARD)
           || allowedUsers.contains(user.getShortUserName())
-          || allowedUsers.contains(user.getUserName());
+          || allowedUsers.contains(user.getUserName())
+          || !Sets.intersection(new HashSet<>(allowedGroups), new HashSet<>(user.getGroups())).isEmpty();
     } else {
       return true;
     }

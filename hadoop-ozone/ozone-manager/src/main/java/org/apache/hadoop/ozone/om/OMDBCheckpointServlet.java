@@ -64,6 +64,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     OzoneConfiguration conf = om.getConfiguration();
     // Only Ozone Admins and Recon are allowed
     Collection<String> allowedUsers = om.getOmAdminUsernames();
+    Collection<String> allowedGroups = om.getOmAdminGroups();
     ReconConfig reconConfig = conf.getObject(ReconConfig.class);
     String reconPrincipal = reconConfig.getKerberosPrincipal();
     if (!reconPrincipal.isEmpty()) {
@@ -76,6 +77,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         om.getMetrics().getDBCheckpointMetrics(),
         om.getAclsEnabled(),
         allowedUsers,
+        allowedGroups,
         om.isSpnegoEnabled());
   }
 }
