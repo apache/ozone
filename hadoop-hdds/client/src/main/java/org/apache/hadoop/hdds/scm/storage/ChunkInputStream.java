@@ -282,6 +282,7 @@ public class ChunkInputStream extends InputStream
 
   @Override
   public synchronized void close() {
+    releaseBuffers();
     releaseClient();
   }
 
