@@ -109,7 +109,7 @@ Recon can integrate with any Prometheus instance configured to collected metrics
 and can display useful information in Recon UI in Datanodes and Pipelines pages.
 Recon also exposes a proxy endpoint ([/metrics]({{< ref "interface/ReconApi.md#metrics" >}}))
 to query Prometheus. This integration can be enabled by setting this configuration `ozone.recon.prometheus.http.endpoint` 
-to the Prometheus endpoint like `ozone.recon.prometheus.http.endpoint=localhost:9090`.
+to the Prometheus endpoint like `ozone.recon.prometheus.http.endpoint=http://prometheus:9090`.
 
 ## API Reference
 
