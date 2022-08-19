@@ -16,11 +16,16 @@
  */
 package org.apache.hadoop.ozone.protocolPB;
 
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMDatanodeRequest;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMDatanodeResponse;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisterRequestProto;
@@ -68,9 +73,17 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
         .getContainerReport();
     NodeReportProto dnNodeReport = request.getNodeReport();
     PipelineReportsProto pipelineReport = request.getPipelineReports();
+    LayoutVersionProto layoutInfo = null;
+    if (request.hasDataNodeLayoutVersion()) {
+      layoutInfo = request.getDataNodeLayoutVersion();
+    } else {
+      // Backward compatibility to make sure old Datanodes can still talk to
+      // SCM.
+      layoutInfo = toLayoutVersionProto(INITIAL_VERSION.layoutVersion(),
+          INITIAL_VERSION.layoutVersion());
+    }
     return impl.register(request.getExtendedDatanodeDetails(), dnNodeReport,
-        containerRequestProto, pipelineReport);
-
+        containerRequestProto, pipelineReport, layoutInfo);
   }
 
   @Override
@@ -108,7 +121,7 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
       default:
         throw new ServiceException("Unknown command type: " + cmdType);
       }
-    } catch (IOException e) {
+    } catch (IOException | TimeoutException e) {
       throw new ServiceException(e);
     }
   }

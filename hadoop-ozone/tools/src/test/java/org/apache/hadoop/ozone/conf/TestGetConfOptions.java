@@ -54,12 +54,12 @@ public class TestGetConfOptions {
   }
 
   @After
-  public void setUp(){
+  public void setUp() {
     bout.reset();
   }
 
   @AfterClass
-  public static void tearDown(){
+  public static void tearDown() {
     System.setOut(psBackup);
   }
 

@@ -36,15 +36,14 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
 
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -73,8 +72,7 @@ public class TestChunkUtils {
       long len = data.limit();
       long offset = 0;
       File file = tempFile.toFile();
-      VolumeIOStats stats = new VolumeIOStats();
-      ChunkUtils.writeData(file, data, offset, len, stats, true);
+      ChunkUtils.writeData(file, data, offset, len, null, true);
       int threads = 10;
       ExecutorService executor = new ThreadPoolExecutor(threads, threads,
           0, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
@@ -85,7 +83,7 @@ public class TestChunkUtils {
         executor.execute(() -> {
           try {
             ByteBuffer[] readBuffers = BufferUtils.assignByteBuffers(len, len);
-            ChunkUtils.readData(file, readBuffers, offset, len, stats);
+            ChunkUtils.readData(file, readBuffers, offset, len, null);
 
             // There should be only one element in readBuffers
             Assert.assertEquals(1, readBuffers.length);
@@ -131,15 +129,19 @@ public class TestChunkUtils {
         Path path = Files.createTempFile(PREFIX, String.valueOf(i));
         paths.add(path);
         executor.execute(() -> {
-          ChunkUtils.processFileExclusively(path, () -> {
-            try {
-              Thread.sleep(perThreadWait);
-            } catch (InterruptedException e) {
-              e.printStackTrace();
-            }
-            processed.incrementAndGet();
-            return null;
-          });
+          try {
+            ChunkUtils.processFileExclusively(path, () -> {
+              try {
+                Thread.sleep(perThreadWait);
+              } catch (InterruptedException e) {
+                e.printStackTrace();
+              }
+              processed.incrementAndGet();
+              return null;
+            });
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
         });
       }
       try {
@@ -163,13 +165,12 @@ public class TestChunkUtils {
     Path tempFile = Files.createTempFile(PREFIX, "serial");
     try {
       File file = tempFile.toFile();
-      VolumeIOStats stats = new VolumeIOStats();
       long len = data.limit();
       long offset = 0;
-      ChunkUtils.writeData(file, data, offset, len, stats, true);
+      ChunkUtils.writeData(file, data, offset, len, null, true);
 
       ByteBuffer[] readBuffers = BufferUtils.assignByteBuffers(len, len);
-      ChunkUtils.readData(file, readBuffers, offset, len, stats);
+      ChunkUtils.readData(file, readBuffers, offset, len, null);
 
       // There should be only one element in readBuffers
       Assert.assertEquals(1, readBuffers.length);
@@ -206,12 +207,11 @@ public class TestChunkUtils {
     int offset = 0;
     File nonExistentFile = new File("nosuchfile");
     ByteBuffer[] bufs = BufferUtils.assignByteBuffers(len, len);
-    VolumeIOStats stats = new VolumeIOStats();
 
     // when
     StorageContainerException e = LambdaTestUtils.intercept(
         StorageContainerException.class,
-        () -> ChunkUtils.readData(nonExistentFile, bufs, offset, len, stats));
+        () -> ChunkUtils.readData(nonExistentFile, bufs, offset, len, null));
 
     // then
     Assert.assertEquals(UNABLE_TO_FIND_CHUNK, e.getResult());

@@ -42,7 +42,7 @@ public class OmBucketGenerator extends BaseFreonGenerator
     implements Callable<Void> {
 
   @Option(names = {"-v", "--volume"},
-      description = "Name of the bucket which contains the test data. Will be"
+      description = "Name of the volume which contains the test data. Will be"
           + " created if missing.",
       defaultValue = "vol1")
   private String volumeName;
@@ -86,7 +86,7 @@ public class OmBucketGenerator extends BaseFreonGenerator
   private void createBucket(long index) throws Exception {
 
     OmBucketInfo bucketInfo = new OmBucketInfo.Builder()
-        .setBucketName(getPrefix()+index)
+        .setBucketName(generateBucketName(index))
         .setVolumeName(volumeName)
         .setStorageType(StorageType.DISK)
         .build();

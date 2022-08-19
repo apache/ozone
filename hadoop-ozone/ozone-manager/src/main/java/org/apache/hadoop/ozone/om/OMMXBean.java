@@ -28,4 +28,9 @@ import org.apache.hadoop.hdds.server.ServiceRuntimeInfo;
 public interface OMMXBean extends ServiceRuntimeInfo {
 
   String getRpcPort();
+
+  String getRatisLogDirectory();
+
+  String getRocksDbDirectory();
+
 }

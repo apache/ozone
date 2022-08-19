@@ -40,6 +40,8 @@ public final class TracingUtil {
 
   private static final String NULL_SPAN_AS_STRING = "";
 
+  private static volatile boolean isInit = false;
+
   private TracingUtil() {
   }
 
@@ -54,7 +56,8 @@ public final class TracingUtil {
           .registerExtractor(StringCodec.FORMAT, new StringCodec())
           .registerInjector(StringCodec.FORMAT, new StringCodec())
           .build();
-      GlobalTracer.register(tracer);
+      GlobalTracer.registerIfAbsent(tracer);
+      isInit = true;
     }
   }
 
@@ -73,7 +76,7 @@ public final class TracingUtil {
    * @return encoded tracing context.
    */
   public static String exportSpan(Span span) {
-    if (span != null) {
+    if (span != null && isInit) {
       StringBuilder builder = new StringBuilder();
       GlobalTracer.get().inject(span.context(), StringCodec.FORMAT, builder);
       return builder.toString();
@@ -155,7 +158,7 @@ public final class TracingUtil {
       Supplier<R> supplier) {
     Span span = GlobalTracer.get()
         .buildSpan(spanName).start();
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
       return supplier.get();
     } catch (Exception ex) {
       span.setTag("failed", true);
@@ -170,7 +173,7 @@ public final class TracingUtil {
    */
   private static <R> R executeInSpan(Span span,
       SupplierWithIOException<R> supplier) throws IOException {
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
       return supplier.get();
     } catch (Exception ex) {
       span.setTag("failed", true);

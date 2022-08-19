@@ -18,8 +18,12 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerReplicaHistoryListProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerReplicaHistoryProto;
 
 /**
  * A list of ContainerReplicaHistory.
@@ -28,23 +32,37 @@ import java.util.List;
  */
 public class ContainerReplicaHistoryList {
 
-  private List<ContainerReplicaHistory> tsList;
+  private List<ContainerReplicaHistory> replicaHistories;
 
   public ContainerReplicaHistoryList(
-      List<ContainerReplicaHistory> tsList) {
-    this.tsList = tsList;
+      List<ContainerReplicaHistory> replicaHistories) {
+    this.replicaHistories = new ArrayList<>(replicaHistories);
   }
 
   public List<ContainerReplicaHistory> asList() {
-    return Collections.unmodifiableList(tsList);
+    return Collections.unmodifiableList(replicaHistories);
   }
 
   public List<ContainerReplicaHistory> getList() {
-    return tsList;
+    return replicaHistories;
   }
 
-  public void setList(List<ContainerReplicaHistory> list) {
-    this.tsList = list;
+  public static ContainerReplicaHistoryList fromProto(
+      ContainerReplicaHistoryListProto proto) {
+    List<ContainerReplicaHistory> replicaHistoryList = new ArrayList<>();
+    for (ContainerReplicaHistoryProto rhProto : proto.getReplicaHistoryList()) {
+      replicaHistoryList.add(ContainerReplicaHistory.fromProto(rhProto));
+    }
+    return new ContainerReplicaHistoryList(replicaHistoryList);
+  }
+
+  public ContainerReplicaHistoryListProto toProto() {
+    ContainerReplicaHistoryListProto.Builder builder =
+        ContainerReplicaHistoryListProto.newBuilder();
+    replicaHistories.stream()
+        .map(ContainerReplicaHistory::toProto)
+        .forEach(builder::addReplicaHistory);
+    return builder.build();
   }
 
 }
