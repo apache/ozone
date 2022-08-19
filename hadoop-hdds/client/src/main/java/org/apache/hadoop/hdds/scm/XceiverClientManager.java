@@ -236,6 +236,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
             case EC:
               client = new ECXceiverClientGrpc(pipeline, conf, caCerts);
               break;
+            case CHAINED:
             default:
               throw new IOException("not implemented " + pipeline.getType());
             }

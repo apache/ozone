@@ -349,8 +349,8 @@ public class TestReplicationConfig {
 
     // CHAINED replication type is not supported by ReplicationConfig.
     assertThrows(RuntimeException.class,
-            () -> ReplicationConfig.parse(
-                    org.apache.hadoop.hdds.client.ReplicationType.CHAINED, "", conf));
+        () -> ReplicationConfig.parse(
+            org.apache.hadoop.hdds.client.ReplicationType.CHAINED, "", conf));
   }
 
   private void validate(ReplicationConfig replicationConfig,
