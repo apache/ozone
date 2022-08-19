@@ -146,7 +146,7 @@ public class BucketEndpoint extends EndpointBase {
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       getMetrics().incGetBucketFailure();
-      if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+      if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
       } else {
         throw ex;
@@ -300,7 +300,7 @@ public class BucketEndpoint extends EndpointBase {
           buildAuditMessageForFailure(s3GAction, getAuditParameters(),
               exception));
       getMetrics().incListMultipartUploadsFailure();
-      if (exception.getResult() == ResultCodes.PERMISSION_DENIED) {
+      if (isAccessDenied(exception)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, prefix, exception);
       }
       throw exception;
@@ -355,7 +355,7 @@ public class BucketEndpoint extends EndpointBase {
         throw newError(S3ErrorTable.BUCKET_NOT_EMPTY, bucketName, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
-      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+      } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
       } else {
         throw ex;
@@ -400,7 +400,7 @@ public class BucketEndpoint extends EndpointBase {
             result.addDeleted(new DeletedObject(keyToDelete.getKey()));
           }
         } catch (OMException ex) {
-          if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+          if (isAccessDenied(ex)) {
             result.addError(
                 new Error(keyToDelete.getKey(), "PermissionDenied",
                     ex.getMessage()));
@@ -463,7 +463,7 @@ public class BucketEndpoint extends EndpointBase {
       auditReadFailure(S3GAction.GET_ACL, ex);
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
-      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+      } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
       } else {
         throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
@@ -565,7 +565,7 @@ public class BucketEndpoint extends EndpointBase {
       auditWriteFailure(S3GAction.PUT_ACL, exception);
       if (exception.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, exception);
-      } else if (exception.getResult() == ResultCodes.PERMISSION_DENIED) {
+      } else if (isAccessDenied(exception)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, exception);
       }
       throw exception;
