@@ -31,9 +31,11 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
@@ -46,7 +48,6 @@ import java.text.ParseException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -84,6 +85,7 @@ import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.apache.hadoop.util.Time;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.annotations.VisibleForTesting;
 import static javax.ws.rs.core.HttpHeaders.CONTENT_LENGTH;
 import static javax.ws.rs.core.HttpHeaders.LAST_MODIFIED;
@@ -128,19 +130,25 @@ public class ObjectEndpoint extends EndpointBase {
       LoggerFactory.getLogger(ObjectEndpoint.class);
 
   @Context
+  private ContainerRequestContext context;
+
+  @Context
   private HttpHeaders headers;
 
-
-  private List<String> customizableGetHeaders = new ArrayList<>();
+  /*FOR the feature Overriding Response Header
+  https://docs.aws.amazon.com/de_de/AmazonS3/latest/API/API_GetObject.html */
+  private Map<String, String> overrideQueryParameter;
   private int bufferSize;
 
   public ObjectEndpoint() {
-    customizableGetHeaders.add("Content-Type");
-    customizableGetHeaders.add("Content-Language");
-    customizableGetHeaders.add("Expires");
-    customizableGetHeaders.add("Cache-Control");
-    customizableGetHeaders.add("Content-Disposition");
-    customizableGetHeaders.add("Content-Encoding");
+    overrideQueryParameter = ImmutableMap.<String, String>builder()
+        .put("Content-Type", "response-content-type")
+        .put("Content-Language", "response-content-language")
+        .put("Expires", "response-expires")
+        .put("Cache-Control", "response-cache-control")
+        .put("Content-Disposition", "response-content-disposition")
+        .put("Content-Encoding", "response-content-encoding")
+        .build();
   }
 
   @Inject
@@ -346,10 +354,28 @@ public class ObjectEndpoint extends EndpointBase {
       }
       responseBuilder.header(ACCEPT_RANGE_HEADER,
           RANGE_HEADER_SUPPORTED_UNIT);
-      for (String responseHeader : customizableGetHeaders) {
-        String headerValue = headers.getHeaderString(responseHeader);
+
+      // if multiple query parameters having same name,
+      // Only the first parameters will be recognized
+      // eg:
+      // http://localhost:9878/bucket/key?response-expires=1&response-expires=2
+      // only response-expires=1 is valid
+      MultivaluedMap<String, String> queryParams = context
+          .getUriInfo().getQueryParameters();
+
+      for (Map.Entry<String, String> entry :
+          overrideQueryParameter.entrySet()) {
+        String headerValue = headers.getHeaderString(entry.getKey());
+
+        /* "Overriding Response Header" by query parameter, See:
+        https://docs.aws.amazon.com/de_de/AmazonS3/latest/API/API_GetObject.html
+        */
+        String queryValue = queryParams.getFirst(entry.getValue());
+        if (queryValue != null) {
+          headerValue = queryValue;
+        }
         if (headerValue != null) {
-          responseBuilder.header(responseHeader, headerValue);
+          responseBuilder.header(entry.getKey(), headerValue);
         }
       }
       addLastModifiedDate(responseBuilder, keyDetails);
@@ -847,6 +873,11 @@ public class ObjectEndpoint extends EndpointBase {
   @VisibleForTesting
   public void setHeaders(HttpHeaders headers) {
     this.headers = headers;
+  }
+
+  @VisibleForTesting
+  public void setContext(ContainerRequestContext context) {
+    this.context = context;
   }
 
   void copy(OzoneVolume volume, InputStream src, long srcKeyLen,
