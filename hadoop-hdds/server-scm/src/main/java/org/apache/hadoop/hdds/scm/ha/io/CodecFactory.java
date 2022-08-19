@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.protobuf.ByteString;
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.Message;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.ProtocolMessageEnum;
 
@@ -38,7 +38,7 @@ public final class CodecFactory {
   private static Map<Class<?>, Codec> codecs = new HashMap<>();
 
   static {
-    codecs.put(GeneratedMessage.class, new GeneratedMessageCodec());
+    codecs.put(Message.class, new GeneratedMessageCodec());
     codecs.put(ProtocolMessageEnum.class, new EnumCodec());
     codecs.put(List.class, new ListCodec());
     codecs.put(Integer.class, new IntegerCodec());

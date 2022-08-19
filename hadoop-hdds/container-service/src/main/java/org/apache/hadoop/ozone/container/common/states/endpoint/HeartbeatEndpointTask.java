@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.Descriptors;
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.Message;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
@@ -200,7 +200,7 @@ public class HeartbeatEndpointTask
   // TODO: Make it generic.
   private void putBackIncrementalReports(
       SCMHeartbeatRequestProto.Builder requestBuilder) {
-    List<GeneratedMessage> reports = new LinkedList<>();
+    List<Message> reports = new LinkedList<>();
     // We only put back CommandStatusReports and IncrementalContainerReport
     // because those are incremental. Container/Node/PipelineReport are
     // accumulative so we can keep only the latest of each.
@@ -219,7 +219,7 @@ public class HeartbeatEndpointTask
    * @param requestBuilder builder to which the report has to be added.
    */
   private void addReports(SCMHeartbeatRequestProto.Builder requestBuilder) {
-    for (GeneratedMessage report :
+    for (Message report :
         context.getAllAvailableReports(rpcEndpoint.getAddress())) {
       String reportName = report.getDescriptorForType().getFullName();
       for (Descriptors.FieldDescriptor descriptor :
