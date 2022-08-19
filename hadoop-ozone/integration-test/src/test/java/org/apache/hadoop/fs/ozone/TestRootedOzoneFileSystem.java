@@ -1724,7 +1724,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   @Test
-  public void testUnbufferBeforeRead() throws IOException {
+  public void testUnbuffer() throws IOException {
     String testKeyName = "testKey2";
     Path path = new Path(bucketPath, testKeyName);
     try (FSDataOutputStream stream = fs.create(path)) {
