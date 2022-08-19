@@ -257,7 +257,7 @@ public class KeyManagerImpl implements KeyManager {
           OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
           TimeUnit.MILLISECONDS);
       dirDeletingService = new DirectoryDeletingService(dirDeleteInterval,
-          TimeUnit.SECONDS, serviceTimeout, ozoneManager, configuration);
+          TimeUnit.MILLISECONDS, serviceTimeout, ozoneManager, configuration);
       dirDeletingService.start();
     }
 
