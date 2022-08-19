@@ -54,7 +54,6 @@ public abstract class AbstractContractUnbufferTest
   public void testUnbufferAfterRead() throws IOException {
     describe("unbuffer a file after a single read");
     try (FSDataInputStream stream = getFileSystem().open(file)) {
-      assertTrue(stream.hasCapability("in:unbuffer"));
       validateFullFileContents(stream);
       unbuffer(stream);
     }
