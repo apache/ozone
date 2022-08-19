@@ -46,7 +46,7 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
   private static final int MAX_SIZE_KB = 2097151;
   private Timer timer;
   private OzoneConfiguration configuration;
-  private OzoneManagerProtocolClientSideTranslatorPB client;
+  private OzoneManagerProtocolClientSideTranslatorPB[] clients;
   private byte[] payloadReqBytes = new byte[0];
   private int payloadRespSize;
   @Option(names = {"--payload-req"},
@@ -55,6 +55,12 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
                           "Max size is 2097151 KB",
           defaultValue = "0")
   private int payloadReqSizeKB = 0;
+
+  @Option(names = {"--clients"},
+      description =
+          "Number of clients, defaults 1.",
+      defaultValue = "1")
+  private int clientsCount = 1;
 
   @Option(names = {"--payload-resp"},
           description =
@@ -70,7 +76,11 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
             "OM echo response payload size should be positive value or zero.");
 
     configuration = createOzoneConfiguration();
-    client = createOmClient(configuration, null);
+    clients = new OzoneManagerProtocolClientSideTranslatorPB[clientsCount];
+    for (int i = 0; i < clientsCount; i++) {
+      clients[i] = createOmClient(configuration, null);
+    }
+
     init();
     payloadReqBytes = RandomUtils.nextBytes(
             calculateMaxPayloadSize(payloadReqSizeKB));
@@ -79,8 +89,10 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
     try {
       runTests(this::sendRPCReq);
     } finally {
-      if (client != null) {
-        client.close();
+      for (int i = 0; i < clientsCount; i++) {
+        if (clients[i] != null) {
+          clients[i].close();
+        }
       }
     }
     return null;
@@ -98,7 +110,7 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
 
   private void sendRPCReq(long l) throws Exception {
     timer.time(() -> {
-      client.echoRPCReq(payloadReqBytes,
+      clients[(int) (l % clientsCount)].echoRPCReq(payloadReqBytes,
               payloadRespSize);
       return null;
     });
