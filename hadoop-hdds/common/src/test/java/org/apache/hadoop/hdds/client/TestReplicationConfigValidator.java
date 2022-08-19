@@ -51,8 +51,10 @@ public class TestReplicationConfigValidator {
     try {
       validator.validate(new ECReplicationConfig(invalidEcConfig1));
     } catch (IllegalArgumentException ex) {
-      GenericTestUtils.assertExceptionContains("Invalid replication " +
-          "config for type EC and replication xor-6-4-{CHUNK_SIZE}", ex);
+      GenericTestUtils.assertExceptionContains(
+              "Invalid data-parity replication " +
+          "config for type EC and replication xor-6-4-{CHUNK_SIZE}. " +
+                      "Supported data-parity are 3-2,6-3,10-4", ex);
     }
 
   }
