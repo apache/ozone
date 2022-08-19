@@ -267,6 +267,7 @@ message AddScmResponseProto {
 enum ReplicationType {
     RATIS = 1;
     STAND_ALONE = 2;
+    CHAINED = 3;
     EC = 4;
     NONE = -1; // Invalid Type
 }
