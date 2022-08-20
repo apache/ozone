@@ -29,10 +29,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /**
  * Test ReplicationConfig validator.
  */
-public class TestReplicationConfigValidator {
+class TestReplicationConfigValidator {
 
   @Test
-  public void testValidation() {
+  void testValidation() {
     MutableConfigurationSource config = new InMemoryConfiguration();
 
     final ReplicationConfigValidator validator =
@@ -60,7 +60,7 @@ public class TestReplicationConfigValidator {
   }
 
   @Test
-  public void testWithoutValidation() {
+  void testWithoutValidation() {
     MutableConfigurationSource config = new InMemoryConfiguration();
     config.set("ozone.replication.allowed-configs", "");
 
@@ -73,7 +73,7 @@ public class TestReplicationConfigValidator {
   }
 
   @Test
-  public void testCustomValidation() {
+  void testCustomValidation() {
     MutableConfigurationSource config = new InMemoryConfiguration();
     config.set("ozone.replication.allowed-configs", "RATIS/THREE");
 
