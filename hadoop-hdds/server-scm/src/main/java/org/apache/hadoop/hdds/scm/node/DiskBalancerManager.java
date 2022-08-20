@@ -22,7 +22,8 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -47,10 +48,12 @@ public class DiskBalancerManager {
   public static final Logger LOG =
       LoggerFactory.getLogger(DiskBalancerManager.class);
 
+  private OzoneConfiguration conf;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
   private final NodeManager nodeManager;
   private Map<DatanodeDetails, DiskBalancerStatus> statusMap;
+  private Map<DatanodeDetails, Long> balancedBytesMap;
   private boolean useHostnames;
 
   /**
@@ -60,6 +63,7 @@ public class DiskBalancerManager {
                         EventPublisher eventPublisher,
                         SCMContext scmContext,
                         NodeManager nodeManager) {
+    this.conf = conf;
     this.scmNodeEventPublisher = eventPublisher;
     this.scmContext = scmContext;
     this.nodeManager = nodeManager;
@@ -80,13 +84,14 @@ public class DiskBalancerManager {
       double volumeDensitySum =
           getVolumeDataDensitySumForDatanodeDetails(datanodeDetails);
       reportList.add(HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
-          .setCurrentVolumeDensitySum(volumeDensitySum)
+          .setCurrentVolumeDensitySum(String.valueOf(volumeDensitySum))
           .setNode(datanodeDetails.toProto(clientVersion))
           .build());
     }
 
-    reportList.sort((t1, t2) -> Double.compare(t2.getCurrentVolumeDensitySum(),
-        t1.getCurrentVolumeDensitySum()));
+    reportList.sort((t1, t2) ->
+        (int)(Double.parseDouble(t2.getCurrentVolumeDensitySum()) -
+            Double.parseDouble(t1.getCurrentVolumeDensitySum())));
     return reportList.stream().limit(count).collect(Collectors.toList());
   }
 
@@ -110,7 +115,7 @@ public class DiskBalancerManager {
         double volumeDensitySum =
             getVolumeDataDensitySumForDatanodeDetails(datanodeDetails);
         statusList.add(HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
-            .setCurrentVolumeDensitySum(volumeDensitySum)
+            .setCurrentVolumeDensitySum(String.valueOf(volumeDensitySum))
             .setDiskBalancerRunning(isRunning(datanodeDetails))
             .setDiskBalancerConf(statusMap.getOrDefault(datanodeDetails,
                     DiskBalancerStatus.DUMMY_STATUS)
@@ -144,8 +149,7 @@ public class DiskBalancerManager {
     DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
 
     double totalCapacity = 0d, totalUsed = 0d;
-    for (StorageContainerDatanodeProtocolProtos.StorageReportProto reportProto :
-        datanodeInfo.getStorageReports()) {
+    for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
       totalCapacity += reportProto.getCapacity();
       totalUsed += reportProto.getScmUsed();
     }
@@ -172,5 +176,25 @@ public class DiskBalancerManager {
   public void addRunningDatanode(DatanodeDetails datanodeDetails) {
     statusMap.put(datanodeDetails, new DiskBalancerStatus(true,
         new DiskBalancerConfiguration()));
+  }
+
+  public void processDiskBalancerReport(DiskBalancerReportProto reportProto,
+      DatanodeDetails dn) {
+    boolean isRunning = reportProto.getIsRunning();
+    DiskBalancerConfiguration diskBalancerConfiguration =
+        reportProto.hasDiskBalancerConf() ?
+            DiskBalancerConfiguration.fromProtobuf(
+                reportProto.getDiskBalancerConf(), conf) :
+            new DiskBalancerConfiguration();
+    statusMap.put(dn, new DiskBalancerStatus(isRunning,
+        diskBalancerConfiguration));
+    if (reportProto.hasBalancedBytes()) {
+      balancedBytesMap.put(dn, reportProto.getBalancedBytes());
+    }
+  }
+
+  @VisibleForTesting
+  public Map<DatanodeDetails, DiskBalancerStatus> getStatusMap() {
+    return statusMap;
   }
 }

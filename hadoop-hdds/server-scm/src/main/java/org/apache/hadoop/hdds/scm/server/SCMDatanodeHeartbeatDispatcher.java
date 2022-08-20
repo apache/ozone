@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.CRLStatusReport;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
@@ -202,6 +203,15 @@ public final class SCMDatanodeHeartbeatDispatcher {
                   commandStatusReport));
         }
       }
+
+      if (heartbeat.hasDiskBalancerReport()) {
+        LOG.debug("Dispatching DiskBalancer Report.");
+        eventPublisher.fireEvent(
+            PIPELINE_ACTIONS,
+            new PipelineActionsFromDatanode(
+                datanodeDetails,
+                heartbeat.getPipelineActions()));
+      }
     }
 
     return commands;
@@ -366,6 +376,18 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     public CRLStatusReportFromDatanode(DatanodeDetails datanodeDetails,
                                            CRLStatusReport report) {
+      super(datanodeDetails, report);
+    }
+  }
+
+  /**
+   * DiskBalancer report event payload with origin.
+   */
+  public static class DiskBalancerReportFromDatanode
+      extends ReportFromDatanode<DiskBalancerReportProto> {
+
+    public DiskBalancerReportFromDatanode(DatanodeDetails datanodeDetails,
+        DiskBalancerReportProto report) {
       super(datanodeDetails, report);
     }
   }

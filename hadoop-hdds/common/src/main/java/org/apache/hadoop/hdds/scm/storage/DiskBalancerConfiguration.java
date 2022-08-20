@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -43,12 +43,12 @@ public final class DiskBalancerConfiguration {
           "utilization of the volume(used space to capacity ratio) differs" +
           " from the utilization of the datanode(used space to capacity ratio" +
           " of the entire datanode) no more than the threshold.")
-  private double threshold = 10d;
+  private String threshold = "10";
 
   @Config(key = "max.disk.throughputInMBPerSec", type = ConfigType.AUTO,
       defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
       description = "The max balance speed.")
-  private double diskBandwidth = 10;
+  private long diskBandwidth = 10;
 
   @Config(key = "parallel.thread", type = ConfigType.AUTO,
       defaultValue = "5", tags = {ConfigTag.DISKBALANCER},
@@ -61,11 +61,11 @@ public final class DiskBalancerConfiguration {
    * @return percentage value in the range 0 to 100
    */
   public double getThreshold() {
-    return threshold;
+    return Double.parseDouble(threshold);
   }
 
   public double getThresholdAsRatio() {
-    return threshold / 100;
+    return Double.parseDouble(threshold) / 100;
   }
 
   /**
@@ -78,7 +78,7 @@ public final class DiskBalancerConfiguration {
       throw new IllegalArgumentException(
           "Threshold must be a percentage(double) in the range 0 to 100.");
     }
-    this.threshold = threshold;
+    this.threshold = String.valueOf(threshold);
   }
 
   /**
@@ -95,8 +95,8 @@ public final class DiskBalancerConfiguration {
    *
    * @param diskBandwidth the bandwidth to control balance speed
    */
-  public void setDiskBandwidth(double diskBandwidth) {
-    if (diskBandwidth <= 0d) {
+  public void setDiskBandwidth(long diskBandwidth) {
+    if (diskBandwidth <= 0L) {
       throw new IllegalArgumentException(
           "diskBandwidth must be a value larger than 0.");
     }
@@ -146,13 +146,13 @@ public final class DiskBalancerConfiguration {
     return builder;
   }
 
-  static DiskBalancerConfiguration fromProtobuf(
+  public static DiskBalancerConfiguration fromProtobuf(
       @NotNull HddsProtos.DiskBalancerConfigurationProto proto,
-      @NotNull OzoneConfiguration ozoneConfiguration) {
+      @NotNull ConfigurationSource configurationSource) {
     DiskBalancerConfiguration config =
-        ozoneConfiguration.getObject(DiskBalancerConfiguration.class);
+        configurationSource.getObject(DiskBalancerConfiguration.class);
     if (proto.hasThreshold()) {
-      config.setThreshold(proto.getThreshold());
+      config.setThreshold(Double.parseDouble(proto.getThreshold()));
     }
     if (proto.hasDiskBandwidth()) {
       config.setDiskBandwidth(proto.getDiskBandwidth());
