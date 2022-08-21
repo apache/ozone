@@ -122,9 +122,9 @@ public class TestDiskBalancerManager {
         .setBalancedBytes(random.nextInt(10000))
         .setDiskBalancerConf(
             HddsProtos.DiskBalancerConfigurationProto.newBuilder()
-                .setThreshold(String.valueOf(random.nextInt(100)))
-                .setParallelThread(random.nextInt(5))
-                .setDiskBandwidth(random.nextInt(100))
+                .setThreshold(String.valueOf(random.nextInt(99)))
+                .setParallelThread(random.nextInt(4) + 1)
+                .setDiskBandwidth(random.nextInt(99) + 1)
                 .build())
         .build();
   }

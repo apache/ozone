@@ -16,15 +16,12 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.protocol.commands.DiskBalancerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,12 +56,12 @@ public class DiskBalancerCommandHandler implements CommandHandler {
   public void handle(SCMCommand command, OzoneContainer ozoneContainer,
       StateContext context, SCMConnectionManager connectionManager) {
     invocationCount.incrementAndGet();
-    final long startTime = Time.monotonicNow();
-    final DatanodeDetails dn = context.getParent().getDatanodeDetails();
-    DiskBalancerCommand diskBalancerCommand = (DiskBalancerCommand) command;
-    final boolean shouldRun = diskBalancerCommand.isShouldRun();
-    final DiskBalancerConfiguration configuration =
-        diskBalancerCommand.getDiskBalancerConfiguration();
+//    final long startTime = Time.monotonicNow();
+//    final DatanodeDetails dn = context.getParent().getDatanodeDetails();
+//    DiskBalancerCommand diskBalancerCommand = (DiskBalancerCommand) command;
+//    final boolean shouldRun = diskBalancerCommand.isShouldRun();
+//    final DiskBalancerConfiguration configuration =
+//        diskBalancerCommand.getDiskBalancerConfiguration();
 
     // TODO: Do start/stop/update operation
   }
