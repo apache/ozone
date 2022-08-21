@@ -36,7 +36,6 @@ public class DiskBalancerCommandHandler implements CommandHandler {
       LoggerFactory.getLogger(DiskBalancerCommandHandler.class);
 
   private AtomicLong invocationCount = new AtomicLong(0);
-  private long totalTime;
 
   /**
    * Constructs a diskBalancerCommand handler.
@@ -56,13 +55,6 @@ public class DiskBalancerCommandHandler implements CommandHandler {
   public void handle(SCMCommand command, OzoneContainer ozoneContainer,
       StateContext context, SCMConnectionManager connectionManager) {
     invocationCount.incrementAndGet();
-//    final long startTime = Time.monotonicNow();
-//    final DatanodeDetails dn = context.getParent().getDatanodeDetails();
-//    DiskBalancerCommand diskBalancerCommand = (DiskBalancerCommand) command;
-//    final boolean shouldRun = diskBalancerCommand.isShouldRun();
-//    final DiskBalancerConfiguration configuration =
-//        diskBalancerCommand.getDiskBalancerConfiguration();
-
     // TODO: Do start/stop/update operation
   }
 
