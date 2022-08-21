@@ -36,6 +36,7 @@ public class DiskBalancerCommandHandler implements CommandHandler {
       LoggerFactory.getLogger(DiskBalancerCommandHandler.class);
 
   private AtomicLong invocationCount = new AtomicLong(0);
+  private long totalTime;
 
   /**
    * Constructs a diskBalancerCommand handler.
