@@ -62,12 +62,17 @@ public class ReplicationConfigValidator {
               (ECReplicationConfig) replicationConfig;
         replication =  ecConfig.getCodec() + "-" + ecConfig.getData() +
                 "-" + ecConfig.getParity() + "-{CHUNK_SIZE}";
-      }
-      throw new IllegalArgumentException(
+        //EC type checks data-parity
+        throw new IllegalArgumentException(
                 "Invalid data-parity replication config " +
                         "for type " + replicationConfig.getReplicationType() +
                         " and replication " + replication + "." +
                         " Supported data-parity are 3-2,6-3,10-4");
+      }
+      //Non-EC type
+      throw new IllegalArgumentException("Invalid replication config " +
+              "for type " + replicationConfig.getReplicationType() +
+              " and replication " + replication);
     }
     return replicationConfig;
   }
