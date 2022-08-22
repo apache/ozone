@@ -168,9 +168,7 @@ public class BlockDeletingService extends BackgroundService {
           + "Retry in next interval. ", e);
     } catch (Exception e) {
       // In case listContainer call throws any uncaught RuntimeException.
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Unexpected error occurs during deleting blocks.", e);
-      }
+      LOG.error("Unexpected error occurs during deleting blocks.", e);
     }
     return queue;
   }
