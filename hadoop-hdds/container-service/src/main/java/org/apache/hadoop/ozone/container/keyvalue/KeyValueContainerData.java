@@ -234,6 +234,13 @@ public class KeyValueContainerData extends ContainerData {
   }
 
   /**
+   * Reset the number of pending deletion blocks.
+   */
+  public void resetNumPendingDeletionBlocks() {
+    this.numPendingDeletionBlocks.set(0L);
+  }
+
+  /**
    * Get the number of pending deletion blocks.
    */
   public long getNumPendingDeletionBlocks() {

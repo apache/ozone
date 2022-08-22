@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 
 import com.google.common.collect.Lists;
 
+import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
@@ -480,8 +481,10 @@ public class BlockDeletingService extends BackgroundService {
           delBlocks.add(delTx);
         }
         if (delBlocks.isEmpty()) {
-          LOG.debug("No transaction found in container : {}",
+          LOG.warn("No transaction found in container : {}, cleaning " +
+              "pendingDeletingBlocks in metadata.",
               containerData.getContainerID());
+          cleanPendingDeletingBlocks(meta);
           return crr;
         }
 
@@ -528,13 +531,26 @@ public class BlockDeletingService extends BackgroundService {
 
         LOG.debug("Container: {}, deleted blocks: {}, space reclaimed: {}, " +
                 "task elapsed time: {}ms", containerData.getContainerID(),
-            deletedBlocksCount, Time.monotonicNow() - startTime);
+            deletedBlocksCount, releasedBytes, Time.monotonicNow() - startTime);
 
         return crr;
       } catch (IOException exception) {
         LOG.warn("Deletion operation was not successful for container: " +
             container.getContainerData().getContainerID(), exception);
         metrics.incrFailureCount();
+        throw exception;
+      }
+    }
+
+    // Clean inconsistency in both DB and memory
+    private void cleanPendingDeletingBlocks(DBHandle meta) throws IOException {
+      containerData.resetNumPendingDeletionBlocks();
+      try {
+        Table<String, Long> metadataTable = meta.getStore().getMetadataTable();
+        metadataTable.put(PENDING_DELETE_BLOCK_COUNT, (long)(0));
+      } catch (IOException exception) {
+        LOG.warn("Clean Pending Deleting Blocks operation was not successful " +
+            "for container: " + containerData.getContainerID(), exception);
         throw exception;
       }
     }
