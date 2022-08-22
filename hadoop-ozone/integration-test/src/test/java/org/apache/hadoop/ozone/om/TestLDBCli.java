@@ -57,7 +57,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 /**
  * This class tests the Debug LDB CLI that reads from an om.db file.
  */
-public class TestOmLDBCli {
+public class TestLDBCli {
   private OzoneConfiguration conf;
 
   private RDBParser rdbParser;
