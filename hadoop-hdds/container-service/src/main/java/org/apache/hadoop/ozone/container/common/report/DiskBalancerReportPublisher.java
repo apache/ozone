@@ -28,10 +28,11 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DISK_BALANCER_REPORT_IN
 
 
 /**
- * Publishes Pipeline which will be sent to SCM as part of heartbeat.
- * PipelineReport consist of the following information about each pipeline:
- *   - pipelineID
- *   - leaderID
+ * Publishes DiskBalancer report which will be sent to SCM as part of heartbeat.
+ * DiskBalancer Report consist of the following information:
+ *   - isBalancerRunning
+ *   - balancedBytes
+ *   - DiskBalancerConfiguration
  */
 public class DiskBalancerReportPublisher extends
     ReportPublisher<DiskBalancerReportProto> {

@@ -176,7 +176,7 @@ public class StateContext {
     nodeReport = new AtomicReference<>();
     pipelineReports = new AtomicReference<>();
     crlStatusReport = new AtomicReference<>(); // Certificate Revocation List
-    diskBalancerReport = new AtomicReference<>(); // Certificate Revocation List
+    diskBalancerReport = new AtomicReference<>();
     endpoints = new HashSet<>();
     containerActions = new HashMap<>();
     pipelineActions = new HashMap<>();
