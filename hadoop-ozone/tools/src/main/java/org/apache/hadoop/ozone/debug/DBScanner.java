@@ -28,12 +28,12 @@ import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.Slice;
 import picocli.CommandLine;
 
 import java.io.FileOutputStream;
@@ -266,8 +266,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         if (containerId > 0 && dnDBSchemaVersion != null &&
             dnDBSchemaVersion.equals("V3")) {
           ManagedReadOptions read_options = new ManagedReadOptions();
-          read_options.setIterateUpperBound(
-              new Slice(DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
+          read_options.setIterateUpperBound(new ManagedSlice(
+              DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
                   containerId + 1).getBytes()));
           iterator = new ManagedRocksIterator(
               rocksDB.get().newIterator(columnFamilyHandle, read_options));
