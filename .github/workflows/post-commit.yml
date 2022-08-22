@@ -346,6 +346,10 @@ jobs:
             maven-repo-${{ hashFiles('**/pom.xml') }}-8
             maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
+      - name: Setup java
+        uses: actions/setup-java@v1
+        with:
+          java-version: 8
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
         if: matrix.profile != 'flaky'
