@@ -148,7 +148,7 @@ public class DatanodeSchemaThreeDBDefinition
         + separator;
   }
 
-  private static int getContainerKeyPrefixLength() {
+  public static int getContainerKeyPrefixLength() {
     return FixedLengthStringUtils.string2Bytes(
         getContainerKeyPrefix(0L)).length;
   }
