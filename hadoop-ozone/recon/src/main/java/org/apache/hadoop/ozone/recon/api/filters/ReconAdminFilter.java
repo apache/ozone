@@ -17,11 +17,11 @@
  */
 package org.apache.hadoop.ozone.recon.api.filters;
 
-import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -38,10 +38,6 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.security.Principal;
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
-
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 
 /**
  * Filter that can be applied to paths to only allow access by configured
@@ -109,14 +105,11 @@ public class ReconAdminFilter implements Filter {
         conf.getStringCollection(OzoneConfigKeys.OZONE_ADMINISTRATORS);
     admins.addAll(
         conf.getStringCollection(ReconConfigKeys.OZONE_RECON_ADMINISTRATORS));
-    Set<String> adminGroups =
-        new HashSet<>(conf.getStringCollection(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS));
+    Collection<String> adminGroups =
+        conf.getStringCollection(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS);
     adminGroups.addAll(
-        conf.getStringCollection(ReconConfigKeys.OZONE_RECON_ADMINISTRATORS_GROUPS));
-
-    return admins.contains(OZONE_ADMINISTRATORS_WILDCARD)
-        || admins.contains(user.getShortUserName())
-        || admins.contains(user.getUserName())
-        || !Sets.intersection(adminGroups, new HashSet<>(user.getGroups())).isEmpty();
+        conf.getStringCollection(
+            ReconConfigKeys.OZONE_RECON_ADMINISTRATORS_GROUPS));
+    return new OzoneAdmins(admins, adminGroups).isAdmin(user);
   }
 }

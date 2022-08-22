@@ -26,7 +26,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
-import com.google.common.collect.Sets;
 import com.google.protobuf.BlockingService;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -78,6 +77,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.De
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.server.events.EventExecutor;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
@@ -172,11 +172,9 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -185,7 +183,6 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
@@ -251,9 +248,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * SCM super user.
    */
-  private final Collection<String> scmAdminUsernames;
-
-  private final Set<String> scmAdminGroups;
+  private final OzoneAdmins scmAdmins;
   /**
    * SCM mxbean.
    */
@@ -391,8 +386,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       securityProtocolServer = null;
     }
 
-    scmAdminUsernames = conf.getTrimmedStringCollection(OzoneConfigKeys
-        .OZONE_ADMINISTRATORS);
+    Collection<String> scmAdminUsernames =
+        conf.getTrimmedStringCollection(OzoneConfigKeys.OZONE_ADMINISTRATORS);
     String scmShortUsername =
         UserGroupInformation.getCurrentUser().getShortUserName();
 
@@ -400,8 +395,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmAdminUsernames.add(scmShortUsername);
     }
 
-    scmAdminGroups = new HashSet<>(conf.getTrimmedStringCollection(OzoneConfigKeys
-        .OZONE_ADMINISTRATORS_GROUPS));
+    Collection<String> scmAdminGroups =
+        conf.getTrimmedStringCollection(
+            OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS);
+
+    scmAdmins = new OzoneAdmins(scmAdminUsernames, scmAdminGroups);
 
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
         eventQueue);
@@ -1822,13 +1820,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public void checkAdminAccess(UserGroupInformation remoteUser)
       throws IOException {
-    if (remoteUser != null
-        && !scmAdminUsernames.contains(remoteUser.getUserName()) &&
-        !scmAdminUsernames.contains(remoteUser.getShortUserName()) &&
-        !scmAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD) &&
-        Sets.intersection(scmAdminGroups, new HashSet<>(remoteUser.getGroups())).isEmpty()) {
+    if (remoteUser != null && !scmAdmins.isAdmin(remoteUser)) {
       throw new AccessControlException(
-          "Access denied for user " + remoteUser.getUserName() + ", groups " + remoteUser.getGroups() +
+          "Access denied for user " + remoteUser.getUserName() +
               ". Superuser privilege is required.");
     }
   }

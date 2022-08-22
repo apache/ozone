@@ -30,11 +30,10 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.google.common.collect.Sets;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 
@@ -47,7 +46,6 @@ import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 
 import org.apache.hadoop.security.UserGroupInformation;
@@ -68,8 +66,7 @@ public class DBCheckpointServlet extends HttpServlet {
 
   private boolean aclEnabled;
   private boolean isSpnegoEnabled;
-  private Collection<String> allowedUsers;
-  private Collection<String> allowedGroups;
+  private transient OzoneAdmins allowedUsers;
 
   public void initialize(DBStore store, DBCheckpointMetrics metrics,
                          boolean omAclEnabled,
@@ -86,8 +83,7 @@ public class DBCheckpointServlet extends HttpServlet {
     }
 
     this.aclEnabled = omAclEnabled;
-    this.allowedUsers = allowedAdminUsers;
-    this.allowedGroups = allowedAdminGroups;
+    this.allowedUsers = new OzoneAdmins(allowedAdminUsers, allowedAdminGroups);
     this.isSpnegoEnabled = isSpnegoAuthEnabled;
   }
 
@@ -95,10 +91,7 @@ public class DBCheckpointServlet extends HttpServlet {
     // Check ACL for dbCheckpoint only when global Ozone ACL and SPNEGO is
     // enabled
     if (aclEnabled && isSpnegoEnabled) {
-      return allowedUsers.contains(OZONE_ADMINISTRATORS_WILDCARD)
-          || allowedUsers.contains(user.getShortUserName())
-          || allowedUsers.contains(user.getUserName())
-          || !Sets.intersection(new HashSet<>(allowedGroups), new HashSet<>(user.getGroups())).isEmpty();
+      return allowedUsers.isAdmin(user);
     } else {
       return true;
     }

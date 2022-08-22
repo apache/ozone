@@ -34,6 +34,7 @@ import java.nio.file.Paths;
 import java.security.Principal;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -213,7 +214,8 @@ public class TestOMDbCheckpointServlet {
     setupCluster();
 
     final OzoneManager om = cluster.getOzoneManager();
-    Collection<String> allowedUsers = om.getOmAdminUsernames();
+    Collection<String> allowedUsers =
+            new LinkedHashSet<>(om.getOmAdminUsernames());
     allowedUsers.add("recon");
 
     doCallRealMethod().when(omDbCheckpointServletMock).initialize(

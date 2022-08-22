@@ -104,10 +104,12 @@ public class TestAdminFilter {
         OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD);
     testAdminFilterWithPrincipal(conf, "other", true);
 
-    UserGroupInformation.createUserForTesting("user1", new String[]{"admingroup"});
+    UserGroupInformation.createUserForTesting("user1",
+        new String[]{"admingroup"});
     try {
       conf.setStrings(OzoneConfigKeys.OZONE_ADMINISTRATORS, "ozone");
-      conf.setStrings(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS, "admingroup");
+      conf.setStrings(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS,
+          "admingroup");
       testAdminFilterWithPrincipal(conf, "user1", true);
     } finally {
       UserGroupInformation.reset();
@@ -125,10 +127,12 @@ public class TestAdminFilter {
         OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD);
     testAdminFilterWithPrincipal(conf, "other", true);
 
-    UserGroupInformation.createUserForTesting("user1", new String[]{"reconadmingroup"});
+    UserGroupInformation.createUserForTesting("user1",
+        new String[]{"reconadmingroup"});
     try {
       conf.setStrings(ReconConfigKeys.OZONE_RECON_ADMINISTRATORS, "recon");
-      conf.setStrings(ReconConfigKeys.OZONE_RECON_ADMINISTRATORS_GROUPS, "reconadmingroup");
+      conf.setStrings(ReconConfigKeys.OZONE_RECON_ADMINISTRATORS_GROUPS,
+          "reconadmingroup");
       testAdminFilterWithPrincipal(conf, "user1", true);
     } finally {
       UserGroupInformation.reset();

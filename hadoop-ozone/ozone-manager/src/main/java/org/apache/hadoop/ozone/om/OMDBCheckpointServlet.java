@@ -30,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
+import java.util.LinkedHashSet;
 
 /**
  * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
@@ -63,7 +64,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     OzoneConfiguration conf = om.getConfiguration();
     // Only Ozone Admins and Recon are allowed
-    Collection<String> allowedUsers = om.getOmAdminUsernames();
+    Collection<String> allowedUsers =
+            new LinkedHashSet<>(om.getOmAdminUsernames());
     Collection<String> allowedGroups = om.getOmAdminGroups();
     ReconConfig reconConfig = conf.getObject(ReconConfig.class);
     String reconPrincipal = reconConfig.getKerberosPrincipal();

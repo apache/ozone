@@ -376,6 +376,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.administrators.groups</name>
+    <value/>
+    <tag>OZONE, SECURITY</tag>
+    <description>Ozone administrator groups delimited by the comma.
+      This is the list of groups who can access admin only information
+      from ozone.
+      It is enough to either have the name defined in ozone.administrators
+      or be directly or indirectly in a group defined in this property.
+    </description>
+  </property>
+  <property>
     <name>ozone.block.deleting.container.limit.per.interval</name>
     <value>10</value>
     <tag>OZONE, PERFORMANCE, SCM</tag>
@@ -2543,6 +2554,18 @@
       This is the list of users who can access admin only information from recon.
       Users defined in ozone.administrators will always be able to access all
       recon information regardless of this setting.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.administrators.groups</name>
+    <value/>
+    <tag>RECON, SECURITY</tag>
+    <description>
+      Recon administrator groups delimited by a comma.
+      This is the list of groups who can access admin only information
+      from recon.
+      It is enough to either have the name defined in ozone.recon.administrators
+      or be directly or indirectly in a group defined in this property.
     </description>
   </property>
   <property>
