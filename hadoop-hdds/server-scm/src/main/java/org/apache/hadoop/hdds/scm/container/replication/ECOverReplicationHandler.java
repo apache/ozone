@@ -140,7 +140,7 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
     if (index2replicas.size() > 0) {
       final Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
       final int replicationFactor = replicaCount
-              .getAvailableIndexes(true).size();
+              .getAvailableIndexSize(true);
       index2replicas.values().forEach(l -> {
         Iterator<ContainerReplica> it = l.iterator();
         Set<ContainerReplica> tempReplicaSet = new HashSet<>(replicas);
