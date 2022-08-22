@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -82,8 +83,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
             .validateContainerPlacement(nodes, nodes.size())
             .isPolicySatisfied();
     if (!placementStatus) {
-      LOG.warn("Selected Nodes does not satisfy placement policy: {} " +
-              "Selected nodes: {}, Existing Replica Nodes: {}");
+      LOG.warn("Selected Nodes does not satisfy placement policy: {}. " +
+              "Selected nodes: {}. Existing Replica Nodes: {}.",
+              containerPlacement.getClass().getName(), selectedNodes, replicaNodes);
     }
     return placementStatus;
   }
@@ -172,6 +174,10 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       List<DatanodeDetails> nodes =
               sources.values().stream().map(Pair::getLeft)
                       .map(ContainerReplica::getDatanodeDetails)
+                      .filter(datanodeDetails ->
+                              datanodeDetails.getPersistedOpState() ==
+                              HddsProtos.NodeOperationalState.IN_SERVICE)
+                      .filter(DatanodeDetails::isDecomissioned)
                       .collect(Collectors.toList());
       // We got the missing indexes, this is excluded any decommissioning
       // indexes. Find the good source nodes.
