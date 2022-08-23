@@ -131,6 +131,12 @@ public class TestReconOmMetadataManagerImpl {
     Assert.assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_two"));
 
+    // Update again with an existing OM DB.
+    DBStore current = reconOMMetadataManager.getStore();
+    reconOMMetadataManager.updateOmDB(
+        checkpoint.getCheckpointLocation().toFile());
+    // Verify that the existing DB instance is closed.
+    Assert.assertTrue(current.isClosed());
   }
 
   /**
