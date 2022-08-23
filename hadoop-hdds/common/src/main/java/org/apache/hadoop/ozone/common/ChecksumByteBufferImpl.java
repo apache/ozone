@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.common;
 
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.zip.Checksum;
 
@@ -27,8 +28,18 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
 
   private Checksum checksum;
 
+  private Field isReadyOnlyField = null;
+
   public ChecksumByteBufferImpl(Checksum impl) {
     this.checksum = impl;
+
+    try {
+      isReadyOnlyField = ByteBuffer.class
+          .getDeclaredField("isReadOnly");
+      isReadyOnlyField.setAccessible(true);
+    } catch (NoSuchFieldException e) {
+      e.printStackTrace();
+    }
   }
 
   @Override
@@ -36,6 +47,12 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
   //        should be refactored to simply call checksum.update(buffer), as the
   //        Checksum interface has been enhanced to allow this since Java 9.
   public void update(ByteBuffer buffer) {
+    // this is a hack to not do memory copy.
+    try {
+      isReadyOnlyField.setBoolean(buffer, false);
+    } catch (IllegalAccessException e) {
+      e.printStackTrace();
+    }
     if (buffer.hasArray()) {
       checksum.update(buffer.array(), buffer.position() + buffer.arrayOffset(),
           buffer.remaining());
