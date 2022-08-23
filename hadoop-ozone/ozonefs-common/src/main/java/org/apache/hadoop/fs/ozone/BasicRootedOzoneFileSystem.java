@@ -965,6 +965,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return super.listLocatedStatus(f);
   }
 
+  @Override
+  public RemoteIterator<FileStatus> listStatusIterator(Path f)
+          throws IOException {
+    return super.listStatusIterator(f);
+  }
+
   /**
    * Turn a path (relative or otherwise) into an Ozone key.
    *

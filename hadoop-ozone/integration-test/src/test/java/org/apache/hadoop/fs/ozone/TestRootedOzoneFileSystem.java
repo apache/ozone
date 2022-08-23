@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
@@ -382,6 +383,31 @@ public class TestRootedOzoneFileSystem {
     Assert.assertEquals(
         "FileStatus did not return all children of the directory",
         3, fileStatuses.length);
+
+    // Cleanup
+    fs.delete(parent, true);
+  }
+
+  @Test
+  public void testListStatusIterator() throws Exception {
+    OzoneBucket bucket =
+            TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+    String volumeName = bucket.getVolumeName();
+    Path volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
+    String bucketName = bucket.getName();
+    Path bucketPath = new Path(volumePath, bucketName);
+
+    Path parent = new Path(bucketPath, "testListStatusIterator");
+    // Iterator should have no items when dir is empty
+    RemoteIterator<FileStatus> it = ofs.listStatusIterator(bucketPath);
+    assertFalse(it.hasNext());
+    Path file1 = new Path(parent, "key1");
+    Path file2 = new Path(parent, "key2");
+    ContractTestUtils.touch(fs, file1);
+    ContractTestUtils.touch(fs, file2);
+    // Iterator should have an item when dir is not empty
+    it = ofs.listStatusIterator(bucketPath);
+    assertTrue(it.hasNext());
 
     // Cleanup
     fs.delete(parent, true);
