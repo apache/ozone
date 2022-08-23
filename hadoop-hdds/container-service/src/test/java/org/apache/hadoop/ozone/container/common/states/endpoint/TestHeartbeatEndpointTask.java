@@ -24,7 +24,9 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutV
 import static org.mockito.ArgumentMatchers.any;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -33,6 +35,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
@@ -68,8 +71,11 @@ public class TestHeartbeatEndpointTask {
         Mockito.mock(
             StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
 
+    List<DatanodeDetails> targetDns = new ArrayList<>();
+    targetDns.add(MockDatanodeDetails.randomDatanodeDetails());
+    targetDns.add(MockDatanodeDetails.randomDatanodeDetails());
     ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
-        1, emptyList(), emptyList(), new byte[]{2, 5},
+        1, emptyList(), targetDns, new byte[]{2, 5},
         new ECReplicationConfig(3, 2));
 
     Mockito.when(scm.sendHeartbeat(any()))

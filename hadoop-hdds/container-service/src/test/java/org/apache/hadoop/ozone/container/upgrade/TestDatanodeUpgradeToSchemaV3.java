@@ -665,7 +665,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public ContainerProtos.ContainerCommandRequestProto getWriteChunk(
       long containerID, Pipeline pipeline) throws Exception {
     return ContainerTestHelper.getWriteChunkRequest(pipeline,
-            ContainerTestHelper.getTestBlockID(containerID), 100, null);
+            ContainerTestHelper.getTestBlockID(containerID), 100);
   }
 
   public Pipeline getPipeline() {

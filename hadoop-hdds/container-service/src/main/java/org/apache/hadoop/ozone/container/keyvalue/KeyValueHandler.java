@@ -473,9 +473,9 @@ public class KeyValueHandler extends Handler {
 
       boolean endOfBlock = false;
       if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
-        // in EC, we will be doing empty put block. So, there may not be dat
-        // a available. So, let's flush only when data size is > 0.
-        if (request.getPutBlock().getBlockData().getSize() > 0) {
+        // in EC, we will be doing empty put block.
+        // So, let's flush only when there are any chunks
+        if (!request.getPutBlock().getBlockData().getChunksList().isEmpty()) {
           chunkManager.finishWriteChunks(kvContainer, blockData);
         }
         endOfBlock = true;

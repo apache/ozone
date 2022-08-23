@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -34,7 +35,7 @@ import org.slf4j.LoggerFactory;
 /**
  * RocksDB Checkpoint Manager, used to create and cleanup checkpoints.
  */
-public class RDBCheckpointManager {
+public class RDBCheckpointManager implements Closeable {
 
   private final RocksCheckpoint checkpoint;
   public static final String RDB_CHECKPOINT_DIR_PREFIX = "checkpoint_";
@@ -89,5 +90,10 @@ public class RDBCheckpointManager {
       LOG.error("Unable to create RocksDB Snapshot.", e);
     }
     return null;
+  }
+
+  @Override
+  public void close() throws IOException {
+    checkpoint.close();
   }
 }

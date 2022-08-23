@@ -63,7 +63,8 @@ public class FreonReplicationOptions extends ReplicationOptions {
    */
   @Override
   public Optional<ReplicationConfig> fromParams(ConfigurationSource conf) {
-    if (spec.commandLine().getParseResult().hasMatchedOption(FACTOR_OPT)) {
+    if (spec != null && spec.commandLine().getParseResult() != null &&
+            spec.commandLine().getParseResult().hasMatchedOption(FACTOR_OPT)) {
       return Optional.of(ReplicationConfig.fromTypeAndFactor(
           ReplicationType.RATIS, factor));
     }

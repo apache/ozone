@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
@@ -78,7 +79,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.ArgumentCaptor;
-import org.rocksdb.TransactionLogIterator;
+import org.rocksdb.TransactionLogIterator.BatchResult;
 import org.rocksdb.WriteBatch;
 
 /**
@@ -220,16 +221,15 @@ public class TestOzoneManagerServiceProviderImpl {
     writeDataToOm(sourceOMMetadataMgr, "key_two");
 
     final RocksDatabase rocksDB = getRocksDatabase(sourceOMMetadataMgr);
-    TransactionLogIterator transactionLogIterator = rocksDB.getUpdatesSince(0L);
+    ManagedTransactionLogIterator logIterator = rocksDB.getUpdatesSince(0L);
     DBUpdates dbUpdatesWrapper = new DBUpdates();
-    while (transactionLogIterator.isValid()) {
-      TransactionLogIterator.BatchResult result =
-          transactionLogIterator.getBatch();
+    while (logIterator.get().isValid()) {
+      BatchResult result = logIterator.get().getBatch();
       result.writeBatch().markWalTerminationPoint();
       WriteBatch writeBatch = result.writeBatch();
       dbUpdatesWrapper.addWriteBatch(writeBatch.data(),
           result.sequenceNumber());
-      transactionLogIterator.next();
+      logIterator.get().next();
     }
 
     // OM Service Provider's Metadata Manager.
@@ -282,19 +282,18 @@ public class TestOzoneManagerServiceProviderImpl {
     writeDataToOm(sourceOMMetadataMgr, "key_two");
 
     final RocksDatabase rocksDB = getRocksDatabase(sourceOMMetadataMgr);
-    TransactionLogIterator transactionLogIterator = rocksDB.getUpdatesSince(0L);
+    ManagedTransactionLogIterator logIterator = rocksDB.getUpdatesSince(0L);
     DBUpdates[] dbUpdatesWrapper = new DBUpdates[4];
     int index = 0;
-    while (transactionLogIterator.isValid()) {
-      TransactionLogIterator.BatchResult result =
-          transactionLogIterator.getBatch();
+    while (logIterator.get().isValid()) {
+      BatchResult result = logIterator.get().getBatch();
       result.writeBatch().markWalTerminationPoint();
       WriteBatch writeBatch = result.writeBatch();
       dbUpdatesWrapper[index] = new DBUpdates();
       dbUpdatesWrapper[index].addWriteBatch(writeBatch.data(),
           result.sequenceNumber());
       index++;
-      transactionLogIterator.next();
+      logIterator.get().next();
     }
 
     // OM Service Provider's Metadata Manager.

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
@@ -58,7 +57,6 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
-import org.rocksdb.ColumnFamilyOptions;
 
 import java.io.File;
 
@@ -73,7 +71,6 @@ import java.util.Map;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -531,39 +528,6 @@ public class TestKeyValueContainer {
         Assert.assertEquals(defaultCacheSize, cacheSize);
       }
     }
-  }
-
-  @Test
-  public void testContainersShareColumnFamilyOptions() {
-    ConfigurationSource conf = new OzoneConfiguration();
-
-    // Make sure ColumnFamilyOptions are same for a particular db profile
-    for (Supplier<DatanodeDBProfile> dbProfileSupplier : new Supplier[] {
-        DatanodeDBProfile.Disk::new, DatanodeDBProfile.SSD::new }) {
-      // ColumnFamilyOptions should be same across configurations
-      ColumnFamilyOptions columnFamilyOptions1 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(new OzoneConfiguration());
-      ColumnFamilyOptions columnFamilyOptions2 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(new OzoneConfiguration());
-      Assert.assertEquals(columnFamilyOptions1, columnFamilyOptions2);
-
-      // ColumnFamilyOptions should be same when queried multiple times
-      // for a particulat configuration
-      columnFamilyOptions1 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(conf);
-      columnFamilyOptions2 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(conf);
-      Assert.assertEquals(columnFamilyOptions1, columnFamilyOptions2);
-    }
-
-    // Make sure ColumnFamilyOptions are different for different db profile
-    DatanodeDBProfile diskProfile = new DatanodeDBProfile.Disk();
-    DatanodeDBProfile ssdProfile = new DatanodeDBProfile.SSD();
-    Assert.assertNotEquals(
-        diskProfile.getColumnFamilyOptions(new OzoneConfiguration()),
-        ssdProfile.getColumnFamilyOptions(new OzoneConfiguration()));
-    Assert.assertNotEquals(diskProfile.getColumnFamilyOptions(conf),
-        ssdProfile.getColumnFamilyOptions(conf));
   }
 
   @Test

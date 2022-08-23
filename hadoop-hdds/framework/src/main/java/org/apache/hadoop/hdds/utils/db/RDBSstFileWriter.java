@@ -17,10 +17,10 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import org.rocksdb.EnvOptions;
-import org.rocksdb.Options;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.SstFileWriter;
 
 import java.io.Closeable;
 import java.io.File;
@@ -34,14 +34,14 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.toIOException;
  */
 public class RDBSstFileWriter implements DumpFileWriter, Closeable {
 
-  private SstFileWriter sstFileWriter;
+  private ManagedSstFileWriter sstFileWriter;
   private File sstFile;
   private AtomicLong keyCounter;
-  private Options emptyOption = new Options();
+  private ManagedOptions emptyOption = new ManagedOptions();
+  private final ManagedEnvOptions emptyEnvOptions = new ManagedEnvOptions();
 
   public RDBSstFileWriter() {
-    EnvOptions envOptions = new EnvOptions();
-    this.sstFileWriter = new SstFileWriter(envOptions, emptyOption);
+    this.sstFileWriter = new ManagedSstFileWriter(emptyEnvOptions, emptyOption);
     this.keyCounter = new AtomicLong(0);
   }
 
@@ -82,19 +82,23 @@ public class RDBSstFileWriter implements DumpFileWriter, Closeable {
         throw toIOException("Failed to finish dumping into file "
             + sstFile.getAbsolutePath(), e);
       } finally {
-        sstFileWriter.close();
-        sstFileWriter = null;
-        emptyOption.close();
+        closeResources();
       }
 
       keyCounter.set(0);
     }
   }
 
+  private void closeResources() {
+    sstFileWriter.close();
+    sstFileWriter = null;
+    emptyOption.close();
+    emptyEnvOptions.close();
+  }
+
   private void closeOnFailure() {
     if (sstFileWriter != null) {
-      sstFileWriter.close();
-      sstFileWriter = null;
+      closeResources();
     }
   }
 }

@@ -92,7 +92,7 @@ public final class SCMContainerPlacementRackScatter
    * @throws SCMException  SCMException
    */
   @Override
-  public List<DatanodeDetails> chooseDatanodes(
+  protected List<DatanodeDetails> chooseDatanodesInternal(
       final List<DatanodeDetails> excludedNodes,
       final List<DatanodeDetails> favoredNodes,
       final int nodesRequiredToChoose, final long metadataSizeRequired,
@@ -225,7 +225,7 @@ public final class SCMContainerPlacementRackScatter
     ContainerPlacementStatus placementStatus =
         validateContainerPlacement(result, nodesRequiredToChoose);
     if (!placementStatus.isPolicySatisfied()) {
-      String errorMsg = "ContainerPlacementPolicy not met, currentRacks is" +
+      String errorMsg = "ContainerPlacementPolicy not met, currentRacks is " +
           placementStatus.actualPlacementCount() + "desired racks is" +
           placementStatus.expectedPlacementCount();
       throw new SCMException(errorMsg, null);
@@ -265,7 +265,17 @@ public final class SCMContainerPlacementRackScatter
     int maxRetry = INNER_LOOP_MAX_RETRY;
     while (true) {
       metrics.incrDatanodeChooseAttemptCount();
-      Node node = networkTopology.chooseRandom(scope, excludedNodes);
+      Node node = null;
+      try {
+        node = networkTopology.chooseRandom(scope, excludedNodes);
+      } catch (Exception e) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Error while choosing Node: Scope: {}, Excluded Nodes: " +
+                          "{}, MetaDataSizeRequired: {}, DataSizeRequired: " +
+                  "{}", scope, excludedNodes, metadataSizeRequired,
+                  dataSizeRequired, e);
+        }
+      }
       if (node != null) {
         DatanodeDetails datanodeDetails = (DatanodeDetails) node;
         if (isValidNode(datanodeDetails, metadataSizeRequired,

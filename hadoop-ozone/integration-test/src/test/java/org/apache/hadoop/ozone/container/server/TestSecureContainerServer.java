@@ -277,7 +277,7 @@ public class TestSecureContainerServer {
       String encodedToken = token.encodeToUrlString();
 
       ContainerCommandRequestProto.Builder writeChunk =
-          newWriteChunkRequestBuilder(pipeline, blockID, 1024, 0);
+          newWriteChunkRequestBuilder(pipeline, blockID, 1024);
       assertRequiresToken(client, encodedToken, writeChunk);
 
       ContainerCommandRequestProto.Builder putBlock =

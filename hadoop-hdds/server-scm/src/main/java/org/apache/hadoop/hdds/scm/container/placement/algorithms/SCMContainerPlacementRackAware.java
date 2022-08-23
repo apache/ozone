@@ -97,7 +97,7 @@ public final class SCMContainerPlacementRackAware
    * @throws SCMException  SCMException
    */
   @Override
-  public List<DatanodeDetails> chooseDatanodes(
+  protected List<DatanodeDetails> chooseDatanodesInternal(
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
       int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {
