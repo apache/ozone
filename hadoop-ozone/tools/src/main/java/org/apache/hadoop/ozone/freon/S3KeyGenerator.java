@@ -24,20 +24,16 @@ import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 
-import com.amazonaws.auth.EnvironmentVariableCredentialsProvider;
-import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
-import com.amazonaws.regions.Regions;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import static com.amazonaws.services.s3.internal.SkipMd5CheckStrategy.DISABLE_PUT_OBJECT_MD5_VALIDATION_PROPERTY;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadResult;
 import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.UploadPartRequest;
+import static com.amazonaws.services.s3.internal.SkipMd5CheckStrategy.DISABLE_PUT_OBJECT_MD5_VALIDATION_PROPERTY;
 import com.amazonaws.services.s3.model.UploadPartResult;
 import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomStringUtils;
+
 import static org.apache.hadoop.ozone.OzoneConsts.OM_MULTIPART_MIN_SIZE;
 
 import org.slf4j.Logger;
@@ -50,12 +46,15 @@ import picocli.CommandLine.Option;
  */
 @Command(name = "s3kg",
     aliases = "s3-key-generator",
-    description = "Create random keys via the s3 interface.",
+    description = "Create random keys via the s3 interface." +
+        "Command requires AWS authentication environment " +
+        "variables set, AWS_ACCESS_KEY_ID and " +
+        "AWS_SECRET_ACCESS_KEY",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
 @SuppressWarnings("java:S2245") // no need for secure random
-public class S3KeyGenerator extends BaseFreonGenerator
+public class S3KeyGenerator extends S3EntityGenerator
     implements Callable<Void> {
 
   private static final Logger LOG =
@@ -73,11 +72,6 @@ public class S3KeyGenerator extends BaseFreonGenerator
       defaultValue = "10240")
   private int fileSize;
 
-  @Option(names = {"-e", "--endpoint"},
-      description = "S3 HTTP endpoint",
-      defaultValue = "http://localhost:9878")
-  private String endpoint;
-
   @Option(names = {"--multi-part-upload"},
       description = "User multi part upload",
       defaultValue = "false")
@@ -93,8 +87,6 @@ public class S3KeyGenerator extends BaseFreonGenerator
 
   private String content;
 
-  private AmazonS3 s3;
-
   @Override
   public Void call() throws Exception {
 
@@ -102,23 +94,8 @@ public class S3KeyGenerator extends BaseFreonGenerator
       throw new IllegalArgumentException(
           "Size of multipart upload parts should be at least 5MB (5242880)");
     }
-    init();
 
-    AmazonS3ClientBuilder amazonS3ClientBuilder =
-        AmazonS3ClientBuilder.standard()
-            .withCredentials(new EnvironmentVariableCredentialsProvider());
-
-    if (endpoint.length() > 0) {
-      amazonS3ClientBuilder
-          .withPathStyleAccessEnabled(true)
-          .withEndpointConfiguration(
-              new EndpointConfiguration(endpoint, "us-east-1"));
-
-    } else {
-      amazonS3ClientBuilder.withRegion(Regions.DEFAULT_REGION);
-    }
-
-    s3 = amazonS3ClientBuilder.build();
+    s3ClientInit();
 
     content = RandomStringUtils.randomAscii(fileSize);
 
@@ -139,7 +116,7 @@ public class S3KeyGenerator extends BaseFreonGenerator
             new InitiateMultipartUploadRequest(bucketName, keyName);
 
         final InitiateMultipartUploadResult initiateMultipartUploadResult =
-            s3.initiateMultipartUpload(initiateRequest);
+            getS3().initiateMultipartUpload(initiateRequest);
         final String uploadId = initiateMultipartUploadResult.getUploadId();
 
         List<PartETag> parts = new ArrayList<>();
@@ -156,16 +133,16 @@ public class S3KeyGenerator extends BaseFreonGenerator
                   StandardCharsets.UTF_8)));
 
           final UploadPartResult uploadPartResult =
-              s3.uploadPart(uploadPartRequest);
+                  getS3().uploadPart(uploadPartRequest);
           parts.add(uploadPartResult.getPartETag());
         }
 
-        s3.completeMultipartUpload(
+        getS3().completeMultipartUpload(
             new CompleteMultipartUploadRequest(bucketName, keyName, uploadId,
                 parts));
 
       } else {
-        s3.putObject(bucketName, generateObjectName(counter),
+        getS3().putObject(bucketName, generateObjectName(counter),
             content);
       }
 
