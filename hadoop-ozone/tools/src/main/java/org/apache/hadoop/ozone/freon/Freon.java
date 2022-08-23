@@ -52,6 +52,7 @@ import picocli.CommandLine.Option;
         HadoopFsValidator.class,
         SameKeyReader.class,
         S3KeyGenerator.class,
+        S3BucketGenerator.class,
         DatanodeChunkGenerator.class,
         DatanodeChunkValidator.class,
         DatanodeBlockPutter.class,
