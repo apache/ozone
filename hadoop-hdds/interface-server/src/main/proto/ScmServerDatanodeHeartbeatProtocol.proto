@@ -482,7 +482,7 @@ message CRLStatusReport {
 
 message DiskBalancerReportProto {
   required bool isRunning = 1;
-  optional int64 balancedBytes = 2;
+  optional uint64 balancedBytes = 2;
   optional DiskBalancerConfigurationProto diskBalancerConf = 3;
 }
 

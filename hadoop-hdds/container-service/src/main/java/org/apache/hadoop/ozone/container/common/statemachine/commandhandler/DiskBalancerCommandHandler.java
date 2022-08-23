@@ -105,7 +105,7 @@ public class DiskBalancerCommandHandler implements CommandHandler {
     // Todo: add implementation to stop DiskBalancer
   }
 
-  private void updateDiskBalancerConfiguration(DiskBalancerConfiguration
+  private void updateDiskBalancer(DiskBalancerConfiguration
       configuration) {
     // Todo: add implementation to update diskBalancer configuration
   }

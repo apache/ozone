@@ -53,7 +53,8 @@ public class DiskBalancerReportPublisher extends
       Preconditions.checkState(
           heartbeatFrequency <= diskBalancerReportInterval,
               HDDS_DISK_BALANCER_REPORT_INTERVAL +
-              " cannot be configured lower than heartbeat frequency.");
+              " cannot be configured lower than heartbeat frequency " +
+                  heartbeatFrequency + ".");
     }
     return diskBalancerReportInterval;
   }
