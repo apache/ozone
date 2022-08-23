@@ -25,7 +25,7 @@ import org.rocksdb.Slice;
  */
 public class ManagedSlice extends Slice {
 
-  public ManagedSlice(String var1) {
+  public ManagedSlice(byte[] var1) {
     super(var1);
   }
 

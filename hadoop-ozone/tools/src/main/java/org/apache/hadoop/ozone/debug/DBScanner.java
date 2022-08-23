@@ -268,8 +268,9 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
             dnDBSchemaVersion.equals("V3")) {
           ManagedReadOptions readOptions = new ManagedReadOptions();
           readOptions.setIterateUpperBound(new ManagedSlice(
-              DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
-                  containerId + 1)));
+              FixedLengthStringUtils.string2Bytes(
+                  DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
+                  containerId + 1))));
           iterator = new ManagedRocksIterator(
               rocksDB.get().newIterator(columnFamilyHandle, readOptions));
           iterator.get().seek(FixedLengthStringUtils.string2Bytes(
