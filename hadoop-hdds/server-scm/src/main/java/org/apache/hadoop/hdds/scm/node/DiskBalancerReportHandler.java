@@ -58,7 +58,7 @@ public class DiskBalancerReportHandler implements
       diskBalancerManager.processDiskBalancerReport(
           diskBalancerReportProto, dn);
     } catch (Exception e) {
-      LOGGER.error("Could not process diskBalancer report={} from dn={}.",
+      LOGGER.error("Failed to process diskBalancer report={} from dn={}.",
           diskBalancerReportProto, dn, e);
     }
   }

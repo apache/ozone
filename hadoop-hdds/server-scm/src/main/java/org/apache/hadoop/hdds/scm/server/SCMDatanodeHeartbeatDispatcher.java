@@ -54,6 +54,7 @@ import java.util.UUID;
 
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.DISK_BALANCER_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents
     .INCREMENTAL_CONTAINER_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
@@ -207,10 +208,10 @@ public final class SCMDatanodeHeartbeatDispatcher {
       if (heartbeat.hasDiskBalancerReport()) {
         LOG.debug("Dispatching DiskBalancer Report.");
         eventPublisher.fireEvent(
-            PIPELINE_ACTIONS,
-            new PipelineActionsFromDatanode(
+            DISK_BALANCER_REPORT,
+            new DiskBalancerReportFromDatanode(
                 datanodeDetails,
-                heartbeat.getPipelineActions()));
+                heartbeat.getDiskBalancerReport()));
       }
     }
 
