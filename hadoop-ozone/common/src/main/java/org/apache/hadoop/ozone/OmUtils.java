@@ -554,6 +554,10 @@ public final class OmUtils {
    */
   public static void validateSnapshotName(String snapshotName)
       throws OMException {
+    // allow null name, for when user wants generated name
+    if (snapshotName == null) {
+      return;
+    }
     try {
       HddsClientUtils.verifyResourceName(snapshotName);
     } catch (IllegalArgumentException e) {

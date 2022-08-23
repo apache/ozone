@@ -49,6 +49,7 @@ import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
 
 
 /**
@@ -122,8 +123,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
               volumeName, bucketName);
 
       acquiredSnapshotLock =
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              volumeName, snapshotInfo.getSnapshotLockResourceName());
+          omMetadataManager.getLock().acquireWriteLock(SNAPSHOT_LOCK,
+              volumeName, bucketName);
 
       //Check if snapshot already exists
       if (omMetadataManager.getSnapshotInfoTable().isExist(key)) {
@@ -148,8 +149,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredSnapshotLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            snapshotInfo.getSnapshotLockResourceName());
+        omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK, volumeName,
+            bucketName);
       }
       if (acquiredBucketLock) {
         omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,

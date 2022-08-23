@@ -91,9 +91,8 @@ public final class SnapshotInfo implements Auditable {
     }
   }
 
-  public static final String SNAPSHOT_FLAG = "snapshot";
   private static final String SEPARATOR = "-";
-  private static final long UNDELETED_TIME = -1;
+  private static final long INVALID_TIMESTAMP = -1;
   private static final String INITIAL_SNAPSHOT_ID =
       UUID.randomUUID().toString();
     
@@ -389,13 +388,6 @@ public final class SnapshotInfo implements Auditable {
 
     return osib.build();
   }
-  /**
-   * Get the name of the lock resource for this snapshot.
-   */
-  public String getSnapshotLockResourceName() {
-    return getBucketName() + OM_KEY_PREFIX + SNAPSHOT_FLAG;
-  }
-
   @Override
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -451,7 +443,7 @@ public final class SnapshotInfo implements Auditable {
     builder.setSnapshotID(id)
         .setName(snapshotName)
         .setCreationTime(initialTime)
-        .setDeletionTime(UNDELETED_TIME)
+        .setDeletionTime(INVALID_TIMESTAMP)
         .setPathPreviousSnapshotID(INITIAL_SNAPSHOT_ID)
         .setGlobalPreviousSnapshotID(INITIAL_SNAPSHOT_ID)
         .setSnapshotPath(volumeName + OM_KEY_PREFIX + bucketName)
