@@ -124,7 +124,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
       acquiredSnapshotLock =
           omMetadataManager.getLock().acquireWriteLock(SNAPSHOT_LOCK,
-              volumeName, bucketName);
+              volumeName, bucketName, snapshotName);
 
       //Check if snapshot already exists
       if (omMetadataManager.getSnapshotInfoTable().isExist(key)) {
@@ -150,7 +150,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           ozoneManagerDoubleBufferHelper);
       if (acquiredSnapshotLock) {
         omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK, volumeName,
-            bucketName);
+            bucketName, snapshotName);
       }
       if (acquiredBucketLock) {
         omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,

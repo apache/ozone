@@ -251,16 +251,15 @@ public class OzoneManagerLock {
    * @param resources
    */
   public String generateResourceName(Resource resource, String... resources) {
-    if (resources.length == 1 && resource != Resource.BUCKET_LOCK
-        && resource != Resource.SNAPSHOT_LOCK) {
+    if (resources.length == 1 && resource != Resource.BUCKET_LOCK) {
       return OzoneManagerLockUtil.generateResourceLockName(resource,
           resources[0]);
     } else if (resources.length == 2 && resource == Resource.BUCKET_LOCK) {
       return OzoneManagerLockUtil.generateBucketLockName(resources[0],
           resources[1]);
-    } else if (resources.length == 2 && resource == Resource.SNAPSHOT_LOCK) {
+    } else if (resources.length == 3 && resource == Resource.SNAPSHOT_LOCK) {
       return OzoneManagerLockUtil.generateSnapshotLockName(resources[0],
-          resources[1]);
+          resources[1], resources[2]);
     } else if (resources.length == 3 && resource == Resource.KEY_PATH_LOCK) {
       return OzoneManagerLockUtil.generateKeyPathLockName(resources[0],
           resources[1], resources[2]);

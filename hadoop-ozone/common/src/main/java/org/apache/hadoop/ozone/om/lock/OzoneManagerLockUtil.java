@@ -78,9 +78,9 @@ final class OzoneManagerLockUtil {
    * @param bucketName
    */
   public static String generateSnapshotLockName(String volumeName,
-      String bucketName) {
+      String bucketName, String snapshotName) {
     return generateBucketLockName(volumeName, bucketName) +
-        OM_KEY_PREFIX + OM_SNAPSHOT_INDICATOR;
+        OM_KEY_PREFIX + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX + snapshotName;
   }
 
   /**
