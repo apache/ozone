@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
@@ -118,12 +119,12 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
               .fromPersistedFormat(iterator.get().key());
           Gson gson = new GsonBuilder().setPrettyPrinting().create();
           if (schemaV3) {
-            String containerId = ((String)key).substring(0,
-                DatanodeSchemaThreeDBDefinition.getContainerKeyPrefixLength());
-            String blockId = ((String)key).substring(
-                DatanodeSchemaThreeDBDefinition.getContainerKeyPrefixLength());
-            result.append(gson.toJson(
-                Longs.fromByteArray(containerId.getBytes()) + ": " + blockId));
+            int index =
+                DatanodeSchemaThreeDBDefinition.getContainerKeyPrefixLength();
+            String cid = ((String)key).substring(0, index);
+            String blockId = ((String)key).substring(index);
+            result.append(gson.toJson(Longs.fromByteArray(
+                FixedLengthStringUtils.string2Bytes(cid)) + ": " + blockId));
           } else {
             result.append(gson.toJson(key));
           }
@@ -265,24 +266,21 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         ManagedRocksIterator iterator;
         if (containerId > 0 && dnDBSchemaVersion != null &&
             dnDBSchemaVersion.equals("V3")) {
-          ManagedReadOptions read_options = new ManagedReadOptions();
-          read_options.setIterateUpperBound(new ManagedSlice(
+          ManagedReadOptions readOptions = new ManagedReadOptions();
+          readOptions.setIterateUpperBound(new ManagedSlice(
               DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
-                  containerId + 1).getBytes()));
+                  containerId + 1)));
           iterator = new ManagedRocksIterator(
-              rocksDB.get().newIterator(columnFamilyHandle, read_options));
-          iterator.get().seek((DatanodeSchemaThreeDBDefinition
-              .getContainerKeyPrefix(containerId)).getBytes());
+              rocksDB.get().newIterator(columnFamilyHandle, readOptions));
+          iterator.get().seek(FixedLengthStringUtils.string2Bytes(
+              DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
+                  containerId)));
         } else {
           iterator = new ManagedRocksIterator(
               rocksDB.get().newIterator(columnFamilyHandle));
           iterator.get().seekToFirst();
         }
-        try {
-          scannedObjects = displayTable(iterator, columnFamilyDefinition);
-        } catch (Throwable e) {
-          e.printStackTrace();
-        }
+        scannedObjects = displayTable(iterator, columnFamilyDefinition);
       }
     } else {
       System.out.println("Incorrect db Path");

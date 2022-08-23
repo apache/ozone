@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -283,7 +284,7 @@ public class TestLDBCli {
     for (int j = 1; j <= blockCount; j++, blockId++) {
       String key = String.valueOf(blockId);
       BlockData blockData = new BlockData(new BlockID(cid, blockId));
-      blockTable.put(key.getBytes(),
+      blockTable.put(StringUtils.string2Bytes(key),
           blockData.getProtoBufMessage().toByteArray());
     }
 
