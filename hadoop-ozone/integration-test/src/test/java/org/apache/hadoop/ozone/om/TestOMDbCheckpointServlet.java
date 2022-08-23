@@ -223,7 +223,7 @@ public class TestOMDbCheckpointServlet {
         om.getMetrics().getDBCheckpointMetrics(),
         om.getAclsEnabled(),
         allowedUsers,
-        Collections.emptyList(),
+        Collections.emptySet(),
         om.isSpnegoEnabled());
 
     omDbCheckpointServletMock.init();

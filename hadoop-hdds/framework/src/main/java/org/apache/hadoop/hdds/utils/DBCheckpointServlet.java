@@ -66,7 +66,7 @@ public class DBCheckpointServlet extends HttpServlet {
 
   private boolean aclEnabled;
   private boolean isSpnegoEnabled;
-  private transient OzoneAdmins allowedUsers;
+  private transient OzoneAdmins admins;
 
   public void initialize(DBStore store, DBCheckpointMetrics metrics,
                          boolean omAclEnabled,
@@ -83,7 +83,7 @@ public class DBCheckpointServlet extends HttpServlet {
     }
 
     this.aclEnabled = omAclEnabled;
-    this.allowedUsers = new OzoneAdmins(allowedAdminUsers, allowedAdminGroups);
+    this.admins = new OzoneAdmins(allowedAdminUsers, allowedAdminGroups);
     this.isSpnegoEnabled = isSpnegoAuthEnabled;
   }
 
@@ -91,7 +91,7 @@ public class DBCheckpointServlet extends HttpServlet {
     // Check ACL for dbCheckpoint only when global Ozone ACL and SPNEGO is
     // enabled
     if (aclEnabled && isSpnegoEnabled) {
-      return allowedUsers.isAdmin(user);
+      return admins.isAdmin(user);
     } else {
       return true;
     }
