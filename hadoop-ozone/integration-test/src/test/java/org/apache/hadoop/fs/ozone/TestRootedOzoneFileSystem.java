@@ -392,10 +392,10 @@ public class TestRootedOzoneFileSystem {
   public void testListStatusIterator() throws Exception {
     OzoneBucket bucket =
             TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
-    String volumeName = bucket.getVolumeName();
-    Path volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
-    String bucketName = bucket.getName();
-    Path bucketPath = new Path(volumePath, bucketName);
+    volumeName = bucket.getVolumeName();
+    volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
+    bucketName = bucket.getName();
+    bucketPath = new Path(volumePath, bucketName);
 
     Path parent = new Path(bucketPath, "testListStatusIterator");
     // Iterator should have no items when dir is empty
