@@ -139,7 +139,7 @@ public class TestAuthorizerLockImpl {
     Assert.assertFalse(authorizerLock.isWriteLockHeldByCurrentThread());
 
     // Read lock does not affect the check
-    long readLockStamp = authorizerLock.tryReadLockThrowOnTimeout();
+    long readLockStamp = authorizerLock.tryOptimisticReadThrowOnTimeout();
     Assert.assertFalse(authorizerLock.isWriteLockHeldByCurrentThread());
     authorizerLock.unlockRead(readLockStamp);
 
