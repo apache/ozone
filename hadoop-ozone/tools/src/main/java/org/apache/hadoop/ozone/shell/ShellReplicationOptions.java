@@ -28,7 +28,7 @@ public class ShellReplicationOptions extends ReplicationOptions {
   @Option(names = {"-t", "--type", "--replication-type"},
       description = "Replication type. Supported types are: RATIS, EC")
   @Override
-  public void setType(ReplicationType type) {
+  public void setType(String type) {
     super.setType(type);
   }
 }

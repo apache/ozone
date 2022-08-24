@@ -132,13 +132,14 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     if (statMBeanName != null) {
       MBeans.unregister(statMBeanName);
       statMBeanName = null;
     }
 
     RDBMetrics.unRegister();
+    checkPointManager.close();
     db.close();
   }
 
@@ -263,7 +264,7 @@ public class RDBStore implements DBStore {
   }
 
   public Collection<ColumnFamily> getColumnFamilies() {
-    return db.getColumnFamilies();
+    return db.getExtraColumnFamilies();
   }
 
   @Override

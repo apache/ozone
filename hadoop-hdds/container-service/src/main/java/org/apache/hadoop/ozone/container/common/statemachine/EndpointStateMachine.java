@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
+import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB
     .StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.slf4j.Logger;
@@ -55,6 +56,10 @@ public class EndpointStateMachine
   private ZonedDateTime lastSuccessfulHeartbeat;
   private boolean isPassive;
   private final ExecutorService executorService;
+
+  private static final String RECON_TYPE = "Recon";
+
+  private static final String SCM_TYPE = "SCM";
 
   /**
    * Constructs RPC Endpoints.
@@ -340,5 +345,14 @@ public class EndpointStateMachine
   public void setLastSuccessfulHeartbeat(
       ZonedDateTime lastSuccessfulHeartbeat) {
     this.lastSuccessfulHeartbeat = lastSuccessfulHeartbeat;
+  }
+
+  @Override
+  public String getType() {
+    if (endPoint.getUnderlyingProxyObject()
+            instanceof ReconDatanodeProtocolPB) {
+      return RECON_TYPE;
+    }
+    return SCM_TYPE;
   }
 }

@@ -177,12 +177,26 @@ public interface ReplicationConfig {
     ReplicationConfig replicationConfig;
     switch (type) {
     case RATIS:
+    case STAND_ALONE:
+      ReplicationFactor factor;
+      try {
+        factor = ReplicationFactor.valueOf(Integer.parseInt(replication));
+      } catch (NumberFormatException ex) {
+        try {
+          factor = ReplicationFactor.valueOf(replication);
+        } catch (IllegalArgumentException e) {
+          throw new IllegalArgumentException(replication +
+                  " is not supported for " + type + " replication type", e);
+        }
+      }
+      replicationConfig = fromTypeAndFactor(type, factor);
+      break;
     case EC:
       replicationConfig = new ECReplicationConfig(replication);
       break;
     default:
-      throw new RuntimeException("Replication type " + type + " can not "
-          + "be parsed.");
+      throw new IllegalArgumentException("Replication type " + type +
+              " can not be parsed.");
     }
 
     ReplicationConfigValidator validator =
