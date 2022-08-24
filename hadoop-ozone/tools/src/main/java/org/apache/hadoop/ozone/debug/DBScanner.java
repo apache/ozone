@@ -121,8 +121,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           if (schemaV3) {
             int index =
                 DatanodeSchemaThreeDBDefinition.getContainerKeyPrefixLength();
-            String cid = ((String)key).substring(0, index);
-            String blockId = ((String)key).substring(index);
+            String cid = key.toString().substring(0, index);
+            String blockId = key.toString().substring(index);
             result.append(gson.toJson(Longs.fromByteArray(
                 FixedLengthStringUtils.string2Bytes(cid)) + ": " + blockId));
           } else {

@@ -21,7 +21,7 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.rocksdb.Slice;
 
 /**
- * Managed Options.
+ * Managed Slice.
  */
 public class ManagedSlice extends Slice {
 

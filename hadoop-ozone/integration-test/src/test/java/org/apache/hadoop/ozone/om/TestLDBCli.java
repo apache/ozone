@@ -56,7 +56,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
- * This class tests the Debug LDB CLI that reads from an om.db file.
+ * This class tests the Debug LDB CLI that reads from rocks db file.
  */
 public class TestLDBCli {
   private OzoneConfiguration conf;
@@ -237,7 +237,7 @@ public class TestLDBCli {
       dbScanner.call();
       // Assert that output has info for container 2 block 4
       Assert.assertTrue(capture.getOutput().contains("2: 4"));
-      // Assert that output doesn't have info for container 1 block 1
+      // Assert that output has info for container 1 block 1
       Assert.assertTrue(capture.getOutput().contains("1: 1"));
     }
 
@@ -246,9 +246,9 @@ public class TestLDBCli {
     try (GenericTestUtils.SystemOutCapturer capture =
              new GenericTestUtils.SystemOutCapturer()) {
       dbScanner.call();
-      // Assert that output has info for container 2 block 4
+      // Assert that output doesn't have info for container 2 block 4
       Assert.assertFalse(capture.getOutput().contains("2: 4"));
-      // Assert that output doesn't have info for container 1 block 1
+      // Assert that output has info for container 1 block 1
       Assert.assertTrue(capture.getOutput().contains("1: 1"));
     }
 
