@@ -111,9 +111,9 @@ public class ReconContainerMetadataManagerImpl
       for (Map.Entry<ContainerKeyPrefix, Integer> entry :
           containerKeyPrefixCounts.entrySet()) {
         containerKeyTable.put(entry.getKey(), entry.getValue());
-        tmpKeyPreifxContainer = entry.getKey().toKeyPrefixContainer();
-        if (tmpKeyPreifxContainer != null) {
-          keyContainerTable.put(tmpKeyPreifxContainer, entry.getValue());
+        tmpKeyPrefixContainer = entry.getKey().toKeyPrefixContainer();
+        if (tmpKeyPrefixContainer != null) {
+          keyContainerTable.put(tmpKeyPrefixContainer, entry.getValue());
         }
       }
     }
@@ -561,49 +561,51 @@ public class ReconContainerMetadataManagerImpl
       String keyPrefix, long keyVersion) throws IOException {
 
     Map<KeyPrefixContainer, Integer> containers = new LinkedHashMap<>();
-    TableIterator<KeyPrefixContainer, ? extends KeyValue<KeyPrefixContainer,
-        Integer>> keyIterator = keyContainerTable.iterator();
-    KeyPrefixContainer seekKey;
-    if (keyVersion != -1) {
-      seekKey = new KeyPrefixContainer(keyPrefix, keyVersion);
-    } else {
-      seekKey = new KeyPrefixContainer(keyPrefix);
-    }
-    KeyValue<KeyPrefixContainer, Integer> seekKeyValue =
-        keyIterator.seek(seekKey);
-
-    // check if RocksDB was able to seek correctly to the given key prefix
-    // if not, then return empty result
-    // In case of an empty prevKeyPrefix, all the keys in the container are
-    // returned
-    if (seekKeyValue == null ||
-        (keyVersion != -1 &&
-            seekKeyValue.getKey().getKeyVersion() != keyVersion)) {
-      return containers;
-    }
-
-    while (keyIterator.hasNext()) {
-      KeyValue<KeyPrefixContainer, Integer> keyValue = keyIterator.next();
-      KeyPrefixContainer keyPrefixContainer = keyValue.getKey();
-
-      // The prefix seek only guarantees that the iterator's head will be
-      // positioned at the first prefix match. We still have to check the key
-      // prefix.
-      if (keyPrefixContainer.getKeyPrefix().equals(keyPrefix)) {
-        if (keyPrefixContainer.getContainerId() != -1 &&
-            (keyVersion == -1 ||
-            keyPrefixContainer.getKeyVersion() == keyVersion)) {
-          containers.put(new KeyPrefixContainer(keyPrefix,
-                  keyPrefixContainer.getKeyVersion(),
-                  keyPrefixContainer.getContainerId()),
-              keyValue.getValue());
-        } else {
-          LOG.warn("Null container returned for keyPrefix = {}," +
-                  " keyVersion = {} ", keyPrefix, keyVersion);
-        }
+    try (TableIterator<KeyPrefixContainer,
+        ? extends KeyValue<KeyPrefixContainer, Integer>> keyIterator =
+             keyContainerTable.iterator()) {
+      KeyPrefixContainer seekKey;
+      if (keyVersion != -1) {
+        seekKey = new KeyPrefixContainer(keyPrefix, keyVersion);
       } else {
-        // Break on first mismatch
-        break;
+        seekKey = new KeyPrefixContainer(keyPrefix);
+      }
+      KeyValue<KeyPrefixContainer, Integer> seekKeyValue =
+          keyIterator.seek(seekKey);
+
+      // check if RocksDB was able to seek correctly to the given key prefix
+      // if not, then return empty result
+      // In case of an empty prevKeyPrefix, all the keys in the container are
+      // returned
+      if (seekKeyValue == null ||
+          (keyVersion != -1 &&
+              seekKeyValue.getKey().getKeyVersion() != keyVersion)) {
+        return containers;
+      }
+
+      while (keyIterator.hasNext()) {
+        KeyValue<KeyPrefixContainer, Integer> keyValue = keyIterator.next();
+        KeyPrefixContainer keyPrefixContainer = keyValue.getKey();
+
+        // The prefix seek only guarantees that the iterator's head will be
+        // positioned at the first prefix match. We still have to check the key
+        // prefix.
+        if (keyPrefixContainer.getKeyPrefix().equals(keyPrefix)) {
+          if (keyPrefixContainer.getContainerId() != -1 &&
+              (keyVersion == -1 ||
+                  keyPrefixContainer.getKeyVersion() == keyVersion)) {
+            containers.put(new KeyPrefixContainer(keyPrefix,
+                    keyPrefixContainer.getKeyVersion(),
+                    keyPrefixContainer.getContainerId()),
+                keyValue.getValue());
+          } else {
+            LOG.warn("Null container returned for keyPrefix = {}," +
+                " keyVersion = {} ", keyPrefix, keyVersion);
+          }
+        } else {
+          // Break on first mismatch
+          break;
+        }
       }
     }
     return containers;

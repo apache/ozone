@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
+import java.util.Objects;
+
 /**
  * Class to encapsulate the Key information needed for the Recon container DB.
  * Currently, it is the whole key + key version and the containerId.
@@ -93,8 +95,7 @@ public class KeyPrefixContainer {
 
   @Override
   public int hashCode() {
-    return Long.valueOf(containerId).hashCode() + 13 * keyPrefix.hashCode() +
-        17 * Long.valueOf(keyVersion).hashCode();
+    return Objects.hash(containerId, keyPrefix, keyPrefix);
   }
 
 }
