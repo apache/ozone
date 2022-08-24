@@ -103,7 +103,9 @@ public class RDBStore implements DBStore {
       if (!checkpointsDir.exists()) {
         boolean success = checkpointsDir.mkdir();
         if (!success) {
-          LOG.warn("Unable to create RocksDB checkpoint directory");
+          throw new IOException(
+              "Unable to create RocksDB checkpoint directory: " +
+              checkpointsParentDir);
         }
       }
 
@@ -114,7 +116,9 @@ public class RDBStore implements DBStore {
       if (!snapshotsDir.exists()) {
         boolean success = snapshotsDir.mkdir();
         if (!success) {
-          LOG.warn("Unable to create RocksDB snapshot directory");
+          throw new IOException(
+              "Unable to create RocksDB snapshot directory: " +
+              snapshotsParentDir);
         }
       }
 
