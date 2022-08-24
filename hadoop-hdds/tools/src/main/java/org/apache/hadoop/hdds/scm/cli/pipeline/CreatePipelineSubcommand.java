@@ -61,7 +61,8 @@ public class CreatePipelineSubcommand extends ScmSubcommand {
     // version here from ScmInfo response.
     // As I see there is no way to specify ECReplicationConfig properly here
     // so failing the request if type is EC, seems to be safe.
-    if (type == HddsProtos.ReplicationType.EC) {
+    if (type == HddsProtos.ReplicationType.CHAINED
+            || type == HddsProtos.ReplicationType.EC) {
       throw new IllegalArgumentException(type.name()
           + " is not supported yet.");
     }
