@@ -107,7 +107,7 @@ public class ReconContainerMetadataManagerImpl
     initializeTables();
 
     if (containerKeyPrefixCounts != null) {
-      KeyPrefixContainer tmpKeyPreifxContainer;
+      KeyPrefixContainer tmpKeyPrefixContainer;
       for (Map.Entry<ContainerKeyPrefix, Integer> entry :
           containerKeyPrefixCounts.entrySet()) {
         containerKeyTable.put(entry.getKey(), entry.getValue());
