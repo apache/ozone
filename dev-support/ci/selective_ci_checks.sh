@@ -163,6 +163,8 @@ function filter_changed_files() {
 }
 
 SOURCES_TRIGGERING_TESTS=(
+    "^.github"
+    "^dev-support"
     "^hadoop-hdds"
     "^hadoop-ozone"
     "^pom.xml"
@@ -190,9 +192,12 @@ function check_if_tests_are_needed_at_all() {
 function run_all_tests_if_environment_files_changed() {
     start_end::group_start "Check if everything should be run"
     local pattern_array=(
-        "^.github/workflows/"
+        "^.github/workflows/post-commit.yml"
         "^dev-support/ci"
         "^hadoop-ozone/dev-support/checks/_lib.sh"
+    )
+    local ignore_array=(
+        "^dev-support/ci/pr_title_check"
     )
     filter_changed_files
 
@@ -451,6 +456,8 @@ function check_needs_unit_test() {
 function get_count_misc_files() {
     start_end::group_start "Count misc. files"
     local pattern_array=(
+        "^dev-support/ci/pr_title_check"
+        "^.github"
         "^hadoop-hdds/dev-support/checkstyle"
         "^hadoop-ozone/dev-support/checks"
         "^hadoop-ozone/dist/src/main/license"
@@ -460,6 +467,7 @@ function get_count_misc_files() {
         "findbugsExcludeFile.xml"
     )
     local ignore_array=(
+        "^.github/workflows/post-commit.yml"
         "^hadoop-ozone/dev-support/checks/_mvn_unit_report.sh"
         "^hadoop-ozone/dev-support/checks/acceptance.sh"
         "^hadoop-ozone/dev-support/checks/integration.sh"

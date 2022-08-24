@@ -164,6 +164,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authe
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantState;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.protocolPB.OMInterServiceProtocolServerSideImpl;
 import org.apache.hadoop.ozone.protocolPB.OMAdminProtocolServerSideImpl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
@@ -408,7 +409,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static boolean testReloadConfigFlag = false;
   private static boolean testSecureOmFlag = false;
 
-  private OzoneLockProvider ozoneLockProvider;
+  private final OzoneLockProvider ozoneLockProvider;
 
   /**
    * OM Startup mode.
@@ -528,6 +529,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // verifies that the SCM info in the OM Version file is correct.
     scmBlockClient = getScmBlockClient(configuration);
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient);
+    this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
+        getEnableFileSystemPaths());
 
     // For testing purpose only, not hit scm from om as Hadoop UGI can't login
     // two principals in the same JVM.
@@ -1543,9 +1546,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (omState == State.BOOTSTRAPPING) {
       bootstrap(omNodeDetails);
     }
-
-    ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
-        getEnableFileSystemPaths());
 
     omState = State.RUNNING;
   }
@@ -3172,32 +3172,33 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // are flushed to the table. This should be acceptable for a list tenant
     // request.
 
-    final TableIterator<String, ? extends KeyValue<String, OmDBTenantState>>
-        iterator = tenantStateTable.iterator();
+    try (TableIterator<String, ? extends KeyValue<String, OmDBTenantState>>
+        iterator = tenantStateTable.iterator()) {
 
-    final List<TenantState> tenantStateList = new ArrayList<>();
+      final List<TenantState> tenantStateList = new ArrayList<>();
 
-    // Iterate table
-    while (iterator.hasNext()) {
-      final Table.KeyValue<String, OmDBTenantState> dbEntry = iterator.next();
-      final String tenantId = dbEntry.getKey();
-      final OmDBTenantState omDBTenantState = dbEntry.getValue();
-      assert (tenantId.equals(omDBTenantState.getTenantId()));
-      tenantStateList.add(TenantState.newBuilder()
-          .setTenantId(omDBTenantState.getTenantId())
-          .setBucketNamespaceName(omDBTenantState.getBucketNamespaceName())
-          .setUserRoleName(omDBTenantState.getUserRoleName())
-          .setAdminRoleName(omDBTenantState.getAdminRoleName())
-          .setBucketNamespacePolicyName(
-              omDBTenantState.getBucketNamespacePolicyName())
-          .setBucketPolicyName(omDBTenantState.getBucketPolicyName())
-          .build());
+      // Iterate table
+      while (iterator.hasNext()) {
+        final Table.KeyValue<String, OmDBTenantState> dbEntry = iterator.next();
+        final String tenantId = dbEntry.getKey();
+        final OmDBTenantState omDBTenantState = dbEntry.getValue();
+        assert (tenantId.equals(omDBTenantState.getTenantId()));
+        tenantStateList.add(TenantState.newBuilder()
+            .setTenantId(omDBTenantState.getTenantId())
+            .setBucketNamespaceName(omDBTenantState.getBucketNamespaceName())
+            .setUserRoleName(omDBTenantState.getUserRoleName())
+            .setAdminRoleName(omDBTenantState.getAdminRoleName())
+            .setBucketNamespacePolicyName(
+                omDBTenantState.getBucketNamespacePolicyName())
+            .setBucketPolicyName(omDBTenantState.getBucketPolicyName())
+            .build());
+      }
+
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          OMAction.LIST_TENANT, new LinkedHashMap<>()));
+
+      return new TenantStateList(tenantStateList);
     }
-
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-        OMAction.LIST_TENANT, new LinkedHashMap<>()));
-
-    return new TenantStateList(tenantStateList);
   }
 
   /**
@@ -4463,6 +4464,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public boolean isOmRpcServerRunning() {
     return isOmRpcServerRunning;
   }
+
+  @Override
+  public EchoRPCResponse echoRPCReq(byte[] payloadReq,
+                                    int payloadSizeResp)
+          throws IOException {
+    return null;
+  }
+
   /**
    * Write down Layout version of a finalized feature to DB on finalization.
    * @param lvm OMLayoutVersionManager

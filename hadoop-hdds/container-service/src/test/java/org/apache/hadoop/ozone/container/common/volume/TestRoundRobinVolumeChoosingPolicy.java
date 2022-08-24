@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +31,8 @@ import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
 import static org.apache.ozone.test.GenericTestUtils.getTestDir;
+import static org.junit.Assert.assertTrue;
+
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -70,6 +71,7 @@ public class TestRoundRobinVolumeChoosingPolicy {
         .conf(CONF)
         .usageCheckFactory(factory2)
         .build();
+    vol2.incCommittedBytes(50);
 
     volumes.add(vol1);
     volumes.add(vol2);
@@ -97,29 +99,18 @@ public class TestRoundRobinVolumeChoosingPolicy {
     // The first volume has only 100L space, so the policy should
     // choose the second one in case we ask for more.
     Assert.assertEquals(hddsVolume2,
-        policy.chooseVolume(volumes, 150));
-
-    // Fail if no volume has enough space available
-    try {
-      policy.chooseVolume(volumes, Long.MAX_VALUE);
-      Assert.fail();
-    } catch (IOException e) {
-      // Passed.
-    }
+        policy.chooseVolume(volumes, 120));
   }
 
   @Test
-  public void testRRPolicyExceptionMessage() throws Exception {
-    int blockSize = 300;
-    try {
-      policy.chooseVolume(volumes, blockSize);
-      Assert.fail("expected to throw DiskOutOfSpaceException");
-    } catch (DiskOutOfSpaceException e) {
-      Assert.assertEquals("Not returning the expected message",
-          "Out of space: The volume with the most available space (=" + 200
-              + " B) is less than the container size (=" + blockSize + " B).",
-          e.getMessage());
-    }
+  public void throwsDiskOutOfSpaceIfRequestMoreThanAvailable() {
+    Exception e = Assert.assertThrows(DiskOutOfSpaceException.class,
+        () -> policy.chooseVolume(volumes, 300));
+
+    String msg = e.getMessage();
+    assertTrue(msg,
+        msg.contains("No volumes have enough space for a new container.  " +
+            "Most available space: 150 bytes"));
   }
 
 }

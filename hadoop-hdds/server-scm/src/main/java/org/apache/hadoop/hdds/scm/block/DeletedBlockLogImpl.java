@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.Set;
@@ -181,6 +182,25 @@ public class DeletedBlockLogImpl
     }
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   */
+  @Override
+  public int resetCount(List<Long> txIDs) throws IOException, TimeoutException {
+    lock.lock();
+    try {
+      if (txIDs == null || txIDs.isEmpty()) {
+        txIDs = getFailedTransactions().stream()
+            .map(DeletedBlocksTransaction::getTxID)
+            .collect(Collectors.toList());
+      }
+      return deletedBlockLogStateManager.resetRetryCountOfTransactionInDB(
+          new ArrayList<>(new HashSet<>(txIDs)));
+    } finally {
+      lock.unlock();
+    }
+  }
 
   private DeletedBlocksTransaction constructNewTransaction(
       long txID, long containerID, List<Long> blocks) {

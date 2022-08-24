@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -42,7 +43,10 @@ import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -53,6 +57,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +69,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
@@ -401,6 +407,16 @@ public class ReplicationManager implements SCMService {
       return new ContainerHealthResult.HealthyResult(containerInfo);
     }
 
+    if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED) {
+      List<ContainerReplica> unhealthyReplicas = replicas.stream()
+          .filter(r -> !compareState(containerInfo.getState(), r.getState()))
+          .collect(Collectors.toList());
+
+      if (unhealthyReplicas.size() > 0) {
+        handleUnhealthyReplicas(containerInfo, unhealthyReplicas);
+      }
+    }
+
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerID);
     ContainerHealthResult health = ecContainerHealthCheck
@@ -430,6 +446,67 @@ public class ReplicationManager implements SCMService {
       }
     }
     return health;
+  }
+
+  /**
+   * Handles unhealthy container.
+   * A container is inconsistent if any of the replica state doesn't
+   * match the container state. We have to take appropriate action
+   * based on state of the replica.
+   *
+   * @param container ContainerInfo
+   * @param unhealthyReplicas List of ContainerReplica
+   */
+  private void handleUnhealthyReplicas(final ContainerInfo container,
+      List<ContainerReplica> unhealthyReplicas) {
+    Iterator<ContainerReplica> iterator = unhealthyReplicas.iterator();
+    while (iterator.hasNext()) {
+      final ContainerReplica replica = iterator.next();
+      final ContainerReplicaProto.State state = replica.getState();
+      if (state == State.OPEN || state == State.CLOSING) {
+        sendCloseCommand(container, replica.getDatanodeDetails(), true);
+        iterator.remove();
+      }
+    }
+  }
+
+  /**
+   * Sends close container command for the given container to the given
+   * datanode.
+   *
+   * @param container Container to be closed
+   * @param datanode The datanode on which the container
+   *                  has to be closed
+   * @param force Should be set to true if we want to force close.
+   */
+  private void sendCloseCommand(final ContainerInfo container,
+      final DatanodeDetails datanode, final boolean force) {
+
+    ContainerID containerID = container.containerID();
+    LOG.info("Sending close container command for container {}" +
+        " to datanode {}.", containerID, datanode);
+    CloseContainerCommand closeContainerCommand =
+        new CloseContainerCommand(container.getContainerID(),
+            container.getPipelineID(), force);
+    try {
+      closeContainerCommand.setTerm(scmContext.getTermOfLeader());
+    } catch (NotLeaderException nle) {
+      LOG.warn("Skip sending close container command,"
+          + " since current SCM is not leader.", nle);
+      return;
+    }
+    closeContainerCommand.setEncodedToken(getContainerToken(containerID));
+    eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
+        new CommandForDatanode<>(datanode.getUuid(), closeContainerCommand));
+  }
+
+  private String getContainerToken(ContainerID containerID) {
+    if (scmContext.getScm() instanceof StorageContainerManager) {
+      StorageContainerManager scm =
+          (StorageContainerManager) scmContext.getScm();
+      return scm.getContainerTokenGenerator().generateEncodedToken(containerID);
+    }
+    return ""; // unit test
   }
 
   /**

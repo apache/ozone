@@ -75,7 +75,7 @@ public class UnderReplicatedProcessor {
       try {
         processContainer(underRep);
         processed++;
-      } catch (IOException e) {
+      } catch (Exception e) {
         LOG.error("Error processing under replicated container {}",
             underRep.getContainerInfo(), e);
         failed++;

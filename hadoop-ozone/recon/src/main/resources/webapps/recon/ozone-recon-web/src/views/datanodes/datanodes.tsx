@@ -216,7 +216,7 @@ const COLUMNS = [
       <Icon type='info-circle'/>
     </Tooltip>
   </span>,
-    dataIndex: 'leader Count',
+    dataIndex: 'leaderCount',
     key: 'leaderCount',
     isVisible: true,
     isSearchable: true,

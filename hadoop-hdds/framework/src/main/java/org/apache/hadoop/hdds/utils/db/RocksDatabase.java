@@ -18,24 +18,25 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.rocksdb.Checkpoint;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedFlushOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedIngestExternalFileOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.DBOptions;
-import org.rocksdb.FlushOptions;
 import org.rocksdb.Holder;
-import org.rocksdb.IngestExternalFileOptions;
-import org.rocksdb.Options;
-import org.rocksdb.ReadOptions;
-import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.RocksIterator;
-import org.rocksdb.TransactionLogIterator;
-import org.rocksdb.WriteBatch;
-import org.rocksdb.WriteOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -47,15 +48,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.StringUtils.bytes2String;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions.closeDeeply;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator.managed;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator.managed;
+import static org.rocksdb.RocksDB.listColumnFamilies;
 
 /**
- * A wrapper class for {@link RocksDB}.
+ * A wrapper class for {@link org.rocksdb.RocksDB}.
  * When there is a {@link RocksDBException} with error,
  * this class will close the underlying {@link org.rocksdb.RocksObject}s.
  */
@@ -74,11 +78,20 @@ public final class RocksDatabase {
    *
    * @return a list of column families.
    */
-  private static List<TableConfig> getColumnFamilies(File file)
-      throws RocksDBException {
+  private static List<TableConfig> getExtraColumnFamilies(
+      File file, Set<TableConfig> families) throws RocksDBException {
+
+    // This logic has been added to support old column families that have
+    // been removed, or those that may have been created in a future version.
+    // TODO : Revisit this logic during upgrade implementation.
+    Set<String> existingFamilyNames = families.stream()
+        .map(TableConfig::getName)
+        .collect(Collectors.toSet());
     final List<TableConfig> columnFamilies = listColumnFamiliesEmptyOptions(
         file.getAbsolutePath())
         .stream()
+        .map(TableConfig::toName)
+        .filter(familyName -> !existingFamilyNames.contains(familyName))
         .map(TableConfig::newTableConfig)
         .collect(Collectors.toList());
     if (LOG.isDebugEnabled()) {
@@ -93,38 +106,34 @@ public final class RocksDatabase {
    * @return A list of column family names
    * @throws RocksDBException
    *
-   * @see RocksDB#listColumnFamilies(Options, String)
+   * @see org.rocksdb.RocksDB#listColumnFamilies(org.rocksdb.Options, String)
    */
   public static List<byte[]> listColumnFamiliesEmptyOptions(final String path)
       throws RocksDBException {
-    try (Options emptyOptions = new Options()) {
-      return RocksDB.listColumnFamilies(emptyOptions, path);
+    try (ManagedOptions emptyOptions = new ManagedOptions()) {
+      return listColumnFamilies(emptyOptions, path);
     }
   }
 
-  static RocksDatabase open(File dbFile, DBOptions dbOptions,
-      WriteOptions writeOptions, Set<TableConfig> families,
-      boolean readOnly) throws IOException {
+  static RocksDatabase open(File dbFile, ManagedDBOptions dbOptions,
+        ManagedWriteOptions writeOptions, Set<TableConfig> families,
+        boolean readOnly) throws IOException {
     List<ColumnFamilyDescriptor> descriptors = null;
-    RocksDB db = null;
+    ManagedRocksDB db = null;
     final Map<String, ColumnFamily> columnFamilies = new HashMap<>();
     try {
-      // This logic has been added to support old column families that have
-      // been removed, or those that may have been created in a future version.
-      // TODO : Revisit this logic during upgrade implementation.
-      final Stream<TableConfig> extra = getColumnFamilies(dbFile).stream()
-          .filter(extraColumnFamily(families));
-      descriptors = Stream.concat(families.stream(), extra)
+      final List<TableConfig> extra = getExtraColumnFamilies(dbFile, families);
+      descriptors = Stream.concat(families.stream(), extra.stream())
           .map(TableConfig::getDescriptor)
           .collect(Collectors.toList());
 
       // open RocksDB
       final List<ColumnFamilyHandle> handles = new ArrayList<>();
       if (readOnly) {
-        db = RocksDB.openReadOnly(dbOptions, dbFile.getAbsolutePath(),
+        db = ManagedRocksDB.openReadOnly(dbOptions, dbFile.getAbsolutePath(),
             descriptors, handles);
       } else {
-        db = RocksDB.open(dbOptions, dbFile.getAbsolutePath(),
+        db = ManagedRocksDB.open(dbOptions, dbFile.getAbsolutePath(),
             descriptors, handles);
       }
       // init a column family map.
@@ -141,7 +150,7 @@ public final class RocksDatabase {
   }
 
   private static void close(ColumnFamilyDescriptor d) {
-    runWithTryCatch(() -> d.getOptions().close(), new Object() {
+    runWithTryCatch(() -> closeDeeply(d.getOptions()), new Object() {
       @Override
       public String toString() {
         return d.getClass() + ":" + bytes2String(d.getName());
@@ -150,8 +159,8 @@ public final class RocksDatabase {
   }
 
   private static void close(Map<String, ColumnFamily> columnFamilies,
-      RocksDB db, List<ColumnFamilyDescriptor> descriptors,
-      WriteOptions writeOptions, DBOptions dbOptions) {
+      ManagedRocksDB db, List<ColumnFamilyDescriptor> descriptors,
+      ManagedWriteOptions writeOptions, ManagedDBOptions dbOptions) {
     if (columnFamilies != null) {
       for (ColumnFamily f : columnFamilies.values()) {
         runWithTryCatch(() -> f.getHandle().close(), f);
@@ -182,16 +191,6 @@ public final class RocksDatabase {
     }
   }
 
-  static Predicate<TableConfig> extraColumnFamily(Set<TableConfig> families) {
-    return f -> {
-      if (families.contains(f)) {
-        return false;
-      }
-      LOG.info("Found an extra column family in existing DB: {}", f);
-      return true;
-    };
-  }
-
   public boolean isClosed() {
     return isClosed.get();
   }
@@ -199,18 +198,18 @@ public final class RocksDatabase {
   /**
    * Represents a checkpoint of the db.
    *
-   * @see Checkpoint
+   * @see ManagedCheckpoint
    */
-  final class RocksCheckpoint {
-    private final Checkpoint checkpoint;
+  final class RocksCheckpoint implements Closeable {
+    private final ManagedCheckpoint checkpoint;
 
     private RocksCheckpoint() {
-      this.checkpoint = Checkpoint.create(db);
+      this.checkpoint = ManagedCheckpoint.create(db);
     }
 
     public void createCheckpoint(Path path) throws IOException {
       try {
-        checkpoint.createCheckpoint(path.toString());
+        checkpoint.get().createCheckpoint(path.toString());
       } catch (RocksDBException e) {
         closeOnError(e);
         throw toIOException(this, "createCheckpoint " + path, e);
@@ -219,6 +218,11 @@ public final class RocksDatabase {
 
     public long getLatestSequenceNumber() {
       return RocksDatabase.this.getLatestSequenceNumber();
+    }
+
+    @Override
+    public void close() throws IOException {
+      checkpoint.close();
     }
   }
 
@@ -255,7 +259,7 @@ public final class RocksDatabase {
       return getHandle().getID();
     }
 
-    public void batchDelete(WriteBatch writeBatch, byte[] key)
+    public void batchDelete(ManagedWriteBatch writeBatch, byte[] key)
         throws IOException {
       try {
         writeBatch.delete(getHandle(), key);
@@ -264,7 +268,7 @@ public final class RocksDatabase {
       }
     }
 
-    public void batchPut(WriteBatch writeBatch, byte[] key, byte[] value)
+    public void batchPut(ManagedWriteBatch writeBatch, byte[] key, byte[] value)
         throws IOException {
       try {
         writeBatch.put(getHandle(), key, value);
@@ -280,16 +284,16 @@ public final class RocksDatabase {
   }
 
   private final String name;
-  private final RocksDB db;
-  private final DBOptions dbOptions;
-  private final WriteOptions writeOptions;
+  private final ManagedRocksDB db;
+  private final ManagedDBOptions dbOptions;
+  private final ManagedWriteOptions writeOptions;
   private final List<ColumnFamilyDescriptor> descriptors;
   private final Map<String, ColumnFamily> columnFamilies;
 
   private final AtomicBoolean isClosed = new AtomicBoolean();
 
-  private RocksDatabase(File dbFile, RocksDB db, DBOptions dbOptions,
-      WriteOptions writeOptions,
+  private RocksDatabase(File dbFile, ManagedRocksDB db,
+      ManagedDBOptions dbOptions, ManagedWriteOptions writeOptions,
       List<ColumnFamilyDescriptor> descriptors,
       Map<String, ColumnFamily> columnFamilies) {
     this.name = getClass().getSimpleName() + "[" + dbFile + "]";
@@ -323,9 +327,9 @@ public final class RocksDatabase {
   }
 
   public void ingestExternalFile(ColumnFamily family, List<String> files,
-      IngestExternalFileOptions ingestOptions) throws IOException {
+      ManagedIngestExternalFileOptions ingestOptions) throws IOException {
     try {
-      db.ingestExternalFile(family.getHandle(), files, ingestOptions);
+      db.get().ingestExternalFile(family.getHandle(), files, ingestOptions);
     } catch (RocksDBException e) {
       closeOnError(e);
       String msg = "Failed to ingest external files " +
@@ -338,7 +342,7 @@ public final class RocksDatabase {
   public void put(ColumnFamily family, byte[] key, byte[] value)
       throws IOException {
     try {
-      db.put(family.getHandle(), writeOptions, key, value);
+      db.get().put(family.getHandle(), writeOptions, key, value);
     } catch (RocksDBException e) {
       closeOnError(e);
       throw toIOException(this, "put " + bytes2String(key), e);
@@ -346,9 +350,9 @@ public final class RocksDatabase {
   }
 
   public void flush() throws IOException {
-    try (FlushOptions options = new FlushOptions()) {
+    try (ManagedFlushOptions options = new ManagedFlushOptions()) {
       options.setWaitForFlush(true);
-      db.flush(options);
+      db.get().flush(options);
     } catch (RocksDBException e) {
       closeOnError(e);
       throw toIOException(this, "flush", e);
@@ -357,7 +361,7 @@ public final class RocksDatabase {
 
   public void flushWal(boolean sync) throws IOException {
     try {
-      db.flushWal(sync);
+      db.get().flushWal(sync);
     } catch (RocksDBException e) {
       closeOnError(e);
       throw toIOException(this, "flushWal with sync=" + sync, e);
@@ -366,7 +370,7 @@ public final class RocksDatabase {
 
   public void compactRange() throws IOException {
     try {
-      db.compactRange();
+      db.get().compactRange();
     } catch (RocksDBException e) {
       closeOnError(e);
       throw toIOException(this, "compactRange", e);
@@ -380,34 +384,35 @@ public final class RocksDatabase {
   /**
    * @return false if the key definitely does not exist in the database;
    *         otherwise, return true.
-   * @see RocksDB#keyMayExist(ColumnFamilyHandle, byte[], Holder)
+   * @see org.rocksdb.RocksDB#keyMayExist(ColumnFamilyHandle, byte[], Holder)
    */
   public boolean keyMayExist(ColumnFamily family, byte[] key) {
-    return db.keyMayExist(family.getHandle(), key, null);
+    return db.get().keyMayExist(family.getHandle(), key, null);
   }
 
   /**
    * @return the null if the key definitely does not exist in the database;
    *         otherwise, return a {@link Supplier}.
-   * @see RocksDB#keyMayExist(ColumnFamilyHandle, byte[], Holder)
+   * @see org.rocksdb.RocksDB#keyMayExist(ColumnFamilyHandle, byte[], Holder)
    */
   public Supplier<byte[]> keyMayExistHolder(ColumnFamily family,
       byte[] key) {
     final Holder<byte[]> out = new Holder<>();
-    return db.keyMayExist(family.getHandle(), key, out) ? out::getValue : null;
+    return db.get().keyMayExist(family.getHandle(), key, out) ?
+        out::getValue : null;
   }
 
   public ColumnFamily getColumnFamily(String key) {
     return columnFamilies.get(key);
   }
 
-  public Collection<ColumnFamily> getColumnFamilies() {
+  public Collection<ColumnFamily> getExtraColumnFamilies() {
     return Collections.unmodifiableCollection(columnFamilies.values());
   }
 
   public byte[] get(ColumnFamily family, byte[] key) throws IOException {
     try {
-      return db.get(family.getHandle(), key);
+      return db.get().get(family.getHandle(), key);
     } catch (RocksDBException e) {
       closeOnError(e);
       final String message = "get " + bytes2String(key) + " from " + family;
@@ -425,7 +430,7 @@ public final class RocksDatabase {
 
   private long getLongProperty(String key) throws IOException {
     try {
-      return db.getLongProperty(key);
+      return db.get().getLongProperty(key);
     } catch (RocksDBException e) {
       closeOnError(e);
       throw toIOException(this, "getLongProperty " + key, e);
@@ -435,7 +440,7 @@ public final class RocksDatabase {
   private long getLongProperty(ColumnFamily family, String key)
       throws IOException {
     try {
-      return db.getLongProperty(family.getHandle(), key);
+      return db.get().getLongProperty(family.getHandle(), key);
     } catch (RocksDBException e) {
       closeOnError(e);
       final String message = "getLongProperty " + key + " from " + family;
@@ -445,7 +450,7 @@ public final class RocksDatabase {
 
   public String getProperty(String key) throws IOException {
     try {
-      return db.getProperty(key);
+      return db.get().getProperty(key);
     } catch (RocksDBException e) {
       closeOnError(e);
       throw toIOException(this, "getProperty " + key, e);
@@ -455,17 +460,17 @@ public final class RocksDatabase {
   public String getProperty(ColumnFamily family, String key)
       throws IOException {
     try {
-      return db.getProperty(family.getHandle(), key);
+      return db.get().getProperty(family.getHandle(), key);
     } catch (RocksDBException e) {
       closeOnError(e);
       throw toIOException(this, "getProperty " + key + " from " + family, e);
     }
   }
 
-  public TransactionLogIterator getUpdatesSince(long sequenceNumber)
+  public ManagedTransactionLogIterator getUpdatesSince(long sequenceNumber)
       throws IOException {
     try {
-      return db.getUpdatesSince(sequenceNumber);
+      return managed(db.get().getUpdatesSince(sequenceNumber));
     } catch (RocksDBException e) {
       closeOnError(e);
       throw toIOException(this, "getUpdatesSince " + sequenceNumber, e);
@@ -473,37 +478,39 @@ public final class RocksDatabase {
   }
 
   public long getLatestSequenceNumber() {
-    return db.getLatestSequenceNumber();
+    return db.get().getLatestSequenceNumber();
   }
 
-  public RocksIterator newIterator(ColumnFamily family) {
-    return db.newIterator(family.getHandle());
+  public ManagedRocksIterator newIterator(ColumnFamily family) {
+    return managed(db.get().newIterator(family.getHandle()));
   }
 
-  public RocksIterator newIterator(ColumnFamily family, boolean fillCache) {
-    try (ReadOptions readOptions = new ReadOptions()) {
+  public ManagedRocksIterator newIterator(ColumnFamily family,
+                                          boolean fillCache) {
+    try (ManagedReadOptions readOptions = new ManagedReadOptions()) {
       readOptions.setFillCache(fillCache);
-      return db.newIterator(family.getHandle(), readOptions);
+      return managed(db.get().newIterator(family.getHandle(), readOptions));
     }
   }
 
-  public void batchWrite(WriteBatch writeBatch, WriteOptions options)
+  public void batchWrite(ManagedWriteBatch writeBatch,
+                         ManagedWriteOptions options)
       throws IOException {
     try {
-      db.write(options, writeBatch);
+      db.get().write(options, writeBatch);
     } catch (RocksDBException e) {
       closeOnError(e);
       throw toIOException(this, "batchWrite", e);
     }
   }
 
-  public void batchWrite(WriteBatch writeBatch) throws IOException {
+  public void batchWrite(ManagedWriteBatch writeBatch) throws IOException {
     batchWrite(writeBatch, writeOptions);
   }
 
   public void delete(ColumnFamily family, byte[] key) throws IOException {
     try {
-      db.delete(family.getHandle(), key);
+      db.get().delete(family.getHandle(), key);
     } catch (RocksDBException e) {
       closeOnError(e);
       final String message = "delete " + bytes2String(key) + " from " + family;
@@ -515,4 +522,5 @@ public final class RocksDatabase {
   public String toString() {
     return name;
   }
+
 }

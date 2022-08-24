@@ -122,6 +122,7 @@ public class KeyValueContainerData extends ContainerData {
     this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
     this.schemaVersion = source.getSchemaVersion();
+    this.replicaIndex = source.getReplicaIndex();
   }
 
   /**
