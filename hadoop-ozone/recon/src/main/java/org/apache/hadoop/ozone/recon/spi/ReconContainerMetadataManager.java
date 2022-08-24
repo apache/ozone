@@ -238,7 +238,7 @@ public interface ReconContainerMetadataManager {
       throws IOException;
       
   /**
-     * Get iterator to the entire Key_Container DB.
+   * Get iterator to the entire Key_Container DB.
    * @return TableIterator
    */
   TableIterator getKeyContainerTableIterator() throws IOException;
