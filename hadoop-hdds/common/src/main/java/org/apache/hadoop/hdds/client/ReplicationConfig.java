@@ -177,7 +177,6 @@ public interface ReplicationConfig {
     ReplicationConfig replicationConfig;
     switch (type) {
     case RATIS:
-    case STAND_ALONE:
       ReplicationFactor factor;
       try {
         factor = ReplicationFactor.valueOf(Integer.parseInt(replication));
