@@ -602,7 +602,8 @@ public class ReconContainerMetadataManagerImpl
                   " keyVersion = {} ", keyPrefix, keyVersion);
         }
       } else {
-        break; //Break when the first mismatch occurs.
+        // Break on first mismatch
+        break;
       }
     }
     return containers;
