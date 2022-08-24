@@ -64,10 +64,10 @@ public class ReplicationConfigValidator {
                 "-" + ecConfig.getParity() + "-{CHUNK_SIZE}";
       }
       throw new IllegalArgumentException(
-              "Invalid data-parity replication config " +
-                      "for type " + replicationConfig.getReplicationType() +
-                      " and replication " + replication + "." +
-                      " Supported data-parity are 3-2,6-3,10-4");    }
+                "Invalid data-parity replication config " +
+                        "for type " + replicationConfig.getReplicationType() +
+                        " and replication " + replication + "." +
+                        " Supported data-parity are 3-2,6-3,10-4");    }
     return replicationConfig;
   }
 
