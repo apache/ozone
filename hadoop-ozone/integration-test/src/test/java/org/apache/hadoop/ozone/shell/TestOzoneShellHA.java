@@ -1005,6 +1005,9 @@ public class TestOzoneShellHA {
           .equals(ECKeyOutputStream.class.getName()));
     }
 
+    args = new String[] {"bucket", "set-replication-config", bucketPath, "-t",
+        "RATIS", "-r", "THREE"};
+    execute(ozoneShell, args);
     bucket = volume.getBucket("bucket0");
     try (OzoneOutputStream out = bucket.createKey("newNonECKey", 1024)) {
       Assert.assertFalse(out.getOutputStream().getClass().getName()
