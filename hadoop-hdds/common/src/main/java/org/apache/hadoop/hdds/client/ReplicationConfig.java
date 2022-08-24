@@ -186,7 +186,7 @@ public interface ReplicationConfig {
           factor = ReplicationFactor.valueOf(replication);
         } catch (IllegalArgumentException e) {
           throw new IllegalArgumentException(replication +
-                  " is not supported for " + type + " replication type", e);
+              " is not supported for " + type + " replication type", e);
         }
       }
       replicationConfig = fromTypeAndFactor(type, factor);
