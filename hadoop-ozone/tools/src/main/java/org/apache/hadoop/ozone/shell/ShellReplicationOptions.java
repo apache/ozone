@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.shell;
 
-import org.apache.hadoop.hdds.client.ReplicationType;
 import picocli.CommandLine.Option;
 
 /**

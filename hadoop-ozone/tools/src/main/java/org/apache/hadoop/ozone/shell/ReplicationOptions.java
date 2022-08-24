@@ -84,15 +84,18 @@ public abstract class ReplicationOptions {
   public void setType(String type) {
     try {
       ReplicationType replicationType = ReplicationType.valueOf(type);
-      if (replicationType == ReplicationType.CHAINED || replicationType == ReplicationType.STAND_ALONE){
+      if (replicationType == ReplicationType.CHAINED
+              || replicationType == ReplicationType.STAND_ALONE) {
         throw new IllegalArgumentException(
-                String.format("Unsupported replication type %s", replicationType.name()));
+                String.format("Unsupported replication type %s",
+                        replicationType.name()));
       }
       this.type = replicationType;
-    } catch (IllegalArgumentException ex){
+    } catch (IllegalArgumentException ex) {
       throw new IllegalArgumentException(
               String.format("Invalid value '%s' for option '--type'. %s." +
-                      " Supported values are: RATIS, EC.", type, ex.getMessage()));
+                      " Supported values are: RATIS, EC.",
+                      type, ex.getMessage()));
     }
   }
 }
