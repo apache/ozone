@@ -253,53 +253,54 @@ public class ContainerKeyMapperTask implements ReconOmTask {
                                       List<ContainerKeyPrefix>
                                           deletedContainerKeyList)
       throws IOException {
-      
+
     Set<ContainerKeyPrefix> keysToBeDeleted = new HashSet<>();
     try (TableIterator<KeyPrefixContainer, ? extends
-      Table.KeyValue<KeyPrefixContainer, Integer>> keyContainerIterator =
-        reconContainerMetadataManager.getKeyContainerTableIterator();) {
+        Table.KeyValue<KeyPrefixContainer, Integer>> keyContainerIterator =
+             reconContainerMetadataManager.getKeyContainerTableIterator()) {
 
       // Check if we have keys in this container in the DB
       keyContainerIterator.seek(new KeyPrefixContainer(key));
       while (keyContainerIterator.hasNext()) {
         Table.KeyValue<KeyPrefixContainer, Integer> keyValue =
-          keyContainerIterator.next();
+            keyContainerIterator.next();
         String keyPrefix = keyValue.getKey().getKeyPrefix();
-      if (keyPrefix.equals(key)) {
-        if (keyValue.getKey().getContainerId() != -1) {
-          keysToBeDeleted.add(keyValue.getKey().toContainerKeyPrefix());
-        }
-      } else {
-        break;
-      }
-    }
-
-    // Check if we have keys in this container in our containerKeyMap
-    containerKeyMap.keySet()
-        .forEach((ContainerKeyPrefix containerKeyPrefix) -> {
-          String keyPrefix = containerKeyPrefix.getKeyPrefix();
-          if (keyPrefix.equals(key)) {
-            keysToBeDeleted.add(containerKeyPrefix);
+        if (keyPrefix.equals(key)) {
+          if (keyValue.getKey().getContainerId() != -1) {
+            keysToBeDeleted.add(keyValue.getKey().toContainerKeyPrefix());
           }
-        });
-
-    for (ContainerKeyPrefix containerKeyPrefix : keysToBeDeleted) {
-      deletedContainerKeyList.add(containerKeyPrefix);
-      // Remove the container-key prefix from the map if we previously added
-      // it in this batch (and now we delete it)
-      containerKeyMap.remove(containerKeyPrefix);
-
-      // decrement count and update containerKeyCount.
-      Long containerID = containerKeyPrefix.getContainerId();
-      long keyCount;
-      if (containerKeyCountMap.containsKey(containerID)) {
-        keyCount = containerKeyCountMap.get(containerID);
-      } else {
-        keyCount = reconContainerMetadataManager
-            .getKeyCountForContainer(containerID);
+        } else {
+          break;
+        }
       }
-      if (keyCount > 0) {
-        containerKeyCountMap.put(containerID, --keyCount);
+
+      // Check if we have keys in this container in our containerKeyMap
+      containerKeyMap.keySet()
+          .forEach((ContainerKeyPrefix containerKeyPrefix) -> {
+            String keyPrefix = containerKeyPrefix.getKeyPrefix();
+            if (keyPrefix.equals(key)) {
+              keysToBeDeleted.add(containerKeyPrefix);
+            }
+          });
+
+      for (ContainerKeyPrefix containerKeyPrefix : keysToBeDeleted) {
+        deletedContainerKeyList.add(containerKeyPrefix);
+        // Remove the container-key prefix from the map if we previously added
+        // it in this batch (and now we delete it)
+        containerKeyMap.remove(containerKeyPrefix);
+
+        // decrement count and update containerKeyCount.
+        Long containerID = containerKeyPrefix.getContainerId();
+        long keyCount;
+        if (containerKeyCountMap.containsKey(containerID)) {
+          keyCount = containerKeyCountMap.get(containerID);
+        } else {
+          keyCount = reconContainerMetadataManager
+              .getKeyCountForContainer(containerID);
+        }
+        if (keyCount > 0) {
+          containerKeyCountMap.put(containerID, --keyCount);
+        }
       }
     }
   }
