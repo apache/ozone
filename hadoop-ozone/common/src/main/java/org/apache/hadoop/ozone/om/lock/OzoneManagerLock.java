@@ -257,12 +257,15 @@ public class OzoneManagerLock {
     } else if (resources.length == 2 && resource == Resource.BUCKET_LOCK) {
       return OzoneManagerLockUtil.generateBucketLockName(resources[0],
           resources[1]);
+    } else if (resources.length == 3 && resource == Resource.SNAPSHOT_LOCK) {
+      return OzoneManagerLockUtil.generateSnapshotLockName(resources[0],
+          resources[1], resources[2]);
     } else if (resources.length == 3 && resource == Resource.KEY_PATH_LOCK) {
       return OzoneManagerLockUtil.generateKeyPathLockName(resources[0],
           resources[1], resources[2]);
     } else {
       throw new IllegalArgumentException("acquire lock is supported on single" +
-          " resource for all locks except for resource bucket");
+          " resource for all locks except for resource bucket/snapshot");
     }
   }
 
@@ -648,7 +651,8 @@ public class OzoneManagerLock {
 
     S3_SECRET_LOCK((byte) 4, "S3_SECRET_LOCK"), // 31
     KEY_PATH_LOCK((byte) 5, "KEY_PATH_LOCK"), //63
-    PREFIX_LOCK((byte) 6, "PREFIX_LOCK"); //127
+    PREFIX_LOCK((byte) 6, "PREFIX_LOCK"), //127
+    SNAPSHOT_LOCK((byte) 7, "SNAPSHOT_LOCK"); // = 255
 
     // level of the resource
     private byte lockLevel;

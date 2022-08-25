@@ -642,6 +642,20 @@ public interface OzoneManagerProtocol
   }
 
   /**
+   * Create snapshot.
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name to be used
+   * @return name used
+   * @throws IOException
+   */
+  default String createSnapshot(String volumeName,
+      String bucketName, String snapshotName) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented");
+  }
+
+  /**
    * Assign admin role to a user identified by an accessId in a tenant.
    * @param accessId access ID.
    * @param tenantId tenant name.
