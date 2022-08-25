@@ -57,4 +57,13 @@ public class TestContainerUtils {
     assertEquals("<redacted>", dataBuffers.getBuffers(0).toString(UTF_8));
   }
 
+  @Test
+  public void testTarGzName() {
+    long containerId = 100;
+    String tarGzName = "container-100.tar.gz";
+    assertEquals(tarGzName, ContainerUtils.getContainerTarGzName(containerId));
+
+    assertEquals(containerId,
+        ContainerUtils.retrieveContainerIdFromTarGzName(tarGzName));
+  }
 }

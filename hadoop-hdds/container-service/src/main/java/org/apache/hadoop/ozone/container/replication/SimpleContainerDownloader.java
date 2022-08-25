@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -28,23 +27,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
-import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 
 /**
  * Simple ContainerDownloaderImplementation to download the missing container
@@ -59,37 +49,23 @@ public class SimpleContainerDownloader implements ContainerDownloader {
       LoggerFactory.getLogger(SimpleContainerDownloader.class);
 
   public static final String CONTAINER_COPY_DIR = "container-copy";
+  public static final String CONTAINER_COPY_TMP_DIR = "tmp";
 
   private ConfigurationSource conf;
   private final SecurityConfig securityConfig;
   private final CertificateClient certClient;
-  private final VolumeSet volumeSet;
-  private VolumeChoosingPolicy volumeChoosingPolicy = null;
-  private long containerSize;
 
   public SimpleContainerDownloader(
-      ConfigurationSource conf, CertificateClient certClient,
-      VolumeSet volumeSet) {
-
+      ConfigurationSource conf, CertificateClient certClient) {
     this.conf = conf;
     securityConfig = new SecurityConfig(conf);
     this.certClient = certClient;
-    this.volumeSet = volumeSet;
-    try {
-      this.volumeChoosingPolicy = conf.getClass(
-          HDDS_DATANODE_VOLUME_CHOOSING_POLICY, RoundRobinVolumeChoosingPolicy
-              .class, VolumeChoosingPolicy.class).newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-    this.containerSize = (long) conf.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
   }
 
   @Override
   public Path getContainerDataFromReplicas(
-      long containerId, List<DatanodeDetails> sourceDatanodes) {
+      long containerId, List<DatanodeDetails> sourceDatanodes,
+      Path downloadDir) {
 
     final List<DatanodeDetails> shuffledDatanodes =
         shuffleDatanodes(sourceDatanodes);
@@ -97,7 +73,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     for (DatanodeDetails datanode : shuffledDatanodes) {
       try {
         CompletableFuture<Path> result =
-            downloadContainer(containerId, datanode);
+            downloadContainer(containerId, datanode, downloadDir);
         return result.get();
       } catch (ExecutionException | IOException e) {
         LOG.error("Error on replicating container: {} from {}/{}", containerId,
@@ -130,12 +106,13 @@ public class SimpleContainerDownloader implements ContainerDownloader {
 
   @VisibleForTesting
   protected CompletableFuture<Path> downloadContainer(
-      long containerId, DatanodeDetails datanode) throws IOException {
+      long containerId, DatanodeDetails datanode, Path downloadDir)
+      throws IOException {
     CompletableFuture<Path> result;
     GrpcReplicationClient grpcReplicationClient =
         new GrpcReplicationClient(datanode.getIpAddress(),
             datanode.getPort(Name.REPLICATION).getValue(),
-            getWorkingDirectory(), securityConfig, certClient);
+            downloadDir, securityConfig, certClient);
     result = grpcReplicationClient.download(containerId)
         .whenComplete((r, ex) -> {
           try {
@@ -151,22 +128,5 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   @Override
   public void close() {
     // noop
-  }
-
-  public Path getWorkingDirectory() {
-    Path defaultWorkingDirectory =
-        Paths.get(System.getProperty("java.io.tmpdir"));
-    try {
-      // Use containerSize * 2 to store source and dest file
-      HddsVolume volume = volumeChoosingPolicy.chooseVolume(
-          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-          containerSize * 2);
-      return Paths.get(volume.getStorageDir().getParent()).resolve("tmp")
-          .resolve(CONTAINER_COPY_DIR);
-    } catch (IOException e) {
-      LOG.error("Exception when spreading copy directory, using default " +
-          "working directory {}", defaultWorkingDirectory.toAbsolutePath(), e);
-    }
-    return defaultWorkingDirectory;
   }
 }

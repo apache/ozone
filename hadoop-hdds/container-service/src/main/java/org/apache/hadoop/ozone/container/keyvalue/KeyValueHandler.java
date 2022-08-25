@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -328,11 +329,19 @@ public class KeyValueHandler extends Handler {
 
   private void populateContainerPathFields(KeyValueContainer container)
       throws IOException {
+    populateContainerPathFields(container, null);
+  }
+
+  private void populateContainerPathFields(KeyValueContainer container,
+      HddsVolume hddsVolume) throws IOException {
     volumeSet.readLock();
+    HddsVolume containerVolume = hddsVolume;
     try {
-      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
-          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-          container.getContainerData().getMaxSize());
+      if (hddsVolume == null) {
+        containerVolume = volumeChoosingPolicy.chooseVolume(
+            StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
+            container.getContainerData().getMaxSize());
+      }
       String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
               containerVolume, clusterId);
       container.populatePathFields(idDir, containerVolume);
@@ -972,6 +981,25 @@ public class KeyValueHandler extends Handler {
 
     populateContainerPathFields(container);
     container.importContainerData(rawContainerStream, packer);
+    sendICR(container);
+    return container;
+
+  }
+
+  @Override
+  public Container importContainer(ContainerData originalContainerData,
+      Path path) throws IOException {
+    Preconditions.checkState(originalContainerData instanceof
+        KeyValueContainerData, "Should be KeyValueContainerData instance");
+
+    KeyValueContainerData containerData = new KeyValueContainerData(
+        (KeyValueContainerData) originalContainerData);
+
+    KeyValueContainer container = new KeyValueContainer(containerData,
+        conf);
+
+    populateContainerPathFields(container);
+//    container.importContainerData(rawContainerStream, packer);
     sendICR(container);
     return container;
 

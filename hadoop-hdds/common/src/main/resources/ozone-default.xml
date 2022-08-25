@@ -1554,9 +1554,9 @@
   <property>
     <name>hdds.datanode.replication.work.dir</name>
     <tag>DATANODE</tag>
-    <description>This configuration is deprecated. Default directory which is used
-      during the container replication betweeen datanodes. Replication work will
-      be spread to different volumes.
+    <description>This configuration is deprecated. Temporary sub directory under
+      each hdds.datanode.dir will be used during the container replication between
+      datanodes to save the downloaded container(in compressed format).
     </description>
   </property>
 

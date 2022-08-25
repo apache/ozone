@@ -666,10 +666,11 @@ public class TestDatanodeUpgradeToScmHA {
    */
   public void importContainer(long containerID, File source) throws Exception {
     DownloadAndImportReplicator replicator =
-        new DownloadAndImportReplicator(dsm.getContainer().getContainerSet(),
+        new DownloadAndImportReplicator(dsm.getConf(),
+            dsm.getContainer().getContainerSet(),
             dsm.getContainer().getController(),
-            new SimpleContainerDownloader(conf, null, null),
-            new TarContainerPacker());
+            new SimpleContainerDownloader(conf, null),
+            new TarContainerPacker(), dsm.getContainer().getVolumeSet());
 
     File tempFile = tempFolder.newFile();
     Files.copy(source.toPath(), tempFile.toPath(),

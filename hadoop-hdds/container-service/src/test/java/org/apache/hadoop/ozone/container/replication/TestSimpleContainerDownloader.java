@@ -64,7 +64,8 @@ public class TestSimpleContainerDownloader {
 
     //WHEN
     final Path result =
-        downloader.getContainerDataFromReplicas(1L, datanodes);
+        downloader.getContainerDataFromReplicas(1L, datanodes,
+            tempDir.newFolder().toPath());
 
     //THEN
     Assert.assertEquals(datanodes.get(0).getUuidString(), result.toString());
@@ -82,7 +83,8 @@ public class TestSimpleContainerDownloader {
 
     //WHEN
     final Path result =
-        downloader.getContainerDataFromReplicas(1L, datanodes);
+        downloader.getContainerDataFromReplicas(1L, datanodes,
+            tempDir.newFolder().toPath());
 
     //THEN
     //first datanode is failed, second worked
@@ -100,7 +102,8 @@ public class TestSimpleContainerDownloader {
 
     //WHEN
     final Path result =
-        downloader.getContainerDataFromReplicas(1L, datanodes);
+        downloader.getContainerDataFromReplicas(1L, datanodes,
+            tempDir.newFolder().toPath());
 
     //THEN
     //first datanode is failed, second worked
@@ -112,17 +115,17 @@ public class TestSimpleContainerDownloader {
    */
   @Test(timeout = 10_000L)
   public void testRandomSelection()
-      throws ExecutionException, InterruptedException {
+      throws ExecutionException, InterruptedException, IOException {
 
     //GIVEN
     final List<DatanodeDetails> datanodes = createDatanodes();
 
     SimpleContainerDownloader downloader =
-        new SimpleContainerDownloader(new OzoneConfiguration(), null, null) {
+        new SimpleContainerDownloader(new OzoneConfiguration(), null) {
 
           @Override
           protected CompletableFuture<Path> downloadContainer(
-              long containerId, DatanodeDetails datanode
+              long containerId, DatanodeDetails datanode, Path downloadPath
           ) {
             //download is always successful.
             return CompletableFuture
@@ -133,7 +136,8 @@ public class TestSimpleContainerDownloader {
     //WHEN executed, THEN at least once the second datanode should be
     //returned.
     for (int i = 0; i < 10000; i++) {
-      Path path = downloader.getContainerDataFromReplicas(1L, datanodes);
+      Path path = downloader.getContainerDataFromReplicas(1L, datanodes,
+          tempDir.newFolder().toPath());
       if (path.toString().equals(datanodes.get(1).getUuidString())) {
         return;
       }
@@ -143,29 +147,6 @@ public class TestSimpleContainerDownloader {
     Assert.fail(
         "Datanodes are selected 10000 times but second datanode was never "
             + "used.");
-  }
-
-  @Test
-  public void testGetWorkingDirectory()
-      throws Exception {
-
-    //GIVEN
-    List<DatanodeDetails> datanodes = createDatanodes();
-
-    // Spread container copy directory
-    OzoneConfiguration conf = new OzoneConfiguration();
-    VolumeSet volumeSet = getVolumeSet(datanodes.get(0), conf);
-
-    SimpleContainerDownloader downloader =
-        new SimpleContainerDownloader(conf, null, volumeSet);
-
-    Path firstDi = downloader.getWorkingDirectory();
-    Path secondDi = downloader.getWorkingDirectory();
-
-    Assert.assertNotEquals(firstDi,
-        Paths.get(System.getProperty("java.io.tmpdir"))
-            .resolve(SimpleContainerDownloader.CONTAINER_COPY_DIR));
-    Assert.assertNotEquals(firstDi, secondDi);
   }
 
   /**
@@ -184,7 +165,7 @@ public class TestSimpleContainerDownloader {
     final List<DatanodeDetails> datanodes =
         Arrays.asList(failedDatanodes);
 
-    return new SimpleContainerDownloader(conf, null, null) {
+    return new SimpleContainerDownloader(conf, null) {
 
       //for retry testing we use predictable list of datanodes.
       @Override
@@ -197,8 +178,7 @@ public class TestSimpleContainerDownloader {
 
       @Override
       protected CompletableFuture<Path> downloadContainer(
-          long containerId,
-          DatanodeDetails datanode
+          long containerId, DatanodeDetails datanode, Path downloadPath
       ) {
 
         if (datanodes.contains(datanode)) {

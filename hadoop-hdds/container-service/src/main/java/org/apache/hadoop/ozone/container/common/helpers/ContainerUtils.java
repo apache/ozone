@@ -32,6 +32,8 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -249,4 +251,20 @@ public final class ContainerUtils {
     return Long.parseLong(containerBaseDir.getName());
   }
 
+  public static String getContainerTarGzName(long containerId) {
+    return "container-" + containerId + ".tar.gz";
+  }
+
+  public static long retrieveContainerIdFromTarGzName(String tarGzName) {
+    Pattern pattern = Pattern.compile("continer-(\\d+).tar.gz");
+    // Now create matcher object.
+    Matcher m = pattern.matcher(tarGzName);
+
+    if (m.find()) {
+      return Long.parseLong(m.group(1));
+    } else {
+      throw new IllegalArgumentException("Illegal container tar gz file " +
+          tarGzName);
+    }
+  }
 }

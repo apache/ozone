@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Map;
 
@@ -131,6 +132,11 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
    */
   void importContainerData(InputStream stream,
       ContainerPacker<CONTAINERDATA> packer) throws IOException;
+
+  /**
+   * Import the container from an existing container directory.
+   */
+  void importContainerData(Path path) throws IOException;
 
   /**
    * Export all the data of the container to one output archive with the help

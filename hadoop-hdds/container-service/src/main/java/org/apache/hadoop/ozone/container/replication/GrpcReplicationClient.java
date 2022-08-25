@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
@@ -101,8 +102,8 @@ public class GrpcReplicationClient implements AutoCloseable {
 
     CompletableFuture<Path> response = new CompletableFuture<>();
 
-    Path destinationPath =
-        getWorkingDirectory().resolve("container-" + containerId + ".tar.gz");
+    Path destinationPath = getWorkingDirectory()
+        .resolve(ContainerUtils.getContainerTarGzName(containerId));
 
     client.download(request,
         new StreamDownloader(containerId, response, destinationPath));

@@ -166,11 +166,10 @@ public class DatanodeStateMachine implements Closeable {
     nextHB = new AtomicLong(Time.monotonicNow());
 
     ContainerReplicator replicator =
-        new DownloadAndImportReplicator(container.getContainerSet(),
+        new DownloadAndImportReplicator(conf, container.getContainerSet(),
             container.getController(),
-            new SimpleContainerDownloader(conf, dnCertClient,
-                container.getVolumeSet()),
-            new TarContainerPacker());
+            new SimpleContainerDownloader(conf, dnCertClient),
+            new TarContainerPacker(), container.getVolumeSet());
 
     replicatorMetrics = new MeasuredReplicator(replicator);
 

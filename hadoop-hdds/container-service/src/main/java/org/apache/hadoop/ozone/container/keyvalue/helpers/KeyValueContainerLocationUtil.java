@@ -76,7 +76,7 @@ public final class KeyValueContainerLocationUtil {
    * @param containerId
    * @return base directory for container.
    */
-  private static String getBaseContainerLocation(String hddsVolumeDir,
+  public static String getBaseContainerLocation(String hddsVolumeDir,
                                                  String clusterId,
                                                  long containerId) {
     Preconditions.checkNotNull(hddsVolumeDir, "Base Directory cannot be null");

@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.common.interfaces;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Path;
 
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 
@@ -54,5 +55,11 @@ public interface ContainerPacker<CONTAINERDATA extends ContainerData> {
    * importing the container.
    */
   byte[] unpackContainerDescriptor(InputStream inputStream)
+      throws IOException;
+
+  /**
+   * Unpack the container to dest path.
+   */
+  void unpackContainer(InputStream inputStream, Path destPath)
       throws IOException;
 }

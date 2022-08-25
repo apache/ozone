@@ -200,6 +200,26 @@ public class TarContainerPacker
         "Container descriptor is missing from the container archive.");
   }
 
+  @Override
+  public void unpackContainer(InputStream input, Path destDir)
+      throws IOException {
+    try (InputStream decompressed = decompress(input);
+         ArchiveInputStream archiveInput = untar(decompressed)) {
+
+      ArchiveEntry entry = archiveInput.getNextEntry();
+      while (entry != null) {
+        String name = entry.getName();
+        long size = entry.getSize();
+        extractEntry(entry, archiveInput, size, destDir, destDir.resolve(name));
+        entry = archiveInput.getNextEntry();
+      }
+    } catch (CompressorException e) {
+      throw new IOException(
+          "Can't uncompress to destination directory " +
+              destDir.toAbsolutePath(), e);
+    }
+  }
+
   public static Path getDbPath(KeyValueContainerData containerData) {
     if (containerData.getSchemaVersion().equals(SCHEMA_V3)) {
       return DatanodeStoreSchemaThreeImpl.getDumpDir(

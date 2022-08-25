@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.common.interfaces;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Path;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -118,6 +119,12 @@ public abstract class Handler {
       ContainerData containerData, InputStream rawContainerStream,
       TarContainerPacker packer)
       throws IOException;
+
+  /**
+   * Imports container from path.
+   */
+  public abstract Container importContainer(
+      ContainerData containerData, Path path) throws IOException;
 
   /**
    * Exports container to the output stream.
