@@ -2387,7 +2387,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         remoteIp != null ? remoteIp.getHostName() : omRpcAddress.getHostName());
   }
 
-  private boolean isOwner(UserGroupInformation callerUgi, String ownerName) {
+  public boolean isOwner(UserGroupInformation callerUgi, String ownerName) {
     if (ownerName == null) {
       return false;
     }

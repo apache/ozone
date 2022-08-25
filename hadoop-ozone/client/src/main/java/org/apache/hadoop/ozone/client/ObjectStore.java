@@ -536,4 +536,17 @@ public class ObjectStore {
     return proxy.getAcl(obj);
   }
 
+  /**
+   * Create snapshot.
+   * @param name name to be used
+   * @param snapshotPath snapshotPath to be used
+   * @return name used
+   * @throws IOException
+   */
+  public String createSnapshot(String volumeName,
+      String bucketName, String snapshotName) throws IOException {
+    return proxy.createSnapshot(volumeName, bucketName, snapshotName);
+  }
+
+
 }

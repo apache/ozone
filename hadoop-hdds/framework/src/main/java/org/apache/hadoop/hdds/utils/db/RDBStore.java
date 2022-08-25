@@ -45,6 +45,8 @@ import org.rocksdb.TransactionLogIterator.BatchResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+
 /**
  * RocksDB Store that supports creating Tables in DB.
  */
@@ -57,6 +59,7 @@ public class RDBStore implements DBStore {
   private ObjectName statMBeanName;
   private final RDBCheckpointManager checkPointManager;
   private final String checkpointsParentDir;
+  private final String snapshotsParentDir;
   private final RDBMetrics rdbMetrics;
 
   @VisibleForTesting
@@ -100,7 +103,22 @@ public class RDBStore implements DBStore {
       if (!checkpointsDir.exists()) {
         boolean success = checkpointsDir.mkdir();
         if (!success) {
-          LOG.warn("Unable to create RocksDB checkpoint directory");
+          throw new IOException(
+              "Unable to create RocksDB checkpoint directory: " +
+              checkpointsParentDir);
+        }
+      }
+
+      //create snapshot directory if does not exist.
+      snapshotsParentDir = Paths.get(dbLocation.getParent(),
+          OM_SNAPSHOT_DIR).toString();
+      File snapshotsDir = new File(snapshotsParentDir);
+      if (!snapshotsDir.exists()) {
+        boolean success = snapshotsDir.mkdir();
+        if (!success) {
+          throw new IOException(
+              "Unable to create RocksDB snapshot directory: " +
+              snapshotsParentDir);
         }
       }
 
@@ -244,6 +262,11 @@ public class RDBStore implements DBStore {
       this.flushDB();
     }
     return checkPointManager.createCheckpoint(checkpointsParentDir);
+  }
+
+  public DBCheckpoint getSnapshot(String name) throws IOException {
+    this.flushLog(true);
+    return checkPointManager.createCheckpoint(snapshotsParentDir, name);
   }
 
   @Override

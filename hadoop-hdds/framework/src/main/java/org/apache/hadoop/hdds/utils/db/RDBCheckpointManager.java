@@ -54,12 +54,13 @@ public class RDBCheckpointManager {
   }
 
   /**
-   * Create RocksDB snapshot by saving a checkpoint to a directory.
+   * Create Ozone snapshot by saving a RocksDb checkpoint to a directory.
    *
    * @param parentDir The directory where the checkpoint needs to be created.
+   * @param name name of checkpoint dir, (null for default name)
    * @return RocksDB specific Checkpoint information object.
    */
-  public RocksDBCheckpoint createCheckpoint(String parentDir) {
+  public RocksDBCheckpoint createCheckpoint(String parentDir, String name) {
     try {
       long currentTime = System.currentTimeMillis();
 
@@ -67,7 +68,10 @@ public class RDBCheckpointManager {
       if (StringUtils.isNotEmpty(checkpointNamePrefix)) {
         checkpointDir += checkpointNamePrefix;
       }
-      checkpointDir += "_" + RDB_CHECKPOINT_DIR_PREFIX + currentTime;
+      if (name == null) {
+        name = "_" + RDB_CHECKPOINT_DIR_PREFIX + currentTime;
+      }
+      checkpointDir += name;
 
       Path checkpointPath = Paths.get(parentDir, checkpointDir);
       Instant start = Instant.now();
@@ -90,4 +94,15 @@ public class RDBCheckpointManager {
     }
     return null;
   }
+
+  /**
+   * Create RocksDB snapshot by saving a checkpoint to a directory.
+   *
+   * @param parentDir The directory where the checkpoint needs to be created.
+   * @return RocksDB specific Checkpoint information object.
+   */
+  public RocksDBCheckpoint createCheckpoint(String parentDir) {
+    return createCheckpoint(parentDir, null);
+  }
+
 }
