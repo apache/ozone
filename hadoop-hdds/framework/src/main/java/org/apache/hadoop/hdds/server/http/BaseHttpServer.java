@@ -195,18 +195,12 @@ public abstract class BaseHttpServer {
       final InetSocketAddress httpsAddr, String name) throws IOException {
     HttpConfig.Policy policy = getHttpPolicy(conf);
 
-    String userString = conf.get(OZONE_ADMINISTRATORS, " ");
+    String userString = conf.get(OZONE_ADMINISTRATORS, "");
     String groupString = conf.get(OZONE_ADMINISTRATORS_GROUPS, "");
-    String userGroupString;
-    if (!groupString.trim().isEmpty()) {
-      userGroupString = userString.trim() + " " + groupString.trim();
-    } else {
-      userGroupString = userString;
-    }
 
     HttpServer2.Builder builder = new HttpServer2.Builder().setName(name)
         .setConf(conf)
-        .setACL(new AccessControlList(userGroupString));
+        .setACL(new AccessControlList(userString, groupString));
 
     // initialize the webserver for uploading/downloading files.
     if (policy.isHttpEnabled()) {
