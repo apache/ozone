@@ -115,6 +115,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           container.getContainerID(), currentUnderRepRes);
       return emptyMap();
     }
+
+    // don't place reconstructed replicas on exclude nodes, since they already
+    // have replicas
     List<DatanodeDetails> excludedNodes = replicas.stream()
         .map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());
@@ -154,6 +157,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         if (sources.size() >= repConfig.getData()) {
           final List<DatanodeDetails> selectedDatanodes = getTargetDatanodes(
               excludedNodes, container, missingIndexes.size());
+          // any further processing shouldn't include these nodes as targets
           excludedNodes.addAll(selectedDatanodes);
 
           List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
@@ -211,6 +215,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           }
         }
       }
+
+      processMaintenanceOnlyIndexes(replicaCount, replicas, excludedNodes,
+          commands);
     } catch (IOException | IllegalStateException ex) {
       LOG.warn("Exception while processing for creating the EC reconstruction" +
               " container commands for {}.",
@@ -265,6 +272,59 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     return containerPlacement
         .chooseDatanodes(excludedNodes, null, requiredNodes, 0,
             dataSizeRequired);
+  }
+
+  /**
+   * Processes replicas that are in maintenance nodes and should need
+   * additional copies.
+   * @param replicaCount
+   * @param replicas set of container replicas
+   * @param excludedNodes nodes that should not be targets for new copies
+   * @param commands
+   * @throws IOException
+   */
+  private void processMaintenanceOnlyIndexes(
+      ECContainerReplicaCount replicaCount, Set<ContainerReplica> replicas,
+      List<DatanodeDetails> excludedNodes,
+      Map<DatanodeDetails, SCMCommand<?>> commands) throws IOException {
+    Set<Integer> maintIndexes = replicaCount.maintenanceOnlyIndexes(true);
+    if (maintIndexes.isEmpty()) {
+      return;
+    }
+
+    ContainerInfo container = replicaCount.getContainer();
+    // this many maintenance replicas need another copy
+    int additionalMaintenanceCopiesNeeded =
+        replicaCount.additionalMaintenanceCopiesNeeded(true);
+    List<DatanodeDetails> targets = getTargetDatanodes(excludedNodes, container,
+        additionalMaintenanceCopiesNeeded);
+    excludedNodes.addAll(targets);
+
+    Iterator<DatanodeDetails> iterator = targets.iterator();
+    // copy replica from source maintenance DN to a target DN
+    for (ContainerReplica replica : replicas) {
+      if (maintIndexes.contains(replica.getReplicaIndex()) &&
+          additionalMaintenanceCopiesNeeded > 0) {
+        if (!iterator.hasNext()) {
+          LOG.warn("Couldn't find enough targets. Available source"
+                  + " nodes: {}, target nodes: {}, excluded nodes: {} and"
+                  + " maintenance indexes: {}",
+              replicas, targets, excludedNodes, maintIndexes);
+          break;
+        }
+        DatanodeDetails maintenanceSourceNode = replica.getDatanodeDetails();
+        final ReplicateContainerCommand replicateCommand =
+            new ReplicateContainerCommand(
+                container.containerID().getProtobuf().getId(),
+                ImmutableList.of(maintenanceSourceNode));
+        // For EC containers we need to track the replica index which is
+        // to be replicated, so add it to the command.
+        replicateCommand.setReplicaIndex(replica.getReplicaIndex());
+        DatanodeDetails target = iterator.next();
+        commands.put(target, replicateCommand);
+        additionalMaintenanceCopiesNeeded -= 1;
+      }
+    }
   }
 
   private static byte[] int2byte(List<Integer> src) {
