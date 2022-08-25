@@ -419,6 +419,9 @@ public class DeletedBlockLogImpl
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
         ArrayList<Long> txIDs = new ArrayList<>();
+        // Here takes block replica count as the threshold to avoid the case
+        // that part of replicas committed the TXN and recorded in the
+        // transactionToDNsCommitMap, while they are counted in the threshold.
         while (iter.hasNext() &&
             transactions.getBlocksDeleted() < blockDeletionLimit) {
           Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = iter.next();

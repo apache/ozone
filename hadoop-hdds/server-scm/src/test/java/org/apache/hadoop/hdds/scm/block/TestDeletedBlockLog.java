@@ -283,6 +283,10 @@ public class TestDeletedBlockLog {
         .setTxID(transaction.getTxID()).build();
   }
 
+  private List<DeletedBlocksTransaction> getAllTransactions() throws Exception {
+    return getTransactions(Integer.MAX_VALUE);
+  }
+
   private List<DeletedBlocksTransaction> getTransactions(
       int maximumAllowedBlocksNum) throws IOException, TimeoutException {
     DatanodeDeletedBlockTransactions transactions =
@@ -307,7 +311,7 @@ public class TestDeletedBlockLog {
     addTransactions(generateData(30), false);
     // Since transactions are not yet flushed deleteTransactionId should be
     // 0 for all containers
-    Assertions.assertEquals(0, getTransactions(1000).size());
+    Assertions.assertEquals(0, getAllTransactions().size());
     for (ContainerInfo containerInfo : containerManager.getContainers()) {
       Assertions.assertEquals(0, containerInfo.getDeleteTransactionId());
     }
@@ -315,7 +319,7 @@ public class TestDeletedBlockLog {
     scmHADBTransactionBuffer.flush();
     // After flush there should be 30 transactions in deleteTable
     // All containers should have positive deleteTransactionId
-    Assertions.assertEquals(90, getTransactions(1000).size());
+    Assertions.assertEquals(30 * THREE, getAllTransactions().size());
     for (ContainerInfo containerInfo : containerManager.getContainers()) {
       Assertions.assertTrue(containerInfo.getDeleteTransactionId() > 0);
     }
@@ -329,8 +333,7 @@ public class TestDeletedBlockLog {
     addTransactions(generateData(30), true);
 
     // This will return all TXs, total num 30.
-    List<DeletedBlocksTransaction> blocks =
-        getTransactions(40 * BLOCKS_PER_TXN * THREE);
+    List<DeletedBlocksTransaction> blocks = getAllTransactions();
     List<Long> txIDs = blocks.stream().map(DeletedBlocksTransaction::getTxID)
         .collect(Collectors.toList());
 
@@ -341,14 +344,14 @@ public class TestDeletedBlockLog {
     // Increment another time so it exceed the maxRetry.
     // On this call, count will be set to -1 which means TX eventually fails.
     incrementCount(txIDs);
-    blocks = getTransactions(40 * BLOCKS_PER_TXN * THREE);
+    blocks = getAllTransactions();
     for (DeletedBlocksTransaction block : blocks) {
       Assertions.assertEquals(-1, block.getCount());
     }
 
     // If all TXs are failed, getTransactions call will always return nothing.
-    blocks = getTransactions(40 * BLOCKS_PER_TXN * THREE);
-    Assertions.assertEquals(blocks.size(), 0);
+    blocks = getAllTransactions();
+    Assertions.assertEquals(0, blocks.size());
   }
 
   @Test
@@ -359,10 +362,9 @@ public class TestDeletedBlockLog {
     addTransactions(generateData(30), true);
 
     // This will return all TXs, total num 30.
-    List<DeletedBlocksTransaction> blocks =
-        getTransactions(40 * BLOCKS_PER_TXN * THREE);
+    List<DeletedBlocksTransaction> blocks = getAllTransactions();
     List<Long> txIDs = blocks.stream().map(DeletedBlocksTransaction::getTxID)
-        .collect(Collectors.toList());
+        .distinct().collect(Collectors.toList());
 
     for (int i = 0; i < maxRetry; i++) {
       incrementCount(txIDs);
@@ -371,22 +373,22 @@ public class TestDeletedBlockLog {
     // Increment another time so it exceed the maxRetry.
     // On this call, count will be set to -1 which means TX eventually fails.
     incrementCount(txIDs);
-    blocks = getTransactions(40 * BLOCKS_PER_TXN * THREE);
+    blocks = getAllTransactions();
     for (DeletedBlocksTransaction block : blocks) {
       Assertions.assertEquals(-1, block.getCount());
     }
 
     // If all TXs are failed, getTransactions call will always return nothing.
-    blocks = getTransactions(40 * BLOCKS_PER_TXN * THREE);
+    blocks = getAllTransactions();
     Assertions.assertEquals(0, blocks.size());
 
     // Reset the retry count, these transactions should be accessible.
     resetCount(txIDs);
-    blocks = getTransactions(40 * BLOCKS_PER_TXN * THREE);
+    blocks = getAllTransactions();
     for (DeletedBlocksTransaction block : blocks) {
       Assertions.assertEquals(0, block.getCount());
     }
-    Assertions.assertEquals(90, blocks.size());
+    Assertions.assertEquals(30 * THREE, blocks.size());
   }
 
   @Test
@@ -401,7 +403,7 @@ public class TestDeletedBlockLog {
     commitTransactions(blocks);
 
     blocks = getTransactions(50 * BLOCKS_PER_TXN * THREE);
-    Assertions.assertEquals(30 * 3, blocks.size());
+    Assertions.assertEquals(30 * THREE, blocks.size());
     commitTransactions(blocks, dnList.get(1), dnList.get(2),
         DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
             .build());
@@ -439,7 +441,7 @@ public class TestDeletedBlockLog {
         30 * BLOCKS_PER_TXN * THREE));
 
     // The rest txn shall be: 41-50. 41-50. 41-50
-    List<DeletedBlocksTransaction> blocks = getTransactions(1000);
+    List<DeletedBlocksTransaction> blocks = getAllTransactions();
     Assertions.assertEquals(30, blocks.size());
   }
 
@@ -456,7 +458,7 @@ public class TestDeletedBlockLog {
         addTransactions(generateData(10), true);
         added += 10;
       } else if (state == 1) {
-        blocks = getTransactions(20 * THREE);
+        blocks = getTransactions(20 * BLOCKS_PER_TXN * THREE);
         txIDs = new ArrayList<>();
         for (DeletedBlocksTransaction block : blocks) {
           txIDs.add(block.getTxID());
@@ -477,7 +479,7 @@ public class TestDeletedBlockLog {
         }
       }
     }
-    blocks = getTransactions(1000);
+    blocks = getAllTransactions();
     commitTransactions(blocks);
   }
 
@@ -496,11 +498,11 @@ public class TestDeletedBlockLog {
         scm.getSequenceIdGen(),
         metrics);
     List<DeletedBlocksTransaction> blocks =
-        getTransactions(BLOCKS_PER_TXN * 10 * THREE);
-    Assertions.assertEquals(10 * 3, blocks.size());
+        getTransactions(10 * BLOCKS_PER_TXN * THREE);
+    Assertions.assertEquals(10 * THREE, blocks.size());
     commitTransactions(blocks);
-    blocks = getTransactions(BLOCKS_PER_TXN * 40 * THREE);
-    Assertions.assertEquals(40 * 3, blocks.size());
+    blocks = getTransactions(40 * BLOCKS_PER_TXN * THREE);
+    Assertions.assertEquals(40 * THREE, blocks.size());
     commitTransactions(blocks);
 
     // close db and reopen it again to make sure
@@ -514,7 +516,7 @@ public class TestDeletedBlockLog {
         scm.getScmContext(),
         scm.getSequenceIdGen(),
         metrics);
-    blocks = getTransactions(BLOCKS_PER_TXN * 40 * THREE);
+    blocks = getTransactions(40 * BLOCKS_PER_TXN * THREE);
     Assertions.assertEquals(0, blocks.size());
     //Assertions.assertEquals((long)deletedBlockLog.getCurrentTXID(), 50L);
   }
@@ -544,7 +546,7 @@ public class TestDeletedBlockLog {
     }
 
     // fetch and delete 1 less txn Id
-    commitTransactions(getTransactions((txNum - 1) * BLOCKS_PER_TXN));
+    commitTransactions(getTransactions((txNum - 1) * BLOCKS_PER_TXN * ONE));
 
     blocks = getTransactions(txNum * BLOCKS_PER_TXN * ONE);
     // There should be one txn remaining
@@ -557,7 +559,7 @@ public class TestDeletedBlockLog {
     addTransactions(deletedBlocksMap, true);
 
     // get should return two transactions for the same container
-    blocks = getTransactions(txNum * ONE);
+    blocks = getTransactions(txNum * BLOCKS_PER_TXN * ONE);
     Assertions.assertEquals(2, blocks.size());
   }
 
