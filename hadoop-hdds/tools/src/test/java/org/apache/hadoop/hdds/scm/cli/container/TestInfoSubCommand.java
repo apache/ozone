@@ -208,6 +208,7 @@ public class TestInfoSubCommand {
 
   private List<ContainerReplicaInfo> getReplicas(boolean includeIndex) {
     List<ContainerReplicaInfo> replicas = new ArrayList<>();
+    int index = 1;
     for (DatanodeDetails dn : datanodes) {
       ContainerReplicaInfo.Builder container
           = new ContainerReplicaInfo.Builder()
@@ -219,7 +220,7 @@ public class TestInfoSubCommand {
           .setKeyCount(1)
           .setSequenceId(1);
       if (includeIndex) {
-        container.setReplicaIndex(4);
+        container.setReplicaIndex(index++);
       }
       replicas.add(container.build());
     }
