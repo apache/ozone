@@ -273,34 +273,34 @@ public class ContainerKeyMapperTask implements ReconOmTask {
           break;
         }
       }
+    }
 
-      // Check if we have keys in this container in our containerKeyMap
-      containerKeyMap.keySet()
-          .forEach((ContainerKeyPrefix containerKeyPrefix) -> {
-            String keyPrefix = containerKeyPrefix.getKeyPrefix();
-            if (keyPrefix.equals(key)) {
-              keysToBeDeleted.add(containerKeyPrefix);
-            }
-          });
+    // Check if we have keys in this container in our containerKeyMap
+    containerKeyMap.keySet()
+        .forEach((ContainerKeyPrefix containerKeyPrefix) -> {
+          String keyPrefix = containerKeyPrefix.getKeyPrefix();
+          if (keyPrefix.equals(key)) {
+            keysToBeDeleted.add(containerKeyPrefix);
+          }
+        });
 
-      for (ContainerKeyPrefix containerKeyPrefix : keysToBeDeleted) {
-        deletedContainerKeyList.add(containerKeyPrefix);
-        // Remove the container-key prefix from the map if we previously added
-        // it in this batch (and now we delete it)
-        containerKeyMap.remove(containerKeyPrefix);
+    for (ContainerKeyPrefix containerKeyPrefix : keysToBeDeleted) {
+      deletedContainerKeyList.add(containerKeyPrefix);
+      // Remove the container-key prefix from the map if we previously added
+      // it in this batch (and now we delete it)
+      containerKeyMap.remove(containerKeyPrefix);
 
-        // decrement count and update containerKeyCount.
-        Long containerID = containerKeyPrefix.getContainerId();
-        long keyCount;
-        if (containerKeyCountMap.containsKey(containerID)) {
-          keyCount = containerKeyCountMap.get(containerID);
-        } else {
-          keyCount = reconContainerMetadataManager
-              .getKeyCountForContainer(containerID);
-        }
-        if (keyCount > 0) {
-          containerKeyCountMap.put(containerID, --keyCount);
-        }
+      // decrement count and update containerKeyCount.
+      Long containerID = containerKeyPrefix.getContainerId();
+      long keyCount;
+      if (containerKeyCountMap.containsKey(containerID)) {
+        keyCount = containerKeyCountMap.get(containerID);
+      } else {
+        keyCount = reconContainerMetadataManager
+            .getKeyCountForContainer(containerID);
+      }
+      if (keyCount > 0) {
+        containerKeyCountMap.put(containerID, --keyCount);
       }
     }
   }
