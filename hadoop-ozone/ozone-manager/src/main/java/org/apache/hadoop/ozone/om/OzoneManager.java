@@ -424,6 +424,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private final boolean isSecurityEnabled;
 
+  // This metadata reader points to the active filesystem
   private OmMetadataReader omMetadataReader;
 
   @SuppressWarnings("methodlength")
@@ -2734,7 +2735,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // bucket links not supported
 
     if (isAclEnabled) {
-      omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+      omMetadataReader.checkAcls(ResourceType.BUCKET,
+          StoreType.OZONE, ACLType.LIST,
           volumeName, bucketName, keyPrefix);
     }
 
@@ -2782,7 +2784,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public AuditMessage buildAuditMessageForFailure(AuditAction op,
       Map<String, String> auditMap, Throwable throwable) {
-    return omMetadataReader.buildAuditMessageForFailure(op, auditMap, throwable);
+    return omMetadataReader.buildAuditMessageForFailure(op,
+        auditMap, throwable);
   }
 
   private void registerMXBean() {

@@ -299,8 +299,10 @@ public abstract class OMClientRequest implements RequestAuditor {
               .setAclRights(parentAclRight)
               .setOwnerName(volumeOwner)
               .build();
-      ozoneManager.getOmMetadataReader().checkAcls(volumeObj, volumeContext, true);
-      ozoneManager.getOmMetadataReader().checkAcls(obj, contextBuilder.build(), true);
+      ozoneManager.getOmMetadataReader().checkAcls(volumeObj,
+          volumeContext, true);
+      ozoneManager.getOmMetadataReader().checkAcls(obj,
+          contextBuilder.build(), true);
     }
   }
 

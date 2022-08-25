@@ -52,8 +52,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -172,23 +170,6 @@ public class KeyManagerImpl implements KeyManager {
   private BackgroundService dirDeletingService;
 
   private BackgroundService openKeyCleanupService;
-
-  @VisibleForTesting
-  public KeyManagerImpl(ScmBlockLocationProtocol scmBlockClient,
-      OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
-      OzoneBlockTokenSecretManager secretManager) {
-    this(null, new ScmClient(scmBlockClient, null), metadataManager,
-        conf, omId, secretManager, null, null);
-  }
-
-  @VisibleForTesting
-  public KeyManagerImpl(ScmBlockLocationProtocol scmBlockClient,
-      StorageContainerLocationProtocol scmContainerClient,
-      OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
-      OzoneBlockTokenSecretManager secretManager) {
-    this(null, new ScmClient(scmBlockClient, scmContainerClient),
-        metadataManager, conf, omId, secretManager, null, null);
-  }
 
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
       OzoneConfiguration conf, String omId) {

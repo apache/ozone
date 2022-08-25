@@ -121,11 +121,13 @@ public final class OzoneAclUtils {
           remoteAddress, hostName, true,
           volOwner);
       if (isVolOwner) {
-        omMetadataReader.checkAcls(resType, storeType, aclType, vol, bucket, key,
+        omMetadataReader.checkAcls(resType, storeType,
+            aclType, vol, bucket, key,
             user, remoteAddress, hostName, true,
             volOwner);
       } else {
-        omMetadataReader.checkAcls(resType, storeType, aclType, vol, bucket, key,
+        omMetadataReader.checkAcls(resType, storeType,
+            aclType, vol, bucket, key,
             user, remoteAddress, hostName, true,
             bucketOwner);
       }
