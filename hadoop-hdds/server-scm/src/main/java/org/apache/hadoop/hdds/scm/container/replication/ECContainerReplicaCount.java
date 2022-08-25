@@ -206,8 +206,12 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
    * in maintenance
    */
   public Set<Integer> maintenanceOnlyIndexes(boolean includePendingAdd) {
-    Set<Integer> maintenanceOnlyIndexes =
-        new HashSet<>(maintenanceOnlyIndexes());
+    Set<Integer> maintenanceOnlyIndexes = new HashSet<>();
+    for (Integer i : maintenanceIndexes.keySet()) {
+      if (!healthyIndexes.containsKey(i)) {
+        maintenanceOnlyIndexes.add(i);
+      }
+    }
 
     // Now we have a set of maintenance only indexes. Remove any pending add
     // as they should eventually recover.
@@ -276,23 +280,6 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
       missing.remove(i);
     }
     return missing.stream().collect(Collectors.toList());
-  }
-
-  /**
-   * Returns an unsorted list of replicas that are on a maintenance node, but
-   * have no other copies on in_service nodes. This list can be used in
-   * conjunction with additionalMaintenanceCopiesNeeded, to select replicas to
-   * copy to ensure the maintenance redundancy goal is met.
-   * @return
-   */
-  public List<Integer> maintenanceOnlyIndexes() {
-    List<Integer> maintenanceOnly = new ArrayList<>();
-    for (Integer i : maintenanceIndexes.keySet()) {
-      if (!healthyIndexes.containsKey(i)) {
-        maintenanceOnly.add(i);
-      }
-    }
-    return maintenanceOnly;
   }
 
   /**
