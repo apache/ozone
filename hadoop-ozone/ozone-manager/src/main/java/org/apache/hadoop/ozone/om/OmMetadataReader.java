@@ -64,7 +64,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
  * This abstraction manages all the metadata key/acl reading
  * from a rocksDb instance, for both the OM and OM snapshots.
  */
-public class OmMReader implements Auditor {
+public class OmMetadataReader implements Auditor {
   private final KeyManager keyManager;
   private final PrefixManager prefixManager;
   private final VolumeManager volumeManager;
@@ -74,17 +74,17 @@ public class OmMReader implements Auditor {
   private final boolean isAclEnabled;
   private final IAccessAuthorizer accessAuthorizer;
   private final boolean isNativeAuthorizerEnabled;
-  private final OmMReaderMetrics metrics;
+  private final OmMetadataReaderMetrics metrics;
   private final Logger log;
   private final AuditLogger audit;
 
-  public OmMReader(KeyManager keyManager,
+  public OmMetadataReader(KeyManager keyManager,
                    PrefixManager prefixManager,
                    OMMetadataManager metadataManager,
                    OzoneManager ozoneManager,
                    Logger log,
                    AuditLogger audit,
-                   OmMReaderMetrics omMReaderMetrics) {
+                   OmMetadataReaderMetrics omMetadataReaderMetrics) {
     this.keyManager = keyManager;
     this.bucketManager = ozoneManager.getBucketManager();
     this.volumeManager = ozoneManager.getVolumeManager();
@@ -96,7 +96,7 @@ public class OmMReader implements Auditor {
     this.log = log;
     this.audit = audit;
     boolean allowListAllVolumes = ozoneManager.getAllowListAllVolumes();
-    metrics = omMReaderMetrics;
+    metrics = omMetadataReaderMetrics;
     if (isAclEnabled) {
       accessAuthorizer = getACLAuthorizerInstance(configuration);
       if (accessAuthorizer instanceof OzoneNativeAuthorizer) {

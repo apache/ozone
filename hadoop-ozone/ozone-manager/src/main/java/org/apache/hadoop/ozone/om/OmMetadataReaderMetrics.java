@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om;
 /**
  * Interface OM Metadata Reading metrics classes.
  */
-public interface OmMReaderMetrics {
+public interface OmMetadataReaderMetrics {
   void incNumKeyLookups();
 
   void incNumKeyLookupFails();

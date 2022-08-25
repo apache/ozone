@@ -424,7 +424,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private final boolean isSecurityEnabled;
 
-  private OmMReader omMReader;
+  private OmMetadataReader omMetadataReader;
 
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
@@ -703,7 +703,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     prefixManager = new PrefixManagerImpl(metadataManager, isRatisEnabled);
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         omStorage.getOmId());
-    omMReader = new OmMReader(keyManager, prefixManager,
+    omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
         metadataManager, this, LOG, AUDIT, metrics);
 
     if (withNewSnapshot) {
@@ -1386,7 +1386,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public IAccessAuthorizer getAccessAuthorizer() {
-    return omMReader.getAccessAuthorizer();
+    return omMetadataReader.getAccessAuthorizer();
   }
 
   /**
@@ -2462,7 +2462,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setOwnerName(owner)
         .build();
 
-    return omMReader.checkAcls(obj, context, throwIfPermissionDenied);
+    return omMetadataReader.checkAcls(obj, context, throwIfPermissionDenied);
   }
 
 
@@ -2480,8 +2480,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return allowListAllVolumes;
   }
 
-  public OmMReader getOmMReader() {
-    return omMReader;
+  public OmMetadataReader getOmMetadataReader() {
+    return omMetadataReader;
   }
 
   /**
@@ -2503,7 +2503,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public OmVolumeArgs getVolumeInfo(String volume) throws IOException {
     if (isAclEnabled) {
-      omMReader.checkAcls(ResourceType.VOLUME,
+      omMetadataReader.checkAcls(ResourceType.VOLUME,
           StoreType.OZONE, ACLType.READ, volume,
           null, null);
     }
@@ -2613,7 +2613,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (!allowListAllVolumes) {
         // Only admin can list all volumes when disallowed in config
         if (isAclEnabled) {
-          omMReader.checkAcls(ResourceType.VOLUME,
+          omMetadataReader.checkAcls(ResourceType.VOLUME,
               StoreType.OZONE, ACLType.LIST,
               OzoneConsts.OZONE_ROOT, null, null);
         }
@@ -2641,7 +2641,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String startKey, String prefix, int maxNumOfBuckets)
       throws IOException {
     if (isAclEnabled) {
-      omMReader.checkAcls(ResourceType.VOLUME,
+      omMetadataReader.checkAcls(ResourceType.VOLUME,
           StoreType.OZONE, ACLType.LIST, volumeName,
           null, null);
     }
@@ -2681,7 +2681,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public OmBucketInfo getBucketInfo(String volume, String bucket)
       throws IOException {
     if (isAclEnabled) {
-      omMReader.checkAcls(ResourceType.BUCKET,
+      omMetadataReader.checkAcls(ResourceType.BUCKET,
           StoreType.OZONE, ACLType.READ, volume,
           bucket, null);
     }
@@ -2716,13 +2716,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
-    return omMReader.lookupKey(args);
+    return omMetadataReader.lookupKey(args);
   }
 
   @Override
   public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
       String startKey, String keyPrefix, int maxKeys) throws IOException {
-    return omMReader.listKeys(volumeName, bucketName,
+    return omMetadataReader.listKeys(volumeName, bucketName,
         startKey, keyPrefix, maxKeys);
   }
 
@@ -2734,7 +2734,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // bucket links not supported
 
     if (isAclEnabled) {
-      omMReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+      omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
           volumeName, bucketName, keyPrefix);
     }
 
@@ -2776,13 +2776,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public AuditMessage buildAuditMessageForSuccess(AuditAction op,
       Map<String, String> auditMap) {
-    return omMReader.buildAuditMessageForSuccess(op, auditMap);
+    return omMetadataReader.buildAuditMessageForSuccess(op, auditMap);
   }
 
   @Override
   public AuditMessage buildAuditMessageForFailure(AuditAction op,
       Map<String, String> auditMap, Throwable throwable) {
-    return omMReader.buildAuditMessageForFailure(op, auditMap, throwable);
+    return omMetadataReader.buildAuditMessageForFailure(op, auditMap, throwable);
   }
 
   private void registerMXBean() {
@@ -3293,12 +3293,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
-    return omMReader.getFileStatus(args);
+    return omMetadataReader.getFileStatus(args);
   }
 
   @Override
   public OmKeyInfo lookupFile(OmKeyArgs args) throws IOException {
-    return omMReader.lookupFile(args);
+    return omMetadataReader.lookupFile(args);
   }
 
   @Override
@@ -3312,7 +3312,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String startKey, long numEntries, boolean allowPartialPrefixes)
       throws IOException {
 
-    return omMReader.listStatus(args, recursive,
+    return omMetadataReader.listStatus(args, recursive,
         startKey, numEntries, allowPartialPrefixes);
   }
 
@@ -3324,7 +3324,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
-    return omMReader.getAcl(obj);
+    return omMetadataReader.getAcl(obj);
   }
 
   /**

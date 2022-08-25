@@ -307,12 +307,12 @@ public class TestOmMetrics {
         any(), any(), any(), any(), anyInt());
     Mockito.doThrow(exception).when(mockKm).listTrash(
         any(), any(), any(), any(), anyInt());
-    OmMReader omMReader = ozoneManager.getOmMReader();
+    OmMetadataReader omMetadataReader = ozoneManager.getOmMetadataReader();
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "keyManager", mockKm);
 
     HddsWhiteboxTestUtils.setInternalState(
-        omMReader, "keyManager", mockKm);
+        omMetadataReader, "keyManager", mockKm);
 
     // inject exception to test for Failure Metrics on the write path
     mockWritePathExceptions(OmBucketInfo.class);

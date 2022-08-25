@@ -62,7 +62,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OmMReader;
+import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
@@ -157,8 +157,8 @@ public class TestOMKeyRequest {
     when(scmClient.getBlockClient()).thenReturn(scmBlockLocationProtocol);
     when(ozoneManager.getKeyManager()).thenReturn(keyManager);
 
-    OmMReader omMReader = Mockito.mock(OmMReader.class);
-    when(ozoneManager.getOmMReader()).thenReturn(omMReader);
+    OmMetadataReader omMetadataReader = Mockito.mock(OmMetadataReader.class);
+    when(ozoneManager.getOmMetadataReader()).thenReturn(omMetadataReader);
 
     prepareState = new OzoneManagerPrepareState(ozoneConfiguration);
     when(ozoneManager.getPrepareState()).thenReturn(prepareState);
