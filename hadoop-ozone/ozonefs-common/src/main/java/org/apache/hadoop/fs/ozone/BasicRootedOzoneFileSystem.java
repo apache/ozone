@@ -577,10 +577,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       return false;
     }
 
-    if (status == null) {
-      return false;
-    }
-
     String key = pathToKey(f);
     boolean result;
 
@@ -871,12 +867,17 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     try {
       fileStatus = convertFileStatus(
           adapter.getFileStatus(key, uri, qualifiedPath, getUsername()));
-    } catch (OMException ex) {
-      if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND) ||
-          ex.getResult().equals(OMException.ResultCodes.BUCKET_NOT_FOUND) ||
-          ex.getResult().equals(OMException.ResultCodes.VOLUME_NOT_FOUND)) {
-        throw new FileNotFoundException("File not found. path:" + f);
+    } catch (IOException e) {
+      if (e instanceof OMException) {
+        OMException ex = (OMException) e;
+        if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND) ||
+            ex.getResult().equals(OMException.ResultCodes.BUCKET_NOT_FOUND) ||
+            ex.getResult().equals(OMException.ResultCodes.VOLUME_NOT_FOUND)) {
+          throw new FileNotFoundException("File not found. path:" + f);
+        }
       }
+      LOG.warn("GetFileStatus failed for path {}", f, e);
+      throw e;
     }
     return fileStatus;
   }
