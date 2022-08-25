@@ -32,7 +32,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
  */
 @InterfaceAudience.Private
 @Metrics(about = "Ozone Manager Metrics", context = "dfs")
-public class OMMetrics {
+public class OMMetrics implements OmMetadataReaderMetrics {
   private static final String SOURCE_NAME =
       OMMetrics.class.getSimpleName();
 
@@ -373,6 +373,7 @@ public class OMMetrics {
     numBucketLists.incr();
   }
 
+  @Override
   public void incNumKeyLists() {
     numKeyOps.incr();
     numKeyLists.incr();
@@ -533,12 +534,14 @@ public class OMMetrics {
     numTenantTenantUserLists.incr();
   }
 
+  @Override
   public void incNumGetFileStatus() {
     numKeyOps.incr();
     numFSOps.incr();
     numGetFileStatus.incr();
   }
 
+  @Override
   public void incNumGetFileStatusFails() {
     numGetFileStatusFails.incr();
   }
@@ -563,22 +566,26 @@ public class OMMetrics {
     numCreateFileFails.incr();
   }
 
+  @Override
   public void incNumLookupFile() {
     numKeyOps.incr();
     numFSOps.incr();
     numLookupFile.incr();
   }
 
+  @Override
   public void incNumLookupFileFails() {
     numLookupFileFails.incr();
   }
 
+  @Override
   public void incNumListStatus() {
     numKeyOps.incr();
     numFSOps.incr();
     numListStatus.incr();
   }
 
+  @Override
   public void incNumListStatusFails() {
     numListStatusFails.incr();
   }
@@ -636,11 +643,13 @@ public class OMMetrics {
     numKeyAllocateFails.incr();
   }
 
+  @Override
   public void incNumKeyLookups() {
     numKeyOps.incr();
     numKeyLookup.incr();
   }
 
+  @Override
   public void incNumKeyLookupFails() {
     numKeyLookupFails.incr();
   }
@@ -684,6 +693,7 @@ public class OMMetrics {
     numBucketListFails.incr();
   }
 
+  @Override
   public void incNumKeyListFails() {
     numKeyListFails.incr();
   }
@@ -724,6 +734,7 @@ public class OMMetrics {
     numSetAcl.incr();
   }
 
+  @Override
   public void incNumGetAcl() {
     numGetAcl.incr();
   }

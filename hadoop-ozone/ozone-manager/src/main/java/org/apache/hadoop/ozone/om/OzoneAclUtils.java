@@ -62,7 +62,7 @@ public final class OzoneAclUtils {
 
   /**
    * Check Acls of ozone object with volume owner and bucket owner.
-   * @param ozoneManager
+   * @param omMetadataReader
    * @param resType
    * @param storeType
    * @param aclType
@@ -74,7 +74,7 @@ public final class OzoneAclUtils {
    * @throws IOException
    */
   @SuppressWarnings("parameternumber")
-  public static void checkAllAcls(OzoneManager ozoneManager,
+  public static void checkAllAcls(OmMetadataReader omMetadataReader,
       OzoneObj.ResourceType resType,
       OzoneObj.StoreType storeType, IAccessAuthorizer.ACLType aclType,
       String vol, String bucket, String key, String volOwner,
@@ -88,7 +88,7 @@ public final class OzoneAclUtils {
     //OzoneNativeAuthorizer differs from Ranger Authorizer as Ranger requires
     // only READ access on parent level access. OzoneNativeAuthorizer has
     // different parent level access based on the child level access type
-    if (ozoneManager.isNativeAuthorizerEnabled()) {
+    if (omMetadataReader.isNativeAuthorizerEnabled()) {
       if (aclType == IAccessAuthorizer.ACLType.CREATE ||
           aclType == IAccessAuthorizer.ACLType.DELETE ||
           aclType == IAccessAuthorizer.ACLType.WRITE_ACL) {
@@ -105,7 +105,7 @@ public final class OzoneAclUtils {
     //For Volume level access we only need to check {OWNER} equal
     // to Volume Owner.
     case VOLUME:
-      ozoneManager.checkAcls(resType, storeType, aclType, vol, bucket, key,
+      omMetadataReader.checkAcls(resType, storeType, aclType, vol, bucket, key,
           user, remoteAddress, hostName, true,
           volOwner);
       break;
@@ -116,16 +116,18 @@ public final class OzoneAclUtils {
     // volume owner if current ugi user is volume owner else we need check
     //{OWNER} equals bucket owner for bucket/key/prefix.
     case PREFIX:
-      ozoneManager.checkAcls(OzoneObj.ResourceType.VOLUME, storeType,
+      omMetadataReader.checkAcls(OzoneObj.ResourceType.VOLUME, storeType,
           parentAclRight, vol, bucket, key, user,
           remoteAddress, hostName, true,
           volOwner);
       if (isVolOwner) {
-        ozoneManager.checkAcls(resType, storeType, aclType, vol, bucket, key,
+        omMetadataReader.checkAcls(resType, storeType,
+            aclType, vol, bucket, key,
             user, remoteAddress, hostName, true,
             volOwner);
       } else {
-        ozoneManager.checkAcls(resType, storeType, aclType, vol, bucket, key,
+        omMetadataReader.checkAcls(resType, storeType,
+            aclType, vol, bucket, key,
             user, remoteAddress, hostName, true,
             bucketOwner);
       }
