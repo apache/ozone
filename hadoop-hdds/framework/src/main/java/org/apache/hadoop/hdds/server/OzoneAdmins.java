@@ -51,14 +51,16 @@ public class OzoneAdmins {
   public OzoneAdmins(Collection<String> adminUsernames,
       Collection<String> adminGroups) {
     this.adminUsernames = adminUsernames != null ?
-            new LinkedHashSet<>(adminUsernames) : Collections.emptySet();
+        Collections.unmodifiableSet(new LinkedHashSet<>(adminUsernames)) :
+        Collections.emptySet();
     this.adminGroups = adminGroups != null ?
-            new LinkedHashSet<>(adminGroups) : Collections.emptySet();
+        Collections.unmodifiableSet(new LinkedHashSet<>(adminGroups)) :
+        Collections.emptySet();
   }
 
   private boolean hasAdminGroup(Collection<String> userGroups) {
     return !Sets.intersection(adminGroups,
-            new LinkedHashSet<>(userGroups)).isEmpty();
+        new LinkedHashSet<>(userGroups)).isEmpty();
   }
 
   /**
@@ -66,7 +68,6 @@ public class OzoneAdmins {
    * has admin permissions.
    *
    * @param user
-   *
    * @return
    */
   public boolean isAdmin(UserGroupInformation user) {
@@ -77,10 +78,10 @@ public class OzoneAdmins {
   }
 
   public Collection<String> getAdminGroups() {
-    return Collections.unmodifiableSet(adminGroups);
+    return adminGroups;
   }
 
   public Set<String> getAdminUsernames() {
-    return Collections.unmodifiableSet(adminUsernames);
+    return adminUsernames;
   }
 }
