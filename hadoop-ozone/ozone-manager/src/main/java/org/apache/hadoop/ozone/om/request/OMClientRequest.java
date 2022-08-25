@@ -251,9 +251,11 @@ public abstract class OMClientRequest implements RequestAuditor {
 
     // check Acl
     if (ozoneManager.getAclsEnabled()) {
-      String volumeOwner = ozoneManager.getVolumeOwner(obj.getVolumeName(),
+      String volumeOwner = ozoneManager.getVolumeOwner(
+          obj.getVolumeName(),
           contextBuilder.getAclRights(), obj.getResourceType());
-      String bucketOwner = ozoneManager.getBucketOwner(obj.getVolumeName(),
+      String bucketOwner = ozoneManager.getBucketOwner(
+          obj.getVolumeName(),
           obj.getBucketName(), contextBuilder.getAclRights(),
           obj.getResourceType());
       UserGroupInformation currentUser = createUGI();
@@ -269,7 +271,7 @@ public abstract class OMClientRequest implements RequestAuditor {
       } else {
         contextBuilder.setOwnerName(bucketOwner);
       }
-      if (ozoneManager.isNativeAuthorizerEnabled()) {
+      if (ozoneManager.getOmMetadataReader().isNativeAuthorizerEnabled()) {
         if (aclType == IAccessAuthorizer.ACLType.CREATE ||
                 aclType == IAccessAuthorizer.ACLType.DELETE ||
                 aclType == IAccessAuthorizer.ACLType.WRITE_ACL) {
@@ -296,8 +298,10 @@ public abstract class OMClientRequest implements RequestAuditor {
               .setAclRights(parentAclRight)
               .setOwnerName(volumeOwner)
               .build();
-      ozoneManager.checkAcls(volumeObj, volumeContext, true);
-      ozoneManager.checkAcls(obj, contextBuilder.build(), true);
+      ozoneManager.getOmMetadataReader().checkAcls(volumeObj,
+          volumeContext, true);
+      ozoneManager.getOmMetadataReader().checkAcls(obj,
+          contextBuilder.build(), true);
     }
   }
 
@@ -357,7 +361,8 @@ public abstract class OMClientRequest implements RequestAuditor {
       String bucketOwner)
       throws IOException {
 
-    OzoneAclUtils.checkAllAcls(ozoneManager, resType, storeType, aclType,
+    OzoneAclUtils.checkAllAcls(ozoneManager.getOmMetadataReader(),
+            resType, storeType, aclType,
             vol, bucket, key, volOwner, bucketOwner, createUGI(),
             getRemoteAddress(), getHostName());
   }
