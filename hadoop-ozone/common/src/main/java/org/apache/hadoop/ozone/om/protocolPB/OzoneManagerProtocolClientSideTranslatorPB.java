@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -61,6 +62,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
@@ -1083,6 +1085,33 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public String createSnapshot(String volumeName,
+      String bucketName, String snapshotName)
+      throws IOException {
+
+    final OzoneManagerProtocolProtos.CreateSnapshotRequest.Builder
+        requestBuilder =
+        OzoneManagerProtocolProtos.CreateSnapshotRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName);
+    if (!StringUtils.isBlank(snapshotName)) {
+      requestBuilder.setSnapshotName(snapshotName);
+    }
+      
+    final OMRequest omRequest = createOMRequest(Type.CreateSnapshot)
+        .setCreateSnapshotRequest(requestBuilder)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+    SnapshotInfo snapshotInfo = SnapshotInfo.getFromProtobuf(
+        omResponse.getCreateSnapshotResponse().getSnapshotInfo());
+    return snapshotInfo.getName();
   }
 
   /**

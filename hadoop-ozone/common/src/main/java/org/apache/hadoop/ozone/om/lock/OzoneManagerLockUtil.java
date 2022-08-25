@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_SECRET;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_USER_PREFIX;
 
 /**
@@ -69,6 +70,17 @@ final class OzoneManagerLockUtil {
   public static String generateBucketLockName(String volumeName,
       String bucketName) {
     return OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName;
+  }
+
+  /**
+   * Generate snapshot lock name.
+   * @param volumeName
+   * @param bucketName
+   */
+  public static String generateSnapshotLockName(String volumeName,
+      String bucketName, String snapshotName) {
+    return generateBucketLockName(volumeName, bucketName) +
+        OM_KEY_PREFIX + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX + snapshotName;
   }
 
   /**

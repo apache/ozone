@@ -2323,7 +2323,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  private boolean isOwner(UserGroupInformation callerUgi, String ownerName) {
+  public boolean isOwner(UserGroupInformation callerUgi, String ownerName) {
     if (ownerName == null) {
       return false;
     }

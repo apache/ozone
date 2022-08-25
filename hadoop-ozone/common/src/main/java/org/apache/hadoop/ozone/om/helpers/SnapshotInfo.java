@@ -18,10 +18,28 @@ package org.apache.hadoop.ozone.om.helpers;
  *  limitations under the License.
  */
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.Auditable;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotStatusProto;
 
 import com.google.common.base.Preconditions;
+
+import org.apache.hadoop.util.Time;
+
+import java.time.format.DateTimeFormatter;
+import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.time.ZoneId;
+
+import java.util.Objects;
+import java.util.UUID;
+import java.util.Map;
+import java.util.LinkedHashMap;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
  * This class is used for storing info related to Snapshots.
@@ -31,7 +49,7 @@ import com.google.common.base.Preconditions;
  * snapshot checkpoint directory, previous snapshotid
  * for the snapshot path & global amongst other necessary fields.
  */
-public final class SnapshotInfo {
+public final class SnapshotInfo implements Auditable {
 
   /**
    * SnapshotStatus enum composed of
@@ -71,8 +89,13 @@ public final class SnapshotInfo {
             "BUG: missing valid SnapshotStatus, found status=" + status);
       }
     }
-  };
+  }
 
+  private static final String SEPARATOR = "-";
+  private static final long INVALID_TIMESTAMP = -1;
+  private static final String INITIAL_SNAPSHOT_ID =
+      UUID.randomUUID().toString();
+    
   private final String snapshotID;  // UUID
   private String name;
   private String volumeName;
@@ -342,7 +365,7 @@ public final class SnapshotInfo {
 
   /**
    * Parses SnapshotInfo protobuf and creates SnapshotInfo.
-   * @param snapshotInfo protobuf
+   * @param snapshotInfoProto protobuf
    * @return instance of SnapshotInfo
    */
   public static SnapshotInfo getFromProtobuf(
@@ -364,5 +387,98 @@ public final class SnapshotInfo {
         .setCheckpointDir(snapshotInfoProto.getCheckpointDir());
 
     return osib.build();
+  }
+  @Override
+  public Map<String, String> toAuditMap() {
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(OzoneConsts.VOLUME, getVolumeName());
+    auditMap.put(OzoneConsts.BUCKET, getBucketName());
+    auditMap.put(OzoneConsts.OM_SNAPSHOT_NAME, this.name);
+    return auditMap;
+  }
+
+  /**
+   * Get the name of the checkpoint directory.
+   */
+  public static String getCheckpointDirName(String snapshotId) {
+    return SEPARATOR + snapshotId;
+  }
+  /**
+   * Get the name of the checkpoint directory, (non-static).
+   */
+  public String getCheckpointDirName() {
+    return getCheckpointDirName(getSnapshotID());
+  }
+
+  /**
+   * Get the table key for this snapshot.
+   */
+  public String getTableKey() {
+    return OM_KEY_PREFIX + snapshotPath + OM_KEY_PREFIX + name;
+  }
+
+  /**
+   * Generate default name of snapshot, (used if user doesn't provide one).
+   */
+  @VisibleForTesting
+  public static String generateName(long initialTime) {
+    String timePattern = "yyyyMMdd-HHmmss.SSS";
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern(timePattern);
+    Instant instant = Instant.ofEpochMilli(initialTime);
+    return "s" + formatter.format(
+        ZonedDateTime.ofInstant(instant, ZoneId.of("UTC")));
+  }
+  
+  /**
+   * Factory for making standard instance.
+   */
+  public static SnapshotInfo newInstance(String volumeName,
+      String bucketName, String snapshotName) {
+    SnapshotInfo.Builder builder = new SnapshotInfo.Builder();
+    String id = UUID.randomUUID().toString();
+    long initialTime = Time.now();
+    if (StringUtils.isBlank(snapshotName)) {
+      snapshotName = generateName(initialTime);
+    }
+    builder.setSnapshotID(id)
+        .setName(snapshotName)
+        .setCreationTime(initialTime)
+        .setDeletionTime(INVALID_TIMESTAMP)
+        .setPathPreviousSnapshotID(INITIAL_SNAPSHOT_ID)
+        .setGlobalPreviousSnapshotID(INITIAL_SNAPSHOT_ID)
+        .setSnapshotPath(volumeName + OM_KEY_PREFIX + bucketName)
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setCheckpointDir(getCheckpointDirName(id));
+    return builder.build();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    SnapshotInfo that = (SnapshotInfo) o;
+    return creationTime == that.creationTime &&
+        deletionTime == that.deletionTime &&
+        snapshotID.equals(that.snapshotID) &&
+        name.equals(that.name) && volumeName.equals(that.volumeName) &&
+        bucketName.equals(that.bucketName) &&
+        snapshotStatus == that.snapshotStatus &&
+        pathPreviousSnapshotID.equals(that.pathPreviousSnapshotID) &&
+        globalPreviousSnapshotID.equals(that.globalPreviousSnapshotID) &&
+        snapshotPath.equals(that.snapshotPath) &&
+        checkpointDir.equals(that.checkpointDir);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(snapshotID, name, volumeName, bucketName,
+        snapshotStatus,
+        creationTime, deletionTime, pathPreviousSnapshotID,
+        globalPreviousSnapshotID, snapshotPath, checkpointDir);
   }
 }
