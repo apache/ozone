@@ -82,7 +82,8 @@ public class AuthorizerLockImpl implements AuthorizerLock {
           ResultCodes.TIMEOUT);
     }
 
-    long optimisticStamp = authorizerStampedLock.tryConvertToOptimisticRead(stamp);
+    long optimisticStamp = authorizerStampedLock.tryConvertToOptimisticRead(
+        stamp);
     if (optimisticStamp == 0L) {
       // This should never happen. If we reached this point we are holding a
       // read lock and providing its stamp so the lock should be in read mode
@@ -91,8 +92,8 @@ public class AuthorizerLockImpl implements AuthorizerLock {
       throw new OMException("Failed to convert read lock to optimistic read.",
               INTERNAL_ERROR);
     } else if (LOG.isDebugEnabled()) {
-      LOG.debug("Acquired authorizer optimistic read from thread {} with stamp {}",
-          Thread.currentThread().getId(), optimisticStamp);
+      LOG.debug("Acquired authorizer optimistic read from thread {} with" +
+          " stamp {}", Thread.currentThread().getId(), optimisticStamp);
     }
     return optimisticStamp;
   }

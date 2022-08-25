@@ -320,10 +320,8 @@ public class OMRangerBGSyncService extends BackgroundService {
       while (dbOzoneServiceVersion != rangerOzoneServiceVersion) {
 
         if (++attempt > MAX_ATTEMPT) {
-          if (LOG.isDebugEnabled()) {
-            LOG.warn("Reached maximum number of attempts ({}). Abort",
-                MAX_ATTEMPT);
-          }
+          LOG.warn("Reached maximum number of attempts ({}). Abort",
+              MAX_ATTEMPT);
           break;
         }
 
@@ -351,7 +349,7 @@ public class OMRangerBGSyncService extends BackgroundService {
     } finally {
       if (attempt > 0) {
         LOG.info("Finished executing Multi-Tenancy Ranger Sync run # {} after" +
-           "{} attempts.", runCount.get(), attempt);
+            "{} attempts.", runCount.get(), attempt);
       }
     }
 
@@ -581,7 +579,8 @@ public class OMRangerBGSyncService extends BackgroundService {
 
     if (!readSuccess) {
       throw new IOException("Failed to read state for Ranger background sync" +
-          "without an interrupting write operation after " + attempt + " attempts.");
+          "without an interrupting write operation after " + attempt +
+          " attempts.");
     }
   }
 
