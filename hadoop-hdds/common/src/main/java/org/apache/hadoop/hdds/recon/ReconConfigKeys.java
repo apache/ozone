@@ -65,4 +65,7 @@ public final class ReconConfigKeys {
    */
   public static final String OZONE_RECON_ADMINISTRATORS =
       "ozone.recon.administrators";
+
+  public static final String OZONE_RECON_ADMINISTRATORS_GROUPS =
+      "ozone.recon.administrators.groups";
 }

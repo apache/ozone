@@ -129,6 +129,9 @@ public final class OzoneConfigKeys {
    * */
   public static final String OZONE_ADMINISTRATORS =
       "ozone.administrators";
+
+  public static final String OZONE_ADMINISTRATORS_GROUPS =
+      "ozone.administrators.groups";
   /**
    * Used only for testing purpose. Results in making every user an admin.
    * */
