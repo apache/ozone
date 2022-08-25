@@ -1724,6 +1724,18 @@ public class TestRootedOzoneFileSystem {
   }
 
   @Test
+  public void testGetFileStatus() throws Exception {
+    String volumeNameLocal = getRandomNonExistVolumeName();
+    String bucketNameLocal = RandomStringUtils.randomNumeric(5);
+    Path volume = new Path("/" + volumeNameLocal);
+    ofs.mkdirs(volume);
+    LambdaTestUtils.intercept(OMException.class,
+        () -> ofs.getFileStatus(new Path(volume, bucketNameLocal)));
+    // Cleanup
+    ofs.delete(volume, true);
+  }
+
+  @Test
   public void testUnbuffer() throws IOException {
     String testKeyName = "testKey2";
     Path path = new Path(bucketPath, testKeyName);
