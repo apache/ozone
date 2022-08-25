@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  * Abstract class responsible for scheduling the reports based on the
  * configured interval. All the ReportPublishers should extend this class.
  */
-public abstract class ReportPublisher<T extends GeneratedMessage>
+public abstract class ReportPublisher<T extends Message>
     implements Runnable {
 
   private static final Logger LOG = LoggerFactory.getLogger(
@@ -81,7 +81,7 @@ public abstract class ReportPublisher<T extends GeneratedMessage>
    */
   private void publishReport() {
     try {
-      GeneratedMessage report = getReport();
+      Message report = getReport();
       if (report instanceof CommandStatusReportsProto) {
         context.addIncrementalReport(report);
       } else {
