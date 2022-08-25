@@ -22,8 +22,6 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.lib.MutableCounterInt;
-import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -33,51 +31,11 @@ import java.util.concurrent.ThreadLocalRandom;
  **/
 @InterfaceAudience.Private
 @Metrics(about = "DataNode container data scrubber metrics", context = "dfs")
-public final class ContainerDataScrubberMetrics {
+public final class ContainerDataScrubberMetrics
+    extends AbstractContainerScannerMetric {
 
-  private final String name;
-  private final MetricsSystem ms;
-
-  @Metric("number of containers scanned in the current iteration")
-  private MutableGaugeInt numContainersScanned;
-  @Metric("number of unhealthy containers found in the current iteration")
-  private MutableGaugeInt numUnHealthyContainers;
-  @Metric("number of iterations of scanner completed since the restart")
-  private MutableCounterInt numScanIterations;
   @Metric("disk bandwidth used by the container data scrubber per volume")
   private MutableRate numBytesScanned;
-
-  public int getNumContainersScanned() {
-    return numContainersScanned.value();
-  }
-
-  public void incNumContainersScanned() {
-    numContainersScanned.incr();
-  }
-
-  public void resetNumContainersScanned() {
-    numContainersScanned.decr(getNumContainersScanned());
-  }
-
-  public int getNumUnHealthyContainers() {
-    return numUnHealthyContainers.value();
-  }
-
-  public void incNumUnHealthyContainers() {
-    numUnHealthyContainers.incr();
-  }
-
-  public void resetNumUnhealthyContainers() {
-    numUnHealthyContainers.decr(getNumUnHealthyContainers());
-  }
-
-  public int getNumScanIterations() {
-    return numScanIterations.value();
-  }
-
-  public void incNumScanIterations() {
-    numScanIterations.incr();
-  }
 
   public double getNumBytesScannedMean() {
     return numBytesScanned.lastStat().mean();
@@ -95,17 +53,8 @@ public final class ContainerDataScrubberMetrics {
     numBytesScanned.add(bytes);
   }
 
-  public void unregister() {
-    ms.unregisterSource(name);
-  }
-
-  public String getName() {
-    return name;
-  }
-
   private ContainerDataScrubberMetrics(String name, MetricsSystem ms) {
-    this.name = name;
-    this.ms = ms;
+    super(name, ms);
   }
 
   @SuppressWarnings("java:S2245") // no need for secure random

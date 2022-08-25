@@ -19,11 +19,8 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsSystem;
-import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.lib.MutableCounterInt;
-import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 
 /**
  * This class captures the container meta-data scrubber metrics on the
@@ -31,61 +28,11 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
  **/
 @InterfaceAudience.Private
 @Metrics(about = "DataNode container data scrubber metrics", context = "dfs")
-public final class ContainerMetadataScrubberMetrics {
-
-  private final String name;
-  private final MetricsSystem ms;
-
-  @Metric("number of containers scanned in the current iteration")
-  private MutableGaugeInt numContainersScanned;
-  @Metric("number of unhealthy containers found in the current iteration")
-  private MutableGaugeInt numUnHealthyContainers;
-  @Metric("number of iterations of scanner completed since the restart")
-  private MutableCounterInt numScanIterations;
-
-  public int getNumContainersScanned() {
-    return numContainersScanned.value();
-  }
-
-  public void incNumContainersScanned() {
-    numContainersScanned.incr();
-  }
-
-  public void resetNumContainersScanned() {
-    numContainersScanned.decr(getNumContainersScanned());
-  }
-
-  public int getNumUnHealthyContainers() {
-    return numUnHealthyContainers.value();
-  }
-
-  public void incNumUnHealthyContainers() {
-    numUnHealthyContainers.incr();
-  }
-
-  public void resetNumUnhealthyContainers() {
-    numUnHealthyContainers.decr(getNumUnHealthyContainers());
-  }
-
-  public int getNumScanIterations() {
-    return numScanIterations.value();
-  }
-
-  public void incNumScanIterations() {
-    numScanIterations.incr();
-  }
-
-  public void unregister() {
-    ms.unregisterSource(name);
-  }
-
-  public String getName() {
-    return name;
-  }
+public final class ContainerMetadataScrubberMetrics
+    extends AbstractContainerScannerMetric {
 
   private ContainerMetadataScrubberMetrics(String name, MetricsSystem ms) {
-    this.name = name;
-    this.ms = ms;
+    super(name, ms);
   }
 
   public static ContainerMetadataScrubberMetrics create() {
@@ -94,5 +41,4 @@ public final class ContainerMetadataScrubberMetrics {
     return ms.register(name, null,
         new ContainerMetadataScrubberMetrics(name, ms));
   }
-
 }
