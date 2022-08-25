@@ -214,8 +214,7 @@ public abstract class OMClientRequest implements RequestAuditor {
       String vol, String bucket, String key) throws IOException {
     checkAcls(ozoneManager, resType, storeType, aclType, vol, bucket, key,
         ozoneManager.getVolumeOwner(vol, aclType, resType),
-        ozoneManager
-        .getBucketOwner(vol, bucket, aclType, resType));
+        ozoneManager.getBucketOwner(vol, bucket, aclType, resType));
   }
 
   /**
