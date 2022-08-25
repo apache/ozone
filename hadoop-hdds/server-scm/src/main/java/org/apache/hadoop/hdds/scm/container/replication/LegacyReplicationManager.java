@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.Message;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
@@ -1610,7 +1610,7 @@ public class LegacyReplicationManager {
    * @param tracker Tracker which tracks the inflight actions
    * @param <T> Type of SCMCommand
    */
-  private <T extends GeneratedMessage> boolean sendAndTrackDatanodeCommand(
+  private <T extends Message> boolean sendAndTrackDatanodeCommand(
       final DatanodeDetails datanode,
       final SCMCommand<T> command,
       final Predicate<InflightAction> tracker) {

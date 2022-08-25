@@ -28,6 +28,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -130,6 +131,12 @@ public class TestReconOmMetadataManagerImpl {
     Assert.assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_two"));
 
+    // Update again with an existing OM DB.
+    DBStore current = reconOMMetadataManager.getStore();
+    reconOMMetadataManager.updateOmDB(
+        checkpoint.getCheckpointLocation().toFile());
+    // Verify that the existing DB instance is closed.
+    Assert.assertTrue(current.isClosed());
   }
 
   /**
