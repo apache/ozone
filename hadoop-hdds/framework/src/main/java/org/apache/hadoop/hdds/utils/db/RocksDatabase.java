@@ -36,6 +36,7 @@ import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -47,12 +48,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.StringUtils.bytes2String;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions.closeDeeply;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator.managed;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator.managed;
 import static org.rocksdb.RocksDB.listColumnFamilies;
@@ -77,11 +78,20 @@ public final class RocksDatabase {
    *
    * @return a list of column families.
    */
-  private static List<TableConfig> getColumnFamilies(File file)
-      throws RocksDBException {
+  private static List<TableConfig> getExtraColumnFamilies(
+      File file, Set<TableConfig> families) throws RocksDBException {
+
+    // This logic has been added to support old column families that have
+    // been removed, or those that may have been created in a future version.
+    // TODO : Revisit this logic during upgrade implementation.
+    Set<String> existingFamilyNames = families.stream()
+        .map(TableConfig::getName)
+        .collect(Collectors.toSet());
     final List<TableConfig> columnFamilies = listColumnFamiliesEmptyOptions(
         file.getAbsolutePath())
         .stream()
+        .map(TableConfig::toName)
+        .filter(familyName -> !existingFamilyNames.contains(familyName))
         .map(TableConfig::newTableConfig)
         .collect(Collectors.toList());
     if (LOG.isDebugEnabled()) {
@@ -112,12 +122,8 @@ public final class RocksDatabase {
     ManagedRocksDB db = null;
     final Map<String, ColumnFamily> columnFamilies = new HashMap<>();
     try {
-      // This logic has been added to support old column families that have
-      // been removed, or those that may have been created in a future version.
-      // TODO : Revisit this logic during upgrade implementation.
-      final Stream<TableConfig> extra = getColumnFamilies(dbFile).stream()
-          .filter(extraColumnFamily(families));
-      descriptors = Stream.concat(families.stream(), extra)
+      final List<TableConfig> extra = getExtraColumnFamilies(dbFile, families);
+      descriptors = Stream.concat(families.stream(), extra.stream())
           .map(TableConfig::getDescriptor)
           .collect(Collectors.toList());
 
@@ -144,7 +150,7 @@ public final class RocksDatabase {
   }
 
   private static void close(ColumnFamilyDescriptor d) {
-    runWithTryCatch(() -> d.getOptions().close(), new Object() {
+    runWithTryCatch(() -> closeDeeply(d.getOptions()), new Object() {
       @Override
       public String toString() {
         return d.getClass() + ":" + bytes2String(d.getName());
@@ -185,16 +191,6 @@ public final class RocksDatabase {
     }
   }
 
-  static Predicate<TableConfig> extraColumnFamily(Set<TableConfig> families) {
-    return f -> {
-      if (families.contains(f)) {
-        return false;
-      }
-      LOG.info("Found an extra column family in existing DB: {}", f);
-      return true;
-    };
-  }
-
   public boolean isClosed() {
     return isClosed.get();
   }
@@ -204,7 +200,7 @@ public final class RocksDatabase {
    *
    * @see ManagedCheckpoint
    */
-  final class RocksCheckpoint {
+  final class RocksCheckpoint implements Closeable {
     private final ManagedCheckpoint checkpoint;
 
     private RocksCheckpoint() {
@@ -222,6 +218,11 @@ public final class RocksDatabase {
 
     public long getLatestSequenceNumber() {
       return RocksDatabase.this.getLatestSequenceNumber();
+    }
+
+    @Override
+    public void close() throws IOException {
+      checkpoint.close();
     }
   }
 
@@ -405,7 +406,7 @@ public final class RocksDatabase {
     return columnFamilies.get(key);
   }
 
-  public Collection<ColumnFamily> getColumnFamilies() {
+  public Collection<ColumnFamily> getExtraColumnFamilies() {
     return Collections.unmodifiableCollection(columnFamilies.values());
   }
 

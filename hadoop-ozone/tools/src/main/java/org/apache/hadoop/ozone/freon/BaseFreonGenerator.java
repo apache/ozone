@@ -210,7 +210,7 @@ public class BaseFreonGenerator {
   }
 
   private void shutdown() {
-    if (failureCounter.get() > 0 && !failAtEnd) {
+    if (failureCounter.get() > 0) {
       progressBar.terminate();
     } else {
       progressBar.shutdown();
@@ -250,7 +250,8 @@ public class BaseFreonGenerator {
       //replace environment variables to support multi-node execution
       prefix = resolvePrefix(prefix);
     }
-    LOG.info("Executing test with prefix {}", prefix);
+    LOG.info("Executing test with prefix {} " +
+        "and number-of-tests {}", prefix, testNo);
 
     pathSchema = new PathSchema(prefix);
 
@@ -301,6 +302,11 @@ public class BaseFreonGenerator {
         Math.round((System.currentTimeMillis() - startTime) / 1000.0));
     messages.add("Failures: " + failureCounter.get());
     messages.add("Successful executions: " + successCounter.get());
+    if (failureCounter.get() > 0) {
+      messages.add("Expected " + testNo
+          + " --number-of-tests objects!, successfully executed "
+          + successCounter.get());
+    }
 
     Consumer<String> print = freonCommand.isInteractive()
         ? System.out::println

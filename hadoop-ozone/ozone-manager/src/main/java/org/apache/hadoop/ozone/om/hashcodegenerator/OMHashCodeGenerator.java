@@ -28,6 +28,6 @@ public interface OMHashCodeGenerator {
    * @param resourceName
    * @return hash code of resourceName
    */
-  int getHashCode(String resourceName);
+  long getHashCode(String resourceName);
 
 }

@@ -73,7 +73,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 /**
@@ -329,7 +331,8 @@ public class TestContainerBalancer {
     // balancer should have identified unbalanced nodes
     Assertions.assertFalse(containerBalancer.getUnBalancedNodes().isEmpty());
     // no container should have been selected
-    Assertions.assertTrue(containerBalancer.getSourceToTargetMap().isEmpty());
+    Assertions.assertTrue(containerBalancer.getContainerToSourceMap()
+        .isEmpty());
     /*
     Iteration result should be CAN_NOT_BALANCE_ANY_MORE because no container
     move is generated
@@ -347,11 +350,10 @@ public class TestContainerBalancer {
     stopBalancer();
 
     // check whether all selected containers are closed
-    for (ContainerMoveSelection moveSelection:
-         containerBalancer.getSourceToTargetMap().values()) {
+    for (ContainerID cid:
+         containerBalancer.getContainerToSourceMap().keySet()) {
       Assertions.assertSame(
-          cidToInfoMap.get(moveSelection.getContainerID()).getState(),
-          HddsProtos.LifeCycleState.CLOSED);
+          cidToInfoMap.get(cid).getState(), HddsProtos.LifeCycleState.CLOSED);
     }
   }
 
@@ -387,19 +389,14 @@ public class TestContainerBalancer {
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     startBalancer(balancerConfiguration);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) { }
+    sleepWhileBalancing(1000);
 
     stopBalancer();
-    Map<DatanodeDetails, ContainerMoveSelection> sourceToTargetMap =
-        containerBalancer.getSourceToTargetMap();
-    for (ContainerMoveSelection moveSelection : sourceToTargetMap.values()) {
-      ContainerID container = moveSelection.getContainerID();
-      DatanodeDetails target = moveSelection.getTargetNode();
+    Map<ContainerID, DatanodeDetails> map =
+        containerBalancer.getContainerToTargetMap();
+    for (Map.Entry<ContainerID, DatanodeDetails> entry : map.entrySet()) {
+      ContainerID container = entry.getKey();
+      DatanodeDetails target = entry.getValue();
       Assertions.assertTrue(cidToReplicasMap.get(container)
           .stream()
           .map(ContainerReplica::getDatanodeDetails)
@@ -414,33 +411,31 @@ public class TestContainerBalancer {
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    balancerConfiguration.setIterations(1);
     startBalancer(balancerConfiguration);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) { }
+    sleepWhileBalancing(500);
 
     stopBalancer();
-    Map<DatanodeDetails, ContainerMoveSelection> sourceToTargetMap =
-        containerBalancer.getSourceToTargetMap();
+    Map<ContainerID, DatanodeDetails> containerFromSourceMap =
+        containerBalancer.getContainerToSourceMap();
+    Map<ContainerID, DatanodeDetails> containerToTargetMap =
+        containerBalancer.getContainerToTargetMap();
 
     // for each move selection, check if {replicas - source + target}
     // satisfies placement policy
-    for (Map.Entry<DatanodeDetails, ContainerMoveSelection> entry :
-        sourceToTargetMap.entrySet()) {
-      ContainerMoveSelection moveSelection = entry.getValue();
-      ContainerID container = moveSelection.getContainerID();
-      DatanodeDetails target = moveSelection.getTargetNode();
+    for (Map.Entry<ContainerID, DatanodeDetails> entry :
+        containerFromSourceMap.entrySet()) {
+      ContainerID container = entry.getKey();
+      DatanodeDetails source = entry.getValue();
 
       List<DatanodeDetails> replicas = cidToReplicasMap.get(container)
           .stream()
           .map(ContainerReplica::getDatanodeDetails)
           .collect(Collectors.toList());
-      replicas.remove(entry.getKey());
-      replicas.add(target);
+      // remove source and add target
+      replicas.remove(source);
+      replicas.add(containerToTargetMap.get(container));
 
       ContainerInfo containerInfo = cidToInfoMap.get(container);
       ContainerPlacementStatus placementStatus =
@@ -459,20 +454,13 @@ public class TestContainerBalancer {
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
+    balancerConfiguration.setIterations(1);
     startBalancer(balancerConfiguration);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) {
-    }
+    sleepWhileBalancing(500);
 
     stopBalancer();
-    for (ContainerMoveSelection moveSelection :
-        containerBalancer.getSourceToTargetMap().values()) {
-      DatanodeDetails target = moveSelection.getTargetNode();
+    for (DatanodeDetails target : containerBalancer.getSelectedTargets()) {
       NodeStatus status = mockNodeManager.getNodeStatus(target);
       Assertions.assertSame(HddsProtos.NodeOperationalState.IN_SERVICE,
           status.getOperationalState());
@@ -483,29 +471,32 @@ public class TestContainerBalancer {
   @Test
   public void selectedContainerShouldNotAlreadyHaveBeenSelected()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
+      InvalidContainerBalancerConfigurationException, NodeNotFoundException,
+      TimeoutException {
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
-
+    balancerConfiguration.setIterations(1);
     startBalancer(balancerConfiguration);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) { }
+    sleepWhileBalancing(500);
 
     stopBalancer();
-    Set<ContainerID> containers = new HashSet<>();
-    for (ContainerMoveSelection moveSelection :
-        containerBalancer.getSourceToTargetMap().values()) {
-      ContainerID container = moveSelection.getContainerID();
-      Assertions.assertFalse(containers.contains(container));
-      containers.add(container);
-    }
+
+    int numContainers = containerBalancer.getContainerToTargetMap().size();
+
+    /*
+    Assuming move is called exactly once for each unique container, number of
+     calls to move should equal number of unique containers. If number of
+     calls to move is more than number of unique containers, at least one
+     container has been re-selected. It's expected that number of calls to
+     move should equal number of unique, selected containers (from
+     containerToTargetMap).
+     */
+    Mockito.verify(replicationManager, times(numContainers))
+        .move(any(ContainerID.class), any(DatanodeDetails.class),
+            any(DatanodeDetails.class));
   }
 
   @Test
@@ -520,19 +511,13 @@ public class TestContainerBalancer {
 
     startBalancer(balancerConfiguration);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) { }
+    sleepWhileBalancing(500);
 
     stopBalancer();
     Set<ContainerID> excludeContainers =
         balancerConfiguration.getExcludeContainers();
-    for (ContainerMoveSelection moveSelection :
-        containerBalancer.getSourceToTargetMap().values()) {
-      ContainerID container = moveSelection.getContainerID();
+    for (ContainerID container :
+        containerBalancer.getContainerToSourceMap().keySet()) {
       Assertions.assertFalse(excludeContainers.contains(container));
     }
   }
@@ -554,7 +539,8 @@ public class TestContainerBalancer {
     sleepWhileBalancing(500);
 
     Assertions.assertFalse(containerBalancer.getUnBalancedNodes().isEmpty());
-    Assertions.assertTrue(containerBalancer.getSourceToTargetMap().isEmpty());
+    Assertions.assertTrue(containerBalancer.getContainerToSourceMap()
+        .isEmpty());
     stopBalancer();
 
     // some containers should be selected when using default values
@@ -568,7 +554,8 @@ public class TestContainerBalancer {
     stopBalancer();
     // balancer should have identified unbalanced nodes
     Assertions.assertFalse(containerBalancer.getUnBalancedNodes().isEmpty());
-    Assertions.assertFalse(containerBalancer.getSourceToTargetMap().isEmpty());
+    Assertions.assertFalse(containerBalancer.getContainerToSourceMap()
+        .isEmpty());
   }
 
   @Test
@@ -649,10 +636,14 @@ public class TestContainerBalancer {
         nodesInCluster.get(secondIncludeIndex).getDatanodeDetails();
     DatanodeDetails dn2 =
         nodesInCluster.get(thirdIncludeIndex).getDatanodeDetails();
-    for (Map.Entry<DatanodeDetails, ContainerMoveSelection> entry :
-        containerBalancer.getSourceToTargetMap().entrySet()) {
-      DatanodeDetails source = entry.getKey();
-      DatanodeDetails target = entry.getValue().getTargetNode();
+    Map<ContainerID, DatanodeDetails> containerFromSourceMap =
+        containerBalancer.getContainerToSourceMap();
+    Map<ContainerID, DatanodeDetails> containerToTargetMap =
+        containerBalancer.getContainerToTargetMap();
+    for (Map.Entry<ContainerID, DatanodeDetails> entry :
+        containerFromSourceMap.entrySet()) {
+      DatanodeDetails source = entry.getValue();
+      DatanodeDetails target = containerToTargetMap.get(entry.getKey());
       Assertions.assertTrue(source.equals(dn1) || source.equals(dn2));
       Assertions.assertTrue(target.equals(dn1) || target.equals(dn2));
     }

@@ -8,7 +8,6 @@ share/ozone/lib/aopalliance-repackaged.jar
 share/ozone/lib/asm.jar
 share/ozone/lib/aspectjrt.jar
 share/ozone/lib/aspectjweaver.jar
-share/ozone/lib/aws-java-sdk-bundle.jar
 share/ozone/lib/aws-java-sdk-core.jar
 share/ozone/lib/aws-java-sdk-kms.jar
 share/ozone/lib/aws-java-sdk-s3.jar
@@ -76,7 +75,6 @@ share/ozone/lib/hdds-interface-server.jar
 share/ozone/lib/hdds-server-framework.jar
 share/ozone/lib/hdds-server-scm.jar
 share/ozone/lib/hdds-tools.jar
-share/ozone/lib/hive-storage-api.jar
 share/ozone/lib/hk2-api.jar
 share/ozone/lib/hk2-locator.jar
 share/ozone/lib/hk2-utils.jar
@@ -120,7 +118,6 @@ share/ozone/lib/jaxb-api.jar
 share/ozone/lib/jaxb-core.jar
 share/ozone/lib/jaxb-runtime.jar
 share/ozone/lib/jcip-annotations.jar
-share/ozone/lib/jcl-over-slf4j.jar
 share/ozone/lib/jersey-cdi1x.jar
 share/ozone/lib/jersey-client.jar
 share/ozone/lib/jersey-client.jar
@@ -157,7 +154,6 @@ share/ozone/lib/json-smart.jar
 share/ozone/lib/jsp-api.jar
 share/ozone/lib/jsr305.jar
 share/ozone/lib/jsr311-api.jar
-share/ozone/lib/kafka-clients.jar
 share/ozone/lib/kerb-admin.jar
 share/ozone/lib/kerb-client.jar
 share/ozone/lib/kerb-common.jar
@@ -258,7 +254,6 @@ share/ozone/lib/slf4j-api.jar
 share/ozone/lib/slf4j-log4j12.jar
 share/ozone/lib/snakeyaml.jar
 share/ozone/lib/snappy-java.jar
-share/ozone/lib/solr-solrj.jar
 share/ozone/lib/spring-beans.RELEASE.jar
 share/ozone/lib/spring-core.RELEASE.jar
 share/ozone/lib/spring-jcl.RELEASE.jar
@@ -271,4 +266,3 @@ share/ozone/lib/token-provider.jar
 share/ozone/lib/txw2.jar
 share/ozone/lib/weld-servlet.Final.jar
 share/ozone/lib/woodstox-core.jar
-share/ozone/lib/zstd-jni.jar

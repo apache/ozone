@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.checksum;
 
 import org.apache.hadoop.fs.FileChecksum;
+import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -87,6 +88,11 @@ public class TestReplicatedFileChecksumHelper {
   @Before
   public void init() throws IOException {
     ConfigurationSource config = new InMemoryConfiguration();
+    OzoneClientConfig clientConfig = config.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumType(ContainerProtos.ChecksumType.CRC32C);
+
+    ((InMemoryConfiguration)config).setFromObject(clientConfig);
+
     rpcClient = new RpcClient(config, null) {
 
       @Override
@@ -104,6 +110,7 @@ public class TestReplicatedFileChecksumHelper {
         return new MockXceiverClientFactory();
       }
     };
+
     client = new OzoneClient(config, rpcClient);
 
     store = client.getObjectStore();
@@ -357,7 +364,9 @@ public class TestReplicatedFileChecksumHelper {
 
       helper.compute();
       FileChecksum fileChecksum = helper.getFileChecksum();
-      assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
+      //assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
+      assertEquals(DataChecksum.Type.CRC32C,
+          ((MD5MD5CRC32FileChecksum)fileChecksum).getCrcType());
       assertEquals(1, helper.getKeyLocationInfoList().size());
     }
   }

@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -204,6 +205,7 @@ public class RpcClient implements ClientProtocol {
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final OzoneManagerVersion omVersion;
   private volatile ExecutorService ecReconstructExecutor;
+  private final ContainerClientMetrics clientMetrics;
 
   /**
    * Creates RpcClient instance with the given configuration.
@@ -332,6 +334,7 @@ public class RpcClient implements ClientProtocol {
     this.byteBufferPool = new ElasticByteBufferPool();
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, this::getECReconstructExecutor);
+    this.clientMetrics = ContainerClientMetrics.acquire();
   }
 
   public XceiverClientFactory getXceiverClientManager() {
@@ -1446,6 +1449,7 @@ public class RpcClient implements ClientProtocol {
     IOUtils.cleanupWithLogger(LOG, ozoneManagerClient, xceiverClientManager);
     keyProviderCache.invalidateAll();
     keyProviderCache.cleanUp();
+    ContainerClientMetrics.release();
   }
 
   @Deprecated
@@ -1940,7 +1944,8 @@ public class RpcClient implements ClientProtocol {
         .setOmClient(ozoneManagerClient)
         .setRequestID(requestId)
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-        .setConfig(clientConfig);
+        .setConfig(clientConfig)
+        .setClientMetrics(clientMetrics);
   }
 
   @Override
