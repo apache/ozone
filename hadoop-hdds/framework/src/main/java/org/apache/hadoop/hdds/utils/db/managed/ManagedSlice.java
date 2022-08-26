@@ -18,35 +18,25 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.rocksdb.RocksObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.rocksdb.Slice;
 
 /**
- * Utilities to help assert RocksObject closures.
+ * Managed Slice.
  */
-public final class ManagedRocksObjectUtils {
-  private ManagedRocksObjectUtils() {
+public class ManagedSlice extends Slice {
+
+  public ManagedSlice(byte[] var1) {
+    super(var1);
   }
 
-  public static final Logger LOG =
-      LoggerFactory.getLogger(ManagedRocksObjectUtils.class);
-
-  static void assertClosed(RocksObject rocksObject) {
+  @Override
+  protected void finalize() throws Throwable {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
-    if (rocksObject.isOwningHandle()) {
+    if (this.isOwningHandle()) {
       ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
-      LOG.warn("{} is not closed properly",
-          rocksObject.getClass().getSimpleName());
+      ManagedRocksObjectUtils.LOG.warn("{} is not closed properly",
+          this.getClass().getSimpleName());
     }
-  }
-
-  static void assertClosed(RocksObject rocksObject, Throwable stack) {
-    ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
-    if (rocksObject.isOwningHandle()) {
-      ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
-      LOG.warn("{} is not closed properly",
-          rocksObject.getClass().getSimpleName(), stack);
-    }
+    super.finalize();
   }
 }

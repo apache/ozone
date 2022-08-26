@@ -18,16 +18,25 @@ package org.apache.hadoop.ozone.om;
 
 
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.debug.DBScanner;
 import org.apache.hadoop.ozone.debug.RDBParser;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -47,9 +56,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
- * This class tests the Debug LDB CLI that reads from an om.db file.
+ * This class tests the Debug LDB CLI that reads from rocks db file.
  */
-public class TestOmLDBCli {
+public class TestLDBCli {
   private OzoneConfiguration conf;
 
   private RDBParser rdbParser;
@@ -73,6 +82,10 @@ public class TestOmLDBCli {
     if (dbStore != null) {
       dbStore.close();
     }
+    // Restore the static fields in DBScanner
+    DBScanner.setContainerId(-1);
+    DBScanner.setDnDBSchemaVersion("V2");
+    DBScanner.setWithKey(false);
   }
 
   @Test
@@ -92,7 +105,7 @@ public class TestOmLDBCli {
       OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("sampleVol",
           "sampleBuck", "key" + (i + 1), HddsProtos.ReplicationType.STAND_ALONE,
           HddsProtos.ReplicationFactor.ONE);
-      String key = "key" + (i);
+      String key = "key" + (i + 1);
       Table<byte[], byte[]> keyTable = dbStore.getTable("keyTable");
       byte[] arr = value
           .getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray();
@@ -183,5 +196,110 @@ public class TestOmLDBCli {
       keyNames.add(keyInfo.getKeyName());
     }
     return keyNames;
+  }
+
+  @Test
+  public void testDNDBSchemaV3() throws Exception {
+    File newFolder = folder.newFolder();
+    if (!newFolder.exists()) {
+      Assert.assertTrue(newFolder.mkdirs());
+    }
+
+    conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, true);
+    dbStore = BlockUtils.getUncachedDatanodeStore(newFolder.getAbsolutePath() +
+            "/" + OzoneConsts.CONTAINER_DB_NAME, OzoneConsts.SCHEMA_V3, conf,
+        false).getStore();
+
+    // insert 2 containers, each with 2 blocks
+    final int containerCount = 2;
+    final int blockCount = 2;
+    int blockId = 1;
+    Table<byte[], byte[]> blockTable = dbStore.getTable("block_data");
+    for (int i = 1; i <= containerCount; i++) {
+      for (int j = 1; j <= blockCount; j++, blockId++) {
+        String key =
+            DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(i) + blockId;
+        BlockData blockData = new BlockData(new BlockID(i, blockId));
+        blockTable.put(FixedLengthStringUtils.string2Bytes(key),
+            blockData.getProtoBufMessage().toByteArray());
+      }
+    }
+
+    rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
+    dbScanner.setParent(rdbParser);
+    dbScanner.setTableName("block_data");
+    DBScanner.setDnDBSchemaVersion("V3");
+    DBScanner.setWithKey(true);
+
+    // Scan all container
+    try (GenericTestUtils.SystemOutCapturer capture =
+             new GenericTestUtils.SystemOutCapturer()) {
+      dbScanner.call();
+      // Assert that output has info for container 2 block 4
+      Assert.assertTrue(capture.getOutput().contains("2: 4"));
+      // Assert that output has info for container 1 block 1
+      Assert.assertTrue(capture.getOutput().contains("1: 1"));
+    }
+
+    // Scan container 1
+    DBScanner.setContainerId(1);
+    try (GenericTestUtils.SystemOutCapturer capture =
+             new GenericTestUtils.SystemOutCapturer()) {
+      dbScanner.call();
+      // Assert that output doesn't have info for container 2 block 4
+      Assert.assertFalse(capture.getOutput().contains("2: 4"));
+      // Assert that output has info for container 1 block 1
+      Assert.assertTrue(capture.getOutput().contains("1: 1"));
+    }
+
+    // Scan container 2
+    DBScanner.setContainerId(2);
+    try (GenericTestUtils.SystemOutCapturer capture =
+             new GenericTestUtils.SystemOutCapturer()) {
+      dbScanner.call();
+      // Assert that output has info for container 2 block 4
+      Assert.assertTrue(capture.getOutput().contains("2: 4"));
+      // Assert that output doesn't have info for container 1 block 1
+      Assert.assertFalse(capture.getOutput().contains("1: 1"));
+    }
+  }
+
+  @Test
+  public void testDNDBSchemaV2() throws Exception {
+    File newFolder = folder.newFolder();
+    if (!newFolder.exists()) {
+      Assert.assertTrue(newFolder.mkdirs());
+    }
+
+    conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, false);
+    dbStore = BlockUtils.getUncachedDatanodeStore(newFolder.getAbsolutePath() +
+            "/" + OzoneConsts.CONTAINER_DB_NAME, OzoneConsts.SCHEMA_V2, conf,
+        false).getStore();
+
+    // insert 1 containers with 2 blocks
+    final long cid = 1;
+    final int blockCount = 2;
+    int blockId = 1;
+    Table<byte[], byte[]> blockTable = dbStore.getTable("block_data");
+    for (int j = 1; j <= blockCount; j++, blockId++) {
+      String key = String.valueOf(blockId);
+      BlockData blockData = new BlockData(new BlockID(cid, blockId));
+      blockTable.put(StringUtils.string2Bytes(key),
+          blockData.getProtoBufMessage().toByteArray());
+    }
+
+    rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
+    dbScanner.setParent(rdbParser);
+    dbScanner.setTableName("block_data");
+    DBScanner.setDnDBSchemaVersion("V2");
+    DBScanner.setWithKey(true);
+
+    // Scan all container
+    try (GenericTestUtils.SystemOutCapturer capture =
+             new GenericTestUtils.SystemOutCapturer()) {
+      dbScanner.call();
+      // Assert that output has info for block 2
+      Assert.assertTrue(capture.getOutput().contains("2"));
+    }
   }
 }
