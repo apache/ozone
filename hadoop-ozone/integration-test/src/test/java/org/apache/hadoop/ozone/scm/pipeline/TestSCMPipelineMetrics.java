@@ -86,14 +86,10 @@ public class TestSCMPipelineMetrics {
     Optional<Pipeline> pipeline = pipelineManager
         .getPipelines().stream().findFirst();
     Assertions.assertTrue(pipeline.isPresent());
-    try {
-      cluster.getStorageContainerManager()
-          .getPipelineManager()
-          .closePipeline(pipeline.get(), false);
-    } catch (IOException | TimeoutException e) {
-      e.printStackTrace();
-      Assertions.fail();
-    }
+    Assertions.assertDoesNotThrow(() ->
+        cluster.getStorageContainerManager()
+            .getPipelineManager()
+            .closePipeline(pipeline.get(), false));
     MetricsRecordBuilder metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     assertCounter("NumPipelineDestroyed", 1L, metrics);
@@ -114,23 +110,18 @@ public class TestSCMPipelineMetrics {
     Assertions.assertEquals(numBlocksAllocated, 1);
 
     // destroy the pipeline
-    try {
-      cluster.getStorageContainerManager().getClientProtocolServer()
-          .closePipeline(pipeline.getId().getProtobuf());
-    } catch (IOException e) {
-      e.printStackTrace();
-      Assertions.fail();
-    }
-    metrics = getMetrics(SCMPipelineMetrics.class.getSimpleName());
-    try {
-      getLongCounter(SCMPipelineMetrics.getBlockAllocationMetricName(pipeline),
-          metrics);
-      Assertions.fail("Metric should not be present for closed pipeline.");
-    } catch (AssertionError e) {
-      Assertions.assertTrue(e.getMessage().contains(
-          "Expected exactly one metric for name " + SCMPipelineMetrics
-              .getBlockAllocationMetricName(block.getPipeline())));
-    }
+    Assertions.assertDoesNotThrow(() ->
+        cluster.getStorageContainerManager().getClientProtocolServer()
+            .closePipeline(pipeline.getId().getProtobuf()));
+
+    MetricsRecordBuilder finalMetrics =
+        getMetrics(SCMPipelineMetrics.class.getSimpleName());
+    Throwable t = Assertions.assertThrows(AssertionError.class, () ->
+        getLongCounter(SCMPipelineMetrics
+            .getBlockAllocationMetricName(pipeline), finalMetrics));
+    Assertions.assertTrue(t.getMessage().contains(
+        "Expected exactly one metric for name " + SCMPipelineMetrics
+            .getBlockAllocationMetricName(block.getPipeline())));
   }
 
   @AfterEach

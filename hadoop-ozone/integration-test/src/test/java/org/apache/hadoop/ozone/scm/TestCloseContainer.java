@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -40,7 +39,6 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
@@ -49,7 +47,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Integration test to ensure a container can be closed and its replicas
@@ -143,14 +142,9 @@ public class TestCloseContainer {
    * @return
    */
   private Set<ContainerReplica> getContainerReplicas(ContainerInfo c) {
-    Set<ContainerReplica> replicas = null;
-    try {
-      replicas = cluster.getStorageContainerManager()
-          .getContainerManager().getContainerReplicas(c.containerID());
-    } catch (ContainerNotFoundException e) {
-      fail("Unexpected ContainerNotFoundException");
-    }
-    return replicas;
+    return assertDoesNotThrow(() -> cluster.getStorageContainerManager()
+        .getContainerManager().getContainerReplicas(c.containerID()),
+        "Unexpected exception while retrieving container replicas");
   }
 
 }
