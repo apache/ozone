@@ -90,7 +90,8 @@ public class OmSnapshot implements IOmMetadataReader {
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, boolean allowPartialPrefixes)
       throws IOException {
-    List<OzoneFileStatus> l = omMetadataReader.listStatus(normalizeOmKeyArgs(args),
+    List<OzoneFileStatus> l = omMetadataReader
+        .listStatus(normalizeOmKeyArgs(args),
         recursive, normalizeKeyName(startKey), numEntries,
         allowPartialPrefixes);
     return l.stream().map(this::denormalizeOzoneFileStatus)
