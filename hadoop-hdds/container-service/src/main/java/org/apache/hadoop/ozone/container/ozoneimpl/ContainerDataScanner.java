@@ -17,12 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import java.io.IOException;
-import java.time.Instant;
-import java.util.Iterator;
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
-
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
@@ -32,11 +26,16 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.time.Instant;
+import java.util.Iterator;
+import java.util.Optional;
+
 /**
  * VolumeScanner scans a single volume.  Each VolumeScanner has its own thread.
  * <p>They are all managed by the DataNode's BlockScanner.
  */
-public class ContainerDataScanner extends Thread {
+public class ContainerDataScanner extends AbstractContainerScanner {
   public static final Logger LOG =
       LoggerFactory.getLogger(ContainerDataScanner.class);
 
@@ -47,103 +46,50 @@ public class ContainerDataScanner extends Thread {
   private final ContainerController controller;
   private final DataTransferThrottler throttler;
   private final Canceler canceler;
-  private final ContainerDataScrubberMetrics metrics;
-  private final long dataScanInterval;
   private static final String NAME_FORMAT = "ContainerDataScanner(%s)";
-
-  /**
-   * True if the thread is stopping.<p/>
-   * Protected by this object's lock.
-   */
-  private volatile boolean stopping = false;
-
+  private final ContainerDataScrubberMetrics metrics;
 
   public ContainerDataScanner(ContainerScrubberConfiguration conf,
                               ContainerController controller,
                               HddsVolume volume) {
+    super(conf.getDataScanInterval(),
+        ContainerDataScrubberMetrics.create(volume.toString()));
     this.controller = controller;
     this.volume = volume;
-    dataScanInterval = conf.getDataScanInterval();
     throttler = new HddsDataTransferThrottler(conf.getBandwidthPerVolume());
     canceler = new Canceler();
-    metrics = ContainerDataScrubberMetrics.create(volume.toString());
+    this.metrics = (ContainerDataScrubberMetrics) super.getMetrics();
     setName(String.format(NAME_FORMAT, volume));
     setDaemon(true);
   }
 
   @Override
-  public void run() {
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("{}: thread starting.", this);
-    }
-    try {
-      while (!stopping) {
-        runIteration();
-        metrics.resetNumContainersScanned();
-        metrics.resetNumUnhealthyContainers();
-      }
-      LOG.info("{} exiting.", this);
-    } catch (Exception e) {
-      LOG.error("{} exiting because of exception ", this, e);
-    } finally {
-      if (metrics != null) {
-        metrics.unregister();
+  public void scanContainer(Container c) {
+    if (c.shouldScanData()) {
+      ContainerData containerData = c.getContainerData();
+      long containerId = containerData.getContainerID();
+      try {
+        logScanStart(containerData);
+        if (!c.scanData(throttler, canceler)) {
+          metrics.incNumUnHealthyContainers();
+          controller.markContainerUnhealthy(containerId);
+        } else {
+          Instant now = Instant.now();
+          logScanCompleted(containerData, now);
+          controller.updateDataScanTimestamp(containerId, now);
+        }
+      } catch (IOException ex) {
+        LOG.warn("Unexpected exception while scanning container "
+            + containerId, ex);
+      } finally {
+        metrics.incNumContainersScanned();
       }
     }
   }
 
-  @VisibleForTesting
-  public void runIteration() {
-    long startTime = System.nanoTime();
-    Iterator<Container<?>> itr = controller.getContainers(volume);
-    while (!stopping && itr.hasNext()) {
-      Container c = itr.next();
-      if (c.shouldScanData()) {
-        ContainerData containerData = c.getContainerData();
-        long containerId = containerData.getContainerID();
-        try {
-          logScanStart(containerData);
-          if (!c.scanData(throttler, canceler)) {
-            metrics.incNumUnHealthyContainers();
-            controller.markContainerUnhealthy(containerId);
-          } else {
-            Instant now = Instant.now();
-            logScanCompleted(containerData, now);
-            controller.updateDataScanTimestamp(containerId, now);
-          }
-        } catch (IOException ex) {
-          LOG.warn("Unexpected exception while scanning container "
-              + containerId, ex);
-        } finally {
-          metrics.incNumContainersScanned();
-        }
-      }
-    }
-    long totalDuration = System.nanoTime() - startTime;
-    if (!stopping) {
-      if (metrics.getNumContainersScanned() > 0) {
-        metrics.incNumScanIterations();
-        LOG.info("Completed an iteration of container data scrubber in" +
-                " {} minutes." +
-                " Number of iterations (since the data-node restart) : {}" +
-                ", Number of containers scanned in this iteration : {}" +
-                ", Number of unhealthy containers found in this iteration : {}",
-            TimeUnit.NANOSECONDS.toMinutes(totalDuration),
-            metrics.getNumScanIterations(),
-            metrics.getNumContainersScanned(),
-            metrics.getNumUnHealthyContainers());
-      }
-      long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(totalDuration);
-      long remainingSleep = dataScanInterval - elapsedMillis;
-      if (remainingSleep > 0) {
-        try {
-          Thread.sleep(remainingSleep);
-        } catch (InterruptedException ignored) {
-          LOG.warn("Operation was interrupted.");
-          Thread.currentThread().interrupt();
-        }
-      }
-    }
+  @Override
+  public Iterator<Container<?>> getContainerIterator() {
+    return controller.getContainers(volume);
   }
 
   private static void logScanStart(ContainerData containerData) {
@@ -163,23 +109,17 @@ public class ContainerDataScanner extends Thread {
     }
   }
 
+  @Override
   public synchronized void shutdown() {
-    this.stopping = true;
     this.canceler.cancel(
         String.format(NAME_FORMAT, volume) + " is shutting down");
-    this.interrupt();
-    try {
-      this.join();
-    } catch (InterruptedException ex) {
-      LOG.warn("Unexpected exception while stopping data scanner for volume "
-          + volume, ex);
-      Thread.currentThread().interrupt();
-    }
+    super.shutdown();
   }
 
   @VisibleForTesting
+  @Override
   public ContainerDataScrubberMetrics getMetrics() {
-    return metrics;
+    return this.metrics;
   }
 
   @Override
