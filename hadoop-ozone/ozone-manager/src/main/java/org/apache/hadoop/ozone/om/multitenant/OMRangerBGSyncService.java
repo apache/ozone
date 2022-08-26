@@ -579,7 +579,7 @@ public class OMRangerBGSyncService extends BackgroundService {
 
     if (!readSuccess) {
       throw new IOException("Failed to read state for Ranger background sync" +
-          "without an interrupting write operation after " + attempt +
+          " without an interrupting write operation after " + attempt +
           " attempts.");
     }
   }
