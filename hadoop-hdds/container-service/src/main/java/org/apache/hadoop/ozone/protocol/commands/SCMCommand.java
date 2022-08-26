@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.protocol.commands;
 
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.Message;
 import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.server.events.IdentifiableEventPayload;
  * commands in protobuf format.
  * @param <T>
  */
-public abstract class SCMCommand<T extends GeneratedMessage> implements
+public abstract class SCMCommand<T extends Message> implements
     IdentifiableEventPayload {
   private final long id;
 

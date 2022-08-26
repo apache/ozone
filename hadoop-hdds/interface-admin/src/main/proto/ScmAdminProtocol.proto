@@ -77,7 +77,8 @@ message ScmContainerLocationRequest {
   optional GetContainerCountRequestProto getContainerCountRequest = 38;
   optional GetContainerReplicasRequestProto getContainerReplicasRequest = 39;
   optional ReplicationManagerReportRequestProto replicationManagerReportRequest = 40;
-  optional DatanodeDiskBalancerInfoRequestProto DatanodeDiskBalancerInfoRequest = 41;
+  optional ResetDeletedBlockRetryCountRequestProto resetDeletedBlockRetryCountRequest = 41;
+  optional DatanodeDiskBalancerInfoRequestProto DatanodeDiskBalancerInfoRequest = 42;
 }
 
 message ScmContainerLocationResponse {
@@ -126,7 +127,8 @@ message ScmContainerLocationResponse {
   optional GetContainerCountResponseProto getContainerCountResponse = 38;
   optional GetContainerReplicasResponseProto getContainerReplicasResponse = 39;
   optional ReplicationManagerReportResponseProto getReplicationManagerReportResponse = 40;
-  optional DatanodeDiskBalancerInfoResponseProto DatanodeDiskBalancerInfoResponse = 41;
+  optional ResetDeletedBlockRetryCountResponseProto resetDeletedBlockRetryCountResponse = 41;
+  optional DatanodeDiskBalancerInfoResponseProto DatanodeDiskBalancerInfoResponse = 42;
 
   enum Status {
     OK = 1;
@@ -174,6 +176,7 @@ enum Type {
   GetContainerReplicas = 34;
   GetReplicationManagerReport = 35;
   DatanodeDiskBalancerInfo= 36;
+  DatanodeDiskBalancerInfo= 37;
 }
 
 /**
@@ -500,6 +503,15 @@ message ReplicationManagerReportRequestProto {
 
 message ReplicationManagerReportResponseProto {
   required ReplicationManagerReportProto report = 1;
+}
+
+message ResetDeletedBlockRetryCountRequestProto {
+  optional string traceID = 1;
+  repeated int64 transactionId = 2;
+}
+
+message ResetDeletedBlockRetryCountResponseProto {
+  required int32 resetCount = 1;
 }
 
 message FinalizeScmUpgradeRequestProto {

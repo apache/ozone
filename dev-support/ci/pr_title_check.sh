@@ -42,6 +42,8 @@ assertMatch    '^HDDS-[1-9][0-9]{0,4}[^0-9]'       'Fail: Jira must be 1 to 5 di
 assertMatch    '^HDDS-[1-9][0-9]{0,4}\.'           'Fail: missing dot after Jira'
 assertMatch    '^HDDS-[1-9][0-9]{0,4}\. '          'Fail: missing space after Jira'
 assertNotMatch '[[:space:]]$'                      'Fail: trailing space'
+assertNotMatch '\.{3,}$'                           'Fail: trailing ellipsis indicates title is cut'
+assertNotMatch '…$'                                'Fail: trailing ellipsis indicates title is cut'
 assertNotMatch '[[:space:]]{2}'                    'Fail: two consecutive spaces'
 assertMatch    '^HDDS-[1-9][0-9]{0,4}\. .*[^ ]$'   'Fail: not match "^HDDS-[1-9][0-9]{0,4}\. .*[^ ]$"'
 

@@ -37,7 +37,8 @@ import picocli.CommandLine.Spec;
     subcommands = {
         GetScmRatisRolesSubcommand.class,
         FinalizeScmUpgradeSubcommand.class,
-        FinalizationScmStatusSubcommand.class
+        FinalizationScmStatusSubcommand.class,
+        ResetDeletedBlockRetryCountSubcommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class ScmAdmin extends GenericCli  implements SubcommandWithParent {

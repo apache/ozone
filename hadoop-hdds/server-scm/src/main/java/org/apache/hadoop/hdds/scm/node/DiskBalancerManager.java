@@ -48,6 +48,7 @@ public class DiskBalancerManager {
   public static final Logger LOG =
       LoggerFactory.getLogger(DiskBalancerManager.class);
 
+
   private OzoneConfiguration conf;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
@@ -84,7 +85,7 @@ public class DiskBalancerManager {
       double volumeDensitySum =
           getVolumeDataDensitySumForDatanodeDetails(datanodeDetails);
       reportList.add(HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
-          .setCurrentVolumeDensitySum(String.valueOf(volumeDensitySum))
+          .setCurrentVolumeDensitySum(volumeDensitySum)
           .setNode(datanodeDetails.toProto(clientVersion))
           .build());
     }

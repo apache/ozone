@@ -18,7 +18,7 @@
 
 import React from 'react';
 import axios from 'axios';
-import {Table, Tabs} from 'antd';
+import {Table, Tabs, Tooltip, Icon} from 'antd';
 import './pipelines.less';
 import {PaginationConfig} from 'antd/lib/pagination';
 import prettyMilliseconds from 'pretty-ms';
@@ -120,11 +120,17 @@ const COLUMNS = [
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.leaderNode.localeCompare(b.leaderNode)
   },
   {
-    title: 'Last Leader Election',
+    title:
+  <span>
+    Last Leader Election&nbsp;
+    <Tooltip title='Elapsed time since the current leader got elected. Only available if any metrics service providers like Prometheus is configured.'>
+      <Icon type='info-circle'/>
+    </Tooltip>
+  </span>,
     dataIndex: 'lastLeaderElection',
     key: 'lastLeaderElection',
     render: (lastLeaderElection: number) => lastLeaderElection > 0 ?
-      moment(lastLeaderElection).format('ll LTS') : 'NA',
+      prettyMilliseconds(lastLeaderElection, {compact: true}) + " ago" : 'NA',
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.lastLeaderElection - b.lastLeaderElection
   },
   {
@@ -135,10 +141,18 @@ const COLUMNS = [
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.duration - b.duration
   },
   {
-    title: 'No. of Elections',
+    title:
+  <span>
+    No. of Elections&nbsp;
+    <Tooltip title='Number of elections in this pipeline. Only available if any metrics service providers like Prometheus is configured.'>
+      <Icon type='info-circle'/>
+    </Tooltip>
+  </span>,
     dataIndex: 'leaderElections',
     key: 'leaderElections',
     isSearchable: true,
+    render: (leaderElections: number) => leaderElections > 0 ?
+          leaderElections : 'NA',
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.leaderElections - b.leaderElections
   }
 ];

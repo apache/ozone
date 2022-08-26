@@ -31,6 +31,8 @@ import java.util.Set;
 import com.google.common.base.Optional;
 
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 
@@ -42,8 +44,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.DBOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
@@ -60,22 +60,23 @@ public class TestTypedRDBTableStore {
           "Sixth", "Seven", "Eighth",
           "Ninth", "Ten");
   private RDBStore rdbStore = null;
-  private DBOptions options = null;
+  private ManagedDBOptions options = null;
   private CodecRegistry codecRegistry;
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
-    options = new DBOptions();
+    options = new ManagedDBOptions();
     options.setCreateIfMissing(true);
     options.setCreateMissingColumnFamilies(true);
 
     Statistics statistics = new Statistics();
     statistics.setStatsLevel(StatsLevel.ALL);
-    options = options.setStatistics(statistics);
+    options.setStatistics(statistics);
 
     Set<TableConfig> configSet = new HashSet<>();
     for (String name : families) {
-      TableConfig newConfig = new TableConfig(name, new ColumnFamilyOptions());
+      TableConfig newConfig = new TableConfig(name,
+          new ManagedColumnFamilyOptions());
       configSet.add(newConfig);
     }
     rdbStore = new RDBStore(tempDir, options, configSet);

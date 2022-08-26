@@ -309,6 +309,15 @@ public interface StorageContainerLocationProtocol extends Closeable {
   ScmInfo getScmInfo() throws IOException;
 
   /**
+   * Reset the expired deleted block retry count.
+   *
+   * @param txIDs transactionId list to be reset
+   * @return num of successful reset
+   * @throws IOException
+   */
+  int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException;
+
+  /**
    * Check if SCM is in safe mode.
    *
    * @return Returns true if SCM is in safe mode else returns false.

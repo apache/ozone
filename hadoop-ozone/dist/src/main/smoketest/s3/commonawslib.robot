@@ -42,6 +42,8 @@ Execute AWSS3Cli
     [return]          ${output}
 
 Install aws cli
+    ${rc}              ${output} =                 Run And Return Rc And Output           which aws
+    Return From Keyword If    '${rc}' == '0'
     ${rc}              ${output} =                 Run And Return Rc And Output           which apt-get
     Run Keyword if     '${rc}' == '0'              Install aws cli s3 debian
     ${rc}              ${output} =                 Run And Return Rc And Output           yum --help

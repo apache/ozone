@@ -73,7 +73,7 @@ public class OverReplicatedProcessor {
       try {
         processContainer(overRep);
         processed++;
-      } catch (IOException e) {
+      } catch (Exception e) {
         LOG.error("Error processing over replicated container {}",
             overRep.getContainerInfo(), e);
         failed++;
