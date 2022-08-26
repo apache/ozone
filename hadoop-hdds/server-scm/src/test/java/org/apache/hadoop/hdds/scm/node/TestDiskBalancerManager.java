@@ -74,9 +74,8 @@ public class TestDiskBalancerManager {
 
     Assertions.assertEquals(2, reportProtoList.size());
     Assertions.assertTrue(
-        Double.parseDouble(reportProtoList.get(0).getCurrentVolumeDensitySum())
-            >= Double.parseDouble(reportProtoList.get(1)
-            .getCurrentVolumeDensitySum()));
+        reportProtoList.get(0).getCurrentVolumeDensitySum()
+            >= reportProtoList.get(1).getCurrentVolumeDensitySum());
   }
 
   @Test
@@ -122,7 +121,7 @@ public class TestDiskBalancerManager {
         .setBalancedBytes(random.nextInt(10000))
         .setDiskBalancerConf(
             HddsProtos.DiskBalancerConfigurationProto.newBuilder()
-                .setThreshold(String.valueOf(random.nextInt(99)))
+                .setThreshold(random.nextInt(99))
                 .setParallelThread(random.nextInt(4) + 1)
                 .setDiskBandwidth(random.nextInt(99) + 1)
                 .build())

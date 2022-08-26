@@ -237,7 +237,7 @@ public class TestReportPublisher {
             new ThreadFactoryBuilder().setDaemon(true)
                 .setNameFormat("Unit test ReportManager Thread - %d").build());
     publisher.init(dummyContext, executorService);
-    GeneratedMessage report =
+    Message report =
         ((DiskBalancerReportPublisher) publisher).getReport();
     Assert.assertNotNull(report);
     for (Descriptors.FieldDescriptor descriptor :

@@ -175,8 +175,8 @@ enum Type {
   GetContainerCount = 33;
   GetContainerReplicas = 34;
   GetReplicationManagerReport = 35;
-  DatanodeDiskBalancerInfo= 36;
-  DatanodeDiskBalancerInfo= 37;
+  ResetDeletedBlockRetryCount = 36;
+  DatanodeDiskBalancerInfo = 37;
 }
 
 /**

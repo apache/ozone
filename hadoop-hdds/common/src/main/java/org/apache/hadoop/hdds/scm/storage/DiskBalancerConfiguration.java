@@ -36,14 +36,14 @@ public final class DiskBalancerConfiguration {
   private static final Logger LOG =
       LoggerFactory.getLogger(DiskBalancerConfiguration.class);
 
-  @Config(key = "volume.density.threshold", type = ConfigType.STRING,
+  @Config(key = "volume.density.threshold", type = ConfigType.DOUBLE,
       defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
       description = "Threshold is a percentage in the range of 0 to 100. A " +
           "datanode is considered balanced if for each volume, the " +
           "utilization of the volume(used space to capacity ratio) differs" +
           " from the utilization of the datanode(used space to capacity ratio" +
           " of the entire datanode) no more than the threshold.")
-  private String threshold = "10";
+  private double threshold = 10d;
 
   @Config(key = "max.disk.throughputInMBPerSec", type = ConfigType.LONG,
       defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
@@ -61,11 +61,11 @@ public final class DiskBalancerConfiguration {
    * @return percentage value in the range 0 to 100
    */
   public double getThreshold() {
-    return Double.parseDouble(threshold);
+    return threshold;
   }
 
   public double getThresholdAsRatio() {
-    return Double.parseDouble(threshold) / 100;
+    return threshold / 100;
   }
 
   /**
@@ -78,7 +78,7 @@ public final class DiskBalancerConfiguration {
       throw new IllegalArgumentException(
           "Threshold must be a percentage(double) in the range 0 to 100.");
     }
-    this.threshold = String.valueOf(threshold);
+    this.threshold = threshold;
   }
 
   /**
@@ -152,7 +152,7 @@ public final class DiskBalancerConfiguration {
     DiskBalancerConfiguration config =
         configurationSource.getObject(DiskBalancerConfiguration.class);
     if (proto.hasThreshold()) {
-      config.setThreshold(Double.parseDouble(proto.getThreshold()));
+      config.setThreshold(proto.getThreshold());
     }
     if (proto.hasDiskBandwidth()) {
       config.setDiskBandwidth(proto.getDiskBandwidth());

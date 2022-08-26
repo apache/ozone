@@ -112,11 +112,11 @@ public class StateContext {
   private final ConfigurationSource conf;
   private final Set<InetSocketAddress> endpoints;
   // Only the latest full report of each type is kept
-  private final AtomicReference<GeneratedMessage> containerReports;
-  private final AtomicReference<GeneratedMessage> nodeReport;
-  private final AtomicReference<GeneratedMessage> pipelineReports;
-  private final AtomicReference<GeneratedMessage> crlStatusReport;
-  private final AtomicReference<GeneratedMessage> diskBalancerReport;
+  private final AtomicReference<Message> containerReports;
+  private final AtomicReference<Message> nodeReport;
+  private final AtomicReference<Message> pipelineReports;
+  private final AtomicReference<Message> crlStatusReport;
+  private final AtomicReference<Message> diskBalancerReport;
   // Incremental reports are queued in the map below
   private final Map<InetSocketAddress, List<Message>>
       incrementalReportsQueue;
@@ -918,7 +918,7 @@ public class StateContext {
   }
 
   @VisibleForTesting
-  public GeneratedMessage getDiskBalancerReport() {
+  public Message getDiskBalancerReport() {
     return diskBalancerReport.get();
   }
 
