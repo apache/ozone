@@ -102,7 +102,8 @@ public class  TestMultiRaftSetup {
     waitForPipelineCreated(1);
     // datanode pipeline limit is set to 2, but only one set of 3 pipelines
     // will be created. Further pipeline creation should fail
-    Assertions.assertEquals(1, pipelineManager.getPipelines(RATIS_THREE).size());
+    Assertions.assertEquals(1,
+        pipelineManager.getPipelines(RATIS_THREE).size());
     Assertions.assertThrows(IOException.class, () ->
         pipelineManager.createPipeline(RATIS_THREE));
     shutdown();
@@ -120,7 +121,8 @@ public class  TestMultiRaftSetup {
     // For example, with d1,d2, d3, d4, d5, only d1 d2 d3 and d1 d4 d5 can form
     // pipeline as the none of peers from any of existing pipelines will be
     // repeated
-    Assertions.assertEquals(2, pipelineManager.getPipelines(RATIS_THREE).size());
+    Assertions.assertEquals(2,
+        pipelineManager.getPipelines(RATIS_THREE).size());
     List<DatanodeDetails> dns = nodeManager.getAllNodes().stream()
         .filter((dn) -> nodeManager.getPipelinesCount(dn) > 2).collect(
             Collectors.toList());

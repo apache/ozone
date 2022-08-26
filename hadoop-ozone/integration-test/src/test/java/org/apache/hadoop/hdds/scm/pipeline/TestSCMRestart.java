@@ -122,6 +122,7 @@ public class TestSCMRestart {
     ContainerInfo containerInfo = newContainerManager
         .allocateContainer(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "Owner1");
-    Assertions.assertEquals(containerInfo.getPipelineID(), ratisPipeline1.getId());
+    Assertions.assertEquals(ratisPipeline1.getId(),
+        containerInfo.getPipelineID());
   }
 }

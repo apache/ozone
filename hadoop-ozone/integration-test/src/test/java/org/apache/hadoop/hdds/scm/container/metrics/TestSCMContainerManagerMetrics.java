@@ -138,8 +138,8 @@ public class TestSCMContainerManagerMetrics {
 
     MetricsRecordBuilder metrics =
         getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-    Assertions.assertEquals(getLongCounter("NumContainerReportsProcessedSuccessful",
-        metrics), 1);
+    Assertions.assertEquals(1L,
+        getLongCounter("NumContainerReportsProcessedSuccessful", metrics));
 
     // Create key should create container on DN.
     cluster.getRpcClient().getObjectStore().getClientProxy()

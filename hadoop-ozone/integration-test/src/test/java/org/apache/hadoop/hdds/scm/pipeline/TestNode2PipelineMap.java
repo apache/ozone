@@ -103,7 +103,8 @@ public class TestNode2PipelineMap {
     // get pipeline details by dnid
     Set<PipelineID> pipelines = scm.getScmNodeManager()
         .getPipelines(dns.get(0));
-    Assertions.assertTrue(pipelines.contains(ratisContainer.getPipeline().getId()));
+    Assertions.assertTrue(
+        pipelines.contains(ratisContainer.getPipeline().getId()));
 
     // Now close the container and it should not show up while fetching
     // containers by pipeline
