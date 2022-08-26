@@ -397,7 +397,8 @@ public class TestDecommissionAndMaintenance {
     // Generate some data on the empty cluster to create some containers
     generateData(20, "key", ratisRepConfig);
     // Locate any container and find its open pipeline
-    final ContainerInfo container = waitForAndReturnContainer(ratisRepConfig, 3);
+    final ContainerInfo container =
+        waitForAndReturnContainer(ratisRepConfig, 3);
     Set<ContainerReplica> replicas = getContainerReplicas(container);
 
     List<DatanodeDetails> forMaintenance = new ArrayList<>();

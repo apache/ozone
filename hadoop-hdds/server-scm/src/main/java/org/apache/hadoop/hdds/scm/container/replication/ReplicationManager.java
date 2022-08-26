@@ -690,7 +690,9 @@ public class ReplicationManager implements SCMService {
 
     /**
      * Defines how many redundant replicas of a container must be online for a
-     * node to enter maintenance.
+     * node to enter maintenance. Currently, only used for EC containers. We
+     * need to consider removing the "maintenance.replica.minimum" setting
+     * and having both Ratis and EC use this new one.
      */
     @Config(key = "maintenance.remaining.redundancy",
         type = ConfigType.INT,
@@ -704,7 +706,9 @@ public class ReplicationManager implements SCMService {
             " value of 1 ensures at least two replicas are online, meaning 1" +
             " more can be lost without data becoming unavailable. For any EC" +
             " container it will have at least dataNum + 1 online, allowing" +
-            " the loss of 1 more replica before data becomes unavailable."
+            " the loss of 1 more replica before data becomes unavailable." +
+            " Currently only EC containers use this setting. Ratis containers" +
+            " use maintenance.replica.minimum."
     )
     private int maintenanceRemainingRedundancy = 1;
 
@@ -724,12 +728,12 @@ public class ReplicationManager implements SCMService {
       return underReplicatedInterval;
     }
 
-    public void setUnderReplicatedInterval(Duration interval) {
-      this.underReplicatedInterval = interval.toMillis();
+    public void setUnderReplicatedInterval(Duration duration) {
+      this.underReplicatedInterval = duration.toMillis();
     }
 
-    public void setOverReplicatedInterval(Duration interval) {
-      this.overReplicatedInterval = interval.toMillis();
+    public void setOverReplicatedInterval(Duration duration) {
+      this.overReplicatedInterval = duration.toMillis();
     }
 
     public long getOverReplicatedInterval() {
