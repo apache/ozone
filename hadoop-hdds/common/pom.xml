@@ -76,6 +76,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-annotation-processing</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-config</artifactId>
     </dependency>
     <dependency>
