@@ -110,7 +110,7 @@ public class TestQueryNode {
   public void testHealthyNodesCount() throws Exception {
     List<HddsProtos.Node> nodes = scmClient.queryNode(null, HEALTHY,
         HddsProtos.QueryScope.CLUSTER, "");
-    assertEquals(numOfDatanodes, nodes.size(), "Expected  live nodes");
+    assertEquals(numOfDatanodes, nodes.size(), "Expected live nodes");
   }
 
   @Test
