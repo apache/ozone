@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.jupiter.api.AfterAll;
@@ -77,20 +76,18 @@ public class TestSCMSnapshot {
         .getLatestTrxInfo().getTransactionIndex();
 
     Assertions.assertTrue(snapshotInfo2 > snapshotInfo1,
-        String.format("Snapshot index 2 {} should greater than Snapshot " +
-            "index 1 {}", snapshotInfo2, snapshotInfo1));
+        String.format("Snapshot index 2 %d should greater than Snapshot " +
+            "index 1 %d", snapshotInfo2, snapshotInfo1));
 
     cluster.restartStorageContainerManager(false);
     TransactionInfo trxInfoAfterRestart =
         scm.getScmHAManager().asSCMHADBTransactionBuffer().getLatestTrxInfo();
     Assertions.assertTrue(
         trxInfoAfterRestart.getTransactionIndex() >= snapshotInfo2);
-    try {
-      pipelineManager.getPipeline(ratisPipeline1.getId());
-      pipelineManager.getPipeline(ratisPipeline2.getId());
-    } catch (PipelineNotFoundException e) {
-      Assertions.fail("Should not see a PipelineNotFoundException");
-    }
+    Assertions.assertDoesNotThrow(() ->
+        pipelineManager.getPipeline(ratisPipeline1.getId()));
+    Assertions.assertDoesNotThrow(() ->
+        pipelineManager.getPipeline(ratisPipeline2.getId()));
   }
 
   @AfterAll

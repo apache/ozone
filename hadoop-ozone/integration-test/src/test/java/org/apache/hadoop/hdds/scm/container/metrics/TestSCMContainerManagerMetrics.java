@@ -48,7 +48,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Class used to test {@link SCMContainerManagerMetrics}.
@@ -91,19 +90,16 @@ public class TestSCMContainerManagerMetrics {
     Assertions.assertEquals(getLongCounter("NumSuccessfulCreateContainers",
         metrics), ++numSuccessfulCreateContainers);
 
-    try {
-      containerManager.allocateContainer(
-          RatisReplicationConfig.getInstance(
-              HddsProtos.ReplicationFactor.THREE), OzoneConsts.OZONE);
-      fail("testContainerOpsMetrics failed");
-    } catch (IOException ex) {
-      // Here it should fail, so it should have the old metric value.
-      metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-      Assertions.assertEquals(getLongCounter("NumSuccessfulCreateContainers",
-          metrics), numSuccessfulCreateContainers);
-      Assertions.assertEquals(getLongCounter("NumFailureCreateContainers",
-          metrics), 1);
-    }
+    Assertions.assertThrows(IOException.class, () ->
+        containerManager.allocateContainer(
+            RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE), OzoneConsts.OZONE));
+    // allocateContainer should fail, so it should have the old metric value.
+    metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
+    Assertions.assertEquals(getLongCounter("NumSuccessfulCreateContainers",
+        metrics), numSuccessfulCreateContainers);
+    Assertions.assertEquals(getLongCounter("NumFailureCreateContainers",
+        metrics), 1);
 
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     long numSuccessfulDeleteContainers = getLongCounter(
@@ -116,19 +112,15 @@ public class TestSCMContainerManagerMetrics {
     Assertions.assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
         metrics), numSuccessfulDeleteContainers + 1);
 
-    try {
-      // Give random container to delete.
-      containerManager.deleteContainer(
-          ContainerID.valueOf(RandomUtils.nextLong(10000, 20000)));
-      fail("testContainerOpsMetrics failed");
-    } catch (ContainerNotFoundException ex) {
-      // Here it should fail, so it should have the old metric value.
-      metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-      Assertions.assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
-          metrics), numSuccessfulCreateContainers);
-      Assertions.assertEquals(getLongCounter("NumFailureDeleteContainers",
-          metrics), 1);
-    }
+    Assertions.assertThrows(ContainerNotFoundException.class, () ->
+        containerManager.deleteContainer(
+            ContainerID.valueOf(RandomUtils.nextLong(10000, 20000))));
+    // deleteContainer should fail, so it should have the old metric value.
+    metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
+    Assertions.assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
+        metrics), numSuccessfulCreateContainers);
+    Assertions.assertEquals(getLongCounter("NumFailureDeleteContainers",
+        metrics), 1);
 
     long currentValue = getLongCounter("NumListContainerOps", metrics);
     containerManager.getContainers(
