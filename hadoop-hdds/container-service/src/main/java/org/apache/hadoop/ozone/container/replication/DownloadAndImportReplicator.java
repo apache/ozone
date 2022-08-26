@@ -28,10 +28,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -42,14 +44,17 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerReader;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
 
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.w3c.dom.html.HTMLParagraphElement;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 
@@ -109,17 +114,47 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
     }
   }
 
-  public void importContainer(long containerID, Path tarFilePath)
-      throws IOException {
+  public void importContainer(long containerID, Path tarFilePath,
+      HddsVolume hddsVolume) throws IOException {
+
+    HddsVolume targetVolume = hddsVolume;
+    if (targetVolume == null) {
+      targetVolume = chooseNextVolume();
+    }
+    KeyValueContainerData originalContainerData;
     try {
-      ContainerData originalContainerData;
-      try (FileInputStream tempContainerTarStream = new FileInputStream(
+      try (FileInputStream tmpContainerTarStream = new FileInputStream(
           tarFilePath.toFile())) {
         byte[] containerDescriptorYaml =
-            packer.unpackContainerDescriptor(tempContainerTarStream);
-        originalContainerData = ContainerDataYaml.readContainer(
-            containerDescriptorYaml);
+            packer.unpackContainerDescriptor(tmpContainerTarStream);
+        originalContainerData = (KeyValueContainerData) ContainerDataYaml
+            .readContainer(containerDescriptorYaml);
       }
+      originalContainerData.setVolume(targetVolume);
+
+//        byte[] descriptorContent =
+//            packer.unpackContainer(tmpContainerTarStream, tmpContainerDir);
+//
+//        Preconditions.checkNotNull(descriptorContent,
+//            "Container descriptor is missing from the container archive: "
+//                + containerID);
+//
+//        //now, we have extracted the container descriptor from the previous
+//        //datanode. We can load it and upload it with the current data
+//        // (original metadata + current filepath fields)
+//        originalContainerData = (KeyValueContainerData) ContainerDataYaml
+//                .readContainer(descriptorContent);
+//      }
+//
+//      String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
+//          targetVolume, targetVolume.getClusterID());
+//      Path destContainerDir =
+//          Paths.get(KeyValueContainerLocationUtil.getBaseContainerLocation(
+//              targetVolume.getHddsRootDir().toString(), idDir, containerID));
+//
+//      Files.move(tmpContainerDir, destContainerDir,
+//          StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+
 
       try (FileInputStream tempContainerTarStream = new FileInputStream(
           tarFilePath.toFile())) {
@@ -130,6 +165,15 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
         containerSet.addContainer(container);
       }
 
+//      try {
+//        Container container = controller.importContainer(originalContainerData,
+//            targetVolume, destContainerDir);
+//        containerSet.addContainer(container);
+//      } catch (IOException e) {
+//        LOG.error("Got exception while importing container file: "
+//            + destContainerDir.toAbsolutePath(), e);
+//        Files.delete(destContainerDir);
+//      }
     } finally {
       try {
         Files.delete(tarFilePath);
@@ -165,26 +209,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
               containerID, bytes);
       task.setTransferredBytes(bytes);
 
-      // Uncompress the downloaded tar
-      Path tmpContainerDir = getUntarContainerDir(tarFilePath);
-      FileInputStream tmpContainerTarStream = new FileInputStream(
-          tarFilePath.toFile());
-      packer.unpackContainer(tmpContainerTarStream, tmpContainerDir);
-      Path destContainerDir =
-          Paths.get(KeyValueContainerLocationUtil.getBaseContainerLocation(
-              targetVolume.getHddsRootDir().toString(),
-              targetVolume.getClusterID(), containerID));
-
-      // Move container directory under hddsVolume
-      Files.move(tmpContainerDir, destContainerDir,
-          StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-
-      File containerFile = ContainerUtils.getContainerFile(
-          destContainerDir.toFile());
-      ContainerData containerData = ContainerDataYaml.readContainerFile(
-          containerFile);
-      containerReaderMap.get(targetVolume)
-          .verifyAndFixupContainerData(containerData, true);
+      importContainer(containerID, tarFilePath, targetVolume);
 
       LOG.info("Container {} is replicated successfully", containerID);
       task.setStatus(Status.DONE);
@@ -205,10 +230,10 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
         .resolve(CONTAINER_COPY_TMP_DIR).resolve(CONTAINER_COPY_DIR);
   }
 
-  private Path getUntarContainerDir(Path containerTarPath) {
-    long containerId = ContainerUtils.retrieveContainerIdFromTarGzName(
-        containerTarPath.getFileName().toString());
-    return containerTarPath.getParent().resolve(String.valueOf(containerId));
+  public static Path getUntarDirectory(HddsVolume hddsVolume)
+      throws IOException {
+    return Paths.get(hddsVolume.getVolumeRootDir())
+        .resolve(CONTAINER_COPY_TMP_DIR).resolve(CONTAINER_COPY_DIR);
   }
 
   private List<HddsVolume> getHddsVolumesList() {

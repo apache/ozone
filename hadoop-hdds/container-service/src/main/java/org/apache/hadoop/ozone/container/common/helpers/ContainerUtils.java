@@ -255,15 +255,17 @@ public final class ContainerUtils {
     return "container-" + containerId + ".tar.gz";
   }
 
-  public static long retrieveContainerIdFromTarGzName(String tarGzName) {
-    Pattern pattern = Pattern.compile("continer-(\\d+).tar.gz");
+  public static long retrieveContainerIdFromTarGzName(String tarGzName)
+      throws IOException {
+    assert tarGzName != null;
+    Pattern pattern = Pattern.compile("container-(\\d+).tar.gz");
     // Now create matcher object.
     Matcher m = pattern.matcher(tarGzName);
 
     if (m.find()) {
       return Long.parseLong(m.group(1));
     } else {
-      throw new IllegalArgumentException("Illegal container tar gz file " +
+      throw new IOException("Illegal container tar gz file " +
           tarGzName);
     }
   }

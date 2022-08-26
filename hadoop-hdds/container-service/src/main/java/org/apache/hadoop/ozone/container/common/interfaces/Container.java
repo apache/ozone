@@ -36,6 +36,7 @@ import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.hdfs.util.RwLock;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 
 /**
@@ -132,11 +133,6 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
    */
   void importContainerData(InputStream stream,
       ContainerPacker<CONTAINERDATA> packer) throws IOException;
-
-  /**
-   * Import the container from an existing container directory.
-   */
-  void importContainerData(Path path) throws IOException;
 
   /**
    * Export all the data of the container to one output archive with the help

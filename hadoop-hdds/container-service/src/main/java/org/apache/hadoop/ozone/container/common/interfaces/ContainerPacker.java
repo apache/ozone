@@ -40,7 +40,7 @@ public interface ContainerPacker<CONTAINERDATA extends ContainerData> {
    * file but returned).
    */
   byte[] unpackContainerData(Container<CONTAINERDATA> container,
-      InputStream inputStream)
+      InputStream inputStream, Path tmpDir, Path destContainerDir)
       throws IOException;
 
   /**
@@ -55,11 +55,5 @@ public interface ContainerPacker<CONTAINERDATA extends ContainerData> {
    * importing the container.
    */
   byte[] unpackContainerDescriptor(InputStream inputStream)
-      throws IOException;
-
-  /**
-   * Unpack the container to dest path.
-   */
-  void unpackContainer(InputStream inputStream, Path destPath)
       throws IOException;
 }

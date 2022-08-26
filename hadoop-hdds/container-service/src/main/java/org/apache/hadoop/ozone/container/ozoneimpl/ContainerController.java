@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Iterator;
 import java.util.Map;
@@ -156,8 +157,7 @@ public class ContainerController {
   public Container importContainer(
       final ContainerData containerData,
       final InputStream rawContainerStream,
-      final TarContainerPacker packer)
-      throws IOException {
+      final TarContainerPacker packer) throws IOException {
     return handlers.get(containerData.getContainerType())
         .importContainer(containerData, rawContainerStream, packer);
   }

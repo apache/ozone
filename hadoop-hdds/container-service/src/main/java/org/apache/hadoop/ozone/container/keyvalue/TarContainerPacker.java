@@ -28,6 +28,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.HddsUtils;
@@ -43,7 +44,11 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
@@ -69,48 +74,25 @@ public class TarContainerPacker
    */
   @Override
   public byte[] unpackContainerData(Container<KeyValueContainerData> container,
-      InputStream input)
+      InputStream input, Path tmpDir, Path destContainerDir)
       throws IOException {
-    byte[] descriptorFileContent = null;
     KeyValueContainerData containerData = container.getContainerData();
-    Path dbRoot = getDbPath(containerData);
-    Path chunksRoot = Paths.get(containerData.getChunksPath());
+    long containerId = containerData.getContainerID();
+    HddsVolume hddsVolume = containerData.getVolume();
 
-    try (InputStream decompressed = decompress(input);
-         ArchiveInputStream archiveInput = untar(decompressed)) {
-
-      ArchiveEntry entry = archiveInput.getNextEntry();
-      while (entry != null) {
-        String name = entry.getName();
-        long size = entry.getSize();
-        if (name.startsWith(DB_DIR_NAME + "/")) {
-          Path destinationPath = dbRoot
-              .resolve(name.substring(DB_DIR_NAME.length() + 1));
-          extractEntry(entry, archiveInput, size, dbRoot,
-              destinationPath);
-        } else if (name.startsWith(CHUNKS_DIR_NAME + "/")) {
-          Path destinationPath = chunksRoot
-              .resolve(name.substring(CHUNKS_DIR_NAME.length() + 1));
-          extractEntry(entry, archiveInput, size, chunksRoot,
-              destinationPath);
-        } else if (CONTAINER_FILE_NAME.equals(name)) {
-          //Don't do anything. Container file should be unpacked in a
-          //separated step by unpackContainerDescriptor call.
-          descriptorFileContent = readEntry(archiveInput, size);
-        } else {
-          throw new IllegalArgumentException(
-              "Unknown entry in the tar file: " + "" + name);
-        }
-        entry = archiveInput.getNextEntry();
-      }
-      return descriptorFileContent;
-
-    } catch (CompressorException e) {
-      throw new IOException(
-          "Can't uncompress the given container: " + container
-              .getContainerData().getContainerID(),
-          e);
+    Path containerUntarDir = tmpDir.resolve(String.valueOf(containerId));
+    if (containerUntarDir.toFile().exists()) {
+      Files.delete(containerUntarDir);
     }
+
+    Path dbRoot = getDbPath(containerUntarDir, containerData);
+    Path chunksRoot = getChunkPath(containerUntarDir, containerData);
+    byte[] descriptorFileContent = innerUnpack(input, dbRoot, chunksRoot);
+
+    Files.move(containerUntarDir, destContainerDir,
+        StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+
+    return descriptorFileContent;
   }
 
   private void extractEntry(ArchiveEntry entry, InputStream input, long size,
@@ -200,26 +182,6 @@ public class TarContainerPacker
         "Container descriptor is missing from the container archive.");
   }
 
-  @Override
-  public void unpackContainer(InputStream input, Path destDir)
-      throws IOException {
-    try (InputStream decompressed = decompress(input);
-         ArchiveInputStream archiveInput = untar(decompressed)) {
-
-      ArchiveEntry entry = archiveInput.getNextEntry();
-      while (entry != null) {
-        String name = entry.getName();
-        long size = entry.getSize();
-        extractEntry(entry, archiveInput, size, destDir, destDir.resolve(name));
-        entry = archiveInput.getNextEntry();
-      }
-    } catch (CompressorException e) {
-      throw new IOException(
-          "Can't uncompress to destination directory " +
-              destDir.toAbsolutePath(), e);
-    }
-  }
-
   public static Path getDbPath(KeyValueContainerData containerData) {
     if (containerData.getSchemaVersion().equals(SCHEMA_V3)) {
       return DatanodeStoreSchemaThreeImpl.getDumpDir(
@@ -227,6 +189,26 @@ public class TarContainerPacker
     } else {
       return containerData.getDbFile().toPath();
     }
+  }
+
+  public static Path getDbPath(Path baseDir,
+      KeyValueContainerData containerData) {
+    Path metadataDir = KeyValueContainerLocationUtil.getContainerMetaDataPath(
+            baseDir.toAbsolutePath().toString()).toPath();
+    if (containerData.getSchemaVersion().equals(SCHEMA_V3)) {
+      return DatanodeStoreSchemaThreeImpl.getDumpDir(metadataDir.toFile())
+          .toPath();
+    } else {
+      return KeyValueContainerLocationUtil.getContainerDBFile(
+          metadataDir.toAbsolutePath().toString(), containerData).toPath();
+    }
+  }
+
+  public static Path getChunkPath(Path baseDir,
+      KeyValueContainerData containerData) {
+    Path chunkDir = KeyValueContainerLocationUtil.getChunksLocationPath(
+        baseDir.toAbsolutePath().toString()).toPath();
+    return chunkDir;
   }
 
   private byte[] readEntry(InputStream input, final long size)
@@ -291,4 +273,40 @@ public class TarContainerPacker
         .createCompressorOutputStream(CompressorStreamFactory.GZIP, output);
   }
 
+  private byte[] innerUnpack(InputStream input, Path dbRoot, Path chunksRoot)
+      throws IOException {
+    byte[] descriptorFileContent = null;
+    try (InputStream decompressed = decompress(input);
+         ArchiveInputStream archiveInput = untar(decompressed)) {
+      ArchiveEntry entry = archiveInput.getNextEntry();
+      while (entry != null) {
+        String name = entry.getName();
+        long size = entry.getSize();
+        if (name.startsWith(DB_DIR_NAME + "/")) {
+          Path destinationPath = dbRoot
+              .resolve(name.substring(DB_DIR_NAME.length() + 1));
+          extractEntry(entry, archiveInput, size, dbRoot,
+              destinationPath);
+        } else if (name.startsWith(CHUNKS_DIR_NAME + "/")) {
+          Path destinationPath = chunksRoot
+              .resolve(name.substring(CHUNKS_DIR_NAME.length() + 1));
+          extractEntry(entry, archiveInput, size, chunksRoot,
+              destinationPath);
+        } else if (CONTAINER_FILE_NAME.equals(name)) {
+          //Don't do anything. Container file should be unpacked in a
+          //separated step by unpackContainerDescriptor call.
+          descriptorFileContent = readEntry(archiveInput, size);
+        } else {
+          throw new IllegalArgumentException(
+              "Unknown entry in the tar file: " + "" + name);
+        }
+        entry = archiveInput.getNextEntry();
+      }
+      return descriptorFileContent;
+
+    } catch (CompressorException e) {
+      throw new IOException("Can't uncompress to dbRoot: " + dbRoot +
+              ", chunksRoot: " + chunksRoot, e);
+    }
+  }
 }

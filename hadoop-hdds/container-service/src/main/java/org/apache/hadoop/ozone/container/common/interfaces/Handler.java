@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
@@ -117,14 +118,7 @@ public abstract class Handler {
    */
   public abstract Container importContainer(
       ContainerData containerData, InputStream rawContainerStream,
-      TarContainerPacker packer)
-      throws IOException;
-
-  /**
-   * Imports container from path.
-   */
-  public abstract Container importContainer(
-      ContainerData containerData, Path path) throws IOException;
+      TarContainerPacker packer) throws IOException;
 
   /**
    * Exports container to the output stream.

@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -58,7 +59,7 @@ public class TestContainerUtils {
   }
 
   @Test
-  public void testTarGzName() {
+  public void testTarGzName() throws IOException {
     long containerId = 100;
     String tarGzName = "container-100.tar.gz";
     assertEquals(tarGzName, ContainerUtils.getContainerTarGzName(containerId));

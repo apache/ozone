@@ -46,6 +46,7 @@ import org.apache.commons.compress.compressors.CompressorInputStream;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -53,6 +54,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.mockito.Mockito;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.compress.compressors.CompressorStreamFactory.GZIP;
@@ -127,13 +129,13 @@ public class TestTarContainerPacker {
   private KeyValueContainerData createContainer(Path dir) throws IOException {
     long id = CONTAINER_ID.getAndIncrement();
 
-    Path containerDir = dir.resolve("container" + id);
+    Path containerDir = dir.resolve(String.valueOf(id));
     Path dbDir = containerDir.resolve("db");
-    Path dataDir = containerDir.resolve("data");
+    Path dataDir = containerDir.resolve("chunks");
     Path metaDir = containerDir.resolve("metadata");
-    Files.createDirectories(metaDir);
-    Files.createDirectories(dbDir);
-    Files.createDirectories(dataDir);
+//    Files.createDirectories(metaDir);
+//    Files.createDirectories(dbDir);
+//    Files.createDirectories(dataDir);
 
     KeyValueContainerData containerData = new KeyValueContainerData(
         id, layout,
@@ -165,6 +167,7 @@ public class TestTarContainerPacker {
     writeDescriptor(sourceContainer);
 
     Path targetFile = TEMP_DIR.resolve("container.tar.gz");
+    long containerId = sourceContainerData.getContainerID();
 
     //WHEN: pack it
     try (FileOutputStream output = new FileOutputStream(targetFile.toFile())) {
@@ -211,7 +214,9 @@ public class TestTarContainerPacker {
     //unpackContainerData
     try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
       descriptor =
-          new String(packer.unpackContainerData(destinationContainer, input),
+          new String(packer.unpackContainerData(destinationContainer, input,
+              TEMP_DIR,
+              DEST_CONTAINER_ROOT.resolve(String.valueOf(containerId))),
               UTF_8);
     }
 
@@ -308,7 +313,8 @@ public class TestTarContainerPacker {
     try (FileInputStream input = new FileInputStream(containerFile)) {
       KeyValueContainerData data = createContainer(DEST_CONTAINER_ROOT);
       KeyValueContainer container = new KeyValueContainer(data, conf);
-      packer.unpackContainerData(container, input);
+      packer.unpackContainerData(container, input, TEMP_DIR,
+          DEST_CONTAINER_ROOT.resolve(String.valueOf(data.getContainerID())));
       return data;
     }
   }

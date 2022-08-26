@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.Collections;
@@ -57,6 +58,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
@@ -502,21 +504,23 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public void importContainerData(InputStream input,
-      ContainerPacker<KeyValueContainerData> packer) throws IOException {
+      ContainerPacker<KeyValueContainerData> packer)
+      throws IOException {
+    long containerId = getContainerData().getContainerID();
+    HddsVolume hddsVolume = containerData.getVolume();
+    String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
+        hddsVolume, hddsVolume.getClusterID());
+    Path destContainerDir =
+        Paths.get(KeyValueContainerLocationUtil.getBaseContainerLocation(
+            hddsVolume.getHddsRootDir().toString(), idDir,
+            containerData.getContainerID()));
+    Path tmpDir = DownloadAndImportReplicator.getUntarDirectory(hddsVolume);
     writeLock();
     try {
-      if (getContainerFile().exists()) {
-        String errorMessage = String.format(
-            "Can't import container (cid=%d) data to a specific location"
-                + " as the container descriptor (%s) has already been exist.",
-            getContainerData().getContainerID(),
-            getContainerFile().getAbsolutePath());
-        throw new StorageContainerException(errorMessage,
-            CONTAINER_ALREADY_EXISTS);
-      }
       //copy the values from the input stream to the final destination
       // directory.
-      byte[] descriptorContent = packer.unpackContainerData(this, input);
+      byte[] descriptorContent = packer.unpackContainerData(this, input, tmpDir,
+          destContainerDir);
 
       Preconditions.checkNotNull(descriptorContent,
           "Container descriptor is missing from the container archive: "
@@ -528,15 +532,23 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       KeyValueContainerData originalContainerData =
           (KeyValueContainerData) ContainerDataYaml
               .readContainer(descriptorContent);
+      importContainerData(originalContainerData);
+    } finally {
+      writeUnlock();
+    }
+  }
 
-
+  public void importContainerData(KeyValueContainerData originalContainerData)
+      throws IOException {
+    writeLock();
+    try {
       containerData.setState(originalContainerData.getState());
       containerData
           .setContainerDBType(originalContainerData.getContainerDBType());
       containerData.setSchemaVersion(originalContainerData.getSchemaVersion());
 
       //rewriting the yaml file with new checksum calculation.
-      update(originalContainerData.getMetadata(), true);
+      update(containerData.getMetadata(), true);
 
       if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
         // load metadata from received dump files before we try to parse kv
@@ -572,11 +584,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } finally {
       writeUnlock();
     }
-  }
-
-  @Override
-  public void importContainerData(Path path) throws IOException {
-
   }
 
   @Override
