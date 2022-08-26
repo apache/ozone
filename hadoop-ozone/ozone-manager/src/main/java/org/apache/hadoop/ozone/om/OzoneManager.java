@@ -609,7 +609,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } else {
       omState = State.INITIALIZED;
     }
-
   }
 
   public boolean isStopped() {
