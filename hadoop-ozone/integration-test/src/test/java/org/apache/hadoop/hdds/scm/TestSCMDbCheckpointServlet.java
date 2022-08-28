@@ -118,6 +118,7 @@ public class TestSCMDbCheckpointServlet {
           scmMetrics.getDBCheckpointMetrics(),
           false,
           Collections.emptyList(),
+          Collections.emptyList(),
           false);
 
       HttpServletRequest requestMock = mock(HttpServletRequest.class);
