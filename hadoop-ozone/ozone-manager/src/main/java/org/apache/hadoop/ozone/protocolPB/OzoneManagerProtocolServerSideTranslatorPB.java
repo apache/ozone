@@ -25,14 +25,12 @@ import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
@@ -42,6 +40,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.request.validation.RequestValidations;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
@@ -506,10 +505,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       // This is not a problem, since we will anyway be validating this bucket
       // ID inside validateAndUpdateCache method - and it will be caught there.
       // This is a fail-slow approach.
-      ResolvedBucket resolvedBucket =
-          ozoneManager.resolveBucketLink(Pair.of(volumeName, bucketName));
-      bucketId = metadataManager.getBucketId(resolvedBucket.realVolume(),
-          resolvedBucket.realBucket());
+      bucketId =
+          OMClientRequestUtils.getResolvedBucketId(ozoneManager, volumeName,
+              bucketName);
     } catch (OMException oe) {
       // Ignore exceptions at this stage, let respective classes handle them.
       return omRequest;
