@@ -355,7 +355,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   @SuppressWarnings("checkstyle:MethodLength")
   private OMRequest associateBucketIdWithRequest(OMRequest omRequest)
       throws IOException {
-    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
     String volumeName = "";
     String bucketName = "";
 
