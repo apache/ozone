@@ -481,6 +481,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       break;
     default:
       // do nothing in case of other requests.
+      LOG.debug(
+          "Bucket ID validation is not enabled for " + omRequest.getCmdType() +
+              ". Bucket ID will not be associated with this request.");
       break;
     }
 
@@ -510,6 +513,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
               bucketName);
     } catch (OMException oe) {
       // Ignore exceptions at this stage, let respective classes handle them.
+      LOG.debug(
+          "There was an error while fetching bucket ID for " + volumeName +
+              "/" + bucketName + ".", oe);
       return omRequest;
     }
 

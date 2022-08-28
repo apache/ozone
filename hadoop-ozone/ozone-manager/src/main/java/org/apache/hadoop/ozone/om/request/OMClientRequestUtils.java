@@ -70,7 +70,8 @@ public final class OMClientRequestUtils {
     if (omRequest.hasAssociatedBucketId()) {
       if (bucketId != omRequest.getAssociatedBucketId()) {
         throw new OMException(
-            "Bucket ID mismatch. Associated bucket was modified while this" +
+            "Bucket ID mismatch. Associated bucket was modified concurrently" +
+                " while " + omRequest.getCmdType() +
                 " request was being processed. Please retry the request.",
             OMException.ResultCodes.BUCKET_ID_MISMATCH);
       }
