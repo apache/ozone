@@ -51,14 +51,15 @@ public interface DeletedBlockLog extends Closeable {
       throws IOException, TimeoutException;
 
   /**
-   * Return all failed transactions in the log. A transaction is considered
-   * to be failed if it has been sent more than MAX_RETRY limit and its
-   * count is reset to -1.
+   * Return the failed transactions in the log. A transaction is
+   * considered to be failed if it has been sent more than MAX_RETRY limit
+   * and its count is reset to -1.
    *
+   * @param count Maximum num of returned transactions, if < 0. return all.
    * @return a list of failed deleted block transactions.
    * @throws IOException
    */
-  List<DeletedBlocksTransaction> getFailedTransactions()
+  List<DeletedBlocksTransaction> getFailedTransactions(int count)
       throws IOException;
 
   /**

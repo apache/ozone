@@ -126,7 +126,7 @@ public class DeletedBlockLogImpl
   }
 
   @Override
-  public List<DeletedBlocksTransaction> getFailedTransactions()
+  public List<DeletedBlocksTransaction> getFailedTransactions(int count)
       throws IOException {
     lock.lock();
     try {
@@ -134,10 +134,19 @@ public class DeletedBlockLogImpl
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
-        while (iter.hasNext()) {
-          DeletedBlocksTransaction delTX = iter.next().getValue();
-          if (delTX.getCount() == -1) {
-            failedTXs.add(delTX);
+        if (count < 0) {
+          while (iter.hasNext()) {
+            DeletedBlocksTransaction delTX = iter.next().getValue();
+            if (delTX.getCount() == -1) {
+              failedTXs.add(delTX);
+            }
+          }
+        } else {
+          while (iter.hasNext() && failedTXs.size() < count) {
+            DeletedBlocksTransaction delTX = iter.next().getValue();
+            if (delTX.getCount() == -1) {
+              failedTXs.add(delTX);
+            }
           }
         }
       }
@@ -191,7 +200,7 @@ public class DeletedBlockLogImpl
     lock.lock();
     try {
       if (txIDs == null || txIDs.isEmpty()) {
-        txIDs = getFailedTransactions().stream()
+        txIDs = getFailedTransactions(-1).stream()
             .map(DeletedBlocksTransaction::getTxID)
             .collect(Collectors.toList());
       }

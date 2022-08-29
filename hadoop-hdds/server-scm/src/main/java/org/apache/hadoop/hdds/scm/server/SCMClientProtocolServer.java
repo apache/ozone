@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
@@ -40,6 +41,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.common.helpers.DeletedBlocksTransactionInfoWrapper;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
@@ -780,6 +782,26 @@ public class SCMClientProtocolServer implements
             buildAuditMessageForSuccess(SCMAction.GET_SCM_INFO, null)
         );
       }
+    }
+  }
+
+  public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count)
+      throws IOException {
+    List<DeletedBlocksTransactionInfo> result;
+    try {
+      result = scm.getScmBlockManager().getDeletedBlockLog()
+          .getFailedTransactions(count).stream()
+          .map(DeletedBlocksTransactionInfoWrapper::fromTxn)
+          .collect(Collectors.toList());
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, null));
+      return result;
+    } catch (IOException ex) {
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(
+              SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, null, ex)
+      );
+      throw ex;
     }
   }
 

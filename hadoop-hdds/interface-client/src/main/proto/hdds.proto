@@ -451,3 +451,10 @@ message ContainerBalancerConfigurationProto {
     required bool shouldRun = 18;
     optional int32 nextIterationIndex = 19;
 }
+
+message DeletedBlocksTransactionInfo {
+    required int64 txID = 1;
+    required int64 containerID = 2;
+    repeated int64 localID = 3;
+    required int32 count = 4;
+}

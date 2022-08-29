@@ -58,6 +58,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetFailedDeletedBlocksTxnRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetFailedDeletedBlocksTxnResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
@@ -648,6 +650,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
               request.getGetContainerReplicasRequest(),
               request.getVersion()))
           .build();
+      case GetFailedDeletedBlocksTransaction:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetFailedDeletedBlocksTxnResponse(getFailedDeletedBlocksTxn(
+                request.getGetFailedDeletedBlocksTxnRequest()
+            ))
+            .build();
       case ResetDeletedBlockRetryCount:
         return ScmContainerLocationResponse.newBuilder()
               .setCmdType(request.getCmdType())
@@ -1147,6 +1157,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return GetContainerCountResponseProto.newBuilder()
       .setContainerCount(impl.getContainerCount())
       .build();
+  }
+
+  public GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxn(
+      GetFailedDeletedBlocksTxnRequestProto request) throws IOException {
+    return GetFailedDeletedBlocksTxnResponseProto.newBuilder()
+        .addAllDeletedBlocksTransactions(
+            impl.getFailedDeletedBlockTxn(request.getCount()))
+        .build();
   }
 
   public ResetDeletedBlockRetryCountResponseProto
