@@ -101,8 +101,6 @@ public abstract class AbstractContainerScanner extends Thread {
       } catch (IOException ex) {
         LOG.warn("Unexpected exception while scanning container "
             + c.getContainerData().getContainerID(), ex);
-      } finally {
-        metrics.incNumContainersScanned();
       }
     }
   }

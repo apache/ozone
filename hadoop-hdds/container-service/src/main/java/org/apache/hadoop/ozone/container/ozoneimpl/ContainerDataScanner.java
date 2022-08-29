@@ -64,26 +64,21 @@ public class ContainerDataScanner extends AbstractContainerScanner {
   }
 
   @Override
-  public void scanContainer(Container c) {
-    if (c.shouldScanData()) {
-      ContainerData containerData = c.getContainerData();
-      long containerId = containerData.getContainerID();
-      try {
-        logScanStart(containerData);
-        if (!c.scanData(throttler, canceler)) {
-          metrics.incNumUnHealthyContainers();
-          controller.markContainerUnhealthy(containerId);
-        } else {
-          Instant now = Instant.now();
-          logScanCompleted(containerData, now);
-          controller.updateDataScanTimestamp(containerId, now);
-        }
-      } catch (IOException ex) {
-        LOG.warn("Unexpected exception while scanning container "
-            + containerId, ex);
-      } finally {
-        metrics.incNumContainersScanned();
-      }
+  public void scanContainer(Container c) throws IOException {
+    if (!c.shouldScanData()) {
+      return;
+    }
+    ContainerData containerData = c.getContainerData();
+    long containerId = containerData.getContainerID();
+    metrics.incNumContainersScanned();
+    logScanStart(containerData);
+    if (!c.scanData(throttler, canceler)) {
+      metrics.incNumUnHealthyContainers();
+      controller.markContainerUnhealthy(containerId);
+    } else {
+      Instant now = Instant.now();
+      logScanCompleted(containerData, now);
+      controller.updateDataScanTimestamp(containerId, now);
     }
   }
 

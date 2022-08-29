@@ -54,6 +54,7 @@ public class ContainerMetadataScanner extends AbstractContainerScanner {
   @VisibleForTesting
   @Override
   public void scanContainer(Container container) throws IOException {
+    metrics.incNumContainersScanned();
     if (!container.scanMetaData()) {
       metrics.incNumUnHealthyContainers();
       controller.markContainerUnhealthy(
