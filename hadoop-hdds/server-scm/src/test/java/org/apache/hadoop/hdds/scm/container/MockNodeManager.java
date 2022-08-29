@@ -346,7 +346,35 @@ public class MockNodeManager implements NodeManager {
    */
   @Override
   public List<DatanodeDetails> getAllNodes() {
-    return new ArrayList<>(nodeMetricMap.keySet());
+    // mock storage reports for TestDiskBalancer
+    List<DatanodeDetails> healthyNodesWithInfo = new ArrayList<>();
+    for (DatanodeDetails dd : nodeMetricMap.keySet()) {
+      NodeStatus nodeStatus = NodeStatus.inServiceHealthy();
+      if (staleNodes.contains(dd)) {
+        nodeStatus = NodeStatus.inServiceStale();
+      } else if (deadNodes.contains(dd)) {
+        nodeStatus = NodeStatus.inServiceDead();
+      }
+      DatanodeInfo di = new DatanodeInfo(dd, nodeStatus,
+          UpgradeUtils.defaultLayoutVersionProto());
+
+      long capacity = nodeMetricMap.get(dd).getCapacity().get();
+      long used = nodeMetricMap.get(dd).getScmUsed().get();
+      long remaining = nodeMetricMap.get(dd).getRemaining().get();
+      StorageReportProto storage1 = HddsTestUtils.createStorageReport(
+          di.getUuid(), "/data1-" + di.getUuidString(),
+          capacity, used, remaining, null);
+      MetadataStorageReportProto metaStorage1 =
+          HddsTestUtils.createMetadataStorageReport(
+              "/metadata1-" + di.getUuidString(), capacity, used,
+              remaining, null);
+      di.updateStorageReports(new ArrayList<>(Arrays.asList(storage1)));
+      di.updateMetaDataStorageReports(
+          new ArrayList<>(Arrays.asList(metaStorage1)));
+
+      healthyNodesWithInfo.add(di);
+    }
+    return healthyNodesWithInfo;
   }
 
   /**

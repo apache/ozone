@@ -116,26 +116,26 @@ public class DiskBalancerManager {
     HddsProtos.DiskBalancerRunningStatus filterStatus =
         status.orElse(HddsProtos.DiskBalancerRunningStatus.RUNNING);
 
-    for (DatanodeDetails datanodeDetails: nodeManager.getNodes(IN_SERVICE,
-        HddsProtos.NodeState.HEALTHY)) {
-      if (shouldReturnDatanode(filterDns, filterStatus, datanodeDetails)) {
-        double volumeDensitySum =
-            getVolumeDataDensitySumForDatanodeDetails(datanodeDetails);
-        HddsProtos.DiskBalancerRunningStatus runningStatus =
-            getRunningStatus(datanodeDetails);
-        HddsProtos.DatanodeDiskBalancerInfoProto.Builder builder =
-            HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
-                .setNode(datanodeDetails.toProto(clientVersion))
-                .setCurrentVolumeDensitySum(volumeDensitySum)
-                .setRunningStatus(getRunningStatus(datanodeDetails));
-        if (runningStatus != HddsProtos.DiskBalancerRunningStatus.UNKNOWN) {
-          builder.setDiskBalancerConf(statusMap.get(datanodeDetails)
-              .getDiskBalancerConfiguration().toProtobufBuilder());
-        }
-        statusList.add(builder.build());
-      }
-    }
-    return statusList;
+    List<DatanodeDetails> finalFilterDns = filterDns;
+
+    return nodeManager.getAllNodes().stream()
+        .filter(dn -> shouldReturnDatanode(finalFilterDns, filterStatus, dn))
+        .map(dn -> {
+          double volumeDensitySum =
+              getVolumeDataDensitySumForDatanodeDetails(dn);
+          HddsProtos.DiskBalancerRunningStatus runningStatus =
+              getRunningStatus(dn);
+          HddsProtos.DatanodeDiskBalancerInfoProto.Builder builder =
+              HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
+                  .setNode(dn.toProto(clientVersion))
+                  .setCurrentVolumeDensitySum(volumeDensitySum)
+                  .setRunningStatus(getRunningStatus(dn));
+          if (runningStatus != HddsProtos.DiskBalancerRunningStatus.UNKNOWN) {
+            builder.setDiskBalancerConf(statusMap.get(dn)
+                .getDiskBalancerConfiguration().toProtobufBuilder());
+          }
+          return builder.build();
+        }).collect(Collectors.toList());
   }
 
   private boolean shouldReturnDatanode(List<DatanodeDetails> hosts,
