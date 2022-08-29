@@ -54,6 +54,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -194,8 +195,11 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     statistics.incrementReadOps(1);
     LOG.trace("open() path: {}", path);
     final String key = pathToKey(path);
-    return new FSDataInputStream(
-        new OzoneFSInputStream(adapter.readFile(key), statistics));
+    return new FSDataInputStream(createFSInputStream(adapter.readFile(key)));
+  }
+
+  protected InputStream createFSInputStream(InputStream inputStream) {
+    return new OzoneFSInputStream(inputStream, statistics);
   }
 
   protected void incrementCounter(Statistic statistic) {
@@ -631,8 +635,19 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         }
       }
 
+      boolean isBucketLink = false;
+      // check for bucket link
+      if (ofsPath.isBucket()) {
+        isBucketLink = adapterImpl.getBucket(ofsPath, false)
+            .isLink();
+      }
 
-      result = innerDelete(f, recursive);
+      // if link, don't delete contents
+      if (isBucketLink) {
+        result = true;
+      } else {
+        result = innerDelete(f, recursive);
+      }
 
       // Handle delete bucket
       if (ofsPath.isBucket()) {

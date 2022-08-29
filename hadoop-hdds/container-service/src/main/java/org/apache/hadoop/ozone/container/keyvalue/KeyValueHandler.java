@@ -31,6 +31,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 
 import com.google.common.util.concurrent.Striped;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -83,8 +84,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DELETE_ON_NON_EMPTY_CONTAINER;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DELETE_ON_OPEN_CONTAINER;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.GET_SMALL_FILE_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_CONTAINER_STATE;
@@ -102,6 +105,8 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
+    .ContainerDataProto.State.RECOVERING;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
@@ -178,6 +183,8 @@ public class KeyValueHandler extends Handler {
 
   @Override
   public void stop() {
+    chunkManager.shutdown();
+    blockManager.shutdown();
   }
 
   @Override
@@ -264,7 +271,12 @@ public class KeyValueHandler extends Handler {
     }
     // Create Container request should be passed a null container as the
     // container would be created here.
-    Preconditions.checkArgument(kvContainer == null);
+    if (kvContainer != null) {
+      return ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException(
+              "Container creation failed because " + "key value container" +
+                  " already exists", null, CONTAINER_ALREADY_EXISTS), request);
+    }
 
     long containerID = request.getContainerID();
 
@@ -273,6 +285,13 @@ public class KeyValueHandler extends Handler {
     KeyValueContainerData newContainerData = new KeyValueContainerData(
         containerID, layoutVersion, maxContainerSize, request.getPipelineID(),
         getDatanodeId());
+    State state = request.getCreateContainer().getState();
+    if (state != null) {
+      newContainerData.setState(state);
+    }
+    newContainerData.setReplicaIndex(request.getCreateContainer()
+        .getReplicaIndex());
+
     // TODO: Add support to add metadataList to ContainerData. Add metadata
     // to container during creation.
     KeyValueContainer newContainer = new KeyValueContainer(
@@ -314,10 +333,9 @@ public class KeyValueHandler extends Handler {
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
           container.getContainerData().getMaxSize());
-      String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
       String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
               containerVolume, clusterId);
-      container.populatePathFields(idDir, containerVolume, hddsVolumeDir);
+      container.populatePathFields(idDir, containerVolume);
     } finally {
       volumeSet.readUnlock();
     }
@@ -455,7 +473,11 @@ public class KeyValueHandler extends Handler {
 
       boolean endOfBlock = false;
       if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
-        chunkManager.finishWriteChunks(kvContainer, blockData);
+        // in EC, we will be doing empty put block.
+        // So, let's flush only when there are any chunks
+        if (!request.getPutBlock().getBlockData().getChunksList().isEmpty()) {
+          chunkManager.finishWriteChunks(kvContainer, blockData);
+        }
         endOfBlock = true;
       }
 
@@ -907,7 +929,8 @@ public class KeyValueHandler extends Handler {
      * in the leader goes to closing state, will arrive here even the container
      * might already be in closing state here.
      */
-    if (containerState == State.OPEN || containerState == State.CLOSING) {
+    if (containerState == State.OPEN || containerState == State.CLOSING
+        || containerState == State.RECOVERING) {
       return;
     }
 
@@ -938,9 +961,11 @@ public class KeyValueHandler extends Handler {
       final InputStream rawContainerStream,
       final TarContainerPacker packer)
       throws IOException {
+    Preconditions.checkState(originalContainerData instanceof
+        KeyValueContainerData, "Should be KeyValueContainerData instance");
 
-    KeyValueContainerData containerData =
-        new KeyValueContainerData(originalContainerData);
+    KeyValueContainerData containerData = new KeyValueContainerData(
+        (KeyValueContainerData) originalContainerData);
 
     KeyValueContainer container = new KeyValueContainer(containerData,
         conf);
@@ -966,8 +991,14 @@ public class KeyValueHandler extends Handler {
       throws IOException {
     container.writeLock();
     try {
-      // Move the container to CLOSING state only if it's OPEN
-      if (container.getContainerState() == State.OPEN) {
+      ContainerProtos.ContainerDataProto.State state =
+          container.getContainerState();
+      // Move the container to CLOSING state only if it's OPEN/RECOVERING
+      if (HddsUtils.isOpenToWriteState(state)) {
+        if (state == RECOVERING) {
+          containerSet.removeRecoveringContainer(
+              container.getContainerData().getContainerID());
+        }
         container.markContainerForClose();
         sendICR(container);
       }
@@ -1090,6 +1121,18 @@ public class KeyValueHandler extends Handler {
           throw new StorageContainerException(
               "Deletion of Open Container is not allowed.",
               DELETE_ON_OPEN_CONTAINER);
+        }
+        // Safety check that the container is empty.
+        // If the container is not empty, it should not be deleted unless the
+        // container is beinf forcefully deleted (which happens when
+        // container is unhealthy or over-replicated).
+        if (container.getContainerData().getBlockCount() != 0) {
+          LOG.error("Received container deletion command for container {} but" +
+              " the container is not empty.",
+              container.getContainerData().getContainerID());
+          throw new StorageContainerException("Non-force deletion of " +
+              "non-empty container is not allowed.",
+              DELETE_ON_NON_EMPTY_CONTAINER);
         }
       }
       long containerId = container.getContainerData().getContainerID();

@@ -18,13 +18,14 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
@@ -54,10 +55,16 @@ public class OMLayoutFeatureAspect {
     String featureName = ((MethodSignature) joinPoint.getSignature())
         .getMethod().getAnnotation(DisallowedUntilLayoutVersion.class)
         .value().name();
-    LayoutVersionManager lvm = null;
+    LayoutVersionManager lvm;
+    final Object[] args = joinPoint.getArgs();
     if (joinPoint.getTarget() instanceof OzoneManagerRequestHandler) {
       OzoneManager ozoneManager = ((OzoneManagerRequestHandler)
           joinPoint.getTarget()).getOzoneManager();
+      lvm = ozoneManager.getVersionManager();
+    } else if (joinPoint.getTarget() instanceof OMClientRequest &&
+        joinPoint.toShortString().endsWith(".preExecute(..))")) {
+      // Get OzoneManager instance from preExecute first argument
+      OzoneManager ozoneManager = (OzoneManager) args[0];
       lvm = ozoneManager.getVersionManager();
     } else {
       try {
@@ -83,7 +90,7 @@ public class OMLayoutFeatureAspect {
           layoutFeature.name(),
           layoutFeature.layoutVersion(),
           lvm.getMetadataLayoutVersion()),
-          NOT_SUPPORTED_OPERATION);
+          NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
     }
   }
 
@@ -109,6 +116,14 @@ public class OMLayoutFeatureAspect {
     LayoutFeature lf = annotation.value();
     checkIsAllowed(joinPoint.getTarget().getClass().getSimpleName(),
         om.getVersionManager(), lf.name());
+  }
+
+  /**
+   * Note: Without this, it occasionally throws NoSuchMethodError when running
+   * the test.
+   */
+  public static OMLayoutFeatureAspect aspectOf() {
+    return new OMLayoutFeatureAspect();
   }
 
 }

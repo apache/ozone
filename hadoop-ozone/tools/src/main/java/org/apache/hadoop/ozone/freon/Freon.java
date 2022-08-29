@@ -52,6 +52,7 @@ import picocli.CommandLine.Option;
         HadoopFsValidator.class,
         SameKeyReader.class,
         S3KeyGenerator.class,
+        S3BucketGenerator.class,
         DatanodeChunkGenerator.class,
         DatanodeChunkValidator.class,
         DatanodeBlockPutter.class,
@@ -63,7 +64,11 @@ import picocli.CommandLine.Option;
         GeneratorDatanode.class,
         ClosedContainerReplicator.class,
         StreamingGenerator.class,
-        SCMThroughputBenchmark.class},
+        SCMThroughputBenchmark.class,
+        OmBucketReadWriteFileOps.class,
+        OmBucketReadWriteKeyOps.class,
+        OmRPCLoadGenerator.class,
+    },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class Freon extends GenericCli {
@@ -85,11 +90,11 @@ public class Freon extends GenericCli {
   private OzoneConfiguration conf;
 
   @Override
-  public void execute(String[] argv) {
+  public int execute(String[] argv) {
     conf = createOzoneConfiguration();
     HddsServerUtil.initializeMetrics(conf, "ozone-freon");
     TracingUtil.initTracing("freon", conf);
-    super.execute(argv);
+    return super.execute(argv);
   }
 
   public void stopHttpServer() {

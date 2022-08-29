@@ -425,7 +425,12 @@ public abstract class ContainerData {
     long unused = getMaxSize() - getBytesUsed();
 
     this.writeBytes.addAndGet(bytes);
-
+    /*
+       Increase the cached Used Space in VolumeInfo as it
+       maybe not updated, DU or DedicatedDiskSpaceUsage runs
+       periodically to update the Used Space in VolumeInfo.
+     */
+    this.getVolume().incrementUsedSpace(bytes);
     // only if container size < max size
     if (committedSpace && unused > 0) {
       //with this write, container size might breach max size

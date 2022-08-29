@@ -328,6 +328,7 @@ public class SCMStateMachine extends BaseStateMachine {
           .isLeaderReady()) {
         scm.getScmContext().setLeaderReady();
         scm.getSCMServiceManager().notifyStatusChanged();
+        scm.getFinalizationManager().onLeaderReady();
       }
 
       // Means all transactions before this term have been applied.
@@ -390,10 +391,17 @@ public class SCMStateMachine extends BaseStateMachine {
     if (!isInitialized) {
       return;
     }
-    super.close();
-    transactionBuffer.close();
-    HadoopExecutors.
-        shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+    //if ratis server is stopped , it indicates this `close` originates
+    // from `scm.stop()`, otherwise, it indicates this `close` originates
+    // from ratis.
+    if (scm.getScmHAManager().getRatisServer().isStopped()) {
+      super.close();
+      transactionBuffer.close();
+      HadoopExecutors.
+          shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+    } else {
+      scm.shutDown("scm statemachine is closed by ratis, terminate SCM");
+    }
   }
 
   @VisibleForTesting

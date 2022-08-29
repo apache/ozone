@@ -92,9 +92,9 @@ public final class S3GatewayMetrics implements MetricsSource {
   }
 
   /**
-   * Create and returns SCMPipelineMetrics instance.
+   * Create and returns S3 Gateway Metrics instance.
    *
-   * @return SCMPipelineMetrics
+   * @return S3GatewayMetrics
    */
   public static synchronized S3GatewayMetrics create() {
     if (instance != null) {
@@ -316,5 +316,133 @@ public final class S3GatewayMetrics implements MetricsSource {
 
   public long getHeadKeySuccess() {
     return headKeySuccess.value();
+  }
+
+  public long getGetBucketSuccess() {
+    return getBucketSuccess.value();
+  }
+
+  public long getGetBucketFailure() {
+    return getBucketFailure.value();
+  }
+
+  public long getCreateBucketSuccess() {
+    return createBucketSuccess.value();
+  }
+
+  public long getCreateBucketFailure() {
+    return createBucketFailure.value();
+  }
+
+  public long getDeleteBucketSuccess() {
+    return deleteBucketSuccess.value();
+  }
+
+  public long getDeleteBucketFailure() {
+    return deleteBucketFailure.value();
+  }
+
+  public long getGetAclSuccess() {
+    return getAclSuccess.value();
+  }
+
+  public long getGetAclFailure() {
+    return getAclFailure.value();
+  }
+
+  public long getPutAclSuccess() {
+    return putAclSuccess.value();
+  }
+
+  public long getPutAclFailure() {
+    return putAclFailure.value();
+  }
+
+  public long getListMultipartUploadsSuccess() {
+    return listMultipartUploadsSuccess.value();
+  }
+
+  public long getListMultipartUploadsFailure() {
+    return listMultipartUploadsFailure.value();
+  }
+
+  public long getCreateMultipartKeySuccess() {
+    return createMultipartKeySuccess.value();
+  }
+
+  public long getCreateMultipartKeyFailure() {
+    return createMultipartKeyFailure.value();
+  }
+
+  public long getCompleteMultiPartUploadSuccess() {
+    return completeMultiPartUploadSuccess.value();
+  }
+
+  public long getCompleteMultiPartUploadFailure() {
+    return completeMultiPartUploadFailure.value();
+  }
+
+  public long getListPartsSuccess() {
+    return listPartsSuccess.value();
+  }
+
+  public long getListPartsFailure() {
+    return listPartsFailure.value();
+  }
+
+  public long getCopyObjectSuccess() {
+    return copyObjectSuccess.value();
+  }
+
+  public long getCopyObjectFailure() {
+    return copyObjectFailure.value();
+  }
+
+  public long getCreateKeyFailure() {
+    return createKeyFailure.value();
+  }
+
+  public long getCreateKeySuccess() {
+    return createKeySuccess.value();
+  }
+
+  public long getInitMultiPartUploadSuccess() {
+    return initMultiPartUploadSuccess.value();
+  }
+
+  public long getInitMultiPartUploadFailure() {
+    return initMultiPartUploadFailure.value();
+  }
+
+  public long getDeleteKeySuccess() {
+    return deleteKeySuccess.value();
+  }
+
+  public long getDeleteKeyFailure() {
+    return deleteKeyFailure.value();
+  }
+
+  public long getGetKeyFailure() {
+    return getKeyFailure.value();
+  }
+
+  public long getGetKeySuccess() {
+    return getKeySuccess.value();
+  }
+
+  public long getAbortMultiPartUploadSuccess() {
+    return abortMultiPartUploadSuccess.value();
+  }
+
+  public long getAbortMultiPartUploadFailure() {
+    return abortMultiPartUploadFailure.value();
+  }
+
+  public long getHeadKeyFailure() {
+    return headKeyFailure.value();
+  }
+
+  public long getListS3BucketsFailure() {
+    return listS3BucketsFailure.value();
   }
 }

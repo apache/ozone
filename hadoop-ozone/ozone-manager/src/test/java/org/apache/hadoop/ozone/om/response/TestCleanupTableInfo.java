@@ -21,6 +21,7 @@ import com.google.common.base.Optional;
 import com.google.common.collect.Iterators;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -37,6 +38,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
@@ -135,6 +137,8 @@ public class TestCleanupTableInfo {
         );
     when(om.getAclsEnabled()).thenReturn(false);
     when(om.getAuditLogger()).thenReturn(mock(AuditLogger.class));
+    when(om.getDefaultReplicationConfig()).thenReturn(ReplicationConfig
+        .getDefault(new OzoneConfiguration()));
     addVolumeToMetaTable(aVolumeArgs());
     addBucketToMetaTable(aBucketInfo());
   }
@@ -186,6 +190,8 @@ public class TestCleanupTableInfo {
   public void testKeyCreateRequestSetsAllTouchedTableCachesForEviction() {
     OMKeyCreateRequest request = anOMKeyCreateRequest();
     when(om.getEnableFileSystemPaths()).thenReturn(true);
+    when(om.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(false, false));
 
     Map<String, Integer> cacheItemCount = recordCacheItemCounts();
 

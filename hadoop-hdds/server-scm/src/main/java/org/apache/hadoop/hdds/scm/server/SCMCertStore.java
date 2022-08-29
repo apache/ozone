@@ -111,9 +111,8 @@ public final class SCMCertStore implements CertificateStore {
   public void storeValidScmCertificate(BigInteger serialID,
       X509Certificate certificate) throws IOException {
     lock.lock();
-    try {
-      BatchOperation batchOperation =
-          scmMetadataStore.getBatchHandler().initBatchOperation();
+    try (BatchOperation batchOperation =
+             scmMetadataStore.getBatchHandler().initBatchOperation()) {
       scmMetadataStore.getValidSCMCertsTable().putWithBatch(batchOperation,
           serialID, certificate);
       scmMetadataStore.getValidCertsTable().putWithBatch(batchOperation,
@@ -265,7 +264,7 @@ public final class SCMCertStore implements CertificateStore {
     } else {
       List<? extends Table.KeyValue<BigInteger, CertInfo>> certs =
           scmMetadataStore.getRevokedCertsV2Table().getRangeKVs(
-          startSerialID, count);
+          startSerialID, count, null);
 
       for (Table.KeyValue<BigInteger, CertInfo> kv : certs) {
         try {
@@ -290,10 +289,10 @@ public final class SCMCertStore implements CertificateStore {
 
     if (role == SCM) {
       return scmMetadataStore.getValidSCMCertsTable().getRangeKVs(
-          startSerialID, count);
+          startSerialID, count, null);
     } else {
       return scmMetadataStore.getValidCertsTable().getRangeKVs(
-          startSerialID, count);
+          startSerialID, count, null);
     }
   }
 

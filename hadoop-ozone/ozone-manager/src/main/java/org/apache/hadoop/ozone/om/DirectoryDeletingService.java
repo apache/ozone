@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -35,9 +36,11 @@ import org.apache.ratis.protocol.RaftClientRequest;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT;
 
@@ -126,16 +129,22 @@ public class DirectoryDeletingService extends BackgroundService {
         try {
           long startTime = Time.monotonicNow();
           // step-1) Get one pending deleted directory
-          OmKeyInfo pendingDeletedDirInfo =
+          Table.KeyValue<String, OmKeyInfo> pendingDeletedDirInfo =
               ozoneManager.getKeyManager().getPendingDeletionDir();
           if (pendingDeletedDirInfo != null) {
             if (LOG.isDebugEnabled()) {
               LOG.debug("Pending deleted dir name: {}",
-                  pendingDeletedDirInfo.getKeyName());
+                  pendingDeletedDirInfo.getValue().getKeyName());
             }
+            final String[] keys = pendingDeletedDirInfo.getKey()
+                    .split(OM_KEY_PREFIX);
+            final long volumeId = Long.parseLong(keys[1]);
+            final long bucketId = Long.parseLong(keys[2]);
+
             // step-1: get all sub directories under the deletedDir
             List<OmKeyInfo> dirs = ozoneManager.getKeyManager()
-                .getPendingDeletionSubDirs(pendingDeletedDirInfo, count);
+                .getPendingDeletionSubDirs(volumeId, bucketId,
+                        pendingDeletedDirInfo.getValue(), count);
             count = count - dirs.size();
             List<OmKeyInfo> deletedSubDirList = new ArrayList<>();
             for (OmKeyInfo dirInfo : dirs) {
@@ -148,7 +157,8 @@ public class DirectoryDeletingService extends BackgroundService {
 
             // step-2: get all sub files under the deletedDir
             List<OmKeyInfo> purgeDeletedFiles = ozoneManager.getKeyManager()
-                .getPendingDeletionSubFiles(pendingDeletedDirInfo, count);
+                .getPendingDeletionSubFiles(volumeId, bucketId,
+                        pendingDeletedDirInfo.getValue(), count);
             count = count - purgeDeletedFiles.size();
 
             if (LOG.isDebugEnabled()) {
@@ -162,21 +172,17 @@ public class DirectoryDeletingService extends BackgroundService {
             // limit. If count reached limit then there can be some more child
             // paths to be visited and will keep the parent deleted directory
             // for one more pass.
-            List<String> purgeDeletedDirs = new ArrayList<>();
-            if (count > 0) {
-              // TODO: Now, there is only one entry in this list. Maintained
-              //  list data structure becuase this can be extended to add
-              //  more directories within the batchSize limit.
-              purgeDeletedDirs.add(pendingDeletedDirInfo.getPath());
-            }
+            final Optional<String> purgeDeletedDir = count > 0 ?
+                    Optional.of(pendingDeletedDirInfo.getKey()) :
+                    Optional.empty();
 
             if (isRatisEnabled()) {
-              submitPurgePaths(purgeDeletedDirs, purgeDeletedFiles,
-                  deletedSubDirList);
+              submitPurgePaths(volumeId, bucketId, purgeDeletedDir,
+                      purgeDeletedFiles, deletedSubDirList);
             }
             // TODO: need to handle delete with non-ratis
 
-            deletedDirsCount.addAndGet(purgeDeletedDirs.size());
+            deletedDirsCount.incrementAndGet();
             deletedFilesCount.addAndGet(purgeDeletedFiles.size());
             if (LOG.isDebugEnabled()) {
               LOG.debug("Number of dirs deleted: {}, Number of files moved:" +
@@ -227,15 +233,17 @@ public class DirectoryDeletingService extends BackgroundService {
     return runCount.get();
   }
 
-  private int submitPurgePaths(List<String> purgeDeletedDirs,
-      List<OmKeyInfo> purgeDeletedFiles, List<OmKeyInfo> markDirsAsDeleted) {
+  private int submitPurgePaths(final long volumeId, final long bucketId,
+      final Optional<String> purgeDeletedDir,
+      final List<OmKeyInfo> purgeDeletedFiles,
+      final List<OmKeyInfo> markDirsAsDeleted) {
     // Put all keys to be purged in a list
     int deletedCount = 0;
-    OzoneManagerProtocolProtos.PurgePathsRequest.Builder purgePathsRequest =
-        OzoneManagerProtocolProtos.PurgePathsRequest.newBuilder();
-    for (String purgeDir : purgeDeletedDirs) {
-      purgePathsRequest.addDeletedDirs(purgeDir);
-    }
+    OzoneManagerProtocolProtos.PurgePathRequest.Builder purgePathsRequest =
+        OzoneManagerProtocolProtos.PurgePathRequest.newBuilder();
+    purgePathsRequest.setVolumeId(volumeId);
+    purgePathsRequest.setBucketId(bucketId);
+    purgeDeletedDir.ifPresent(purgePathsRequest::setDeletedDir);
     for (OmKeyInfo purgeFile : purgeDeletedFiles) {
       purgePathsRequest.addDeletedSubFiles(
           purgeFile.getProtobuf(true, ClientVersion.CURRENT_VERSION));
@@ -248,10 +256,15 @@ public class DirectoryDeletingService extends BackgroundService {
           dir.getProtobuf(ClientVersion.CURRENT_VERSION));
     }
 
+    OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
+            OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
+    purgeDirRequest.addDeletedPath(purgePathsRequest.build());
+
+
     OzoneManagerProtocolProtos.OMRequest omRequest =
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
-            .setCmdType(OzoneManagerProtocolProtos.Type.PurgePaths)
-            .setPurgePathsRequest(purgePathsRequest)
+            .setCmdType(OzoneManagerProtocolProtos.Type.PurgeDirectories)
+            .setPurgeDirectoriesRequest(purgeDirRequest)
             .setClientId(clientId.toString())
             .build();
 

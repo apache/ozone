@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.protocol;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
@@ -184,6 +185,28 @@ public interface StorageContainerLocationProtocol extends Closeable {
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor) throws IOException;
 
+
+  /**
+   * Ask SCM for a list of containers with a range of container ID, state
+   * and replication config, and the limit of count.
+   * The containers are returned from startID (exclusive), and
+   * filtered by state and replication config. The returned list is limited to
+   * count entries.
+   *
+   * @param startContainerID start container ID.
+   * @param count count, if count {@literal <} 0, the max size is unlimited.(
+   *              Usually the count will be replace with a very big
+   *              value instead of being unlimited in case the db is very big)
+   * @param state Container with this state will be returned.
+   * @param replicationConfig Replication config for the containers
+   * @return a list of container.
+   * @throws IOException
+   */
+  List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig) throws IOException;
+
   /**
    * Deletes a container in SCM.
    *
@@ -201,7 +224,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @param state The node health
    * @param clientVersion Client's version number
    * @return List of Datanodes.
-   * @see org.apache.hadoop.ozone.ClientVersions
+   * @see org.apache.hadoop.ozone.ClientVersion
    */
   List<HddsProtos.Node> queryNode(HddsProtos.NodeOperationalState opState,
       HddsProtos.NodeState state, HddsProtos.QueryScope queryScope,
@@ -286,6 +309,15 @@ public interface StorageContainerLocationProtocol extends Closeable {
   ScmInfo getScmInfo() throws IOException;
 
   /**
+   * Reset the expired deleted block retry count.
+   *
+   * @param txIDs transactionId list to be reset
+   * @return num of successful reset
+   * @throws IOException
+   */
+  int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException;
+
+  /**
    * Check if SCM is in safe mode.
    *
    * @return Returns true if SCM is in safe mode else returns false.
@@ -362,7 +394,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMused, and remaining space.
    * @throws IOException
-   * @see org.apache.hadoop.ozone.ClientVersions
+   * @see org.apache.hadoop.ozone.ClientVersion
    */
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       String ipaddress, String uuid, int clientVersion) throws IOException;
@@ -376,7 +408,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMUsed, and remaining space.
    * @throws IOException
-   * @see org.apache.hadoop.ozone.ClientVersions
+   * @see org.apache.hadoop.ozone.ClientVersion
    */
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count, int clientVersion) throws IOException;

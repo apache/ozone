@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Manages the state of pipelines in SCM.
@@ -40,7 +41,8 @@ public interface PipelineStateManager {
    * @throws IOException
    */
   @Replicate
-  void addPipeline(HddsProtos.Pipeline pipelineProto) throws IOException;
+  void addPipeline(HddsProtos.Pipeline pipelineProto)
+      throws IOException, TimeoutException;
 
   /**
    * Removing pipeline would be replicated to Ratis.
@@ -50,7 +52,7 @@ public interface PipelineStateManager {
    */
   @Replicate
   void removePipeline(HddsProtos.PipelineID pipelineIDProto)
-      throws IOException;
+      throws IOException, TimeoutException;
 
   /**
    * Updating pipeline state would be replicated to Ratis.
@@ -59,11 +61,8 @@ public interface PipelineStateManager {
    * @throws IOException
    */
   @Replicate
-  void updatePipelineState(
-      HddsProtos.PipelineID pipelineIDProto,
-      HddsProtos.PipelineState newState
-  )
-      throws IOException;
+  void updatePipelineState(HddsProtos.PipelineID pipelineIDProto,
+      HddsProtos.PipelineState newState) throws IOException, TimeoutException;
 
   void addContainerToPipeline(
       PipelineID pipelineID,
@@ -93,6 +92,11 @@ public interface PipelineStateManager {
       Pipeline.PipelineState state,
       Collection<DatanodeDetails> excludeDns,
       Collection<PipelineID> excludePipelines
+  );
+
+  int getPipelineCount(
+      ReplicationConfig replicationConfig,
+      Pipeline.PipelineState state
   );
 
   NavigableSet<ContainerID> getContainers(PipelineID pipelineID)

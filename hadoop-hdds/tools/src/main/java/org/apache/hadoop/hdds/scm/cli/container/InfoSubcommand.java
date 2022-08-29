@@ -119,6 +119,9 @@ public class InfoSubcommand extends ScmSubcommand {
   private static String buildReplicaDetails(ContainerReplicaInfo replica) {
     StringBuilder sb = new StringBuilder();
     sb.append("State: " + replica.getState() + ";");
+    if (replica.getReplicaIndex() != -1) {
+      sb.append(" ReplicaIndex: " + replica.getReplicaIndex() + ";");
+    }
     sb.append(" Origin: " + replica.getPlaceOfBirth().toString() + ";");
     sb.append(" Location: "
         + buildDatanodeDetails(replica.getDatanodeDetails()));

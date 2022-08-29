@@ -34,7 +34,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
@@ -250,11 +250,11 @@ public abstract class TestOzoneManagerHA {
    */
   protected void stopLeaderOM() {
     //Stop the leader OM.
-    OMFailoverProxyProvider omFailoverProxyProvider =
+    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
         OmFailoverProxyUtil.getFailoverProxyProvider(
             (RpcClient) objectStore.getClientProxy());
 
-    // The OMFailoverProxyProvider will point to the current leader OM node.
+    // The omFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     // Stop one of the ozone manager, to see when the OM leader changes
@@ -288,14 +288,18 @@ public abstract class TestOzoneManagerHA {
         // Verify that the request failed
         fail("There is no quorum. Request should have failed");
       }
-    } catch (ConnectException | RemoteException e) {
+    } catch (IOException e) {
       if (!checkSuccess) {
         // If the last OM to be tried by the RetryProxy is down, we would get
         // ConnectException. Otherwise, we would get a RemoteException from the
         // last running OM as it would fail to get a quorum.
         if (e instanceof RemoteException) {
+          GenericTestUtils.assertExceptionContains("OMNotLeaderException", e);
+        } else if (e instanceof ConnectException) {
+          GenericTestUtils.assertExceptionContains("Connection refused", e);
+        } else {
           GenericTestUtils.assertExceptionContains(
-              "OMNotLeaderException", e);
+              "Could not determine or connect to OM Leader", e);
         }
       } else {
         throw e;
@@ -382,14 +386,18 @@ public abstract class TestOzoneManagerHA {
       ozoneInputStream.read(fileContent);
       Assert.assertEquals(value, new String(fileContent, UTF_8));
 
-    } catch (ConnectException | RemoteException e) {
+    } catch (IOException e) {
       if (!checkSuccess) {
         // If the last OM to be tried by the RetryProxy is down, we would get
         // ConnectException. Otherwise, we would get a RemoteException from the
         // last running OM as it would fail to get a quorum.
         if (e instanceof RemoteException) {
+          GenericTestUtils.assertExceptionContains("OMNotLeaderException", e);
+        } else if (e instanceof ConnectException) {
+          GenericTestUtils.assertExceptionContains("Connection refused", e);
+        } else {
           GenericTestUtils.assertExceptionContains(
-              "OMNotLeaderException", e);
+              "Could not determine or connect to OM Leader", e);
         }
       } else {
         throw e;

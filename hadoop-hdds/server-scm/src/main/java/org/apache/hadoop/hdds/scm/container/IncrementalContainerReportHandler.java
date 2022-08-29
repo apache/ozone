@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos
@@ -103,7 +104,8 @@ public class IncrementalContainerReportHandler extends
           success = false;
           LOG.warn("Container {} replica not found!",
               replicaProto.getContainerID());
-        } catch (IOException | InvalidStateTransitionException e) {
+        } catch (IOException | InvalidStateTransitionException |
+                 TimeoutException e) {
           success = false;
           LOG.error("Exception while processing ICR for container {}",
               replicaProto.getContainerID(), e);

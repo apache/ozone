@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
@@ -97,6 +98,12 @@ public abstract class Handler {
    */
   protected void sendICR(final Container container)
       throws StorageContainerException {
+    if (container
+        .getContainerState() == ContainerProtos.ContainerDataProto
+        .State.RECOVERING) {
+      // Ignoring the recovering containers reports for now.
+      return;
+    }
     icrSender.send(container);
   }
 

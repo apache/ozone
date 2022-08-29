@@ -82,12 +82,8 @@ public interface CommandHandler {
   }
 
   /**
-   * Returns the queued command count for this handler. Some handlers do not
-   * have an internal queue and hence commands are executed immediately. For
-   * those, the default implementation will return 0.
+   * Returns the queued command count for this handler.
    * @return The number of queued commands inside this handler.
    */
-  default int getQueuedCount() {
-    return 0;
-  }
+  int getQueuedCount();
 }
