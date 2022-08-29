@@ -114,6 +114,16 @@ public class TestInfoSubCommand {
       Matcher matcher = pattern.matcher(replica.get(0).getRenderedMessage());
       Assertions.assertTrue(matcher.matches());
     }
+    // Ensure the replicaIndex output is in order
+    if (includeIndex) {
+      List<Integer> indexList = new ArrayList<>();
+      for (int i = 1; i < datanodes.size() + 1; i++) {
+        String temp = "ReplicaIndex: " + i;
+        indexList.add(replica.get(0).getRenderedMessage().indexOf(temp));
+      }
+      Assertions.assertEquals(datanodes.size(), indexList.size());
+      Assertions.assertTrue(inSort(indexList));
+    }
     // Ensure ReplicaIndex is not mentioned as it was not passed in the proto:
     Pattern pattern = Pattern.compile(".*ReplicaIndex.*",
         Pattern.DOTALL);
@@ -179,6 +189,15 @@ public class TestInfoSubCommand {
     Mockito.when(scmClient.getContainerWithPipeline(anyLong()))
         .thenReturn(getECContainerWithPipeline());
     testJsonOutput();
+  }
+
+  private static boolean inSort(List<Integer> list) {
+    for (int i = 0; i < list.size(); i++) {
+      if (list.indexOf(i) > list.indexOf(i + 1)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private void testJsonOutput() throws IOException {
