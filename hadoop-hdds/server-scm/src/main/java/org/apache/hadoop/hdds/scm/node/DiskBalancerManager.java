@@ -101,7 +101,9 @@ public class DiskBalancerManager {
    * If hosts is null, return status of all datanodes in balancing.
    */
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      Optional<List<String>> hosts, int clientVersion) throws IOException {
+      Optional<List<String>> hosts,
+      Optional<HddsProtos.DiskBalancerRunningStatus> status,
+      int clientVersion) throws IOException {
     List<HddsProtos.DatanodeDiskBalancerInfoProto> statusList =
         new ArrayList<>();
     List<DatanodeDetails> filterDns = null;
@@ -110,31 +112,45 @@ public class DiskBalancerManager {
           useHostnames);
     }
 
+    // Filter Running Status by default
+    HddsProtos.DiskBalancerRunningStatus filterStatus =
+        status.orElse(HddsProtos.DiskBalancerRunningStatus.RUNNING);
+
     for (DatanodeDetails datanodeDetails: nodeManager.getNodes(IN_SERVICE,
         HddsProtos.NodeState.HEALTHY)) {
-      if (shouldReturnDatanode(filterDns, datanodeDetails)) {
+      if (shouldReturnDatanode(filterDns, filterStatus, datanodeDetails)) {
         double volumeDensitySum =
             getVolumeDataDensitySumForDatanodeDetails(datanodeDetails);
-        statusList.add(HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
-            .setCurrentVolumeDensitySum(volumeDensitySum)
-            .setDiskBalancerRunning(isRunning(datanodeDetails))
-            .setDiskBalancerConf(statusMap.getOrDefault(datanodeDetails,
-                    DiskBalancerStatus.DUMMY_STATUS)
-                .getDiskBalancerConfiguration().toProtobufBuilder())
-            .setNode(datanodeDetails.toProto(clientVersion))
-            .build());
+        HddsProtos.DiskBalancerRunningStatus runningStatus =
+            getRunningStatus(datanodeDetails);
+        HddsProtos.DatanodeDiskBalancerInfoProto.Builder builder =
+            HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
+                .setNode(datanodeDetails.toProto(clientVersion))
+                .setCurrentVolumeDensitySum(volumeDensitySum)
+                .setRunningStatus(getRunningStatus(datanodeDetails));
+        if (runningStatus != HddsProtos.DiskBalancerRunningStatus.UNKNOWN) {
+          builder.setDiskBalancerConf(statusMap.get(datanodeDetails)
+              .getDiskBalancerConfiguration().toProtobufBuilder());
+        }
+        statusList.add(builder.build());
       }
     }
     return statusList;
   }
 
   private boolean shouldReturnDatanode(List<DatanodeDetails> hosts,
+      HddsProtos.DiskBalancerRunningStatus status,
       DatanodeDetails datanodeDetails) {
-    if (hosts == null || hosts.isEmpty()) {
-      return isRunning(datanodeDetails);
-    } else {
-      return hosts.contains(datanodeDetails);
+    boolean shouldReturn = true;
+    // If dn not in specified hosts, do not return
+    if (hosts != null && !hosts.isEmpty() && !hosts.contains(datanodeDetails)) {
+      shouldReturn = false;
     }
+    // If status specified, do not return if status not match.
+    if (status != null && getRunningStatus(datanodeDetails) != status) {
+      shouldReturn = false;
+    }
+    return shouldReturn;
   }
 
   /**
@@ -167,10 +183,17 @@ public class DiskBalancerManager {
     return volumeDensitySum;
   }
 
-  private boolean isRunning(DatanodeDetails datanodeDetails) {
-    return statusMap
-        .getOrDefault(datanodeDetails, DiskBalancerStatus.DUMMY_STATUS)
-        .isRunning();
+  private HddsProtos.DiskBalancerRunningStatus getRunningStatus(
+      DatanodeDetails datanodeDetails) {
+    if (!statusMap.containsKey(datanodeDetails)) {
+      return HddsProtos.DiskBalancerRunningStatus.UNKNOWN;
+    } else {
+      if (statusMap.get(datanodeDetails).isRunning()) {
+        return HddsProtos.DiskBalancerRunningStatus.RUNNING;
+      } else {
+        return HddsProtos.DiskBalancerRunningStatus.STOPPED;
+      }
+    }
   }
 
   @VisibleForTesting

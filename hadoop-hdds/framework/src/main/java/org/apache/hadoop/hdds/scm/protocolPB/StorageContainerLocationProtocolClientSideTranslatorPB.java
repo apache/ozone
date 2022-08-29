@@ -1040,11 +1040,14 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   @Override
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      Optional<List<String>> hosts, int clientVersion) throws IOException {
+      Optional<List<String>> hosts,
+      Optional<HddsProtos.DiskBalancerRunningStatus> status,
+      int clientVersion) throws IOException {
     DatanodeDiskBalancerInfoRequestProto.Builder requestBuilder =
         DatanodeDiskBalancerInfoRequestProto.newBuilder()
             .setInfoType(DatanodeDiskBalancerInfoType.status);
     hosts.ifPresent(requestBuilder::addAllHosts);
+    status.ifPresent(requestBuilder::setStatus);
     DatanodeDiskBalancerInfoRequestProto request = requestBuilder.build();
 
     DatanodeDiskBalancerInfoResponseProto response =

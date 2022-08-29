@@ -418,7 +418,9 @@ public interface ScmClient extends Closeable {
    * @throws IOException
    */
   List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      Optional<List<String>> hosts) throws IOException;
+      Optional<List<String>> hosts,
+      Optional<HddsProtos.DiskBalancerRunningStatus> runningStatus)
+      throws IOException;
 
   /**
    * Start DiskBalancer.

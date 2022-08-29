@@ -89,6 +89,7 @@ public class TestDiskBalancerManager {
 
     List<HddsProtos.DatanodeDiskBalancerInfoProto> statusProtoList =
         diskBalancerManager.getDiskBalancerStatus(Optional.of(dns),
+            Optional.empty(),
             ClientVersion.CURRENT_VERSION);
 
     Assertions.assertEquals(3, statusProtoList.size());
@@ -100,6 +101,7 @@ public class TestDiskBalancerManager {
 
     statusProtoList =
         diskBalancerManager.getDiskBalancerStatus(Optional.of(dns),
+            Optional.empty(),
             ClientVersion.CURRENT_VERSION);
 
     Assertions.assertEquals(1, statusProtoList.size());
@@ -123,7 +125,7 @@ public class TestDiskBalancerManager {
             HddsProtos.DiskBalancerConfigurationProto.newBuilder()
                 .setThreshold(random.nextInt(99))
                 .setParallelThread(random.nextInt(4) + 1)
-                .setDiskBandwidth(random.nextInt(99) + 1)
+                .setDiskBandwidthInMB(random.nextInt(99) + 1)
                 .build())
         .build();
   }

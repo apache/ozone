@@ -48,7 +48,7 @@ public final class DiskBalancerConfiguration {
   @Config(key = "max.disk.throughputInMBPerSec", type = ConfigType.LONG,
       defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
       description = "The max balance speed.")
-  private long diskBandwidth = 10;
+  private long diskBandwidthInMB = 10;
 
   @Config(key = "parallel.thread", type = ConfigType.INT,
       defaultValue = "5", tags = {ConfigTag.DISKBALANCER},
@@ -86,21 +86,21 @@ public final class DiskBalancerConfiguration {
    *
    * @return max disk bandwidth per second
    */
-  public double getDiskBandwidth() {
-    return diskBandwidth;
+  public double getDiskBandwidthInMB() {
+    return diskBandwidthInMB;
   }
 
   /**
    * Sets the disk bandwidth value for Disk Balancer.
    *
-   * @param diskBandwidth the bandwidth to control balance speed
+   * @param diskBandwidthInMB the bandwidth to control balance speed
    */
-  public void setDiskBandwidth(long diskBandwidth) {
-    if (diskBandwidth <= 0L) {
+  public void setDiskBandwidthInMB(long diskBandwidthInMB) {
+    if (diskBandwidthInMB <= 0L) {
       throw new IllegalArgumentException(
-          "diskBandwidth must be a value larger than 0.");
+          "diskBandwidthInMB must be a value larger than 0.");
     }
-    this.diskBandwidth = diskBandwidth;
+    this.diskBandwidthInMB = diskBandwidthInMB;
   }
 
   /**
@@ -124,6 +124,7 @@ public final class DiskBalancerConfiguration {
     }
     this.parallelThread = parallelThread;
   }
+
   @Override
   public String toString() {
     return String.format("Disk Balancer Configuration values:%n" +
@@ -132,7 +133,7 @@ public final class DiskBalancerConfiguration {
             "%-50s %s%n" +
             "%-50s %s%n",
             "Key", "Value",
-        "Threshold", threshold, "Max disk bandwidth", diskBandwidth,
+        "Threshold", threshold, "Max disk bandwidth", diskBandwidthInMB,
         "Parallel Thread", parallelThread);
   }
 
@@ -141,7 +142,7 @@ public final class DiskBalancerConfiguration {
         HddsProtos.DiskBalancerConfigurationProto.newBuilder();
 
     builder.setThreshold(threshold)
-        .setDiskBandwidth(diskBandwidth)
+        .setDiskBandwidthInMB(diskBandwidthInMB)
         .setParallelThread(parallelThread);
     return builder;
   }
@@ -154,8 +155,8 @@ public final class DiskBalancerConfiguration {
     if (proto.hasThreshold()) {
       config.setThreshold(proto.getThreshold());
     }
-    if (proto.hasDiskBandwidth()) {
-      config.setDiskBandwidth(proto.getDiskBandwidth());
+    if (proto.hasDiskBandwidthInMB()) {
+      config.setDiskBandwidthInMB(proto.getDiskBandwidthInMB());
     }
     if (proto.hasParallelThread()) {
       config.setParallelThread(proto.getParallelThread());

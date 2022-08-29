@@ -340,6 +340,7 @@ message DatanodeDiskBalancerInfoRequestProto {
   required DatanodeDiskBalancerInfoType infoType = 1;
   optional uint32 count = 2;
   repeated string hosts = 3;
+  optional DiskBalancerRunningStatus status = 4;
 }
 
 message DatanodeDiskBalancerInfoResponseProto {

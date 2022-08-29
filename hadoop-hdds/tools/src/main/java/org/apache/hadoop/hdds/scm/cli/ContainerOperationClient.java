@@ -685,9 +685,11 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      Optional<List<String>> hosts) throws IOException {
+      Optional<List<String>> hosts,
+      Optional<HddsProtos.DiskBalancerRunningStatus> runningStatus)
+      throws IOException {
     return storageContainerLocationClient.getDiskBalancerStatus(hosts,
-        ClientVersion.CURRENT_VERSION);
+        runningStatus, ClientVersion.CURRENT_VERSION);
   }
 
   @Override

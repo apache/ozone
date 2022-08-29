@@ -1179,7 +1179,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       break;
     case status:
       infoProtoList = impl.getDiskBalancerStatus(
-          Optional.of(request.getHostsList()), clientVersion);
+          Optional.of(request.getHostsList()),
+          Optional.of(request.getStatus()),
+          clientVersion);
       break;
     default:
       infoProtoList = null;
