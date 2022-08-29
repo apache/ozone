@@ -48,7 +48,6 @@ import java.text.ParseException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -215,7 +214,8 @@ public class ObjectEndpoint extends EndpointBase {
       bucket = getBucket(bucketName);
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(headers.getRequestHeaders());
-      output = bucket.createKey(keyPath, length, replicationConfig, customMetadata);
+      output = bucket.createKey(keyPath, length,
+              replicationConfig, customMetadata);
 
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
