@@ -300,7 +300,7 @@ public final class TestNSSummaryTaskWithLegacy {
               OM_KEY_PREFIX + BUCKET_TWO +
               OM_KEY_PREFIX + FILE_FIVE;
       OmKeyInfo omPutKeyInfo = buildOmKeyInfo(VOL, BUCKET_TWO, KEY_FIVE,
-          FILE_FIVE, KEY_FIVE_OBJECT_ID, KEY_FIVE_SIZE);
+          FILE_FIVE, KEY_FIVE_OBJECT_ID, BUCKET_TWO_OBJECT_ID, KEY_FIVE_SIZE);
       keyEvent1 = new OMDBUpdateEvent.
           OMUpdateEventBuilder<String, OmKeyInfo>()
           .setKey(omPutKey)
@@ -334,10 +334,10 @@ public final class TestNSSummaryTaskWithLegacy {
               OM_KEY_PREFIX + FILE_TWO;
       OmKeyInfo omOldInfo = buildOmKeyInfo(
           VOL, BUCKET_TWO, KEY_TWO, FILE_TWO,
-          KEY_TWO_OBJECT_ID, KEY_TWO_OLD_SIZE);
+          KEY_TWO_OBJECT_ID, BUCKET_TWO_OBJECT_ID, KEY_TWO_OLD_SIZE);
       OmKeyInfo omUpdateInfo = buildOmKeyInfo(
           VOL, BUCKET_TWO, KEY_TWO, FILE_TWO,
-          KEY_TWO_OBJECT_ID, KEY_TWO_UPDATE_SIZE);
+          KEY_TWO_OBJECT_ID, BUCKET_TWO_OBJECT_ID, KEY_TWO_UPDATE_SIZE);
       keyEvent3 = new OMDBUpdateEvent.
           OMUpdateEventBuilder<String, OmKeyInfo>()
           .setKey(omUpdateKey)
