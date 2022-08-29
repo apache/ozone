@@ -141,6 +141,8 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
         }
         response.setAllocateScmBlockResponse(allocateScmBlock(
             request.getAllocateScmBlockRequest(), request.getVersion()));
+        LOG.error("!!!!!!!!!!!!!!!!!!!!!!! complete setAllocateScmBlockResponse " );
+
         break;
       case DeleteScmKeyBlocks:
         response.setDeleteScmKeyBlocksResponse(
@@ -173,6 +175,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
         response.setMessage(e.getMessage());
       }
     }
+    LOG.error("!!!!!!!!!!!!!!!!!!!!!!! going to return response.build " );
 
     return response.build();
   }
@@ -188,9 +191,17 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   public AllocateScmBlockResponseProto allocateScmBlock(
       AllocateScmBlockRequestProto request, int clientVersion)
       throws IOException {
+    LOG.error("###### ###### ##### ");
+    LOG.error("###### ###### ##### ");
+    LOG.error("scm block req: " + request.toString());
+    LOG.error("###### ###### ##### ");
+    LOG.error("###### ###### ##### ");
+
     List<AllocatedBlock> allocatedBlocks =
         impl.allocateBlock(request.getSize(),
             request.getNumBlocks(),
+//            1,
+//            3,
             ReplicationConfig.fromProto(
                 request.getType(),
                 request.getFactor(),
@@ -211,6 +222,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
           .setContainerBlockID(block.getBlockID().getProtobuf())
           .setPipeline(block.getPipeline().getProtobufMessage(clientVersion)));
     }
+    LOG.error("!!!!!!!!!!!!!!!!!!!!!!! complete allocateblock builer" );
 
     return builder.build();
   }

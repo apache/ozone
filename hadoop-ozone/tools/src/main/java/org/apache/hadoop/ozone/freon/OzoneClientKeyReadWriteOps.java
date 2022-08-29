@@ -19,14 +19,8 @@ import picocli.CommandLine;
 
 import java.io.File;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.*;
+import java.util.concurrent.*;
 
 @CommandLine.Command(name = "ockrw",
         aliases = "ozone-client-key-read-write-ops",
@@ -103,8 +97,13 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   private Timer timer;
 
   private OzoneClient rpcClient;
+  private OzoneBucket ozbk;
 
   private byte[] keyContent;
+
+  List<Callable<Object>> readTasks;
+  List<Callable<Object>> writeTasks;
+
   private static final Logger LOG =
           LoggerFactory.getLogger(OzoneClientKeyReadWriteOps.class);
 
@@ -113,60 +112,81 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
 
   @Override
   public Void call() throws Exception {
-
     init();
-
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-
+    if (readTasks == null) {
+      readTasks = new LinkedList<>();
+    }
+    if (writeTasks == null) {
+      writeTasks = new LinkedList<>();
+    }
     rpcClient = createOzoneClient(omServiceID, ozoneConfiguration);
+    ozbk = rpcClient.getObjectStore().getVolume(volumeName)
+            .getBucket(bucketName);
+
     ensureVolumeAndBucketExist(rpcClient, volumeName, bucketName);
     timer = getMetrics().timer("key-read-write");
-
     if (wSizeInBytes >= 0) {
       keyContent = RandomUtils.nextBytes(wSizeInBytes);
     }
-
     for (int i = 0; i < 100000; i++){
       String encodedStr = DigestUtils.md5Hex(String.valueOf(i));
       intToMd5Hash.put(i, encodedStr.substring(0,7));
     }
-
-
     runTests(this::readWriteKeys);
-
     rpcClient.close();
-
     return null;
   }
 
   public void readWriteKeys(long counter) throws Exception{
-    List<Future<Object>> readResults = timer.time(() -> {
-      List<Future<Object>> results = null;
-
+    List<Future<Object>> readWriteResults = timer.time(() -> {
+      List<Future<Object>> readResults = null;
       if (cntForRead > 0) {
-        results = asyncKeyReadOps(readThreadCount, startIndexForRead, cntForRead);
+        asyncKeyReadOps(startIndexForRead, cntForRead);
+        ExecutorService readEs = Executors.newFixedThreadPool(readThreadCount);
+        readResults = readEs.invokeAll(readTasks);
+        readEs.shutdown();
       }
       if (cntForWrite > 0) {
-        asyncKeyWriteOps(writeThreadCount, startIndexForWrite, cntForWrite);
+        asyncKeyWriteOps(startIndexForWrite, cntForWrite);
+        ExecutorService writeEs = Executors.newFixedThreadPool(writeThreadCount);
+        writeEs.invokeAll(writeTasks);
+        writeEs.shutdown();
       }
-
-      return results;
+      return readResults;
     });
-    int readTotalBytes = 0;
-    if (readResults != null && readResults.size() > 0) {
-      for (Future<Object> readF:readResults) {
-        readTotalBytes += Integer.parseInt((String)readF.get());
-      }
-      print("readTotalBytes: " + readTotalBytes);
-    }
+//    int readTotalBytes = 0;
+//    if (readResults != null && readResults.size() > 0) {
+//      for (Future<Object> readF:readResults) {
+//        readTotalBytes += Integer.parseInt((String)readF.get());
+//      }
+//      print("readTotalBytes: " + readTotalBytes);
+//    }
+    return;
   }
 
-  public List asyncKeyReadOps(int threadCount, int startIdx, int cnt) throws Exception{
-    OzoneBucket ozbk = rpcClient.getObjectStore().getVolume(volumeName)
-            .getBucket(bucketName);
+  public void asyncKeyOps(String taskType, int taskCounts, int startIndex, int threadCounts) throws Exception {
+    List<Future<Object>> readResults = null;
+    List<Callable<Object>> tasks = null;
+    if (taskCounts > 0) {
+      if (taskType.equals())
+      appendReadTasks(startIndex, taskCounts);
+      ExecutorService es = Executors.newFixedThreadPool(threadCounts);
+      readResults = es.invokeAll(readTasks);
+      es.shutdown();
+    }
 
-    ExecutorService es = Executors.newFixedThreadPool(threadCount);
-    List<Callable<Object>> todo = new ArrayList<>(cnt);
+  }
+
+  public List<Callable<Object>> getReadTasks() {
+    return readTasks;
+  }
+  public List<Callable<Object>> getWriteTasks() {
+    return writeTasks;
+  }
+
+
+  public List appendReadTasks(int startIdx, int cnt) throws Exception{
 
     for (int i = startIdx; i < startIdx + cnt; i++){
       String keyName;
@@ -191,27 +211,20 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
           return 1;
         };
       }
-      todo.add(readTask);
+      readTasks.add(readTask);
     }
 
-    LOG.error("#### #### #### envoke read thread pool #### #### ###");
-    List<Future<Object>> results = es.invokeAll(todo);
-    LOG.error("#### #### #### done read thread #### #### ###");
-
-    return results;
+//    LOG.error("#### #### #### envoke read thread pool #### #### ###");
+//    List<Future<Object>> results = es.invokeAll(todo);
+    return readTasks;
   }
 
   public String generateMd5ObjectName(int index) {
     String md5Hash = intToMd5Hash.get(index);
     return getPrefix() + "/" + md5Hash;
   }
-  public void asyncKeyWriteOps(int threadCount, int startIdx, int cnt) throws Exception{
-    OzoneBucket ozbk = rpcClient.getObjectStore().getVolume(volumeName)
-            .getBucket(bucketName);
-
-    ExecutorService es = Executors.newFixedThreadPool(threadCount);
-    List<Callable<Object>> todo = new ArrayList<>(cnt);
-
+  public void asyncKeyWriteOps(int startIdx, int cnt) throws Exception{
+//    CountDownLatch latch = new CountDownLatch(cnt);
     for (int i = startIdx; i < startIdx + cnt; i++){
       String keyName;
       if (keySorted) {
@@ -220,30 +233,54 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
         keyName = generateMd5ObjectName(i);
       }
 
+//      es.submit(
+//              () -> {
+//                LOG.error("#### #### #### write key: " + keyName + " ####### ###### ###### ");
+//
+//                try {
+//                  OzoneOutputStream out = ozbk.createKey(keyName, wSizeInBytes);
+//                  LOG.error("#### #### #### write keyContent: " + keyContent + " ####### ###### ###### ");
+//
+//                  out.write(keyContent);
+//                  LOG.error("#### #### #### flush:  ####### ###### ###### ");
+//
+//                  out.flush();
+//                  out.close();
+//                  latch.countDown();
+//                }catch (Exception ex) {
+//                  LOG.error("#### #### #### exception:  " + ex.getMessage());
+//                  ex.printStackTrace();
+//                }
+//                return 1;
+//              }
+//      );
+
       Callable writeTask = () -> {
-        LOG.error("#### #### #### write key: " + keyName + " ####### ###### ###### ");
 
         try {
+          LOG.error("#### #### #### write key: " + keyName + " ####### ###### ###### ");
           OzoneOutputStream out = ozbk.createKey(keyName, wSizeInBytes);
+
           LOG.error("#### #### #### write keyContent: " + keyContent + " ####### ###### ###### ");
-
           out.write(keyContent);
-          LOG.error("#### #### #### flush:  ####### ###### ###### ");
 
+          LOG.error("#### #### #### flush:  ####### ###### ###### ");
           out.flush();
+          LOG.error("#### #### #### close  ####### ###### ###### ");
           out.close();
 
         }catch (Exception ex) {
-
+          LOG.error("#### #### #### exception:  " + ex.getMessage());
+          ex.printStackTrace();
         }
         return 1;
       };
-      todo.add(writeTask);
+      writeTasks.add(writeTask);
     }
-    LOG.error("#### #### #### envoke write thread pool #### #### ###");
-    es.invokeAll(todo);
-    LOG.error("#### #### #### done write thread #### #### ###");
-
+//    es.invokeAll(todo);
+//    latch.await(3, TimeUnit.MINUTES);
+//    es.shutdown();
+    return ;
   }
 
 }
