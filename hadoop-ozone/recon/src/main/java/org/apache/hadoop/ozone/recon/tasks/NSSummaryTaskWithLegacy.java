@@ -99,29 +99,29 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
 
           if (!updatedKeyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
             switch (action) {
-              case PUT:
-                handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
-                break;
+            case PUT:
+              handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+              break;
 
-              case DELETE:
-                handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
-                break;
+            case DELETE:
+              handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
+              break;
 
-              case UPDATE:
-                if (oldKeyInfo != null) {
-                  // delete first, then put
-                  setKeyParentID(oldKeyInfo);
-                  handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
-                } else {
-                  LOG.warn("Update event does not have the old keyInfo for {}.",
-                      updatedKey);
-                }
-                handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
-                break;
+            case UPDATE:
+              if (oldKeyInfo != null) {
+                // delete first, then put
+                setKeyParentID(oldKeyInfo);
+                handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
+              } else {
+                LOG.warn("Update event does not have the old keyInfo for {}.",
+                    updatedKey);
+              }
+              handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+              break;
 
-              default:
-                LOG.debug("Skipping DB update event : {}",
-                    omdbUpdateEvent.getAction());
+            default:
+              LOG.debug("Skipping DB update event : {}",
+                  omdbUpdateEvent.getAction());
             }
           } else {
             OmDirectoryInfo updatedDirectoryInfo =
@@ -143,28 +143,28 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
             }
 
             switch (action) {
-              case PUT:
-                handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
-                break;
+            case PUT:
+              handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+              break;
 
-              case DELETE:
-                handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
-                break;
+            case DELETE:
+              handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
+              break;
 
-              case UPDATE:
-                if (oldDirectoryInfo != null) {
-                  // delete first, then put
-                  handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
-                } else {
-                  LOG.warn("Update event does not have the old dirInfo for {}.",
-                      updatedKey);
-                }
-                handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
-                break;
+            case UPDATE:
+              if (oldDirectoryInfo != null) {
+                // delete first, then put
+                handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
+              } else {
+                LOG.warn("Update event does not have the old dirInfo for {}.",
+                    updatedKey);
+              }
+              handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+              break;
 
-              default:
-                LOG.debug("Skipping DB update event : {}",
-                    omdbUpdateEvent.getAction());
+            default:
+              LOG.debug("Skipping DB update event : {}",
+                  omdbUpdateEvent.getAction());
             }
           }
         } else {

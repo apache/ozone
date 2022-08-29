@@ -72,7 +72,9 @@ import java.util.HashSet;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.*;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -688,7 +690,7 @@ public class TestNSSummaryEndpointWithLegacy {
     checkFileSizeDist(VOL_PATH, 2, 1, 2, 1);
     checkFileSizeDist(BUCKET_ONE_PATH, 1, 1, 1, 1);
     checkFileSizeDist(DIR_ONE_PATH, 0, 1, 1, 1);
-      }
+  }
 
   public void checkFileSizeDist(String path, int bin0,
       int bin1, int bin2, int bin3) throws Exception {
@@ -709,126 +711,127 @@ public class TestNSSummaryEndpointWithLegacy {
    * Write directories and keys info into OM DB.
    * @throws Exception
    */
+  @SuppressWarnings("checkstyle:MethodLength")
   private void populateOMDB() throws Exception {
     // write all directories
     writeKeyToOm(reconOMMetadataManager,
-        (DIR_ONE + OM_KEY_PREFIX),
-        BUCKET_ONE,
-        VOL,
-        DIR_ONE,
-        DIR_ONE_OBJECT_ID,
-        BUCKET_ONE_OBJECT_ID,
-        BUCKET_ONE_OBJECT_ID,
-        VOL_OBJECT_ID,
-        getBucketLayout());
+          (DIR_ONE + OM_KEY_PREFIX),
+          BUCKET_ONE,
+          VOL,
+          DIR_ONE,
+          DIR_ONE_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
+          VOL_OBJECT_ID,
+          getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        (DIR_ONE + OM_KEY_PREFIX + DIR_TWO + OM_KEY_PREFIX),
-        BUCKET_ONE,
-        VOL,
-        DIR_TWO,
-        DIR_TWO_OBJECT_ID,
-        DIR_ONE_OBJECT_ID,
-        BUCKET_ONE_OBJECT_ID,
-        VOL_OBJECT_ID,
-        getBucketLayout());
+          (DIR_ONE + OM_KEY_PREFIX + DIR_TWO + OM_KEY_PREFIX),
+          BUCKET_ONE,
+          VOL,
+          DIR_TWO,
+          DIR_TWO_OBJECT_ID,
+          DIR_ONE_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
+          VOL_OBJECT_ID,
+          getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        (DIR_ONE + OM_KEY_PREFIX + DIR_THREE + OM_KEY_PREFIX),
-        BUCKET_ONE,
-        VOL,
-        DIR_THREE,
-        DIR_THREE_OBJECT_ID,
-        DIR_ONE_OBJECT_ID,
-        BUCKET_ONE_OBJECT_ID,
-        VOL_OBJECT_ID,
-        getBucketLayout());
+          (DIR_ONE + OM_KEY_PREFIX + DIR_THREE + OM_KEY_PREFIX),
+          BUCKET_ONE,
+          VOL,
+          DIR_THREE,
+          DIR_THREE_OBJECT_ID,
+          DIR_ONE_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
+          VOL_OBJECT_ID,
+          getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        (DIR_ONE + OM_KEY_PREFIX + DIR_FOUR + OM_KEY_PREFIX),
-        BUCKET_ONE,
-        VOL,
-        DIR_FOUR,
-        DIR_FOUR_OBJECT_ID,
-        DIR_ONE_OBJECT_ID,
-        BUCKET_ONE_OBJECT_ID,
-        VOL_OBJECT_ID,
-        getBucketLayout());
+          (DIR_ONE + OM_KEY_PREFIX + DIR_FOUR + OM_KEY_PREFIX),
+          BUCKET_ONE,
+          VOL,
+          DIR_FOUR,
+          DIR_FOUR_OBJECT_ID,
+          DIR_ONE_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
+          VOL_OBJECT_ID,
+          getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        (DIR_FIVE + OM_KEY_PREFIX),
-        BUCKET_THREE,
-        VOL_TWO,
-        DIR_FIVE,
-        DIR_FIVE_OBJECT_ID,
-        BUCKET_THREE_OBJECT_ID,
-        BUCKET_THREE_OBJECT_ID,
-        VOL_TWO_OBJECT_ID,
-        getBucketLayout());
+          (DIR_FIVE + OM_KEY_PREFIX),
+          BUCKET_THREE,
+          VOL_TWO,
+          DIR_FIVE,
+          DIR_FIVE_OBJECT_ID,
+          BUCKET_THREE_OBJECT_ID,
+          BUCKET_THREE_OBJECT_ID,
+          VOL_TWO_OBJECT_ID,
+          getBucketLayout());
 
     // write all keys
     writeKeyToOm(reconOMMetadataManager,
-        KEY_ONE,
-        BUCKET_ONE,
-        VOL,
-        FILE_ONE,
-        KEY_ONE_OBJECT_ID,
-        BUCKET_ONE_OBJECT_ID,
-        BUCKET_ONE_OBJECT_ID,
-        VOL_OBJECT_ID,
-        KEY_ONE_SIZE,
-        getBucketLayout());
+          KEY_ONE,
+          BUCKET_ONE,
+          VOL,
+          FILE_ONE,
+          KEY_ONE_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
+          VOL_OBJECT_ID,
+          KEY_ONE_SIZE,
+          getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        KEY_TWO,
-        BUCKET_ONE,
-        VOL,
-        FILE_TWO,
-        KEY_TWO_OBJECT_ID,
-        DIR_TWO_OBJECT_ID,
-        BUCKET_ONE_OBJECT_ID,
-        VOL_OBJECT_ID,
-        KEY_TWO_SIZE,
-        getBucketLayout());
+          KEY_TWO,
+          BUCKET_ONE,
+          VOL,
+          FILE_TWO,
+          KEY_TWO_OBJECT_ID,
+          DIR_TWO_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
+          VOL_OBJECT_ID,
+          KEY_TWO_SIZE,
+          getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        KEY_THREE,
-        BUCKET_ONE,
-        VOL,
-        FILE_THREE,
-        KEY_THREE_OBJECT_ID,
-        DIR_THREE_OBJECT_ID,
-        BUCKET_ONE_OBJECT_ID,
-        VOL_OBJECT_ID,
-        KEY_THREE_SIZE,
-        getBucketLayout());
+          KEY_THREE,
+          BUCKET_ONE,
+          VOL,
+          FILE_THREE,
+          KEY_THREE_OBJECT_ID,
+          DIR_THREE_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
+          VOL_OBJECT_ID,
+          KEY_THREE_SIZE,
+          getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        KEY_FOUR,
-        BUCKET_TWO,
-        VOL,
-        FILE_FOUR,
-        KEY_FOUR_OBJECT_ID,
-        BUCKET_TWO_OBJECT_ID,
-        BUCKET_TWO_OBJECT_ID,
-        VOL_OBJECT_ID,
-        KEY_FOUR_SIZE,
-        getBucketLayout());
+          KEY_FOUR,
+          BUCKET_TWO,
+          VOL,
+          FILE_FOUR,
+          KEY_FOUR_OBJECT_ID,
+          BUCKET_TWO_OBJECT_ID,
+          BUCKET_TWO_OBJECT_ID,
+          VOL_OBJECT_ID,
+          KEY_FOUR_SIZE,
+          getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        KEY_FIVE,
-        BUCKET_TWO,
-        VOL,
-        FILE_FIVE,
-        KEY_FIVE_OBJECT_ID,
-        BUCKET_TWO_OBJECT_ID,
-        BUCKET_TWO_OBJECT_ID,
-        VOL_OBJECT_ID,
-        KEY_FIVE_SIZE,
-        getBucketLayout());
+          KEY_FIVE,
+          BUCKET_TWO,
+          VOL,
+          FILE_FIVE,
+          KEY_FIVE_OBJECT_ID,
+          BUCKET_TWO_OBJECT_ID,
+          BUCKET_TWO_OBJECT_ID,
+          VOL_OBJECT_ID,
+          KEY_FIVE_SIZE,
+          getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        KEY_SIX,
-        BUCKET_ONE,
-        VOL,
-        FILE_SIX,
-        KEY_SIX_OBJECT_ID,
-        DIR_FOUR_OBJECT_ID,
-        BUCKET_ONE_OBJECT_ID,
-        VOL_OBJECT_ID,
-        KEY_SIX_SIZE,
-        getBucketLayout());
+          KEY_SIX,
+          BUCKET_ONE,
+          VOL,
+          FILE_SIX,
+          KEY_SIX_OBJECT_ID,
+          DIR_FOUR_OBJECT_ID,
+          BUCKET_ONE_OBJECT_ID,
+          VOL_OBJECT_ID,
+          KEY_SIX_SIZE,
+          getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
           KEY_EIGHT,
           BUCKET_THREE,
@@ -1059,7 +1062,7 @@ public class TestNSSummaryEndpointWithLegacy {
         getLocationInfoGroup2();
 
     //vol/bucket1/file1
-      writeKeyToOm(reconOMMetadataManager,
+    writeKeyToOm(reconOMMetadataManager,
         KEY_ONE,
         BUCKET_ONE,
         VOL,
@@ -1072,7 +1075,7 @@ public class TestNSSummaryEndpointWithLegacy {
           getBucketLayout());
 
     //vol/bucket1/dir1/dir2/file2
-      writeKeyToOm(reconOMMetadataManager,
+    writeKeyToOm(reconOMMetadataManager,
         KEY_TWO,
         BUCKET_ONE,
         VOL,
@@ -1085,7 +1088,7 @@ public class TestNSSummaryEndpointWithLegacy {
           getBucketLayout());
 
     //vol/bucket1/dir1/dir3/file3
-      writeKeyToOm(reconOMMetadataManager,
+    writeKeyToOm(reconOMMetadataManager,
         KEY_THREE,
         BUCKET_ONE,
         VOL,

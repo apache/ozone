@@ -30,6 +30,8 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -89,7 +91,13 @@ public class DirectoryEntityHandler extends EntityHandler {
     for (long subdirObjectId: subdirs) {
       NSSummary subdirNSSummary =
               getReconNamespaceSummaryManager().getNSSummary(subdirObjectId);
-      String subdirName = subdirNSSummary.getDirName();
+      // for the subdirName we need the filename, not the key name
+      Path subdirPath = Paths.get(subdirNSSummary.getDirName());
+      Path subdirFileName = subdirPath.getFileName();
+      String subdirName = "";
+      if (subdirFileName != null) {
+        subdirName += subdirFileName.toString();
+      }
       // build the path for subdirectory
       String subpath = BucketHandler
               .buildSubpath(getNormalizedPath(), subdirName);

@@ -419,14 +419,14 @@ public final class TestNSSummaryTaskWithLegacy {
 
       OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(
           new ArrayList<OMDBUpdateEvent>() {{
-            add(keyEvent1);
-            add(keyEvent2);
-            add(keyEvent3);
-            add(keyEvent4);
-            add(keyEvent5);
-            add(keyEvent6);
-            add(keyEvent7);
-          }});
+              add(keyEvent1);
+              add(keyEvent2);
+              add(keyEvent3);
+              add(keyEvent4);
+              add(keyEvent5);
+              add(keyEvent6);
+              add(keyEvent7);
+              }});
 
       return omUpdateEventBatch;
     }
