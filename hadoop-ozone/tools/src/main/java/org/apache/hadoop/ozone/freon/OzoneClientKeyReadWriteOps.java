@@ -31,6 +31,11 @@ import java.util.concurrent.*;
 public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
         implements Callable<Void> {
 
+  @CommandLine.Option(names = {"--time"},
+          description = "Total time (in minutes) of test.",
+          defaultValue = "5")
+  private String time;
+
   @CommandLine.Option(names = {"-v", "--volume"},
           description = "Name of the volume which contains the test data. Will be"
                   + " created if missing.",
@@ -47,35 +52,25 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
           defaultValue = "false")
   private boolean readMetadataOnly;
 
-  @CommandLine.Option(names = {"-r", "--read-thread-count"},
-          description = "number of threads to execute read task.",
-          defaultValue = "1")
-  private int readThreadCount;
-
   @CommandLine.Option(names = {"-s", "--start-index-for-read"},
           description = "start-index for read operations.",
           defaultValue = "0")
   private int startIndexForRead;
 
-  @CommandLine.Option(names = {"-c", "--count-for-read"},
-          description = "Number of keys for read operations.",
+  @CommandLine.Option(names = {"-e", "--end-index-for-read"},
+          description = "end-index for read operations.",
           defaultValue = "0")
-  private int cntForRead;
-
-  @CommandLine.Option(names = {"-w", "--write-thread-count"},
-          description = "number of threads to execute write task.",
-          defaultValue = "1")
-  private int writeThreadCount;
+  private int endIndexForRead;
 
   @CommandLine.Option(names = {"-i", "--start-index-for-write"},
           description = "start-index for write operations.",
           defaultValue = "0")
   private int startIndexForWrite;
 
-  @CommandLine.Option(names = {"-l", "--count-for-write"},
-          description = "Number of keys for write operations.",
+  @CommandLine.Option(names = {"-x", "--end-index-for-write"},
+          description = "end-index for write operations.",
           defaultValue = "0")
-  private int cntForWrite;
+  private int endIndexForWrite;
 
   @CommandLine.Option(names = {"-g", "--size"},
           description = "Generated data size (in bytes) of each key/file to be " +
@@ -83,10 +78,21 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
           defaultValue = "256")
   private int wSizeInBytes;
 
-  @CommandLine.Option(names = {"-o", "--keySorted"},
+  @CommandLine.Option(names = {"--keySorted"},
           description = "Generated sorted key or not. The key name will be generated via md5 hash if choose to use unsorted key.",
           defaultValue = "false")
   private boolean keySorted;
+
+  @CommandLine.Option(names = {"--mix-workload"},
+          description = "Set to True if you would like to generate mix workload (Read and Write).",
+          defaultValue = "false")
+  private boolean ifMixWorkload;
+
+  @CommandLine.Option(names = {"--percentage-read"},
+          description = "Percentage of read tasks in mix workload.",
+          defaultValue = "0")
+  private int percentageRead;
+
 
   @CommandLine.Option(
           names = "--om-service-id",
@@ -100,26 +106,19 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   private OzoneBucket ozbk;
 
   private byte[] keyContent;
-
-  List<Callable<Object>> readTasks;
-  List<Callable<Object>> writeTasks;
+  private String keyName;
 
   private static final Logger LOG =
           LoggerFactory.getLogger(OzoneClientKeyReadWriteOps.class);
 
+  private final String READ_TASK = "READ_TASK";
+  private final String WRITE_TASK = "WRITE_TASK";
 
-  private HashMap<Integer, String> intToMd5Hash = new HashMap<>();
 
   @Override
   public Void call() throws Exception {
     init();
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-    if (readTasks == null) {
-      readTasks = new LinkedList<>();
-    }
-    if (writeTasks == null) {
-      writeTasks = new LinkedList<>();
-    }
     rpcClient = createOzoneClient(omServiceID, ozoneConfiguration);
     ozbk = rpcClient.getObjectStore().getVolume(volumeName)
             .getBucket(bucketName);
@@ -129,9 +128,30 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     if (wSizeInBytes >= 0) {
       keyContent = RandomUtils.nextBytes(wSizeInBytes);
     }
-    for (int i = 0; i < 100000; i++){
-      String encodedStr = DigestUtils.md5Hex(String.valueOf(i));
-      intToMd5Hash.put(i, encodedStr.substring(0,7));
+    //pre-generated integer to md5 hash value mapping
+//    for (int i = 0; i < 100000; i++){
+//      String encodedStr = DigestUtils.md5Hex(String.valueOf(i));
+//      intToMd5Hash.put(i, encodedStr.substring(0,7));
+//    }
+    int startIdx = 0, endIdx = 0;
+    switch (decideReadOrWriteTask()){
+      case READ_TASK:
+        startIdx = startIndexForRead;
+        endIdx = endIndexForRead;
+        break;
+      case WRITE_TASK:
+        startIdx = startIndexForWrite;
+        endIdx = endIndexForWrite;
+        break;
+    }
+
+    Random r = new Random();
+    int randomIdxWithinRange = r.nextInt(endIdx + 1 - startIdx) + startIdx;
+
+    if (keySorted) {
+      keyName = generateObjectName(randomIdxWithinRange);
+    } else {
+      keyName = generateMd5ObjectName(randomIdxWithinRange);
     }
     runTests(this::readWriteKeys);
     rpcClient.close();
@@ -141,146 +161,81 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   public void readWriteKeys(long counter) throws Exception{
     List<Future<Object>> readWriteResults = timer.time(() -> {
       List<Future<Object>> readResults = null;
-      if (cntForRead > 0) {
-        asyncKeyReadOps(startIndexForRead, cntForRead);
-        ExecutorService readEs = Executors.newFixedThreadPool(readThreadCount);
-        readResults = readEs.invokeAll(readTasks);
-        readEs.shutdown();
-      }
-      if (cntForWrite > 0) {
-        asyncKeyWriteOps(startIndexForWrite, cntForWrite);
-        ExecutorService writeEs = Executors.newFixedThreadPool(writeThreadCount);
-        writeEs.invokeAll(writeTasks);
-        writeEs.shutdown();
+      if (!ifMixWorkload){
+        if (endIndexForRead - startIndexForRead > 0) {
+          processReadTasks();
+        }
+        if (endIndexForWrite - startIndexForWrite > 0) {
+          processWriteTasks();
+        }
+
+      }else{
+        switch (decideReadOrWriteTask()){
+          case READ_TASK:
+            processReadTasks();
+            break;
+          case WRITE_TASK:
+            processWriteTasks();
+            break;
+        }
       }
       return readResults;
     });
-//    int readTotalBytes = 0;
-//    if (readResults != null && readResults.size() > 0) {
-//      for (Future<Object> readF:readResults) {
-//        readTotalBytes += Integer.parseInt((String)readF.get());
-//      }
-//      print("readTotalBytes: " + readTotalBytes);
-//    }
-    return;
   }
 
-  public void asyncKeyOps(String taskType, int taskCounts, int startIndex, int threadCounts) throws Exception {
-    List<Future<Object>> readResults = null;
-    List<Callable<Object>> tasks = null;
-    if (taskCounts > 0) {
-      if (taskType.equals())
-      appendReadTasks(startIndex, taskCounts);
-      ExecutorService es = Executors.newFixedThreadPool(threadCounts);
-      readResults = es.invokeAll(readTasks);
-      es.shutdown();
-    }
-
-  }
-
-  public List<Callable<Object>> getReadTasks() {
-    return readTasks;
-  }
-  public List<Callable<Object>> getWriteTasks() {
-    return writeTasks;
-  }
-
-
-  public List appendReadTasks(int startIdx, int cnt) throws Exception{
-
-    for (int i = startIdx; i < startIdx + cnt; i++){
-      String keyName;
-      if (keySorted) {
-        keyName = generateObjectName(i);
-      } else {
-        keyName = generateMd5ObjectName(i);
-      }
-
-      Callable readTask;
+  public void processReadTasks() throws Exception{
       if (readMetadataOnly) {
-        readTask = () -> {
           ozbk.getKey(keyName);
-          return 1;
-        };
       }else {
-        readTask = () -> {
           byte[] data = new byte[wSizeInBytes];
           OzoneInputStream introStream = ozbk.readKey(keyName);
           introStream.read(data);
           introStream.close();
-          return 1;
-        };
       }
-      readTasks.add(readTask);
-    }
-
-//    LOG.error("#### #### #### envoke read thread pool #### #### ###");
-//    List<Future<Object>> results = es.invokeAll(todo);
-    return readTasks;
   }
 
-  public String generateMd5ObjectName(int index) {
-    String md5Hash = intToMd5Hash.get(index);
+  public String generateMd5ObjectName(int number) {
+    String encodedStr = DigestUtils.md5Hex(String.valueOf(number));
+    String md5Hash = encodedStr.substring(0,7);
     return getPrefix() + "/" + md5Hash;
   }
-  public void asyncKeyWriteOps(int startIdx, int cnt) throws Exception{
-//    CountDownLatch latch = new CountDownLatch(cnt);
-    for (int i = startIdx; i < startIdx + cnt; i++){
-      String keyName;
-      if (keySorted) {
-        keyName = generateObjectName(i);
-      } else {
-        keyName = generateMd5ObjectName(i);
+  public void processWriteTasks(){
+
+      try {
+        LOG.error("#### #### #### write key: " + keyName + " ####### ###### ###### ");
+        OzoneOutputStream out = ozbk.createKey(keyName, wSizeInBytes);
+
+        LOG.error("#### #### #### write keyContent: " + keyContent + " ####### ###### ###### ");
+        out.write(keyContent);
+
+        LOG.error("#### #### #### flush:  ####### ###### ###### ");
+        out.flush();
+
+        LOG.error("#### #### #### close  ####### ###### ###### ");
+        out.close();
+
+      }catch (Exception ex) {
+        LOG.error("#### #### #### exception:  " + ex.getMessage());
+        ex.printStackTrace();
       }
+  }
 
-//      es.submit(
-//              () -> {
-//                LOG.error("#### #### #### write key: " + keyName + " ####### ###### ###### ");
-//
-//                try {
-//                  OzoneOutputStream out = ozbk.createKey(keyName, wSizeInBytes);
-//                  LOG.error("#### #### #### write keyContent: " + keyContent + " ####### ###### ###### ");
-//
-//                  out.write(keyContent);
-//                  LOG.error("#### #### #### flush:  ####### ###### ###### ");
-//
-//                  out.flush();
-//                  out.close();
-//                  latch.countDown();
-//                }catch (Exception ex) {
-//                  LOG.error("#### #### #### exception:  " + ex.getMessage());
-//                  ex.printStackTrace();
-//                }
-//                return 1;
-//              }
-//      );
-
-      Callable writeTask = () -> {
-
-        try {
-          LOG.error("#### #### #### write key: " + keyName + " ####### ###### ###### ");
-          OzoneOutputStream out = ozbk.createKey(keyName, wSizeInBytes);
-
-          LOG.error("#### #### #### write keyContent: " + keyContent + " ####### ###### ###### ");
-          out.write(keyContent);
-
-          LOG.error("#### #### #### flush:  ####### ###### ###### ");
-          out.flush();
-          LOG.error("#### #### #### close  ####### ###### ###### ");
-          out.close();
-
-        }catch (Exception ex) {
-          LOG.error("#### #### #### exception:  " + ex.getMessage());
-          ex.printStackTrace();
-        }
-        return 1;
-      };
-      writeTasks.add(writeTask);
+  public String decideReadOrWriteTask( ) {
+    if (!ifMixWorkload){
+      if (endIndexForRead - startIndexForRead > 0) {
+        return READ_TASK;
+      }else if ((endIndexForWrite - startIndexForWrite) > 0) {
+        return WRITE_TASK;
+      }
     }
-//    es.invokeAll(todo);
-//    latch.await(3, TimeUnit.MINUTES);
-//    es.shutdown();
-    return ;
+    //mix workload
+    Random r = new Random();
+    int tmp = r.nextInt(100) + 1; // 1 ~ 100
+    if (tmp < percentageRead) {
+      return READ_TASK;
+    }else{
+      return WRITE_TASK;
+    }
   }
 
 }
