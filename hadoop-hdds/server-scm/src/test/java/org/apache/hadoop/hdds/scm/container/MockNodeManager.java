@@ -348,19 +348,20 @@ public class MockNodeManager implements NodeManager {
   public List<DatanodeDetails> getAllNodes() {
     // mock storage reports for TestDiskBalancer
     List<DatanodeDetails> healthyNodesWithInfo = new ArrayList<>();
-    for (DatanodeDetails dd : nodeMetricMap.keySet()) {
+    for (Map.Entry<DatanodeDetails, SCMNodeStat> entry:
+        nodeMetricMap.entrySet()) {
       NodeStatus nodeStatus = NodeStatus.inServiceHealthy();
-      if (staleNodes.contains(dd)) {
+      if (staleNodes.contains(entry.getKey())) {
         nodeStatus = NodeStatus.inServiceStale();
-      } else if (deadNodes.contains(dd)) {
+      } else if (deadNodes.contains(entry.getKey())) {
         nodeStatus = NodeStatus.inServiceDead();
       }
-      DatanodeInfo di = new DatanodeInfo(dd, nodeStatus,
+      DatanodeInfo di = new DatanodeInfo(entry.getKey(), nodeStatus,
           UpgradeUtils.defaultLayoutVersionProto());
 
-      long capacity = nodeMetricMap.get(dd).getCapacity().get();
-      long used = nodeMetricMap.get(dd).getScmUsed().get();
-      long remaining = nodeMetricMap.get(dd).getRemaining().get();
+      long capacity = entry.getValue().getCapacity().get();
+      long used = entry.getValue().getScmUsed().get();
+      long remaining = entry.getValue().getRemaining().get();
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           di.getUuid(), "/data1-" + di.getUuidString(),
           capacity, used, remaining, null);

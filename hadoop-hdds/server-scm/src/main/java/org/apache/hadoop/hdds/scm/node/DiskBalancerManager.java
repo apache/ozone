@@ -104,8 +104,6 @@ public class DiskBalancerManager {
       Optional<List<String>> hosts,
       Optional<HddsProtos.DiskBalancerRunningStatus> status,
       int clientVersion) throws IOException {
-    List<HddsProtos.DatanodeDiskBalancerInfoProto> statusList =
-        new ArrayList<>();
     List<DatanodeDetails> filterDns = null;
     if (hosts.isPresent() && !hosts.get().isEmpty()) {
       filterDns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts.get(),
