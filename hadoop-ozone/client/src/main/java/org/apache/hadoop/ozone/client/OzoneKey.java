@@ -24,8 +24,8 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * A class that encapsulates OzoneKey.
@@ -61,6 +61,8 @@ public class OzoneKey {
 
   private Map<String, String> metadata = new HashMap<>();
 
+  Set<String> excludeMetadataFields = new HashSet<>(Arrays.asList("gdprEnabled"));
+
   /**
    * Constructs OzoneKey from OmKeyInfo.
    *
@@ -68,17 +70,9 @@ public class OzoneKey {
   @SuppressWarnings("parameternumber")
   @Deprecated
   public OzoneKey(String volumeName, String bucketName,
-                  String keyName, long size, long creationTime,
-                  long modificationTime, ReplicationType type,
+                  String keyName, long size, ReplicationType type,
                   int replicationFactor) {
-    this.volumeName = volumeName;
-    this.bucketName = bucketName;
-    this.name = keyName;
-    this.dataSize = size;
-    this.creationTime = Instant.ofEpochMilli(creationTime);
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
-    this.replicationConfig = ReplicationConfig.fromTypeAndFactor(type,
-            ReplicationFactor.valueOf(replicationFactor));
+    this(volumeName, bucketName, keyName, size, ReplicationConfig.fromTypeAndFactor(type, ReplicationFactor.valueOf(replicationFactor)));
   }
 
   /**
@@ -87,25 +81,20 @@ public class OzoneKey {
    */
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
-                  String keyName, long size, long creationTime,
-                  long modificationTime, ReplicationConfig replicationConfig) {
+                  String keyName, long size, ReplicationConfig replicationConfig) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.name = keyName;
     this.dataSize = size;
-    this.creationTime = Instant.ofEpochMilli(creationTime);
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.replicationConfig = replicationConfig;
   }
 
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
-                  String keyName, long size, long creationTime,
-                  long modificationTime, ReplicationConfig replicationConfig,
+                  String keyName, long size, ReplicationConfig replicationConfig,
                   Map<String, String> metadata) {
-    this(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig);
-    this.metadata.putAll(metadata);
+    this(volumeName, bucketName, keyName, size, replicationConfig);
+    this.metadata.putAll(filterMetaData(metadata));
   }
 
   /**
@@ -187,6 +176,17 @@ public class OzoneKey {
 
   public ReplicationConfig getReplicationConfig() {
     return replicationConfig;
+  }
+
+  public Map<String, String> filterMetaData(Map<String, String> metadata){
+    return metadata.entrySet()
+            .stream().filter(x -> {
+                      if(excludeMetadataFields.contains(x.getKey())){
+                        return false;
+                      }
+                    return true;
+            })
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
 }
