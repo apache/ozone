@@ -447,7 +447,7 @@ public class TestDecommissionAndMaintenance {
     scmClient.recommissionNodes(forMaintenance.stream()
         .map(this::getDNHostAndPort)
         .collect(Collectors.toList()));
-    // Ensure the 2 DNs go to maintenance
+    // Ensure the 2 DNs go to IN_SERVICE
     for (DatanodeDetails dn : ecMaintenance) {
       waitForDnToReachOpState(dn, IN_SERVICE);
     }
