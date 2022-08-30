@@ -59,7 +59,6 @@ import java.util.Map;
 import java.util.Stack;
 import java.util.NoSuchElementException;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
@@ -1374,8 +1373,7 @@ public class OzoneBucket extends WithMetadata {
       //  reads.)
       // case-2) if startKey is not null or empty
       if (StringUtils.isBlank(keyPrefix) || StringUtils.isNotBlank(startKey) ||
-          (keyPrefix.startsWith(OM_SNAPSHOT_INDICATOR)
-              && keyPrefix.split("/").length == 2)) {
+          OmUtils.isBucketSnapshotIndicator(keyPrefix)) {
         return;
       }
 

@@ -316,8 +316,6 @@ public class TestOmSnapshotFileSystem {
       }
       outputKeys.add(keyName);
     }
-    keys.sort(String::compareTo);
-    outputKeys.sort(String::compareTo);
     Assert.assertEquals(keys, outputKeys);
   }
 
