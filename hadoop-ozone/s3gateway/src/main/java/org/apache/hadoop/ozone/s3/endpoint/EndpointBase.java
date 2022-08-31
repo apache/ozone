@@ -24,7 +24,9 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Context;
 import java.io.IOException;
-import java.util.*;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Arrays;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -262,9 +264,8 @@ public abstract class EndpointBase implements Auditor {
               if (k.startsWith(CUSTOM_METADATA_HEADER_PREFIX) &&
                       !excludeMetadataFields.contains(k)) {
                 return true;
-              }else{
-                return false;
               }
+              return false;
             })
             .collect(Collectors.toSet());
     long sizeInBytes = 0;
@@ -276,7 +277,8 @@ public abstract class EndpointBase implements Auditor {
         String value = StringUtils.join(values, ",");
         sizeInBytes += mapKey.getBytes(UTF_8).length;
         sizeInBytes += value.getBytes(UTF_8).length;
-        if (sizeInBytes > OzoneConsts.S3_REQUEST_HEADER_METADATA_SIZE_LIMIT * KB) {
+        if (sizeInBytes >
+                OzoneConsts.S3_REQUEST_HEADER_METADATA_SIZE_LIMIT * KB) {
           throw new IllegalArgumentException("Illegal user defined metadata." +
               " Combined size cannot exceed 2KB.");
         }
