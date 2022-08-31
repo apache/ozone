@@ -2,9 +2,7 @@ package org.apache.hadoop.ozone.freon;
 
 
 import com.codahale.metrics.Timer;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -12,13 +10,10 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
-import java.io.File;
-import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -78,6 +73,11 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
           defaultValue = "256")
   private int wSizeInBytes;
 
+  @CommandLine.Option(names = {"--write-range-keys"},
+          description = "Generate the range of keys based on option start-index-for-write and end-index-for-write.",
+          defaultValue = "false")
+  private boolean writeRangeKeys;
+
   @CommandLine.Option(names = {"--keySorted"},
           description = "Generated sorted key or not. The key name will be generated via md5 hash if choose to use unsorted key.",
           defaultValue = "false")
@@ -128,7 +128,7 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     if (wSizeInBytes >= 0) {
       keyContent = RandomUtils.nextBytes(wSizeInBytes);
     }
-    //pre-generated integer to md5 hash value mapping
+//    pre-generated integer to md5 hash value mapping
 //    for (int i = 0; i < 100000; i++){
 //      String encodedStr = DigestUtils.md5Hex(String.valueOf(i));
 //      intToMd5Hash.put(i, encodedStr.substring(0,7));
@@ -199,25 +199,31 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     String md5Hash = encodedStr.substring(0,7);
     return getPrefix() + "/" + md5Hash;
   }
-  public void processWriteTasks(){
-
-      try {
-        LOG.error("#### #### #### write key: " + keyName + " ####### ###### ###### ");
-        OzoneOutputStream out = ozbk.createKey(keyName, wSizeInBytes);
-
-        LOG.error("#### #### #### write keyContent: " + keyContent + " ####### ###### ###### ");
-        out.write(keyContent);
-
-        LOG.error("#### #### #### flush:  ####### ###### ###### ");
-        out.flush();
-
-        LOG.error("#### #### #### close  ####### ###### ###### ");
-        out.close();
-
-      }catch (Exception ex) {
-        LOG.error("#### #### #### exception:  " + ex.getMessage());
-        ex.printStackTrace();
+  public void processWriteTasks() throws Exception{
+    if (writeRangeKeys) {
+      for (int i = startIndexForWrite; i < endIndexForWrite + 1; i++){
+        createKeyAndWrite(generateKeyName(i));
       }
+    } else {
+      createKeyAndWrite(keyName);
+    }
+  }
+
+  public void createKeyAndWrite(String keyName) throws Exception{
+    OzoneOutputStream out = ozbk.createKey(keyName, wSizeInBytes);
+    out.write(keyContent);
+    out.flush();
+    out.close();
+  }
+
+  public String generateKeyName(int number) {
+    String keyName;
+    if (keySorted) {
+      keyName = generateObjectName(number);
+    } else {
+      keyName = generateMd5ObjectName(number);
+    }
+    return keyName;
   }
 
   public String decideReadOrWriteTask( ) {
