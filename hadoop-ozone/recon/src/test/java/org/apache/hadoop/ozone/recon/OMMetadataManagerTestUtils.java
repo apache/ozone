@@ -223,44 +223,6 @@ public final class OMMetadataManagerTestUtils {
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
-  /**
-   * Write a directory as key on OM instance.
-   * We don't need to set size.
-   * @throws IOException
-   */
-  public static void writeKeyToOm(OMMetadataManager omMetadataManager,
-                                  String key,
-                                  String bucket,
-                                  String volume,
-                                  String fileName,
-                                  long objectID,
-                                  long parentObjectId,
-                                  long bucketObjectId,
-                                  long volumeObjectId,
-                                  BucketLayout bucketLayout)
-      throws IOException {
-    // DB key in FileTable => "volumeId/bucketId/parentId/fileName"
-    // DB key in KeyTable => "/volume/bucket/key"
-    String omKey;
-    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-      omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
-          bucketObjectId, parentObjectId, fileName);
-    } else {
-      omKey = omMetadataManager.getOzoneKey(volume, bucket, key);
-    }
-    omMetadataManager.getKeyTable(bucketLayout).put(omKey,
-        new OmKeyInfo.Builder()
-            .setBucketName(bucket)
-            .setVolumeName(volume)
-            .setKeyName(key)
-            .setReplicationConfig(
-                StandaloneReplicationConfig.getInstance(ONE))
-            .setObjectID(objectID)
-            .setParentObjectID(parentObjectId)
-            .build());
-  }
-
-  @SuppressWarnings("checkstyle:parameternumber")
   public static void writeKeyToOm(OMMetadataManager omMetadataManager,
                                   String keyName,
                                   String bucketName,
@@ -273,7 +235,6 @@ public final class OMMetadataManagerTestUtils {
                                   List<OmKeyLocationInfoGroup> locationVersions,
                                   BucketLayout bucketLayout)
           throws IOException {
-
     String omKey;
     if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
       omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
@@ -292,6 +253,42 @@ public final class OMMetadataManagerTestUtils {
                     .setObjectID(objectId)
                     .setParentObjectID(parentObjectId)
                     .build());
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  /**
+   * Write a directory as key on OM instance.
+   * We don't need to set size.
+   * @throws IOException
+   */
+  public static void writeDirToOm(OMMetadataManager omMetadataManager,
+                                  String key,
+                                  String bucket,
+                                  String volume,
+                                  String fileName,
+                                  long objectID,
+                                  long parentObjectId,
+                                  long bucketObjectId,
+                                  long volumeObjectId,
+                                  BucketLayout bucketLayout)
+      throws IOException {
+    String omKey;
+    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
+          bucketObjectId, parentObjectId, fileName);
+    } else {
+      omKey = omMetadataManager.getOzoneKey(volume, bucket, key);
+    }
+    omMetadataManager.getKeyTable(bucketLayout).put(omKey,
+        new OmKeyInfo.Builder()
+            .setBucketName(bucket)
+            .setVolumeName(volume)
+            .setKeyName(key)
+            .setReplicationConfig(
+                StandaloneReplicationConfig.getInstance(ONE))
+            .setObjectID(objectID)
+            .setParentObjectID(parentObjectId)
+            .build());
   }
 
   public static void writeDirToOm(OMMetadataManager omMetadataManager,

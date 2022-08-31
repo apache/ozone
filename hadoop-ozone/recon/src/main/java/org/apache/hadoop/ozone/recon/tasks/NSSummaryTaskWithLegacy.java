@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -47,7 +48,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
  */
 public class NSSummaryTaskWithLegacy extends NSSummaryTask {
 
-  private final BucketLayout bucketLayout;
+  private static final BucketLayout BUCKET_LAYOUT = BucketLayout.LEGACY;
 
   private final ReconOMMetadataManager reconOMMetadataManager;
 
@@ -61,7 +62,6 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
                                  reconOMMetadataManager) {
     super(reconNamespaceSummaryManager);
     this.reconOMMetadataManager = reconOMMetadataManager;
-    this.bucketLayout = BucketLayout.LEGACY;
   }
 
   @Override
@@ -94,81 +94,77 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
         OmKeyInfo updatedKeyInfo = keyTableUpdateEvent.getValue();
         OmKeyInfo oldKeyInfo = keyTableUpdateEvent.getOldValue();
 
-        if (updatedKeyInfo != null) {
-          setKeyParentID(updatedKeyInfo);
+        setKeyParentID(updatedKeyInfo);
 
-          if (!updatedKeyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
-            switch (action) {
-            case PUT:
-              handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
-              break;
+        if (!updatedKeyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
+          switch (action) {
+          case PUT:
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+            break;
 
-            case DELETE:
-              handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
-              break;
+          case DELETE:
+            handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
+            break;
 
-            case UPDATE:
-              if (oldKeyInfo != null) {
-                // delete first, then put
-                setKeyParentID(oldKeyInfo);
-                handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
-              } else {
-                LOG.warn("Update event does not have the old keyInfo for {}.",
-                    updatedKey);
-              }
-              handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
-              break;
-
-            default:
-              LOG.debug("Skipping DB update event : {}",
-                  omdbUpdateEvent.getAction());
-            }
-          } else {
-            OmDirectoryInfo updatedDirectoryInfo =
-                new OmDirectoryInfo.Builder()
-                    .setName(updatedKeyInfo.getKeyName())
-                    .setObjectID(updatedKeyInfo.getObjectID())
-                    .setParentObjectID(updatedKeyInfo.getParentObjectID())
-                    .build();
-
-            OmDirectoryInfo oldDirectoryInfo = null;
-
+          case UPDATE:
             if (oldKeyInfo != null) {
-              oldDirectoryInfo =
-                  new OmDirectoryInfo.Builder()
-                      .setName(oldKeyInfo.getKeyName())
-                      .setObjectID(oldKeyInfo.getObjectID())
-                      .setParentObjectID(oldKeyInfo.getParentObjectID())
-                      .build();
+              // delete first, then put
+              setKeyParentID(oldKeyInfo);
+              handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
+            } else {
+              LOG.warn("Update event does not have the old keyInfo for {}.",
+                  updatedKey);
             }
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+            break;
 
-            switch (action) {
-            case PUT:
-              handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
-              break;
-
-            case DELETE:
-              handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
-              break;
-
-            case UPDATE:
-              if (oldDirectoryInfo != null) {
-                // delete first, then put
-                handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
-              } else {
-                LOG.warn("Update event does not have the old dirInfo for {}.",
-                    updatedKey);
-              }
-              handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
-              break;
-
-            default:
-              LOG.debug("Skipping DB update event : {}",
-                  omdbUpdateEvent.getAction());
-            }
+          default:
+            LOG.debug("Skipping DB update event : {}",
+                omdbUpdateEvent.getAction());
           }
         } else {
-          LOG.error("UpdatedKeyInfo for NSSummaryTaskWithLegacy is null");
+          OmDirectoryInfo updatedDirectoryInfo =
+              new OmDirectoryInfo.Builder()
+                  .setName(updatedKeyInfo.getKeyName())
+                  .setObjectID(updatedKeyInfo.getObjectID())
+                  .setParentObjectID(updatedKeyInfo.getParentObjectID())
+                  .build();
+
+          OmDirectoryInfo oldDirectoryInfo = null;
+
+          if (oldKeyInfo != null) {
+            oldDirectoryInfo =
+                new OmDirectoryInfo.Builder()
+                    .setName(oldKeyInfo.getKeyName())
+                    .setObjectID(oldKeyInfo.getObjectID())
+                    .setParentObjectID(oldKeyInfo.getParentObjectID())
+                    .build();
+          }
+
+          switch (action) {
+          case PUT:
+            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+            break;
+
+          case DELETE:
+            handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
+            break;
+
+          case UPDATE:
+            if (oldDirectoryInfo != null) {
+              // delete first, then put
+              handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
+            } else {
+              LOG.warn("Update event does not have the old dirInfo for {}.",
+                  updatedKey);
+            }
+            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+            break;
+
+          default:
+            LOG.debug("Skipping DB update event : {}",
+                omdbUpdateEvent.getAction());
+          }
         }
       } catch (IOException ioEx) {
         LOG.error("Unable to process Namespace Summary data in Recon DB. ",
@@ -196,7 +192,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
       // reinit Recon RocksDB's namespace CF.
       getReconNamespaceSummaryManager().clearNSSummaryTable();
 
-      Table keyTable = omMetadataManager.getKeyTable(bucketLayout);
+      Table keyTable = omMetadataManager.getKeyTable(BUCKET_LAYOUT);
 
       TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
           keyTableIter = keyTable.iterator();
@@ -205,22 +201,18 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
         Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
         OmKeyInfo keyInfo = kv.getValue();
 
-        if (keyInfo != null) {
-          setKeyParentID(keyInfo);
+        setKeyParentID(keyInfo);
 
-          if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
-            OmDirectoryInfo directoryInfo =
-                new OmDirectoryInfo.Builder()
-                    .setName(keyInfo.getKeyName())
-                    .setObjectID(keyInfo.getObjectID())
-                    .setParentObjectID(keyInfo.getParentObjectID())
-                    .build();
-            handlePutDirEvent(directoryInfo, nsSummaryMap);
-          } else {
-            handlePutKeyEvent(keyInfo, nsSummaryMap);
-          }
+        if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
+          OmDirectoryInfo directoryInfo =
+              new OmDirectoryInfo.Builder()
+                  .setName(keyInfo.getKeyName())
+                  .setObjectID(keyInfo.getObjectID())
+                  .setParentObjectID(keyInfo.getParentObjectID())
+                  .build();
+          handlePutDirEvent(directoryInfo, nsSummaryMap);
         } else {
-          LOG.error("Reprocess KeyInfo for NSSummaryTaskWithLegacy is null");
+          handlePutKeyEvent(keyInfo, nsSummaryMap);
         }
       }
     } catch (IOException ioEx) {
@@ -244,23 +236,20 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
 
     //if (keyPath > 1) there is one or more directories
     if (keyPath.length > 1) {
-      StringBuilder bld = new StringBuilder();
-      for (int i = 0; i < keyPath.length - 1; i++) {
-        bld.append(keyPath[i])
-            .append(OM_KEY_PREFIX);
-      }
-      String parentKeyName = bld.toString();
-      String keyBytes =
+      String[] dirs = Arrays.copyOf(keyPath, keyPath.length - 1);
+      String parentKeyName = String.join(OM_KEY_PREFIX, dirs);
+      parentKeyName += OM_KEY_PREFIX;
+      String fullParentKeyName =
           reconOMMetadataManager.getOzoneKey(keyInfo.getVolumeName(),
               keyInfo.getBucketName(), parentKeyName);
       OmKeyInfo parentKeyInfo = reconOMMetadataManager
-          .getKeyTable(bucketLayout)
-          .get(keyBytes);
+          .getKeyTable(BUCKET_LAYOUT)
+          .get(fullParentKeyName);
 
-      if (parentKeyInfo != null) {
+      try {
         keyInfo.setParentObjectID(parentKeyInfo.getObjectID());
-      } else {
-        LOG.error("ParentKeyInfo for NSSummaryTaskWithLegacy is null");
+      } catch (NullPointerException e) {
+        LOG.error("ParentKeyInfo for NSSummaryTaskWithLegacy is null", e);
       }
     } else {
       String bucketKey = reconOMMetadataManager
@@ -268,10 +257,10 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
       OmBucketInfo parentBucketInfo =
           reconOMMetadataManager.getBucketTable().get(bucketKey);
 
-      if (parentBucketInfo != null) {
+      try {
         keyInfo.setParentObjectID(parentBucketInfo.getObjectID());
-      } else {
-        LOG.error("ParentBucketInfo for NSSummaryTaskWithLegacy is null");
+      } catch (NullPointerException e) {
+        LOG.error("ParentBucketInfo for NSSummaryTaskWithLegacy is null", e);
       }
     }
   }

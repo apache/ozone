@@ -73,8 +73,9 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -714,7 +715,7 @@ public class TestNSSummaryEndpointWithLegacy {
   @SuppressWarnings("checkstyle:MethodLength")
   private void populateOMDB() throws Exception {
     // write all directories
-    writeKeyToOm(reconOMMetadataManager,
+    writeDirToOm(reconOMMetadataManager,
           (DIR_ONE + OM_KEY_PREFIX),
           BUCKET_ONE,
           VOL,
@@ -724,7 +725,7 @@ public class TestNSSummaryEndpointWithLegacy {
           BUCKET_ONE_OBJECT_ID,
           VOL_OBJECT_ID,
           getBucketLayout());
-    writeKeyToOm(reconOMMetadataManager,
+    writeDirToOm(reconOMMetadataManager,
           (DIR_ONE + OM_KEY_PREFIX + DIR_TWO + OM_KEY_PREFIX),
           BUCKET_ONE,
           VOL,
@@ -734,7 +735,7 @@ public class TestNSSummaryEndpointWithLegacy {
           BUCKET_ONE_OBJECT_ID,
           VOL_OBJECT_ID,
           getBucketLayout());
-    writeKeyToOm(reconOMMetadataManager,
+    writeDirToOm(reconOMMetadataManager,
           (DIR_ONE + OM_KEY_PREFIX + DIR_THREE + OM_KEY_PREFIX),
           BUCKET_ONE,
           VOL,
@@ -744,7 +745,7 @@ public class TestNSSummaryEndpointWithLegacy {
           BUCKET_ONE_OBJECT_ID,
           VOL_OBJECT_ID,
           getBucketLayout());
-    writeKeyToOm(reconOMMetadataManager,
+    writeDirToOm(reconOMMetadataManager,
           (DIR_ONE + OM_KEY_PREFIX + DIR_FOUR + OM_KEY_PREFIX),
           BUCKET_ONE,
           VOL,
@@ -754,7 +755,7 @@ public class TestNSSummaryEndpointWithLegacy {
           BUCKET_ONE_OBJECT_ID,
           VOL_OBJECT_ID,
           getBucketLayout());
-    writeKeyToOm(reconOMMetadataManager,
+    writeDirToOm(reconOMMetadataManager,
           (DIR_FIVE + OM_KEY_PREFIX),
           BUCKET_THREE,
           VOL_TWO,

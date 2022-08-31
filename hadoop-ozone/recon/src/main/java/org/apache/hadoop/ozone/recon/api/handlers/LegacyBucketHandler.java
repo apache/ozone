@@ -29,6 +29,8 @@ import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
@@ -40,6 +42,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  * Class for handling Legacy buckets.
  */
 public class LegacyBucketHandler extends BucketHandler {
+
+  private static final Logger LOG = LoggerFactory.getLogger(
+      LegacyBucketHandler.class);
 
   private final String vol;
   private final String bucket;
@@ -78,7 +83,7 @@ public class LegacyBucketHandler extends BucketHandler {
         OM_KEY_PREFIX + bucket +
         OM_KEY_PREFIX + filename;
 
-    Table keyTable = getKeyTable();
+    Table<String, OmKeyInfo> keyTable = getKeyTable();
 
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
         iterator = keyTable.iterator();
@@ -102,15 +107,15 @@ public class LegacyBucketHandler extends BucketHandler {
   @Override
   public long calculateDUUnderObject(long parentId)
       throws IOException {
-    Table keyTable = getKeyTable();
+    Table<String, OmKeyInfo> keyTable = getKeyTable();
 
+    long totalDU = 0L;
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
         iterator = keyTable.iterator();
 
     String seekPrefix =
         OM_KEY_PREFIX + vol + OM_KEY_PREFIX + bucket + OM_KEY_PREFIX;
 
-    // handle nested keys (DFS)
     NSSummary nsSummary = getReconNamespaceSummaryManager()
         .getNSSummary(parentId);
     // empty bucket
@@ -125,7 +130,6 @@ public class LegacyBucketHandler extends BucketHandler {
 
     String[] seekKeys = seekPrefix.split(OM_KEY_PREFIX);
     iterator.seek(seekPrefix);
-    long totalDU = 0L;
     // handle direct keys
     while (iterator.hasNext()) {
       Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
@@ -153,6 +157,7 @@ public class LegacyBucketHandler extends BucketHandler {
       }
     }
 
+    // handle nested keys (DFS)
     Set<Long> subDirIds = nsSummary.getChildDir();
     for (long subDirId: subDirIds) {
       totalDU += calculateDUUnderObject(subDirId);
@@ -177,7 +182,9 @@ public class LegacyBucketHandler extends BucketHandler {
                                List<DUResponse.DiskUsage> duData,
                                String normalizedPath) throws IOException {
 
-    Table keyTable = getKeyTable();
+    Table<String, OmKeyInfo> keyTable = getKeyTable();
+    long keyDataSizeWithReplica = 0L;
+
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
         iterator = keyTable.iterator();
 
@@ -201,8 +208,6 @@ public class LegacyBucketHandler extends BucketHandler {
     String[] seekKeys = seekPrefix.split(OM_KEY_PREFIX);
 
     iterator.seek(seekPrefix);
-
-    long keyDataSizeWithReplica = 0L;
 
     while (iterator.hasNext()) {
       Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
@@ -280,8 +285,10 @@ public class LegacyBucketHandler extends BucketHandler {
     String dirKey = bld.toString();
     OmKeyInfo dirInfo = getKeyTable().getSkipCache(dirKey);
 
-    if (dirInfo != null) {
+    try {
       dirObjectId = dirInfo.getObjectID();
+    } catch (NullPointerException e) {
+      LOG.error("OmKeyInfo for the directory is null", e);
     }
     return dirObjectId;
   }
@@ -293,12 +300,9 @@ public class LegacyBucketHandler extends BucketHandler {
 
   @Override
   public OmKeyInfo getKeyInfo(String[] names) throws IOException {
-    StringBuilder bld = new StringBuilder();
-    for (int i = 0; i < names.length; i++) {
-      bld.append(OM_KEY_PREFIX)
-          .append(names[i]);
-    }
-    String ozoneKey = bld.toString();
+    String ozoneKey = OM_KEY_PREFIX;
+    ozoneKey += String.join(OM_KEY_PREFIX, names);
+
     OmKeyInfo keyInfo = getKeyTable().get(ozoneKey);
     return keyInfo;
   }
