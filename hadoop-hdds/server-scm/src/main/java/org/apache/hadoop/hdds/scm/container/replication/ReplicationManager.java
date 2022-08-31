@@ -358,6 +358,10 @@ public class ReplicationManager implements SCMService {
     }
   }
 
+  public void sendCloseContainerEvent(ContainerID containerID) {
+    eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
+  }
+
   /**
    * Add an under replicated container back to the queue if it was unable to
    * be processed. Its retry count will be incremented before it is re-queued,
