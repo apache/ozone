@@ -94,6 +94,8 @@ public class OzoneKey {
     this.bucketName = bucketName;
     this.name = keyName;
     this.dataSize = size;
+    this.creationTime = Instant.ofEpochMilli(creationTime);
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.replicationConfig = replicationConfig;
   }
 
