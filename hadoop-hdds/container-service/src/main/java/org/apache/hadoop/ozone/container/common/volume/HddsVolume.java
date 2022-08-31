@@ -216,7 +216,7 @@ public class HddsVolume extends StorageVolume {
     return dbLoaded.get();
   }
 
-  public void loadDbStore() throws IOException {
+  public void loadDbStore(boolean readOnly) throws IOException {
     // DN startup for the first time, not registered yet,
     // so the DbVolume is not formatted.
     if (!getStorageState().equals(VolumeState.NORMAL)) {
@@ -252,7 +252,7 @@ public class HddsVolume extends StorageVolume {
 
     String containerDBPath = containerDBFile.getAbsolutePath();
     try {
-      initPerDiskDBStore(containerDBPath, getConf());
+      initPerDiskDBStore(containerDBPath, getConf(), readOnly);
     } catch (IOException e) {
       throw new IOException("Can't init db instance under path "
           + containerDBPath + " for volume " + getStorageID(), e);
@@ -305,7 +305,7 @@ public class HddsVolume extends StorageVolume {
     String containerDBPath = new File(storageIdDir, CONTAINER_DB_NAME)
         .getAbsolutePath();
     try {
-      HddsVolumeUtil.initPerDiskDBStore(containerDBPath, getConf());
+      HddsVolumeUtil.initPerDiskDBStore(containerDBPath, getConf(), false);
       dbLoaded.set(true);
       LOG.info("SchemaV3 db is created and loaded at {} for volume {}",
           containerDBPath, getStorageID());
