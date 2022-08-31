@@ -708,7 +708,10 @@ public class ReplicationManager implements SCMService {
             " container it will have at least dataNum + 1 online, allowing" +
             " the loss of 1 more replica before data becomes unavailable." +
             " Currently only EC containers use this setting. Ratis containers" +
-            " use hdds.scm.replication.maintenance.replica.minimum."
+            " use hdds.scm.replication.maintenance.replica.minimum. For EC," +
+            " if nodes are in maintenance, it is likely reconstruction reads" +
+            " will be required if some of the data replicas are offline. This" +
+            " is seamless to the client, but will affect read performance."
     )
     private int maintenanceRemainingRedundancy = 1;
 
