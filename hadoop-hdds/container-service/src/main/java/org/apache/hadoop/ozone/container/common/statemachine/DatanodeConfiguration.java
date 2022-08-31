@@ -73,8 +73,8 @@ public class DatanodeConfiguration {
       Duration.ofMinutes(10).toMillis();
 
   static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = false;
-  static final long ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT = 8 * 1024 * 1024;
-  static final int ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT = 100;
+  static final long ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT = 32 * 1024 * 1024;
+  static final int ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT = 64;
   static final long ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT =
       6 * 60 * 60 * 1000 * 1000;
   public static final String ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY =
@@ -322,7 +322,7 @@ public class DatanodeConfiguration {
   private String rocksdbLogLevel = "INFO";
 
   @Config(key = "rocksdb.log.max-file-size",
-      defaultValue = "8MB",
+      defaultValue = "32MB",
       type = ConfigType.SIZE,
       tags = { DATANODE },
       description = "The max size of each user log file of RocksDB. " +
@@ -331,7 +331,7 @@ public class DatanodeConfiguration {
   private long rocksdbMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
 
   @Config(key = "rocksdb.log.max-file-num",
-      defaultValue = "100",
+      defaultValue = "64",
       type = ConfigType.INT,
       tags = { DATANODE },
       description = "The max user log file number to keep for each RocksDB"
