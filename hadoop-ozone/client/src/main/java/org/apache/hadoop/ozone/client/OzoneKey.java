@@ -56,11 +56,11 @@ public class OzoneKey {
   /**
    * Creation time of the key.
    */
-//  private Instant creationTime;
+  private Instant creationTime;
   /**
    * Modification time of the key.
    */
-//  private Instant modificationTime;
+  private Instant modificationTime;
 
   private ReplicationConfig replicationConfig;
 
@@ -150,18 +150,18 @@ public class OzoneKey {
    *
    * @return creation time
    */
-//  public Instant getCreationTime() {
-//    return creationTime;
-//  }
+  public Instant getCreationTime() {
+    return creationTime;
+  }
 
   /**
    * Returns the modification time of the key.
    *
    * @return modification time
    */
-//  public Instant getModificationTime() {
-//    return modificationTime;
-//  }
+  public Instant getModificationTime() {
+    return modificationTime;
+  }
 
   /**
    * Returns the replication type of the key.
