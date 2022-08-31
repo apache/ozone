@@ -425,7 +425,7 @@ public interface ScmClient extends Closeable {
   /**
    * Start DiskBalancer.
    */
-  void startDiskBalancer(
+  List<DatanodeAdminError> startDiskBalancer(
       Optional<Double> threshold,
       Optional<Long> bandwidthInMB,
       Optional<Integer> parallelThread,
@@ -434,13 +434,14 @@ public interface ScmClient extends Closeable {
   /**
    * Stop DiskBalancer.
    */
-  void stopDiskBalancer(Optional<List<String>> hosts) throws IOException;
+  List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
+      throws IOException;
 
 
   /**
    * Update DiskBalancer Configuration.
    */
-  void updateDiskBalancerConfiguration(
+  List<DatanodeAdminError> updateDiskBalancerConfiguration(
       Optional<Double> threshold,
       Optional<Long> bandwidth,
       Optional<Integer> parallelThread,
