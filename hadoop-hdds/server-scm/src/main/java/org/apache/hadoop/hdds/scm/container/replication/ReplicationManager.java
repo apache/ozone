@@ -701,14 +701,14 @@ public class ReplicationManager implements SCMService {
         description = "The number of redundant containers in a group which" +
             " must be available for a node to enter maintenance. If putting" +
             " a node into maintenance reduces the redundancy below this value" +
-            " , the node will remain in the entering maintenance state until" +
+            " , the node will remain in the ENTERING_MAINTENANCE state until" +
             " a new replica is created. For Ratis containers, the default" +
             " value of 1 ensures at least two replicas are online, meaning 1" +
             " more can be lost without data becoming unavailable. For any EC" +
             " container it will have at least dataNum + 1 online, allowing" +
             " the loss of 1 more replica before data becomes unavailable." +
             " Currently only EC containers use this setting. Ratis containers" +
-            " use maintenance.replica.minimum."
+            " use hdds.scm.replication.maintenance.replica.minimum."
     )
     private int maintenanceRemainingRedundancy = 1;
 
