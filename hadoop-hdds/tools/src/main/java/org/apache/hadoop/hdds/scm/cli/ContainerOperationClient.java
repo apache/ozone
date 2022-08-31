@@ -671,10 +671,10 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public void startDiskBalancer(Optional<Double> threshold,
-      Optional<Double> bandwidth, Optional<List<String>> hosts)
-      throws IOException {
-    storageContainerLocationClient.startDiskBalancer(threshold, bandwidth,
-        hosts);
+      Optional<Long> bandwidthInMB, Optional<Integer> parallelThread,
+      Optional<List<String>> hosts) throws IOException {
+    storageContainerLocationClient.startDiskBalancer(threshold, bandwidthInMB,
+        parallelThread, hosts);
   }
 
   @Override
@@ -694,9 +694,9 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public void updateDiskBalancerConfiguration(Optional<Double> threshold,
-      Optional<Double> bandwidth, Optional<List<String>> hosts)
-      throws IOException {
+      Optional<Long> bandwidth, Optional<Integer> parallelThread,
+      Optional<List<String>> hosts) throws IOException {
     storageContainerLocationClient.updateDiskBalancerConfiguration(threshold,
-        bandwidth, hosts);
+        bandwidth, parallelThread, hosts);
   }
 }

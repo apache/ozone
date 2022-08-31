@@ -427,7 +427,8 @@ public interface ScmClient extends Closeable {
    */
   void startDiskBalancer(
       Optional<Double> threshold,
-      Optional<Double> bandwidth,
+      Optional<Long> bandwidthInMB,
+      Optional<Integer> parallelThread,
       Optional<List<String>> hosts) throws IOException;
 
   /**
@@ -441,6 +442,7 @@ public interface ScmClient extends Closeable {
    */
   void updateDiskBalancerConfiguration(
       Optional<Double> threshold,
-      Optional<Double> bandwidth,
+      Optional<Long> bandwidth,
+      Optional<Integer> parallelThread,
       Optional<List<String>> hosts) throws IOException;
 }
