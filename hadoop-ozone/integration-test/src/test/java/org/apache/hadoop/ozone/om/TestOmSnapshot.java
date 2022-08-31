@@ -285,6 +285,7 @@ public class TestOmSnapshot {
     Assert.assertEquals(20, volBBucketAKeyCount);
 
     snapshotKeyPrefix = createSnapshot(volumeB, bucketB);
+    deleteKeys(volBbucketB);
     Iterator<? extends OzoneKey> volBBucketBIter =
         volBbucketB.listKeys(snapshotKeyPrefix + "key-");
     int volBBucketBKeyCount = 0;
@@ -415,9 +416,6 @@ public class TestOmSnapshot {
       OzoneKey key = bucketIter.next();
       bucket.deleteKey(key.getName());
     }
-    bucketIter = bucket.listKeys(null);
-    if (bucketIter.hasNext()) {
-      fail();
-    }
   }
 }
+
