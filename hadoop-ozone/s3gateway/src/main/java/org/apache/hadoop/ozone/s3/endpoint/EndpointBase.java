@@ -24,16 +24,12 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Context;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -75,6 +71,8 @@ public abstract class EndpointBase implements Auditor {
   @Context
   private ContainerRequestContext context;
 
+  private Set<String> excludeMetadataFields =
+          new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG));
   private static final Logger LOG =
       LoggerFactory.getLogger(EndpointBase.class);
 
@@ -260,7 +258,14 @@ public abstract class EndpointBase implements Auditor {
     }
 
     Set<String> customMetadataKeys = requestHeaders.keySet().stream()
-            .filter(k -> k.startsWith(CUSTOM_METADATA_HEADER_PREFIX))
+            .filter(k -> {
+              if (k.startsWith(CUSTOM_METADATA_HEADER_PREFIX) &&
+                      !excludeMetadataFields.contains(k)) {
+                return true;
+              }else{
+                return false;
+              }
+            })
             .collect(Collectors.toSet());
     long sizeInBytes = 0;
     if (!customMetadataKeys.isEmpty()) {
@@ -271,7 +276,7 @@ public abstract class EndpointBase implements Auditor {
         String value = StringUtils.join(values, ",");
         sizeInBytes += mapKey.getBytes(UTF_8).length;
         sizeInBytes += value.getBytes(UTF_8).length;
-        if (sizeInBytes > 2 * KB) {
+        if (sizeInBytes > OzoneConsts.S3_REQUEST_HEADER_METADATA_SIZE_LIMIT * KB) {
           throw new IllegalArgumentException("Illegal user defined metadata." +
               " Combined size cannot exceed 2KB.");
         }

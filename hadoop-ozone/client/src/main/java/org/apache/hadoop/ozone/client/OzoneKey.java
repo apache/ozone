@@ -106,7 +106,7 @@ public class OzoneKey {
                   Map<String, String> metadata) {
     this(volumeName, bucketName, keyName, size, creationTime,
         modificationTime, replicationConfig);
-    this.metadata.putAll(filterMetaData(metadata));
+    this.metadata.putAll(metadata);
   }
 
   /**
@@ -188,17 +188,6 @@ public class OzoneKey {
 
   public ReplicationConfig getReplicationConfig() {
     return replicationConfig;
-  }
-
-  public Map<String, String> filterMetaData(Map<String, String> keyMetadata) {
-    return keyMetadata.entrySet()
-            .stream().filter(x -> {
-              if (excludeMetadataFields.contains(x.getKey())) {
-                return false;
-              }
-              return true;
-            })
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
 }
