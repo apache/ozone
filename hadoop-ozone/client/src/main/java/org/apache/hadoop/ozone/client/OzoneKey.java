@@ -24,7 +24,12 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Arrays;
+
 import java.util.stream.Collectors;
 
 /**
@@ -61,7 +66,8 @@ public class OzoneKey {
 
   private Map<String, String> metadata = new HashMap<>();
 
-  Set<String> excludeMetadataFields = new HashSet<>(Arrays.asList("gdprEnabled"));
+  private Set<String> excludeMetadataFields =
+          new HashSet<>(Arrays.asList("gdprEnabled"));
 
   /**
    * Constructs OzoneKey from OmKeyInfo.
@@ -70,9 +76,12 @@ public class OzoneKey {
   @SuppressWarnings("parameternumber")
   @Deprecated
   public OzoneKey(String volumeName, String bucketName,
-                  String keyName, long size, ReplicationType type,
+                  String keyName, long size, long creationTime,
+                  long modificationTime, ReplicationType type,
                   int replicationFactor) {
-    this(volumeName, bucketName, keyName, size, ReplicationConfig.fromTypeAndFactor(type, ReplicationFactor.valueOf(replicationFactor)));
+    this(volumeName, bucketName, keyName, size, creationTime, modificationTime,
+            ReplicationConfig.fromTypeAndFactor(type,
+                    ReplicationFactor.valueOf(replicationFactor)));
   }
 
   /**
@@ -81,7 +90,8 @@ public class OzoneKey {
    */
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
-                  String keyName, long size, ReplicationConfig replicationConfig) {
+                  String keyName, long size, long creationTime,
+                  long modificationTime, ReplicationConfig replicationConfig) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.name = keyName;
@@ -91,9 +101,11 @@ public class OzoneKey {
 
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
-                  String keyName, long size, ReplicationConfig replicationConfig,
+                  String keyName, long size, long creationTime,
+                  long modificationTime, ReplicationConfig replicationConfig,
                   Map<String, String> metadata) {
-    this(volumeName, bucketName, keyName, size, replicationConfig);
+    this(volumeName, bucketName, keyName, size, creationTime,
+        modificationTime, replicationConfig);
     this.metadata.putAll(filterMetaData(metadata));
   }
 
@@ -178,13 +190,13 @@ public class OzoneKey {
     return replicationConfig;
   }
 
-  public Map<String, String> filterMetaData(Map<String, String> metadata){
-    return metadata.entrySet()
+  public Map<String, String> filterMetaData(Map<String, String> keyMetadata) {
+    return keyMetadata.entrySet()
             .stream().filter(x -> {
-                      if(excludeMetadataFields.contains(x.getKey())){
-                        return false;
-                      }
-                    return true;
+              if (excludeMetadataFields.contains(x.getKey())) {
+                return false;
+              }
+              return true;
             })
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
