@@ -64,9 +64,6 @@ public class OzoneKey {
 
   private Map<String, String> metadata = new HashMap<>();
 
-  private Set<String> excludeMetadataFields =
-          new HashSet<>(Arrays.asList("gdprEnabled"));
-
   /**
    * Constructs OzoneKey from OmKeyInfo.
    *
