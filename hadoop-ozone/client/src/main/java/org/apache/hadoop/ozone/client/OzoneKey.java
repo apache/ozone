@@ -26,9 +26,6 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import java.time.Instant;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.Set;
-import java.util.HashSet;
-import java.util.Arrays;
 
 /**
  * A class that encapsulates OzoneKey.
