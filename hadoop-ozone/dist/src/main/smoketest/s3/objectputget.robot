@@ -182,4 +182,4 @@ Create file with user defined metadata larger than 2 KB
                                 Execute                    echo "Randomtext" > /tmp/testfile2
                                 Execute                    dd if=/dev/zero of=/tmp/testfileOver2KB bs=3000 count=1
                                 Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata /tmp/testfileOver2KB
-                                Should contain             ${result}   \"Illegal user defined metadata\"
+                                Should contain             ${result}   Illegal user defined metadata
