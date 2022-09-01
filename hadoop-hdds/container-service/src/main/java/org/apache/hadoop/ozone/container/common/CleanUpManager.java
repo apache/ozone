@@ -94,7 +94,8 @@ public class CleanUpManager {
     String clusterId = hddsVolume.getClusterID();
 
     if (clusterId == null) {
-      LOG.error("Volume has not been initialized, clusterId is null.");
+      throw new NullPointerException("Volume has not been initialized, " +
+          "clusterId is null.");
     }
 
     String pathId = "";

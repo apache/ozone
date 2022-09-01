@@ -163,7 +163,7 @@ public class TestHddsDatanodeService {
         tempHddsVolumes[i] = tempDir.newFolder();
         hddsDirs.append(tempHddsVolumes[i]).append(",");
 
-        // Write to volume
+        // Write to tmp dir under volume
         File testFile = new File(manager.getTmpDirPath() + "/testFile.txt");
         Files.touch(testFile);
         assertTrue(testFile.exists());

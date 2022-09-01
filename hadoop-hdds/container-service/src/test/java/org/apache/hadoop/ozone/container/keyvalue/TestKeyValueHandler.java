@@ -20,9 +20,10 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
+import java.util.LinkedList;
 import java.util.HashMap;
 import java.util.UUID;
+import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.FileUtils;
@@ -36,6 +37,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.ozone.container.common.CleanUpManager;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -44,6 +47,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -53,16 +57,20 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import static org.junit.Assert.assertEquals;
 
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -77,6 +85,9 @@ public class TestKeyValueHandler {
 
   @Rule
   public TestRule timeout = Timeout.seconds(300);
+
+  @Rule
+  public final TemporaryFolder tempDir = new TemporaryFolder();
 
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
 
@@ -393,6 +404,78 @@ public class TestKeyValueHandler {
       kvHandler.deleteContainer(containerSet.getContainer(containerID), true);
       Assert.assertEquals(2, icrReceived.get());
       Assert.assertNull(containerSet.getContainer(containerID));
+    } finally {
+      FileUtils.deleteDirectory(new File(testDir));
+    }
+  }
+
+  @Test
+  public void testDeleteContainerWithSchemaV3Enabled() throws IOException {
+    final String testDir = GenericTestUtils.getTempPath(
+        TestKeyValueHandler.class.getSimpleName() +
+            "-" + UUID.randomUUID().toString());
+
+    try {
+      final long containerID = 1L;
+      final String clusterId = UUID.randomUUID().toString();
+      final String datanodeId = UUID.randomUUID().toString();
+      final ConfigurationSource conf = new OzoneConfiguration();
+      ContainerTestUtils.enableSchemaV3((OzoneConfiguration) conf);
+
+      assumeTrue(CleanUpManager.checkContainerSchemaV3Enabled(conf));
+
+      final ContainerSet containerSet = new ContainerSet(1000);
+
+      final VolumeSet volumeSet = Mockito.mock(VolumeSet.class);
+
+      Mockito.when(volumeSet.getVolumesList())
+          .thenReturn(Collections.singletonList(
+              new HddsVolume.Builder(testDir).conf(conf).build()));
+
+      LinkedList<CleanUpManager> cleanUpManagers = new LinkedList<>();
+
+      for (HddsVolume hddsVolume : StorageVolumeUtil
+          .getHddsVolumesList(volumeSet.getVolumesList())) {
+        hddsVolume.format(clusterId);
+        hddsVolume.createWorkingDir(clusterId, null);
+        CleanUpManager manager = new CleanUpManager(hddsVolume);
+        cleanUpManagers.add(manager);
+      }
+
+      final int[] interval = new int[1];
+      interval[0] = 2;
+      final ContainerMetrics metrics = new ContainerMetrics(interval);
+
+      final AtomicInteger icrReceived = new AtomicInteger(0);
+
+      final KeyValueHandler kvHandler = new KeyValueHandler(conf,
+          UUID.randomUUID().toString(), containerSet, volumeSet, metrics,
+          c -> icrReceived.incrementAndGet());
+      kvHandler.setClusterID(clusterId);
+
+      final ContainerCommandRequestProto createContainer =
+          ContainerCommandRequestProto.newBuilder()
+              .setCmdType(ContainerProtos.Type.CreateContainer)
+              .setDatanodeUuid(datanodeId)
+              .setCreateContainer(
+                  ContainerProtos.CreateContainerRequestProto.newBuilder()
+                      .setContainerType(ContainerType.KeyValueContainer)
+                      .build())
+              .setContainerID(containerID)
+              .setPipelineID(UUID.randomUUID().toString())
+              .build();
+
+      kvHandler.handleCreateContainer(createContainer, null);
+      Assert.assertEquals(1, icrReceived.get());
+      Assert.assertNotNull(containerSet.getContainer(containerID));
+
+      kvHandler.deleteContainer(containerSet.getContainer(containerID), true);
+      Assert.assertEquals(2, icrReceived.get());
+      Assert.assertNull(containerSet.getContainer(containerID));
+
+      for (CleanUpManager manager : cleanUpManagers) {
+        assertTrue(manager.tmpDirIsEmpty());
+      }
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }
