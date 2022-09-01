@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.ListIterator;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -48,6 +49,7 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
@@ -60,6 +62,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
@@ -79,8 +82,10 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
+import static org.junit.Assume.assumeFalse;
 
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -258,20 +263,15 @@ public class TestContainerPersistence {
   }
 
   @Test
-  public void testDeleteContainer() throws Exception {
+  public void testAddingBlockToDeletedContainer() throws Exception {
     long testContainerID1 = getTestContainerID();
     Thread.sleep(100);
-    long testContainerID2 = getTestContainerID();
 
     Container container1 = addContainer(containerSet, testContainerID1);
     container1.close();
 
-    Container container2 = addContainer(containerSet, testContainerID2);
-
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID1));
-    Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID2));
 
     container1.delete();
     containerSet.removeContainer(testContainerID1);
@@ -280,9 +280,7 @@ public class TestContainerPersistence {
 
     // With schema v3, we don't have a container dedicated db,
     // so skip check the behaviors related to it.
-    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
-      return;
-    }
+    assumeFalse(schemaVersion.contains(OzoneConsts.SCHEMA_V3));
 
     // Adding block to a deleted container should fail.
     exception.expect(StorageContainerException.class);
@@ -291,18 +289,44 @@ public class TestContainerPersistence {
     BlockData someKey1 = new BlockData(blockID1);
     someKey1.setChunks(new LinkedList<ContainerProtos.ChunkInfo>());
     blockManager.putBlock(container1, someKey1);
+  }
 
-    // TODO: Refactor the code, that block never gets executed.
+  @Test
+  public void testDeleteNonEmptyContainer() throws Exception {
+    long testContainerID2 = getTestContainerID();
+    Container container2 = addContainer(containerSet, testContainerID2);
+    container2.close();
+
+    Assert.assertTrue(containerSet.getContainerMapCopy()
+        .containsKey(testContainerID2));
+
+    // With schema v3, we don't have a container dedicated db,
+    // so skip check the behaviors related to it.
+    assumeFalse(schemaVersion.contains(OzoneConsts.SCHEMA_V3));
+
     // Deleting a non-empty container should fail.
     BlockID blockID2 = ContainerTestHelper.getTestBlockID(testContainerID2);
     BlockData someKey2 = new BlockData(blockID2);
     someKey2.setChunks(new LinkedList<ContainerProtos.ChunkInfo>());
     blockManager.putBlock(container2, someKey2);
 
+    // KeyValueHandler setup
+    String datanodeId = UUID.randomUUID().toString();
+
+    int[] interval = new int[1];
+    interval[0] = 2;
+    ContainerMetrics metrics = new ContainerMetrics(interval);
+
+    AtomicInteger icrReceived = new AtomicInteger(0);
+
+    KeyValueHandler kvHandler = new KeyValueHandler(conf,
+        datanodeId, containerSet, volumeSet, metrics,
+        c -> icrReceived.incrementAndGet());
+
     exception.expect(StorageContainerException.class);
     exception.expectMessage(
-        "Container cannot be deleted because it is not empty.");
-    container2.delete();
+        "Non-force deletion of non-empty container is not allowed.");
+    kvHandler.deleteContainer(container2, false);
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID2));
   }
@@ -341,6 +365,28 @@ public class TestContainerPersistence {
     // Rename container2 dir
     Assert.assertTrue(cleanUpManager.renameDir(container2Data));
 
+    File container1File =
+        new File(container1Data.getContainerPath());
+
+    File container2File =
+        new File(container2Data.getContainerPath());
+
+    ListIterator<File> tmpDirIter = cleanUpManager.getDeleteLeftovers();
+    boolean container1ExistsUnderTmpDir = false;
+    boolean container2ExistsUnderTmpDir = false;
+
+    while (tmpDirIter.hasNext()) {
+      if (tmpDirIter.next().equals(container1File)) {
+        container1ExistsUnderTmpDir = true;
+      }
+
+      if (tmpDirIter.next().equals(container2File)) {
+        container2ExistsUnderTmpDir = true;
+      }
+    }
+    assertTrue(container1ExistsUnderTmpDir);
+    assertTrue(container2ExistsUnderTmpDir);
+
     // Delete container1
     container1.delete();
 
@@ -366,7 +412,6 @@ public class TestContainerPersistence {
 
     // Delete /tmp/delete_container_service from system
     cleanUpManager.deleteTmpDir();
-
   }
 
   @Test
