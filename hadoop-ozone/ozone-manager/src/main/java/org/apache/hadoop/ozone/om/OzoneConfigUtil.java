@@ -28,8 +28,10 @@ import org.apache.hadoop.security.UserGroupInformation;
 import java.io.IOException;
 import java.util.Collection;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.*;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS;
 
 /**
  * Utility class for ozone configurations.
@@ -78,8 +80,8 @@ public final class OzoneConfigUtil {
       OzoneConfiguration conf) {
     Collection<String> s3AdminsGroup =
             conf.getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS_GROUPS);
-    if (s3AdminsGroup.isEmpty()
-            && conf.getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS).isEmpty()) {
+    if (s3AdminsGroup.isEmpty() && conf
+        .getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS).isEmpty()) {
       s3AdminsGroup = conf
               .getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS);
     }

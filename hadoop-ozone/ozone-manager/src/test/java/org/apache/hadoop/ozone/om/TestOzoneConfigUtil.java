@@ -112,7 +112,8 @@ public class TestOzoneConfigUtil {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OzoneConfigKeys.OZONE_S3_ADMINISTRATORS, "alice,bob");
 
-    Assert.assertTrue(OzoneConfigUtil.getS3AdminsFromConfig(configuration).containsAll(Arrays.asList("alice", "bob")));
+    Assert.assertTrue(OzoneConfigUtil.getS3AdminsFromConfig(configuration)
+        .containsAll(Arrays.asList("alice", "bob")));
   }
 
   @Test
@@ -120,22 +121,27 @@ public class TestOzoneConfigUtil {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, "alice,bob");
 
-    Assert.assertTrue(OzoneConfigUtil.getS3AdminsFromConfig(configuration).containsAll(Arrays.asList("alice", "bob")));
+    Assert.assertTrue(OzoneConfigUtil.getS3AdminsFromConfig(configuration)
+        .containsAll(Arrays.asList("alice", "bob")));
   }
 
   @Test
   public void testS3AdminGroupExtraction() {
     OzoneConfiguration configuration = new OzoneConfiguration();
-    configuration.set(OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS, "test1, test2");
+    configuration.set(OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS,
+        "test1, test2");
 
-    Assert.assertTrue(OzoneConfigUtil.getS3AdminsGroupsFromConfig(configuration).containsAll(Arrays.asList("test1", "test2")));
+    Assert.assertTrue(OzoneConfigUtil.getS3AdminsGroupsFromConfig(configuration)
+        .containsAll(Arrays.asList("test1", "test2")));
   }
 
   @Test
   public void testS3AdminGroupExtractionWithFallback() {
     OzoneConfiguration configuration = new OzoneConfiguration();
-    configuration.set(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS, "test1, test2");
+    configuration.set(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS,
+        "test1, test2");
 
-    Assert.assertTrue(OzoneConfigUtil.getS3AdminsGroupsFromConfig(configuration).containsAll(Arrays.asList("test1", "test2")));
+    Assert.assertTrue(OzoneConfigUtil.getS3AdminsGroupsFromConfig(configuration)
+        .containsAll(Arrays.asList("test1", "test2")));
   }
 }
