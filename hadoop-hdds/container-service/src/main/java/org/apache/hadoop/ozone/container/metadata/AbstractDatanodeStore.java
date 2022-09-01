@@ -36,7 +36,9 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
+import org.rocksdb.InfoLogLevel;
 import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,6 +111,19 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
           this.dbDef instanceof DatanodeSchemaTwoDBDefinition) {
         long maxWalSize = DBProfile.toLong(StorageUnit.MB.toBytes(2));
         options.setMaxTotalWalSize(maxWalSize);
+      }
+
+      if (this.dbDef instanceof DatanodeSchemaThreeDBDefinition) {
+        DatanodeConfiguration dc =
+            config.getObject(DatanodeConfiguration.class);
+        // Config user log files
+        InfoLogLevel level = InfoLogLevel.valueOf(
+            dc.getRocksdbLogLevel() + "_LEVEL");
+        options.setInfoLogLevel(level);
+        options.setMaxLogFileSize(dc.getRocksdbMaxFileSize());
+        options.setKeepLogFileNum(dc.getRocksdbMaxFileNum());
+        options.setDeleteObsoleteFilesPeriodMicros(
+            dc.getRocksdbDeleteObsoleteFilesPeriod());
       }
 
       String rocksDbStat = config.getTrimmed(
