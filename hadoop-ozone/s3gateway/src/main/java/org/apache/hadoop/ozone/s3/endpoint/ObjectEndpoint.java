@@ -211,11 +211,11 @@ public class ObjectEndpoint extends EndpointBase {
       }
 
       // Normal put object
-      bucket = getBucket(bucketName);
+//      bucket = getBucket(bucketName);
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(headers.getRequestHeaders());
-      output = bucket.createKey(keyPath, length,
-              replicationConfig, customMetadata);
+//      output = bucket.createKey(keyPath, length,
+//              replicationConfig, customMetadata);
 
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
@@ -223,7 +223,7 @@ public class ObjectEndpoint extends EndpointBase {
       }
 
       output = getClientProtocol().createKey(volume.getName(), bucketName,
-          keyPath, length, replicationConfig, new HashMap<>());
+          keyPath, length, replicationConfig, customMetadata);
       IOUtils.copy(body, output);
 
       getMetrics().incCreateKeySuccess();
