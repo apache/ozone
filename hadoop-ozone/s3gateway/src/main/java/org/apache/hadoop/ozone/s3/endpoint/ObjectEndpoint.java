@@ -890,10 +890,10 @@ public class ObjectEndpoint extends EndpointBase {
 
   void copy(OzoneVolume volume, InputStream src, long srcKeyLen,
       String destKey, String destBucket,
-      ReplicationConfig replication) throws IOException {
+      ReplicationConfig replication, Map<String, String> metadata) throws IOException {
     try (OzoneOutputStream dest = getClientProtocol().createKey(
         volume.getName(), destBucket, destKey, srcKeyLen,
-        replication, new HashMap<>())) {
+        replication, metadata)) {
       IOUtils.copy(src, dest);
     }
   }
@@ -944,7 +944,8 @@ public class ObjectEndpoint extends EndpointBase {
 
       try (OzoneInputStream src = getClientProtocol().getKey(volume.getName(),
           sourceBucket, sourceKey)) {
-        copy(volume, src, sourceKeyLen, destkey, destBucket, replicationConfig);
+        copy(volume, src, sourceKeyLen, destkey, destBucket, replicationConfig,
+                sourceKeyDetails.getMetadata());
       }
 
       final OzoneKeyDetails destKeyDetails = getClientProtocol().getKeyDetails(
