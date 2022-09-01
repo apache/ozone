@@ -113,8 +113,11 @@ public class LegacyBucketHandler extends BucketHandler {
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
         iterator = keyTable.iterator();
 
-    String seekPrefix =
-        OM_KEY_PREFIX + vol + OM_KEY_PREFIX + bucket + OM_KEY_PREFIX;
+    String seekPrefix = OM_KEY_PREFIX +
+        vol +
+        OM_KEY_PREFIX +
+        bucket +
+        OM_KEY_PREFIX;
 
     NSSummary nsSummary = getReconNamespaceSummaryManager()
         .getNSSummary(parentId);
@@ -206,7 +209,6 @@ public class LegacyBucketHandler extends BucketHandler {
       seekPrefix += dirName;
     }
     String[] seekKeys = seekPrefix.split(OM_KEY_PREFIX);
-
     iterator.seek(seekPrefix);
 
     while (iterator.hasNext()) {

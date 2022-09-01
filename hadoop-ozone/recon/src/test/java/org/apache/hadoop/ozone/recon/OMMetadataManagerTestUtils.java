@@ -272,23 +272,9 @@ public final class OMMetadataManagerTestUtils {
                                   long volumeObjectId,
                                   BucketLayout bucketLayout)
       throws IOException {
-    String omKey;
-    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-      omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
-          bucketObjectId, parentObjectId, fileName);
-    } else {
-      omKey = omMetadataManager.getOzoneKey(volume, bucket, key);
-    }
-    omMetadataManager.getKeyTable(bucketLayout).put(omKey,
-        new OmKeyInfo.Builder()
-            .setBucketName(bucket)
-            .setVolumeName(volume)
-            .setKeyName(key)
-            .setReplicationConfig(
-                StandaloneReplicationConfig.getInstance(ONE))
-            .setObjectID(objectID)
-            .setParentObjectID(parentObjectId)
-            .build());
+    writeKeyToOm(omMetadataManager, key, bucket, volume,
+        fileName, objectID, parentObjectId, bucketObjectId,
+        volumeObjectId, 0, bucketLayout);
   }
 
   public static void writeDirToOm(OMMetadataManager omMetadataManager,
