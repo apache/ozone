@@ -88,6 +88,8 @@ public class TestDiskBalancer {
         storageClient.getDiskBalancerReport(2);
 
     assertEquals(2, reportProtoList.size());
+//    System.out.println("YYYYY" + reportProtoList.get(0).getCurrentVolumeDensitySum());
+//    System.out.println("YYYYY" + reportProtoList.get(1).getCurrentVolumeDensitySum());
     Assert.assertTrue(
         reportProtoList.get(0).getCurrentVolumeDensitySum()
         >= reportProtoList.get(1).getCurrentVolumeDensitySum());

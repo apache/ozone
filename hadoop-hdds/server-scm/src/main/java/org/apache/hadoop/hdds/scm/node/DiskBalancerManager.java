@@ -111,39 +111,26 @@ public class DiskBalancerManager {
     }
 
     // Filter Running Status by default
-    HddsProtos.DiskBalancerRunningStatus filterStatus =
-        status.orElse(HddsProtos.DiskBalancerRunningStatus.RUNNING);
+    HddsProtos.DiskBalancerRunningStatus filterStatus = status.orElse(null);
 
-    List<DatanodeDetails> finalFilterDns = filterDns;
-
-    return nodeManager.getAllNodes().stream()
-        .filter(dn -> shouldReturnDatanode(finalFilterDns, filterStatus, dn))
-        .map(dn -> {
-          double volumeDensitySum =
-              getVolumeDataDensitySumForDatanodeDetails(dn);
-          HddsProtos.DiskBalancerRunningStatus runningStatus =
-              getRunningStatus(dn);
-          HddsProtos.DatanodeDiskBalancerInfoProto.Builder builder =
-              HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
-                  .setNode(dn.toProto(clientVersion))
-                  .setCurrentVolumeDensitySum(volumeDensitySum)
-                  .setRunningStatus(getRunningStatus(dn));
-          if (runningStatus != HddsProtos.DiskBalancerRunningStatus.UNKNOWN) {
-            builder.setDiskBalancerConf(statusMap.get(dn)
-                .getDiskBalancerConfiguration().toProtobufBuilder());
-          }
-          return builder.build();
-        }).collect(Collectors.toList());
+    if (filterDns != null) {
+      return filterDns.stream()
+          .filter(dn -> shouldReturnDatanode(filterStatus, dn))
+          .map(nodeManager::getDatanodeInfo)
+          .map(dn -> getInfoProto(dn, clientVersion))
+          .collect(Collectors.toList());
+    } else {
+      return nodeManager.getAllNodes().stream()
+          .filter(dn -> shouldReturnDatanode(filterStatus, dn))
+          .map(dn -> getInfoProto((DatanodeInfo)dn, clientVersion))
+          .collect(Collectors.toList());
+    }
   }
 
-  private boolean shouldReturnDatanode(List<DatanodeDetails> hosts,
+  private boolean shouldReturnDatanode(
       HddsProtos.DiskBalancerRunningStatus status,
       DatanodeDetails datanodeDetails) {
     boolean shouldReturn = true;
-    // If dn not in specified hosts, do not return
-    if (hosts != null && !hosts.isEmpty() && !hosts.contains(datanodeDetails)) {
-      shouldReturn = false;
-    }
     // If status specified, do not return if status not match.
     if (status != null && getRunningStatus(datanodeDetails) != status) {
       shouldReturn = false;
@@ -151,6 +138,23 @@ public class DiskBalancerManager {
     return shouldReturn;
   }
 
+  private HddsProtos.DatanodeDiskBalancerInfoProto getInfoProto(
+      DatanodeInfo dn, int clientVersion) {
+    double volumeDensitySum =
+        getVolumeDataDensitySumForDatanodeDetails(dn);
+    HddsProtos.DiskBalancerRunningStatus runningStatus =
+        getRunningStatus(dn);
+    HddsProtos.DatanodeDiskBalancerInfoProto.Builder builder =
+        HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
+            .setNode(dn.toProto(clientVersion))
+            .setCurrentVolumeDensitySum(volumeDensitySum)
+            .setRunningStatus(getRunningStatus(dn));
+    if (runningStatus != HddsProtos.DiskBalancerRunningStatus.UNKNOWN) {
+      builder.setDiskBalancerConf(statusMap.get(dn)
+          .getDiskBalancerConfiguration().toProtobufBuilder());
+    }
+    return builder.build();
+  }
   /**
    * Get volume density for a specific DatanodeDetails node.
    *

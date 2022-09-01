@@ -93,8 +93,7 @@ public class TestDiskBalancerManager {
             Optional.empty(),
             ClientVersion.CURRENT_VERSION);
 
-    // Only retrun 2 running dns
-    Assertions.assertEquals(2, statusProtoList.size());
+    Assertions.assertEquals(3, statusProtoList.size());
 
     // Simulate users asking status of 1 datanodes
     dns = nodeManager.getAllNodes().stream().map(
