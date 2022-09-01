@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeAdminErrorResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeUsageInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerOpResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesRequestProto;
@@ -665,6 +666,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
               request.getDatanodeDiskBalancerInfoRequest(),
               request.getVersion()))
           .build();
+      case DatanodeDiskBalancerOp:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setDatanodeDiskBalancerOpResponse(getDatanodeDiskBalancerOp(
+                request.getDatanodeDiskBalancerOpRequest()))
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -1189,5 +1197,44 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return DatanodeDiskBalancerInfoResponseProto.newBuilder()
         .addAllInfo(infoProtoList)
         .build();
+  }
+
+  public DatanodeDiskBalancerOpResponseProto getDatanodeDiskBalancerOp(
+      StorageContainerLocationProtocolProtos.
+          DatanodeDiskBalancerOpRequestProto request)
+      throws IOException {
+    List<DatanodeAdminError> errors;
+    switch (request.getOpType()) {
+    case start:
+      errors = impl.startDiskBalancer(
+          Optional.of(request.getConf().getThreshold()),
+          Optional.of(request.getConf().getDiskBandwidthInMB()),
+          Optional.of(request.getConf().getParallelThread()),
+          Optional.of(request.getHostsList()));
+      break;
+    case update:
+      errors = impl.updateDiskBalancerConfiguration(
+          Optional.of(request.getConf().getThreshold()),
+          Optional.of(request.getConf().getDiskBandwidthInMB()),
+          Optional.of(request.getConf().getParallelThread()),
+          Optional.of(request.getHostsList()));
+      break;
+    case stop:
+      errors = impl.stopDiskBalancer(Optional.of(request.getHostsList()));
+      break;
+    default:
+      errors = new ArrayList<>();
+    }
+
+    DatanodeDiskBalancerOpResponseProto.Builder response =
+        DatanodeDiskBalancerOpResponseProto.newBuilder();
+    for (DatanodeAdminError e : errors) {
+      DatanodeAdminErrorResponseProto.Builder error =
+          DatanodeAdminErrorResponseProto.newBuilder();
+      error.setHost(e.getHostname());
+      error.setError(e.getError());
+      response.addFailedHosts(error);
+    }
+    return response.build();
   }
 }

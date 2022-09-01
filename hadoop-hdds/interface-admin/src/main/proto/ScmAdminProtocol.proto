@@ -357,7 +357,7 @@ enum DatanodeDiskBalancerOpType{
 }
 
 message DatanodeDiskBalancerOpRequestProto {
-  required DatanodeDiskBalancerOpType infoType = 1;
+  required DatanodeDiskBalancerOpType opType = 1;
   repeated string hosts = 2;
   optional DiskBalancerConfigurationProto conf = 3;
 }
