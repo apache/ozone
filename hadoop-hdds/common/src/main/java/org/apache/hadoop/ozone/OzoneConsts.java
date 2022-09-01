@@ -391,7 +391,7 @@ public final class OzoneConsts {
 
   public static final int S3_SECRET_KEY_MIN_LENGTH = 8;
 
-  public static final int S3_REQUEST_HEADER_METADATA_SIZE_LIMIT = 2;
+  public static final int S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB = 2;
 
   //GDPR
   public static final String GDPR_FLAG = "gdprEnabled";

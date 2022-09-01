@@ -49,7 +49,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Map;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.OptionalLong;
@@ -891,7 +890,8 @@ public class ObjectEndpoint extends EndpointBase {
   void copy(OzoneVolume volume, InputStream src, long srcKeyLen,
       String destKey, String destBucket,
       ReplicationConfig replication, Map<String, String> metadata) throws IOException {
-    try (OzoneOutputStream dest = getClientProtocol().createKey(
+    try (OzoneOutputStream dest =
+                 getClientProtocol().createKey(
         volume.getName(), destBucket, destKey, srcKeyLen,
         replication, metadata)) {
       IOUtils.copy(src, dest);
