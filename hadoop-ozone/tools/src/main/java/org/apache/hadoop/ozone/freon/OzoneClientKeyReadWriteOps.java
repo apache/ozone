@@ -1,3 +1,19 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with this
+ * work for additional information regarding copyright ownership.  The ASF
+ * licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
 package org.apache.hadoop.ozone.freon;
 
 
@@ -14,8 +30,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
-import java.util.*;
-import java.util.concurrent.*;
+//import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.Random;
+
+//import java.util.concurrent.*;
+/**
+ * Ozone data generator and performance test tool.
+ */
 
 @CommandLine.Command(name = "ockrw",
         aliases = "ozone-client-key-read-write-ops",
@@ -32,8 +54,8 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   private String time;
 
   @CommandLine.Option(names = {"-v", "--volume"},
-          description = "Name of the volume which contains the test data. Will be"
-                  + " created if missing.",
+          description = "Name of the volume which contains the test data. " +
+                  "Will be created if missing.",
           defaultValue = "vol1")
   private String volumeName;
 
@@ -43,7 +65,8 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   private String bucketName;
 
   @CommandLine.Option(names = {"-m", "--read-metadata-only"},
-          description = "If only read key's metadata. Supported values are Y, F.",
+          description = "If only read key's metadata. " +
+                  "Supported values are Y, F.",
           defaultValue = "false")
   private boolean readMetadataOnly;
 
@@ -68,23 +91,27 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   private int endIndexForWrite;
 
   @CommandLine.Option(names = {"-g", "--size"},
-          description = "Generated data size (in bytes) of each key/file to be " +
+          description = "Generated data size (in bytes) of " +
+                  "each key/file to be " +
                   "written.",
           defaultValue = "256")
   private int wSizeInBytes;
 
   @CommandLine.Option(names = {"--write-range-keys"},
-          description = "Generate the range of keys based on option start-index-for-write and end-index-for-write.",
+          description = "Generate the range of keys based on option" +
+                  " start-index-for-write and end-index-for-write.",
           defaultValue = "false")
   private boolean writeRangeKeys;
 
   @CommandLine.Option(names = {"--keySorted"},
-          description = "Generated sorted key or not. The key name will be generated via md5 hash if choose to use unsorted key.",
+          description = "Generated sorted key or not. The key name " +
+                  "will be generated via md5 hash if choose to use unsorted key.",
           defaultValue = "false")
   private boolean keySorted;
 
   @CommandLine.Option(names = {"--mix-workload"},
-          description = "Set to True if you would like to generate mix workload (Read and Write).",
+          description = "Set to True if you would like to " +
+                  "generate mix workload (Read and Write).",
           defaultValue = "false")
   private boolean ifMixWorkload;
 
@@ -111,8 +138,8 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   private static final Logger LOG =
           LoggerFactory.getLogger(OzoneClientKeyReadWriteOps.class);
 
-  private final String READ_TASK = "READ_TASK";
-  private final String WRITE_TASK = "WRITE_TASK";
+  private final String READTASK = "READ_TASK";
+  private final String WRITETASK = "WRITE_TASK";
 
 
   @Override
@@ -134,14 +161,18 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
 //      intToMd5Hash.put(i, encodedStr.substring(0,7));
 //    }
     int startIdx = 0, endIdx = 0;
-    switch (decideReadOrWriteTask()){
-      case READ_TASK:
+    switch (decideReadOrWriteTask()) {
+      case READTASK:
         startIdx = startIndexForRead;
         endIdx = endIndexForRead;
         break;
-      case WRITE_TASK:
+      case WRITETASK:
         startIdx = startIndexForWrite;
         endIdx = endIndexForWrite;
+        break;
+      default:
+        startIdx = 0;
+        endIdx = 0;
         break;
     }
 
@@ -158,10 +189,11 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     return null;
   }
 
-  public void readWriteKeys(long counter) throws Exception{
-    List<Future<Object>> readWriteResults = timer.time(() -> {
-      List<Future<Object>> readResults = null;
-      if (!ifMixWorkload){
+  public void readWriteKeys(long counter) throws Exception {
+//    List<Future<Object>> readWriteResults = timer.time(() -> {
+    timer.time(() -> {
+//      List<Future<Object>> readResults = null;
+      if (!ifMixWorkload) {
         if (endIndexForRead - startIndexForRead > 0) {
           processReadTasks();
         }
@@ -169,39 +201,41 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
           processWriteTasks();
         }
 
-      }else{
+      } else {
         switch (decideReadOrWriteTask()){
-          case READ_TASK:
+          case READTASK:
             processReadTasks();
             break;
-          case WRITE_TASK:
+          case WRITETASK:
             processWriteTasks();
+            break;
+          default:
             break;
         }
       }
-      return readResults;
+//      return readResults;
     });
   }
 
-  public void processReadTasks() throws Exception{
-      if (readMetadataOnly) {
-          ozbk.getKey(keyName);
-      }else {
-          byte[] data = new byte[wSizeInBytes];
-          OzoneInputStream introStream = ozbk.readKey(keyName);
-          introStream.read(data);
-          introStream.close();
-      }
+  public void processReadTasks() throws Exception {
+    if (readMetadataOnly) {
+        ozbk.getKey(keyName);
+    } else {
+        byte[] data = new byte[wSizeInBytes];
+        OzoneInputStream introStream = ozbk.readKey(keyName);
+        introStream.read(data);
+        introStream.close();
+    }
   }
 
   public String generateMd5ObjectName(int number) {
     String encodedStr = DigestUtils.md5Hex(String.valueOf(number));
-    String md5Hash = encodedStr.substring(0,7);
+    String md5Hash = encodedStr.substring(0, 7);
     return getPrefix() + "/" + md5Hash;
   }
-  public void processWriteTasks() throws Exception{
+  public void processWriteTasks() throws Exception {
     if (writeRangeKeys) {
-      for (int i = startIndexForWrite; i < endIndexForWrite + 1; i++){
+      for (int i = startIndexForWrite; i < endIndexForWrite + 1; i++) {
         createKeyAndWrite(generateKeyName(i));
       }
     } else {
@@ -209,38 +243,38 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     }
   }
 
-  public void createKeyAndWrite(String keyName) throws Exception{
-    OzoneOutputStream out = ozbk.createKey(keyName, wSizeInBytes);
+  public void createKeyAndWrite(String key) throws Exception{
+    OzoneOutputStream out = ozbk.createKey(key, wSizeInBytes);
     out.write(keyContent);
     out.flush();
     out.close();
   }
 
   public String generateKeyName(int number) {
-    String keyName;
+    String key;
     if (keySorted) {
-      keyName = generateObjectName(number);
+      key = generateObjectName(number);
     } else {
-      keyName = generateMd5ObjectName(number);
+      key = generateMd5ObjectName(number);
     }
-    return keyName;
+    return key;
   }
 
-  public String decideReadOrWriteTask( ) {
-    if (!ifMixWorkload){
+  public String decideReadOrWriteTask() {
+    if (!ifMixWorkload) {
       if (endIndexForRead - startIndexForRead > 0) {
-        return READ_TASK;
-      }else if ((endIndexForWrite - startIndexForWrite) > 0) {
-        return WRITE_TASK;
+        return READTASK;
+      } else if ((endIndexForWrite - startIndexForWrite) > 0) {
+        return WRITETASK;
       }
     }
     //mix workload
     Random r = new Random();
     int tmp = r.nextInt(100) + 1; // 1 ~ 100
     if (tmp < percentageRead) {
-      return READ_TASK;
-    }else{
-      return WRITE_TASK;
+      return READTASK;
+    } else {
+      return WRITETASK;
     }
   }
 
