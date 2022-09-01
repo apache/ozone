@@ -94,8 +94,10 @@ public class TestS3GetSecretRequest {
   private static final String USER_BOB_SHORT = "bob";
   private static final String ACCESS_ID_BOB =
       OMMultiTenantManager.getDefaultAccessId(TENANT_ID, USER_BOB_SHORT);
+  private static final String USER_CAROL = "carol@EXAMPLE.COM";
 
   private UserGroupInformation ugiAlice;
+  private UserGroupInformation ugiCarol;
 
   private OMMultiTenantManager omMultiTenantManager;
   private Tenant tenant;
@@ -109,6 +111,9 @@ public class TestS3GetSecretRequest {
         "DEFAULT");
     ugiAlice = UserGroupInformation.createRemoteUser(USER_ALICE);
     Assert.assertEquals("alice", ugiAlice.getShortUserName());
+
+    ugiCarol = UserGroupInformation.createRemoteUser(USER_CAROL);
+    Assert.assertEquals("carol", ugiCarol.getShortUserName());
 
     ozoneManager = mock(OzoneManager.class);
 
@@ -196,7 +201,7 @@ public class TestS3GetSecretRequest {
   public void testGetSecretOfAnotherUserAsAdmin() throws IOException {
 
     // This effectively makes alice an admin.
-    when(ozoneManager.isAdmin(ugiAlice)).thenReturn(true);
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
 
     // 1. Get secret of "bob@EXAMPLE.COM" (as an admin).
     long txLogIndex = 1;
@@ -237,7 +242,7 @@ public class TestS3GetSecretRequest {
   public void testGetOwnSecretAsNonAdmin() throws IOException {
 
     // This effectively makes alice a regular user.
-    when(ozoneManager.isAdmin(ugiAlice)).thenReturn(false);
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(false);
 
     // 1. Get secret of "alice" (as herself).
     long txLogIndex = 1;
@@ -312,7 +317,7 @@ public class TestS3GetSecretRequest {
   public void testGetSecretOfAnotherUserAsNonAdmin() throws IOException {
 
     // This effectively makes alice a regular user.
-    when(ozoneManager.isAdmin(ugiAlice)).thenReturn(false);
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(false);
 
     // Get secret of "bob@EXAMPLE.COM" (as another regular user).
     // Run preExecute, expect USER_MISMATCH
@@ -330,10 +335,47 @@ public class TestS3GetSecretRequest {
   }
 
   @Test
+  public void testGetSecretOfAnotherUserAsOzoneAdmin() throws IOException {
+    // This effectively makes alice an admin.
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
+
+
+    int txLogIndex = 1;
+
+    S3GetSecretRequest s3GetSecretRequest = new S3GetSecretRequest(
+        new S3GetSecretRequest(
+            s3GetSecretRequest(USER_CAROL)
+        ).preExecute(ozoneManager));
+
+    // Run validateAndUpdateCache
+    OMClientResponse omClientResponse =
+            s3GetSecretRequest.validateAndUpdateCache(ozoneManager,
+                    txLogIndex, ozoneManagerDoubleBufferHelper);
+
+    // Check response type and cast
+    Assert.assertTrue(omClientResponse instanceof S3GetSecretResponse);
+    final S3GetSecretResponse s3GetSecretResponse =
+        (S3GetSecretResponse) omClientResponse;
+
+    // Check response
+    final S3SecretValue s3SecretValue = s3GetSecretResponse.getS3SecretValue();
+    Assert.assertEquals(USER_CAROL, s3SecretValue.getKerberosID());
+    final String awsSecret1 = s3SecretValue.getAwsSecret();
+    Assert.assertNotNull(awsSecret1);
+
+    final GetS3SecretResponse getS3SecretResponse =
+        s3GetSecretResponse.getOMResponse().getGetS3SecretResponse();
+    // The secret inside should be the same.
+    final S3Secret s3Secret1 = getS3SecretResponse.getS3Secret();
+    Assert.assertEquals(USER_CAROL, s3Secret1.getKerberosID());
+    Assert.assertEquals(awsSecret1, s3Secret1.getAwsSecret());
+  }
+
+  @Test
   public void testGetSecretWithTenant() throws IOException {
 
     // This effectively makes alice an admin.
-    when(ozoneManager.isAdmin(ugiAlice)).thenReturn(true);
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
     // Make alice a non-delegated admin
     when(omMultiTenantManager.isTenantAdmin(ugiAlice, TENANT_ID, false))
         .thenReturn(true);

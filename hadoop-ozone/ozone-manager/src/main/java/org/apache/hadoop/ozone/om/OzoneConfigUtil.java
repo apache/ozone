@@ -69,15 +69,19 @@ public final class OzoneConfigUtil {
     return ozAdmins;
   }
 
-  static Collection<String> getOzoneAdminsGroupsFromConfig(OzoneConfiguration conf) {
+  static Collection<String> getOzoneAdminsGroupsFromConfig(
+      OzoneConfiguration conf) {
     return conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS);
   }
 
-  static Collection<String> getS3AdminsGroupsFromConfig(OzoneConfiguration conf) {
+  static Collection<String> getS3AdminsGroupsFromConfig(
+      OzoneConfiguration conf) {
     Collection<String> s3AdminsGroup =
             conf.getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS_GROUPS);
-    if (s3AdminsGroup.isEmpty() && conf.getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS).isEmpty()) {
-      s3AdminsGroup = conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS);
+    if (s3AdminsGroup.isEmpty()
+            && conf.getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS).isEmpty()) {
+      s3AdminsGroup = conf
+              .getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS);
     }
     return s3AdminsGroup;
   }
