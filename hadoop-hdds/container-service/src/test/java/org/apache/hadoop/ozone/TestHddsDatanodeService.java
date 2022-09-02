@@ -20,11 +20,7 @@ package org.apache.hadoop.ozone;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Arrays;
-import java.util.UUID;
+import java.util.*;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
@@ -170,12 +166,15 @@ public class TestHddsDatanodeService {
         assertTrue(testFile.exists());
 
         ListIterator<File> tmpDirIter = manager.getDeleteLeftovers();
+        List<File> tmpDirFileList = new LinkedList<>();
         boolean testFileExistsUnderTmp = false;
 
         while (tmpDirIter.hasNext()) {
-          if (tmpDirIter.next().equals(testFile)) {
-            testFileExistsUnderTmp = true;
-          }
+          tmpDirFileList.add(tmpDirIter.next());
+        }
+
+        if (tmpDirFileList.contains(testFile)) {
+          testFileExistsUnderTmp = true;
         }
         assertTrue(testFileExistsUnderTmp);
       }

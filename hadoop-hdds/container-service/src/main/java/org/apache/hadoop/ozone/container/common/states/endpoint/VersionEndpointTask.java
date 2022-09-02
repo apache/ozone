@@ -54,17 +54,6 @@ public class VersionEndpointTask implements
     this.ozoneContainer = container;
   }
 
-  public void cleanTmpDir() {
-    MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
-    for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
-        volumeSet.getVolumesList())) {
-      CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
-      if (!cleanUpManager.tmpDirIsEmpty()) {
-        cleanUpManager.cleanTmpDir();
-      }
-    }
-  }
-
   /**
    * Computes a result, or throws an exception if unable to do so.
    *
@@ -107,12 +96,6 @@ public class VersionEndpointTask implements
             rpcEndPoint.getState().getNextState();
         rpcEndPoint.setState(nextState);
         rpcEndPoint.zeroMissedCount();
-
-        // Clean /tmp/container_delete_service,
-        // if SchemaV3 is enabled.
-        if (CleanUpManager.checkContainerSchemaV3Enabled(configuration)) {
-          cleanTmpDir();
-        }
       } else {
         LOG.debug("Cannot execute GetVersion task as endpoint state machine " +
             "is in {} state", rpcEndPoint.getState());
@@ -141,6 +124,13 @@ public class VersionEndpointTask implements
         boolean result = StorageVolumeUtil.checkVolume(volume,
             scmId, clusterId, configuration, LOG,
             ozoneContainer.getDbVolumeSet());
+
+        // Check and clean /tmp/container_delete_service
+        HddsVolume hddsVolume = (HddsVolume) volume;
+        CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
+        if (!cleanUpManager.tmpDirIsEmpty()) {
+          cleanUpManager.cleanTmpDir();
+        }
         if (!result) {
           volumeSet.failVolume(volume.getStorageDir().getPath());
         }

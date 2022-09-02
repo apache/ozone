@@ -372,18 +372,22 @@ public class TestContainerPersistence {
         new File(container2Data.getContainerPath());
 
     ListIterator<File> tmpDirIter = cleanUpManager.getDeleteLeftovers();
+    List<File> tmpDirFileList = new LinkedList<>();
     boolean container1ExistsUnderTmpDir = false;
     boolean container2ExistsUnderTmpDir = false;
 
     while (tmpDirIter.hasNext()) {
-      if (tmpDirIter.next().equals(container1File)) {
-        container1ExistsUnderTmpDir = true;
-      }
-
-      if (tmpDirIter.next().equals(container2File)) {
-        container2ExistsUnderTmpDir = true;
-      }
+      tmpDirFileList.add(tmpDirIter.next());
     }
+
+    if (tmpDirFileList.contains(container1File)) {
+      container1ExistsUnderTmpDir = true;
+    }
+
+    if (tmpDirFileList.contains(container2File)) {
+      container2ExistsUnderTmpDir = true;
+    }
+
     assertTrue(container1ExistsUnderTmpDir);
     assertTrue(container2ExistsUnderTmpDir);
 
