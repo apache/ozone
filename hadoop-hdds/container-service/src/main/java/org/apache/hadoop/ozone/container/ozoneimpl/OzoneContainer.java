@@ -148,7 +148,8 @@ public class OzoneContainer {
         new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
             context, VolumeType.DB_VOLUME, volumeChecker);
     if (SchemaV3.isFinalizedAndEnabled(config)) {
-      HddsVolumeUtil.loadAllHddsVolumeDbStore(volumeSet, dbVolumeSet, LOG);
+      HddsVolumeUtil.loadAllHddsVolumeDbStore(
+          volumeSet, dbVolumeSet, false, LOG);
     }
 
     long recoveringContainerTimeout = config.getTimeDuration(
