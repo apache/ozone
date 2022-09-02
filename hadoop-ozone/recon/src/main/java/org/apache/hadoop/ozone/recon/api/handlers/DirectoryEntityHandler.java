@@ -94,10 +94,12 @@ public class DirectoryEntityHandler extends EntityHandler {
       // for the subdirName we need the filename, not the key name
       Path subdirPath = Paths.get(subdirNSSummary.getDirName());
       Path subdirFileName = subdirPath.getFileName();
-      if (subdirFileName == null) {
+      String subdirName;
+      if (subdirFileName != null) {
+        subdirName = subdirFileName.toString();
+      } else {
         throw new NullPointerException("Subdirectory file name is null.");
       }
-      String subdirName = subdirFileName.toString();
       // build the path for subdirectory
       String subpath = BucketHandler
               .buildSubpath(getNormalizedPath(), subdirName);
