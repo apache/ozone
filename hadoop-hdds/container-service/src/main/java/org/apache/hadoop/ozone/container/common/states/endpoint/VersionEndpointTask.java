@@ -56,8 +56,8 @@ public class VersionEndpointTask implements
 
   public void cleanTmpDir() {
     MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
-    for (StorageVolume storageVolume : volumeSet.getVolumesList()) {
-      HddsVolume hddsVolume = (HddsVolume) storageVolume;
+    for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
+        volumeSet.getVolumesList())) {
       CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
       if (!cleanUpManager.tmpDirIsEmpty()) {
         cleanUpManager.cleanTmpDir();

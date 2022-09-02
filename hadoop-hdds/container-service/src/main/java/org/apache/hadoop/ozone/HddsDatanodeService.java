@@ -127,8 +127,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   public void cleanTmpDir() {
     MutableVolumeSet volumeSet =
         getDatanodeStateMachine().getContainer().getVolumeSet();
-    for (StorageVolume storageVolume : volumeSet.getVolumesList()) {
-      HddsVolume hddsVolume = (HddsVolume) storageVolume;
+    for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
+        volumeSet.getVolumesList())) {
       CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
       if (!cleanUpManager.tmpDirIsEmpty()) {
         cleanUpManager.cleanTmpDir();

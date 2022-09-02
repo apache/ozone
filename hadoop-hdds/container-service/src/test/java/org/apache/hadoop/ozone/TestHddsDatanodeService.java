@@ -170,14 +170,14 @@ public class TestHddsDatanodeService {
         assertTrue(testFile.exists());
 
         ListIterator<File> tmpDirIter = manager.getDeleteLeftovers();
-        boolean testFileExists = false;
+        boolean testFileExistsUnderTmp = false;
 
         while (tmpDirIter.hasNext()) {
           if (tmpDirIter.next().equals(testFile)) {
-            testFileExists = true;
+            testFileExistsUnderTmp = true;
           }
         }
-        assertTrue(testFileExists);
+        assertTrue(testFileExistsUnderTmp);
       }
       conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
           Arrays.toString(tempHddsVolumes));

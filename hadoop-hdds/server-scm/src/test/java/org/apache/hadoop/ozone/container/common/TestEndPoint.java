@@ -20,6 +20,7 @@ import java.io.File;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.UUID;
 
@@ -55,10 +56,12 @@ import org.apache.hadoop.ozone.container.common.states.endpoint.RegisterEndpoint
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
+import org.apache.hadoop.thirdparty.com.google.common.io.Files;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.apache.hadoop.util.Time;
@@ -69,8 +72,10 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createEndpoint;
+import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import static org.junit.Assume.assumeTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -162,6 +167,62 @@ public class TestEndPoint {
 
       // Now rpcEndpoint should remember the version it got from SCM
       Assertions.assertNotNull(rpcEndPoint.getVersion());
+    }
+  }
+
+  @Test
+  public void testCleanTmpDirOnVersionTaskCall() throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf();
+
+    // enable SchemaV3
+    ContainerTestUtils.enableSchemaV3(conf);
+    assumeTrue(CleanUpManager.checkContainerSchemaV3Enabled(conf));
+
+    conf.setFromObject(new ReplicationConfig().setPort(0));
+    try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
+        serverAddress, 1000)) {
+      DatanodeDetails datanodeDetails = randomDatanodeDetails();
+      OzoneContainer ozoneContainer = new OzoneContainer(
+          datanodeDetails, conf, getContext(datanodeDetails), null);
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
+
+      String clusterId = scmServerImpl.getClusterId();
+
+      // write some data before calling versionTask.call()
+      MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
+      for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
+          volumeSet.getVolumesList())) {
+        hddsVolume.format(clusterId);
+
+        CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
+
+        // Write to tmp dir under volume
+        File testFile = new File(cleanUpManager
+            .getTmpDirPath() + "/testFile.txt");
+        Files.touch(testFile);
+        Assert.assertTrue(testFile.exists());
+
+        ListIterator<File> tmpDirIter = cleanUpManager.getDeleteLeftovers();
+        boolean testFileExistsUnderTmp = false;
+
+        while (tmpDirIter.hasNext()) {
+          if (tmpDirIter.next().equals(testFile)) {
+            testFileExistsUnderTmp = true;
+          }
+        }
+        Assert.assertTrue(testFileExistsUnderTmp);
+      }
+
+      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
+          conf, ozoneContainer);
+      versionTask.call();
+
+      // assert that tmp dir is empty
+      for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
+          volumeSet.getVolumesList())) {
+        CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
+        Assert.assertTrue(cleanUpManager.tmpDirIsEmpty());
+      }
     }
   }
 
