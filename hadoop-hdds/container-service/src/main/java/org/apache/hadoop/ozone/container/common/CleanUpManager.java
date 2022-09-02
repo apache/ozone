@@ -137,10 +137,14 @@ public class CleanUpManager {
   public ListIterator<File> getDeleteLeftovers() {
     List<File> leftovers = new ArrayList<>();
 
-    File tmpDir = new File(tmpDirPath.toString());
+    try {
+      File tmpDir = new File(tmpDirPath.toString());
 
-    for (File file : tmpDir.listFiles()) {
-      leftovers.add(file);
+      for (File file : tmpDir.listFiles()) {
+        leftovers.add(file);
+      }
+    } catch (NullPointerException ex) {
+      LOG.error("Tmp directory is null, path doesn't exist", ex);
     }
 
     ListIterator<File> leftoversListIt = leftovers.listIterator();

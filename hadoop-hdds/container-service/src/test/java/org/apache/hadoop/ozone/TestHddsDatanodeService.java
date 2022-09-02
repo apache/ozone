@@ -23,6 +23,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Arrays;
 import java.util.UUID;
 
 import org.apache.hadoop.fs.FileUtil;
@@ -70,7 +71,7 @@ public class TestHddsDatanodeService {
   private final String clusterId = UUID.randomUUID().toString();
   private final OzoneConfiguration conf = new OzoneConfiguration();
   private final String schemaVersion;
-  private final int scmServerCount = 1;
+  private static final int SCM_SERVER_COUNT = 1;
 
   private File testDir;
   private HddsDatanodeService service;
@@ -97,7 +98,7 @@ public class TestHddsDatanodeService {
     scmServers = new ArrayList<>();
     mockServers = new ArrayList<>();
 
-    for (int x = 0; x < scmServerCount; x++) {
+    for (int x = 0; x < SCM_SERVER_COUNT; x++) {
       int port = SCMTestUtils.getReuseableAddress().getPort();
       String address = "127.0.0.1";
       serverAddresses.add(address + ":" + port);
@@ -178,7 +179,8 @@ public class TestHddsDatanodeService {
         }
         assertTrue(testFileExists);
       }
-      conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, tempHddsVolumes.toString());
+      conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+          Arrays.toString(tempHddsVolumes));
     }
 
     service.stop();
