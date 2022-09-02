@@ -47,6 +47,8 @@ import java.util.Random;
         showDefaultValues = true)
 public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
         implements Callable<Void> {
+  private static final Logger LOG =
+          LoggerFactory.getLogger(OzoneClientKeyReadWriteOps.class);
 
   @CommandLine.Option(names = {"-v", "--volume"},
           description = "Name of the volume which contains the test data. " +
@@ -188,26 +190,29 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
 //    List<Future<Object>> readWriteResults = timer.time(() -> {
     timer.time(() -> {
 //      List<Future<Object>> readResults = null;
-      if (!ifMixWorkload) {
-        if (endIndexForRead - startIndexForRead > 0) {
-          processReadTasks();
-        }
-        if (endIndexForWrite - startIndexForWrite > 0) {
-          processWriteTasks();
-        }
-
-      } else {
-        switch (decideReadOrWriteTask()){
-          case READTASK:
-            processReadTasks();
-            break;
-          case WRITETASK:
-            processWriteTasks();
-            break;
-          default:
-            break;
-        }
-      }
+              try {
+                if (!ifMixWorkload) {
+                  if (endIndexForRead - startIndexForRead > 0) {
+                    processReadTasks();
+                  }
+                  if (endIndexForWrite - startIndexForWrite > 0) {
+                    processWriteTasks();
+                  }
+                } else {
+                  switch (decideReadOrWriteTask()) {
+                    case READTASK:
+                      processReadTasks();
+                      break;
+                    case WRITETASK:
+                      processWriteTasks();
+                      break;
+                    default:
+                      break;
+                  }
+                }
+            } catch (Exception ex) {
+                LOG.error(ex.getMessage());
+            }
 //      return readResults;
     });
   }
