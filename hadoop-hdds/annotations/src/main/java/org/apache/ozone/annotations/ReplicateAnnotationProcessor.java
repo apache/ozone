@@ -20,6 +20,8 @@ package org.apache.ozone.annotations;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.annotation.processing.SupportedSourceVersion;
+import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
@@ -35,6 +37,7 @@ import java.util.concurrent.TimeoutException;
  * TimeoutException.
  */
 @SupportedAnnotationTypes("org.apache.hadoop.hdds.scm.metadata.Replicate")
+@SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class ReplicateAnnotationProcessor extends AbstractProcessor {
 
   private static final String ANNOTATION_SIMPLE_NAME = "Replicate";
