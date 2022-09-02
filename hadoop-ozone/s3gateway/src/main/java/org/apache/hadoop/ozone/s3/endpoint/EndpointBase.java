@@ -267,7 +267,7 @@ public abstract class EndpointBase implements Auditor {
     Set<String> customMetadataKeys = requestHeaders.keySet().stream()
             .filter(k -> {
               if (k.startsWith(CUSTOM_METADATA_HEADER_PREFIX) &&
-                      !excludeMetadataFields.contains(k)) {
+                      !excludeMetadataFields.contains(k.substring(CUSTOM_METADATA_HEADER_PREFIX.length()))) {
                 return true;
               }
               return false;
