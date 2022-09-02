@@ -46,7 +46,6 @@ import org.apache.commons.compress.compressors.CompressorInputStream;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -54,7 +53,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.mockito.Mockito;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.compress.compressors.CompressorStreamFactory.GZIP;
@@ -174,7 +172,6 @@ public class TestTarContainerPacker {
     writeDescriptor(sourceContainer);
 
     Path targetFile = TEMP_DIR.resolve("container.tar.gz");
-    long containerId = sourceContainerData.getContainerID();
 
     //WHEN: pack it
     try (FileOutputStream output = new FileOutputStream(targetFile.toFile())) {

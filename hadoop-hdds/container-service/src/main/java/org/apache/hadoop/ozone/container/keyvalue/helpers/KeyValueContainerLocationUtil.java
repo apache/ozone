@@ -56,7 +56,7 @@ public final class KeyValueContainerLocationUtil {
    * .container file will be stored.
    */
   public static File getContainerMetaDataPath(String containerBaseDir) {
-    String containerMetaDataPath = containerBaseDir+ File.separator +
+    String containerMetaDataPath = containerBaseDir + File.separator +
         OzoneConsts.CONTAINER_META_PATH;
     return new File(containerMetaDataPath);
   }

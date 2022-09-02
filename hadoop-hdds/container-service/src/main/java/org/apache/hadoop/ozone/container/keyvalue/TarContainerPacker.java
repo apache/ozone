@@ -44,11 +44,8 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
-import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
@@ -78,7 +75,6 @@ public class TarContainerPacker
       throws IOException {
     KeyValueContainerData containerData = container.getContainerData();
     long containerId = containerData.getContainerID();
-    HddsVolume hddsVolume = containerData.getVolume();
 
     Path containerUntarDir = tmpDir.resolve(String.valueOf(containerId));
     if (containerUntarDir.toFile().exists()) {
@@ -89,6 +85,9 @@ public class TarContainerPacker
     Path chunksRoot = getChunkPath(containerUntarDir, containerData);
     byte[] descriptorFileContent = innerUnpack(input, dbRoot, chunksRoot);
 
+    if (!Files.exists(destContainerDir)) {
+      Files.createDirectories(destContainerDir);
+    }
     Files.move(containerUntarDir, destContainerDir,
         StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
 
@@ -193,21 +192,28 @@ public class TarContainerPacker
 
   public static Path getDbPath(Path baseDir,
       KeyValueContainerData containerData) {
-    Path metadataDir = KeyValueContainerLocationUtil.getContainerMetaDataPath(
-            baseDir.toAbsolutePath().toString()).toPath();
+    if (baseDir.toAbsolutePath().toString().equals(
+        containerData.getContainerPath())) {
+      return getDbPath(containerData);
+    }
+    Path containerPath = Paths.get(containerData.getContainerPath());
+    Path dbPath = Paths.get(containerData.getDbFile().getPath());
+    Path relativePath = containerPath.relativize(dbPath);
+
     if (containerData.getSchemaVersion().equals(SCHEMA_V3)) {
+      Path metadataDir = KeyValueContainerLocationUtil.getContainerMetaDataPath(
+          baseDir.toString()).toPath();
       return DatanodeStoreSchemaThreeImpl.getDumpDir(metadataDir.toFile())
           .toPath();
     } else {
-      return KeyValueContainerLocationUtil.getContainerDBFile(
-          metadataDir.toAbsolutePath().toString(), containerData).toPath();
+      return baseDir.resolve(relativePath);
     }
   }
 
   public static Path getChunkPath(Path baseDir,
       KeyValueContainerData containerData) {
     Path chunkDir = KeyValueContainerLocationUtil.getChunksLocationPath(
-        baseDir.toAbsolutePath().toString()).toPath();
+        baseDir.toString()).toPath();
     return chunkDir;
   }
 

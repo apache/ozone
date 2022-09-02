@@ -506,7 +506,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   public void importContainerData(InputStream input,
       ContainerPacker<KeyValueContainerData> packer)
       throws IOException {
-    long containerId = getContainerData().getContainerID();
     HddsVolume hddsVolume = containerData.getVolume();
     String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
         hddsVolume, hddsVolume.getClusterID());
@@ -548,7 +547,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       containerData.setSchemaVersion(originalContainerData.getSchemaVersion());
 
       //rewriting the yaml file with new checksum calculation.
-      update(containerData.getMetadata(), true);
+      update(originalContainerData.getMetadata(), true);
 
       if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
         // load metadata from received dump files before we try to parse kv
