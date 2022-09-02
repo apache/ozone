@@ -90,9 +90,8 @@ public class DiskBalancerManager {
           .build());
     }
 
-    reportList.sort((t1, t2) ->
-        (int)(t2.getCurrentVolumeDensitySum() -
-            t1.getCurrentVolumeDensitySum()));
+    reportList.sort((t1, t2) -> Double.compare(t2.getCurrentVolumeDensitySum(),
+        t1.getCurrentVolumeDensitySum()));
     return reportList.stream().limit(count).collect(Collectors.toList());
   }
 
