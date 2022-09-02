@@ -47,8 +47,6 @@ import java.util.Random;
         showDefaultValues = true)
 public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
         implements Callable<Void> {
-  private static final Logger LOG =
-          LoggerFactory.getLogger(OzoneClientKeyReadWriteOps.class);
 
   @CommandLine.Option(names = {"-v", "--volume"},
           description = "Name of the volume which contains the test data. " +
