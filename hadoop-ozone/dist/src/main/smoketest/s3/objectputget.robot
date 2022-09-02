@@ -174,13 +174,19 @@ Create file with user defined metadata
 
 Create file with user defined metadata with gdpr enabled value in request
                                 Execute                    echo "Randomtext" > /tmp/testfile2
-    ${result} =                 Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="gdprEnabled=true,custom-key2=custom-value2"
+                                Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="gdprEnabled=true,custom-key2=custom-value2"
+
+    ${result} =                 Execute AWSS3ApiCli        head-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2
                                 Should contain             ${result}   \"custom-key2\" : \"custom-value2\"
                                 Should not contain         ${result}   \"gdprEnabled\" : \"true\"
 
-Create file with user defined metadata larger than 2 KB
+
+Create file with user defined metadata size of total keys and values larger than 2 KB
                                 Execute                    echo "Randomtext" > /tmp/testfile2
-                                Execute                    dd if=/dev/zero of=/tmp/testfileOver2KB bs=3000 count=1
-                                Execute                    testMetadata=`cat /tmp/testfileOver2KB`
-    ${result} =                 Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="$testMetadata"
+                                Execute                    dd if=/dev/zero of=/tmp/testMetadataKey bs=2000 count=1
+                                Execute                    dd if=/dev/zero of=/tmp/testMetadataValue bs=2000 count=1
+                                Execute                    testMetadataKey=`cat /tmp/testMetadataKey`
+                                Execute                    testMetadataValue=`cat /tmp/testMetadataValue`
+#    ${result} =                 Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="$testMetadata"
+    ${result} =                 Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="$testMetadataKey=$testMetadataValue"
                                 Should contain             ${result}   Illegal user defined metadata
