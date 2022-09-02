@@ -48,11 +48,6 @@ import java.util.Random;
 public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
         implements Callable<Void> {
 
-  @CommandLine.Option(names = {"--time"},
-          description = "Total time (in minutes) of test.",
-          defaultValue = "5")
-  private String time;
-
   @CommandLine.Option(names = {"-v", "--volume"},
           description = "Name of the volume which contains the test data. " +
                   "Will be created if missing.",
@@ -80,12 +75,18 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
           defaultValue = "0")
   private int endIndexForRead;
 
+  @CommandLine.Option(names = {"-r", "--write-range-keys"},
+          description = "Generate the range of keys based on option" +
+                  " start-index-for-write and end-index-for-write.",
+          defaultValue = "false")
+  private boolean writeRangeKeys;
+
   @CommandLine.Option(names = {"-i", "--start-index-for-write"},
           description = "start-index for write operations.",
           defaultValue = "0")
   private int startIndexForWrite;
 
-  @CommandLine.Option(names = {"-x", "--end-index-for-write"},
+  @CommandLine.Option(names = {"-j", "--end-index-for-write"},
           description = "end-index for write operations.",
           defaultValue = "0")
   private int endIndexForWrite;
@@ -97,19 +98,13 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
           defaultValue = "256")
   private int wSizeInBytes;
 
-  @CommandLine.Option(names = {"--write-range-keys"},
-          description = "Generate the range of keys based on option" +
-                  " start-index-for-write and end-index-for-write.",
-          defaultValue = "false")
-  private boolean writeRangeKeys;
-
-  @CommandLine.Option(names = {"--keySorted"},
+  @CommandLine.Option(names = {"-k", "--keySorted"},
           description = "Generated sorted key or not. The key name " +
                   "will be generated via md5 hash if choose to use unsorted key.",
           defaultValue = "false")
   private boolean keySorted;
 
-  @CommandLine.Option(names = {"--mix-workload"},
+  @CommandLine.Option(names = {"-x", "--mix-workload"},
           description = "Set to True if you would like to " +
                   "generate mix workload (Read and Write).",
           defaultValue = "false")
