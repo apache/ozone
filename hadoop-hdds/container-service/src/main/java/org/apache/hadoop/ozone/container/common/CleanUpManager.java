@@ -100,7 +100,7 @@ public class CleanUpManager {
 
     String pathId = "";
     try {
-      pathId = VersionedDatanodeFeatures.ScmHA
+      pathId += VersionedDatanodeFeatures.ScmHA
           .chooseContainerPathID(hddsVolume, clusterId);
     } catch (IOException ex) {
       LOG.error("Failed to get the container path Id", ex);
@@ -152,6 +152,9 @@ public class CleanUpManager {
     return leftoversListIt;
   }
 
+  /**
+   * @return true if tmpDir is empty
+   */
   public boolean tmpDirIsEmpty() {
     ListIterator<File> leftoversListIt = getDeleteLeftovers();
 
