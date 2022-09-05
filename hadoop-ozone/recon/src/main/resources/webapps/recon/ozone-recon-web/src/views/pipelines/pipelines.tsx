@@ -245,7 +245,9 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
 
                   return filtered;
                 }, [])}
-                loading={activeLoading} pagination={paginationConfig} rowKey='pipelineId'/>
+                loading={activeLoading} pagination={paginationConfig} rowKey='pipelineId'
+                scroll={{x: true, y: false, scrollToFirstRowOnChange: true}}
+                />
             </TabPane>
             <TabPane key='2' tab='Inactive'/>
           </Tabs>
