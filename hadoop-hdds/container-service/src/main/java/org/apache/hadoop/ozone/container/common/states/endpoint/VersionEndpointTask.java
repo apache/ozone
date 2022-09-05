@@ -126,11 +126,14 @@ public class VersionEndpointTask implements
             ozoneContainer.getDbVolumeSet());
 
         // Check and clean /tmp/container_delete_service
-        HddsVolume hddsVolume = (HddsVolume) volume;
-        CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
-        if (!cleanUpManager.tmpDirIsEmpty()) {
-          cleanUpManager.cleanTmpDir();
+        if (volume instanceof HddsVolume) {
+          HddsVolume hddsVolume = (HddsVolume) volume;
+          CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
+          if (!cleanUpManager.tmpDirIsEmpty()) {
+            cleanUpManager.cleanTmpDir();
+          }
         }
+
         if (!result) {
           volumeSet.failVolume(volume.getStorageDir().getPath());
         }

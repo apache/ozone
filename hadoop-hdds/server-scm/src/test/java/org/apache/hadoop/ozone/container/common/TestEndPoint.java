@@ -142,36 +142,9 @@ public class TestEndPoint {
   /**
    * We make getVersion RPC call, but via the VersionEndpointTask which is
    * how the state machine would make the call.
+   * Writing data to tmp dir and checking if it has been cleaned.
    */
   public void testGetVersionTask() throws Exception {
-    OzoneConfiguration conf = SCMTestUtils.getConf();
-    conf.setFromObject(new ReplicationConfig().setPort(0));
-    try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
-        serverAddress, 1000)) {
-      DatanodeDetails datanodeDetails = randomDatanodeDetails();
-      conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
-          true);
-      conf.setBoolean(
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
-      OzoneContainer ozoneContainer = new OzoneContainer(
-          datanodeDetails, conf, getContext(datanodeDetails), null);
-      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
-      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
-          conf, ozoneContainer);
-      EndpointStateMachine.EndPointStates newState = versionTask.call();
-
-      // if version call worked the endpoint should automatically move to the
-      // next state.
-      Assertions.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
-          newState);
-
-      // Now rpcEndpoint should remember the version it got from SCM
-      Assertions.assertNotNull(rpcEndPoint.getVersion());
-    }
-  }
-
-  @Test
-  public void testCleanTmpDirOnVersionTaskCall() throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
 
     // enable SchemaV3
@@ -215,7 +188,15 @@ public class TestEndPoint {
 
       VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
           conf, ozoneContainer);
-      versionTask.call();
+      EndpointStateMachine.EndPointStates newState = versionTask.call();
+
+      // if version call worked the endpoint should automatically move to the
+      // next state.
+      Assertions.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
+          newState);
+
+      // Now rpcEndpoint should remember the version it got from SCM
+      Assertions.assertNotNull(rpcEndPoint.getVersion());
 
       // assert that tmp dir is empty
       for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
@@ -233,10 +214,6 @@ public class TestEndPoint {
         true);
     conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
         true);
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
-        true);
-    conf.setBoolean(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
     conf.setFromObject(new ReplicationConfig().setPort(0));
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
         serverAddress, 1000)) {
