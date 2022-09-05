@@ -152,6 +152,7 @@ public class ReplicationManager implements SCMService {
       overRepQueue;
   private final ECUnderReplicationHandler ecUnderReplicationHandler;
   private final ECOverReplicationHandler ecOverReplicationHandler;
+  private final int maintenanceRedundancy;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -190,6 +191,7 @@ public class ReplicationManager implements SCMService {
     this.nodeManager = nodeManager;
     this.underRepQueue = createUnderReplicatedQueue();
     this.overRepQueue = new LinkedList<>();
+    this.maintenanceRedundancy = rmConf.maintenanceRemainingRedundancy;
     ecUnderReplicationHandler = new ECUnderReplicationHandler(
         containerPlacement, conf, nodeManager);
     ecOverReplicationHandler =
@@ -370,7 +372,7 @@ public class ReplicationManager implements SCMService {
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerID);
     return ecUnderReplicationHandler.processAndCreateCommands(replicas,
-        pendingOps, result, 0);
+        pendingOps, result, maintenanceRedundancy);
   }
 
   public Map<DatanodeDetails, SCMCommand<?>> processOverReplicatedContainer(
@@ -381,7 +383,7 @@ public class ReplicationManager implements SCMService {
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerID);
     return ecOverReplicationHandler.processAndCreateCommands(replicas,
-        pendingOps, result, 0);
+        pendingOps, result, maintenanceRedundancy);
   }
 
   public long getScmTerm() throws NotLeaderException {
@@ -419,8 +421,8 @@ public class ReplicationManager implements SCMService {
 
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerID);
-    ContainerHealthResult health = ecContainerHealthCheck
-        .checkHealth(containerInfo, replicas, pendingOps, 0);
+    ContainerHealthResult health = ecContainerHealthCheck.checkHealth(
+        containerInfo, replicas, pendingOps, maintenanceRedundancy);
       // TODO - should the report have a HEALTHY state, rather than just bad
       //        states? It would need to be added to legacy RM too.
     if (health.getHealthState()
@@ -686,12 +688,55 @@ public class ReplicationManager implements SCMService {
       this.maintenanceReplicaMinimum = replicaCount;
     }
 
+    /**
+     * Defines how many redundant replicas of a container must be online for a
+     * node to enter maintenance. Currently, only used for EC containers. We
+     * need to consider removing the "maintenance.replica.minimum" setting
+     * and having both Ratis and EC use this new one.
+     */
+    @Config(key = "maintenance.remaining.redundancy",
+        type = ConfigType.INT,
+        defaultValue = "1",
+        tags = {SCM, OZONE},
+        description = "The number of redundant containers in a group which" +
+            " must be available for a node to enter maintenance. If putting" +
+            " a node into maintenance reduces the redundancy below this value" +
+            " , the node will remain in the ENTERING_MAINTENANCE state until" +
+            " a new replica is created. For Ratis containers, the default" +
+            " value of 1 ensures at least two replicas are online, meaning 1" +
+            " more can be lost without data becoming unavailable. For any EC" +
+            " container it will have at least dataNum + 1 online, allowing" +
+            " the loss of 1 more replica before data becomes unavailable." +
+            " Currently only EC containers use this setting. Ratis containers" +
+            " use hdds.scm.replication.maintenance.replica.minimum. For EC," +
+            " if nodes are in maintenance, it is likely reconstruction reads" +
+            " will be required if some of the data replicas are offline. This" +
+            " is seamless to the client, but will affect read performance."
+    )
+    private int maintenanceRemainingRedundancy = 1;
+
+    public void setMaintenanceRemainingRedundancy(int redundancy) {
+      this.maintenanceRemainingRedundancy = redundancy;
+    }
+
+    public int getMaintenanceRemainingRedundancy() {
+      return maintenanceRemainingRedundancy;
+    }
+
     public long getInterval() {
       return interval;
     }
 
     public long getUnderReplicatedInterval() {
       return underReplicatedInterval;
+    }
+
+    public void setUnderReplicatedInterval(Duration duration) {
+      this.underReplicatedInterval = duration.toMillis();
+    }
+
+    public void setOverReplicatedInterval(Duration duration) {
+      this.overReplicatedInterval = duration.toMillis();
     }
 
     public long getOverReplicatedInterval() {
@@ -796,8 +841,8 @@ public class ReplicationManager implements SCMService {
         containerInfo.containerID());
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
-    // TODO: define maintenance redundancy for EC (HDDS-6975)
-    return new ECContainerReplicaCount(containerInfo, replicas, pendingOps, 0);
+    return new ECContainerReplicaCount(
+        containerInfo, replicas, pendingOps, maintenanceRedundancy);
   }
 
   /**
