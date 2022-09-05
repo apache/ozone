@@ -1006,15 +1006,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public RemoteIterator<FileStatus> listStatusIterator(Path f)
           throws IOException {
-    return new OzoneFileStatusIterator<>(f, false);
+    return new OzoneFileStatusIterator<>(f);
   }
 
   /**
+   * A private class implementation for iterating list of file status.
    *
-   * This class defines an iterator that returns
-   * the file status of each file/subdirectory of a directory
-   * if needLocation, status contains block location if it is a file
-   * throws a RuntimeException with the error as its cause.
    * @param <T> the type of the file status
    */
   private final class  OzoneFileStatusIterator<T extends FileStatus>
@@ -1022,25 +1019,18 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     private FileStatusListing thisListing;
     private int i;
     private Path p;
-    private String src;
     private T curStat = null;
-    private PathFilter filter;
-    private boolean needLocation;
     private String startPath = "";
 
     /**
-     * A private class implementation for iterating list of file status.
-     * @param p
-     * @param filter
-     * @param needLocation
+     * Constructor to initialize OzoneFileStatusIterator.
+     * Gets the first batch of entry for iteration.
+     *
+     * @param p path to file/directory.
      * @throws IOException
      */
-    private OzoneFileStatusIterator(Path p, PathFilter filter,
-                               boolean needLocation) throws IOException {
+    private OzoneFileStatusIterator(Path p) throws IOException {
       this.p = p;
-      this.src = pathToKey(p);
-      this.filter = filter;
-      this.needLocation = needLocation;
       // fetch the first batch of entries in the directory
       thisListing = listFileStatus(p, startPath);
       if (thisListing != null) {
@@ -1048,18 +1038,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       }
       statistics.incrementReadOps(1);
       i = 0;
-    }
-
-    /**
-     * constructor to initialize OzoneFileStatusIterator.
-     * Gets the first batch of entry for iteration.
-     * @param p
-     * @param needLocation
-     * @throws IOException
-     */
-    private OzoneFileStatusIterator(Path p, boolean needLocation)
-            throws IOException {
-      this(p, null, needLocation);
     }
 
     /**
