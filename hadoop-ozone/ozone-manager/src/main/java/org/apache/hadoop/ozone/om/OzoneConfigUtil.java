@@ -56,6 +56,9 @@ public final class OzoneConfigUtil {
 
   /**
    * Return list of s3 administrators prop from config.
+   *
+   * If ozone.s3.administrators value is empty string or unset,
+   * defaults to ozone.administrators value.
    */
   static Collection<String> getS3AdminsFromConfig(OzoneConfiguration conf)
           throws IOException {
