@@ -93,7 +93,7 @@ public class RDBStore implements DBStore {
           LOG.warn("jmx registration failed during RocksDB init, db path :{}",
               dbJmxBeanName);
         } else {
-          LOG.info("jmx registration succeed during RocksDB init, db path :{}",
+          LOG.debug("jmx registration succeed during RocksDB init, db path :{}",
               dbJmxBeanName);
         }
       }
