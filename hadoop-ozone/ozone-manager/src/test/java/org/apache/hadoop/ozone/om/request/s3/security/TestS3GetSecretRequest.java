@@ -398,7 +398,8 @@ public class TestS3GetSecretRequest {
     // Check response
     if (shouldHaveResponse) {
       // Check response
-      final S3SecretValue s3SecretValue = s3GetSecretResponse.getS3SecretValue();
+      final S3SecretValue s3SecretValue =
+          s3GetSecretResponse.getS3SecretValue();
       Assert.assertEquals(userPrincipalId, s3SecretValue.getKerberosID());
       final String awsSecret1 = s3SecretValue.getAwsSecret();
       Assert.assertNotNull(awsSecret1);
@@ -415,7 +416,8 @@ public class TestS3GetSecretRequest {
     return s3Secret;
   }
 
-  private void processFailedSecretRequest(String userPrincipalId) throws IOException {
+  private void processFailedSecretRequest(String userPrincipalId)
+      throws IOException {
     try {
       new S3GetSecretRequest(
           s3GetSecretRequest(userPrincipalId)
