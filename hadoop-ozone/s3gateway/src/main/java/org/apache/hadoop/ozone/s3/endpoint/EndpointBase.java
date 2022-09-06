@@ -58,6 +58,7 @@ import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
+import org.apache.http.protocol.HTTP;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -258,11 +259,16 @@ public abstract class EndpointBase implements Auditor {
   }
 
   protected Map<String, String> getCustomMetadataFromHeaders(
-      MultivaluedMap<String, String> requestHeaders) {
+      MultivaluedMap<String, String> requestHeaders) throws OS3Exception {
     Map<String, String> customMetadata = new HashMap<>();
     if (requestHeaders == null || requestHeaders.isEmpty()) {
       return customMetadata;
     }
+
+    LOG.error("**** **** **** **** **** **** **** **** **** **** **** **** **** **** **** ");
+    LOG.error("list all pre-filtered metadata keys in request: ");
+    requestHeaders.keySet().forEach(System.out::println);
+    LOG.error("**** **** **** **** **** **** **** **** **** **** **** **** **** **** **** ");
 
     Set<String> customMetadataKeys = requestHeaders.keySet().stream()
             .filter(k -> {
@@ -273,6 +279,11 @@ public abstract class EndpointBase implements Auditor {
               return false;
             })
             .collect(Collectors.toSet());
+    LOG.error("#### #### #### #### #### #### #### #### #### #### #### #### #### #### ####");
+    LOG.error("list all metadata keys in s3 request: ");
+    customMetadataKeys.forEach(System.out:: println);
+    LOG.error("#### #### #### #### #### #### #### #### #### #### #### #### #### #### ####");
+
     long sizeInBytes = 0;
     if (!customMetadataKeys.isEmpty()) {
       for (String key : customMetadataKeys) {
@@ -280,12 +291,20 @@ public abstract class EndpointBase implements Auditor {
             key.substring(CUSTOM_METADATA_HEADER_PREFIX.length());
         List<String> values = requestHeaders.get(key);
         String value = StringUtils.join(values, ",");
+        LOG.error("cur mapKey = " + mapKey);
         sizeInBytes += mapKey.getBytes(UTF_8).length;
+        LOG.error("cur sizeInBytes = " + sizeInBytes);
+        LOG.error("cur mapValue = " + value);
         sizeInBytes += value.getBytes(UTF_8).length;
+        LOG.error("cur sizeInBytes = " + sizeInBytes);
+
         if (sizeInBytes >
                 OzoneConsts.S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB * KB) {
-          throw new IllegalArgumentException("Illegal user defined metadata." +
-              " Combined size cannot exceed 2KB.");
+//          throw new IllegalArgumentException("Illegal user defined metadata." +
+//              " Combined size cannot exceed 2KB.");
+          throw new OS3Exception("403", "Illegal user defined metadata." +
+                  " Combined size cannot exceed 2KB.", 403);
+
         }
         customMetadata.put(mapKey, value);
       }

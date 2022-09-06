@@ -173,7 +173,7 @@ public class ObjectEndpoint extends EndpointBase {
       @HeaderParam("Content-Length") long length,
       @QueryParam("partNumber")  int partNumber,
       @QueryParam("uploadId") @DefaultValue("") String uploadID,
-      InputStream body) throws IOException, OS3Exception {
+      InputStream body) throws IOException, OS3Exception, IllegalArgumentException {
 
     S3GAction s3GAction = S3GAction.CREATE_KEY;
     boolean auditSuccess = true;

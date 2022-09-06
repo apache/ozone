@@ -186,8 +186,9 @@ Create file with user defined metadata size of total keys and values larger than
 #                                Execute                    dd if=/dev/zero of=/tmp/testMetadataKey bs=2000 count=1
 #                                Execute                    dd if=/dev/zero of=/tmp/testMetadataValue bs=2000 count=1
 #                                Execute
-                                Execute                    testMetadataKey=$(printf '=%.0s' {1..2000})
-                                Execute                    testMetadataValue=$(printf '=%.0s' {1..2000})
+                                Execute                    testMetadataKey=$(printf '=%.0s' {1..20})
+                                Execute                    testMetadataValue=$(printf '=%.0s' {1..20})
+                                Execute                    echo "$testMetadataKey=$testMetadataValue"
 #    ${result} =                 Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="$testMetadata"
     ${result} =                 Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="$testMetadataKey=$testMetadataValue"
                                 Should contain             ${result}   Illegal user defined metadata
