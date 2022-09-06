@@ -66,7 +66,8 @@ const COLUMNS = [
     dataIndex: 'pipelineId',
     key: 'pipelineId',
     isSearchable: true,
-    sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.pipelineId.localeCompare(b.pipelineId)
+    sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.pipelineId.localeCompare(b.pipelineId),
+    fixed: 'left'
   },
   {
     title: 'Replication Type & Factor',
