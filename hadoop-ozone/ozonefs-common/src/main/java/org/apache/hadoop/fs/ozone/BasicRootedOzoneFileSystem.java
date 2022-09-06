@@ -795,8 +795,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       } else {
         statuses.addAll(tmpStatusList.subList(1, tmpStatusList.size()));
       }
-      partialListing = new FileStatusListing(
-              statuses.toArray(new FileStatus[0]));
+      partialListing = new FileStatusListing(statuses);
     }
     return partialListing;
   }
@@ -1049,7 +1048,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     public boolean hasNext() throws IOException {
       while (curStat == null && hasNextNoFilter()) {
         T next;
-        FileStatus fileStat = thisListing.getPartialListing()[i++];
+        FileStatus fileStat = thisListing.getPartialListing().
+               toArray(new FileStatus[0])[i++];
         next = (T)(fileStat);
         curStat = next;
       }
@@ -1066,12 +1066,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       if (thisListing == null) {
         return false;
       }
-      if (i >= thisListing.getPartialListing().length) {
+      if (i >= thisListing.getPartialListing().size()) {
         if (startPath != null) {
           // current listing is exhausted & fetch a new listing
           thisListing = listFileStatus(p, startPath);
           if (thisListing != null &&
-                  thisListing.getPartialListing().length != 0) {
+                  thisListing.getPartialListing().size() != 0) {
             startPath = pathToKey(thisListing.getLastName());
             statistics.incrementReadOps(1);
           } else {
@@ -1080,7 +1080,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           i = 0;
         }
       }
-      return (i < thisListing.getPartialListing().length);
+      return (i < thisListing.getPartialListing().size());
     }
 
     /**
