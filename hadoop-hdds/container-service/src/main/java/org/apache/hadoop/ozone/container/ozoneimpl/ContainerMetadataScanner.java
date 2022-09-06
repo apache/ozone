@@ -28,22 +28,21 @@ import java.util.Iterator;
 /**
  * This class is responsible to perform metadata verification of the
  * containers.
+ * Only one thread will be responsible for scanning all volumes.
  */
 public class ContainerMetadataScanner extends AbstractContainerScanner {
   public static final Logger LOG =
       LoggerFactory.getLogger(ContainerMetadataScanner.class);
 
-  private final ContainerMetadataScrubberMetrics metrics;
+  private final ContainerMetadataScannerMetrics metrics;
   private final ContainerController controller;
 
-  public ContainerMetadataScanner(ContainerScrubberConfiguration conf,
+  public ContainerMetadataScanner(ContainerScannerConfiguration conf,
                                   ContainerController controller) {
-    super(conf.getMetadataScanInterval(),
-        ContainerMetadataScrubberMetrics.create());
+    super("ContainerMetadataScanner", conf.getMetadataScanInterval(),
+        ContainerMetadataScannerMetrics.create());
     this.controller = controller;
-    this.metrics = (ContainerMetadataScrubberMetrics) super.getMetrics();
-    setName("ContainerMetadataScanner");
-    setDaemon(true);
+    this.metrics = (ContainerMetadataScannerMetrics) super.getMetrics();
   }
 
   @Override
@@ -54,16 +53,16 @@ public class ContainerMetadataScanner extends AbstractContainerScanner {
   @VisibleForTesting
   @Override
   public void scanContainer(Container container) throws IOException {
-    metrics.incNumContainersScanned();
     if (!container.scanMetaData()) {
       metrics.incNumUnHealthyContainers();
       controller.markContainerUnhealthy(
           container.getContainerData().getContainerID());
     }
+    metrics.incNumContainersScanned();
   }
 
   @Override
-  public ContainerMetadataScrubberMetrics getMetrics() {
+  public ContainerMetadataScannerMetrics getMetrics() {
     return this.metrics;
   }
 }

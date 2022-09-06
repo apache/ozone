@@ -43,10 +43,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * This test verifies the container scrubber metrics functionality.
+ * This test verifies the container scanner metrics functionality.
  */
 @RunWith(MockitoJUnitRunner.class)
-public class TestContainerScrubberMetrics {
+public class TestContainerScannerMetrics {
 
   private final AtomicLong containerIdSeq = new AtomicLong(100);
 
@@ -62,31 +62,31 @@ public class TestContainerScrubberMetrics {
   @Mock
   private HddsVolume vol;
 
-  private ContainerScrubberConfiguration conf;
+  private ContainerScannerConfiguration conf;
   private ContainerController controller;
 
   @Before
   public void setup() {
-    conf = newInstanceOf(ContainerScrubberConfiguration.class);
+    conf = newInstanceOf(ContainerScannerConfiguration.class);
     conf.setMetadataScanInterval(0);
     conf.setDataScanInterval(0);
     controller = mockContainerController();
   }
 
   @Test
-  public void testContainerMetaDataScrubberMetrics() {
+  public void testContainerMetaDataScannerMetrics() {
     ContainerMetadataScanner subject =
         new ContainerMetadataScanner(conf, controller);
     subject.runIteration();
 
-    ContainerMetadataScrubberMetrics metrics = subject.getMetrics();
+    ContainerMetadataScannerMetrics metrics = subject.getMetrics();
     assertEquals(1, metrics.getNumScanIterations());
     assertEquals(3, metrics.getNumContainersScanned());
     assertEquals(1, metrics.getNumUnHealthyContainers());
   }
 
   @Test
-  public void testContainerMetaDataScrubberMetricsUnregisters() {
+  public void testContainerMetaDataScannerMetricsUnregisters() {
     ContainerMetadataScanner subject =
         new ContainerMetadataScanner(conf, controller);
     String name = subject.getMetrics().getName();
@@ -100,19 +100,19 @@ public class TestContainerScrubberMetrics {
   }
 
   @Test
-  public void testContainerDataScrubberMetrics() {
+  public void testContainerDataScannerMetrics() {
     ContainerDataScanner subject =
         new ContainerDataScanner(conf, controller, vol);
     subject.runIteration();
 
-    ContainerDataScrubberMetrics metrics = subject.getMetrics();
+    ContainerDataScannerMetrics metrics = subject.getMetrics();
     assertEquals(1, metrics.getNumScanIterations());
     assertEquals(2, metrics.getNumContainersScanned());
     assertEquals(1, metrics.getNumUnHealthyContainers());
   }
 
   @Test
-  public void testContainerDataScrubberMetricsUnregisters() throws IOException {
+  public void testContainerDataScannerMetricsUnregisters() throws IOException {
     HddsVolume volume = new HddsVolume.Builder("/").failedVolume(true).build();
     ContainerDataScanner subject =
         new ContainerDataScanner(conf, controller, volume);

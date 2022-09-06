@@ -17,7 +17,7 @@
  * under the License.
  *
  */
-package org.apache.hadoop.ozone.dn.scrubber;
+package org.apache.hadoop.ozone.dn.scanner;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -47,7 +47,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerMetadataScanner;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -72,13 +72,13 @@ import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 
 /**
- * This class tests the data scrubber functionality.
+ * This class tests the data scanner functionality.
  */
-public class TestDataScrubber {
+public class TestDataScanner {
 
   /**
-    * Set a timeout for each test.
-    */
+   * Set a timeout for each test.
+   */
   @Rule
   public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster;
@@ -173,8 +173,8 @@ public class TestDataScrubber {
     deleteDirectory(chunksDir);
     Assert.assertFalse(chunksDir.exists());
 
-    ContainerScrubberConfiguration conf = ozoneConfig.getObject(
-        ContainerScrubberConfiguration.class);
+    ContainerScannerConfiguration conf = ozoneConfig.getObject(
+        ContainerScannerConfiguration.class);
     ContainerMetadataScanner sb = new ContainerMetadataScanner(conf,
         oc.getController());
     sb.scanContainer(c);

@@ -32,8 +32,7 @@ import java.util.Iterator;
 import java.util.Optional;
 
 /**
- * VolumeScanner scans a single volume.  Each VolumeScanner has its own thread.
- * <p>They are all managed by the DataNode's BlockScanner.
+ * Data scanner that full checks a volume. Each volume gets a separate thread.
  */
 public class ContainerDataScanner extends AbstractContainerScanner {
   public static final Logger LOG =
@@ -47,20 +46,19 @@ public class ContainerDataScanner extends AbstractContainerScanner {
   private final DataTransferThrottler throttler;
   private final Canceler canceler;
   private static final String NAME_FORMAT = "ContainerDataScanner(%s)";
-  private final ContainerDataScrubberMetrics metrics;
+  private final ContainerDataScannerMetrics metrics;
 
-  public ContainerDataScanner(ContainerScrubberConfiguration conf,
+  public ContainerDataScanner(ContainerScannerConfiguration conf,
                               ContainerController controller,
                               HddsVolume volume) {
-    super(conf.getDataScanInterval(),
-        ContainerDataScrubberMetrics.create(volume.toString()));
+    super(String.format(NAME_FORMAT, volume), conf.getDataScanInterval(),
+        ContainerDataScannerMetrics.create(volume.toString())
+    );
     this.controller = controller;
     this.volume = volume;
     throttler = new HddsDataTransferThrottler(conf.getBandwidthPerVolume());
     canceler = new Canceler();
-    this.metrics = (ContainerDataScrubberMetrics) super.getMetrics();
-    setName(String.format(NAME_FORMAT, volume));
-    setDaemon(true);
+    this.metrics = (ContainerDataScannerMetrics) super.getMetrics();
   }
 
   @Override
@@ -70,7 +68,6 @@ public class ContainerDataScanner extends AbstractContainerScanner {
     }
     ContainerData containerData = c.getContainerData();
     long containerId = containerData.getContainerID();
-    metrics.incNumContainersScanned();
     logScanStart(containerData);
     if (!c.scanData(throttler, canceler)) {
       metrics.incNumUnHealthyContainers();
@@ -80,6 +77,7 @@ public class ContainerDataScanner extends AbstractContainerScanner {
       logScanCompleted(containerData, now);
       controller.updateDataScanTimestamp(containerId, now);
     }
+    metrics.incNumContainersScanned();
   }
 
   @Override
@@ -113,7 +111,7 @@ public class ContainerDataScanner extends AbstractContainerScanner {
 
   @VisibleForTesting
   @Override
-  public ContainerDataScrubberMetrics getMetrics() {
+  public ContainerDataScannerMetrics getMetrics() {
     return this.metrics;
   }
 

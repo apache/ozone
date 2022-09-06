@@ -23,22 +23,22 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 
 /**
- * This class captures the container meta-data scrubber metrics on the
+ * This class captures the container meta-data scanner metrics on the
  * data-node.
  **/
 @InterfaceAudience.Private
-@Metrics(about = "DataNode container data scrubber metrics", context = "dfs")
-public final class ContainerMetadataScrubberMetrics
+@Metrics(about = "DataNode container metadata scanner metrics", context = "dfs")
+public final class ContainerMetadataScannerMetrics
     extends AbstractContainerScannerMetric {
 
-  private ContainerMetadataScrubberMetrics(String name, MetricsSystem ms) {
+  private ContainerMetadataScannerMetrics(String name, MetricsSystem ms) {
     super(name, ms);
   }
 
-  public static ContainerMetadataScrubberMetrics create() {
+  public static ContainerMetadataScannerMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    String name = "ContainerMetadataScrubberMetrics";
+    String name = "ContainerMetadataScannerMetrics";
     return ms.register(name, null,
-        new ContainerMetadataScrubberMetrics(name, ms));
+        new ContainerMetadataScannerMetrics(name, ms));
   }
 }

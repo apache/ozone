@@ -27,14 +27,14 @@ import org.apache.hadoop.metrics2.lib.MutableRate;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * This class captures the container data scrubber metrics on the data-node.
+ * This class captures the container data scanner metrics on the data-node.
  **/
 @InterfaceAudience.Private
-@Metrics(about = "DataNode container data scrubber metrics", context = "dfs")
-public final class ContainerDataScrubberMetrics
+@Metrics(about = "DataNode container data scanner metrics", context = "dfs")
+public final class ContainerDataScannerMetrics
     extends AbstractContainerScannerMetric {
 
-  @Metric("disk bandwidth used by the container data scrubber per volume")
+  @Metric("disk bandwidth used by the container data scanner per volume")
   private MutableRate numBytesScanned;
 
   public double getNumBytesScannedMean() {
@@ -53,17 +53,17 @@ public final class ContainerDataScrubberMetrics
     numBytesScanned.add(bytes);
   }
 
-  private ContainerDataScrubberMetrics(String name, MetricsSystem ms) {
+  private ContainerDataScannerMetrics(String name, MetricsSystem ms) {
     super(name, ms);
   }
 
   @SuppressWarnings("java:S2245") // no need for secure random
-  public static ContainerDataScrubberMetrics create(final String volumeName) {
+  public static ContainerDataScannerMetrics create(final String volumeName) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    String name = "ContainerDataScrubberMetrics-" + (volumeName.isEmpty()
+    String name = "ContainerDataScannerMetrics-" + (volumeName.isEmpty()
         ? "UndefinedDataNodeVolume" + ThreadLocalRandom.current().nextInt()
         : volumeName.replace(':', '-'));
 
-    return ms.register(name, null, new ContainerDataScrubberMetrics(name, ms));
+    return ms.register(name, null, new ContainerDataScannerMetrics(name, ms));
   }
 }

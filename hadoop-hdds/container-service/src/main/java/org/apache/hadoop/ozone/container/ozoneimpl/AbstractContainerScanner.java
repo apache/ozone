@@ -44,10 +44,11 @@ public abstract class AbstractContainerScanner extends Thread {
    */
   private volatile boolean stopping = false;
 
-  public AbstractContainerScanner(long dataScanInterval,
+  public AbstractContainerScanner(String name, long dataScanInterval,
                                   AbstractContainerScannerMetric metrics) {
     this.dataScanInterval = dataScanInterval;
     this.metrics = metrics;
+    setName(name);
     setDaemon(true);
   }
 
