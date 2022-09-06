@@ -212,11 +212,13 @@ public class TestS3GetSecretRequest {
     // This effectively makes alice a regular user.
     when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(false);
 
-    final S3Secret s3Secret1 = processSuccessSecretRequest(USER_ALICE, 1, true);
+    final S3Secret s3Secret1 = processSuccessSecretRequest(
+        USER_ALICE, 1, true);
 
 
     // 2. Get secret of "alice" (as herself) again.
-    final S3Secret s3Secret2 = processSuccessSecretRequest(USER_ALICE, 2, false);
+    final S3Secret s3Secret2 = processSuccessSecretRequest(
+        USER_ALICE, 2, false);
 
     Assert.assertEquals(s3Secret1.getAwsSecret(), s3Secret2.getAwsSecret());
   }
@@ -413,11 +415,10 @@ public class TestS3GetSecretRequest {
     return s3Secret;
   }
 
-
   private void processFailedSecretRequest(String userPrincipalId) throws IOException {
     try {
       new S3GetSecretRequest(
-          s3GetSecretRequest(ACCESS_ID_BOB)
+          s3GetSecretRequest(userPrincipalId)
       ).preExecute(ozoneManager);
     } catch (OMException omEx) {
       Assert.assertEquals(ResultCodes.USER_MISMATCH, omEx.getResult());
