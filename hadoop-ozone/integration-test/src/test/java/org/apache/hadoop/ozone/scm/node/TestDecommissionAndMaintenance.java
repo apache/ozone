@@ -433,6 +433,7 @@ public class TestDecommissionAndMaintenance {
     generateData(20, "eckey", ecRepConfig);
     final ContainerInfo ecContainer =
         waitForAndReturnContainer(ecRepConfig, 5);
+    replicas = getContainerReplicas(ecContainer);
     List<DatanodeDetails> ecMaintenance = replicas.stream()
         .map(ContainerReplica::getDatanodeDetails)
         .limit(2)
@@ -444,7 +445,7 @@ public class TestDecommissionAndMaintenance {
       waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
     }
     assertTrue(cm.getContainerReplicas(ecContainer.containerID()).size() >= 6);
-    scmClient.recommissionNodes(forMaintenance.stream()
+    scmClient.recommissionNodes(ecMaintenance.stream()
         .map(this::getDNHostAndPort)
         .collect(Collectors.toList()));
     // Ensure the 2 DNs go to IN_SERVICE
