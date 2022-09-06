@@ -499,6 +499,7 @@ public class TestRootedOzoneFileSystem {
         while (iterator.hasNext()) {
           FileStatus fileStatus = iterator.next();
           iCount++;
+          LOG.info("path:{} in FileStatus " + fileStatus.getPath());
           Assert.assertTrue(paths.contains(fileStatus.getPath().getName()));
         }
       }

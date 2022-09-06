@@ -635,6 +635,42 @@ public class BasicOzoneFileSystem extends FileSystem {
     return statuses.toArray(new FileStatus[0]);
   }
 
+  /**
+   * Get all the file status for input path and startPath.
+   *
+   * @param f
+   * @param startPath
+   * @return
+   * @throws IOException
+   */
+  public FileStatusListing listFileStatus(Path f, String startPath)
+      throws IOException {
+    incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
+    statistics.incrementReadOps(1);
+    LOG.trace("listFileStatus() path:{}", f);
+    int numEntries = LISTING_PAGE_SIZE;
+    LinkedList<FileStatus> statuses = new LinkedList<>();
+    List<FileStatus> tmpStatusList;
+    FileStatusListing partialListing = null;
+
+    tmpStatusList =
+        adapter.listStatus(pathToKey(f), false, startPath,
+            numEntries, uri, workingDir, getUsername())
+            .stream()
+            .map(this::convertFileStatus)
+            .collect(Collectors.toList());
+
+    if (!tmpStatusList.isEmpty()) {
+      if (startPath.isEmpty()) {
+        statuses.addAll(tmpStatusList);
+      } else { //Excluding the 1st file status element from list.
+        statuses.addAll(tmpStatusList.subList(1, tmpStatusList.size()));
+      }
+      partialListing = new FileStatusListing(statuses);
+    }
+    return partialListing;
+  }
+
   @Override
   public void setWorkingDirectory(Path newDir) {
     workingDir = newDir;
@@ -866,8 +902,103 @@ public class BasicOzoneFileSystem extends FileSystem {
 
   @Override
   public RemoteIterator<FileStatus> listStatusIterator(Path f)
-          throws IOException {
-    return super.listStatusIterator(f);
+      throws IOException {
+    return new OzoneFileStatusIterator<>(f);
+  }
+
+  /**
+   * A private class implementation for iterating list of file status.
+   *
+   * @param <T> the type of the file status
+   */
+  private final class  OzoneFileStatusIterator<T extends FileStatus>
+      implements RemoteIterator<T> {
+    private FileStatusListing thisListing;
+    private FileStatus[] fileStatuses;
+    private int i;
+    private Path p;
+    private T curStat = null;
+    private String startPath = "";
+
+    /**
+     * Constructor to initialize OzoneFileStatusIterator.
+     * Get the first batch of entry for iteration.
+     *
+     * @param p path to file/directory.
+     * @throws IOException
+     */
+    private OzoneFileStatusIterator(Path p) throws IOException {
+      this.p = p;
+      // fetch the first batch of entries
+      thisListing = listFileStatus(p, startPath);
+      if (thisListing != null) {
+        fileStatuses = thisListing.getPartialListing().
+            toArray(new FileStatus[0]);
+        startPath = pathToKey(thisListing.getLastName());
+      }
+      statistics.incrementReadOps(1);
+      i = 0;
+    }
+
+    /**
+     *
+     * @return true if next entry exists false otherwise.
+     * @throws IOException
+     */
+    @Override
+    public boolean hasNext() throws IOException {
+      while (curStat == null && hasNextNoFilter()) {
+        T next;
+        FileStatus fileStat = fileStatuses[i++];
+        next = (T)(fileStat);
+        curStat = next;
+      }
+      return curStat != null;
+    }
+
+    /**
+     * Checks the next available entry from partial listing if not exhausted
+     * or fetches new batch for listing.
+     * @return true if next entry exists false otherwise.
+     * @throws IOException
+     */
+    private boolean hasNextNoFilter() throws IOException {
+      if (thisListing == null) {
+        return false;
+      }
+      if (i >= thisListing.getPartialListing().size()) {
+        if (startPath != null) {
+          // current listing is exhausted & fetch a new listing
+          thisListing = listFileStatus(p, startPath);
+          if (thisListing != null &&
+              thisListing.getPartialListing().size() != 0) {
+            fileStatuses = thisListing.getPartialListing().
+                toArray(new FileStatus[0]);
+            startPath = pathToKey(thisListing.getLastName());
+            statistics.incrementReadOps(1);
+          } else {
+            return false;
+          }
+          i = 0;
+        }
+      }
+      return (i < thisListing.getPartialListing().size());
+    }
+
+    /**
+     *
+     * @return next entry.
+     * @throws IOException
+     */
+    @Override
+    public T next() throws IOException {
+      if (hasNext()) {
+        T tmp = curStat;
+        curStat = null;
+        return tmp;
+      }
+      throw new java.util.NoSuchElementException("No more entry in " + p);
+    }
   }
 
   /**

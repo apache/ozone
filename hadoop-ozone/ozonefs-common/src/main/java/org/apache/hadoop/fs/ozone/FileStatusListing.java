@@ -26,8 +26,8 @@ import java.util.Collection;
 import java.util.LinkedList;
 
 /**
- * This class defines a partial listing of a directory to support.
- * iterative directory listing.
+ * This class defines a partial listing of a directory to support
+ * iterative listing.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving

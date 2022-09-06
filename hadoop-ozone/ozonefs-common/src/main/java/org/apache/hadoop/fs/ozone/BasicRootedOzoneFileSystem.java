@@ -792,7 +792,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     if (!tmpStatusList.isEmpty()) {
       if (startPath.isEmpty()) {
         statuses.addAll(tmpStatusList);
-      } else {
+      } else { // Excluding the 1st file status element from list.
         statuses.addAll(tmpStatusList.subList(1, tmpStatusList.size()));
       }
       partialListing = new FileStatusListing(statuses);
@@ -1016,6 +1016,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private final class  OzoneFileStatusIterator<T extends FileStatus>
           implements RemoteIterator<T> {
     private FileStatusListing thisListing;
+    private FileStatus[] fileStatuses;
     private int i;
     private Path p;
     private T curStat = null;
@@ -1033,6 +1034,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       // fetch the first batch of entries in the directory
       thisListing = listFileStatus(p, startPath);
       if (thisListing != null) {
+        fileStatuses = thisListing.getPartialListing().
+            toArray(new FileStatus[0]);
         startPath = pathToKey(thisListing.getLastName());
       }
       statistics.incrementReadOps(1);
@@ -1048,8 +1051,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     public boolean hasNext() throws IOException {
       while (curStat == null && hasNextNoFilter()) {
         T next;
-        FileStatus fileStat = thisListing.getPartialListing().
-               toArray(new FileStatus[0])[i++];
+        FileStatus fileStat = fileStatuses[i++];
         next = (T)(fileStat);
         curStat = next;
       }
@@ -1072,6 +1074,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           thisListing = listFileStatus(p, startPath);
           if (thisListing != null &&
                   thisListing.getPartialListing().size() != 0) {
+            fileStatuses = thisListing.getPartialListing().
+                toArray(new FileStatus[0]);
             startPath = pathToKey(thisListing.getLastName());
             statistics.incrementReadOps(1);
           } else {
