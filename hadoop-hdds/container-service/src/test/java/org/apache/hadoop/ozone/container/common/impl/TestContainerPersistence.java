@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.common.CleanUpManager;
+import org.apache.hadoop.ozone.container.common.helpers.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -414,7 +414,7 @@ public class TestContainerPersistence {
     // '/tmp/delete_container_service' is empty
     Assert.assertTrue(cleanUpManager.tmpDirIsEmpty());
 
-    // Delete /tmp/delete_container_service from system
+    // Delete /delete_container_service from system
     cleanUpManager.deleteTmpDir();
   }
 

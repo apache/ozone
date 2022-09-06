@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.container.common;
+package org.apache.hadoop.ozone.container.common.helpers;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -46,8 +46,10 @@ public class CleanUpManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(CleanUpManager.class);
 
+  private static final String FILE_SEPARATOR = File.separator;
+
   private static final String TMP_DELETE_SERVICE_DIR =
-      "/tmp/container_delete_service";
+      FILE_SEPARATOR + "tmp" + FILE_SEPARATOR + "container_delete_service";
 
   private Path tmpDirPath;
 
@@ -58,7 +60,7 @@ public class CleanUpManager {
       try {
         Files.createDirectories(tmpDirPath);
       } catch (IOException ex) {
-        LOG.error("Error creating /tmp/container_delete_service", ex);
+        LOG.error("Error creating {}", tmpDirPath.toString(), ex);
       }
     }
   }
@@ -89,13 +91,18 @@ public class CleanUpManager {
     String volPath = HddsVolumeUtil.getHddsRoot(hddsRoot);
 
     stringBuilder.append(volPath);
-    stringBuilder.append("/");
+    stringBuilder.append(FILE_SEPARATOR);
 
-    String clusterId = hddsVolume.getClusterID();
+    String clusterId = "";
+    try {
+      clusterId += hddsVolume.getClusterID();
 
-    if (clusterId == null) {
-      throw new NullPointerException("Volume has not been initialized, " +
-          "clusterId is null.");
+      if (clusterId == null) {
+        throw new IOException();
+      }
+    } catch (IOException ex) {
+      LOG.error("Volume has not been initialized, " +
+          "clusterId is null.", ex);
     }
 
     String pathId = "";
@@ -118,13 +125,16 @@ public class CleanUpManager {
     File container = new File(containerPath);
     String containerDirName = container.getName();
 
-    String destinationDirPath = tmpDirPath.toString() + "/" + containerDirName;
+    String destinationDirPath = tmpDirPath
+        .resolve(Paths.get(containerDirName)).toString();
 
     boolean success = container.renameTo(new File(destinationDirPath));
 
     if (success) {
-      keyValueContainerData.setMetadataPath(destinationDirPath + "/metadata");
-      keyValueContainerData.setChunksPath(destinationDirPath + "/chunks");
+      keyValueContainerData.setMetadataPath(destinationDirPath +
+          FILE_SEPARATOR + OzoneConsts.CONTAINER_META_PATH);
+      keyValueContainerData.setChunksPath(destinationDirPath +
+          FILE_SEPARATOR + OzoneConsts.STORAGE_DIR_CHUNKS);
     }
     return success;
   }
@@ -163,9 +173,8 @@ public class CleanUpManager {
 
   /**
    * Delete all files under the /tmp/container_delete_service.
-   * @throws IOException
    */
-  public void cleanTmpDir() {
+  public synchronized void cleanTmpDir() {
     ListIterator<File> leftoversListIt = getDeleteLeftovers();
 
     while (leftoversListIt.hasNext()) {
@@ -184,12 +193,15 @@ public class CleanUpManager {
   }
 
   /**
-   * Delete the /tmp/container_delete_service and all of its contents.
+   * Delete the /container_delete_service and all of its contents.
    * @throws IOException
    */
-  public void deleteTmpDir() throws IOException {
+  public void deleteTmpDir() {
     File deleteDir = new File(tmpDirPath.toString());
-    File tmpDir = deleteDir.getParentFile();
-    FileUtils.deleteDirectory(tmpDir);
+    try {
+      FileUtils.deleteDirectory(deleteDir);
+    } catch (IOException ex) {
+      LOG.error("Error deleting {}", deleteDir.getPath(), ex);
+    }
   }
 }

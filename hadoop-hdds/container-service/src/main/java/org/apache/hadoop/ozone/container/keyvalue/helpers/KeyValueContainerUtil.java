@@ -385,7 +385,7 @@ public final class KeyValueContainerUtil {
   }
 
   /**
-   * Container metadata directory -- here is where the level DB and
+   * Container metadata directory -- here is where the RocksDB and
    * .container file lives.
    *
    * @param kvContainerData - KeyValueContainerData
