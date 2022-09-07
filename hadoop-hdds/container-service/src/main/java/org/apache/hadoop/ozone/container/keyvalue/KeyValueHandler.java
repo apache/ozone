@@ -1240,17 +1240,19 @@ public class KeyValueHandler extends Handler {
               DELETE_ON_NON_EMPTY_CONTAINER);
         }
       }
-      KeyValueContainerData keyValueContainerData =
-          (KeyValueContainerData) container.getContainerData();
-      if (CleanUpManager
-          .checkContainerSchemaV3Enabled(keyValueContainerData)) {
-        HddsVolume hddsVolume = keyValueContainerData.getVolume();
+      if (container.getContainerData() instanceof KeyValueContainerData) {
+        KeyValueContainerData keyValueContainerData =
+            (KeyValueContainerData) container.getContainerData();
+        if (CleanUpManager
+            .checkContainerSchemaV3Enabled(keyValueContainerData)) {
+          HddsVolume hddsVolume = keyValueContainerData.getVolume();
 
-        // Initialize the directory
-        CleanUpManager cleanUpManager =
-            new CleanUpManager(hddsVolume);
-        // Rename
-        cleanUpManager.renameDir(keyValueContainerData);
+          // Initialize the directory
+          CleanUpManager cleanUpManager =
+              new CleanUpManager(hddsVolume);
+          // Rename
+          cleanUpManager.renameDir(keyValueContainerData);
+        }
       }
       long containerId = container.getContainerData().getContainerID();
       containerSet.removeContainer(containerId);

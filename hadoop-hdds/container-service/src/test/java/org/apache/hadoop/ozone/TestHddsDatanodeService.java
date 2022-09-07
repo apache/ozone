@@ -73,10 +73,9 @@ public class TestHddsDatanodeService {
   private final OzoneConfiguration conf = new OzoneConfiguration();
   private final String schemaVersion;
   private static final int SCM_SERVER_COUNT = 1;
+  private static final String FILE_SEPARATOR = File.separator;
 
   private File testDir;
-  private HddsDatanodeService service;
-  private String[] args = new String[] {};
   private CleanUpManager[] managers;
   private List<String> serverAddresses;
   private List<RPC.Server> scmServers;
@@ -124,7 +123,7 @@ public class TestHddsDatanodeService {
     conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
     conf.setBoolean(HDDS_CONTAINER_TOKEN_ENABLED, true);
 
-    String volumeDir = testDir + "/disk1";
+    String volumeDir = testDir + FILE_SEPARATOR + "disk1";
     conf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, volumeDir);
   }
 
@@ -135,7 +134,9 @@ public class TestHddsDatanodeService {
 
   @Test
   public void testStartup() throws IOException {
-    service = HddsDatanodeService.createHddsDatanodeService(args);
+    String[] args = new String[] {};
+    HddsDatanodeService service = HddsDatanodeService
+        .createHddsDatanodeService(args);
     service.start(conf);
 
     assertNotNull(service.getDatanodeDetails());
@@ -166,7 +167,8 @@ public class TestHddsDatanodeService {
         hddsDirs.append(tempHddsVolumes[i]).append(",");
 
         // Write to tmp dir under volume
-        File testFile = new File(manager.getTmpDirPath() + "/testFile.txt");
+        File testFile = new File(manager.getTmpDirPath() +
+            FILE_SEPARATOR + "testFile.txt");
         Files.touch(testFile);
         assertTrue(testFile.exists());
 

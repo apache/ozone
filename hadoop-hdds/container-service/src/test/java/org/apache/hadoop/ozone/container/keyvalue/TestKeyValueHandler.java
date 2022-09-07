@@ -20,10 +20,10 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.HashMap;
+import java.util.List;
 import java.util.UUID;
+import java.util.HashMap;
+import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.FileUtils;
@@ -431,15 +431,16 @@ public class TestKeyValueHandler {
           .thenReturn(Collections.singletonList(
               new HddsVolume.Builder(testDir).conf(conf).build()));
 
-      LinkedList<CleanUpManager> cleanUpManagers = new LinkedList<>();
+      List<HddsVolume> hddsVolumeList = StorageVolumeUtil
+          .getHddsVolumesList(volumeSet.getVolumesList());
 
-      for (HddsVolume hddsVolume : StorageVolumeUtil
-          .getHddsVolumesList(volumeSet.getVolumesList())) {
-        hddsVolume.format(clusterId);
-        hddsVolume.createWorkingDir(clusterId, null);
-        CleanUpManager manager = new CleanUpManager(hddsVolume);
-        cleanUpManagers.add(manager);
-      }
+      assertTrue(hddsVolumeList.size() == 1);
+
+      HddsVolume hddsVolume = hddsVolumeList.get(0);
+
+      hddsVolume.format(clusterId);
+      hddsVolume.createWorkingDir(clusterId, null);
+      CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
 
       final int[] interval = new int[1];
       interval[0] = 2;
@@ -472,9 +473,7 @@ public class TestKeyValueHandler {
       Assert.assertEquals(2, icrReceived.get());
       Assert.assertNull(containerSet.getContainer(containerID));
 
-      for (CleanUpManager manager : cleanUpManagers) {
-        assertTrue(manager.tmpDirIsEmpty());
-      }
+      assertTrue(cleanUpManager.tmpDirIsEmpty());
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }

@@ -82,7 +82,6 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
 import static org.junit.Assume.assumeFalse;
@@ -345,14 +344,20 @@ public class TestContainerPersistence {
     container1.close();
 
     Container container2 = addContainer(containerSet, testContainerID2);
+    container2.close();
 
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID1));
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID2));
 
+    Assert.assertTrue(container1.getContainerData()
+        instanceof KeyValueContainerData);
     KeyValueContainerData container1Data =
         (KeyValueContainerData) container1.getContainerData();
+
+    Assert.assertTrue(container2.getContainerData()
+        instanceof KeyValueContainerData);
     KeyValueContainerData container2Data =
         (KeyValueContainerData) container2.getContainerData();
 
@@ -388,8 +393,8 @@ public class TestContainerPersistence {
       container2ExistsUnderTmpDir = true;
     }
 
-    assertTrue(container1ExistsUnderTmpDir);
-    assertTrue(container2ExistsUnderTmpDir);
+    Assert.assertTrue(container1ExistsUnderTmpDir);
+    Assert.assertTrue(container2ExistsUnderTmpDir);
 
     // Delete container1
     container1.delete();

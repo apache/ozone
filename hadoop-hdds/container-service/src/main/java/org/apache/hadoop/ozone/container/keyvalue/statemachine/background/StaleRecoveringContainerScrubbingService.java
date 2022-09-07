@@ -89,14 +89,17 @@ public class StaleRecoveringContainerScrubbingService
     @Override
     public BackgroundTaskResult call() throws Exception {
       Container container = containerSet.getContainer(containerID);
-      KeyValueContainerData keyValueContainerData =
-          (KeyValueContainerData) container.getContainerData();
-      if (CleanUpManager
-          .checkContainerSchemaV3Enabled(keyValueContainerData)) {
-        HddsVolume hddsVolume = keyValueContainerData.getVolume();
-        CleanUpManager cleanUpManager =
-            new CleanUpManager(hddsVolume);
-        cleanUpManager.renameDir(keyValueContainerData);
+
+      if (container.getContainerData() instanceof KeyValueContainerData) {
+        KeyValueContainerData keyValueContainerData =
+            (KeyValueContainerData) container.getContainerData();
+        if (CleanUpManager
+            .checkContainerSchemaV3Enabled(keyValueContainerData)) {
+          HddsVolume hddsVolume = keyValueContainerData.getVolume();
+          CleanUpManager cleanUpManager =
+              new CleanUpManager(hddsVolume);
+          cleanUpManager.renameDir(keyValueContainerData);
+        }
       }
       containerSet.getContainer(containerID).delete();
       containerSet.removeContainer(containerID);
