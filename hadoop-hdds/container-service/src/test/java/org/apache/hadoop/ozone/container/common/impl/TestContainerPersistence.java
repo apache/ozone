@@ -351,13 +351,9 @@ public class TestContainerPersistence {
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID2));
 
-    Assert.assertTrue(container1.getContainerData()
-        instanceof KeyValueContainerData);
     KeyValueContainerData container1Data =
         (KeyValueContainerData) container1.getContainerData();
 
-    Assert.assertTrue(container2.getContainerData()
-        instanceof KeyValueContainerData);
     KeyValueContainerData container2Data =
         (KeyValueContainerData) container2.getContainerData();
 
