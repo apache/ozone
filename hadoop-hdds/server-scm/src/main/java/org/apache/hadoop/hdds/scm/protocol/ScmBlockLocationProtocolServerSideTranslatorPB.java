@@ -141,7 +141,6 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
         }
         response.setAllocateScmBlockResponse(allocateScmBlock(
             request.getAllocateScmBlockRequest(), request.getVersion()));
-
         break;
       case DeleteScmKeyBlocks:
         response.setDeleteScmKeyBlocksResponse(
@@ -189,17 +188,9 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   public AllocateScmBlockResponseProto allocateScmBlock(
       AllocateScmBlockRequestProto request, int clientVersion)
       throws IOException {
-    LOG.error("###### ###### ##### ");
-    LOG.error("###### ###### ##### ");
-    LOG.error("scm block req: " + request.toString());
-    LOG.error("###### ###### ##### ");
-    LOG.error("###### ###### ##### ");
-
     List<AllocatedBlock> allocatedBlocks =
         impl.allocateBlock(request.getSize(),
             request.getNumBlocks(),
-//            1,
-//            3,
             ReplicationConfig.fromProto(
                 request.getType(),
                 request.getFactor(),

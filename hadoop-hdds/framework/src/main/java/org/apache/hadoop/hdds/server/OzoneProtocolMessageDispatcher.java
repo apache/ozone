@@ -97,7 +97,6 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
             type,
             escapeNewLines(responsePreprocessor.apply(response)));
       }
-
       return response;
 
     } finally {
