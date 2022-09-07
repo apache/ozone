@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -192,6 +193,11 @@ public class ReplicationNodeManagerMock implements NodeManager {
    */
   @Override
   public DatanodeUsageInfo getUsageInfo(DatanodeDetails dn) {
+    return null;
+  }
+
+  @Override
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails dn) {
     return null;
   }
 

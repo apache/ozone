@@ -84,6 +84,7 @@ message ScmContainerLocationRequest {
   optional SingleNodeQueryRequestProto singleNodeQueryRequest = 45;
   optional GetContainersOnDecomNodeRequestProto getContainersOnDecomNodeRequest = 46;
   optional DatanodeDiskBalancerInfoRequestProto DatanodeDiskBalancerInfoRequest = 47;
+  optional DatanodeDiskBalancerOpRequestProto datanodeDiskBalancerOpRequest = 48;
 }
 
 message ScmContainerLocationResponse {
@@ -139,6 +140,7 @@ message ScmContainerLocationResponse {
   optional SingleNodeQueryResponseProto singleNodeQueryResponse = 45;
   optional GetContainersOnDecomNodeResponseProto getContainersOnDecomNodeResponse = 46;
   optional DatanodeDiskBalancerInfoResponseProto DatanodeDiskBalancerInfoResponse = 47;
+  optional DatanodeDiskBalancerOpResponseProto datanodeDiskBalancerOpResponse = 48;
 
   enum Status {
     OK = 1;
@@ -193,6 +195,7 @@ enum Type {
   SingleNodeQuery = 41;
   GetContainersOnDecomNode = 42;
   DatanodeDiskBalancerInfo = 43;
+  DatanodeDiskBalancerOp = 44;
 }
 
 /**
@@ -369,10 +372,27 @@ message DatanodeDiskBalancerInfoRequestProto {
   required DatanodeDiskBalancerInfoType infoType = 1;
   optional uint32 count = 2;
   repeated string hosts = 3;
+  optional DiskBalancerRunningStatus status = 4;
 }
 
 message DatanodeDiskBalancerInfoResponseProto {
   repeated DatanodeDiskBalancerInfoProto info = 1;
+}
+
+enum DatanodeDiskBalancerOpType{
+  start = 1;
+  stop = 2;
+  update = 3;
+}
+
+message DatanodeDiskBalancerOpRequestProto {
+  required DatanodeDiskBalancerOpType opType = 1;
+  repeated string hosts = 2;
+  optional DiskBalancerConfigurationProto conf = 3;
+}
+
+message DatanodeDiskBalancerOpResponseProto {
+  repeated DatanodeAdminErrorResponseProto failedHosts = 1;
 }
 
 /*
