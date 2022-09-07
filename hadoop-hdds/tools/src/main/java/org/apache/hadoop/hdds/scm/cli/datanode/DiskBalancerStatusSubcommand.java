@@ -60,6 +60,7 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
       System.err.println("Unsupported state: " + state);
     }
 
+    assert state != null;
     List<HddsProtos.DatanodeDiskBalancerInfoProto> resultProto =
         scmClient.getDiskBalancerStatus(
             hosts.size() == 0 ? Optional.empty() : Optional.of(hosts),
