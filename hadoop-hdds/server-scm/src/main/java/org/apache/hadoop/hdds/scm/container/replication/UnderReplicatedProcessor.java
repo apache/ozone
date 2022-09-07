@@ -67,6 +67,9 @@ public class UnderReplicatedProcessor {
     int processed = 0;
     int failed = 0;
     while (true) {
+      if (!replicationManager.shouldRun()) {
+        break;
+      }
       ContainerHealthResult.UnderReplicatedHealthResult underRep =
           replicationManager.dequeueUnderReplicatedContainer();
       if (underRep == null) {

@@ -268,6 +268,7 @@ public class TestLegacyReplicationManager {
         eventQueue,
         SCMContext.emptyContext(),
         nodeManager,
+        serviceManager,
         clock,
         legacyRM,
         containerReplicaPendingOps);

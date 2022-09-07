@@ -94,6 +94,7 @@ public class TestReplicationManager {
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     containerReplicaPendingOps =
         new ContainerReplicaPendingOps(configuration, clock);
+    SCMServiceManager serviceManager = new SCMServiceManager();
 
     Mockito.when(containerManager
         .getContainerReplicas(Mockito.any(ContainerID.class))).thenAnswer(
@@ -112,6 +113,7 @@ public class TestReplicationManager {
         eventPublisher,
         scmContext,
         nodeManager,
+        serviceManager,
         clock,
         legacyReplicationManager,
         containerReplicaPendingOps);

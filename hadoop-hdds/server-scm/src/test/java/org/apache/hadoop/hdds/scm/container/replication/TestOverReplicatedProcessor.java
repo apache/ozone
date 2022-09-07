@@ -66,6 +66,7 @@ public class TestOverReplicatedProcessor {
     repConfig = new ECReplicationConfig(3, 2);
     overReplicatedProcessor = new OverReplicatedProcessor(
         replicationManager, pendingOps, eventPublisher);
+    Mockito.when(replicationManager.shouldRun()).thenReturn(true);
   }
 
   @Test

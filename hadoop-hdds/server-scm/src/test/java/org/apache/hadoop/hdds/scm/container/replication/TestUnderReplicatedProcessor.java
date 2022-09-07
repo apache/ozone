@@ -68,6 +68,7 @@ public class TestUnderReplicatedProcessor {
     repConfig = new ECReplicationConfig(3, 2);
     underReplicatedProcessor = new UnderReplicatedProcessor(
         replicationManager, pendingOps, eventPublisher);
+    Mockito.when(replicationManager.shouldRun()).thenReturn(true);
   }
 
   @Test

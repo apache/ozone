@@ -38,8 +38,10 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -103,6 +105,8 @@ public class ReplicationManager implements SCMService {
   private final ReplicationManagerConfiguration rmConf;
   private final NodeManager nodeManager;
 
+  private final SCMServiceManager serviceManager;
+
   /**
    * ReplicationMonitor thread is the one which wakes up at configured
    * interval and processes all the containers.
@@ -153,6 +157,8 @@ public class ReplicationManager implements SCMService {
   private final ECUnderReplicationHandler ecUnderReplicationHandler;
   private final ECOverReplicationHandler ecOverReplicationHandler;
   private final int maintenanceRedundancy;
+  private BackgroundSCMService underReplicatedQueueThread;
+  private BackgroundSCMService overReplicatedQueueThread;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -169,6 +175,7 @@ public class ReplicationManager implements SCMService {
              final EventPublisher eventPublisher,
              final SCMContext scmContext,
              final NodeManager nodeManager,
+             final SCMServiceManager serviceManager,
              final Clock clock,
              final LegacyReplicationManager legacyReplicationManager,
              final ContainerReplicaPendingOps replicaPendingOps)
@@ -189,6 +196,7 @@ public class ReplicationManager implements SCMService {
     this.legacyReplicationManager = legacyReplicationManager;
     this.ecContainerHealthCheck = new ECContainerHealthCheck();
     this.nodeManager = nodeManager;
+    this.serviceManager = serviceManager;
     this.underRepQueue = createUnderReplicatedQueue();
     this.overRepQueue = new LinkedList<>();
     this.maintenanceRedundancy = rmConf.maintenanceRemainingRedundancy;
@@ -196,6 +204,7 @@ public class ReplicationManager implements SCMService {
         containerPlacement, conf, nodeManager);
     ecOverReplicationHandler =
         new ECOverReplicationHandler(containerPlacement, nodeManager);
+    createSubServices();
     start();
   }
 
@@ -213,6 +222,8 @@ public class ReplicationManager implements SCMService {
       replicationMonitor.setName("ReplicationMonitor");
       replicationMonitor.setDaemon(true);
       replicationMonitor.start();
+      underReplicatedQueueThread.start();
+      overReplicatedQueueThread.start();
     } else {
       LOG.info("Replication Monitor Thread is already running.");
     }
@@ -239,6 +250,8 @@ public class ReplicationManager implements SCMService {
   public synchronized void stop() {
     if (running) {
       LOG.info("Stopping Replication Monitor Thread.");
+      underReplicatedQueueThread.stop();
+      overReplicatedQueueThread.stop();
       running = false;
       legacyReplicationManager.clearInflightActions();
       metrics.unRegister();
@@ -246,6 +259,38 @@ public class ReplicationManager implements SCMService {
     } else {
       LOG.info("Replication Monitor Thread is not running.");
     }
+  }
+
+  /**
+   * Create Replication Manager sub services such as Over and Under Replication
+   * processors.
+   */
+  private void createSubServices() {
+    UnderReplicatedProcessor underReplicatedProcessor =
+        new UnderReplicatedProcessor(this, containerReplicaPendingOps,
+            eventPublisher);
+
+    underReplicatedQueueThread =
+        new BackgroundSCMService.Builder().setClock(clock)
+            .setScmContext(scmContext)
+            .setServiceName("UnderReplicatedQueueThread")
+            .setIntervalInMillis(rmConf.getUnderReplicatedInterval())
+            .setWaitTimeInMillis(waitTimeInMillis)
+            .setPeriodicalTask(underReplicatedProcessor::processAll).build();
+    serviceManager.register(underReplicatedQueueThread);
+
+    OverReplicatedProcessor overReplicatedProcessor =
+        new OverReplicatedProcessor(this, containerReplicaPendingOps,
+            eventPublisher);
+
+    overReplicatedQueueThread =
+        new BackgroundSCMService.Builder().setClock(clock)
+            .setScmContext(scmContext)
+            .setServiceName("OverReplicatedQueueThread")
+            .setIntervalInMillis(rmConf.getOverReplicatedInterval())
+            .setWaitTimeInMillis(waitTimeInMillis)
+            .setPeriodicalTask(overReplicatedProcessor::processAll).build();
+    serviceManager.register(overReplicatedQueueThread);
   }
 
   /**

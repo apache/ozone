@@ -65,6 +65,9 @@ public class OverReplicatedProcessor {
     int processed = 0;
     int failed = 0;
     while (true) {
+      if (!replicationManager.shouldRun()) {
+        break;
+      }
       ContainerHealthResult.OverReplicatedHealthResult overRep =
           replicationManager.dequeueOverReplicatedContainer();
       if (overRep == null) {
