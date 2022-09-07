@@ -34,10 +34,18 @@ import java.util.Map;
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
+<<<<<<< HEAD
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerActionsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
+=======
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.CRLStatusReport;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
+>>>>>>> 96e0342226 (HDDS-7155. [DiskBalancer] Create interface between SCM and DN (#3701))
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
@@ -53,6 +61,25 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+<<<<<<< HEAD
+=======
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_ACTIONS;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.DISK_BALANCER_REPORT;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents
+    .INCREMENTAL_CONTAINER_REPORT;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.CMD_STATUS_REPORT;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_ACTIONS;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+
+>>>>>>> 96e0342226 (HDDS-7155. [DiskBalancer] Create interface between SCM and DN (#3701))
 /**
  * This class is responsible for dispatching heartbeat from datanode to
  * appropriate EventHandler at SCM.
@@ -187,6 +214,15 @@ public final class SCMDatanodeHeartbeatDispatcher {
                   datanodeDetails,
                   commandStatusReport));
         }
+      }
+
+      if (heartbeat.hasDiskBalancerReport()) {
+        LOG.debug("Dispatching DiskBalancer Report.");
+        eventPublisher.fireEvent(
+            DISK_BALANCER_REPORT,
+            new DiskBalancerReportFromDatanode(
+                datanodeDetails,
+                heartbeat.getDiskBalancerReport()));
       }
     }
     if (LOG.isDebugEnabled()) {
@@ -445,4 +481,31 @@ public final class SCMDatanodeHeartbeatDispatcher {
       super(datanodeDetails, report);
     }
   }
+<<<<<<< HEAD
+=======
+
+  /**
+   * CRL Status report event payload with origin.
+   */
+  public static class CRLStatusReportFromDatanode
+      extends ReportFromDatanode<CRLStatusReport> {
+
+    public CRLStatusReportFromDatanode(DatanodeDetails datanodeDetails,
+                                           CRLStatusReport report) {
+      super(datanodeDetails, report);
+    }
+  }
+
+  /**
+   * DiskBalancer report event payload with origin.
+   */
+  public static class DiskBalancerReportFromDatanode
+      extends ReportFromDatanode<DiskBalancerReportProto> {
+
+    public DiskBalancerReportFromDatanode(DatanodeDetails datanodeDetails,
+        DiskBalancerReportProto report) {
+      super(datanodeDetails, report);
+    }
+  }
+>>>>>>> 96e0342226 (HDDS-7155. [DiskBalancer] Create interface between SCM and DN (#3701))
 }

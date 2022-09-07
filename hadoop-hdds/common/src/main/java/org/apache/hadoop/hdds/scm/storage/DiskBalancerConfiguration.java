@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +36,7 @@ public final class DiskBalancerConfiguration {
   private static final Logger LOG =
       LoggerFactory.getLogger(DiskBalancerConfiguration.class);
 
-  @Config(key = "volume.density.threshold", type = ConfigType.AUTO,
+  @Config(key = "volume.density.threshold", type = ConfigType.DOUBLE,
       defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
       description = "Threshold is a percentage in the range of 0 to 100. A " +
           "datanode is considered balanced if for each volume, the " +
@@ -45,12 +45,12 @@ public final class DiskBalancerConfiguration {
           " of the entire datanode) no more than the threshold.")
   private double threshold = 10d;
 
-  @Config(key = "max.disk.throughputInMBPerSec", type = ConfigType.AUTO,
+  @Config(key = "max.disk.throughputInMBPerSec", type = ConfigType.LONG,
       defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
       description = "The max balance speed.")
-  private double diskBandwidth = 10;
+  private long diskBandwidthInMB = 10;
 
-  @Config(key = "parallel.thread", type = ConfigType.AUTO,
+  @Config(key = "parallel.thread", type = ConfigType.INT,
       defaultValue = "5", tags = {ConfigTag.DISKBALANCER},
       description = "The max parallel balance thread count.")
   private int parallelThread = 5;
@@ -86,21 +86,21 @@ public final class DiskBalancerConfiguration {
    *
    * @return max disk bandwidth per second
    */
-  public double getDiskBandwidth() {
-    return diskBandwidth;
+  public double getDiskBandwidthInMB() {
+    return diskBandwidthInMB;
   }
 
   /**
    * Sets the disk bandwidth value for Disk Balancer.
    *
-   * @param diskBandwidth the bandwidth to control balance speed
+   * @param diskBandwidthInMB the bandwidth to control balance speed
    */
-  public void setDiskBandwidth(double diskBandwidth) {
-    if (diskBandwidth <= 0d) {
+  public void setDiskBandwidthInMB(long diskBandwidthInMB) {
+    if (diskBandwidthInMB <= 0L) {
       throw new IllegalArgumentException(
-          "diskBandwidth must be a value larger than 0.");
+          "diskBandwidthInMB must be a value larger than 0.");
     }
-    this.diskBandwidth = diskBandwidth;
+    this.diskBandwidthInMB = diskBandwidthInMB;
   }
 
   /**
@@ -124,6 +124,7 @@ public final class DiskBalancerConfiguration {
     }
     this.parallelThread = parallelThread;
   }
+
   @Override
   public String toString() {
     return String.format("Disk Balancer Configuration values:%n" +
@@ -132,7 +133,7 @@ public final class DiskBalancerConfiguration {
             "%-50s %s%n" +
             "%-50s %s%n",
             "Key", "Value",
-        "Threshold", threshold, "Max disk bandwidth", diskBandwidth,
+        "Threshold", threshold, "Max disk bandwidth", diskBandwidthInMB,
         "Parallel Thread", parallelThread);
   }
 
@@ -141,21 +142,21 @@ public final class DiskBalancerConfiguration {
         HddsProtos.DiskBalancerConfigurationProto.newBuilder();
 
     builder.setThreshold(threshold)
-        .setDiskBandwidth(diskBandwidth)
+        .setDiskBandwidthInMB(diskBandwidthInMB)
         .setParallelThread(parallelThread);
     return builder;
   }
 
-  static DiskBalancerConfiguration fromProtobuf(
+  public static DiskBalancerConfiguration fromProtobuf(
       @Nonnull HddsProtos.DiskBalancerConfigurationProto proto,
-      @Nonnull OzoneConfiguration ozoneConfiguration) {
+      @Nonnull ConfigurationSource configurationSource) {
     DiskBalancerConfiguration config =
-        ozoneConfiguration.getObject(DiskBalancerConfiguration.class);
+        configurationSource.getObject(DiskBalancerConfiguration.class);
     if (proto.hasThreshold()) {
       config.setThreshold(proto.getThreshold());
     }
-    if (proto.hasDiskBandwidth()) {
-      config.setDiskBandwidth(proto.getDiskBandwidth());
+    if (proto.hasDiskBandwidthInMB()) {
+      config.setDiskBandwidthInMB(proto.getDiskBandwidthInMB());
     }
     if (proto.hasParallelThread()) {
       config.setParallelThread(proto.getParallelThread());
