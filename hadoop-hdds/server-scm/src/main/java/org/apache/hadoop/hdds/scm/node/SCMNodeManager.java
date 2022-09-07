@@ -984,6 +984,23 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
+   * Get the usage info of a specified datanode.
+   *
+   * @param dn the usage of which we want to get
+   * @return DatanodeUsageInfo of the specified datanode
+   */
+  @Override
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails dn) {
+    try {
+      return nodeStateManager.getNode(dn);
+    } catch (NodeNotFoundException e) {
+      LOG.warn("Cannot retrieve DatanodeInfo, datanode {} not found.",
+          dn.getUuid());
+      return null;
+    }
+  }
+
+  /**
    * Return the node stat of the specified datanode.
    *
    * @param datanodeDetails - datanode ID.

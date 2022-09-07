@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.CRLStatusReport;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
@@ -57,6 +58,7 @@ import java.util.UUID;
 
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.DISK_BALANCER_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents
     .INCREMENTAL_CONTAINER_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
@@ -200,6 +202,15 @@ public final class SCMDatanodeHeartbeatDispatcher {
                   datanodeDetails,
                   commandStatusReport));
         }
+      }
+
+      if (heartbeat.hasDiskBalancerReport()) {
+        LOG.debug("Dispatching DiskBalancer Report.");
+        eventPublisher.fireEvent(
+            DISK_BALANCER_REPORT,
+            new DiskBalancerReportFromDatanode(
+                datanodeDetails,
+                heartbeat.getDiskBalancerReport()));
       }
     }
 
@@ -450,6 +461,18 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     public CRLStatusReportFromDatanode(DatanodeDetails datanodeDetails,
                                            CRLStatusReport report) {
+      super(datanodeDetails, report);
+    }
+  }
+
+  /**
+   * DiskBalancer report event payload with origin.
+   */
+  public static class DiskBalancerReportFromDatanode
+      extends ReportFromDatanode<DiskBalancerReportProto> {
+
+    public DiskBalancerReportFromDatanode(DatanodeDetails datanodeDetails,
+        DiskBalancerReportProto report) {
       super(datanodeDetails, report);
     }
   }

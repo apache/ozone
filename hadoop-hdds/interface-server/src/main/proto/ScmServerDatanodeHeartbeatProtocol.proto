@@ -139,6 +139,7 @@ message SCMHeartbeatRequestProto {
   optional PipelineReportsProto pipelineReports = 8;
   optional LayoutVersionProto dataNodeLayoutVersion = 9;
   optional CommandQueueReportProto commandQueueReport = 10;
+  optional DiskBalancerReportProto diskBalancerReport = 11;
 }
 
 message CommandQueueReportProto {
@@ -328,6 +329,7 @@ message SCMCommandProto {
     finalizeNewLayoutVersionCommand = 9;
     refreshVolumeUsageInfo = 10;
     reconstructECContainersCommand = 11;
+    diskBalancerCommand = 12;
   }
   // TODO: once we start using protoc 3.x, refactor this message using "oneof"
   required Type commandType = 1;
@@ -343,6 +345,7 @@ message SCMCommandProto {
   finalizeNewLayoutVersionCommandProto = 10;
   optional RefreshVolumeUsageCommandProto refreshVolumeUsageCommandProto = 11;
   optional ReconstructECContainersCommandProto reconstructECContainersCommandProto = 12;
+  optional DiskBalancerCommandProto diskBalancerCommandProto = 13;
 
 
   // If running upon Ratis, holds term of underlying RaftServer iff current
@@ -446,6 +449,14 @@ message DatanodeDetailsAndReplicaIndexProto {
 }
 
 /**
+This command asks the datanode to update diskBalancer status
+ */
+message DiskBalancerCommandProto {
+  required bool shouldRun = 1;
+  optional DiskBalancerConfigurationProto diskBalancerConf = 2;
+}
+
+/**
 This command asks the datanode to create a pipeline.
 */
 message CreatePipelineCommandProto {
@@ -481,6 +492,12 @@ message SetNodeOperationalStateCommandProto {
 message CRLStatusReport {
   required int64 receivedCrlId=1;
   repeated int64 pendingCrlIds=2;
+}
+
+message DiskBalancerReportProto {
+  required bool isRunning = 1;
+  optional uint64 balancedBytes = 2;
+  optional DiskBalancerConfigurationProto diskBalancerConf = 3;
 }
 
 /**

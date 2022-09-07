@@ -524,13 +524,19 @@ message InnerNode {
 
 message DiskBalancerConfigurationProto {
     optional double threshold = 1;
-    optional double diskBandwidth = 2;
+    optional uint64 diskBandwidthInMB = 2;
     optional int32 parallelThread = 3;
+}
+
+enum DiskBalancerRunningStatus {
+    RUNNING = 1;
+    STOPPED = 2;
+    UNKNOWN = 3;
 }
 
 message DatanodeDiskBalancerInfoProto {
     required DatanodeDetailsProto node = 1;
     required double currentVolumeDensitySum = 2;
-    optional bool diskBalancerRunning = 3;
+    optional DiskBalancerRunningStatus runningStatus = 3;
     optional DiskBalancerConfigurationProto diskBalancerConf = 4;
 }

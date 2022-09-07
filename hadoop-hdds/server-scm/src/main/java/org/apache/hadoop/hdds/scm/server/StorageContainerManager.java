@@ -71,6 +71,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.node.DiskBalancerManager;
+import org.apache.hadoop.hdds.scm.node.DiskBalancerReportHandler;
 import org.apache.hadoop.hdds.scm.node.NodeAddressUpdateHandler;
 import org.apache.hadoop.hdds.scm.security.SecretKeyManagerService;
 import org.apache.hadoop.hdds.scm.security.RootCARotationManager;
@@ -507,6 +508,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new PipelineActionHandler(pipelineManager, scmContext, configuration);
     CRLStatusReportHandler crlStatusReportHandler =
         new CRLStatusReportHandler(certificateStore, configuration);
+    DiskBalancerReportHandler diskBalancerReportHandler =
+        new DiskBalancerReportHandler(diskBalancerManager);
 
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
@@ -584,6 +587,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmNodeManager.registerSendCommandNotify(
         SCMCommandProto.Type.deleteBlocksCommand,
         scmBlockManager.getDeletedBlockLog()::onSent);
+    eventQueue.addHandler(SCMEvents.DISK_BALANCER_REPORT,
+        diskBalancerReportHandler);
   }
 
   private void initializeCertificateClient() throws IOException {

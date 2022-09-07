@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 
@@ -55,6 +56,8 @@ public class ReportPublisherFactory {
     report2publisher.put(PipelineReportsProto.class,
             PipelineReportPublisher.class);
     report2publisher.put(CRLStatusReport.class, CRLStatusReportPublisher.class);
+    report2publisher.put(DiskBalancerReportProto.class,
+        DiskBalancerReportPublisher.class);
   }
 
   /**

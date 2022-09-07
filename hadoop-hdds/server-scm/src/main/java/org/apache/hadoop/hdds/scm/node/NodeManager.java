@@ -176,6 +176,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   DatanodeUsageInfo getUsageInfo(DatanodeDetails dn);
 
   /**
+   * Get the datanode info of a specified datanode.
+   *
+   * @param dn the usage of which we want to get
+   * @return DatanodeInfo of the specified datanode
+   */
+  DatanodeInfo getDatanodeInfo(DatanodeDetails dn);
+
+  /**
    * Return the node stat of the specified datanode.
    * @param datanodeDetails DatanodeDetails.
    * @return node stat if it is live/stale, null if it is decommissioned or

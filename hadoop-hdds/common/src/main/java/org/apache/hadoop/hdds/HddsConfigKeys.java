@@ -46,6 +46,10 @@ public final class HddsConfigKeys {
       "hdds.pipeline.report.interval";
   public static final String HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT =
       "60s";
+  public static final String HDDS_DISK_BALANCER_REPORT_INTERVAL =
+      "hdds.disk.balancer.report.interval";
+  public static final String HDDS_DISK_BALANCER_REPORT_INTERVAL_DEFAULT =
+      "60s";
   public static final String HDDS_COMMAND_STATUS_REPORT_INTERVAL =
       "hdds.command.status.report.interval";
   public static final String HDDS_COMMAND_STATUS_REPORT_INTERVAL_DEFAULT =

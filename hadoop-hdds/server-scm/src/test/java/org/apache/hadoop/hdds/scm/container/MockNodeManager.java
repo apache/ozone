@@ -349,7 +349,36 @@ public class MockNodeManager implements NodeManager {
    */
   @Override
   public List<DatanodeDetails> getAllNodes() {
-    return new ArrayList<>(nodeMetricMap.keySet());
+    // mock storage reports for TestDiskBalancer
+    List<DatanodeDetails> healthyNodesWithInfo = new ArrayList<>();
+    for (Map.Entry<DatanodeDetails, SCMNodeStat> entry:
+        nodeMetricMap.entrySet()) {
+      NodeStatus nodeStatus = NodeStatus.inServiceHealthy();
+      if (staleNodes.contains(entry.getKey())) {
+        nodeStatus = NodeStatus.inServiceStale();
+      } else if (deadNodes.contains(entry.getKey())) {
+        nodeStatus = NodeStatus.inServiceDead();
+      }
+      DatanodeInfo di = new DatanodeInfo(entry.getKey(), nodeStatus,
+          UpgradeUtils.defaultLayoutVersionProto());
+
+      long capacity = entry.getValue().getCapacity().get();
+      long used = entry.getValue().getScmUsed().get();
+      long remaining = entry.getValue().getRemaining().get();
+      StorageReportProto storage1 = HddsTestUtils.createStorageReport(
+          di.getUuid(), "/data1-" + di.getUuidString(),
+          capacity, used, remaining, null);
+      MetadataStorageReportProto metaStorage1 =
+          HddsTestUtils.createMetadataStorageReport(
+              "/metadata1-" + di.getUuidString(), capacity, used,
+              remaining, null);
+      di.updateStorageReports(new ArrayList<>(Arrays.asList(storage1)));
+      di.updateMetaDataStorageReports(
+          new ArrayList<>(Arrays.asList(metaStorage1)));
+
+      healthyNodesWithInfo.add(di);
+    }
+    return healthyNodesWithInfo;
   }
 
   /**
@@ -410,6 +439,26 @@ public class MockNodeManager implements NodeManager {
   public DatanodeUsageInfo getUsageInfo(DatanodeDetails datanodeDetails) {
     SCMNodeStat stat = nodeMetricMap.get(datanodeDetails);
     return new DatanodeUsageInfo(datanodeDetails, stat);
+  }
+
+  @Override
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails dd) {
+    DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),
+        UpgradeUtils.defaultLayoutVersionProto());
+    long capacity = nodeMetricMap.get(dd).getCapacity().get();
+    long used = nodeMetricMap.get(dd).getScmUsed().get();
+    long remaining = nodeMetricMap.get(dd).getRemaining().get();
+    StorageReportProto storage1 = HddsTestUtils.createStorageReport(
+        di.getUuid(), "/data1-" + di.getUuidString(),
+        capacity, used, remaining, null);
+    MetadataStorageReportProto metaStorage1 =
+        HddsTestUtils.createMetadataStorageReport(
+            "/metadata1-" + di.getUuidString(), capacity, used,
+            remaining, null);
+    di.updateStorageReports(new ArrayList<>(Arrays.asList(storage1)));
+    di.updateMetaDataStorageReports(
+        new ArrayList<>(Arrays.asList(metaStorage1)));
+    return di;
   }
 
   /**
