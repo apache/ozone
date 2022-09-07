@@ -79,6 +79,7 @@ public final class DBStoreBuilder {
   private ManagedColumnFamilyOptions defaultCfOptions;
   private String dbname;
   private Path dbPath;
+  private String dbJmxBeanNameName;
   // Maps added column family names to the column family options they were
   // added with. Value will be null if the column family was not added with
   // any options. On build, this will be replaced with defaultCfOptions.
@@ -188,7 +189,7 @@ public final class DBStoreBuilder {
       }
 
       return new RDBStore(dbFile, rocksDBOption, writeOptions, tableConfigs,
-          registry, openReadOnly);
+          registry, openReadOnly, dbJmxBeanNameName);
     } finally {
       tableConfigs.forEach(TableConfig::close);
     }
@@ -196,6 +197,11 @@ public final class DBStoreBuilder {
 
   public DBStoreBuilder setName(String name) {
     dbname = name;
+    return this;
+  }
+
+  public DBStoreBuilder setDBJmxBeanNameName(String name) {
+    dbJmxBeanNameName = name;
     return this;
   }
 

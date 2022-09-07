@@ -1612,6 +1612,30 @@
   </property>
 
   <property>
+    <name>ozone.s3.administrators</name>
+    <value/>
+    <tag>OZONE, SECURITY</tag>
+    <description>
+      S3 administrator users delimited by a comma.
+      This is the list of users who can access admin only information from s3.
+      If this property is empty then ozone.administrators will be able to access all
+      s3 information regardless of this setting.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3.administrators.groups</name>
+    <value/>
+    <tag>OZONE, SECURITY</tag>
+    <description>
+      S3 administrator groups delimited by a comma.
+      This is the list of groups who can access admin only information
+      from S3.
+      It is enough to either have the name defined in ozone.s3.administrators
+      or be directly or indirectly in a group defined in this property.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.s3g.volume.name</name>
     <value>s3v</value>
     <tag>OZONE, S3GATEWAY</tag>
