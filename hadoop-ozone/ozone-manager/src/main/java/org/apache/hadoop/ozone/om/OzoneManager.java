@@ -225,8 +225,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
@@ -335,6 +333,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * OM super user / admin list.
    */
   private final OzoneAdmins omAdmins;
+  private final OzoneAdmins s3OzoneAdmins;
 
   private final OMMetrics metrics;
   private final ProtocolMessageMetrics<ProtocolMessageEnum>
@@ -574,10 +573,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Get admin list
     Collection<String> omAdminUsernames =
-        getOzoneAdminsFromConfig(configuration);
+        OzoneConfigUtil.getOzoneAdminsFromConfig(configuration);
     Collection<String> omAdminGroups =
-        getOzoneAdminsGroupsFromConfig(configuration);
+        OzoneConfigUtil.getOzoneAdminsGroupsFromConfig(configuration);
     omAdmins = new OzoneAdmins(omAdminUsernames, omAdminGroups);
+
+    Collection<String> s3AdminUsernames =
+            OzoneConfigUtil.getS3AdminsFromConfig(configuration);
+    Collection<String> s3AdminGroups =
+            OzoneConfigUtil.getS3AdminsGroupsFromConfig(configuration);
+    s3OzoneAdmins = new OzoneAdmins(s3AdminUsernames, s3AdminGroups);
     instantiateServices(false);
 
     // Create special volume s3v which is required for S3G.
@@ -4061,24 +4066,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Return list of OzoneAdministrators from config.
-   */
-  Collection<String> getOzoneAdminsFromConfig(OzoneConfiguration conf)
-      throws IOException {
-    Collection<String> ozAdmins =
-        conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
-    String omSPN = UserGroupInformation.getCurrentUser().getShortUserName();
-    if (!ozAdmins.contains(omSPN)) {
-      ozAdmins.add(omSPN);
-    }
-    return ozAdmins;
-  }
-
-  Collection<String> getOzoneAdminsGroupsFromConfig(OzoneConfiguration conf) {
-    return conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS);
-  }
-
-  /**
    * Return the list of Ozone administrators in effect.
    */
   Collection<String> getOmAdminUsernames() {
@@ -4095,6 +4082,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isAdmin(UserGroupInformation callerUgi) {
     return callerUgi != null && omAdmins.isAdmin(callerUgi);
+  }
+
+  public boolean isS3Admin(UserGroupInformation callerUgi) {
+    return callerUgi != null && s3OzoneAdmins.isAdmin(callerUgi);
   }
 
   /**
