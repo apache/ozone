@@ -409,7 +409,10 @@ public class BaseFreonGenerator {
       volume.getBucket(bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
+        LOG.error("**** **** **** **** **** **** **** **** **** ");
+        LOG.error("be ready to create bucket " + bucketName);
         volume.createBucket(bucketName);
+        LOG.error("**** **** **** **** **** **** **** **** **** ");
       } else {
         throw ex;
       }
@@ -427,7 +430,12 @@ public class BaseFreonGenerator {
       rpcClient.getObjectStore().getVolume(volumeName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
+        LOG.error("**** **** **** **** **** **** **** **** **** ");
+        LOG.error("be ready to create vol " + volumeName);
+
         rpcClient.getObjectStore().createVolume(volumeName);
+        LOG.error("**** **** **** **** **** **** **** **** **** ");
+
       } else {
         throw ex;
       }

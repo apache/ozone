@@ -142,10 +142,10 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     init();
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
     rpcClient = createOzoneClient(omServiceID, ozoneConfiguration);
-    ozbk = rpcClient.getObjectStore().getVolume(volumeName)
-            .getBucket(bucketName);
 
     ensureVolumeAndBucketExist(rpcClient, volumeName, bucketName);
+    ozbk = rpcClient.getObjectStore().getVolume(volumeName)
+            .getBucket(bucketName);
     timer = getMetrics().timer("key-read-write");
     if (wSizeInBytes >= 0) {
       keyContent = RandomUtils.nextBytes(wSizeInBytes);
@@ -155,6 +155,12 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
 //      String encodedStr = DigestUtils.md5Hex(String.valueOf(i));
 //      intToMd5Hash.put(i, encodedStr.substring(0,7));
 //    }
+    runTests(this::readWriteKeys);
+    rpcClient.close();
+    return null;
+  }
+
+  public void readWriteKeys(long counter) throws Exception {
     int startIdx = 0, endIdx = 0;
     switch (decideReadOrWriteTask()) {
       case READTASK:
@@ -179,12 +185,7 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     } else {
       keyName = generateMd5ObjectName(randomIdxWithinRange);
     }
-    runTests(this::readWriteKeys);
-    rpcClient.close();
-    return null;
-  }
 
-  public void readWriteKeys(long counter) throws Exception {
 //    List<Future<Object>> readWriteResults = timer.time(() -> {
     timer.time(() -> {
 //      List<Future<Object>> readResults = null;
@@ -219,9 +220,13 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     if (readMetadataOnly) {
         ozbk.getKey(keyName);
     } else {
-        byte[] data = new byte[wSizeInBytes];
+      LOG.error("ozbk is about write to key : " + keyName);
+
+      byte[] data = new byte[wSizeInBytes];
         OzoneInputStream introStream = ozbk.readKey(keyName);
         introStream.read(data);
+      LOG.error("ozbk compete read key : " + keyName);
+
         introStream.close();
     }
   }
@@ -233,17 +238,24 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   }
   public void processWriteTasks() throws Exception {
     if (writeRangeKeys) {
+      LOG.error("*** *** *** *** *** *** *** *** *** ");
       for (int i = startIndexForWrite; i < endIndexForWrite + 1; i++) {
+        LOG.error("Range write start for i = " + i);
         createKeyAndWrite(generateKeyName(i));
       }
+      LOG.error("*** *** *** *** *** *** *** *** *** ");
+
     } else {
       createKeyAndWrite(keyName);
     }
   }
 
   public void createKeyAndWrite(String key) throws Exception{
+    LOG.error("ozbk is about write to key : " + key);
     OzoneOutputStream out = ozbk.createKey(key, wSizeInBytes);
     out.write(keyContent);
+    LOG.error("ozbk complete write to key : " + key);
+
     out.flush();
     out.close();
   }
