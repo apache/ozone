@@ -32,8 +32,6 @@ public class DiskBalancerStatus {
   private boolean isRunning;
   private DiskBalancerConfiguration diskBalancerConfiguration;
 
-  public static final DiskBalancerStatus DUMMY_STATUS =
-      new DiskBalancerStatus(false, new DiskBalancerConfiguration());
 
   public DiskBalancerStatus(boolean isRunning, DiskBalancerConfiguration conf) {
     this.isRunning = isRunning;

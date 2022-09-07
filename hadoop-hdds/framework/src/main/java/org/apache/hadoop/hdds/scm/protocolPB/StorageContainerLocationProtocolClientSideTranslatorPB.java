@@ -45,6 +45,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerInfoType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerInfoRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerOpType;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerOpRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerOpResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesResponseProto;
@@ -1052,11 +1055,14 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   @Override
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      Optional<List<String>> hosts, int clientVersion) throws IOException {
+      Optional<List<String>> hosts,
+      Optional<HddsProtos.DiskBalancerRunningStatus> status,
+      int clientVersion) throws IOException {
     DatanodeDiskBalancerInfoRequestProto.Builder requestBuilder =
         DatanodeDiskBalancerInfoRequestProto.newBuilder()
             .setInfoType(DatanodeDiskBalancerInfoType.status);
     hosts.ifPresent(requestBuilder::addAllHosts);
+    status.ifPresent(requestBuilder::setStatus);
     DatanodeDiskBalancerInfoRequestProto request = requestBuilder.build();
 
     DatanodeDiskBalancerInfoResponseProto response =
@@ -1068,22 +1074,83 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void startDiskBalancer(Optional<Double> threshold,
-      Optional<Double> bandwidth, Optional<List<String>> hosts)
-      throws IOException {
+  public List<DatanodeAdminError> startDiskBalancer(Optional<Double> threshold,
+      Optional<Long> bandwidthInMB, Optional<Integer> parallelThread,
+      Optional<List<String>> hosts) throws IOException {
+    HddsProtos.DiskBalancerConfigurationProto.Builder confBuilder =
+        HddsProtos.DiskBalancerConfigurationProto.newBuilder();
+    threshold.ifPresent(confBuilder::setThreshold);
+    bandwidthInMB.ifPresent(confBuilder::setDiskBandwidthInMB);
+    parallelThread.ifPresent(confBuilder::setParallelThread);
 
+    DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
+        DatanodeDiskBalancerOpRequestProto.newBuilder()
+            .setOpType(DatanodeDiskBalancerOpType.start)
+            .setConf(confBuilder);
+    hosts.ifPresent(requestBuilder::addAllHosts);
+
+    DatanodeDiskBalancerOpResponseProto response =
+        submitRequest(Type.DatanodeDiskBalancerOp,
+            builder -> builder.setDatanodeDiskBalancerOpRequest(
+                requestBuilder.build()))
+            .getDatanodeDiskBalancerOpResponse();
+
+    List<DatanodeAdminError> errors = new ArrayList<>();
+    for (DatanodeAdminErrorResponseProto e : response.getFailedHostsList()) {
+      errors.add(new DatanodeAdminError(e.getHost(), e.getError()));
+    }
+    return errors;
   }
 
   @Override
-  public void stopDiskBalancer(Optional<List<String>> hosts)
+  public List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
       throws IOException {
+    DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
+        DatanodeDiskBalancerOpRequestProto.newBuilder()
+            .setOpType(DatanodeDiskBalancerOpType.stop);
+    hosts.ifPresent(requestBuilder::addAllHosts);
 
+    DatanodeDiskBalancerOpResponseProto response =
+        submitRequest(Type.DatanodeDiskBalancerOp,
+            builder -> builder.setDatanodeDiskBalancerOpRequest(
+                requestBuilder.build()))
+            .getDatanodeDiskBalancerOpResponse();
+
+    List<DatanodeAdminError> errors = new ArrayList<>();
+    for (DatanodeAdminErrorResponseProto e : response.getFailedHostsList()) {
+      errors.add(new DatanodeAdminError(e.getHost(), e.getError()));
+    }
+    return errors;
   }
 
   @Override
-  public void updateDiskBalancerConfiguration(Optional<Double> threshold,
-      Optional<Double> bandwidth, Optional<List<String>> hosts)
+  public List<DatanodeAdminError> updateDiskBalancerConfiguration(
+      Optional<Double> threshold, Optional<Long> bandwidthInMB,
+      Optional<Integer> parallelThread, Optional<List<String>> hosts)
       throws IOException {
+    HddsProtos.DiskBalancerConfigurationProto.Builder confBuilder =
+        HddsProtos.DiskBalancerConfigurationProto.newBuilder();
+    threshold.ifPresent(confBuilder::setThreshold);
+    bandwidthInMB.ifPresent(confBuilder::setDiskBandwidthInMB);
+    parallelThread.ifPresent(confBuilder::setParallelThread);
+
+    DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
+        DatanodeDiskBalancerOpRequestProto.newBuilder()
+            .setOpType(DatanodeDiskBalancerOpType.update)
+            .setConf(confBuilder);
+    hosts.ifPresent(requestBuilder::addAllHosts);
+
+    DatanodeDiskBalancerOpResponseProto response =
+        submitRequest(Type.DatanodeDiskBalancerOp,
+            builder -> builder.setDatanodeDiskBalancerOpRequest(
+                requestBuilder.build()))
+            .getDatanodeDiskBalancerOpResponse();
+
+    List<DatanodeAdminError> errors = new ArrayList<>();
+    for (DatanodeAdminErrorResponseProto e : response.getFailedHostsList()) {
+      errors.add(new DatanodeAdminError(e.getHost(), e.getError()));
+    }
+    return errors;
   }
 
   @Override

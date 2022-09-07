@@ -78,7 +78,8 @@ message ScmContainerLocationRequest {
   optional GetContainerReplicasRequestProto getContainerReplicasRequest = 39;
   optional ReplicationManagerReportRequestProto replicationManagerReportRequest = 40;
   optional ResetDeletedBlockRetryCountRequestProto resetDeletedBlockRetryCountRequest = 41;
-  optional DatanodeDiskBalancerInfoRequestProto DatanodeDiskBalancerInfoRequest = 42;
+  optional DatanodeDiskBalancerInfoRequestProto datanodeDiskBalancerInfoRequest = 42;
+  optional DatanodeDiskBalancerOpRequestProto datanodeDiskBalancerOpRequest = 43;
 }
 
 message ScmContainerLocationResponse {
@@ -128,7 +129,8 @@ message ScmContainerLocationResponse {
   optional GetContainerReplicasResponseProto getContainerReplicasResponse = 39;
   optional ReplicationManagerReportResponseProto getReplicationManagerReportResponse = 40;
   optional ResetDeletedBlockRetryCountResponseProto resetDeletedBlockRetryCountResponse = 41;
-  optional DatanodeDiskBalancerInfoResponseProto DatanodeDiskBalancerInfoResponse = 42;
+  optional DatanodeDiskBalancerInfoResponseProto datanodeDiskBalancerInfoResponse = 42;
+  optional DatanodeDiskBalancerOpResponseProto datanodeDiskBalancerOpResponse = 43;
 
   enum Status {
     OK = 1;
@@ -178,6 +180,7 @@ enum Type {
   ResetDeletedBlockRetryCount = 36;
   GetClosedContainerCount = 37;
   DatanodeDiskBalancerInfo= 38;
+  DatanodeDiskBalancerOp = 39;
 }
 
 /**
@@ -341,10 +344,27 @@ message DatanodeDiskBalancerInfoRequestProto {
   required DatanodeDiskBalancerInfoType infoType = 1;
   optional uint32 count = 2;
   repeated string hosts = 3;
+  optional DiskBalancerRunningStatus status = 4;
 }
 
 message DatanodeDiskBalancerInfoResponseProto {
   repeated DatanodeDiskBalancerInfoProto info = 1;
+}
+
+enum DatanodeDiskBalancerOpType{
+  start = 1;
+  stop = 2;
+  update = 3;
+}
+
+message DatanodeDiskBalancerOpRequestProto {
+  required DatanodeDiskBalancerOpType opType = 1;
+  repeated string hosts = 2;
+  optional DiskBalancerConfigurationProto conf = 3;
+}
+
+message DatanodeDiskBalancerOpResponseProto {
+  repeated DatanodeAdminErrorResponseProto failedHosts = 1;
 }
 
 /*
