@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.DiskBalancerCommand;
 import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
@@ -415,6 +416,12 @@ public class HeartbeatEndpointTask
             RefreshVolumeUsageCommand.getFromProtobuf(
             commandResponseProto.getRefreshVolumeUsageCommandProto());
         processCommonCommand(commandResponseProto, refreshVolumeUsageCommand);
+        break;
+      case diskBalancerCommand:
+        DiskBalancerCommand diskBalancerCommand =
+            DiskBalancerCommand.getFromProtobuf(
+                commandResponseProto.getDiskBalancerCommandProto(), conf);
+        processCommonCommand(commandResponseProto, diskBalancerCommand);
         break;
       default:
         throw new IllegalArgumentException("Unknown response : "

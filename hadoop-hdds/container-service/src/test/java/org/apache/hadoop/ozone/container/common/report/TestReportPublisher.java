@@ -31,7 +31,9 @@ import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.
@@ -39,6 +41,7 @@ import org.apache.hadoop.hdds.protocol.proto.
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.junit.jupiter.api.BeforeAll;
@@ -212,6 +215,45 @@ public class TestReportPublisher {
       if (descriptor.getNumber() ==
           CRLStatusReport.RECEIVEDCRLID_FIELD_NUMBER) {
         assertEquals(3L, report.getField(descriptor));
+      }
+    }
+    executorService.shutdown();
+  }
+
+  @Test
+  public void testDiskBalancerReportPublisher() throws IOException {
+    StateContext dummyContext = mock(StateContext.class);
+    DatanodeStateMachine dummyStateMachine =
+        mock(DatanodeStateMachine.class);
+    OzoneContainer dummyContainer = mock(OzoneContainer.class);
+
+    DiskBalancerReportProto.Builder builder =
+        DiskBalancerReportProto.newBuilder();
+    builder.setIsRunning(true);
+    builder.setBalancedBytes(1L);
+    builder.setDiskBalancerConf(
+        HddsProtos.DiskBalancerConfigurationProto.newBuilder().build());
+    DiskBalancerReportProto dummyReport = builder.build();
+
+    ReportPublisher publisher = new DiskBalancerReportPublisher();
+    when(dummyContext.getParent()).thenReturn(dummyStateMachine);
+    when(dummyStateMachine.getContainer()).thenReturn(dummyContainer);
+    when(dummyContainer.getDiskBalancerReport()).thenReturn(dummyReport);
+    publisher.setConf(config);
+
+    ScheduledExecutorService executorService = HadoopExecutors
+        .newScheduledThreadPool(1,
+            new ThreadFactoryBuilder().setDaemon(true)
+                .setNameFormat("Unit test ReportManager Thread - %d").build());
+    publisher.init(dummyContext, executorService);
+    Message report =
+        ((DiskBalancerReportPublisher) publisher).getReport();
+    assertNotNull(report);
+    for (Descriptors.FieldDescriptor descriptor :
+        report.getDescriptorForType().getFields()) {
+      if (descriptor.getNumber() ==
+          DiskBalancerReportProto.ISRUNNING_FIELD_NUMBER) {
+        assertEquals(true, report.getField(descriptor));
       }
     }
     executorService.shutdown();
