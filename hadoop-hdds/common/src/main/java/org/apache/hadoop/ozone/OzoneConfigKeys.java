@@ -132,6 +132,11 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_ADMINISTRATORS_GROUPS =
       "ozone.administrators.groups";
+
+  public static final String OZONE_S3_ADMINISTRATORS =
+          "ozone.s3.administrators";
+  public static final String OZONE_S3_ADMINISTRATORS_GROUPS =
+          "ozone.s3.administrators.groups";
   /**
    * Used only for testing purpose. Results in making every user an admin.
    * */
