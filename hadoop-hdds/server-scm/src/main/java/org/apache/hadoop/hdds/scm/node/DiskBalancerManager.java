@@ -22,7 +22,8 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -47,10 +48,13 @@ public class DiskBalancerManager {
   public static final Logger LOG =
       LoggerFactory.getLogger(DiskBalancerManager.class);
 
+
+  private OzoneConfiguration conf;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
   private final NodeManager nodeManager;
   private Map<DatanodeDetails, DiskBalancerStatus> statusMap;
+  private Map<DatanodeDetails, Long> balancedBytesMap;
   private boolean useHostnames;
 
   /**
@@ -60,6 +64,7 @@ public class DiskBalancerManager {
                         EventPublisher eventPublisher,
                         SCMContext scmContext,
                         NodeManager nodeManager) {
+    this.conf = conf;
     this.scmNodeEventPublisher = eventPublisher;
     this.scmContext = scmContext;
     this.nodeManager = nodeManager;
@@ -95,42 +100,60 @@ public class DiskBalancerManager {
    * If hosts is null, return status of all datanodes in balancing.
    */
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      Optional<List<String>> hosts, int clientVersion) throws IOException {
-    List<HddsProtos.DatanodeDiskBalancerInfoProto> statusList =
-        new ArrayList<>();
+      Optional<List<String>> hosts,
+      Optional<HddsProtos.DiskBalancerRunningStatus> status,
+      int clientVersion) throws IOException {
     List<DatanodeDetails> filterDns = null;
     if (hosts.isPresent() && !hosts.get().isEmpty()) {
       filterDns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts.get(),
           useHostnames);
     }
 
-    for (DatanodeDetails datanodeDetails: nodeManager.getNodes(IN_SERVICE,
-        HddsProtos.NodeState.HEALTHY)) {
-      if (shouldReturnDatanode(filterDns, datanodeDetails)) {
-        double volumeDensitySum =
-            getVolumeDataDensitySumForDatanodeDetails(datanodeDetails);
-        statusList.add(HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
-            .setCurrentVolumeDensitySum(volumeDensitySum)
-            .setDiskBalancerRunning(isRunning(datanodeDetails))
-            .setDiskBalancerConf(statusMap.getOrDefault(datanodeDetails,
-                    DiskBalancerStatus.DUMMY_STATUS)
-                .getDiskBalancerConfiguration().toProtobufBuilder())
-            .setNode(datanodeDetails.toProto(clientVersion))
-            .build());
-      }
-    }
-    return statusList;
-  }
+    // Filter Running Status by default
+    HddsProtos.DiskBalancerRunningStatus filterStatus = status.orElse(null);
 
-  private boolean shouldReturnDatanode(List<DatanodeDetails> hosts,
-      DatanodeDetails datanodeDetails) {
-    if (hosts == null || hosts.isEmpty()) {
-      return isRunning(datanodeDetails);
+    if (filterDns != null) {
+      return filterDns.stream()
+          .filter(dn -> shouldReturnDatanode(filterStatus, dn))
+          .map(nodeManager::getDatanodeInfo)
+          .map(dn -> getInfoProto(dn, clientVersion))
+          .collect(Collectors.toList());
     } else {
-      return hosts.contains(datanodeDetails);
+      return nodeManager.getAllNodes().stream()
+          .filter(dn -> shouldReturnDatanode(filterStatus, dn))
+          .map(dn -> getInfoProto((DatanodeInfo)dn, clientVersion))
+          .collect(Collectors.toList());
     }
   }
 
+  private boolean shouldReturnDatanode(
+      HddsProtos.DiskBalancerRunningStatus status,
+      DatanodeDetails datanodeDetails) {
+    boolean shouldReturn = true;
+    // If status specified, do not return if status not match.
+    if (status != null && getRunningStatus(datanodeDetails) != status) {
+      shouldReturn = false;
+    }
+    return shouldReturn;
+  }
+
+  private HddsProtos.DatanodeDiskBalancerInfoProto getInfoProto(
+      DatanodeInfo dn, int clientVersion) {
+    double volumeDensitySum =
+        getVolumeDataDensitySumForDatanodeDetails(dn);
+    HddsProtos.DiskBalancerRunningStatus runningStatus =
+        getRunningStatus(dn);
+    HddsProtos.DatanodeDiskBalancerInfoProto.Builder builder =
+        HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
+            .setNode(dn.toProto(clientVersion))
+            .setCurrentVolumeDensitySum(volumeDensitySum)
+            .setRunningStatus(getRunningStatus(dn));
+    if (runningStatus != HddsProtos.DiskBalancerRunningStatus.UNKNOWN) {
+      builder.setDiskBalancerConf(statusMap.get(dn)
+          .getDiskBalancerConfiguration().toProtobufBuilder());
+    }
+    return builder.build();
+  }
   /**
    * Get volume density for a specific DatanodeDetails node.
    *
@@ -144,8 +167,7 @@ public class DiskBalancerManager {
     DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
 
     double totalCapacity = 0d, totalUsed = 0d;
-    for (StorageContainerDatanodeProtocolProtos.StorageReportProto reportProto :
-        datanodeInfo.getStorageReports()) {
+    for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
       totalCapacity += reportProto.getCapacity();
       totalUsed += reportProto.getScmUsed();
     }
@@ -162,15 +184,42 @@ public class DiskBalancerManager {
     return volumeDensitySum;
   }
 
-  private boolean isRunning(DatanodeDetails datanodeDetails) {
-    return statusMap
-        .getOrDefault(datanodeDetails, DiskBalancerStatus.DUMMY_STATUS)
-        .isRunning();
+  private HddsProtos.DiskBalancerRunningStatus getRunningStatus(
+      DatanodeDetails datanodeDetails) {
+    if (!statusMap.containsKey(datanodeDetails)) {
+      return HddsProtos.DiskBalancerRunningStatus.UNKNOWN;
+    } else {
+      if (statusMap.get(datanodeDetails).isRunning()) {
+        return HddsProtos.DiskBalancerRunningStatus.RUNNING;
+      } else {
+        return HddsProtos.DiskBalancerRunningStatus.STOPPED;
+      }
+    }
   }
 
   @VisibleForTesting
   public void addRunningDatanode(DatanodeDetails datanodeDetails) {
     statusMap.put(datanodeDetails, new DiskBalancerStatus(true,
         new DiskBalancerConfiguration()));
+  }
+
+  public void processDiskBalancerReport(DiskBalancerReportProto reportProto,
+      DatanodeDetails dn) {
+    boolean isRunning = reportProto.getIsRunning();
+    DiskBalancerConfiguration diskBalancerConfiguration =
+        reportProto.hasDiskBalancerConf() ?
+            DiskBalancerConfiguration.fromProtobuf(
+                reportProto.getDiskBalancerConf(), conf) :
+            new DiskBalancerConfiguration();
+    statusMap.put(dn, new DiskBalancerStatus(isRunning,
+        diskBalancerConfiguration));
+    if (reportProto.hasBalancedBytes()) {
+      balancedBytesMap.put(dn, reportProto.getBalancedBytes());
+    }
+  }
+
+  @VisibleForTesting
+  public Map<DatanodeDetails, DiskBalancerStatus> getStatusMap() {
+    return statusMap;
   }
 }

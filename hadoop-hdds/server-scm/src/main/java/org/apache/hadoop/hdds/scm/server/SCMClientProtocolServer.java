@@ -1228,7 +1228,9 @@ public class SCMClientProtocolServer implements
 
   @Override
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      Optional<List<String>> hosts, int clientVersion) throws IOException {
+      Optional<List<String>> hosts,
+      Optional<HddsProtos.DiskBalancerRunningStatus> status,
+      int clientVersion) throws IOException {
     // check admin authorisation
     try {
       getScm().checkAdminAccess(getRemoteUser());
@@ -1237,29 +1239,33 @@ public class SCMClientProtocolServer implements
       throw e;
     }
 
-    return scm.getDiskBalancerManager().getDiskBalancerStatus(hosts,
+    return scm.getDiskBalancerManager().getDiskBalancerStatus(hosts, status,
         clientVersion);
   }
 
   @Override
-  public void startDiskBalancer(Optional<Double> threshold,
-      Optional<Double> bandwidth, Optional<List<String>> hosts)
-      throws IOException {
+  public List<DatanodeAdminError> startDiskBalancer(Optional<Double> threshold,
+      Optional<Long> bandwidthInMB, Optional<Integer> parallelThread,
+      Optional<List<String>> hosts) throws IOException {
     // TODO: Send message to datanodes
+    return null;
   }
 
   @Override
-  public void stopDiskBalancer(Optional<List<String>> hosts)
+  public List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
       throws IOException {
     // TODO: Send message to datanodes
+    return null;
   }
 
 
   @Override
-  public void updateDiskBalancerConfiguration(Optional<Double> threshold,
-      Optional<Double> bandwidth, Optional<List<String>> hosts)
+  public List<DatanodeAdminError> updateDiskBalancerConfiguration(
+      Optional<Double> threshold, Optional<Long> bandwidthInMB,
+      Optional<Integer> parallelThread, Optional<List<String>> hosts)
       throws IOException {
     // TODO: Send message to datanodes
+    return null;
   }
 
   /**

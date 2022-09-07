@@ -518,31 +518,34 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public void startDiskBalancer(Optional<Double> threshold,
-      Optional<Double> bandwidth, Optional<List<String>> hosts)
-      throws IOException {
-    storageContainerLocationClient.startDiskBalancer(threshold, bandwidth,
-        hosts);
+  public List<DatanodeAdminError> startDiskBalancer(Optional<Double> threshold,
+      Optional<Long> bandwidthInMB, Optional<Integer> parallelThread,
+      Optional<List<String>> hosts) throws IOException {
+    return storageContainerLocationClient.startDiskBalancer(threshold,
+        bandwidthInMB, parallelThread, hosts);
   }
 
   @Override
-  public void stopDiskBalancer(Optional<List<String>> hosts)
+  public List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
       throws IOException {
-    storageContainerLocationClient.stopDiskBalancer(hosts);
+    return storageContainerLocationClient.stopDiskBalancer(hosts);
   }
 
   @Override
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      Optional<List<String>> hosts) throws IOException {
+      Optional<List<String>> hosts,
+      Optional<HddsProtos.DiskBalancerRunningStatus> runningStatus)
+      throws IOException {
     return storageContainerLocationClient.getDiskBalancerStatus(hosts,
-        ClientVersion.CURRENT_VERSION);
+        runningStatus, ClientVersion.CURRENT_VERSION);
   }
 
   @Override
-  public void updateDiskBalancerConfiguration(Optional<Double> threshold,
-      Optional<Double> bandwidth, Optional<List<String>> hosts)
+  public List<DatanodeAdminError> updateDiskBalancerConfiguration(
+      Optional<Double> threshold, Optional<Long> bandwidth,
+      Optional<Integer> parallelThread, Optional<List<String>> hosts)
       throws IOException {
-    storageContainerLocationClient.updateDiskBalancerConfiguration(threshold,
-        bandwidth, hosts);
+    return storageContainerLocationClient.updateDiskBalancerConfiguration(
+        threshold, bandwidth, parallelThread, hosts);
   }
 }

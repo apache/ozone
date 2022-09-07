@@ -80,7 +80,8 @@ message ScmContainerLocationRequest {
   optional ResetDeletedBlockRetryCountRequestProto resetDeletedBlockRetryCountRequest = 41;
   optional TransferLeadershipRequestProto  transferScmLeadershipRequest = 42;
   optional GetFailedDeletedBlocksTxnRequestProto getFailedDeletedBlocksTxnRequest = 43;
-  optional DatanodeDiskBalancerInfoRequestProto DatanodeDiskBalancerInfoRequest = 44;
+  optional DatanodeDiskBalancerInfoRequestProto datanodeDiskBalancerInfoRequest = 44;
+  optional DatanodeDiskBalancerOpRequestProto datanodeDiskBalancerOpRequest = 45;
 }
 
 message ScmContainerLocationResponse {
@@ -132,7 +133,8 @@ message ScmContainerLocationResponse {
   optional ResetDeletedBlockRetryCountResponseProto resetDeletedBlockRetryCountResponse = 41;
   optional TransferLeadershipResponseProto  transferScmLeadershipResponse = 42;
   optional GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxnResponse = 43;
-  optional DatanodeDiskBalancerInfoResponseProto DatanodeDiskBalancerInfoResponse = 44;
+  optional DatanodeDiskBalancerInfoResponseProto datanodeDiskBalancerInfoResponse = 44;
+  optional DatanodeDiskBalancerOpResponseProto datanodeDiskBalancerOpResponse = 45;
 
   enum Status {
     OK = 1;
@@ -184,6 +186,7 @@ enum Type {
   TransferLeadership = 38;
   GetFailedDeletedBlocksTransaction = 39;
   DatanodeDiskBalancerInfo = 40;
+  DatanodeDiskBalancerOp = 41;
 }
 
 /**
@@ -347,10 +350,27 @@ message DatanodeDiskBalancerInfoRequestProto {
   required DatanodeDiskBalancerInfoType infoType = 1;
   optional uint32 count = 2;
   repeated string hosts = 3;
+  optional DiskBalancerRunningStatus status = 4;
 }
 
 message DatanodeDiskBalancerInfoResponseProto {
   repeated DatanodeDiskBalancerInfoProto info = 1;
+}
+
+enum DatanodeDiskBalancerOpType{
+  start = 1;
+  stop = 2;
+  update = 3;
+}
+
+message DatanodeDiskBalancerOpRequestProto {
+  required DatanodeDiskBalancerOpType opType = 1;
+  repeated string hosts = 2;
+  optional DiskBalancerConfigurationProto conf = 3;
+}
+
+message DatanodeDiskBalancerOpResponseProto {
+  repeated DatanodeAdminErrorResponseProto failedHosts = 1;
 }
 
 /*

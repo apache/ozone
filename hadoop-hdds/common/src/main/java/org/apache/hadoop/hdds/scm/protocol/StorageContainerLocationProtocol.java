@@ -463,26 +463,31 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * Get DiskBalancer status.
    */
   List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      Optional<List<String>> hosts, int clientVersion) throws IOException;
+      Optional<List<String>> hosts,
+      Optional<HddsProtos.DiskBalancerRunningStatus> runningStatus,
+      int clientVersion) throws IOException;
 
   /**
    * Start DiskBalancer.
    */
-  void startDiskBalancer(
+  List<DatanodeAdminError> startDiskBalancer(
       Optional<Double> threshold,
-      Optional<Double> bandwidth,
+      Optional<Long> bandwidthInMB,
+      Optional<Integer> parallelThread,
       Optional<List<String>> hosts) throws IOException;
 
   /**
    * Stop DiskBalancer.
    */
-  void stopDiskBalancer(Optional<List<String>> hosts) throws IOException;
+  List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
+      throws IOException;
 
   /**
    * Update DiskBalancer Configuration.
    */
-  void updateDiskBalancerConfiguration(
+  List<DatanodeAdminError> updateDiskBalancerConfiguration(
       Optional<Double> threshold,
-      Optional<Double> bandwidth,
+      Optional<Long> bandwidthInMB,
+      Optional<Integer> parallelThread,
       Optional<List<String>> hosts) throws IOException;
 }

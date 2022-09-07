@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Comm
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CreatePipelineCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteContainerCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DiskBalancerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.FinalizeNewLayoutVersionCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconstructECContainersCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.RefreshVolumeUsageCommandHandler;
@@ -228,6 +229,7 @@ public class DatanodeStateMachine implements Closeable {
         .addHandler(new SetNodeOperationalStateCommandHandler(conf))
         .addHandler(new FinalizeNewLayoutVersionCommandHandler())
         .addHandler(new RefreshVolumeUsageCommandHandler())
+        .addHandler(new DiskBalancerCommandHandler())
         .setConnectionManager(connectionManager)
         .setContainer(container)
         .setContext(context)
