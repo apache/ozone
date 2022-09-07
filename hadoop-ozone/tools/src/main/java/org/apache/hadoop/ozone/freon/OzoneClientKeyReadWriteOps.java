@@ -36,7 +36,7 @@ import java.util.Random;
 
 //import java.util.concurrent.*;
 /**
- * Ozone data generator and performance test tool.
+ * Ozone key generator/reader for performance test.
  */
 
 @CommandLine.Command(name = "ockrw",
@@ -150,11 +150,6 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     if (wSizeInBytes >= 0) {
       keyContent = RandomUtils.nextBytes(wSizeInBytes);
     }
-//    pre-generated integer to md5 hash value mapping
-//    for (int i = 0; i < 100000; i++){
-//      String encodedStr = DigestUtils.md5Hex(String.valueOf(i));
-//      intToMd5Hash.put(i, encodedStr.substring(0,7));
-//    }
     runTests(this::readWriteKeys);
     rpcClient.close();
     return null;
@@ -186,9 +181,7 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
       keyName = generateMd5ObjectName(randomIdxWithinRange);
     }
 
-//    List<Future<Object>> readWriteResults = timer.time(() -> {
     timer.time(() -> {
-//      List<Future<Object>> readResults = null;
               try {
                 if (!ifMixWorkload) {
                   if (endIndexForRead - startIndexForRead > 0) {
@@ -212,7 +205,6 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
             } catch (Exception ex) {
                 LOG.error(ex.getMessage());
             }
-//      return readResults;
     });
   }
 
@@ -220,13 +212,9 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     if (readMetadataOnly) {
         ozbk.getKey(keyName);
     } else {
-      LOG.error("ozbk is about write to key : " + keyName);
-
       byte[] data = new byte[wSizeInBytes];
         OzoneInputStream introStream = ozbk.readKey(keyName);
         introStream.read(data);
-      LOG.error("ozbk compete read key : " + keyName);
-
         introStream.close();
     }
   }
@@ -238,24 +226,17 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   }
   public void processWriteTasks() throws Exception {
     if (writeRangeKeys) {
-      LOG.error("*** *** *** *** *** *** *** *** *** ");
       for (int i = startIndexForWrite; i < endIndexForWrite + 1; i++) {
-        LOG.error("Range write start for i = " + i);
         createKeyAndWrite(generateKeyName(i));
       }
-      LOG.error("*** *** *** *** *** *** *** *** *** ");
-
     } else {
       createKeyAndWrite(keyName);
     }
   }
 
   public void createKeyAndWrite(String key) throws Exception{
-    LOG.error("ozbk is about write to key : " + key);
     OzoneOutputStream out = ozbk.createKey(key, wSizeInBytes);
     out.write(keyContent);
-    LOG.error("ozbk complete write to key : " + key);
-
     out.flush();
     out.close();
   }

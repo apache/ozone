@@ -141,8 +141,6 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
         }
         response.setAllocateScmBlockResponse(allocateScmBlock(
             request.getAllocateScmBlockRequest(), request.getVersion()));
-//        LOG.error("!!!!!!!!!!!!!!!!!!!!!!! complete " +
-//                "setAllocateScmBlockResponse ");
 
         break;
       case DeleteScmKeyBlocks:
@@ -176,7 +174,6 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
         response.setMessage(e.getMessage());
       }
     }
-//    LOG.error("!!!!!!!!!!!!!!!!!!!!!!! going to return response.build ");
 
     return response.build();
   }
@@ -223,7 +220,6 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
           .setContainerBlockID(block.getBlockID().getProtobuf())
           .setPipeline(block.getPipeline().getProtobufMessage(clientVersion)));
     }
-//    LOG.error("!!!!!!!!!!!!!!!!!!!!!!! complete allocateblock builer");
 
     return builder.build();
   }

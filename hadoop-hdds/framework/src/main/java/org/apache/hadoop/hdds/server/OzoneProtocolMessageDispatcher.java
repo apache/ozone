@@ -85,7 +85,6 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
       long startTime = System.currentTimeMillis();
 
       RESPONSE response = methodCall.apply(request);
-//      logger.error("!!!!!!!!!!!!!!!!!!!!!!! complete methodCall apply ");
 
       protocolMessageMetrics.increment(type,
           System.currentTimeMillis() - startTime);
@@ -98,7 +97,6 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
             type,
             escapeNewLines(responsePreprocessor.apply(response)));
       }
-//      logger.error("!!!!!!!!!!!!!!!!!!!!!!! going to return response ");
 
       return response;
 
