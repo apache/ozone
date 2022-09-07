@@ -170,37 +170,43 @@ public class KeyManagerImpl implements KeyManager {
 
   private final boolean enableFileSystemPaths;
   private BackgroundService dirDeletingService;
+  private final OMPerformanceMetrics metrics;
 
   private BackgroundService openKeyCleanupService;
 
   @VisibleForTesting
   public KeyManagerImpl(ScmBlockLocationProtocol scmBlockClient,
       OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
-      OzoneBlockTokenSecretManager secretManager) {
+      OzoneBlockTokenSecretManager secretManager,
+      OMPerformanceMetrics metrics) {
     this(null, new ScmClient(scmBlockClient, null), metadataManager,
-        conf, omId, secretManager, null, null);
+        conf, omId, secretManager, null, null, metrics);
   }
 
   @VisibleForTesting
   public KeyManagerImpl(ScmBlockLocationProtocol scmBlockClient,
       StorageContainerLocationProtocol scmContainerClient,
       OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
-      OzoneBlockTokenSecretManager secretManager) {
+      OzoneBlockTokenSecretManager secretManager,
+      OMPerformanceMetrics metrics) {
     this(null, new ScmClient(scmBlockClient, scmContainerClient),
-        metadataManager, conf, omId, secretManager, null, null);
+        metadataManager, conf, omId, secretManager, null, null,
+        metrics);
   }
 
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
-      OzoneConfiguration conf, String omId) {
+      OzoneConfiguration conf, String omId, OMPerformanceMetrics metrics) {
     this (om, scmClient, om.getMetadataManager(), conf, omId,
-        om.getBlockTokenMgr(), om.getKmsProvider(), om.getPrefixManager());
+        om.getBlockTokenMgr(), om.getKmsProvider(), om.getPrefixManager(),
+        metrics);
   }
 
   @SuppressWarnings("parameternumber")
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
       OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
       OzoneBlockTokenSecretManager secretManager,
-      KeyProviderCryptoExtension kmsProvider, PrefixManager prefixManager) {
+      KeyProviderCryptoExtension kmsProvider, PrefixManager prefixManager,
+      OMPerformanceMetrics metrics) {
     this.scmBlockSize = (long) conf
         .getStorageSize(OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT,
             StorageUnit.BYTES);
@@ -226,6 +232,7 @@ public class KeyManagerImpl implements KeyManager {
     this.prefixManager = prefixManager;
     this.secretManager = secretManager;
     this.kmsProvider = kmsProvider;
+    this.metrics = metrics;
 
   }
 
@@ -359,7 +366,7 @@ public class KeyManagerImpl implements KeyManager {
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
-
+    long start = Time.monotonicNowNanos();
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
 
@@ -390,6 +397,8 @@ public class KeyManagerImpl implements KeyManager {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
+    long take = Time.monotonicNowNanos() - start;
+    metrics.addReadKeyInfoLatency(take);
 
     if (value == null) {
       if (LOG.isDebugEnabled()) {
@@ -460,6 +469,7 @@ public class KeyManagerImpl implements KeyManager {
   private void addBlockToken4Read(OmKeyInfo value) throws IOException {
     Preconditions.checkNotNull(value, "OMKeyInfo cannot be null");
     if (grpcBlockTokenEnabled) {
+      long start = Time.monotonicNowNanos();
       String remoteUser = getRemoteUser().getShortUserName();
       for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
         key.getLocationList().forEach(k -> {
@@ -467,6 +477,8 @@ public class KeyManagerImpl implements KeyManager {
               EnumSet.of(READ), k.getLength()));
         });
       }
+      long latency = Time.monotonicNowNanos() - start;
+      metrics.addBlockTokenLatency(latency);
     }
   }
   /**
@@ -475,6 +487,7 @@ public class KeyManagerImpl implements KeyManager {
    */
   @VisibleForTesting
   protected void refreshPipeline(List<OmKeyInfo> keyList) throws IOException {
+    long start = Time.monotonicNowNanos();
     if (keyList == null || keyList.isEmpty()) {
       return;
     }
@@ -514,6 +527,8 @@ public class KeyManagerImpl implements KeyManager {
         }
       }
     }
+    long take = Time.monotonicNowNanos() - start;
+    metrics.addRefreshLatency(take);
   }
 
   /**

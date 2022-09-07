@@ -202,7 +202,7 @@ public class TestOmBucketReadWriteKeyOps {
     Assert.assertTrue("Read Lock Waiting Samples should be positive",
         readWaitingSamples > 0);
 
-    String readLockHeldTimeMsStat = omLockMetrics.getReadLockHeldTimeMsStat();
+    String readLockHeldTimeMsStat = omLockMetrics.getReadLockHeldTimeNsStat();
     LOG.info("Read Lock Held Time Stat: " + readLockHeldTimeMsStat);
     LOG.info("Longest Read Lock Held Time (ms): " +
         omLockMetrics.getLongestReadLockHeldTimeMs());
@@ -212,7 +212,7 @@ public class TestOmBucketReadWriteKeyOps {
         readHeldSamples > 0);
 
     String writeLockWaitingTimeMsStat =
-        omLockMetrics.getWriteLockWaitingTimeMsStat();
+        omLockMetrics.getWriteLockWaitingTimeNsStat();
     LOG.info("Write Lock Waiting Time Stat: " + writeLockWaitingTimeMsStat);
     LOG.info("Longest Write Lock Waiting Time (ms): " +
         omLockMetrics.getLongestWriteLockWaitingTimeMs());
@@ -221,7 +221,7 @@ public class TestOmBucketReadWriteKeyOps {
     Assert.assertTrue("Write Lock Waiting Samples should be positive",
         writeWaitingSamples > 0);
 
-    String writeLockHeldTimeMsStat = omLockMetrics.getWriteLockHeldTimeMsStat();
+    String writeLockHeldTimeMsStat = omLockMetrics.getWriteLockHeldTimeNsStat();
     LOG.info("Write Lock Held Time Stat: " + writeLockHeldTimeMsStat);
     LOG.info("Longest Write Lock Held Time (ms): " +
         omLockMetrics.getLongestWriteLockHeldTimeMs());
