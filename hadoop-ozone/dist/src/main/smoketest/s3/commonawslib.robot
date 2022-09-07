@@ -31,14 +31,14 @@ Execute AWSS3APICli
     ${output} =       Execute                    aws s3api --endpoint-url ${ENDPOINT_URL} ${command}
     [return]          ${output}
 
-Execute AWSS3APICli with testFile
-    [Arguments]       ${command}
-    ${output} =       Execute                    testMetadata="$(printf 'k%.0s' {1..2000})=$(printf 'v%.0s' {1..2000})";aws s3api --endpoint-url ${ENDPOINT_URL} ${command}
-    [return]          ${output}
-
 Execute AWSS3APICli and checkrc
     [Arguments]       ${command}                 ${expected_error_code}
     ${output} =       Execute and checkrc        aws s3api --endpoint-url ${ENDPOINT_URL} ${command}  ${expected_error_code}
+    [return]          ${output}
+
+Execute AWSS3APICli and ignore error
+    [Arguments]       ${command}
+    ${output} =       Execute And Ignore Error   aws s3api --endpoint-url ${ENDPOINT_URL} ${command}
     [return]          ${output}
 
 Execute AWSS3Cli
