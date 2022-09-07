@@ -14,6 +14,16 @@ public interface HealthCheck {
    */
   boolean handle(ContainerCheckRequest request);
 
-  void addNext(HealthCheck handler);
+  /**
+   * Starting from this HealthCheck, call the handle method. If it returns
+   * false, indicating the request was not handled, then forward the request to
+   * the next handler in the chain via its handleChain method. Repeating until
+   * the request is handled, or there are no further handlers to try.
+   * @param request
+   * @return True if the request was handled or false if not handler handled it.
+   */
+  boolean handleChain(ContainerCheckRequest request);
+
+  HealthCheck addNext(HealthCheck handler);
 
 }

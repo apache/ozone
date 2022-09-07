@@ -37,6 +37,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
+import org.apache.hadoop.hdds.scm.container.replication.health.HealthCheck;
+import org.apache.hadoop.hdds.scm.container.replication.health.OpenContainerHandler;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
@@ -157,6 +159,7 @@ public class ReplicationManager implements SCMService {
   private Thread overReplicatedProcessorThread;
   private final UnderReplicatedProcessor underReplicatedProcessor;
   private final OverReplicatedProcessor overReplicatedProcessor;
+  private final HealthCheck containerCheckChain;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -206,6 +209,11 @@ public class ReplicationManager implements SCMService {
     overReplicatedProcessor =
         new OverReplicatedProcessor(this, containerReplicaPendingOps,
             eventPublisher, rmConf.getOverReplicatedInterval());
+
+    // Chain together the series of checks that are needed to validate the
+    // containers when they are checked by RM.
+    containerCheckChain = new OpenContainerHandler(this);
+    //containerCheckChain.addNext(null)
     start();
   }
 
@@ -431,15 +439,25 @@ public class ReplicationManager implements SCMService {
     ContainerID containerID = containerInfo.containerID();
     Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
         containerID);
+    List<ContainerReplicaOp> pendingOps =
+        containerReplicaPendingOps.getPendingOps(containerID);
 
-    if (containerInfo.getState() == HddsProtos.LifeCycleState.OPEN) {
-      if (!isOpenContainerHealthy(containerInfo, replicas)) {
-        report.incrementAndSample(
-            HealthState.OPEN_UNHEALTHY, containerID);
-        eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
-        return new ContainerHealthResult.UnHealthyResult(containerInfo);
-      }
-      return new ContainerHealthResult.HealthyResult(containerInfo);
+    ContainerCheckRequest checkRequest = new ContainerCheckRequest.Builder()
+        .containerInfo(containerInfo)
+        .containerReplicas(replicas)
+        .maintenanceRedundancy(maintenanceRedundancy)
+        .report(report)
+        .pendingOps(pendingOps)
+        .build();
+    // This will call the chain of container health handlers in turn which
+    // will issue commands as needed, update the report and perhaps add
+    // containers to the over and under replicated queue.
+    boolean handled = containerCheckChain.handleChain(checkRequest);
+    // TODO - this needs to be removed. All checks should be handled within
+    //        the chain.
+    if (handled) {
+      // should not continue any further processing
+      return new ContainerHealthResult.UnHealthyResult(containerInfo);
     }
 
     if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED) {
@@ -451,9 +469,6 @@ public class ReplicationManager implements SCMService {
         handleUnhealthyReplicas(containerInfo, unhealthyReplicas);
       }
     }
-
-    List<ContainerReplicaOp> pendingOps =
-        containerReplicaPendingOps.getPendingOps(containerID);
     ContainerHealthResult health = ecContainerHealthCheck.checkHealth(
         containerInfo, replicas, pendingOps, maintenanceRedundancy);
       // TODO - should the report have a HEALTHY state, rather than just bad
