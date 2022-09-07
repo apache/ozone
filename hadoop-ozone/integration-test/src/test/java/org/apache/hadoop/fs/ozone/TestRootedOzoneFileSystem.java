@@ -484,7 +484,7 @@ public class TestRootedOzoneFileSystem {
   public void testListStatusIteratorWithPathNotFound() throws Exception {
     Path root = new Path("/test");
     try {
-      RemoteIterator<FileStatus> it = ofs.listStatusIterator(root);
+      ofs.listStatusIterator(root);
       Assert.fail("Should have thrown OMException");
     } catch (OMException omEx) {
       Assert.assertEquals("Volume test is not found",
