@@ -21,8 +21,10 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.DiskBalancerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.ozone.test.GenericTestUtils;
@@ -33,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.Random;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -46,6 +49,8 @@ public class TestDiskBalancerManager {
   private NodeManager nodeManager;
   private OzoneConfiguration conf;
   private String storageDir;
+  private DiskBalancerReportHandler diskBalancerReportHandler;
+  private Random random;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -56,6 +61,9 @@ public class TestDiskBalancerManager {
     nodeManager = new MockNodeManager(true, 3);
     diskBalancerManager = new DiskBalancerManager(conf, new EventQueue(),
         SCMContext.emptyContext(), nodeManager);
+    diskBalancerReportHandler =
+        new DiskBalancerReportHandler(diskBalancerManager);
+    random = new Random();
   }
 
   @Test
@@ -73,6 +81,7 @@ public class TestDiskBalancerManager {
   @Test
   public void testDatanodeDiskBalancerStatus() throws IOException {
     diskBalancerManager.addRunningDatanode(nodeManager.getAllNodes().get(0));
+    diskBalancerManager.addRunningDatanode(nodeManager.getAllNodes().get(1));
 
     // Simulate users asking all status of 3 datanodes
     List<String> dns = nodeManager.getAllNodes().stream().map(
@@ -81,6 +90,7 @@ public class TestDiskBalancerManager {
 
     List<HddsProtos.DatanodeDiskBalancerInfoProto> statusProtoList =
         diskBalancerManager.getDiskBalancerStatus(Optional.of(dns),
+            Optional.empty(),
             ClientVersion.CURRENT_VERSION);
 
     Assertions.assertEquals(3, statusProtoList.size());
@@ -92,8 +102,32 @@ public class TestDiskBalancerManager {
 
     statusProtoList =
         diskBalancerManager.getDiskBalancerStatus(Optional.of(dns),
+            Optional.empty(),
             ClientVersion.CURRENT_VERSION);
 
     Assertions.assertEquals(1, statusProtoList.size());
+  }
+
+  @Test
+  public void testHandleDiskBalancerReportFromDatanode() {
+    for (DatanodeDetails dn: nodeManager.getAllNodes()) {
+      diskBalancerReportHandler.onMessage(
+          new DiskBalancerReportFromDatanode(dn, generateRandomReport()), null);
+    }
+
+    Assertions.assertEquals(3, diskBalancerManager.getStatusMap().size());
+  }
+
+  private DiskBalancerReportProto generateRandomReport() {
+    return DiskBalancerReportProto.newBuilder()
+        .setIsRunning(random.nextBoolean())
+        .setBalancedBytes(random.nextInt(10000))
+        .setDiskBalancerConf(
+            HddsProtos.DiskBalancerConfigurationProto.newBuilder()
+                .setThreshold(random.nextInt(99))
+                .setParallelThread(random.nextInt(4) + 1)
+                .setDiskBandwidthInMB(random.nextInt(99) + 1)
+                .build())
+        .build();
   }
 }
