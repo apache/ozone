@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.DiskBalancerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -48,6 +49,7 @@ public class TestDiskBalancer {
   private static ScmClient storageClient;
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConf;
+  private static DiskBalancerManager diskBalancerManager;
 
   @BeforeAll
   public static void setup() throws Exception {
@@ -57,6 +59,8 @@ public class TestDiskBalancer {
     cluster = MiniOzoneCluster.newBuilder(ozoneConf).setNumDatanodes(3).build();
     storageClient = new ContainerOperationClient(ozoneConf);
     cluster.waitForClusterToBeReady();
+    diskBalancerManager = cluster.getStorageContainerManager()
+        .getDiskBalancerManager();
 
     for (DatanodeDetails dn: cluster.getStorageContainerManager()
         .getScmNodeManager().getAllNodes()) {

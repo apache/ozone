@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CRLStatu
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CommandStatusReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerActionsFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.DiskBalancerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineActionsFromDatanode;
@@ -216,6 +217,14 @@ public final class SCMEvents {
       CRL_STATUS_REPORT =
       new TypedEvent<>(CRLStatusReportFromDatanode.class,
           "Crl_Status_Report");
+
+  /**
+   * DiskBalancer reports are send out by Datanodes. This report is received by
+   * SCMDatanodeHeartbeatDispatcher and DiskBalancer_Report Event is generated.
+   */
+  public static final TypedEvent<DiskBalancerReportFromDatanode>
+      DISK_BALANCER_REPORT = new TypedEvent<>(
+          DiskBalancerReportFromDatanode.class, "DiskBalancer_Report");
 
   /**
    * Private Ctor. Never Constructed.
