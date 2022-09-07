@@ -140,8 +140,7 @@ const COLUMNS = [
     filters: DatanodeStateList.map(state => ({text: state, value: state})),
     onFilter: (value: DatanodeState, record: IDatanode) => record.state === value,
     render: (text: DatanodeState) => renderDatanodeState(text),
-    sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state),
-    //fixed: 'left'
+    sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state)
   },
   {
     title: 'Operational State',
@@ -153,8 +152,7 @@ const COLUMNS = [
     filters: DatanodeOpStateList.map(state => ({text: state, value: state})),
     onFilter: (value: DatanodeOpState, record: IDatanode) => record.opState === value,
     render: (text: DatanodeOpState) => renderDatanodeOpState(text),
-    sorter: (a: IDatanode, b: IDatanode) => a.opState.localeCompare(b.opState),
-    //fixed: 'left'
+    sorter: (a: IDatanode, b: IDatanode) => a.opState.localeCompare(b.opState)
   },
  
   {
