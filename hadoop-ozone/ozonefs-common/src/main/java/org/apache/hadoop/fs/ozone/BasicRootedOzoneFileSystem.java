@@ -764,42 +764,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return statuses.toArray(new FileStatus[0]);
   }
 
-  /**
-   * Get all the file status for input path and startPath.
-   *
-   * @param f
-   * @param startPath
-   * @return
-   * @throws IOException
-   */
-  public FileStatusListing listFileStatus(Path f, String startPath)
-          throws IOException {
-    incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
-    statistics.incrementReadOps(1);
-    LOG.trace("listFileStatus() path:{}", f);
-    int numEntries = LISTING_PAGE_SIZE;
-    LinkedList<FileStatus> statuses = new LinkedList<>();
-    List<FileStatus> tmpStatusList;
-    FileStatusListing partialListing = null;
-
-    tmpStatusList =
-            adapter.listStatus(pathToKey(f), false, startPath,
-                    numEntries, uri, workingDir, getUsername())
-                    .stream()
-                    .map(this::convertFileStatus)
-                    .collect(Collectors.toList());
-
-    if (!tmpStatusList.isEmpty()) {
-      if (startPath.isEmpty()) {
-        statuses.addAll(tmpStatusList);
-      } else { // Excluding the 1st file status element from list.
-        statuses.addAll(tmpStatusList.subList(1, tmpStatusList.size()));
-      }
-      partialListing = new FileStatusListing(statuses);
-    }
-    return partialListing;
-  }
-
   @Override
   public void setWorkingDirectory(Path newDir) {
     workingDir = newDir;
@@ -1004,19 +968,18 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   @Override
   public RemoteIterator<FileStatus> listStatusIterator(Path f)
-          throws IOException {
+      throws IOException {
     return new OzoneFileStatusIterator<>(f);
   }
 
   /**
    * A private class implementation for iterating list of file status.
    *
-   * @param <T> the type of the file status
+   * @param <T> the type of the file status.
    */
-  private final class  OzoneFileStatusIterator<T extends FileStatus>
-          implements RemoteIterator<T> {
-    private FileStatusListing thisListing;
-    private FileStatus[] fileStatuses;
+  private final class OzoneFileStatusIterator<T extends FileStatus>
+      implements RemoteIterator<T> {
+    private List<FileStatus> thisListing;
     private int i;
     private Path p;
     private T curStat = null;
@@ -1024,7 +987,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
     /**
      * Constructor to initialize OzoneFileStatusIterator.
-     * Gets the first batch of entry for iteration.
+     * Get the first batch of entry for iteration.
      *
      * @param p path to file/directory.
      * @throws IOException
@@ -1033,17 +996,17 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       this.p = p;
       // fetch the first batch of entries in the directory
       thisListing = listFileStatus(p, startPath);
-      if (thisListing != null) {
-        fileStatuses = thisListing.getPartialListing().
-            toArray(new FileStatus[0]);
-        startPath = pathToKey(thisListing.getLastName());
+      if (thisListing != null && !thisListing.isEmpty()) {
+        startPath = pathToKey(
+            thisListing.get(thisListing.size() - 1).getPath());
+        LOG.info("Got {} file status, next start path {}",
+            thisListing.size(), startPath);
       }
       statistics.incrementReadOps(1);
       i = 0;
     }
 
     /**
-     *
      * @return true if next entry exists false otherwise.
      * @throws IOException
      */
@@ -1051,8 +1014,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     public boolean hasNext() throws IOException {
       while (curStat == null && hasNextNoFilter()) {
         T next;
-        FileStatus fileStat = fileStatuses[i++];
-        next = (T)(fileStat);
+        FileStatus fileStat = thisListing.get(i++);
+        next = (T) (fileStat);
         curStat = next;
       }
       return curStat != null;
@@ -1061,6 +1024,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     /**
      * Checks the next available entry from partial listing if not exhausted
      * or fetches new batch for listing.
+     *
      * @return true if next entry exists false otherwise.
      * @throws IOException
      */
@@ -1068,27 +1032,27 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       if (thisListing == null) {
         return false;
       }
-      if (i >= thisListing.getPartialListing().size()) {
-        if (startPath != null) {
+      if (i >= thisListing.size()) {
+        if (startPath != null && (thisListing.size() == LISTING_PAGE_SIZE ||
+            thisListing.size() == LISTING_PAGE_SIZE - 1)) {
           // current listing is exhausted & fetch a new listing
           thisListing = listFileStatus(p, startPath);
-          if (thisListing != null &&
-                  thisListing.getPartialListing().size() != 0) {
-            fileStatuses = thisListing.getPartialListing().
-                toArray(new FileStatus[0]);
-            startPath = pathToKey(thisListing.getLastName());
+          if (thisListing != null && !thisListing.isEmpty()) {
+            startPath = pathToKey(
+                thisListing.get(thisListing.size() - 1).getPath());
             statistics.incrementReadOps(1);
+            LOG.info("Got {} file status, next start path {}",
+                thisListing.size(), startPath);
           } else {
             return false;
           }
           i = 0;
         }
       }
-      return (i < thisListing.getPartialListing().size());
+      return (i < thisListing.size());
     }
 
     /**
-     *
      * @return next entry.
      * @throws IOException
      */
@@ -1101,6 +1065,34 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       }
       throw new java.util.NoSuchElementException("No more entry in " + p);
     }
+  }
+
+  /**
+   * Get all the file status for input path and startPath.
+   *
+   * @param f
+   * @param startPath
+   * @return list of file status.
+   * @throws IOException
+   */
+  private List<FileStatus> listFileStatus(Path f, String startPath)
+      throws IOException {
+    incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
+    statistics.incrementReadOps(1);
+    LOG.trace("listFileStatus() path:{}", f);
+    List<FileStatus> statusList;
+    statusList =
+        adapter.listStatus(pathToKey(f), false, startPath,
+            LISTING_PAGE_SIZE, uri, workingDir, getUsername())
+            .stream()
+            .map(this::convertFileStatus)
+            .collect(Collectors.toList());
+
+    if (!statusList.isEmpty() && !startPath.isEmpty()) {
+      // Excluding the 1st file status element from list.
+      statusList.remove(0);
+    }
+    return statusList;
   }
 
   /**
