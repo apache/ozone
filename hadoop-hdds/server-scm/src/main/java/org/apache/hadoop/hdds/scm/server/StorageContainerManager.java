@@ -738,8 +738,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           clock,
           legacyRM,
           containerReplicaPendingOps);
-      ReplicationManager.ReplicationManagerConfiguration rmConf = conf
-          .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     }
     serviceManager.register(replicationManager);
     if (configurator.getScmSafeModeManager() != null) {
