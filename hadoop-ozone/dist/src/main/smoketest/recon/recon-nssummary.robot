@@ -29,9 +29,9 @@ ${SUMMARY_URL}              ${ADMIN_NAMESPACE_URL}/summary
 ${DISK_USAGE_URL}           ${ADMIN_NAMESPACE_URL}/du
 ${QUOTA_USAGE_URL}          ${ADMIN_NAMESPACE_URL}/quota
 ${FILE_SIZE_DIST_URL}       ${ADMIN_NAMESPACE_URL}/dist
+${BUCKET_LAYOUT}            FILE_SYSTEM_OPTIMIZED
 ${VOLUME}
 ${BUCKET}
-${BUCKET_LAYOUT}
 
 *** Keywords ***
 Create volume

@@ -305,7 +305,7 @@ public class LegacyBucketHandler extends BucketHandler {
     String ozoneKey = OM_KEY_PREFIX;
     ozoneKey += String.join(OM_KEY_PREFIX, names);
 
-    OmKeyInfo keyInfo = getKeyTable().get(ozoneKey);
+    OmKeyInfo keyInfo = getKeyTable().getSkipCache(ozoneKey);
     return keyInfo;
   }
 

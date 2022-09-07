@@ -45,7 +45,7 @@ import java.util.Map;
  * add the current directory's objectID to the parent object's childDir field.
  *
  * Process() will write all OMDB updates to RocksDB.
- * The write logic is the same as above. For update action, we will treat it as
+ * Write logic is the same as above. For update action, we will treat it as
  * delete old value first, and write updated value then.
  */
 public abstract class NSSummaryTask implements ReconOmTask {
