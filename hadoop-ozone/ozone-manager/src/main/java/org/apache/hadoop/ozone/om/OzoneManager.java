@@ -2840,8 +2840,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             auditMap));
       }
 
-      long duration = Time.monotonicNowNanos() - startTime;
-      perfMetrics.addLookupKeyLatency(duration);
+      perfMetrics.addLookupKeyLatency(Time.monotonicNowNanos() - startTime);
     }
   }
 
@@ -3409,7 +3408,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     final S3VolumeContext.Builder s3VolumeContext = S3VolumeContext.newBuilder()
         .setOmVolumeArgs(getVolumeInfo(s3Volume))
         .setUserPrincipal(userPrincipal);
-    perfMetrics.addS3VolumeInfoLatencyNs(Time.monotonicNowNanos() - start);
+    perfMetrics.addS3VolumeContextLatencyNs(Time.monotonicNowNanos() - start);
     return s3VolumeContext.build();
   }
 

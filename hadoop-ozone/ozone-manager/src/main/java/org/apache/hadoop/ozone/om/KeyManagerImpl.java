@@ -397,8 +397,7 @@ public class KeyManagerImpl implements KeyManager {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
-    long take = Time.monotonicNowNanos() - start;
-    metrics.addReadKeyInfoLatency(take);
+    metrics.addReadKeyInfoLatency(Time.monotonicNowNanos() - start);
 
     if (value == null) {
       if (LOG.isDebugEnabled()) {
@@ -477,8 +476,7 @@ public class KeyManagerImpl implements KeyManager {
               EnumSet.of(READ), k.getLength()));
         });
       }
-      long latency = Time.monotonicNowNanos() - start;
-      metrics.addBlockTokenLatency(latency);
+      metrics.addBlockTokenLatency(Time.monotonicNowNanos() - start);
     }
   }
   /**
