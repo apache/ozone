@@ -265,24 +265,16 @@ public abstract class EndpointBase implements Auditor {
       return customMetadata;
     }
 
-    LOG.error("**** **** **** **** **** **** **** **** **** **** **** **** **** **** **** ");
-    LOG.error("list all pre-filtered metadata keys in request: ");
-    requestHeaders.keySet().forEach(System.out::println);
-    LOG.error("**** **** **** **** **** **** **** **** **** **** **** **** **** **** **** ");
-
     Set<String> customMetadataKeys = requestHeaders.keySet().stream()
             .filter(k -> {
               if (k.startsWith(CUSTOM_METADATA_HEADER_PREFIX) &&
-                      !excludeMetadataFields.contains(k.substring(CUSTOM_METADATA_HEADER_PREFIX.length()))) {
+                      !excludeMetadataFields.contains(
+                              k.substring(CUSTOM_METADATA_HEADER_PREFIX.length()))) {
                 return true;
               }
               return false;
             })
             .collect(Collectors.toSet());
-    LOG.error("#### #### #### #### #### #### #### #### #### #### #### #### #### #### ####");
-    LOG.error("list all metadata keys in s3 request: ");
-    customMetadataKeys.forEach(System.out:: println);
-    LOG.error("#### #### #### #### #### #### #### #### #### #### #### #### #### #### ####");
 
     long sizeInBytes = 0;
     if (!customMetadataKeys.isEmpty()) {
@@ -302,7 +294,6 @@ public abstract class EndpointBase implements Auditor {
                 OzoneConsts.S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB * KB) {
           throw new IllegalArgumentException("Illegal user defined metadata." +
               " Combined size cannot exceed 2KB.");
-
         }
         customMetadata.put(mapKey, value);
       }
