@@ -28,13 +28,13 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 
 /**
- * This class defines configuration parameters for container scrubber.
+ * This class defines configuration parameters for the container scanners.
  **/
 @ConfigGroup(prefix = "hdds.container.scrub")
-public class ContainerScrubberConfiguration {
+public class ContainerScannerConfiguration {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerScrubberConfiguration.class);
+      LoggerFactory.getLogger(ContainerScannerConfiguration.class);
 
   // only for log
   public static final String HDDS_CONTAINER_SCRUB_ENABLED =
@@ -56,7 +56,7 @@ public class ContainerScrubberConfiguration {
       type = ConfigType.BOOLEAN,
       defaultValue = "false",
       tags = {ConfigTag.STORAGE},
-      description = "Config parameter to enable container scrubber.")
+      description = "Config parameter to enable container scanner.")
   private boolean enabled = false;
 
   @Config(key = "metadata.scan.interval",
@@ -64,7 +64,7 @@ public class ContainerScrubberConfiguration {
       defaultValue = "3h",
       tags = {ConfigTag.STORAGE},
       description = "Config parameter define time interval" +
-          " between two metadata scans by container scrubber." +
+          " between two metadata scans by container scanner." +
           " Unit could be defined with postfix (ns,ms,s,m,h,d).")
   private long metadataScanInterval = METADATA_SCAN_INTERVAL_DEFAULT;
 
@@ -83,7 +83,7 @@ public class ContainerScrubberConfiguration {
       defaultValue = "1048576",
       tags = {ConfigTag.STORAGE},
       description = "Config parameter to throttle I/O bandwidth used"
-          + " by scrubber per volume.")
+          + " by scanner per volume.")
   private long bandwidthPerVolume = BANDWIDTH_PER_VOLUME_DEFAULT;
 
   @PostConstruct

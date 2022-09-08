@@ -24,18 +24,18 @@ import org.junit.Test;
 
 import java.time.Duration;
 
-import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration.BANDWIDTH_PER_VOLUME_DEFAULT;
-import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration.DATA_SCAN_INTERVAL_DEFAULT;
-import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration.DATA_SCAN_INTERVAL_KEY;
-import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration.METADATA_SCAN_INTERVAL_DEFAULT;
-import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration.METADATA_SCAN_INTERVAL_KEY;
-import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration.VOLUME_BYTES_PER_SECOND_KEY;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.BANDWIDTH_PER_VOLUME_DEFAULT;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.DATA_SCAN_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.DATA_SCAN_INTERVAL_KEY;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.METADATA_SCAN_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.METADATA_SCAN_INTERVAL_KEY;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.VOLUME_BYTES_PER_SECOND_KEY;
 import static org.junit.Assert.assertEquals;
 
 /**
- * Test for {@link ContainerScrubberConfiguration}.
+ * Test for {@link ContainerScannerConfiguration}.
  */
-public class TestContainerScrubberConfiguration {
+public class TestContainerScannerConfiguration {
 
   private OzoneConfiguration conf;
 
@@ -53,8 +53,8 @@ public class TestContainerScrubberConfiguration {
     conf.setLong(DATA_SCAN_INTERVAL_KEY, validInterval);
     conf.setLong(VOLUME_BYTES_PER_SECOND_KEY, validBandwidth);
 
-    ContainerScrubberConfiguration csConf =
-        conf.getObject(ContainerScrubberConfiguration.class);
+    ContainerScannerConfiguration csConf =
+        conf.getObject(ContainerScannerConfiguration.class);
 
     assertEquals(validInterval, csConf.getMetadataScanInterval());
     assertEquals(validInterval, csConf.getDataScanInterval());
@@ -70,8 +70,8 @@ public class TestContainerScrubberConfiguration {
     conf.setLong(DATA_SCAN_INTERVAL_KEY, invalidInterval);
     conf.setLong(VOLUME_BYTES_PER_SECOND_KEY, invalidBandwidth);
 
-    ContainerScrubberConfiguration csConf =
-        conf.getObject(ContainerScrubberConfiguration.class);
+    ContainerScannerConfiguration csConf =
+        conf.getObject(ContainerScannerConfiguration.class);
 
     assertEquals(METADATA_SCAN_INTERVAL_DEFAULT,
         csConf.getMetadataScanInterval());
@@ -83,8 +83,8 @@ public class TestContainerScrubberConfiguration {
 
   @Test
   public void isCreatedWitDefaultValues() {
-    ContainerScrubberConfiguration csConf =
-        conf.getObject(ContainerScrubberConfiguration.class);
+    ContainerScannerConfiguration csConf =
+        conf.getObject(ContainerScannerConfiguration.class);
 
     assertEquals(false, csConf.isEnabled());
     assertEquals(METADATA_SCAN_INTERVAL_DEFAULT,

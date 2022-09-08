@@ -17,7 +17,7 @@
  * under the License.
  *
  */
-package org.apache.hadoop.ozone.dn.scrubber;
+package org.apache.hadoop.ozone.dn.scanner;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -26,28 +26,28 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerMetadataScanner;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -56,30 +56,29 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 
+import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Set;
 import java.util.UUID;
-import java.io.File;
-
-import org.junit.Rule;
-import org.junit.rules.Timeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 
 /**
- * This class tests the data scrubber functionality.
+ * This class tests the data scanner functionality.
  */
-public class TestDataScrubber {
+public class TestDataScanner {
 
   /**
-    * Set a timeout for each test.
-    */
+   * Set a timeout for each test.
+   */
   @Rule
   public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster;
@@ -174,11 +173,11 @@ public class TestDataScrubber {
     deleteDirectory(chunksDir);
     Assert.assertFalse(chunksDir.exists());
 
-    ContainerScrubberConfiguration conf = ozoneConfig.getObject(
-        ContainerScrubberConfiguration.class);
+    ContainerScannerConfiguration conf = ozoneConfig.getObject(
+        ContainerScannerConfiguration.class);
     ContainerMetadataScanner sb = new ContainerMetadataScanner(conf,
         oc.getController());
-    sb.scrub(c);
+    sb.scanContainer(c);
 
     // wait for the incremental container report to propagate to SCM
     Thread.sleep(5000);
