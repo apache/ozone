@@ -32,7 +32,7 @@ import java.util.concurrent.ThreadLocalRandom;
 @InterfaceAudience.Private
 @Metrics(about = "DataNode container data scanner metrics", context = "dfs")
 public final class ContainerDataScannerMetrics
-    extends AbstractContainerScannerMetric {
+    extends AbstractContainerScannerMetrics {
 
   @Metric("disk bandwidth used by the container data scanner per volume")
   private MutableRate numBytesScanned;

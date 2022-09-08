@@ -35,7 +35,6 @@ public abstract class AbstractContainerScanner extends Thread {
   public static final Logger LOG =
       LoggerFactory.getLogger(AbstractContainerScanner.class);
 
-  private final AbstractContainerScannerMetric metrics;
   private final long dataScanInterval;
 
   /**
@@ -44,16 +43,15 @@ public abstract class AbstractContainerScanner extends Thread {
    */
   private volatile boolean stopping = false;
 
-  public AbstractContainerScanner(String name, long dataScanInterval,
-                                  AbstractContainerScannerMetric metrics) {
+  public AbstractContainerScanner(String name, long dataScanInterval) {
     this.dataScanInterval = dataScanInterval;
-    this.metrics = metrics;
     setName(name);
     setDaemon(true);
   }
 
   @Override
   public final void run() {
+    AbstractContainerScannerMetrics metrics = getMetrics();
     try {
       while (!stopping) {
         runIteration();
@@ -78,9 +76,9 @@ public abstract class AbstractContainerScanner extends Thread {
     if (stopping) {
       return;
     }
+    AbstractContainerScannerMetrics metrics = getMetrics();
     metrics.incNumScanIterations();
-    LOG.info("Completed an iteration of " + this.getClass().toString() +
-            " in {} minutes." +
+    LOG.info("Completed an iteration in {} minutes." +
             " Number of iterations (since the data-node restart) : {}" +
             ", Number of containers scanned in this iteration : {}" +
             ", Number of unhealthy containers found in this iteration : {}",
@@ -134,7 +132,5 @@ public abstract class AbstractContainerScanner extends Thread {
   }
 
   @VisibleForTesting
-  public AbstractContainerScannerMetric getMetrics() {
-    return metrics;
-  }
+  public abstract AbstractContainerScannerMetrics getMetrics();
 }

@@ -39,10 +39,9 @@ public class ContainerMetadataScanner extends AbstractContainerScanner {
 
   public ContainerMetadataScanner(ContainerScannerConfiguration conf,
                                   ContainerController controller) {
-    super("ContainerMetadataScanner", conf.getMetadataScanInterval(),
-        ContainerMetadataScannerMetrics.create());
+    super("ContainerMetadataScanner", conf.getMetadataScanInterval());
     this.controller = controller;
-    this.metrics = (ContainerMetadataScannerMetrics) super.getMetrics();
+    this.metrics = ContainerMetadataScannerMetrics.create();
   }
 
   @Override

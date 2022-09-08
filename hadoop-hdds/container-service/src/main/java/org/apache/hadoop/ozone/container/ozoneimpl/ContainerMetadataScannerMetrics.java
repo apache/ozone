@@ -29,7 +29,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 @InterfaceAudience.Private
 @Metrics(about = "DataNode container metadata scanner metrics", context = "dfs")
 public final class ContainerMetadataScannerMetrics
-    extends AbstractContainerScannerMetric {
+    extends AbstractContainerScannerMetrics {
 
   private ContainerMetadataScannerMetrics(String name, MetricsSystem ms) {
     super(name, ms);

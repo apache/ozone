@@ -51,14 +51,12 @@ public class ContainerDataScanner extends AbstractContainerScanner {
   public ContainerDataScanner(ContainerScannerConfiguration conf,
                               ContainerController controller,
                               HddsVolume volume) {
-    super(String.format(NAME_FORMAT, volume), conf.getDataScanInterval(),
-        ContainerDataScannerMetrics.create(volume.toString())
-    );
+    super(String.format(NAME_FORMAT, volume), conf.getDataScanInterval());
     this.controller = controller;
     this.volume = volume;
     throttler = new HddsDataTransferThrottler(conf.getBandwidthPerVolume());
     canceler = new Canceler();
-    this.metrics = (ContainerDataScannerMetrics) super.getMetrics();
+    this.metrics = ContainerDataScannerMetrics.create(volume.toString());
   }
 
   @Override

@@ -31,7 +31,7 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
  */
 @InterfaceAudience.Private
 @Metrics(about = "Datanode container scanner metrics", context = "dfs")
-public abstract class AbstractContainerScannerMetric {
+public abstract class AbstractContainerScannerMetrics {
 
   private final String name;
   private final MetricsSystem ms;
@@ -43,7 +43,7 @@ public abstract class AbstractContainerScannerMetric {
   @Metric("number of iterations of scanner completed since the restart")
   private MutableCounterInt numScanIterations;
 
-  public AbstractContainerScannerMetric(String name, MetricsSystem ms) {
+  public AbstractContainerScannerMetrics(String name, MetricsSystem ms) {
     this.name = name;
     this.ms = ms;
   }
