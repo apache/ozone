@@ -123,7 +123,7 @@ public class HddsVolume extends StorageVolume {
       // HddsVolume Object.
       this.setState(VolumeState.FAILED);
       volumeIOStats = null;
-      volumeInfoMetrics = null;
+      volumeInfoMetrics = new VolumeInfoMetrics(b.getVolumeRootStr(), this);
       committedBytes = null;
     }
 
@@ -162,9 +162,6 @@ public class HddsVolume extends StorageVolume {
     super.failVolume();
     if (volumeIOStats != null) {
       volumeIOStats.unregister();
-    }
-    if (volumeInfoMetrics != null) {
-      volumeInfoMetrics.unregister();
     }
     closeDbStore();
   }
