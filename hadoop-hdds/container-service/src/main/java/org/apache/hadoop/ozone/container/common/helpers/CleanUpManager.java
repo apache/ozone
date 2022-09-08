@@ -98,11 +98,11 @@ public class CleanUpManager {
       clusterId += hddsVolume.getClusterID();
 
       if (clusterId == null) {
-        throw new IOException();
+        throw new IOException("Volume has not been initialized," +
+            " clusterId is null.");
       }
     } catch (IOException ex) {
-      LOG.error("Volume has not been initialized, " +
-          "clusterId is null.", ex);
+      LOG.error("Exception in CleanUpManger setTmpDirPath.", ex);
     }
 
     String pathId = "";
