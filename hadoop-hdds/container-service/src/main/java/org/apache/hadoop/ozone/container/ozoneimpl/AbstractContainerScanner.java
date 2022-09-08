@@ -94,7 +94,7 @@ public abstract class AbstractContainerScanner extends Thread {
   public final void scanContainers() {
     Iterator<Container<?>> itr = getContainerIterator();
     while (!stopping && itr.hasNext()) {
-      Container c = itr.next();
+      Container<?> c = itr.next();
       try {
         scanContainer(c);
       } catch (IOException ex) {
@@ -106,7 +106,7 @@ public abstract class AbstractContainerScanner extends Thread {
 
   public abstract Iterator<Container<?>> getContainerIterator();
 
-  public abstract void scanContainer(Container c) throws IOException;
+  public abstract void scanContainer(Container<?> c) throws IOException;
 
   public final void handleRemainingSleep(long remainingSleep) {
     if (remainingSleep > 0) {
