@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -61,6 +62,8 @@ public class TestECOverReplicationHandler {
   private NodeManager nodeManager;
   private OzoneConfiguration conf;
   private PlacementPolicy policy;
+  private ReplicationManager replicationManager;
+  private ECReplicationCheckHandler replicationCheck;
 
   @BeforeEach
   public void setup() {
@@ -80,6 +83,8 @@ public class TestECOverReplicationHandler {
     NodeSchema[] schemas =
         new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
+    replicationManager = Mockito.mock(ReplicationManager.class);
+    replicationCheck = new ECReplicationCheckHandler(replicationManager);
   }
 
   @Test
@@ -126,7 +131,7 @@ public class TestECOverReplicationHandler {
       Set<ContainerReplica> availableReplicas,
       Map<Integer, Integer> index2excessNum) {
     ECOverReplicationHandler ecORH =
-        new ECOverReplicationHandler(policy, nodeManager);
+        new ECOverReplicationHandler(replicationCheck, policy, nodeManager);
     ContainerHealthResult.OverReplicatedHealthResult result =
         Mockito.mock(ContainerHealthResult.OverReplicatedHealthResult.class);
     Mockito.when(result.getContainerInfo()).thenReturn(container);

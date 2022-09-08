@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
 
 /**
@@ -34,6 +35,11 @@ public class ContainerCheckRequest {
   private final List<ContainerReplicaOp> pendingOps;
   private final int maintenanceRedundancy;
   private final ReplicationManagerReport report;
+  private final Queue<ContainerHealthResult.UnderReplicatedHealthResult>
+      underRepQueue;
+  private final Queue<ContainerHealthResult.OverReplicatedHealthResult>
+      overRepQueue;
+
 
   private ContainerCheckRequest(Builder builder) {
     this.containerInfo = builder.containerInfo;
@@ -41,6 +47,8 @@ public class ContainerCheckRequest {
     this.pendingOps = builder.pendingOps;
     this.maintenanceRedundancy = builder.maintenanceRedundancy;
     this.report = builder.report;
+    this.overRepQueue = builder.overRepQueue;
+    this.underRepQueue = builder.underRepQueue;
   }
 
   public List<ContainerReplicaOp> getPendingOps() {
@@ -63,6 +71,16 @@ public class ContainerCheckRequest {
     return report;
   }
 
+  public Queue<ContainerHealthResult.UnderReplicatedHealthResult>
+      getUnderRepQueue() {
+    return underRepQueue;
+  }
+
+  public Queue<ContainerHealthResult.OverReplicatedHealthResult>
+      getOverRepQueue() {
+    return overRepQueue;
+  }
+
   public static class Builder {
 
     private ContainerInfo containerInfo;
@@ -70,6 +88,10 @@ public class ContainerCheckRequest {
     private List<ContainerReplicaOp> pendingOps;
     private int maintenanceRedundancy;
     private ReplicationManagerReport report;
+    private Queue<ContainerHealthResult.UnderReplicatedHealthResult>
+        underRepQueue;
+    private Queue<ContainerHealthResult.OverReplicatedHealthResult>
+        overRepQueue;
 
     public Builder containerInfo(ContainerInfo containerInfo) {
       this.containerInfo = containerInfo;
@@ -88,6 +110,18 @@ public class ContainerCheckRequest {
 
     public Builder maintenanceRedundancy(int maintenanceRedundancy) {
       this.maintenanceRedundancy = maintenanceRedundancy;
+      return this;
+    }
+
+    public Builder underRepQueue(
+        Queue<ContainerHealthResult.UnderReplicatedHealthResult> queue) {
+      this.underRepQueue = queue;
+      return this;
+    }
+
+    public Builder overRepQueue(
+        Queue<ContainerHealthResult.OverReplicatedHealthResult> queue) {
+      this.overRepQueue = queue;
       return this;
     }
 
