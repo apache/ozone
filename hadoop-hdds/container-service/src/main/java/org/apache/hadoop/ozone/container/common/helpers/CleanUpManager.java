@@ -120,6 +120,13 @@ public class CleanUpManager {
     this.tmpDirPath = Paths.get(tmpPath);
   }
 
+  /**
+   * Renaming container directory path to a new location
+   * under "/tmp/container_delete_service" and
+   * updating metadata and chunks path.
+   * @param keyValueContainerData
+   * @return true if renaming was successful
+   */
   public boolean renameDir(KeyValueContainerData keyValueContainerData) {
     String containerPath = keyValueContainerData.getContainerPath();
     File container = new File(containerPath);
