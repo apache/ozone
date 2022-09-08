@@ -20,8 +20,10 @@ package org.apache.hadoop.ozone.shell;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.Iterator;
 import java.util.concurrent.Callable;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import org.apache.hadoop.hdds.cli.GenericParentCommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -116,6 +118,21 @@ public abstract class Handler implements Callable<Void> {
 
   protected void printObjectAsJson(Object o) throws IOException {
     out().println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(o));
+  }
+
+  /**
+   * Pretty print the result as a valid JSON array to out().
+   * @return Number of entries actually printed.
+   */
+  protected int printAsJsonArray(Iterator<?> iterator, int limit) {
+    int counter = 0;
+    final ArrayNode arrayNode = JsonUtils.createArrayNode();
+    while (limit > counter && iterator.hasNext()) {
+      arrayNode.add(JsonUtils.createObjectNode(iterator.next()));
+      counter++;
+    }
+    out().println(arrayNode.toPrettyString());
+    return counter;
   }
 
   protected void printMsg(String msg) {

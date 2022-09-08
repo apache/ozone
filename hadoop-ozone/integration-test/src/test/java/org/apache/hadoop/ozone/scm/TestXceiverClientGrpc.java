@@ -18,11 +18,12 @@
 package org.apache.hadoop.ozone.scm;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -60,14 +61,14 @@ public class TestXceiverClientGrpc {
     dns.add(MockDatanodeDetails.randomDatanodeDetails());
 
     dnsInOrder = new ArrayList<>();
-    for (int i=2; i>=0; i--) {
+    for (int i = 2; i >= 0; i--) {
       dnsInOrder.add(dns.get(i));
     }
 
     pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
-        .setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.CLOSED)
         .setNodes(dns)
         .build();
@@ -81,14 +82,14 @@ public class TestXceiverClientGrpc {
     Assert.assertNotEquals(dns.get(0), dnsInOrder.get(0));
   }
 
-  @Test(timeout=5000)
+  @Test(timeout = 5000)
   public void testRandomFirstNodeIsCommandTarget() throws IOException {
     final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
     // Using a new Xceiver Client, call it repeatedly until all DNs in the
     // pipeline have been the target of the command, indicating it is shuffling
     // the DNs on each call with a new client. This test will timeout if this
     // is not happening.
-    while(allDNs.size() > 0) {
+    while (allDNs.size() > 0) {
       XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
         @Override
         public XceiverClientReply sendCommandAsync(
@@ -111,7 +112,7 @@ public class TestXceiverClientGrpc {
     // With a new Client, make 100 calls and ensure the first sortedDN is used
     // each time. The logic should always use the sorted node, so we can check
     // only a single DN is ever seen after 100 calls.
-    for (int i=0; i<100; i++) {
+    for (int i = 0; i < 100; i++) {
       XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
         @Override
         public XceiverClientReply sendCommandAsync(
@@ -130,7 +131,7 @@ public class TestXceiverClientGrpc {
   public void testConnectionReusedAfterGetBlock() throws IOException {
     // With a new Client, make 100 calls. On each call, ensure that only one
     // DN is seen, indicating the same DN connection is reused.
-    for (int i=0; i<100; i++) {
+    for (int i = 0; i < 100; i++) {
       final Set<DatanodeDetails> seenDNs = new HashSet<>();
       XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
         @Override

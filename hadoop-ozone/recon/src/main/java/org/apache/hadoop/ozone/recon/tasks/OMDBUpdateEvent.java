@@ -83,12 +83,13 @@ public final class OMDBUpdateEvent<KEY, VALUE> {
     }
     OMDBUpdateEvent that = (OMDBUpdateEvent) o;
     return this.updatedKey.equals(that.updatedKey) &&
+        this.table.equals(that.table) &&
         this.action.equals(that.action);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(updatedKey, action);
+    return Objects.hash(updatedKey, table, action);
   }
 
   /**

@@ -25,10 +25,13 @@ import java.io.File;
 import java.io.IOException;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -76,9 +79,9 @@ public class TestReconOmMetadataManagerImpl {
         .get("/sampleVol"));
     Assert.assertNotNull(reconOMMetadataManager.getBucketTable()
         .get("/sampleVol/bucketOne"));
-    Assert.assertNotNull(reconOMMetadataManager.getKeyTable()
+    Assert.assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_one"));
-    Assert.assertNotNull(reconOMMetadataManager.getKeyTable()
+    Assert.assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_two"));
   }
 
@@ -87,9 +90,9 @@ public class TestReconOmMetadataManagerImpl {
 
     OMMetadataManager omMetadataManager = getOMMetadataManager();
     //Make sure OM Metadata reflects the keys that were inserted.
-    Assert.assertNotNull(omMetadataManager.getKeyTable()
+    Assert.assertNotNull(omMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_one"));
-    Assert.assertNotNull(omMetadataManager.getKeyTable()
+    Assert.assertNotNull(omMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_two"));
 
     //Take checkpoint of OM DB.
@@ -123,11 +126,21 @@ public class TestReconOmMetadataManagerImpl {
         .get("/sampleVol/bucketOne"));
 
     //Verify Keys inserted in OM DB are available in Recon OM DB.
-    Assert.assertNotNull(reconOMMetadataManager.getKeyTable()
+    Assert.assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_one"));
-    Assert.assertNotNull(reconOMMetadataManager.getKeyTable()
+    Assert.assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_two"));
 
+    //Take a new checkpoint of OM DB.
+    DBCheckpoint newCheckpoint = omMetadataManager.getStore()
+        .getCheckpoint(true);
+    Assert.assertNotNull(newCheckpoint.getCheckpointLocation());
+    // Update again with an existing OM DB.
+    DBStore current = reconOMMetadataManager.getStore();
+    reconOMMetadataManager.updateOmDB(
+        newCheckpoint.getCheckpointLocation().toFile());
+    // Verify that the existing DB instance is closed.
+    Assert.assertTrue(current.isClosed());
   }
 
   /**
@@ -165,23 +178,27 @@ public class TestReconOmMetadataManagerImpl {
     omMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
 
 
-    omMetadataManager.getKeyTable().put("/sampleVol/bucketOne/key_one",
-        new OmKeyInfo.Builder()
+    omMetadataManager.getKeyTable(getBucketLayout()).put(
+        "/sampleVol/bucketOne/key_one", new OmKeyInfo.Builder()
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
             .setKeyName("key_one")
-            .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
-            .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.ONE))
             .build());
-    omMetadataManager.getKeyTable().put("/sampleVol/bucketOne/key_two",
-        new OmKeyInfo.Builder()
+    omMetadataManager.getKeyTable(getBucketLayout()).put(
+        "/sampleVol/bucketOne/key_two", new OmKeyInfo.Builder()
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
             .setKeyName("key_two")
-            .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
-            .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.ONE))
             .build());
 
     return omMetadataManager;
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

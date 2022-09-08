@@ -21,8 +21,9 @@ import java.util.UUID;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
+import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclRequest;
@@ -46,9 +47,9 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
 
     // Manually add volume, bucket and key to DB
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
-    TestOMRequestUtils.addKeyToTable(false, false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, false, volumeName, bucketName,
         keyName, clientID, replicationType, replicationFactor, 1L,
         omMetadataManager);
 
@@ -68,6 +69,51 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
         omClientResponse.getOMResponse().getStatus());
   }
 
+  @Test
+  public void testRemoveAclRequest() throws Exception {
+    PrefixManager prefixManager = new PrefixManagerImpl(
+        ozoneManager.getMetadataManager(), true);
+    when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
+
+    // Manually add volume, bucket and key to DB
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
+    OMRequestTestUtils.addKeyToTable(false, false, volumeName, bucketName,
+        keyName, clientID, replicationType, replicationFactor, 1L,
+        omMetadataManager);
+
+    OzoneAcl acl = OzoneAcl.parseAcl("user:mohanad.elsafty:rwdlncxy[ACCESS]");
+
+    // Create KeyAddAcl request
+    OMRequest originalRequest = createAddAclkeyRequest(acl);
+    OMPrefixAddAclRequest omKeyPrefixAclRequest = new OMPrefixAddAclRequest(
+        originalRequest);
+    omKeyPrefixAclRequest.preExecute(ozoneManager);
+    omKeyPrefixAclRequest.validateAndUpdateCache(ozoneManager, 2,
+        ozoneManagerDoubleBufferHelper);
+
+    // Remove existing prefix acl.
+    OMRequest validRemoveAclRequest = createRemoveAclKeyRequest(acl, keyName);
+    OMPrefixRemoveAclRequest omPrefixRemoveAclRequest1 =
+        new OMPrefixRemoveAclRequest(validRemoveAclRequest);
+    omPrefixRemoveAclRequest1.preExecute(ozoneManager);
+    OMClientResponse omClientResponse1 = omPrefixRemoveAclRequest1
+        .validateAndUpdateCache(ozoneManager, 3,
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse1.getOMResponse().getStatus());
+
+    // Remove non-existing prefix acl.
+    OMRequest invalidRemoveAclRequest = createRemoveAclKeyRequest(acl, keyName);
+    OMPrefixRemoveAclRequest omPrefixRemoveAclRequest2 =
+        new OMPrefixRemoveAclRequest(invalidRemoveAclRequest);
+    omPrefixRemoveAclRequest1.preExecute(ozoneManager);
+    OMClientResponse omClientResponse2 = omPrefixRemoveAclRequest2
+        .validateAndUpdateCache(ozoneManager, 4,
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.PREFIX_NOT_FOUND,
+        omClientResponse2.getOMResponse().getStatus());
+  }
 
   /**
    * Create OMRequest which encapsulates OMKeyAddAclRequest.
@@ -91,4 +137,24 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
         .build();
   }
 
+  private OMRequest createRemoveAclKeyRequest(OzoneAcl acl, String key) {
+    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
+        .setBucketName(bucketName)
+        .setVolumeName(volumeName)
+        .setKeyName(key)
+        .setResType(OzoneObj.ResourceType.PREFIX)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .build();
+
+    OzoneManagerProtocolProtos.RemoveAclRequest removeAclRequest =
+        OzoneManagerProtocolProtos.RemoveAclRequest.newBuilder()
+            .setObj(OzoneObj.toProtobuf(obj))
+            .setAcl(OzoneAcl.toProtobuf(acl))
+            .build();
+
+    return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
+        .setCmdType(OzoneManagerProtocolProtos.Type.RemoveAcl)
+        .setRemoveAclRequest(removeAclRequest)
+        .build();
+  }
 }

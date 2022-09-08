@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -19,8 +19,12 @@ package org.apache.hadoop.hdds.scm.server;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -40,7 +44,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +59,9 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CMD_STATUS_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.COMMAND_QUEUE_REPORT;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
 /**
  * This class is responsible for dispatching heartbeat from datanode to
@@ -102,8 +109,22 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     } else {
 
+      LayoutVersionProto layoutVersion = null;
+      if (!heartbeat.hasDataNodeLayoutVersion()) {
+        // Backward compatibility to make sure old Datanodes can still talk to
+        // SCM.
+        layoutVersion = toLayoutVersionProto(INITIAL_VERSION.layoutVersion(),
+            INITIAL_VERSION.layoutVersion());
+      } else {
+        layoutVersion = heartbeat.getDataNodeLayoutVersion();
+      }
+
+      LOG.debug("Processing DataNode Layout Report.");
+      nodeManager.processLayoutVersionReport(datanodeDetails, layoutVersion);
+
       // should we dispatch heartbeat through eventPublisher?
-      commands = nodeManager.processHeartbeat(datanodeDetails);
+      commands = nodeManager.processHeartbeat(datanodeDetails,
+          layoutVersion);
       if (heartbeat.hasNodeReport()) {
         LOG.debug("Dispatching Node Report.");
         eventPublisher.fireEvent(
@@ -111,6 +132,13 @@ public final class SCMDatanodeHeartbeatDispatcher {
             new NodeReportFromDatanode(
                 datanodeDetails,
                 heartbeat.getNodeReport()));
+      }
+
+      if (heartbeat.hasCommandQueueReport()) {
+        LOG.debug("Dispatching Queued Command Report");
+        eventPublisher.fireEvent(COMMAND_QUEUE_REPORT,
+            new CommandQueueReportFromDatanode(datanodeDetails,
+                heartbeat.getCommandQueueReport()));
       }
 
       if (heartbeat.hasContainerReport()) {
@@ -182,7 +210,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
   /**
    * Wrapper class for events with the datanode origin.
    */
-  public static class ReportFromDatanode<T extends GeneratedMessage> {
+  public static class ReportFromDatanode<T extends Message> {
 
     private final DatanodeDetails datanodeDetails;
 
@@ -215,6 +243,29 @@ public final class SCMDatanodeHeartbeatDispatcher {
   }
 
   /**
+   * Command Queue Report with origin.
+   */
+  public static class CommandQueueReportFromDatanode
+      extends ReportFromDatanode<CommandQueueReportProto> {
+    public CommandQueueReportFromDatanode(DatanodeDetails datanodeDetails,
+                                          CommandQueueReportProto report) {
+      super(datanodeDetails, report);
+    }
+  }
+
+  /**
+   * Layout report event payload with origin.
+   */
+  public static class LayoutReportFromDatanode
+      extends ReportFromDatanode<LayoutVersionProto> {
+
+    public LayoutReportFromDatanode(DatanodeDetails datanodeDetails,
+                                  LayoutVersionProto report) {
+      super(datanodeDetails, report);
+    }
+  }
+
+  /**
    * Container report event payload with origin.
    */
   public static class ContainerReportFromDatanode
@@ -223,6 +274,16 @@ public final class SCMDatanodeHeartbeatDispatcher {
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
         ContainerReportsProto report) {
       super(datanodeDetails, report);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      return this == o;
+    }
+
+    @Override
+    public int hashCode() {
+      return this.getDatanodeDetails().getUuid().hashCode();
     }
   }
 
@@ -236,6 +297,16 @@ public final class SCMDatanodeHeartbeatDispatcher {
         DatanodeDetails datanodeDetails,
         IncrementalContainerReportProto report) {
       super(datanodeDetails, report);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      return this == o;
+    }
+
+    @Override
+    public int hashCode() {
+      return this.getDatanodeDetails().getUuid().hashCode();
     }
   }
 
@@ -287,4 +358,15 @@ public final class SCMDatanodeHeartbeatDispatcher {
     }
   }
 
+  /**
+   * CRL Status report event payload with origin.
+   */
+  public static class CRLStatusReportFromDatanode
+      extends ReportFromDatanode<CRLStatusReport> {
+
+    public CRLStatusReportFromDatanode(DatanodeDetails datanodeDetails,
+                                           CRLStatusReport report) {
+      super(datanodeDetails, report);
+    }
+  }
 }

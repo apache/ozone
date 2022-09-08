@@ -18,16 +18,26 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -37,6 +47,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 public class DatanodeInfo extends DatanodeDetails {
 
+  private static final Logger LOG = LoggerFactory.getLogger(DatanodeInfo.class);
+
   private final ReadWriteLock lock;
 
   private volatile long lastHeartbeatTime;
@@ -44,6 +56,8 @@ public class DatanodeInfo extends DatanodeDetails {
 
   private List<StorageReportProto> storageReports;
   private List<MetadataStorageReportProto> metadataStorageReports;
+  private LayoutVersionProto lastKnownLayoutVersion;
+  private Map<SCMCommandProto.Type, Integer> commandCounts;
 
   private NodeStatus nodeStatus;
 
@@ -51,14 +65,20 @@ public class DatanodeInfo extends DatanodeDetails {
    * Constructs DatanodeInfo from DatanodeDetails.
    *
    * @param datanodeDetails Details about the datanode
+   * @param layoutInfo Details about the LayoutVersionProto
    */
-  public DatanodeInfo(DatanodeDetails datanodeDetails, NodeStatus nodeStatus) {
+  public DatanodeInfo(DatanodeDetails datanodeDetails, NodeStatus nodeStatus,
+        LayoutVersionProto layoutInfo) {
     super(datanodeDetails);
     this.lock = new ReentrantReadWriteLock();
     this.lastHeartbeatTime = Time.monotonicNow();
+    lastKnownLayoutVersion = toLayoutVersionProto(
+        layoutInfo != null ? layoutInfo.getMetadataLayoutVersion() : 0,
+        layoutInfo != null ? layoutInfo.getSoftwareLayoutVersion() : 0);
     this.storageReports = Collections.emptyList();
     this.nodeStatus = nodeStatus;
     this.metadataStorageReports = Collections.emptyList();
+    this.commandCounts = new HashMap<>();
   }
 
   /**
@@ -85,6 +105,23 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
+   * Updates the last LayoutVersion.
+   */
+  public void updateLastKnownLayoutVersion(LayoutVersionProto version) {
+    if (version == null) {
+      return;
+    }
+    try {
+      lock.writeLock().lock();
+      lastKnownLayoutVersion = toLayoutVersionProto(
+          version.getMetadataLayoutVersion(),
+          version.getSoftwareLayoutVersion());
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  /**
    * Returns the last heartbeat time.
    *
    * @return last heartbeat time.
@@ -93,6 +130,20 @@ public class DatanodeInfo extends DatanodeDetails {
     try {
       lock.readLock().lock();
       return lastHeartbeatTime;
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  /**
+   * Returns the last known Layout Version .
+   *
+   * @return last  Layout Version.
+   */
+  public LayoutVersionProto getLastKnownLayoutVersion() {
+    try {
+      lock.readLock().lock();
+      return lastKnownLayoutVersion;
     } finally {
       lock.readLock().unlock();
     }
@@ -138,6 +189,20 @@ public class DatanodeInfo extends DatanodeDetails {
     try {
       lock.readLock().lock();
       return storageReports;
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  /**
+   * Returns the storage reports associated with this datanode.
+   *
+   * @return list of storage report
+   */
+  public List<MetadataStorageReportProto> getMetadataStorageReports() {
+    try {
+      lock.readLock().lock();
+      return metadataStorageReports;
     } finally {
       lock.readLock().unlock();
     }
@@ -214,6 +279,57 @@ public class DatanodeInfo extends DatanodeDetails {
       this.nodeStatus = newNodeStatus;
     } finally {
       lock.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Set the current command counts for this datanode, as reported in the last
+   * heartbeat.
+   * @param cmds Proto message containing a list of command count pairs.
+   */
+  public void setCommandCounts(CommandQueueReportProto cmds) {
+    try {
+      int count = cmds.getCommandCount();
+      lock.writeLock().lock();
+      for (int i = 0; i < count; i++) {
+        SCMCommandProto.Type command = cmds.getCommand(i);
+        if (command == SCMCommandProto.Type.unknownScmCommand) {
+          LOG.warn("Unknown SCM Command received from {} in the "
+              + "heartbeat. SCM and the DN may not be at the same version.",
+              this);
+          continue;
+        }
+        int cmdCount = cmds.getCount(i);
+        if (cmdCount < 0) {
+          LOG.warn("Command count of {} from {} should be greater than zero. " +
+              "Setting it to zero", cmdCount, this);
+          cmdCount = 0;
+        }
+        commandCounts.put(command, cmdCount);
+      }
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Retrieve the number of queued commands of the given type, as reported by
+   * the datanode at the last heartbeat.
+   * @param cmd The command for which to receive the queued command count
+   * @return -1 if we have no information about the count, or an integer >= 0
+   *         indicating the command count at the last heartbeat.
+   */
+  public int getCommandCount(SCMCommandProto.Type cmd) {
+    try {
+      lock.readLock().lock();
+      Integer count = commandCounts.get(cmd);
+      if (count == null) {
+        return -1;
+      } else {
+        return count.intValue();
+      }
+    } finally {
+      lock.readLock().unlock();
     }
   }
 

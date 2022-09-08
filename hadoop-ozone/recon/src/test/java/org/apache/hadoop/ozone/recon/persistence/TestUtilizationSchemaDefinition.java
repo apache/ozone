@@ -21,7 +21,8 @@ import static org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition.CLUSTER_
 import static org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition.FILE_COUNT_BY_SIZE_TABLE_NAME;
 import static org.hadoop.ozone.recon.schema.tables.ClusterGrowthDailyTable.CLUSTER_GROWTH_DAILY;
 import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -43,8 +44,7 @@ import org.hadoop.ozone.recon.schema.tables.records.FileCountBySizeRecord;
 import org.jooq.Record3;
 import org.jooq.Table;
 import org.jooq.UniqueKey;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test persistence module provides connection and transaction awareness.
@@ -77,8 +77,8 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
           resultSet.getInt("DATA_TYPE")));
     }
 
-    Assert.assertEquals(8, actualPairs.size());
-    Assert.assertEquals(expectedPairs, actualPairs);
+    assertEquals(8, actualPairs.size());
+    assertEquals(expectedPairs, actualPairs);
 
     ResultSet resultSetFileCount = metaData.getColumns(null, null,
         FILE_COUNT_BY_SIZE_TABLE_NAME, null);
@@ -94,15 +94,15 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
         new ImmutablePair<>("count", Types.BIGINT));
 
     List<Pair<String, Integer>> actualPairsFileCount = new ArrayList<>();
-    while(resultSetFileCount.next()) {
+    while (resultSetFileCount.next()) {
       actualPairsFileCount.add(new ImmutablePair<>(resultSetFileCount.getString(
           "COLUMN_NAME"), resultSetFileCount.getInt(
               "DATA_TYPE")));
     }
-    assertEquals("Unexpected number of columns",
-        4, actualPairsFileCount.size());
-    assertEquals("Columns Do not Match ",
-        expectedPairsFileCount, actualPairsFileCount);
+    assertEquals(4, actualPairsFileCount.size(),
+        "Unexpected number of columns");
+    assertEquals(expectedPairsFileCount, actualPairsFileCount,
+        "Columns Do not Match ");
   }
 
   @Test
@@ -115,7 +115,7 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
         CLUSTER_GROWTH_DAILY_TABLE_NAME, null);
 
     while (resultSet.next()) {
-      Assert.assertEquals(CLUSTER_GROWTH_DAILY_TABLE_NAME,
+      assertEquals(CLUSTER_GROWTH_DAILY_TABLE_NAME,
           resultSet.getString("TABLE_NAME"));
     }
 
@@ -140,12 +140,12 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
             CLUSTER_GROWTH_DAILY.DATANODE_ID)
             .value1(new Timestamp(now)).value2(10));
 
-    Assert.assertEquals("host1", dbRecord.getDatanodeHost());
-    Assert.assertEquals("rack1", dbRecord.getRackId());
-    Assert.assertEquals(Long.valueOf(1024), dbRecord.getAvailableSize());
-    Assert.assertEquals(Long.valueOf(512), dbRecord.getUsedSize());
-    Assert.assertEquals(Integer.valueOf(10), dbRecord.getContainerCount());
-    Assert.assertEquals(Integer.valueOf(25), dbRecord.getBlockCount());
+    assertEquals("host1", dbRecord.getDatanodeHost());
+    assertEquals("rack1", dbRecord.getRackId());
+    assertEquals(Long.valueOf(1024), dbRecord.getAvailableSize());
+    assertEquals(Long.valueOf(512), dbRecord.getUsedSize());
+    assertEquals(Integer.valueOf(10), dbRecord.getContainerCount());
+    assertEquals(Integer.valueOf(25), dbRecord.getBlockCount());
 
     // Update
     dbRecord.setUsedSize(700L);
@@ -158,8 +158,8 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
             CLUSTER_GROWTH_DAILY.DATANODE_ID)
             .value1(new Timestamp(now)).value2(10));
 
-    Assert.assertEquals(Long.valueOf(700), dbRecord.getUsedSize());
-    Assert.assertEquals(Integer.valueOf(30), dbRecord.getBlockCount());
+    assertEquals(Long.valueOf(700), dbRecord.getUsedSize());
+    assertEquals(Integer.valueOf(30), dbRecord.getBlockCount());
 
     // Delete
     dao.deleteById(getDslContext().newRecord(CLUSTER_GROWTH_DAILY.TIMESTAMP,
@@ -172,7 +172,7 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
             CLUSTER_GROWTH_DAILY.DATANODE_ID)
             .value1(new Timestamp(now)).value2(10));
 
-    Assert.assertNull(dbRecord);
+    assertNull(dbRecord);
   }
 
   @Test
@@ -184,7 +184,7 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
         FILE_COUNT_BY_SIZE_TABLE_NAME, null);
 
     while (resultSet.next()) {
-      Assert.assertEquals(FILE_COUNT_BY_SIZE_TABLE_NAME,
+      assertEquals(FILE_COUNT_BY_SIZE_TABLE_NAME,
           resultSet.getString("TABLE_NAME"));
     }
 

@@ -59,7 +59,7 @@ import org.junit.rules.Timeout;
 /**
  * Tests Close Container Exception handling by Ozone Client.
  */
-public class TestDiscardPreallocatedBlocks{
+public class TestDiscardPreallocatedBlocks {
 
   /**
    * Set a timeout for each test.
@@ -154,7 +154,7 @@ public class TestDiscardPreallocatedBlocks{
     long containerID = locationInfos.get(0).getContainerID();
     ContainerInfo container =
         cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueof(containerID));
+            .getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());

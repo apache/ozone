@@ -18,19 +18,22 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.test.LambdaTestUtils;
-import org.junit.After;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -43,7 +46,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 /**
  * Tests for LeaderChoosePolicy.
  */
-@Ignore
+@Disabled("This test was never enabled")
 public class TestLeaderChoosePolicy {
 
   private MiniOzoneCluster cluster;
@@ -58,7 +61,7 @@ public class TestLeaderChoosePolicy {
 
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(numDatanodes)
-            .setTotalPipelineNumLimit(numDatanodes + numDatanodes/3)
+            .setTotalPipelineNumLimit(numDatanodes + numDatanodes / 3)
             .setHbInterval(2000)
             .setHbProcessorInterval(1000)
             .build();
@@ -67,7 +70,7 @@ public class TestLeaderChoosePolicy {
     pipelineManager = scm.getPipelineManager();
   }
 
-  @After
+  @AfterEach
   public void cleanup() {
     cluster.shutdown();
   }
@@ -75,8 +78,8 @@ public class TestLeaderChoosePolicy {
   private void checkLeaderBalance(int dnNum, int leaderNumOfEachDn)
       throws Exception {
     List<Pipeline> pipelines = pipelineManager
-        .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
+        .getPipelines(RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
 
     for (Pipeline pipeline : pipelines) {
       LambdaTestUtils.await(30000, 500, () ->
@@ -99,7 +102,7 @@ public class TestLeaderChoosePolicy {
     }
   }
 
-  @Test(timeout = 360000)
+  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 360000)
   public void testRestoreSuggestedLeader() throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     conf.set(OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,
@@ -114,9 +117,9 @@ public class TestLeaderChoosePolicy {
     // make sure two pipelines are created
     waitForPipelines(pipelineNum);
     // No Factor ONE pipeline is auto created.
-    Assert.assertEquals(0, pipelineManager.getPipelines(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE).size());
+    Assert.assertEquals(0,
+        pipelineManager.getPipelines(RatisReplicationConfig.getInstance(
+            ReplicationFactor.ONE)).size());
 
     // pipelineNum pipelines in 3 datanodes,
     // each datanode has leaderNumOfEachDn leaders after balance
@@ -148,7 +151,7 @@ public class TestLeaderChoosePolicy {
     }
   }
 
-  @Test(timeout = 360000)
+  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 360000)
   public void testMinLeaderCountChoosePolicy() throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     conf.set(OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,
@@ -164,8 +167,8 @@ public class TestLeaderChoosePolicy {
     waitForPipelines(pipelineNum);
     // No Factor ONE pipeline is auto created.
     Assert.assertEquals(0, pipelineManager.getPipelines(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE).size());
+        RatisReplicationConfig.getInstance(
+            ReplicationFactor.ONE)).size());
 
     // pipelineNum pipelines in 3 datanodes,
     // each datanode has leaderNumOfEachDn leaders after balance
@@ -177,12 +180,12 @@ public class TestLeaderChoosePolicy {
       // then check leader balance
 
       List<Pipeline> pipelines = pipelineManager
-          .getPipelines(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
+          .getPipelines(RatisReplicationConfig.getInstance(
+              ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
 
       int destroyNum = r.nextInt(pipelines.size());
       for (int k = 0; k <= destroyNum; k++) {
-        pipelineManager.finalizeAndDestroyPipeline(pipelines.get(k), false);
+        pipelineManager.closePipeline(pipelines.get(k), false);
       }
 
       waitForPipelines(pipelineNum);
@@ -191,7 +194,7 @@ public class TestLeaderChoosePolicy {
     }
   }
 
-  @Test(timeout = 60000)
+  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 60000)
   public void testDefaultLeaderChoosePolicy() throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     conf.set(OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,
@@ -209,8 +212,8 @@ public class TestLeaderChoosePolicy {
   private void waitForPipelines(int numPipelines)
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pipelineManager
-        .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
+        .getPipelines(RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE), Pipeline.PipelineState.OPEN)
         .size() >= numPipelines, 100, 60000);
   }
 }

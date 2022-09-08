@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.file;
 
 import javax.annotation.Nonnull;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
@@ -50,8 +51,9 @@ public class OMFileCreateResponse extends OMKeyCreateResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMFileCreateResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMFileCreateResponse(@Nonnull OMResponse omResponse, @Nonnull
+                              BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     checkStatusNotOK();
   }
 

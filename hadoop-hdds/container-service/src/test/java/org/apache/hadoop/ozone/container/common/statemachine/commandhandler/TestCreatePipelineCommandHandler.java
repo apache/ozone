@@ -21,30 +21,23 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.CreatePipelineCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CreatePipelineCommandProto;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.common.statemachine
-    .SCMConnectionManager;
+import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.common.transport.server
-    .XceiverServerSpi;
+import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.api.GroupManagementApi;
-import org.apache.ratis.conf.RaftProperties;
-import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftPeerId;
-import org.apache.ratis.retry.RetryPolicy;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
-import org.mockito.stubbing.Answer;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
@@ -75,30 +68,9 @@ public class TestCreatePipelineCommandHandler {
     connectionManager = Mockito.mock(SCMConnectionManager.class);
     raftClient = Mockito.mock(RaftClient.class);
     raftClientGroupManager = Mockito.mock(GroupManagementApi.class);
-    final RaftClient.Builder builder = mockRaftClientBuilder();
-    Mockito.when(builder.build()).thenReturn(raftClient);
     Mockito.when(raftClient.getGroupManagementApi(
         Mockito.any(RaftPeerId.class))).thenReturn(raftClientGroupManager);
     PowerMockito.mockStatic(RaftClient.class);
-    // Work around for mockito bug:
-    // https://github.com/powermock/powermock/issues/992
-    PowerMockito.when(RaftClient.newBuilder()).thenAnswer(
-        (Answer<RaftClient.Builder>) invocation -> builder);
-  }
-
-  private RaftClient.Builder mockRaftClientBuilder() {
-    final RaftClient.Builder builder = Mockito.mock(RaftClient.Builder.class);
-    Mockito.when(builder.setClientId(Mockito.any(ClientId.class)))
-        .thenReturn(builder);
-    Mockito.when(builder.setRaftGroup(Mockito.any(RaftGroup.class)))
-        .thenReturn(builder);
-    Mockito.when(builder.setLeaderId(Mockito.any(RaftPeerId.class)))
-        .thenReturn(builder);
-    Mockito.when(builder.setProperties(Mockito.any(RaftProperties.class)))
-        .thenReturn(builder);
-    Mockito.when(builder.setRetryPolicy(Mockito.any(RetryPolicy.class)))
-        .thenReturn(builder);
-    return builder;
   }
 
   @Test
@@ -120,7 +92,7 @@ public class TestCreatePipelineCommandHandler {
         .thenReturn(false);
 
     final CreatePipelineCommandHandler commandHandler =
-        new CreatePipelineCommandHandler(new OzoneConfiguration());
+        new CreatePipelineCommandHandler((leader, tls) -> raftClient);
     commandHandler.handle(command, ozoneContainer, stateContext,
         connectionManager);
 

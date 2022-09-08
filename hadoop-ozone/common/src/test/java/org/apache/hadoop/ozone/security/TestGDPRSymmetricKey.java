@@ -55,7 +55,7 @@ public class TestGDPRSymmetricKey {
   @Test
   public void testKeyGenerationWithInvalidInput() throws Exception {
     GDPRSymmetricKey gkey = null;
-    try{
+    try {
       gkey = new GDPRSymmetricKey(RandomStringUtils.randomAlphabetic(5),
           OzoneConsts.GDPR_ALGORITHM_NAME);
     } catch (IllegalArgumentException ex) {

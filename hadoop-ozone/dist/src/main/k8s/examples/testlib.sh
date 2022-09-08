@@ -37,10 +37,13 @@ grep_log() {
 
 wait_for_startup(){
    print_phase "Waiting until the k8s cluster is running"
-   retry all_pods_are_running
-   retry grep_log scm-0 "SCM exiting safe mode."
-   retry grep_log om-0 "HTTP server of ozoneManager listening"
-   print_phase "Cluster is up and running"
+   if retry all_pods_are_running \
+       && retry grep_log scm-0 "SCM exiting safe mode." \
+       && retry grep_log om-0 "HTTP server of ozoneManager listening"; then
+     print_phase "Cluster is up and running"
+   else
+     return 1
+   fi
 }
 
 all_pods_are_running() {
@@ -72,7 +75,7 @@ start_k8s_env() {
    kubectl delete pvc --all
    kubectl delete pv --all
 
-   print_phase "Applying k8s resources from $1"
+   print_phase "Applying k8s resources from $(basename $(pwd))"
    kubectl apply -f .
    wait_for_startup
 }
@@ -80,7 +83,10 @@ start_k8s_env() {
 get_logs() {
   mkdir -p logs
   for pod in $(kubectl get pods -o custom-columns=NAME:.metadata.name | tail -n +2); do
-    kubectl logs "${pod}" > "logs/pod-${pod}.log"
+    for initContainer in $(kubectl get pod -o jsonpath='{.spec.initContainers[*].name}' "${pod}"); do
+      kubectl logs "${pod}" "${initContainer}" > logs/"pod-${pod}-${initContainer}.log"
+    done
+    kubectl logs "${pod}" > logs/"pod-${pod}.log"
   done
 }
 
@@ -102,13 +108,19 @@ regenerate_resources() {
 
   if [ $(basename $PARENT_OF_PARENT) == "k8s" ]; then
     #running from src dir
-    OZONE_ROOT=$(realpath ../../../../../target/ozone-0.6.0-SNAPSHOT)
+    local version
+    version=$(cd ../../../../.. && mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout)
+    OZONE_ROOT=$(realpath ../../../../../target/ozone-${version})
   else
     #running from dist
     OZONE_ROOT=$(realpath ../../..)
   fi
 
-  flekszible generate -t mount:hostPath="$OZONE_ROOT",path=/opt/hadoop -t image:image=apache/ozone-runner:20200420-1 -t ozone/onenode
+  local default_version=${docker.ozone-runner.version} # set at build-time from Maven property
+  local runner_version=${OZONE_RUNNER_VERSION:-${default_version}} # may be specified by user running the test
+  local runner_image="${OZONE_RUNNER_IMAGE:-apache/ozone-runner}" # may be specified by user running the test
+
+  flekszible generate -t mount:hostPath="$OZONE_ROOT",path=/opt/hadoop -t image:image="${runner_image}:${runner_version}" -t ozone/onenode
 }
 
 revert_resources() {

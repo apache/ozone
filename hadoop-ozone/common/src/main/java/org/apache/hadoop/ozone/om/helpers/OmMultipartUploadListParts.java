@@ -18,8 +18,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .PartInfo;
 
@@ -31,9 +30,7 @@ import java.util.List;
  */
 public class OmMultipartUploadListParts {
 
-  private HddsProtos.ReplicationType replicationType;
-
-  private HddsProtos.ReplicationFactor replicationFactor;
+  private ReplicationConfig replicationConfig;
 
   //When a list is truncated, this element specifies the last part in the list,
   // as well as the value to use for the part-number-marker request parameter
@@ -47,11 +44,9 @@ public class OmMultipartUploadListParts {
 
   private final List<OmPartInfo> partInfoList = new ArrayList<>();
 
-  public OmMultipartUploadListParts(HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor factor,
+  public OmMultipartUploadListParts(ReplicationConfig replicationConfig,
       int nextMarker, boolean truncate) {
-    this.replicationType = type;
-    this.replicationFactor = factor;
+    this.replicationConfig = replicationConfig;
 
     this.nextPartNumberMarker = nextMarker;
     this.truncated = truncate;
@@ -59,10 +54,6 @@ public class OmMultipartUploadListParts {
 
   public void addPart(OmPartInfo partInfo) {
     partInfoList.add(partInfo);
-  }
-
-  public HddsProtos.ReplicationType getReplicationType() {
-    return replicationType;
   }
 
   public int getNextPartNumberMarker() {
@@ -73,16 +64,12 @@ public class OmMultipartUploadListParts {
     return truncated;
   }
 
-  public void setReplicationType(HddsProtos.ReplicationType replicationType) {
-    this.replicationType = replicationType;
-  }
-
   public List<OmPartInfo> getPartInfoList() {
     return partInfoList;
   }
 
-  public ReplicationFactor getReplicationFactor() {
-    return replicationFactor;
+  public ReplicationConfig getReplicationConfig() {
+    return replicationConfig;
   }
 
   public void addPartList(List<OmPartInfo> partInfos) {

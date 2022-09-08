@@ -20,8 +20,8 @@ package org.apache.hadoop.hdds.ratis;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.ratis.conf.RaftProperties;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test RatisHelper class.
@@ -42,11 +42,11 @@ public class TestRatisHelper {
     RaftProperties raftProperties = new RaftProperties();
     RatisHelper.createRaftClientProperties(ozoneConfiguration, raftProperties);
 
-    Assert.assertEquals("30s",
+    Assertions.assertEquals("30s",
         raftProperties.get("raft.client.rpc.watch.request.timeout"));
-    Assert.assertEquals("30s",
+    Assertions.assertEquals("30s",
         raftProperties.get("raft.client.rpc.request.timeout"));
-    Assert.assertNull(
+    Assertions.assertNull(
         raftProperties.get("raft.server.rpc.watch.request.timeout"));
 
   }
@@ -67,16 +67,17 @@ public class TestRatisHelper {
     RaftProperties raftProperties = new RaftProperties();
     RatisHelper.createRaftClientProperties(ozoneConfiguration, raftProperties);
 
-    Assert.assertEquals("30MB",
+    Assertions.assertEquals("30MB",
         raftProperties.get("raft.grpc.message.size.max"));
-    Assert.assertEquals("1MB",
+    Assertions.assertEquals("1MB",
         raftProperties.get("raft.grpc.flow.control.window"));
 
     // As we dont match tls and server raft.grpc properties. So they should
     // be null.
-    Assert.assertNull(raftProperties.get("raft.grpc.tls.set"));
-    Assert.assertNull(raftProperties.get("raft.grpc.tls.mutual_authn.enabled"));
-    Assert.assertNull(raftProperties.get("raft.grpc.server.port"));
+    Assertions.assertNull(raftProperties.get("raft.grpc.tls.set"));
+    Assertions.assertNull(
+        raftProperties.get("raft.grpc.tls.mutual_authn.enabled"));
+    Assertions.assertNull(raftProperties.get("raft.grpc.server.port"));
 
   }
 
@@ -100,15 +101,15 @@ public class TestRatisHelper {
     RatisHelper.createRaftServerProperties(ozoneConfiguration,
         raftProperties);
 
-    Assert.assertEquals("30MB",
+    Assertions.assertEquals("30MB",
         raftProperties.get("raft.grpc.message.size.max"));
-    Assert.assertEquals("1MB",
+    Assertions.assertEquals("1MB",
         raftProperties.get("raft.grpc.flow.control.window"));
-    Assert.assertEquals("true",
+    Assertions.assertEquals("true",
         raftProperties.get("raft.grpc.tls.enabled"));
-    Assert.assertEquals("true",
+    Assertions.assertEquals("true",
         raftProperties.get("raft.grpc.tls.mutual_authn.enabled"));
-    Assert.assertEquals("100",
+    Assertions.assertEquals("100",
         raftProperties.get("raft.grpc.server.port"));
 
   }
@@ -127,11 +128,12 @@ public class TestRatisHelper {
     RaftProperties raftProperties = new RaftProperties();
     RatisHelper.createRaftServerProperties(ozoneConfiguration, raftProperties);
 
-    Assert.assertEquals("30s",
+    Assertions.assertEquals("30s",
         raftProperties.get("raft.server.rpc.watch.request.timeout"));
-    Assert.assertEquals("30s",
+    Assertions.assertEquals("30s",
         raftProperties.get("raft.server.rpc.request.timeout"));
-    Assert.assertNull(raftProperties.get("raft.client.rpc.request.timeout"));
+    Assertions.assertNull(
+        raftProperties.get("raft.client.rpc.request.timeout"));
 
   }
 }

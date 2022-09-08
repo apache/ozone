@@ -21,19 +21,42 @@ Library             DateTime
 Resource            ../commonlib.robot
 Resource            commonawslib.robot
 Test Timeout        5 minutes
-Suite Setup         Setup s3 tests
+Suite Setup         Setup Multipart Tests
 Test Setup          Generate random prefix
 
 *** Keywords ***
+Setup Multipart Tests
+    Setup s3 tests
+
+    # 5MB + a bit
+    Create Random File KB    /tmp/part1    5121
+
+    # 1MB - a bit
+    Create Random File KB    /tmp/part2    1023
+
 Create Random file
     [arguments]             ${size_in_megabytes}
-    Execute                 dd if=/dev/urandom of=/tmp/part1 bs=1048576 count=${size_in_megabytes}
+    Execute                 dd if=/dev/urandom of=/tmp/part1 bs=1048576 count=${size_in_megabytes} status=none
+
+Create Random File KB
+    [arguments]             ${file}    ${size_in_kilobytes}
+    Execute                 dd if=/dev/urandom of=${file} bs=1024 count=${size_in_kilobytes} status=none
+
+Wait Til Date Past
+    [arguments]         ${date}
+    ${latestDate} =     Get Current Date         UTC
+    ${sleepSeconds} =   Subtract Date From Date  ${date}  ${latestDate}
+    Run Keyword If      ${sleepSeconds} > 0      Sleep  ${sleepSeconds}
 
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
 
 *** Test Cases ***
+
+Test Multipart Upload With Adjusted Length
+    Perform Multipart Upload    ${BUCKET}    multipart/adjusted_length_${PREFIX}    /tmp/part1    /tmp/part2
+    Verify Multipart Upload     ${BUCKET}    multipart/adjusted_length_${PREFIX}    /tmp/part1    /tmp/part2
 
 Test Multipart Upload
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey
@@ -279,7 +302,7 @@ Test Multipart Upload Put With Copy and range with IfModifiedSince
     Run Keyword         Create Random file      10
     ${curDate} =        Get Current Date
     ${beforeCreate} =   Subtract Time From Date     ${curDate}  1 day
-    ${afterCreate} =    Add Time To Date        ${curDate}  1 day
+    ${tomorrow} =       Add Time To Date            ${curDate}  1 day
 
     ${result} =         Execute AWSS3APICli     put-object --bucket ${BUCKET} --key ${PREFIX}/copyrange/source --body /tmp/part1
 
@@ -288,6 +311,14 @@ Test Multipart Upload Put With Copy and range with IfModifiedSince
     ${uploadID} =       Execute and checkrc      echo '${result}' | jq -r '.UploadId'    0
                         Should contain           ${result}    ${BUCKET}
                         Should contain           ${result}    UploadId
+
+#calc time-to-sleep from time-last-modified plus a few seconds
+    ${result} =         Execute AWSS3APICli      head-object --bucket ${BUCKET} --key ${PREFIX}/copyrange/source
+    ${lastModified} =   Execute and checkrc      echo '${result}' | jq -r '.LastModified'    0
+                        Should contain           ${result}    ${LastModified}
+    ${lmDate} =         Convert Date 	 	 ${lastModified}  date_format=%a, %d %b %Y %H:%M:%S %Z
+    ${afterCreate} =    Add Time To Date         ${lmDate}  3 seconds
+    Wait Til Date Past  ${afterCreate}
 
     ${result} =         Execute AWSS3APICli and checkrc     upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --upload-id ${uploadID} --part-number 1 --copy-source ${BUCKET}/${PREFIX}/copyrange/source --copy-source-range bytes=0-10485757 --copy-source-if-modified-since '${afterCreate}'    255
                         Should contain           ${result}    PreconditionFailed
@@ -306,6 +337,13 @@ Test Multipart Upload Put With Copy and range with IfModifiedSince
                         Should contain           ${result}    LastModified
 
     ${eTag2} =          Execute and checkrc      echo '${result}' | jq -r '.CopyPartResult.ETag'   0
+
+# future date strings cause precondition to be ignored
+    ${result} =         Execute AWSS3APICli and checkrc     upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --upload-id ${uploadID} --part-number 1 --copy-source ${BUCKET}/${PREFIX}/copyrange/source --copy-source-range bytes=0-10485757 --copy-source-if-modified-since '${tomorrow}'   0
+                        Should contain           ${result}    ETag
+                        Should contain           ${result}    LastModified
+
+    ${eTag1} =          Execute and checkrc      echo '${result}' | jq -r '.CopyPartResult.ETag'   0
 
 
                         Execute AWSS3APICli     complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}]'

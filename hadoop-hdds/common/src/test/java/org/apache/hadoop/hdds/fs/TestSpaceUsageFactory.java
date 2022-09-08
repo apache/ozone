@@ -21,11 +21,11 @@ import java.io.File;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 
 import static org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory.Conf.configKeyForClassName;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -58,7 +58,7 @@ public class TestSpaceUsageFactory {
     return factoryClass.cast(factory);
   }
 
-  @Before
+  @BeforeEach
   public void setUp() {
     capturer = LogCapturer.captureLogs(
         LoggerFactory.getLogger(SpaceUsageCheckFactory.class));

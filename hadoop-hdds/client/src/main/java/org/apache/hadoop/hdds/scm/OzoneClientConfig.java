@@ -38,6 +38,18 @@ public class OzoneClientConfig {
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneClientConfig.class);
 
+  /**
+   * Enum for indicating what mode to use when combining chunk and block
+   * checksums to define an aggregate FileChecksum. This should be considered
+   * a client-side runtime option rather than a persistent property of any
+   * stored metadata, which is why this is not part of ChecksumOpt, which
+   * deals with properties of files at rest.
+   */
+  public enum ChecksumCombineMode {
+    MD5MD5CRC,  // MD5 of block checksums, which are MD5 over chunk CRCs
+    COMPOSITE_CRC  // Block/chunk-independent composite CRC
+  }
+
   @Config(key = "stream.buffer.flush.size",
       defaultValue = "16MB",
       type = ConfigType.SIZE,
@@ -123,6 +135,54 @@ public class OzoneClientConfig {
           + "blocksize data.",
       tags = ConfigTag.CLIENT)
   private boolean checksumVerify = true;
+
+  @Config(key = "max.ec.stripe.write.retries",
+      defaultValue = "10",
+      description = "Ozone EC client to retry stripe to new block group on" +
+          " failures.",
+      tags = ConfigTag.CLIENT)
+  private int maxECStripeWriteRetries = 10;
+
+  @Config(key = "exclude.nodes.expiry.time",
+      defaultValue = "600000",
+      description = "Time after which an excluded node is reconsidered for" +
+          " writes in EC. If the value is zero, the node is excluded for the" +
+          " life of the client",
+      tags = ConfigTag.CLIENT)
+  private long excludeNodesExpiryTime = 10 * 60 * 1000;
+
+  @Config(key = "ec.reconstruct.stripe.read.pool.limit",
+      defaultValue = "30",
+      description = "Thread pool max size for parallelly read" +
+          " available ec chunks to reconstruct the whole stripe.",
+      tags = ConfigTag.CLIENT)
+  // For the largest recommended EC policy rs-10-4-1024k,
+  // 10 chunks are required at least for stripe reconstruction,
+  // so 1 core thread for each chunk and
+  // 3 concurrent stripe read should be enough.
+  private int ecReconstructStripeReadPoolLimit = 10 * 3;
+
+  @Config(key = "checksum.combine.mode",
+      defaultValue = "COMPOSITE_CRC",
+      description = "The combined checksum type [MD5MD5CRC / COMPOSITE_CRC] "
+          + "determines which algorithm would be used to compute file checksum."
+          + "COMPOSITE_CRC calculates the combined CRC of the whole file, "
+          + "where the lower-level chunk/block checksums are combined into "
+          + "file-level checksum."
+          + "MD5MD5CRC calculates the MD5 of MD5 of checksums of individual "
+          + "chunks."
+          + "Default checksum type is COMPOSITE_CRC.",
+      tags = ConfigTag.CLIENT)
+  private String checksumCombineMode =
+      ChecksumCombineMode.COMPOSITE_CRC.name();
+
+  @Config(key = "fs.default.bucket.layout",
+      defaultValue = "FILE_SYSTEM_OPTIMIZED",
+      type = ConfigType.STRING,
+      description = "The bucket layout used by buckets created using OFS. " +
+          "Valid values include FILE_SYSTEM_OPTIMIZED and LEGACY",
+      tags = ConfigTag.CLIENT)
+  private String fsDefaultBucketLayout = "FILE_SYSTEM_OPTIMIZED";
 
   @PostConstruct
   private void validate() {
@@ -224,7 +284,45 @@ public class OzoneClientConfig {
     this.checksumVerify = checksumVerify;
   }
 
+  public int getMaxECStripeWriteRetries() {
+    return this.maxECStripeWriteRetries;
+  }
+
+  public long getExcludeNodesExpiryTime() {
+    return excludeNodesExpiryTime;
+  }
+
   public int getBufferIncrement() {
     return bufferIncrement;
+  }
+
+  public ChecksumCombineMode getChecksumCombineMode() {
+    try {
+      return ChecksumCombineMode.valueOf(checksumCombineMode);
+    } catch (IllegalArgumentException iae) {
+      LOG.warn("Bad checksum combine mode: {}. Using default {}",
+          checksumCombineMode,
+          ChecksumCombineMode.COMPOSITE_CRC.name());
+      return ChecksumCombineMode.valueOf(
+          ChecksumCombineMode.COMPOSITE_CRC.name());
+    }
+  }
+
+  public void setEcReconstructStripeReadPoolLimit(int poolLimit) {
+    this.ecReconstructStripeReadPoolLimit = poolLimit;
+  }
+
+  public int getEcReconstructStripeReadPoolLimit() {
+    return ecReconstructStripeReadPoolLimit;
+  }
+
+  public void setFsDefaultBucketLayout(String bucketLayout) {
+    if (!bucketLayout.isEmpty()) {
+      this.fsDefaultBucketLayout = bucketLayout;
+    }
+  }
+
+  public String getFsDefaultBucketLayout() {
+    return fsDefaultBucketLayout;
   }
 }

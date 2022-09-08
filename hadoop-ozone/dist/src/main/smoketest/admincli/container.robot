@@ -22,11 +22,17 @@ Suite Setup         Create test data
 
 *** Variables ***
 ${CONTAINER}
+${SCM}       scm
 
 *** Keywords ***
 Create test data
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
                         Execute          ozone freon ockg -n1 -t1 -p container
+
+Container is closed
+    [arguments]     ${container}
+    ${output} =         Execute          ozone admin container info "${container}"
+                        Should contain   ${output}   CLOSED
 
 *** Test Cases ***
 Create container
@@ -40,12 +46,20 @@ List containers
                         Should contain   ${output}   OPEN
 
 List containers with explicit host
-    ${output} =         Execute          ozone admin container list --scm scm
+    ${output} =         Execute          ozone admin container list --scm ${SCM}
                         Should contain   ${output}   OPEN
 
 List containers with container state
     ${output} =         Execute          ozone admin container list --state=CLOSED
                         Should Not contain   ${output}   OPEN
+
+List containers with replication factor ONE
+    ${output} =         Execute          ozone admin container list -t RATIS -r ONE
+                        Should Not contain   ${output}   THREE
+
+List containers with replication factor THREE
+    ${output} =         Execute          ozone admin container list -t RATIS -r THREE
+                        Should Not contain   ${output}   ONE
 
 Container info
     ${output} =         Execute          ozone admin container info "${CONTAINER}"
@@ -58,20 +72,26 @@ Verbose container info
                         Should contain   ${output}   Pipeline Info
 
 Close container
-                        Execute          ozone admin container close "${CONTAINER}"
-    ${output} =         Execute          ozone admin container info "${CONTAINER}"
+    ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
+                        Execute          ozone admin container close "${container}"
+    ${output} =         Execute          ozone admin container info "${container}"
                         Should contain   ${output}   CLOS
+    Wait until keyword succeeds    1min    10sec    Container is closed    ${container}
 
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin container
                         Should contain   ${output}   Incomplete command
                         Should contain   ${output}   list
                         Should contain   ${output}   info
-                        Should contain   ${output}   delete
                         Should contain   ${output}   create
                         Should contain   ${output}   close
 
-List containers on unknown host
-    ${output} =         Execute And Ignore Error     ozone admin --verbose container list --scm unknown-host
-                        Should contain   ${output}   Invalid host name
+#List containers on unknown host
+#    ${output} =         Execute And Ignore Error     ozone admin --verbose container list --scm unknown-host
+#                        Should contain   ${output}   Invalid host name
 
+Cannot close container without admin privilege
+    Requires admin privilege    ozone admin container close "${CONTAINER}"
+
+Cannot create container without admin privilege
+    Requires admin privilege    ozone admin container create

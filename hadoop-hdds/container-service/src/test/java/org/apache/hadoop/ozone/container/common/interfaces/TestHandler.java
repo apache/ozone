@@ -82,7 +82,7 @@ public class TestHandler {
   }
 
   @After
-  public void tearDown(){
+  public void tearDown() {
     ContainerMetrics.remove();
   }
 

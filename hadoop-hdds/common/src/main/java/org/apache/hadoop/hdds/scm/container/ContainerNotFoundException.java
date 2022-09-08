@@ -27,7 +27,7 @@ public class ContainerNotFoundException extends ContainerException {
    * as its error detail message.
    */
   public ContainerNotFoundException() {
-    super();
+    super(ResultCodes.CONTAINER_NOT_FOUND);
   }
 
   /**
@@ -39,6 +39,6 @@ public class ContainerNotFoundException extends ContainerException {
    *        by the {@link #getMessage()} method)
    */
   public ContainerNotFoundException(String message) {
-    super(message);
+    super(message, ResultCodes.CONTAINER_NOT_FOUND);
   }
 }
