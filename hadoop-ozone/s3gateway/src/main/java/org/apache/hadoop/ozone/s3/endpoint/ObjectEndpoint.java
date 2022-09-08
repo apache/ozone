@@ -210,11 +210,8 @@ public class ObjectEndpoint extends EndpointBase {
       }
 
       // Normal put object
-//      bucket = getBucket(bucketName);
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(headers.getRequestHeaders());
-//      output = bucket.createKey(keyPath, length,
-//              replicationConfig, customMetadata);
 
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {

@@ -58,7 +58,6 @@ import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
-import org.apache.http.protocol.HTTP;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -269,7 +268,8 @@ public abstract class EndpointBase implements Auditor {
             .filter(k -> {
               if (k.startsWith(CUSTOM_METADATA_HEADER_PREFIX) &&
                       !excludeMetadataFields.contains(
-                              k.substring(CUSTOM_METADATA_HEADER_PREFIX.length()))) {
+                              k.substring(
+                                      CUSTOM_METADATA_HEADER_PREFIX.length()))) {
                 return true;
               }
               return false;
@@ -283,12 +283,8 @@ public abstract class EndpointBase implements Auditor {
             key.substring(CUSTOM_METADATA_HEADER_PREFIX.length());
         List<String> values = requestHeaders.get(key);
         String value = StringUtils.join(values, ",");
-        LOG.error("cur mapKey = " + mapKey);
         sizeInBytes += mapKey.getBytes(UTF_8).length;
-        LOG.error("cur sizeInBytes = " + sizeInBytes);
-        LOG.error("cur mapValue = " + value);
         sizeInBytes += value.getBytes(UTF_8).length;
-        LOG.error("cur sizeInBytes = " + sizeInBytes);
 
         if (sizeInBytes >
                 OzoneConsts.S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB * KB) {

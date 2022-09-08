@@ -161,8 +161,8 @@ Zero byte file
                                 Should contain             ${result}        InvalidRange
 
 Create file with user defined metadata
-                                Execute                    echo "Randomtext" > /tmp/testfile2
-                                Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1 --body /tmp/testfile2 --metadata="custom-key1=custom-value1,custom-key2=custom-value2"
+                                Execute                   echo "Randomtext" > /tmp/testfile2
+                                Execute AWSS3ApiCli       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1 --body /tmp/testfile2 --metadata="custom-key1=custom-value1,custom-key2=custom-value2"
 
     ${result} =                 Execute AWSS3APICli       head-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1
                                 Should contain            ${result}    \"custom-key1\": \"custom-value1\"
