@@ -60,7 +60,7 @@ public class ContainerDataScanner extends AbstractContainerScanner {
   }
 
   @Override
-  public void scanContainer(Container<?> c) throws IOException {
+  public void scanContainer(Container c) throws IOException {
     if (!c.shouldScanData()) {
       return;
     }
