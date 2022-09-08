@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -35,75 +36,102 @@ import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.times;
 
 /**
- * Tests for the OpenContainerHandler class.
+ * Tests for the ClosedWithMismatchedReplicasHandler.
  */
-public class TestOpenContainerHandler {
+public class TestClosedWithMismatchedReplicasHandler {
 
   private ReplicationManager replicationManager;
-  private OpenContainerHandler openContainerHandler;
+  private ClosedWithMismatchedReplicasHandler handler;
   private ECReplicationConfig replicationConfig;
 
   @BeforeEach
   public void setup() {
     replicationConfig = new ECReplicationConfig(3, 2);
     replicationManager = Mockito.mock(ReplicationManager.class);
-    openContainerHandler = new OpenContainerHandler(replicationManager);
-  }
-
-  @Test
-  public void testClosedContainerReturnsTrue() {
-    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        replicationConfig, 1, CLOSED);
-    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
-        .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
-    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .pendingOps(Collections.EMPTY_LIST)
-        .report(new ReplicationManagerReport())
-        .containerInfo(containerInfo)
-        .containerReplicas(containerReplicas)
-        .build();
-    Assertions.assertFalse(openContainerHandler.handle(request));
-    Mockito.verify(replicationManager, times(0))
-        .sendCloseContainerEvent(Mockito.any());
+    handler = new ClosedWithMismatchedReplicasHandler(replicationManager);
   }
 
   @Test
   public void testOpenContainerReturnsFalse() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         replicationConfig, 1, OPEN);
-    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
-        .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.OPEN, 1, 2, 3, 4, 5);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .pendingOps(Collections.EMPTY_LIST)
         .report(new ReplicationManagerReport())
         .containerInfo(containerInfo)
-        .containerReplicas(containerReplicas)
+        .containerReplicas(Collections.emptySet())
         .build();
-    Assertions.assertTrue(openContainerHandler.handle(request));
+
+    Assertions.assertFalse(handler.handle(request));
     Mockito.verify(replicationManager, times(0))
-        .sendCloseContainerEvent(Mockito.any());
+        .sendCloseContainerReplicaCommand(
+            any(), any(), anyBoolean());
   }
 
   @Test
-  public void testOpenUnhealthyContainerIsClosed() {
+  public void testClosedHealthyContainerReturnsFalse() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        replicationConfig, 1, OPEN);
+        replicationConfig, 1, CLOSED);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil.createReplicas(
-        containerInfo.containerID(), ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
+        containerInfo.containerID(), ContainerReplicaProto.State.CLOSED,
+        1, 2, 3, 4, 5);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .pendingOps(Collections.EMPTY_LIST)
         .report(new ReplicationManagerReport())
         .containerInfo(containerInfo)
         .containerReplicas(containerReplicas)
         .build();
-    Assertions.assertTrue(openContainerHandler.handle(request));
+    Assertions.assertFalse(handler.handle(request));
+
+    Mockito.verify(replicationManager, times(0))
+        .sendCloseContainerReplicaCommand(
+          any(), any(), anyBoolean());
+  }
+
+  @Test
+  public void testClosedMissMatchContainerReturnsTrue() {
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        replicationConfig, 1, CLOSED);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil.createReplicas(
+        containerInfo.containerID(), ContainerReplicaProto.State.CLOSED,
+        1, 2);
+    ContainerReplica mismatch1 = ReplicationTestUtil.createContainerReplica(
+        containerInfo.containerID(),4,
+        HddsProtos.NodeOperationalState.IN_SERVICE,
+        ContainerReplicaProto.State.OPEN);
+    ContainerReplica mismatch2 = ReplicationTestUtil.createContainerReplica(
+        containerInfo.containerID(),5,
+        HddsProtos.NodeOperationalState.IN_SERVICE,
+        ContainerReplicaProto.State.CLOSING);
+    ContainerReplica mismatch3 = ReplicationTestUtil.createContainerReplica(
+        containerInfo.containerID(),3,
+        HddsProtos.NodeOperationalState.IN_SERVICE,
+        ContainerReplicaProto.State.UNHEALTHY);
+    containerReplicas.add(mismatch1);
+    containerReplicas.add(mismatch2);
+    containerReplicas.add(mismatch3);
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .pendingOps(Collections.EMPTY_LIST)
+        .report(new ReplicationManagerReport())
+        .containerInfo(containerInfo)
+        .containerReplicas(containerReplicas)
+        .build();
+    Assertions.assertTrue(handler.handle(request));
+
     Mockito.verify(replicationManager, times(1))
-        .sendCloseContainerEvent(containerInfo.containerID());
+        .sendCloseContainerReplicaCommand(
+            containerInfo, mismatch1.getDatanodeDetails(), true);
+    Mockito.verify(replicationManager, times(1))
+        .sendCloseContainerReplicaCommand(
+            containerInfo, mismatch2.getDatanodeDetails(), true);
+    Mockito.verify(replicationManager, times(0))
+        .sendCloseContainerReplicaCommand(
+            containerInfo, mismatch3.getDatanodeDetails(), true);
   }
 
 }

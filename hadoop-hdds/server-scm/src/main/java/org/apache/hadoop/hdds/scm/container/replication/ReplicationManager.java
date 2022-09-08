@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -37,6 +36,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
+import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithMismatchedReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.HealthCheck;
 import org.apache.hadoop.hdds.scm.container.replication.health.OpenContainerHandler;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -59,7 +59,6 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Comparator;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -71,7 +70,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
@@ -213,7 +211,7 @@ public class ReplicationManager implements SCMService {
     // Chain together the series of checks that are needed to validate the
     // containers when they are checked by RM.
     containerCheckChain = new OpenContainerHandler(this);
-    //containerCheckChain.addNext(null)
+    containerCheckChain.addNext(new ClosedWithMismatchedReplicasHandler(this));
     start();
   }
 
@@ -460,15 +458,6 @@ public class ReplicationManager implements SCMService {
       return new ContainerHealthResult.UnHealthyResult(containerInfo);
     }
 
-    if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED) {
-      List<ContainerReplica> unhealthyReplicas = replicas.stream()
-          .filter(r -> !compareState(containerInfo.getState(), r.getState()))
-          .collect(Collectors.toList());
-
-      if (unhealthyReplicas.size() > 0) {
-        handleUnhealthyReplicas(containerInfo, unhealthyReplicas);
-      }
-    }
     ContainerHealthResult health = ecContainerHealthCheck.checkHealth(
         containerInfo, replicas, pendingOps, maintenanceRedundancy);
       // TODO - should the report have a HEALTHY state, rather than just bad
@@ -499,28 +488,6 @@ public class ReplicationManager implements SCMService {
   }
 
   /**
-   * Handles unhealthy container.
-   * A container is inconsistent if any of the replica state doesn't
-   * match the container state. We have to take appropriate action
-   * based on state of the replica.
-   *
-   * @param container ContainerInfo
-   * @param unhealthyReplicas List of ContainerReplica
-   */
-  private void handleUnhealthyReplicas(final ContainerInfo container,
-      List<ContainerReplica> unhealthyReplicas) {
-    Iterator<ContainerReplica> iterator = unhealthyReplicas.iterator();
-    while (iterator.hasNext()) {
-      final ContainerReplica replica = iterator.next();
-      final ContainerReplicaProto.State state = replica.getState();
-      if (state == State.OPEN || state == State.CLOSING) {
-        sendCloseCommand(container, replica.getDatanodeDetails(), true);
-        iterator.remove();
-      }
-    }
-  }
-
-  /**
    * Sends close container command for the given container to the given
    * datanode.
    *
@@ -529,7 +496,7 @@ public class ReplicationManager implements SCMService {
    *                  has to be closed
    * @param force Should be set to true if we want to force close.
    */
-  private void sendCloseCommand(final ContainerInfo container,
+  public void sendCloseContainerReplicaCommand(final ContainerInfo container,
       final DatanodeDetails datanode, final boolean force) {
 
     ContainerID containerID = container.containerID();
