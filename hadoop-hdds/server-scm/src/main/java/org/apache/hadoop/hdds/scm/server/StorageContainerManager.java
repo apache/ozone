@@ -734,7 +734,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           eventQueue,
           scmContext,
           scmNodeManager,
-          serviceManager,
           clock,
           legacyRM,
           containerReplicaPendingOps);
