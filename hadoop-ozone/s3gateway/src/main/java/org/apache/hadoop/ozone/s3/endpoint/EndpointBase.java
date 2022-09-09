@@ -268,8 +268,8 @@ public abstract class EndpointBase implements Auditor {
             .filter(k -> {
               if (k.startsWith(CUSTOM_METADATA_HEADER_PREFIX) &&
                       !excludeMetadataFields.contains(
-                              k.substring(
-                                      CUSTOM_METADATA_HEADER_PREFIX.length()))) {
+                        k.substring(
+                          CUSTOM_METADATA_HEADER_PREFIX.length()))) {
                 return true;
               }
               return false;
