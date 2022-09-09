@@ -153,6 +153,10 @@ public class ReplicationManager implements SCMService {
   private final ECUnderReplicationHandler ecUnderReplicationHandler;
   private final ECOverReplicationHandler ecOverReplicationHandler;
   private final int maintenanceRedundancy;
+  private Thread underReplicatedProcessorThread;
+  private Thread overReplicatedProcessorThread;
+  private final UnderReplicatedProcessor underReplicatedProcessor;
+  private final OverReplicatedProcessor overReplicatedProcessor;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -196,6 +200,12 @@ public class ReplicationManager implements SCMService {
         containerPlacement, conf, nodeManager);
     ecOverReplicationHandler =
         new ECOverReplicationHandler(containerPlacement, nodeManager);
+    underReplicatedProcessor =
+        new UnderReplicatedProcessor(this, containerReplicaPendingOps,
+            eventPublisher, rmConf.getUnderReplicatedInterval());
+    overReplicatedProcessor =
+        new OverReplicatedProcessor(this, containerReplicaPendingOps,
+            eventPublisher, rmConf.getOverReplicatedInterval());
     start();
   }
 
@@ -213,6 +223,7 @@ public class ReplicationManager implements SCMService {
       replicationMonitor.setName("ReplicationMonitor");
       replicationMonitor.setDaemon(true);
       replicationMonitor.start();
+      startSubServices();
     } else {
       LOG.info("Replication Monitor Thread is already running.");
     }
@@ -239,6 +250,8 @@ public class ReplicationManager implements SCMService {
   public synchronized void stop() {
     if (running) {
       LOG.info("Stopping Replication Monitor Thread.");
+      underReplicatedProcessorThread.interrupt();
+      overReplicatedProcessorThread.interrupt();
       running = false;
       legacyReplicationManager.clearInflightActions();
       metrics.unRegister();
@@ -246,6 +259,22 @@ public class ReplicationManager implements SCMService {
     } else {
       LOG.info("Replication Monitor Thread is not running.");
     }
+  }
+
+  /**
+   * Create Replication Manager sub services such as Over and Under Replication
+   * processors.
+   */
+  private void startSubServices() {
+    underReplicatedProcessorThread = new Thread(underReplicatedProcessor);
+    underReplicatedProcessorThread.setName("Under Replicated Processor");
+    underReplicatedProcessorThread.setDaemon(true);
+    underReplicatedProcessorThread.start();
+
+    overReplicatedProcessorThread = new Thread(overReplicatedProcessor);
+    overReplicatedProcessorThread.setName("Over Replicated Processor");
+    overReplicatedProcessorThread.setDaemon(true);
+    overReplicatedProcessorThread.start();
   }
 
   /**
