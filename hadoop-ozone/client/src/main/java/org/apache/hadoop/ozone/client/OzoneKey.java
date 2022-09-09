@@ -60,7 +60,6 @@ public class OzoneKey {
   private ReplicationConfig replicationConfig;
 
   private Map<String, String> metadata = new HashMap<>();
-
   /**
    * Constructs OzoneKey from OmKeyInfo.
    *
