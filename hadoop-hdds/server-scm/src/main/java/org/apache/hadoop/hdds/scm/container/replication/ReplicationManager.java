@@ -155,6 +155,8 @@ public class ReplicationManager implements SCMService {
   private final int maintenanceRedundancy;
   private Thread underReplicatedProcessorThread;
   private Thread overReplicatedProcessorThread;
+  private final UnderReplicatedProcessor underReplicatedProcessor;
+  private final OverReplicatedProcessor overReplicatedProcessor;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -198,6 +200,12 @@ public class ReplicationManager implements SCMService {
         containerPlacement, conf, nodeManager);
     ecOverReplicationHandler =
         new ECOverReplicationHandler(containerPlacement, nodeManager);
+    underReplicatedProcessor =
+        new UnderReplicatedProcessor(this, containerReplicaPendingOps,
+            eventPublisher, rmConf.getUnderReplicatedInterval());
+    overReplicatedProcessor =
+        new OverReplicatedProcessor(this, containerReplicaPendingOps,
+            eventPublisher, rmConf.getOverReplicatedInterval());
     start();
   }
 
@@ -258,21 +266,15 @@ public class ReplicationManager implements SCMService {
    * processors.
    */
   private void startSubServices() {
-    UnderReplicatedProcessor underReplicatedProcessor =
-        new UnderReplicatedProcessor(this, containerReplicaPendingOps,
-            eventPublisher, rmConf.getUnderReplicatedInterval());
-
     underReplicatedProcessorThread = new Thread(underReplicatedProcessor);
     underReplicatedProcessorThread.setName("Under Replicated Processor");
     underReplicatedProcessorThread.setDaemon(true);
-
-    OverReplicatedProcessor overReplicatedProcessor =
-        new OverReplicatedProcessor(this, containerReplicaPendingOps,
-            eventPublisher, rmConf.getOverReplicatedInterval());
+    underReplicatedProcessorThread.start();
 
     overReplicatedProcessorThread = new Thread(overReplicatedProcessor);
     overReplicatedProcessorThread.setName("Over Replicated Processor");
     overReplicatedProcessorThread.setDaemon(true);
+    overReplicatedProcessorThread.start();
   }
 
   /**
