@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
@@ -532,5 +533,15 @@ public class MutableVolumeSet implements VolumeSet {
     } finally {
       this.readUnlock();
     }
+  }
+
+  public double getIdealUsage() {
+    long totalCapacity = 0L, totalUsed = 0L;
+    for (StorageVolume volume: volumeMap.values()) {
+      totalCapacity += volume.getCapacity();
+      totalUsed += volume.getUsedSpace();
+    }
+    Preconditions.checkArgument(totalCapacity != 0);
+    return (double) totalUsed / totalCapacity;
   }
 }

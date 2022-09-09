@@ -242,6 +242,9 @@ public final class OzoneConsts {
    */
   public static final String OZONE_SCM_DATANODE_ID_FILE_DEFAULT = "datanode.id";
 
+  public static final String OZONE_SCM_DATANODE_DISK_BALANCER_INFO_DEFAULT =
+      "diskBalancer.info";
+
   // The ServiceListJSONServlet context attribute where OzoneManager
   // instance gets stored.
   public static final String OM_CONTEXT_ATTRIBUTE = "ozone.om";

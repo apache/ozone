@@ -112,6 +112,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           SCMCommandProto.Type.deleteBlocksCommand, command.getType());
       return;
     }
+    if (shouldRequeue(command, context, container)) {
+      context.requeueCommand(command);
+      return;
+    }
 
     try {
       DeleteCmdInfo cmd = new DeleteCmdInfo((DeleteBlocksCommand) command,
@@ -544,5 +548,21 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     void apply(Table<?, DeletedBlocksTransaction> deleteTxnsTable,
         BatchOperation batch, long txnID, DeletedBlocksTransaction delTX)
         throws IOException;
+  }
+
+  private boolean shouldRequeue(SCMCommand cmd, StateContext stateContext,
+      OzoneContainer ozoneContainer) {
+    // If exceeds retry limit, no need to retry then.
+    if (cmd.getRetryCount() >= stateContext.getRequeueRetryLimit()) {
+      return false;
+    }
+    for (DeletedBlocksTransaction tx:
+        ((DeleteBlocksCommand) cmd).blocksTobeDeleted()) {
+      if (ozoneContainer.getDiskBalancerService()
+          .isBalancingContainer(tx.getContainerID())) {
+        return true;
+      }
+    }
+    return false;
   }
 }

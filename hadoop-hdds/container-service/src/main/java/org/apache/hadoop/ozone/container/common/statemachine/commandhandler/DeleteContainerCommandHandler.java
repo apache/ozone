@@ -67,6 +67,9 @@ public class DeleteContainerCommandHandler implements CommandHandler {
                      final SCMConnectionManager connectionManager) {
     final DeleteContainerCommand deleteContainerCommand =
         (DeleteContainerCommand) command;
+    if (shouldRequeue(command, context, ozoneContainer)) {
+      context.requeueCommand(command);
+    }
     final ContainerController controller = ozoneContainer.getController();
     executor.execute(() -> {
       final long startTime = Time.monotonicNow();
@@ -117,4 +120,17 @@ public class DeleteContainerCommandHandler implements CommandHandler {
     }
   }
 
+  private boolean shouldRequeue(SCMCommand cmd, StateContext stateContext,
+      OzoneContainer ozoneContainer) {
+    // If exceeds retry limit, no need to retry then.
+    if (cmd.getRetryCount() >= stateContext.getRequeueRetryLimit()) {
+      return false;
+    }
+    long containerId = ((DeleteContainerCommand) cmd).getContainerID();
+    if (ozoneContainer.getDiskBalancerService()
+        .isBalancingContainer(containerId)) {
+      return true;
+    }
+    return false;
+  }
 }

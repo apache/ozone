@@ -38,6 +38,8 @@ public abstract class SCMCommand<T extends Message> implements
 
   private String encodedToken = "";
 
+  private long retryCount = 0L;
+
   SCMCommand() {
     this.id = HddsIdFactory.getLongId();
   }
@@ -87,5 +89,13 @@ public abstract class SCMCommand<T extends Message> implements
 
   public void setEncodedToken(String encodedToken) {
     this.encodedToken = encodedToken;
+  }
+
+  public void incRetryCount() {
+    this.retryCount++;
+  }
+
+  public long getRetryCount() {
+    return retryCount;
   }
 }

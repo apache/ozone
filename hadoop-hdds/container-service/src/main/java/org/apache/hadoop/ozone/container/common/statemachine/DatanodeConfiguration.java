@@ -297,6 +297,78 @@ public class DatanodeConfiguration {
   )
   private String containerSchemaV3KeySeparator = "|";
 
+  @Config(key = "disk.balancer.should.run.default",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = { DATANODE, ConfigTag.DISKBALANCER},
+      description =
+          "Refresh Time interval of the Datanode DiskBalancer service. " +
+              "The Datanode will check the service periodically and update " +
+              "the config and running status for DiskBalancer service. " +
+              "Unit could be defined with postfix (ns,ms,s,m,h,d). "
+  )
+  private boolean diskBalancerShouldRun = false;
+
+  public boolean getDiskBalancerShouldRun() {
+    return diskBalancerShouldRun;
+  }
+
+  public void setDiskBalancerShouldRun(boolean shouldRun) {
+    this.diskBalancerShouldRun = shouldRun;
+  }
+
+  @Config(key = "disk.balancer.service.interval",
+      defaultValue = "60s",
+      type = ConfigType.TIME,
+      tags = { DATANODE, ConfigTag.DISKBALANCER},
+      description = "Time interval of the Datanode DiskBalancer service. " +
+              "The Datanode will check the service periodically and update " +
+              "the config and running status for DiskBalancer service. " +
+              "Unit could be defined with postfix (ns,ms,s,m,h,d). "
+  )
+  private long diskBalancerInterval = Duration.ofSeconds(60).toMillis();
+
+  public Duration getDiskBalancerInterval() {
+    return Duration.ofMillis(diskBalancerInterval);
+  }
+
+  public void setDiskBalancerInterval(Duration duration) {
+    this.diskBalancerInterval = duration.toMillis();
+  }
+
+  @Config(key = "disk.balancer.service.timeout",
+      defaultValue = "300s",
+      type = ConfigType.TIME,
+      tags = { DATANODE, ConfigTag.DISKBALANCER},
+      description = "Timeout for the Datanode DiskBalancer service. "
+              + "Unit could be defined with postfix (ns,ms,s,m,h,d). "
+  )
+  private long diskBalancerTimeout = Duration.ofSeconds(300).toMillis();
+
+  public Duration getDiskBalancerTimeout() {
+    return Duration.ofMillis(diskBalancerTimeout);
+  }
+
+  public void setDiskBalancerTimeout(Duration duration) {
+    this.diskBalancerTimeout = duration.toMillis();
+  }
+
+  @Config(key = "command.requeue.retry.limit",
+      defaultValue = "100",
+      type = ConfigType.LONG,
+      tags = { DATANODE},
+      description = "The retrying limit for requeue commands."
+  )
+  private long commandRequeueRetryLimit = 100;
+
+  public long getCommandRequeueRetryLimit() {
+    return commandRequeueRetryLimit;
+  }
+
+  public void setCommandRequeueRetryLimit(long limit) {
+    this.commandRequeueRetryLimit = limit;
+  }
+
   @PostConstruct
   public void validate() {
     if (containerDeleteThreads < 1) {

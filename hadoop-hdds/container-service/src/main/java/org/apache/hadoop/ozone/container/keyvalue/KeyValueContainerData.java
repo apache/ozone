@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Collections;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -35,6 +36,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.yaml.snakeyaml.nodes.Tag;
 
 
@@ -51,6 +53,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETE_TRANSACTION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETING_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSION;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
@@ -63,6 +66,10 @@ import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDe
  * by the .container file.
  */
 public class KeyValueContainerData extends ContainerData {
+
+  public static final String DB_DIR_NAME = "db";
+  public static final String CHUNK_DIR_NAME = OzoneConsts.STORAGE_DIR_CHUNKS;
+  public static final String CONTAINER_FILE_NAME = "container.yaml";
 
   // Yaml Tag used for KeyValueContainerData.
   public static final Tag KEYVALUE_YAML_TAG = new Tag("KeyValueContainerData");
@@ -409,5 +416,14 @@ public class KeyValueContainerData extends ContainerData {
       key = getContainerKeyPrefix(getContainerID()) + key;
     }
     return key;
+  }
+
+  public Path getDbPath() {
+    if (getSchemaVersion().equals(SCHEMA_V3)) {
+      return DatanodeStoreSchemaThreeImpl.getDumpDir(
+          new File(getMetadataPath())).toPath();
+    } else {
+      return getDbFile().toPath();
+    }
   }
 }

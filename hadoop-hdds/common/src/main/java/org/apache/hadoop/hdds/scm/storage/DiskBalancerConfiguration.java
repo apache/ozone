@@ -28,6 +28,8 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Optional;
+
 /**
  * This class contains configuration values for the DiskBalancer.
  */
@@ -54,6 +56,17 @@ public final class DiskBalancerConfiguration {
       defaultValue = "5", tags = {ConfigTag.DISKBALANCER},
       description = "The max parallel balance thread count.")
   private int parallelThread = 5;
+
+  public DiskBalancerConfiguration() {
+  }
+
+  public DiskBalancerConfiguration(Optional<Double> threshold,
+      Optional<Long> bandwidthInMB,
+      Optional<Integer> parallelThread) {
+    threshold.ifPresent(aDouble -> this.threshold = aDouble);
+    bandwidthInMB.ifPresent(aLong -> this.diskBandwidthInMB = aLong);
+    parallelThread.ifPresent(integer -> this.parallelThread = integer);
+  }
 
   /**
    * Gets the threshold value for DiskBalancer.
@@ -86,7 +99,7 @@ public final class DiskBalancerConfiguration {
    *
    * @return max disk bandwidth per second
    */
-  public double getDiskBandwidthInMB() {
+  public long getDiskBandwidthInMB() {
     return diskBandwidthInMB;
   }
 
