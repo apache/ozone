@@ -23,17 +23,17 @@ ${PREFIX}    ${EMPTY}
 
 *** Test Cases ***
 Pre-generate 100 keys of size 1 byte each to Ozone
-    ${result} =        Execute          ozone freon ockrw -n 1 -t 10 -r true -i 0 -j 99 -g 1 -v voltest -b buckettest -p performanceTest
+    ${result} =        Execute          ozone freon ockrw -n 1 -t 10 -r -i 0 -j 99 -g 1 -v voltest -b buckettest -p performanceTest
 
 Read 10 keys from pre-generated keys
     ${result} =        Execute          ozone freon ockrw -n 10 -t 10 -s 0 -e 9 -v voltest -b buckettest -p performanceTest
 
 Read 10 keys' metadata from pre-generated keys
-    ${result} =        Execute          ozone freon ockrw -n 10 -t 10 -m true -s 0 -e 9 -v voltest -b buckettest -p performanceTest
+    ${result} =        Execute          ozone freon ockrw -n 10 -t 10 -m -s 0 -e 9 -v voltest -b buckettest -p performanceTest
 
 Write 10 keys of size 1 byte each to replace parts of the pre-generated keys
     ${result} =        Execute          ozone freon ockrw -n 10 -t 10 -i 0 -j 9 -g 1 -v voltest -b buckettest -p performanceTest
 
 Run 90 % of read-key tasks and 10 % of write-key tasks from pre-generated keys
-    ${result} =        Execute          ozone freon ockrw -n 10 -t 10 -x true -s 0 -e 9 -i 10 -j 19 -g 1 -v voltest -b buckettest -p performanceTest
+    ${result} =        Execute          ozone freon ockrw -n 10 -t 10 -x -s 0 -e 9 -i 10 -j 19 -g 1 -v voltest -b buckettest -p performanceTest
 

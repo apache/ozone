@@ -30,11 +30,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
-//import java.util.*;
 import java.util.concurrent.Callable;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
-//import java.util.concurrent.*;
 /**
  * Ozone key generator/reader for performance test.
  */
@@ -96,11 +94,12 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
                   "each key/file to be " +
                   "written.",
           defaultValue = "256")
-  private int wSizeInBytes;
+  private int writeSizeInBytes;
 
   @CommandLine.Option(names = {"-k", "--keySorted"},
           description = "Generated sorted key or not. The key name " +
-                  "will be generated via md5 hash if choose to use unsorted key.",
+                  "will be generated via md5 hash if choose " +
+                  "to use unsorted key.",
           defaultValue = "false")
   private boolean keySorted;
 
@@ -108,7 +107,7 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
           description = "Set to True if you would like to " +
                   "generate mix workload (Read and Write).",
           defaultValue = "false")
-  private boolean ifMixWorkload;
+  private boolean isMixWorkload;
 
   @CommandLine.Option(names = {"--percentage-read"},
           description = "Percentage of read tasks in mix workload.",
@@ -133,8 +132,8 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   private static final Logger LOG =
           LoggerFactory.getLogger(OzoneClientKeyReadWriteOps.class);
 
-  private final String READTASK = "READ_TASK";
-  private final String WRITETASK = "WRITE_TASK";
+  private final String readTask = "READ_TASK";
+  private final String writeTask = "WRITE_TASK";
 
 
   @Override
@@ -147,8 +146,8 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     ozbk = rpcClient.getObjectStore().getVolume(volumeName)
             .getBucket(bucketName);
     timer = getMetrics().timer("key-read-write");
-    if (wSizeInBytes >= 0) {
-      keyContent = RandomUtils.nextBytes(wSizeInBytes);
+    if (writeSizeInBytes >= 0) {
+      keyContent = RandomUtils.nextBytes(writeSizeInBytes);
     }
     runTests(this::readWriteKeys);
     rpcClient.close();
@@ -158,22 +157,22 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   public void readWriteKeys(long counter) throws Exception {
     int startIdx = 0, endIdx = 0;
     switch (decideReadOrWriteTask()) {
-      case READTASK:
-        startIdx = startIndexForRead;
-        endIdx = endIndexForRead;
-        break;
-      case WRITETASK:
-        startIdx = startIndexForWrite;
-        endIdx = endIndexForWrite;
-        break;
-      default:
-        startIdx = 0;
-        endIdx = 0;
-        break;
+    case readTask:
+      startIdx = startIndexForRead;
+      endIdx = endIndexForRead;
+      break;
+    case writeTask:
+      startIdx = startIndexForWrite;
+      endIdx = endIndexForWrite;
+      break;
+    default:
+      startIdx = 0;
+      endIdx = 0;
+      break;
     }
 
-    Random r = new Random();
-    int randomIdxWithinRange = r.nextInt(endIdx + 1 - startIdx) + startIdx;
+    int randomIdxWithinRange = ThreadLocalRandom.current().
+            nextInt(endIdx + 1 - startIdx) + startIdx;
 
     if (keySorted) {
       keyName = generateObjectName(randomIdxWithinRange);
@@ -182,40 +181,40 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     }
 
     timer.time(() -> {
-              try {
-                if (!ifMixWorkload) {
-                  if (endIndexForRead - startIndexForRead > 0) {
-                    processReadTasks();
-                  }
-                  if (endIndexForWrite - startIndexForWrite > 0) {
-                    processWriteTasks();
-                  }
-                } else {
-                  switch (decideReadOrWriteTask()) {
-                    case READTASK:
-                      processReadTasks();
-                      break;
-                    case WRITETASK:
-                      processWriteTasks();
-                      break;
-                    default:
-                      break;
-                  }
-                }
-            } catch (Exception ex) {
-                LOG.error(ex.getMessage());
-            }
+      try {
+        if (!isMixWorkload) {
+          if (endIndexForRead - startIndexForRead > 0) {
+            processReadTasks();
+          }
+          if (endIndexForWrite - startIndexForWrite > 0) {
+            processWriteTasks();
+          }
+        } else {
+          switch (decideReadOrWriteTask()) {
+          case readTask:
+            processReadTasks();
+            break;
+          case writeTask:
+            processWriteTasks();
+            break;
+          default:
+            break;
+          }
+        }
+      } catch (Exception ex) {
+        LOG.error(ex.getMessage());
+      }
     });
   }
 
   public void processReadTasks() throws Exception {
     if (readMetadataOnly) {
-        ozbk.getKey(keyName);
+      ozbk.getKey(keyName);
     } else {
-      byte[] data = new byte[wSizeInBytes];
-        OzoneInputStream introStream = ozbk.readKey(keyName);
-        introStream.read(data);
-        introStream.close();
+      byte[] data = new byte[writeSizeInBytes];
+      try (OzoneInputStream introStream = ozbk.readKey(keyName)) {
+        int bytesRead = introStream.read(data);
+      }
     }
   }
 
@@ -234,11 +233,11 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     }
   }
 
-  public void createKeyAndWrite(String key) throws Exception{
-    OzoneOutputStream out = ozbk.createKey(key, wSizeInBytes);
-    out.write(keyContent);
-    out.flush();
-    out.close();
+  public void createKeyAndWrite(String key) throws Exception {
+    try (OzoneOutputStream out = ozbk.createKey(key, writeSizeInBytes)) {
+      out.write(keyContent);
+      out.flush();
+    }
   }
 
   public String generateKeyName(int number) {
@@ -252,20 +251,19 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   }
 
   public String decideReadOrWriteTask() {
-    if (!ifMixWorkload) {
+    if (!isMixWorkload) {
       if (endIndexForRead - startIndexForRead > 0) {
-        return READTASK;
+        return readTask;
       } else if ((endIndexForWrite - startIndexForWrite) > 0) {
-        return WRITETASK;
+        return writeTask;
       }
     }
     //mix workload
-    Random r = new Random();
-    int tmp = r.nextInt(100) + 1; // 1 ~ 100
+    int tmp = ThreadLocalRandom.current().nextInt(100) + 1; // 1 ~ 100
     if (tmp < percentageRead) {
-      return READTASK;
+      return readTask;
     } else {
-      return WRITETASK;
+      return writeTask;
     }
   }
 
