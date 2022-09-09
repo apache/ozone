@@ -43,7 +43,7 @@ public class DiskBalancerStartSubcommand extends ScmSubcommand {
 
   @Option(names = {"-t", "--threshold"},
       description = "Percentage deviation from average utilization of " +
-          "the cluster after which a datanode will be rebalanced (for " +
+          "the disks after which a datanode will be rebalanced (for " +
           "example, '10' for 10%%).")
   private Optional<Double> threshold;
 
