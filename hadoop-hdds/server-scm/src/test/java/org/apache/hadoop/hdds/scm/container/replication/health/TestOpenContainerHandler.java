@@ -61,10 +61,10 @@ public class TestOpenContainerHandler {
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .pendingOps(Collections.EMPTY_LIST)
-        .report(new ReplicationManagerReport())
-        .containerInfo(containerInfo)
-        .containerReplicas(containerReplicas)
+        .setPendingOps(Collections.EMPTY_LIST)
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
         .build();
     Assertions.assertFalse(openContainerHandler.handle(request));
     Mockito.verify(replicationManager, times(0))
@@ -79,10 +79,10 @@ public class TestOpenContainerHandler {
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.OPEN, 1, 2, 3, 4, 5);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .pendingOps(Collections.EMPTY_LIST)
-        .report(new ReplicationManagerReport())
-        .containerInfo(containerInfo)
-        .containerReplicas(containerReplicas)
+        .setPendingOps(Collections.EMPTY_LIST)
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
         .build();
     Assertions.assertTrue(openContainerHandler.handle(request));
     Mockito.verify(replicationManager, times(0))
@@ -93,13 +93,14 @@ public class TestOpenContainerHandler {
   public void testOpenUnhealthyContainerIsClosed() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         replicationConfig, 1, OPEN);
-    Set<ContainerReplica> containerReplicas = ReplicationTestUtil.createReplicas(
-        containerInfo.containerID(), ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .pendingOps(Collections.EMPTY_LIST)
-        .report(new ReplicationManagerReport())
-        .containerInfo(containerInfo)
-        .containerReplicas(containerReplicas)
+        .setPendingOps(Collections.EMPTY_LIST)
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
         .build();
     Assertions.assertTrue(openContainerHandler.handle(request));
     Mockito.verify(replicationManager, times(1))

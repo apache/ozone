@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.Un
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.HealthState;
 
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
-import org.apache.hadoop.hdds.scm.container.replication.ECContainerHealthCheck;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.junit.Assert;
 import org.junit.Before;
@@ -73,10 +72,10 @@ public class TestECReplicationCheckHandler {
     underRepQueue = new LinkedList<>();
     overRepQueue = new LinkedList<>();
     requestBuilder = new ContainerCheckRequest.Builder()
-        .overRepQueue(overRepQueue)
-        .underRepQueue(underRepQueue)
-        .maintenanceRedundancy(maintenanceRedundancy)
-        .pendingOps(Collections.emptyList());
+        .setOverRepQueue(overRepQueue)
+        .setUnderRepQueue(underRepQueue)
+        .setMaintenanceRedundancy(maintenanceRedundancy)
+        .setPendingOps(Collections.emptyList());
   }
 
   @Test
@@ -85,8 +84,8 @@ public class TestECReplicationCheckHandler {
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), 1, 2, 3, 4, 5);
     ContainerCheckRequest request = requestBuilder
-        .containerReplicas(replicas)
-        .containerInfo(container)
+        .setContainerReplicas(replicas)
+        .setContainerInfo(container)
         .build();
 
     ContainerHealthResult result = healthCheck.checkHealth(request);
@@ -99,8 +98,8 @@ public class TestECReplicationCheckHandler {
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), 1, 2, 4, 5);
     ContainerCheckRequest request = requestBuilder
-        .containerReplicas(replicas)
-        .containerInfo(container)
+        .setContainerReplicas(replicas)
+        .setContainerInfo(container)
         .build();
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
         healthCheck.checkHealth(request);
@@ -119,9 +118,9 @@ public class TestECReplicationCheckHandler {
     pending.add(ContainerReplicaOp.create(
         ADD, MockDatanodeDetails.randomDatanodeDetails(), 3));
     ContainerCheckRequest request = requestBuilder
-        .containerReplicas(replicas)
-        .containerInfo(container)
-        .pendingOps(pending)
+        .setContainerReplicas(replicas)
+        .setContainerInfo(container)
+        .setPendingOps(pending)
         .build();
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
         healthCheck.checkHealth(request);
@@ -139,8 +138,8 @@ public class TestECReplicationCheckHandler {
         Pair.of(IN_SERVICE, 3), Pair.of(DECOMMISSIONING, 4),
         Pair.of(DECOMMISSIONED, 5));
     ContainerCheckRequest request = requestBuilder
-        .containerReplicas(replicas)
-        .containerInfo(container)
+        .setContainerReplicas(replicas)
+        .setContainerInfo(container)
         .build();
 
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
@@ -162,9 +161,9 @@ public class TestECReplicationCheckHandler {
     pending.add(ContainerReplicaOp.create(
         ADD, MockDatanodeDetails.randomDatanodeDetails(), 5));
     ContainerCheckRequest request = requestBuilder
-        .containerReplicas(replicas)
-        .containerInfo(container)
-        .pendingOps(pending)
+        .setContainerReplicas(replicas)
+        .setContainerInfo(container)
+        .setPendingOps(pending)
         .build();
 
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
@@ -186,9 +185,9 @@ public class TestECReplicationCheckHandler {
         ADD, MockDatanodeDetails.randomDatanodeDetails(), 3));
 
     ContainerCheckRequest request = requestBuilder
-        .containerReplicas(replicas)
-        .containerInfo(container)
-        .pendingOps(pending)
+        .setContainerReplicas(replicas)
+        .setContainerInfo(container)
+        .setPendingOps(pending)
         .build();
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
         healthCheck.checkHealth(request);
@@ -204,8 +203,8 @@ public class TestECReplicationCheckHandler {
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2));
     ContainerCheckRequest request = requestBuilder
-        .containerReplicas(replicas)
-        .containerInfo(container)
+        .setContainerReplicas(replicas)
+        .setContainerInfo(container)
         .build();
 
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
@@ -232,9 +231,9 @@ public class TestECReplicationCheckHandler {
     pending.add(ContainerReplicaOp.create(
         DELETE, MockDatanodeDetails.randomDatanodeDetails(), 2));
     ContainerCheckRequest request = requestBuilder
-        .containerReplicas(replicas)
-        .containerInfo(container)
-        .pendingOps(pending)
+        .setContainerReplicas(replicas)
+        .setContainerInfo(container)
+        .setPendingOps(pending)
         .build();
 
     OverReplicatedHealthResult result = (OverReplicatedHealthResult)
@@ -253,8 +252,8 @@ public class TestECReplicationCheckHandler {
         Pair.of(IN_SERVICE, 5),
         Pair.of(IN_MAINTENANCE, 1), Pair.of(IN_MAINTENANCE, 2));
     ContainerCheckRequest request = requestBuilder
-        .containerReplicas(replicas)
-        .containerInfo(container)
+        .setContainerReplicas(replicas)
+        .setContainerInfo(container)
         .build();
     ContainerHealthResult result = healthCheck.checkHealth(request);
     Assert.assertEquals(HealthState.HEALTHY, result.getHealthState());
@@ -268,8 +267,8 @@ public class TestECReplicationCheckHandler {
         Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2));
     ContainerCheckRequest request = requestBuilder
-        .containerReplicas(replicas)
-        .containerInfo(container)
+        .setContainerReplicas(replicas)
+        .setContainerInfo(container)
         .build();
     ContainerHealthResult result = healthCheck.checkHealth(request);
     Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());

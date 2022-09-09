@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithMismatchedReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.HealthCheck;
@@ -444,13 +443,13 @@ public class ReplicationManager implements SCMService {
         containerReplicaPendingOps.getPendingOps(containerID);
 
     ContainerCheckRequest checkRequest = new ContainerCheckRequest.Builder()
-        .containerInfo(containerInfo)
-        .containerReplicas(replicas)
-        .maintenanceRedundancy(maintenanceRedundancy)
-        .report(report)
-        .pendingOps(pendingOps)
-        .underRepQueue(underRep)
-        .overRepQueue(overRep)
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(replicas)
+        .setMaintenanceRedundancy(maintenanceRedundancy)
+        .setReport(report)
+        .setPendingOps(pendingOps)
+        .setUnderRepQueue(underRep)
+        .setOverRepQueue(overRep)
         .build();
     // This will call the chain of container health handlers in turn which
     // will issue commands as needed, update the report and perhaps add

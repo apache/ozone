@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
  */
 public class ClosedWithMismatchedReplicasHandler extends AbstractCheck {
 
-  ReplicationManager replicationManager;
+  private ReplicationManager replicationManager;
 
   public ClosedWithMismatchedReplicasHandler(
       ReplicationManager replicationManager) {

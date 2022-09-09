@@ -41,7 +41,8 @@ public class ContainerHealthResult {
   private final HealthState healthState;
   private final List<SCMCommand> commands = new ArrayList<>();
 
-  public ContainerHealthResult(ContainerInfo containerInfo, HealthState healthState) {
+  public ContainerHealthResult(ContainerInfo containerInfo,
+      HealthState healthState) {
     this.containerInfo = containerInfo;
     this.healthState = healthState;
   }

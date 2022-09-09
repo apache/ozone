@@ -39,7 +39,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.E
  */
 public class ECReplicationCheckHandler extends AbstractCheck {
 
-  ReplicationManager replicationManager;
+  private ReplicationManager replicationManager;
 
   public ECReplicationCheckHandler(
       ReplicationManager replicationManager) {

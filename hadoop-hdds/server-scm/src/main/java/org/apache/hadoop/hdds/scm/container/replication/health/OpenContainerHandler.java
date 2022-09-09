@@ -36,7 +36,7 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManage
  */
 public class OpenContainerHandler extends AbstractCheck {
 
-  ReplicationManager replicationManager;
+  private ReplicationManager replicationManager;
 
   public OpenContainerHandler(ReplicationManager replicationManager) {
     this.replicationManager = replicationManager;

@@ -61,10 +61,10 @@ public class TestClosedWithMismatchedReplicasHandler {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         replicationConfig, 1, OPEN);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .pendingOps(Collections.EMPTY_LIST)
-        .report(new ReplicationManagerReport())
-        .containerInfo(containerInfo)
-        .containerReplicas(Collections.emptySet())
+        .setPendingOps(Collections.EMPTY_LIST)
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(Collections.emptySet())
         .build();
 
     Assertions.assertFalse(handler.handle(request));
@@ -77,14 +77,14 @@ public class TestClosedWithMismatchedReplicasHandler {
   public void testClosedHealthyContainerReturnsFalse() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         replicationConfig, 1, CLOSED);
-    Set<ContainerReplica> containerReplicas = ReplicationTestUtil.createReplicas(
-        containerInfo.containerID(), ContainerReplicaProto.State.CLOSED,
-        1, 2, 3, 4, 5);
+    Set<ContainerReplica> containerReplicas =
+        ReplicationTestUtil.createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .pendingOps(Collections.EMPTY_LIST)
-        .report(new ReplicationManagerReport())
-        .containerInfo(containerInfo)
-        .containerReplicas(containerReplicas)
+        .setPendingOps(Collections.EMPTY_LIST)
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
         .build();
     Assertions.assertFalse(handler.handle(request));
 
@@ -97,29 +97,29 @@ public class TestClosedWithMismatchedReplicasHandler {
   public void testClosedMissMatchContainerReturnsTrue() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         replicationConfig, 1, CLOSED);
-    Set<ContainerReplica> containerReplicas = ReplicationTestUtil.createReplicas(
-        containerInfo.containerID(), ContainerReplicaProto.State.CLOSED,
-        1, 2);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.CLOSED, 1, 2);
     ContainerReplica mismatch1 = ReplicationTestUtil.createContainerReplica(
-        containerInfo.containerID(),4,
+        containerInfo.containerID(), 4,
         HddsProtos.NodeOperationalState.IN_SERVICE,
         ContainerReplicaProto.State.OPEN);
     ContainerReplica mismatch2 = ReplicationTestUtil.createContainerReplica(
-        containerInfo.containerID(),5,
+        containerInfo.containerID(), 5,
         HddsProtos.NodeOperationalState.IN_SERVICE,
         ContainerReplicaProto.State.CLOSING);
     ContainerReplica mismatch3 = ReplicationTestUtil.createContainerReplica(
-        containerInfo.containerID(),3,
+        containerInfo.containerID(), 3,
         HddsProtos.NodeOperationalState.IN_SERVICE,
         ContainerReplicaProto.State.UNHEALTHY);
     containerReplicas.add(mismatch1);
     containerReplicas.add(mismatch2);
     containerReplicas.add(mismatch3);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .pendingOps(Collections.EMPTY_LIST)
-        .report(new ReplicationManagerReport())
-        .containerInfo(containerInfo)
-        .containerReplicas(containerReplicas)
+        .setPendingOps(Collections.EMPTY_LIST)
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
         .build();
     Assertions.assertTrue(handler.handle(request));
 

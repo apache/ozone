@@ -28,7 +28,7 @@ import java.util.Set;
  * Simple class to wrap the parameters needed to check a container's health
  * in ReplicationManager.
  */
-public class ContainerCheckRequest {
+public final class ContainerCheckRequest {
 
   private final ContainerInfo containerInfo;
   private final Set<ContainerReplica> containerReplicas;
@@ -81,6 +81,9 @@ public class ContainerCheckRequest {
     return overRepQueue;
   }
 
+  /**
+   * Builder class for ContainerCheckRequest.
+   */
   public static class Builder {
 
     private ContainerInfo containerInfo;
@@ -93,39 +96,40 @@ public class ContainerCheckRequest {
     private Queue<ContainerHealthResult.OverReplicatedHealthResult>
         overRepQueue;
 
-    public Builder containerInfo(ContainerInfo containerInfo) {
+    public Builder setContainerInfo(ContainerInfo containerInfo) {
       this.containerInfo = containerInfo;
       return this;
     }
 
-    public Builder containerReplicas(Set<ContainerReplica> containerReplicas) {
+    public Builder setContainerReplicas(
+        Set<ContainerReplica> containerReplicas) {
       this.containerReplicas = containerReplicas;
       return this;
     }
 
-    public Builder pendingOps(List<ContainerReplicaOp> pendingOps) {
+    public Builder setPendingOps(List<ContainerReplicaOp> pendingOps) {
       this.pendingOps = pendingOps;
       return this;
     }
 
-    public Builder maintenanceRedundancy(int maintenanceRedundancy) {
+    public Builder setMaintenanceRedundancy(int maintenanceRedundancy) {
       this.maintenanceRedundancy = maintenanceRedundancy;
       return this;
     }
 
-    public Builder underRepQueue(
+    public Builder setUnderRepQueue(
         Queue<ContainerHealthResult.UnderReplicatedHealthResult> queue) {
       this.underRepQueue = queue;
       return this;
     }
 
-    public Builder overRepQueue(
+    public Builder setOverRepQueue(
         Queue<ContainerHealthResult.OverReplicatedHealthResult> queue) {
       this.overRepQueue = queue;
       return this;
     }
 
-    public Builder report(ReplicationManagerReport report) {
+    public Builder setReport(ReplicationManagerReport report) {
       this.report = report;
       return this;
     }

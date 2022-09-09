@@ -104,10 +104,10 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
             remainingMaintenanceRedundancy);
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .containerInfo(container)
-        .containerReplicas(replicas)
-        .pendingOps(pendingOps)
-        .maintenanceRedundancy(remainingMaintenanceRedundancy)
+        .setContainerInfo(container)
+        .setContainerReplicas(replicas)
+        .setPendingOps(pendingOps)
+        .setMaintenanceRedundancy(remainingMaintenanceRedundancy)
         .build();
 
     ContainerHealthResult currentUnderRepRes = ecReplicationCheck
