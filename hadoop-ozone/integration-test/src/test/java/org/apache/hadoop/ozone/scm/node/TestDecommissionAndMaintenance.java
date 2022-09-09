@@ -28,13 +28,11 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -65,6 +63,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
@@ -83,7 +82,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.junit.Assert.fail;
 
 /**
  * Test from the scmclient for decommission and maintenance.
@@ -633,13 +631,8 @@ public class TestDecommissionAndMaintenance {
    * @return
    */
   private NodeStatus getNodeStatus(DatanodeDetails dn) {
-    NodeStatus status = null;
-    try {
-      status = nm.getNodeStatus(dn);
-    } catch (NodeNotFoundException e) {
-      fail("Unexpected exception getting the nodeState");
-    }
-    return status;
+    return assertDoesNotThrow(() -> nm.getNodeStatus(dn),
+        "Unexpected exception getting the nodeState");
   }
 
   /**
@@ -650,13 +643,8 @@ public class TestDecommissionAndMaintenance {
    * @return
    */
   private Set<ContainerReplica> getContainerReplicas(ContainerInfo c) {
-    Set<ContainerReplica> replicas = null;
-    try {
-      replicas = cm.getContainerReplicas(c.containerID());
-    } catch (ContainerNotFoundException e) {
-      fail("Unexpected ContainerNotFoundException");
-    }
-    return replicas;
+    return assertDoesNotThrow(() -> cm.getContainerReplicas(c.containerID()),
+        "Unexpected exception getting the container replicas");
   }
 
   /**
