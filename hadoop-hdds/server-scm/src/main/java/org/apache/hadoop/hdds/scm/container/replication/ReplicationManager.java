@@ -192,7 +192,7 @@ public class ReplicationManager implements SCMService {
         TimeUnit.MILLISECONDS);
     this.containerReplicaPendingOps = replicaPendingOps;
     this.legacyReplicationManager = legacyReplicationManager;
-    this.ecReplicationCheckHandler = new ECReplicationCheckHandler(this);
+    this.ecReplicationCheckHandler = new ECReplicationCheckHandler();
     this.nodeManager = nodeManager;
     this.underRepQueue = createUnderReplicatedQueue();
     this.overRepQueue = new LinkedList<>();
@@ -455,8 +455,6 @@ public class ReplicationManager implements SCMService {
     // will issue commands as needed, update the report and perhaps add
     // containers to the over and under replicated queue.
     boolean handled = containerCheckChain.handleChain(checkRequest);
-    // TODO - this needs to be removed. All checks should be handled within
-    //        the chain.
     if (!handled) {
       LOG.debug("Container {} had no actions after passing through the " +
           "check chain", containerInfo.containerID());

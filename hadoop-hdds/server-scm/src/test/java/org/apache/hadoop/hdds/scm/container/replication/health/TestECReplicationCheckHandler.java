@@ -28,11 +28,9 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.Un
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.HealthState;
 
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -57,7 +55,6 @@ public class TestECReplicationCheckHandler {
 
   private ECReplicationCheckHandler healthCheck;
   private ECReplicationConfig repConfig;
-  private ReplicationManager replicationManager;
   private Queue<UnderReplicatedHealthResult> underRepQueue;
   private Queue<OverReplicatedHealthResult> overRepQueue;
   private int maintenanceRedundancy = 2;
@@ -66,8 +63,7 @@ public class TestECReplicationCheckHandler {
 
   @Before
   public void setup() {
-    replicationManager = Mockito.mock(ReplicationManager.class);
-    healthCheck = new ECReplicationCheckHandler(replicationManager);
+    healthCheck = new ECReplicationCheckHandler();
     repConfig = new ECReplicationConfig(3, 2);
     underRepQueue = new LinkedList<>();
     overRepQueue = new LinkedList<>();

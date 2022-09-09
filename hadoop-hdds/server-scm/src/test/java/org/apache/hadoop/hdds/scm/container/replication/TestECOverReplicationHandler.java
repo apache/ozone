@@ -62,7 +62,6 @@ public class TestECOverReplicationHandler {
   private NodeManager nodeManager;
   private OzoneConfiguration conf;
   private PlacementPolicy policy;
-  private ReplicationManager replicationManager;
   private ECReplicationCheckHandler replicationCheck;
 
   @BeforeEach
@@ -83,8 +82,7 @@ public class TestECOverReplicationHandler {
     NodeSchema[] schemas =
         new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
-    replicationManager = Mockito.mock(ReplicationManager.class);
-    replicationCheck = new ECReplicationCheckHandler(replicationManager);
+    replicationCheck = new ECReplicationCheckHandler();
   }
 
   @Test

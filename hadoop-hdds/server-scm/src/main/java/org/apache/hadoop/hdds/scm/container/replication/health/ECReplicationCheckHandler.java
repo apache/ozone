@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ECContainerReplicaCount;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 
 import java.util.List;
 import java.util.Set;
@@ -39,11 +38,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.E
  */
 public class ECReplicationCheckHandler extends AbstractCheck {
 
-  private ReplicationManager replicationManager;
-
-  public ECReplicationCheckHandler(
-      ReplicationManager replicationManager) {
-    this.replicationManager = replicationManager;
+  public ECReplicationCheckHandler() {
   }
 
   @Override

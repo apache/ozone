@@ -70,7 +70,6 @@ public class TestECUnderReplicationHandler {
   private static final int DATA = 3;
   private static final int PARITY = 2;
   private ECReplicationCheckHandler replicationCheck;
-  private ReplicationManager replicationManager;
 
   @BeforeEach
   public void setup() {
@@ -90,8 +89,7 @@ public class TestECUnderReplicationHandler {
     NodeSchema[] schemas =
         new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
-    replicationManager = Mockito.mock(ReplicationManager.class);
-    replicationCheck = new ECReplicationCheckHandler(replicationManager);
+    replicationCheck = new ECReplicationCheckHandler();
   }
 
   @Test
