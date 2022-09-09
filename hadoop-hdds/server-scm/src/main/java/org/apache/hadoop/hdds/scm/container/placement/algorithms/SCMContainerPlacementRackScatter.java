@@ -29,7 +29,13 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -75,8 +81,7 @@ public final class SCMContainerPlacementRackScatter
           List<Node> unavailableNodes,
           List<DatanodeDetails> mutableFavoredNodes,
           int nodesRequired, final long metadataSizeRequired,
-          final long dataSizeRequired, int maxRetries,
-          int maxOuterLoopIterations) {
+          final long dataSizeRequired, int maxOuterLoopIterations) {
     if (nodesRequired <= 0) {
       return Collections.emptySet();
     }
@@ -86,7 +91,7 @@ public final class SCMContainerPlacementRackScatter
     // If the result doesn't change after retryCount, we return with exception
     int retryCount = 0;
     while (nodesRequired > 0 && maxOuterLoopIterations > 0) {
-      if (retryCount > maxRetries) {
+      if (retryCount > OUTER_LOOP_MAX_RETRY) {
         return chosenNodes;
       }
       int chosenListSize = chosenNodes.size();
@@ -253,7 +258,7 @@ public final class SCMContainerPlacementRackScatter
 
     Set<DatanodeDetails> chosenNodes = new LinkedHashSet<>();
 
-    if (racks.size() < additionalRacksRequired ) {
+    if (racks.size() < additionalRacksRequired) {
       String reason = "Number of existing racks: " + racks.size()
               + "is less than additional required number of racks to choose: "
               + additionalRacksRequired + " do not match.";
@@ -267,7 +272,7 @@ public final class SCMContainerPlacementRackScatter
 
     chosenNodes.addAll(chooseNodesFromRacks(racks, unavailableNodes,
             mutableFavoredNodes, additionalRacksRequired,
-            metadataSizeRequired, dataSizeRequired, OUTER_LOOP_MAX_RETRY, 1));
+            metadataSizeRequired, dataSizeRequired, 1));
 
     if (chosenNodes.size() < additionalRacksRequired) {
       String reason = "Chosen nodes size from Unique Racks: " + chosenNodes
@@ -292,18 +297,17 @@ public final class SCMContainerPlacementRackScatter
       racks.addAll(usedRacks);
       chosenNodes.addAll(chooseNodesFromRacks(racks, unavailableNodes,
               mutableFavoredNodes, nodesRequired - chosenNodes.size(),
-              metadataSizeRequired, dataSizeRequired, OUTER_LOOP_MAX_RETRY,
-              Integer.MAX_VALUE));
+              metadataSizeRequired, dataSizeRequired, Integer.MAX_VALUE));
     }
 
     List<DatanodeDetails> result = new ArrayList<>(chosenNodes);
 
     if (nodesRequiredToChoose != chosenNodes.size()) {
       String reason = "Chosen nodes size: " + chosenNodes
-              .size() + ", but required nodes to choose: " + nodesRequiredToChoose
-              + " do not match.";
+              .size() + ", but required nodes to choose: "
+              + nodesRequiredToChoose + " do not match.";
       LOG.warn("Placement policy could not choose the enough nodes."
-                      + " {} Available nodes count: {}, Excluded nodes count: {}",
+               + " {} Available nodes count: {}, Excluded nodes count: {}",
               reason, totalNodesCount, excludedNodesCount);
       throw new SCMException(reason,
               SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);

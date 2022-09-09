@@ -33,8 +33,9 @@ public interface PlacementPolicy {
           List<DatanodeDetails> excludedNodes,
           List<DatanodeDetails> favoredNodes, int nodesRequired,
           long metadataSizeRequired, long dataSizeRequired) throws IOException {
-    return this.chooseDatanodes(Collections.emptyList(), excludedNodes,favoredNodes,
-            nodesRequired, metadataSizeRequired, dataSizeRequired);
+    return this.chooseDatanodes(Collections.emptyList(), excludedNodes,
+            favoredNodes, nodesRequired, metadataSizeRequired,
+            dataSizeRequired);
   }
   /**
    * Given an initial set of datanodes and the size required,

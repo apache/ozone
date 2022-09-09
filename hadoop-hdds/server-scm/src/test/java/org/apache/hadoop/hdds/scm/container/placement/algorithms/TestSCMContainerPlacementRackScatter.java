@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.assertj.core.util.Lists;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -519,15 +518,12 @@ public class TestSCMContainerPlacementRackScatter {
   }
 
   private void assertPlacementPolicySatisfied(List<DatanodeDetails> usedDns,
-                                              List<DatanodeDetails> additionalNodes,
-                                              List<DatanodeDetails> excludedNodes,
-                                              int requiredNodes,
-                                              boolean isSatisfied,
-                                              int misReplication) {
-    assertFalse(excludedNodes.stream().anyMatch(additionalNodes::
-    contains));
+      List<DatanodeDetails> additionalNodes,
+      List<DatanodeDetails> excludedNodes, int requiredNodes,
+      boolean isSatisfied, int misReplication) {
+    assertFalse(excludedNodes.stream().anyMatch(additionalNodes::contains));
     ContainerPlacementStatus stat = policy.validateContainerPlacement(
-            Stream.of(usedDns,additionalNodes)
+            Stream.of(usedDns, additionalNodes)
                     .flatMap(List::stream).collect(Collectors.toList()),
             requiredNodes);
     assertEquals(isSatisfied, stat.isPolicySatisfied());
@@ -546,7 +542,7 @@ public class TestSCMContainerPlacementRackScatter {
   }
 
   @Test
-  public void testInValidChooseNodesWithUsedNodesWithInsufficientRequiredNodeCount() {
+  public void testChooseNodesWithUsedNodesWithInsufficientRequiredNodeCount() {
     setup(5, 2);
     List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1));
     List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(2));
@@ -555,7 +551,8 @@ public class TestSCMContainerPlacementRackScatter {
                     null, 1, 0, 5));
     assertEquals("Required nodes size: 1 is less than " +
             "required number of racks to choose: 2.", exception.getMessage());
-    assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE, exception.getResult());
+    assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
+            exception.getResult());
   }
 
   @Test
@@ -568,8 +565,10 @@ public class TestSCMContainerPlacementRackScatter {
             policy.chooseDatanodes(usedDns, excludedDns,
                     null, 2, 0, 5));
     assertEquals("Chosen nodes size from Unique Racks: 1, but required " +
-            "nodes to choose from Unique Racks: 2 do not match.", exception.getMessage());
-    assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES, exception.getResult());
+            "nodes to choose from Unique Racks: 2 do not match.",
+            exception.getMessage());
+    assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES,
+            exception.getResult());
   }
 
   @Test

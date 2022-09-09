@@ -18,8 +18,11 @@
 package org.apache.hadoop.hdds.scm;
 
 
-import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Random;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
@@ -109,9 +112,11 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   public final List<DatanodeDetails> chooseDatanodes(
           List<DatanodeDetails> excludedNodes,
           List<DatanodeDetails> favoredNodes, int nodesRequired,
-          long metadataSizeRequired, long dataSizeRequired) throws SCMException {
-    return this.chooseDatanodes(Collections.emptyList(), excludedNodes,favoredNodes,
-            nodesRequired, metadataSizeRequired, dataSizeRequired);
+          long metadataSizeRequired,
+          long dataSizeRequired) throws SCMException {
+    return this.chooseDatanodes(Collections.emptyList(), excludedNodes,
+            favoredNodes, nodesRequired, metadataSizeRequired,
+            dataSizeRequired);
   }
 
   /**
@@ -159,7 +164,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
                       DatanodeDetails datanodeDetails =
                               nodeManager.getNodeByUuid(node.getUuidString());
                       return datanodeDetails != null ? datanodeDetails : node;
-            }).collect(Collectors.toList()),
+                    }).collect(Collectors.toList()),
             Objects.isNull(excludedNodes)
                     ? Collections.emptyList() : excludedNodes.stream()
                     .map(node -> {
