@@ -30,11 +30,13 @@ public class ServiceInfoEx {
 
   // PEM encoded string of SCM CA certificate.
   private String caCertificate;
+  private List<String> caCertPemList;
 
   public ServiceInfoEx(List<ServiceInfo> infoList,
-      String caCertificate) {
+      String caCertificate, List<String> caCertPemList) {
     this.infoList = infoList;
     this.caCertificate = caCertificate;
+    this.caCertPemList = caCertPemList;
   }
 
   public List<ServiceInfo> getServiceInfoList() {
@@ -43,5 +45,9 @@ public class ServiceInfoEx {
 
   public String getCaCertificate() {
     return caCertificate;
+  }
+
+  public List<String> getCaCertPemList() {
+    return caCertPemList;
   }
 }

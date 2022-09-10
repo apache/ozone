@@ -848,7 +848,7 @@ function ozone_basic_init
   OZONE_LOGFILE=${OZONE_LOGFILE:-ozone.log}
   OZONE_LOGLEVEL=${OZONE_LOGLEVEL:-INFO}
   OZONE_NICENESS=${OZONE_NICENESS:-0}
-  OZONE_STOP_TIMEOUT=${OZONE_STOP_TIMEOUT:-5}
+  OZONE_STOP_TIMEOUT=${OZONE_STOP_TIMEOUT:-60}
   OZONE_PID_DIR=${OZONE_PID_DIR:-/tmp}
   OZONE_ROOT_LOGGER=${OZONE_ROOT_LOGGER:-${OZONE_LOGLEVEL},console}
   OZONE_DAEMON_ROOT_LOGGER=${OZONE_DAEMON_ROOT_LOGGER:-${OZONE_LOGLEVEL},RFA}
@@ -2722,7 +2722,8 @@ function ozone_deprecate_envvar
   local oldvar=$1
   local newvar=$2
 
-  if ozone_set_var_for_compatibility "$newvar" "$oldvar"; then
+  if ozone_set_var_for_compatibility "$newvar" "$oldvar" && \
+    [[ "${OZONE_DEPRECATION_WARNING:-true}" != "false" ]]; then
     ozone_error "WARNING: ${oldvar} has been deprecated by ${newvar}."
   fi
 }

@@ -82,7 +82,7 @@
     <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
   </Match>
   <Match>
-    <Class name="org.apache.hadoop.ozone.container.ozoneimpl.TestContainerScrubberMetrics" />
+    <Class name="org.apache.hadoop.ozone.container.ozoneimpl.TestContainerScannerMetrics"/>
     <Bug pattern="RU_INVOKE_RUN" />
   </Match>
 </FindBugsFilter>

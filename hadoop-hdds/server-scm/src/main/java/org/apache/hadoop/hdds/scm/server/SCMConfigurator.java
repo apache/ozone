@@ -21,15 +21,20 @@ package org.apache.hadoop.hdds.scm.server;
 
 
 import org.apache.hadoop.hdds.scm.block.BlockManager;
-import org.apache.hadoop.hdds.scm.net.NetworkTopology;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.hdds.security.x509.certificate.authority
     .CertificateServer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 
 /**
  * This class acts as an SCM builder Class. This class is important for us
@@ -51,7 +56,9 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority
  * ReplicationManager replicationManager;
  * SCMSafeModeManager scmSafeModeManager;
  * CertificateServer certificateServer;
- * SCMMetadata scmMetadataStore.
+ * SCMMetadata scmMetadataStore;
+ * SCMHAManager scmHAManager;
+ * SCMContext scmContext.
  *
  * If any of these are *not* specified then the default version of these
  * managers are used by SCM.
@@ -67,6 +74,11 @@ public final class SCMConfigurator {
   private CertificateServer certificateServer;
   private SCMMetadataStore metadataStore;
   private NetworkTopology networkTopology;
+  private SCMHAManager scmHAManager;
+  private SCMContext scmContext;
+  private WritableContainerFactory writableContainerFactory;
+  private UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
+      finalizationExecutor;
 
   /**
    * Allows user to specify a version of Node manager to use with this SCM.
@@ -149,6 +161,42 @@ public final class SCMConfigurator {
   }
 
   /**
+   * Allows user to specify a custom version of SCMHAManager to be
+   * used with this SCM.
+   * @param scmHaMgr - SCMHAManager.
+   */
+  public void setSCMHAManager(SCMHAManager scmHaMgr) {
+    this.scmHAManager = scmHaMgr;
+  }
+
+  /**
+   * Allows user to specify a custom version of SCMContext to be
+   * used with this SCM.
+   * @param scmContext - SCMContext.
+   */
+  public void setScmContext(SCMContext scmContext) {
+    this.scmContext = scmContext;
+  }
+
+  /**
+   * Allows user to set the WritableContainerFactory to be used with this SCM.
+   * @param writableContainerFactory - Container Factory to use.
+   */
+  public void setWritableContainerFactory(
+      WritableContainerFactory writableContainerFactory) {
+    this.writableContainerFactory = writableContainerFactory;
+  }
+
+  /**
+   * Allows user to set the executor for upgrade finalization.
+   * @param executor - Finalization executor to use.
+   */
+  public void setUpgradeFinalizationExecutor(
+      UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor) {
+    this.finalizationExecutor = executor;
+  }
+
+  /**
    * Gets SCM Node Manager.
    * @return Node Manager.
    */
@@ -218,5 +266,38 @@ public final class SCMConfigurator {
    */
   public NetworkTopology getNetworkTopology() {
     return networkTopology;
+  }
+
+  /**
+   * Get SCMHAManager.
+   * @return SCMHAManager.
+   */
+  public SCMHAManager getSCMHAManager() {
+    return scmHAManager;
+  }
+
+  /**
+   * Get SCMContext.
+   * @return SCMContext.
+   */
+  public SCMContext getScmContext() {
+    return scmContext;
+  }
+
+  /**
+   * Get the WritableContainerFactory.
+   * @return WritableContainerFactory.
+   */
+  public WritableContainerFactory getWritableContainerFactory() {
+    return writableContainerFactory;
+  }
+
+  /**
+   * Get the upgrade finalization executor.
+   * @return UpgradeFinalizationExecutor.
+   */
+  public UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
+      getUpgradeFinalizationExecutor() {
+    return finalizationExecutor;
   }
 }

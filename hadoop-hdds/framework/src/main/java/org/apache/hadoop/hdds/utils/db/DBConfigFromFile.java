@@ -20,9 +20,9 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.DBOptions;
 import org.rocksdb.Env;
 import org.rocksdb.OptionsUtil;
 import org.rocksdb.RocksDBException;
@@ -114,7 +114,7 @@ public final class DBConfigFromFile {
    * @return DBOptions, Options to be used for opening/creating the DB.
    * @throws IOException
    */
-  public static DBOptions readFromFile(String dbFileName,
+  public static ManagedDBOptions readFromFile(String dbFileName,
       List<ColumnFamilyDescriptor> cfDescs) throws IOException {
     Preconditions.checkNotNull(dbFileName);
     Preconditions.checkNotNull(cfDescs);
@@ -122,15 +122,15 @@ public final class DBConfigFromFile {
 
     //TODO: Add Documentation on how to support RocksDB Mem Env.
     Env env = Env.getDefault();
-    DBOptions options = null;
+    ManagedDBOptions options = null;
     File configLocation = getConfigLocation();
-    if(configLocation != null &&
-        StringUtil.isNotBlank(configLocation.toString())){
+    if (configLocation != null &&
+        StringUtil.isNotBlank(configLocation.toString())) {
       Path optionsFile = Paths.get(configLocation.toString(),
           getOptionsFileNameFromDB(dbFileName));
 
       if (optionsFile.toFile().exists()) {
-        options = new DBOptions();
+        options = new ManagedDBOptions();
         try {
           OptionsUtil.loadOptionsFromFile(optionsFile.toString(),
               env, options, cfDescs, true);

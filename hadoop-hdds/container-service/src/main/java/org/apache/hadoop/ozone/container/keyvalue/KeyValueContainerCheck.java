@@ -29,13 +29,14 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 
 import java.io.File;
 import java.io.IOException;
@@ -47,7 +48,6 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_LEVELDB;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 
 /**
@@ -65,15 +65,17 @@ public class KeyValueContainerCheck {
   private ConfigurationSource checkConfig;
 
   private String metadataPath;
+  private HddsVolume volume;
 
   public KeyValueContainerCheck(String metadataPath, ConfigurationSource conf,
-      long containerID) {
+      long containerID, HddsVolume volume) {
     Preconditions.checkArgument(metadataPath != null);
 
     this.checkConfig = conf;
     this.containerID = containerID;
     this.onDiskContainerData = null;
     this.metadataPath = metadataPath;
+    this.volume = volume;
   }
 
   /**
@@ -84,7 +86,7 @@ public class KeyValueContainerCheck {
    * @return true : integrity checks pass, false : otherwise.
    */
   public boolean fastCheck() {
-    LOG.info("Running basic checks for container {};", containerID);
+    LOG.debug("Running basic checks for container {};", containerID);
     boolean valid = false;
     try {
       loadContainerData();
@@ -93,6 +95,8 @@ public class KeyValueContainerCheck {
       valid = true;
 
     } catch (IOException e) {
+      LOG.info("Marking Container {} UNHEALTHY as it failed metadata check",
+              containerID);
       handleCorruption(e);
     }
 
@@ -171,7 +175,7 @@ public class KeyValueContainerCheck {
     Preconditions
         .checkState(onDiskContainerData != null, "Container File not loaded");
 
-    ContainerUtils.verifyChecksum(onDiskContainerData);
+    ContainerUtils.verifyChecksum(onDiskContainerData, checkConfig);
 
     if (onDiskContainerData.getContainerType()
         != ContainerProtos.ContainerType.KeyValueContainer) {
@@ -186,8 +190,7 @@ public class KeyValueContainerCheck {
     }
 
     dbType = onDiskContainerData.getContainerDBType();
-    if (!dbType.equals(CONTAINER_DB_TYPE_ROCKSDB) &&
-        !dbType.equals(CONTAINER_DB_TYPE_LEVELDB)) {
+    if (!dbType.equals(CONTAINER_DB_TYPE_ROCKSDB)) {
       String errStr = "Unknown DBType [" + dbType
           + "] in Container File for  [" + containerID + "]";
       throw new IOException(errStr);
@@ -215,9 +218,8 @@ public class KeyValueContainerCheck {
     Preconditions.checkState(onDiskContainerData != null,
         "invoke loadContainerData prior to calling this function");
 
-    File metaDir = new File(metadataPath);
     File dbFile = KeyValueContainerLocationUtil
-        .getContainerDBFile(metaDir, containerID);
+        .getContainerDBFile(onDiskContainerData);
 
     if (!dbFile.exists() || !dbFile.canRead()) {
       String dbFileErrorMsg = "Unable to access DB File [" + dbFile.toString()
@@ -228,28 +230,33 @@ public class KeyValueContainerCheck {
 
     onDiskContainerData.setDbFile(dbFile);
 
-    ChunkLayOutVersion layout = onDiskContainerData.getLayOutVersion();
+    ContainerLayoutVersion layout = onDiskContainerData.getLayoutVersion();
 
-    try(ReferenceCountedDB db =
-            BlockUtils.getDB(onDiskContainerData, checkConfig);
-        BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator()) {
+    try (DBHandle db = BlockUtils.getDB(onDiskContainerData, checkConfig);
+        BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator(
+            onDiskContainerData.getContainerID(),
+            onDiskContainerData.getUnprefixedKeyFilter())) {
 
-      while(kvIter.hasNext()) {
+      while (kvIter.hasNext()) {
         BlockData block = kvIter.nextBlock();
-        for(ContainerProtos.ChunkInfo chunk : block.getChunks()) {
+        for (ContainerProtos.ChunkInfo chunk : block.getChunks()) {
           File chunkFile = layout.getChunkFile(onDiskContainerData,
               block.getBlockID(), ChunkInfo.getFromProtoBuf(chunk));
 
           if (!chunkFile.exists()) {
             // concurrent mutation in Block DB? lookup the block again.
-            String localBlockID =
-                    Long.toString(block.getBlockID().getLocalID());
+            String blockKey =
+                onDiskContainerData.blockKey(block.getBlockID().getLocalID());
             BlockData bdata = db.getStore()
                     .getBlockDataTable()
-                    .get(localBlockID);
-            if (bdata != null) {
-              throw new IOException("Missing chunk file "
-                  + chunkFile.getAbsolutePath());
+                    .get(blockKey);
+            // In EC, client may write empty putBlock in padding block nodes.
+            // So, we need to make sure, chunk length > 0, before declaring
+            // the missing chunk file.
+            if (bdata != null && bdata.getChunks().size() > 0 && bdata
+                .getChunks().get(0).getLen() > 0) {
+              throw new IOException(
+                  "Missing chunk file " + chunkFile.getAbsolutePath());
             }
           } else if (chunk.getChecksumData().getType()
               != ContainerProtos.ChecksumType.NONE) {
@@ -263,7 +270,7 @@ public class KeyValueContainerCheck {
 
   private static void verifyChecksum(BlockData block,
       ContainerProtos.ChunkInfo chunk, File chunkFile,
-      ChunkLayOutVersion layout,
+      ContainerLayoutVersion layout,
       DataTransferThrottler throttler, Canceler canceler) throws IOException {
     ChecksumData checksumData =
         ChecksumData.getFromProtoBuf(chunk.getChecksumData());
@@ -275,12 +282,12 @@ public class KeyValueContainerCheck {
     long bytesRead = 0;
     try (FileChannel channel = FileChannel.open(chunkFile.toPath(),
         ChunkUtils.READ_OPTIONS, ChunkUtils.NO_ATTRIBUTES)) {
-      if (layout == ChunkLayOutVersion.FILE_PER_BLOCK) {
+      if (layout == ContainerLayoutVersion.FILE_PER_BLOCK) {
         channel.position(chunk.getOffset());
       }
       for (int i = 0; i < checksumCount; i++) {
         // limit last read for FILE_PER_BLOCK, to avoid reading next chunk
-        if (layout == ChunkLayOutVersion.FILE_PER_BLOCK &&
+        if (layout == ContainerLayoutVersion.FILE_PER_BLOCK &&
             i == checksumCount - 1 &&
             chunk.getLen() % bytesPerChecksum != 0) {
           buffer.limit((int) (chunk.getLen() % bytesPerChecksum));
@@ -329,6 +336,7 @@ public class KeyValueContainerCheck {
 
     onDiskContainerData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
+    onDiskContainerData.setVolume(volume);
   }
 
   private void handleCorruption(IOException e) {

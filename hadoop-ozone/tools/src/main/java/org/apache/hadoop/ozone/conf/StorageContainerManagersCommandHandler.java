@@ -42,7 +42,7 @@ public class StorageContainerManagersCommandHandler implements Callable<Void> {
   @Override
   public Void call() throws Exception {
     Collection<InetSocketAddress> addresses = HddsUtils
-        .getSCMAddresses(OzoneConfiguration.of(tool.getConf()));
+        .getScmAddressForClients(OzoneConfiguration.of(tool.getConf()));
 
     for (InetSocketAddress addr : addresses) {
       tool.printOut(addr.getHostName());

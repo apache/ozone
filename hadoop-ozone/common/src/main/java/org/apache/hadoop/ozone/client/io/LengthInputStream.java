@@ -18,13 +18,18 @@
 
 package org.apache.hadoop.ozone.client.io;
 
+import org.apache.hadoop.fs.ByteBufferReadable;
+
 import java.io.FilterInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 
 /**
  * An input stream with length.
  */
-public class LengthInputStream extends FilterInputStream {
+public class LengthInputStream extends FilterInputStream implements
+    ByteBufferReadable {
 
   private final long length;
 
@@ -45,5 +50,15 @@ public class LengthInputStream extends FilterInputStream {
 
   public InputStream getWrappedStream() {
     return in;
+  }
+
+  @Override
+  public int read(ByteBuffer byteBuffer) throws IOException {
+    if (in instanceof ByteBufferReadable) {
+      return ((ByteBufferReadable)in).read(byteBuffer);
+    } else {
+      throw new UnsupportedOperationException("Read with ByteBuffer is not " +
+          " supported by " + in.getClass().getName());
+    }
   }
 }

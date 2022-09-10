@@ -46,12 +46,14 @@ interface IDatanodeResponse {
   storageReport: IStorageReport;
   pipelines: IPipeline[];
   containers: number;
+  openContainers: number;
   leaderCount: number;
   uuid: string;
   version: string;
   setupTime: number;
   revision: string;
   buildDate: string;
+  networkLocation: string;
 }
 
 interface IDatanodesResponse {
@@ -69,18 +71,20 @@ interface IDatanode {
   storageRemaining: number;
   pipelines: IPipeline[];
   containers: number;
+  openContainers: number;
   leaderCount: number;
   uuid: string;
   version: string;
   setupTime: number;
   revision: string;
   buildDate: string;
+  networkLocation: string;
 }
 
 interface IPipeline {
   pipelineID: string;
   replicationType: string;
-  replicationFactor: number;
+  replicationFactor: string;
   leaderNode: string;
 }
 
@@ -137,7 +141,7 @@ const COLUMNS = [
     filters: DatanodeOpStateList.map(state => ({text: state, value: state})),
     onFilter: (value: DatanodeOpState, record: IDatanode) => record.opState === value,
     render: (text: DatanodeOpState) => renderDatanodeOpState(text),
-    sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state),
+    sorter: (a: IDatanode, b: IDatanode) => a.opState.localeCompare(b.opState),
     fixed: 'left'
   },
   {
@@ -227,19 +231,27 @@ const COLUMNS = [
     sorter: (a: IDatanode, b: IDatanode) => a.containers - b.containers
   },
   {
+    title: 'Open Containers',
+    dataIndex: 'openContainers',
+    key: 'openContainers',
+    isVisible: true,
+    isSearchable: true,
+    sorter: (a: IDatanode, b: IDatanode) => a.openContainers - b.openContainers
+  },
+  {
     title: 'Version',
     dataIndex: 'version',
     key: 'version',
-    isVisible: false,
+    isVisible: true,
     isSearchable: true,
     sorter: (a: IDatanode, b: IDatanode) => a.version.localeCompare(b.version),
     defaultSortOrder: 'ascend' as const
   },
   {
-    title: 'SetupTime',
+    title: 'Setup Time',
     dataIndex: 'setupTime',
     key: 'setupTime',
-    isVisible: false,
+    isVisible: true,
     sorter: (a: IDatanode, b: IDatanode) => a.setupTime - b.setupTime,
     render: (uptime: number) => {
       return uptime > 0 ? moment(uptime).format('ll LTS') : 'NA';
@@ -249,18 +261,27 @@ const COLUMNS = [
     title: 'Revision',
     dataIndex: 'revision',
     key: 'revision',
-    isVisible: false,
+    isVisible: true,
     isSearchable: true,
     sorter: (a: IDatanode, b: IDatanode) => a.revision.localeCompare(b.revision),
     defaultSortOrder: 'ascend' as const
   },
   {
-    title: 'BuildDate',
+    title: 'Build Date',
     dataIndex: 'buildDate',
     key: 'buildDate',
-    isVisible: false,
+    isVisible: true,
     isSearchable: true,
     sorter: (a: IDatanode, b: IDatanode) => a.buildDate.localeCompare(b.buildDate),
+    defaultSortOrder: 'ascend' as const
+  },
+  {
+    title: 'Network Location',
+    dataIndex: 'networkLocation',
+    key: 'networkLocation',
+    isVisible: true,
+    isSearchable: true,
+    sorter: (a: IDatanode, b: IDatanode) => a.networkLocation.localeCompare(b.networkLocation),
     defaultSortOrder: 'ascend' as const
   }
 ];
@@ -327,11 +348,13 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           storageRemaining: datanode.storageReport.remaining,
           pipelines: datanode.pipelines,
           containers: datanode.containers,
+          openContainers: datanode.openContainers,
           leaderCount: datanode.leaderCount,
           version: datanode.version,
           setupTime: datanode.setupTime,
           revision: datanode.revision,
-          buildDate: datanode.buildDate
+          buildDate: datanode.buildDate,
+          networkLocation: datanode.networkLocation
         };
       });
 

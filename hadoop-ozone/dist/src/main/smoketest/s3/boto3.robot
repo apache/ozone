@@ -27,8 +27,9 @@ Suite Setup         Setup s3 tests
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
+${S3_SMOKETEST_DIR}   /opt/hadoop/smoketest/s3
 
 *** Test Cases ***
 
-Bobo3 Client Test
-    ${result} =    Execute    python3 /opt/hadoop/smoketest/s3/boto_client.py ${ENDPOINT_URL} ${BUCKET}
+Boto3 Client Test
+    ${result} =    Execute    python3 ${S3_SMOKETEST_DIR}/boto_client.py ${ENDPOINT_URL} ${BUCKET}

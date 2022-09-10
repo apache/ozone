@@ -119,12 +119,12 @@ public final class SCMPipelineMetrics implements MetricsSource {
 
   public static String getBlockAllocationMetricName(Pipeline pipeline) {
     return "NumBlocksAllocated-" + pipeline.getType() + "-" + pipeline
-        .getFactor() + "-" + pipeline.getId().getId();
+        .getReplicationConfig().toString() + "-" + pipeline.getId().getId();
   }
 
   public static String getBytesWrittenMetricName(Pipeline pipeline) {
     return "NumPipelineBytesWritten-" + pipeline.getType() + "-" + pipeline
-        .getFactor() + "-" + pipeline.getId().getId();
+        .getReplicationConfig().toString() + "-" + pipeline.getId().getId();
   }
 
   void removePipelineMetrics(PipelineID pipelineID) {

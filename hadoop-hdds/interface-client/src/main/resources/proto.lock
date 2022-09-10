@@ -247,6 +247,10 @@
               {
                 "name": "ERROR_IN_DB_SYNC",
                 "integer": 42
+              },
+              {
+                "name": "CHUNK_FILE_INCONSISTENCY",
+                "integer": 43
               }
             ]
           },
@@ -314,6 +318,18 @@
               {
                 "name": "MD5",
                 "integer": 5
+              }
+            ]
+          },
+          {
+            "name": "ReadChunkVersion",
+            "enum_fields": [
+              {
+                "name": "V0"
+              },
+              {
+                "name": "V1",
+                "integer": 1
               }
             ]
           }
@@ -477,6 +493,11 @@
                 "id": 23,
                 "name": "encodedToken",
                 "type": "string"
+              },
+              {
+                "id": 24,
+                "name": "version",
+                "type": "uint32"
               }
             ]
           },
@@ -955,6 +976,17 @@
             ]
           },
           {
+            "name": "ChunkInfoList",
+            "fields": [
+              {
+                "id": 1,
+                "name": "chunks",
+                "type": "ChunkInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
             "name": "ChecksumData",
             "fields": [
               {
@@ -1010,6 +1042,11 @@
                 "id": 2,
                 "name": "chunkData",
                 "type": "ChunkInfo"
+              },
+              {
+                "id": 3,
+                "name": "readChunkVersion",
+                "type": "ReadChunkVersion"
               }
             ]
           },
@@ -1030,6 +1067,22 @@
                 "id": 3,
                 "name": "data",
                 "type": "bytes"
+              },
+              {
+                "id": 4,
+                "name": "dataBuffers",
+                "type": "DataBuffers"
+              }
+            ]
+          },
+          {
+            "name": "DataBuffers",
+            "fields": [
+              {
+                "id": 1,
+                "name": "buffers",
+                "type": "bytes",
+                "is_repeated": true
               }
             ]
           },
@@ -1119,6 +1172,11 @@
                 "id": 1,
                 "name": "block",
                 "type": "GetBlockRequestProto"
+              },
+              {
+                "id": 2,
+                "name": "readChunkVersion",
+                "type": "ReadChunkVersion"
               }
             ]
           },
@@ -1149,6 +1207,11 @@
                 "id": 3,
                 "name": "len",
                 "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "version",
+                "type": "uint32"
               }
             ]
           },
@@ -1292,6 +1355,35 @@
               {
                 "name": "DEAD",
                 "integer": 3
+              },
+              {
+                "name": "HEALTHY_READONLY",
+                "integer": 6
+              }
+            ]
+          },
+          {
+            "name": "NodeOperationalState",
+            "enum_fields": [
+              {
+                "name": "IN_SERVICE",
+                "integer": 1
+              },
+              {
+                "name": "ENTERING_MAINTENANCE",
+                "integer": 2
+              },
+              {
+                "name": "IN_MAINTENANCE",
+                "integer": 3
+              },
+              {
+                "name": "DECOMMISSIONING",
+                "integer": 4
+              },
+              {
+                "name": "DECOMMISSIONED",
+                "integer": 5
               }
             ]
           },
@@ -1465,6 +1557,31 @@
                 "integer": 4
               }
             ]
+          },
+          {
+            "name": "UpgradeFinalizationStatus.Status",
+            "enum_fields": [
+              {
+                "name": "ALREADY_FINALIZED",
+                "integer": 1
+              },
+              {
+                "name": "STARTING_FINALIZATION",
+                "integer": 2
+              },
+              {
+                "name": "FINALIZATION_IN_PROGRESS",
+                "integer": 3
+              },
+              {
+                "name": "FINALIZATION_DONE",
+                "integer": 4
+              },
+              {
+                "name": "FINALIZATION_REQUIRED",
+                "integer": 5
+              }
+            ]
           }
         ],
         "messages": [
@@ -1523,6 +1640,16 @@
                 "type": "string"
               },
               {
+                "id": 8,
+                "name": "persistedOpState",
+                "type": "NodeOperationalState"
+              },
+              {
+                "id": 9,
+                "name": "persistedOpStateExpiry",
+                "type": "int64"
+              },
+              {
                 "id": 100,
                 "name": "uuid128",
                 "type": "UUID"
@@ -1530,34 +1657,49 @@
             ]
           },
           {
-		"name": "ExtendedDatanodeDetailsProto",
+            "name": "ExtendedDatanodeDetailsProto",
             "fields": [
-			  {
-			    "id": 1,
-				"name": "datanodeDetails",
-				"type": "DatanodeDetailsProto"
-			  },
-			  {
-			    "id": 2,
-				"name": "version",
-				"type": "string"
-			  },
-			  {
-			    "id": 3,
-				"name": "setupTime",
-				"type": "int64"
-			  },
-			  {
-			    "id": 4,
-				"name": "revision",
-				"type": "string"
-			  },
-			  {
-			    "id": 5,
-				"name": "buildDate",
-				"type": "string"
-			  }
-			]
+              {
+                "id": 1,
+                "name": "datanodeDetails",
+                "type": "DatanodeDetailsProto"
+              },
+              {
+                "id": 2,
+                "name": "version",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "setupTime",
+                "type": "int64"
+              },
+              {
+                "id": 4,
+                "name": "revision",
+                "type": "string"
+              },
+              {
+                "id": 5,
+                "name": "buildDate",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "MoveDataNodePairProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "src",
+                "type": "DatanodeDetailsProto"
+              },
+              {
+                "id": 2,
+                "name": "tgt",
+                "type": "DatanodeDetailsProto"
+              }
+            ]
           },
           {
             "name": "OzoneManagerDetailsProto",
@@ -1582,6 +1724,26 @@
                 "name": "ports",
                 "type": "Port",
                 "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ScmNodeDetailsProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "scmNodeId",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "clusterId",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "hostName",
+                "type": "string"
               }
             ]
           },
@@ -1612,6 +1774,16 @@
                 "id": 100,
                 "name": "uuid128",
                 "type": "UUID"
+              }
+            ]
+          },
+          {
+            "name": "ContainerID",
+            "fields": [
+              {
+                "id": 1,
+                "name": "id",
+                "type": "uint64"
               }
             ]
           },
@@ -1679,6 +1851,11 @@
                 "type": "uint64"
               },
               {
+                "id": 9,
+                "name": "suggestedLeaderID",
+                "type": "UUID"
+              },
+              {
                 "id": 100,
                 "name": "leaderID128",
                 "type": "UUID"
@@ -1713,6 +1890,12 @@
                 "name": "nodeStates",
                 "type": "NodeState",
                 "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "nodeOperationalStates",
+                "type": "NodeOperationalState",
+                "is_repeated": true
               }
             ]
           },
@@ -1724,6 +1907,31 @@
                 "name": "nodes",
                 "type": "Node",
                 "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "DatanodeUsageInfoProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "capacity",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "used",
+                "type": "int64"
+              },
+              {
+                "id": 3,
+                "name": "remaining",
+                "type": "int64"
+              },
+              {
+                "id": 4,
+                "name": "node",
+                "type": "DatanodeDetailsProto"
               }
             ]
           },
@@ -1824,6 +2032,47 @@
                 "id": 2,
                 "name": "scmId",
                 "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "peerRoles",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "AddScmRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "clusterId",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "scmId",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "ratisAddr",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "AddScmResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "success",
+                "type": "bool"
+              },
+              {
+                "id": 2,
+                "name": "scmId",
+                "type": "string"
               }
             ]
           },
@@ -1862,6 +2111,56 @@
                 "id": 2,
                 "name": "localID",
                 "type": "int64"
+              }
+            ]
+          },
+          {
+            "name": "SecretKeyProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyId",
+                "type": "uint32"
+              },
+              {
+                "id": 2,
+                "name": "expiryDate",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "privateKeyBytes",
+                "type": "bytes"
+              },
+              {
+                "id": 4,
+                "name": "publicKeyBytes",
+                "type": "bytes"
+              }
+            ]
+          },
+          {
+            "name": "TokenProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "identifier",
+                "type": "bytes"
+              },
+              {
+                "id": 2,
+                "name": "password",
+                "type": "bytes"
+              },
+              {
+                "id": 3,
+                "name": "kind",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "service",
+                "type": "string"
               }
             ]
           },
@@ -1919,6 +2218,57 @@
                     "value": "0"
                   }
                 ]
+              }
+            ]
+          },
+          {
+            "name": "UpgradeFinalizationStatus",
+            "fields": [
+              {
+                "id": 1,
+                "name": "status",
+                "type": "Status"
+              },
+              {
+                "id": 2,
+                "name": "messages",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "CRLInfoProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "x509CRL",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "creationTimestamp",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "crlSequenceID",
+                "type": "int64"
+              }
+            ]
+          },
+          {
+            "name": "CertInfoProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "x509Certificate",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "timestamp",
+                "type": "uint64"
               }
             ]
           }

@@ -18,9 +18,14 @@
 
 package org.apache.hadoop.ozone.client;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.function.SupplierWithIOException;
+import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -38,10 +43,13 @@ public class OzoneKeyDetails extends OzoneKey {
 
   private FileEncryptionInfo feInfo;
 
+  private SupplierWithIOException<OzoneInputStream> contentSupplier;
+
   /**
    * Constructs OzoneKeyDetails from OmKeyInfo.
    */
   @SuppressWarnings("parameternumber")
+  @Deprecated
   public OzoneKeyDetails(String volumeName, String bucketName, String keyName,
                          long size, long creationTime, long modificationTime,
                          List<OzoneKeyLocation> ozoneKeyLocations,
@@ -52,6 +60,26 @@ public class OzoneKeyDetails extends OzoneKey {
     this.ozoneKeyLocations = ozoneKeyLocations;
     this.metadata = metadata;
     this.feInfo = feInfo;
+  }
+
+
+  /**
+   * Constructs OzoneKeyDetails from OmKeyInfo.
+   */
+  @SuppressWarnings("parameternumber")
+  public OzoneKeyDetails(String volumeName, String bucketName, String keyName,
+      long size, long creationTime, long modificationTime,
+      List<OzoneKeyLocation> ozoneKeyLocations,
+      ReplicationConfig replicationConfig,
+      Map<String, String> metadata,
+      FileEncryptionInfo feInfo,
+      SupplierWithIOException<OzoneInputStream> contentSupplier) {
+    super(volumeName, bucketName, keyName, size, creationTime,
+            modificationTime, replicationConfig);
+    this.ozoneKeyLocations = ozoneKeyLocations;
+    this.metadata = metadata;
+    this.feInfo = feInfo;
+    this.contentSupplier = contentSupplier;
   }
 
   /**
@@ -74,5 +102,15 @@ public class OzoneKeyDetails extends OzoneKey {
    */
   public void setOzoneKeyLocations(List<OzoneKeyLocation> ozoneKeyLocations) {
     this.ozoneKeyLocations = ozoneKeyLocations;
+  }
+
+  /**
+   * Get OzoneInputStream to read the content of the key.
+   * @return OzoneInputStream
+   * @throws IOException
+   */
+  @JsonIgnore
+  public OzoneInputStream getContent() throws IOException {
+    return this.contentSupplier.get();
   }
 }

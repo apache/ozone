@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.debug;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import picocli.CommandLine;
 
 /**
@@ -32,8 +33,17 @@ import picocli.CommandLine;
         mixinStandardHelpOptions = true)
 public class OzoneDebug extends GenericCli {
 
+  private OzoneConfiguration ozoneConf;
+
   public OzoneDebug() {
     super(OzoneDebug.class);
+  }
+
+  public OzoneConfiguration getOzoneConf() {
+    if (ozoneConf == null) {
+      ozoneConf = createOzoneConfiguration();
+    }
+    return ozoneConf;
   }
 
   /**

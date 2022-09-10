@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client;
 
 import java.time.Instant;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 
@@ -38,10 +39,9 @@ public class OzoneMultipartUpload {
 
   private Instant creationTime;
 
-  private ReplicationType replicationType;
+  private ReplicationConfig replicationConfig;
 
-  private ReplicationFactor replicationFactor;
-
+  @Deprecated
   public OzoneMultipartUpload(String volumeName, String bucketName,
       String keyName, String uploadId, Instant creationTime,
       ReplicationType replicationType,
@@ -51,8 +51,20 @@ public class OzoneMultipartUpload {
     this.keyName = keyName;
     this.uploadId = uploadId;
     this.creationTime = creationTime;
-    this.replicationType = replicationType;
-    this.replicationFactor = replicationFactor;
+    this.replicationConfig =
+            ReplicationConfig
+                    .fromTypeAndFactor(replicationType, replicationFactor);
+  }
+
+  public OzoneMultipartUpload(String volumeName, String bucketName,
+      String keyName, String uploadId, Instant creationTime,
+      ReplicationConfig replicationConfig) {
+    this.volumeName = volumeName;
+    this.bucketName = bucketName;
+    this.keyName = keyName;
+    this.uploadId = uploadId;
+    this.creationTime = creationTime;
+    this.replicationConfig = replicationConfig;
   }
 
   public String getVolumeName() {
@@ -79,11 +91,19 @@ public class OzoneMultipartUpload {
     this.creationTime = creationTime;
   }
 
+  @Deprecated
   public ReplicationType getReplicationType() {
-    return replicationType;
+    return ReplicationType
+            .fromProto(replicationConfig.getReplicationType());
   }
 
+  @Deprecated
   public ReplicationFactor getReplicationFactor() {
-    return replicationFactor;
+    return ReplicationFactor
+            .fromProto(ReplicationConfig.getLegacyFactor(replicationConfig));
+  }
+
+  public ReplicationConfig getReplicationConfig() {
+    return replicationConfig;
   }
 }

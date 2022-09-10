@@ -50,7 +50,7 @@ public class DummyChunkInputStream extends ChunkInputStream {
   }
 
   @Override
-  protected List<ByteBuffer> readChunk(ChunkInfo readChunkInfo) {
+  protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo) {
     int offset = (int) readChunkInfo.getOffset();
     int remainingToRead = (int) readChunkInfo.getLen();
 
@@ -72,7 +72,8 @@ public class DummyChunkInputStream extends ChunkInputStream {
       remainingToRead -= bufferLen;
     }
 
-    return BufferUtils.getReadOnlyByteBuffers(readByteBuffers);
+    return BufferUtils.getReadOnlyByteBuffers(readByteBuffers)
+        .toArray(new ByteBuffer[0]);
   }
 
   @Override

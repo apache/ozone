@@ -162,7 +162,7 @@ public class TestOzoneClientRetriesOnExceptions {
     Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 1);
     ContainerInfo container =
             cluster.getStorageContainerManager().getContainerManager()
-                    .getContainer(ContainerID.valueof(containerID));
+                    .getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline =
             cluster.getStorageContainerManager().getPipelineManager()
                     .getPipeline(container.getPipelineID());
@@ -191,8 +191,8 @@ public class TestOzoneClientRetriesOnExceptions {
   @Test
   public void testMaxRetriesByOzoneClient() throws Exception {
     String keyName = getKeyName();
-    OzoneOutputStream key =
-        createKey(keyName, ReplicationType.RATIS, (MAX_RETRIES+1) * blockSize);
+    OzoneOutputStream key = createKey(
+        keyName, ReplicationType.RATIS, (MAX_RETRIES + 1) * blockSize);
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
     List<BlockOutputStreamEntry> entries = keyOutputStream.getStreamEntries();
@@ -209,7 +209,7 @@ public class TestOzoneClientRetriesOnExceptions {
       containerID = entry.getBlockID().getContainerID();
       ContainerInfo container =
           cluster.getStorageContainerManager().getContainerManager()
-              .getContainer(ContainerID.valueof(containerID));
+              .getContainer(ContainerID.valueOf(containerID));
       Pipeline pipeline =
           cluster.getStorageContainerManager().getPipelineManager()
               .getPipeline(container.getPipelineID());

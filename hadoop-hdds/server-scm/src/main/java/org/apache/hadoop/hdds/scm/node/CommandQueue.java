@@ -91,7 +91,7 @@ public class CommandQueue {
     try {
       Commands cmds = commandMap.remove(datanodeUuid);
       List<SCMCommand> cmdList = null;
-      if(cmds != null) {
+      if (cmds != null) {
         cmdList = cmds.getCommands();
         commandsInQueue -= cmdList.size() > 0 ? cmdList.size() : 0;
         // A post condition really.

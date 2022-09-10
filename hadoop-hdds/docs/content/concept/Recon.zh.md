@@ -70,7 +70,7 @@ Recon 有其自己的任务框架，可对从 OM 和 SCM 获得的数据进行�
 
 ## Recon 和 Prometheus
 
-Recon 可以与任何配置为收集指标的 Prometheus 实例集成，并且可以在数据节点和 Pipelines 页面的 Recon UI 中显示有用的信息。Recon 还公开了一个代理端点 ([/指标]({{< ref path="interface/ReconApi.zh.md#metrics" >}})) 来查询 Prometheus。可以通过将此配置`ozone.recon.prometheus.http.endpoint`设置为 Prometheus 端点如`ozone.recon.prometheus.http.endpoint=localhost:9090`来启用此集成。
+Recon 可以与任何配置为收集指标的 Prometheus 实例集成，并且可以在数据节点和 Pipelines 页面的 Recon UI 中显示有用的信息。Recon 还公开了一个代理端点 ([/指标]({{< ref path="interface/ReconApi.zh.md#metrics" >}})) 来查询 Prometheus。可以通过将此配置`ozone.recon.prometheus.http.endpoint`设置为 Prometheus 端点如`ozone.recon.prometheus.http.endpoint=http://prometheus:9090`来启用此集成。
 
 ## API 参考
 

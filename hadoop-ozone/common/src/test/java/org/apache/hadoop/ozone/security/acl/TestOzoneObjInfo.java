@@ -20,8 +20,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.Test;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType.*;
-import static org.junit.Assert.*;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType.KEY;
+import static org.junit.Assert.assertEquals;
+
 import org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType;
 
 /**
@@ -67,10 +68,10 @@ public class TestOzoneObjInfo {
     objInfo = getBuilder(volume, bucket, key).build();
     assertEquals(objInfo.getBucketName(), bucket);
 
-    objInfo =getBuilder(volume, null, null).build();
+    objInfo = getBuilder(volume, null, null).build();
     assertEquals(objInfo.getBucketName(), null);
 
-    objInfo =getBuilder(null, bucket, null).build();
+    objInfo = getBuilder(null, bucket, null).build();
     assertEquals(objInfo.getBucketName(), bucket);
   }
 

@@ -132,7 +132,7 @@ public class ContainerAttribute<T> {
    * @return true or false
    */
   public boolean hasContainerID(T key, int id) {
-    return hasContainerID(key, ContainerID.valueof(id));
+    return hasContainerID(key, ContainerID.valueOf(id));
   }
 
   /**
