@@ -47,7 +47,7 @@ public class OMPerformanceMetrics {
   private MutableRate readKeyInfoLatencyNs;
 
   @Metric(about = "Block token generation latency in nanoseconds")
-  private MutableRate blockTokenLatencyNs;
+  private MutableRate generateBlockTokenLatencyNs;
 
   @Metric(about = "Refresh location nanoseconds")
   private MutableRate refreshContainerLocationLatencyNs;
