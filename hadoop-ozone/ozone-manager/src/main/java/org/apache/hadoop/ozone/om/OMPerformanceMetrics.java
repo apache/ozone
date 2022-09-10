@@ -50,7 +50,7 @@ public class OMPerformanceMetrics {
   private MutableRate blockTokenLatencyNs;
 
   @Metric(about = "Refresh location nanoseconds")
-  private MutableRate refreshLatencyNs;
+  private MutableRate refreshContainerLocationLatencyNs;
 
   @Metric(about = "ACLs check nanoseconds")
   private MutableRate aclCheckLatencyNs;
