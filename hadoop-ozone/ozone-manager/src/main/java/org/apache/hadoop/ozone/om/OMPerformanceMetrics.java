@@ -31,7 +31,7 @@ public class OMPerformanceMetrics {
   public static OMPerformanceMetrics register() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     return ms.register(SOURCE_NAME,
-            "OzoneManager Latency",
+            "OzoneManager Request Performance",
             new OMPerformanceMetrics());
   }
 
