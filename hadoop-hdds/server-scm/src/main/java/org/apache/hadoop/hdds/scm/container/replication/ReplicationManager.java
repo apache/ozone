@@ -20,9 +20,6 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.Config;
-import org.apache.hadoop.hdds.conf.ConfigGroup;
-import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -55,7 +52,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Clock;
-import java.time.Duration;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -71,8 +67,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
-import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 
 /**
@@ -195,7 +189,7 @@ public class ReplicationManager implements SCMService {
     this.nodeManager = nodeManager;
     this.underRepQueue = createUnderReplicatedQueue();
     this.overRepQueue = new LinkedList<>();
-    this.maintenanceRedundancy = rmConf.maintenanceRemainingRedundancy;
+    this.maintenanceRedundancy = rmConf.getMaintenanceRemainingRedundancy();
     ecUnderReplicationHandler = new ECUnderReplicationHandler(
         containerPlacement, conf, nodeManager);
     ecOverReplicationHandler =
@@ -632,152 +626,6 @@ public class ReplicationManager implements SCMService {
       return replicaState == ContainerReplicaProto.State.CLOSED;
     default:
       return false;
-    }
-  }
-
-  /**
-   * Configuration used by the Replication Manager.
-   */
-  @ConfigGroup(prefix = "hdds.scm.replication")
-  public static class ReplicationManagerConfiguration {
-    /**
-     * The frequency in which ReplicationMonitor thread should run.
-     */
-    @Config(key = "thread.interval",
-        type = ConfigType.TIME,
-        defaultValue = "300s",
-        tags = {SCM, OZONE},
-        description = "There is a replication monitor thread running inside " +
-            "SCM which takes care of replicating the containers in the " +
-            "cluster. This property is used to configure the interval in " +
-            "which that thread runs."
-    )
-    private long interval = Duration.ofSeconds(300).toMillis();
-
-    /**
-     * The frequency in which the Under Replicated queue is processed.
-     */
-    @Config(key = "under.replicated.interval",
-        type = ConfigType.TIME,
-        defaultValue = "30s",
-        tags = {SCM, OZONE},
-        description = "How frequently to check if there are work to process " +
-            " on the under replicated queue"
-    )
-    private long underReplicatedInterval = Duration.ofSeconds(30).toMillis();
-
-    /**
-     * The frequency in which the Over Replicated queue is processed.
-     */
-    @Config(key = "over.replicated.interval",
-        type = ConfigType.TIME,
-        defaultValue = "30s",
-        tags = {SCM, OZONE},
-        description = "How frequently to check if there are work to process " +
-            " on the over replicated queue"
-    )
-    private long overReplicatedInterval = Duration.ofSeconds(30).toMillis();
-
-    /**
-     * Timeout for container replication & deletion command issued by
-     * ReplicationManager.
-     */
-    @Config(key = "event.timeout",
-        type = ConfigType.TIME,
-        defaultValue = "30m",
-        tags = {SCM, OZONE},
-        description = "Timeout for the container replication/deletion commands "
-            + "sent  to datanodes. After this timeout the command will be "
-            + "retried.")
-    private long eventTimeout = Duration.ofMinutes(30).toMillis();
-    public void setInterval(Duration interval) {
-      this.interval = interval.toMillis();
-    }
-
-    public void setEventTimeout(Duration timeout) {
-      this.eventTimeout = timeout.toMillis();
-    }
-
-    /**
-     * The number of container replica which must be available for a node to
-     * enter maintenance.
-     */
-    @Config(key = "maintenance.replica.minimum",
-        type = ConfigType.INT,
-        defaultValue = "2",
-        tags = {SCM, OZONE},
-        description = "The minimum number of container replicas which must " +
-            " be available for a node to enter maintenance. If putting a " +
-            " node into maintenance reduces the available replicas for any " +
-            " container below this level, the node will remain in the " +
-            " entering maintenance state until a new replica is created.")
-    private int maintenanceReplicaMinimum = 2;
-
-    public void setMaintenanceReplicaMinimum(int replicaCount) {
-      this.maintenanceReplicaMinimum = replicaCount;
-    }
-
-    /**
-     * Defines how many redundant replicas of a container must be online for a
-     * node to enter maintenance. Currently, only used for EC containers. We
-     * need to consider removing the "maintenance.replica.minimum" setting
-     * and having both Ratis and EC use this new one.
-     */
-    @Config(key = "maintenance.remaining.redundancy",
-        type = ConfigType.INT,
-        defaultValue = "1",
-        tags = {SCM, OZONE},
-        description = "The number of redundant containers in a group which" +
-            " must be available for a node to enter maintenance. If putting" +
-            " a node into maintenance reduces the redundancy below this value" +
-            " , the node will remain in the ENTERING_MAINTENANCE state until" +
-            " a new replica is created. For Ratis containers, the default" +
-            " value of 1 ensures at least two replicas are online, meaning 1" +
-            " more can be lost without data becoming unavailable. For any EC" +
-            " container it will have at least dataNum + 1 online, allowing" +
-            " the loss of 1 more replica before data becomes unavailable." +
-            " Currently only EC containers use this setting. Ratis containers" +
-            " use hdds.scm.replication.maintenance.replica.minimum. For EC," +
-            " if nodes are in maintenance, it is likely reconstruction reads" +
-            " will be required if some of the data replicas are offline. This" +
-            " is seamless to the client, but will affect read performance."
-    )
-    private int maintenanceRemainingRedundancy = 1;
-
-    public void setMaintenanceRemainingRedundancy(int redundancy) {
-      this.maintenanceRemainingRedundancy = redundancy;
-    }
-
-    public int getMaintenanceRemainingRedundancy() {
-      return maintenanceRemainingRedundancy;
-    }
-
-    public long getInterval() {
-      return interval;
-    }
-
-    public long getUnderReplicatedInterval() {
-      return underReplicatedInterval;
-    }
-
-    public void setUnderReplicatedInterval(Duration duration) {
-      this.underReplicatedInterval = duration.toMillis();
-    }
-
-    public void setOverReplicatedInterval(Duration duration) {
-      this.overReplicatedInterval = duration.toMillis();
-    }
-
-    public long getOverReplicatedInterval() {
-      return overReplicatedInterval;
-    }
-
-    public long getEventTimeout() {
-      return eventTimeout;
-    }
-
-    public int getMaintenanceReplicaMinimum() {
-      return maintenanceReplicaMinimum;
     }
   }
 

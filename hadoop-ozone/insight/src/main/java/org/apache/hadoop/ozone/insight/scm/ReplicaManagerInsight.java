@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManagerConfiguration;
 import org.apache.hadoop.ozone.insight.BaseInsightPoint;
 import org.apache.hadoop.ozone.insight.Component.Type;
 import org.apache.hadoop.ozone.insight.LoggerSource;
@@ -50,7 +51,7 @@ public class ReplicaManagerInsight extends BaseInsightPoint {
   @Override
   public List<Class> getConfigurationClasses() {
     List<Class> result = new ArrayList<>();
-    result.add(ReplicationManager.ReplicationManagerConfiguration.class);
+    result.add(ReplicationManagerConfiguration.class);
     return result;
   }
 
