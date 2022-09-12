@@ -44,6 +44,13 @@ public interface HealthCheck {
    */
   boolean handleChain(ContainerCheckRequest request);
 
+  /**
+   * Add a subsequent HealthCheck that will be tried only if the current check
+   * returns false. This allows handlers to be chained together, and each will
+   * be tried in turn until one succeeds.
+   * @param handler
+   * @return
+   */
   HealthCheck addNext(HealthCheck handler);
 
 }
