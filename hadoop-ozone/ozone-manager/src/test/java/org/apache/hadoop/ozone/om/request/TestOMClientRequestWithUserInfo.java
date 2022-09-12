@@ -95,7 +95,7 @@ public class TestOMClientRequestWithUserInfo {
     String volumeName = UUID.randomUUID().toString();
     OzoneManagerProtocolProtos.OMRequest omRequest =
         OMRequestTestUtils.createBucketRequest(bucketName, volumeName, true,
-            OzoneManagerProtocolProtos.StorageTypeProto.DISK);
+            OzoneManagerProtocolProtos.StorageTypeProto.DISK, 0);
 
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(omRequest);

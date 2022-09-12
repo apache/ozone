@@ -469,7 +469,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
 
     OzoneManagerProtocolProtos.OMRequest omRequest =
         OMRequestTestUtils.createBucketRequest(bucketName, volumeName, false,
-            OzoneManagerProtocolProtos.StorageTypeProto.DISK);
+            OzoneManagerProtocolProtos.StorageTypeProto.DISK, 0);
 
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(omRequest);

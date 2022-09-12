@@ -76,7 +76,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     String bucketName = UUID.randomUUID().toString();
 
     OMRequest originalRequest = OMRequestTestUtils.createBucketRequest(
-        bucketName, volumeName, false, StorageTypeProto.SSD);
+        bucketName, volumeName, false, StorageTypeProto.SSD, 0);
 
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(originalRequest);
@@ -145,7 +145,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     addCreateVolumeToTable(volumeName, omMetadataManager);
     OMRequest originalRequest =
         OMRequestTestUtils.createBucketRequest(bucketName, volumeName, false,
-            StorageTypeProto.SSD);
+            StorageTypeProto.SSD, 0);
 
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(originalRequest);

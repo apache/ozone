@@ -632,6 +632,10 @@ public class RpcClient implements ClientProtocol {
     StorageType storageType = bucketArgs.getStorageType() == null ?
         StorageType.DEFAULT : bucketArgs.getStorageType();
     BucketLayout bucketLayout = bucketArgs.getBucketLayout();
+    if (bucketLayout == null) {
+      bucketLayout = BucketLayout
+          .fromString(conf.get(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT));
+    }
     BucketEncryptionKeyInfo bek = null;
     if (bucketArgs.getEncryptionKey() != null) {
       bek = new BucketEncryptionKeyInfo.Builder()
