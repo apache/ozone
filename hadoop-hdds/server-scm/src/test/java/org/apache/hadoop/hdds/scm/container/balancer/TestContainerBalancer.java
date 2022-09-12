@@ -30,15 +30,16 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
-import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager.MoveResult;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager.MoveResult;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
@@ -779,7 +780,44 @@ public class TestContainerBalancer {
         .getNumContainerMovesTimeoutInLatestIteration() > 0);
     stopBalancer();
   }
-  
+
+  @Test
+  public void checkIterationResultException()
+      throws NodeNotFoundException, IOException,
+      IllegalContainerBalancerStateException,
+      InvalidContainerBalancerConfigurationException,
+      TimeoutException {
+
+    Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
+            Mockito.any(DatanodeDetails.class),
+            Mockito.any(DatanodeDetails.class)))
+        .thenThrow(new ContainerNotFoundException("Test Container not found"),
+            new NodeNotFoundException("Test Node not found"))
+        .thenReturn(genCompletableFuture(2000));
+
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setIterations(1);
+    balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    balancerConfiguration.setMoveTimeout(Duration.ofMillis(1000));
+
+    startBalancer(balancerConfiguration);
+    sleepWhileBalancing(2000);
+
+    /*
+    Immediate failure count is 2 and timeout count is 4 together
+     */
+    Assertions.assertEquals(
+        ContainerBalancer.IterationResult.ITERATION_COMPLETED,
+        containerBalancer.getIterationResult());
+    Assertions.assertEquals(6,
+        containerBalancer.getMetrics()
+            .getNumContainerMovesFailed());
+    stopBalancer();
+
+  }
+
   @Test
   public void testStartAndImmediateStopForDeadlock()
       throws IllegalContainerBalancerStateException, IOException,
@@ -999,5 +1037,4 @@ public class TestContainerBalancer {
       return LegacyReplicationManager.MoveResult.COMPLETED;
     });
   }
-
 }

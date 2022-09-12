@@ -529,6 +529,7 @@ public class ContainerBalancer extends StatefulService {
       allFuturesResult.get(config.getMoveTimeout().toMillis(),
           TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
+      metrics.incrementNumContainerMovesFailed(1);
       Thread.currentThread().interrupt();
     } catch (TimeoutException e) {
       long timeoutCounts = moveSelectionToFutureMap.entrySet().stream()
@@ -544,8 +545,10 @@ public class ContainerBalancer extends StatefulService {
           }).count();
       LOG.warn("{} Container moves are canceled.", timeoutCounts);
       metrics.incrementNumContainerMovesTimeoutInLatestIteration(timeoutCounts);
+      metrics.incrementNumContainerMovesFailed(timeoutCounts);
     } catch (ExecutionException e) {
       LOG.error("Got exception while checkIterationMoveResults", e);
+      metrics.incrementNumContainerMovesFailed(moveSelectionToFutureMap.size());
     }
 
     countDatanodesInvolvedPerIteration =
@@ -690,14 +693,17 @@ public class ContainerBalancer extends StatefulService {
     } catch (ContainerNotFoundException e) {
       LOG.warn("Could not find Container {} for container move",
           containerID, e);
+      metrics.incrementNumContainerMovesFailed(1);
       return false;
     } catch (NodeNotFoundException | TimeoutException e) {
       LOG.warn("Container move failed for container {}", containerID, e);
+      metrics.incrementNumContainerMovesFailed(1);
       return false;
     }
 
     if (future.isDone()) {
       if (future.isCompletedExceptionally()) {
+        metrics.incrementNumContainerMovesFailed(1);
         return false;
       } else {
         LegacyReplicationManager.MoveResult result = future.join();

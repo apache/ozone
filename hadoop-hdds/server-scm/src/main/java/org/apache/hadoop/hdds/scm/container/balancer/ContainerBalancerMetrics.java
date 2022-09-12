@@ -74,6 +74,10 @@ public final class ContainerBalancerMetrics {
       "Container Balancer.")
   private MutableCounterLong dataSizeMovedGB;
 
+  @Metric(about = "Total number container for which moves failed " +
+      "exceptionally across all iterations of Container Balancer.")
+  private MutableCounterLong numContainerMovesFailed;
+
   /**
    * Create and register metrics named {@link ContainerBalancerMetrics#NAME}
    * for {@link ContainerBalancer}.
@@ -266,5 +270,13 @@ public final class ContainerBalancerMetrics {
 
   public void incrementDataSizeMovedGB(long valueToAdd) {
     dataSizeMovedGB.incr(valueToAdd);
+  }
+
+  public long getNumContainerMovesFailed() {
+    return numContainerMovesFailed.value();
+  }
+
+  public void incrementNumContainerMovesFailed(long valueToAdd) {
+    numContainerMovesFailed.incr(valueToAdd);
   }
 }
