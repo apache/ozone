@@ -61,6 +61,13 @@ public class TestOMBucketCreateRequestWithFSO
         omMetadataManager.getBucketTable().get(bucketKey).getBucketLayout());
   }
 
+  /**
+   * Gets the bucket layout from the ozone configuration and
+   * creates a bucket request using the latest client version.
+   * Checking that the configuration layout is the same with
+   * the one used for the request.
+   * @throws Exception
+   */
   @Test
   public void testValidateAndUpdateCacheVerifyBucketLayoutWithFSO()
       throws Exception {
@@ -151,8 +158,6 @@ public class TestOMBucketCreateRequestWithFSO
     // verify table data with actual request data.
     OmBucketInfo bucketInfoFromProto = OmBucketInfo.getFromProtobuf(
         modifiedRequest.getCreateBucketRequest().getBucketInfo(), bucketLayout);
-
-    bucketInfoFromProto.getBucketLayout();
 
     Assert.assertEquals(bucketInfoFromProto.getCreationTime(),
         dbBucketInfo.getCreationTime());
