@@ -189,30 +189,29 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
     try {
-      // reinit Recon RocksDB's namespace CF.
-      getReconNamespaceSummaryManager().clearNSSummaryTable();
+      Table<String, OmKeyInfo> keyTable =
+          omMetadataManager.getKeyTable(BUCKET_LAYOUT);
 
-      Table keyTable = omMetadataManager.getKeyTable(BUCKET_LAYOUT);
+      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+          keyTableIter = keyTable.iterator()) {
 
-      TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-          keyTableIter = keyTable.iterator();
+        while (keyTableIter.hasNext()) {
+          Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
+          OmKeyInfo keyInfo = kv.getValue();
 
-      while (keyTableIter.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
-        OmKeyInfo keyInfo = kv.getValue();
+          setKeyParentID(keyInfo);
 
-        setKeyParentID(keyInfo);
-
-        if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
-          OmDirectoryInfo directoryInfo =
-              new OmDirectoryInfo.Builder()
-                  .setName(keyInfo.getKeyName())
-                  .setObjectID(keyInfo.getObjectID())
-                  .setParentObjectID(keyInfo.getParentObjectID())
-                  .build();
-          handlePutDirEvent(directoryInfo, nsSummaryMap);
-        } else {
-          handlePutKeyEvent(keyInfo, nsSummaryMap);
+          if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
+            OmDirectoryInfo directoryInfo =
+                new OmDirectoryInfo.Builder()
+                    .setName(keyInfo.getKeyName())
+                    .setObjectID(keyInfo.getObjectID())
+                    .setParentObjectID(keyInfo.getParentObjectID())
+                    .build();
+            handlePutDirEvent(directoryInfo, nsSummaryMap);
+          } else {
+            handlePutKeyEvent(keyInfo, nsSummaryMap);
+          }
         }
       }
     } catch (IOException ioEx) {
