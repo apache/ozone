@@ -247,7 +247,7 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
                 }, [])}
                 loading={activeLoading} pagination={paginationConfig} rowKey='pipelineId'/>
             </TabPane>
-            <TabPane key='2' tab='Inactive'/>
+
           </Tabs>
         </div>
       </div>
