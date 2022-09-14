@@ -343,7 +343,8 @@ public class ObjectEndpoint extends EndpointBase {
           }
         };
         responseBuilder = Response
-            .ok(output)
+            .status(Status.PARTIAL_CONTENT)
+            .entity(output)
             .header(CONTENT_LENGTH, copyLength);
 
         String contentRangeVal = RANGE_HEADER_SUPPORTED_UNIT + " " +

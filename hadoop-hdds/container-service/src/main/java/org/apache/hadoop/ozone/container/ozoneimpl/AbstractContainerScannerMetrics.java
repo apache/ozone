@@ -7,13 +7,15 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ *
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
@@ -21,17 +23,15 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterInt;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 
 /**
- * This class captures the container meta-data scrubber metrics on the
- * data-node.
- **/
+ * Base class for container scanner metrics.
+ */
 @InterfaceAudience.Private
-@Metrics(about = "DataNode container data scrubber metrics", context = "dfs")
-public final class ContainerMetadataScrubberMetrics {
+@Metrics(about = "Datanode container scanner metrics", context = "dfs")
+public abstract class AbstractContainerScannerMetrics {
 
   private final String name;
   private final MetricsSystem ms;
@@ -42,6 +42,11 @@ public final class ContainerMetadataScrubberMetrics {
   private MutableGaugeInt numUnHealthyContainers;
   @Metric("number of iterations of scanner completed since the restart")
   private MutableCounterInt numScanIterations;
+
+  public AbstractContainerScannerMetrics(String name, MetricsSystem ms) {
+    this.name = name;
+    this.ms = ms;
+  }
 
   public int getNumContainersScanned() {
     return numContainersScanned.value();
@@ -82,17 +87,4 @@ public final class ContainerMetadataScrubberMetrics {
   public String getName() {
     return name;
   }
-
-  private ContainerMetadataScrubberMetrics(String name, MetricsSystem ms) {
-    this.name = name;
-    this.ms = ms;
-  }
-
-  public static ContainerMetadataScrubberMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    String name = "ContainerMetadataScrubberMetrics";
-    return ms.register(name, null,
-        new ContainerMetadataScrubberMetrics(name, ms));
-  }
-
 }

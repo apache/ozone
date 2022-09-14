@@ -44,6 +44,7 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.mockito.Mockito.doReturn;
 
 /**
@@ -170,6 +171,43 @@ public class TestObjectGet {
         response.getHeaderString("Content-Disposition"));
     Assert.assertEquals(CONTENT_ENCODING2,
         response.getHeaderString("Content-Encoding"));
+  }
+
+  @Test
+  public void getRangeHeader() throws IOException, OS3Exception {
+    Response response;
+    Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-0");
+    body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+
+    response = rest.get("b1", "key1", null, 0, null, body);
+    Assert.assertEquals("1", response.getHeaderString("Content-Length"));
+    Assert.assertEquals(String.format("bytes 0-0/%s", CONTENT.length()),
+        response.getHeaderString("Content-Range"));
+
+    Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-");
+    response = rest.get("b1", "key1", null, 0, null, body);
+    Assert.assertEquals(String.valueOf(CONTENT.length()),
+        response.getHeaderString("Content-Length"));
+    Assert.assertEquals(
+        String.format("bytes 0-%s/%s", CONTENT.length() - 1, CONTENT.length()),
+        response.getHeaderString("Content-Range"));
+  }
+
+  @Test
+  public void getStatusCode() throws IOException, OS3Exception {
+    Response response;
+    body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    response = rest.get("b1", "key1", null, 0, null, body);
+    Assert.assertEquals(response.getStatus(),
+        Response.Status.OK.getStatusCode());
+
+    // https://www.rfc-editor.org/rfc/rfc7233#section-4.1
+    // The 206 (Partial Content) status code indicates that the server is
+    //   successfully fulfilling a range request for the target resource
+    Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-1");
+    response = rest.get("b1", "key1", null, 0, null, body);
+    Assert.assertEquals(response.getStatus(),
+        Response.Status.PARTIAL_CONTENT.getStatusCode());
   }
 
   private void setDefaultHeader() {
