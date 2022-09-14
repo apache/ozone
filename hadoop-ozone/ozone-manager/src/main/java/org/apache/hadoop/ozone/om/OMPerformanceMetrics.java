@@ -41,51 +41,52 @@ public class OMPerformanceMetrics {
   }
 
   @Metric(about = "Overall lookupKey in nanoseconds")
-  private MutableRate lookupKeyLatencyNs;
+  private MutableRate lookupLatencyNs;
 
   @Metric(about = "Read key info from meta in nanoseconds")
-  private MutableRate readKeyInfoLatencyNs;
+  private MutableRate lookupReadKeyInfoLatencyNs;
 
   @Metric(about = "Block token generation latency in nanoseconds")
-  private MutableRate generateBlockTokenLatencyNs;
+  private MutableRate lookupGenerateBlockTokenLatencyNs;
 
   @Metric(about = "Refresh location nanoseconds")
-  private MutableRate refreshContainerLocationLatencyNs;
+  private MutableRate lookupRefreshLocationLatencyNs;
 
   @Metric(about = "ACLs check nanoseconds")
-  private MutableRate aclCheckLatencyNs;
+  private MutableRate lookupAclCheckLatencyNs;
+
+  @Metric(about = "resolveBucketLink latency nanoseconds")
+  private MutableRate lookupResolveBucketLatencyNs;
 
   @Metric(about = "s3VolumeInfo latency nanoseconds")
   private MutableRate s3VolumeContextLatencyNs;
 
-  @Metric(about = "resolveBucketLink latency nanoseconds")
-  private MutableRate resolveBucketLinkLatencyNs;
 
-  public void addLookupKeyLatency(long latencyInNs) {
-    lookupKeyLatencyNs.add(latencyInNs);
+  public void addLookupLatency(long latencyInNs) {
+    lookupLatencyNs.add(latencyInNs);
   }
 
-  public void addBlockTokenLatency(long latencyInNs) {
-    blockTokenLatencyNs.add(latencyInNs);
+  public void addLookupGenerateBlockTokenLatency(long latencyInNs) {
+    lookupGenerateBlockTokenLatencyNs.add(latencyInNs);
   }
 
-  public void addRefreshLatency(long latencyInNs) {
-    refreshLatencyNs.add(latencyInNs);
+  public void addLookupRefreshLocationLatency(long latencyInNs) {
+    lookupRefreshLocationLatencyNs.add(latencyInNs);
   }
 
-  public void addAckCheckLatency(long latencyInNs) {
-    aclCheckLatencyNs.add(latencyInNs);
+  public void addLookupAclCheckLatency(long latencyInNs) {
+    lookupAclCheckLatencyNs.add(latencyInNs);
   }
 
-  public void addReadKeyInfoLatency(long latencyInNs) {
-    readKeyInfoLatencyNs.add(latencyInNs);
+  public void addLookupReadKeyInfoLatency(long latencyInNs) {
+    lookupReadKeyInfoLatencyNs.add(latencyInNs);
   }
 
   public void addS3VolumeContextLatencyNs(long latencyInNs) {
     s3VolumeContextLatencyNs.add(latencyInNs);
   }
 
-  public void addResolveBucketLinkLatencyNs(long latencyInNs) {
-    resolveBucketLinkLatencyNs.add(latencyInNs);
+  public void addLookupResolveBucketLatencyNs(long latencyInNs) {
+    lookupResolveBucketLatencyNs.add(latencyInNs);
   }
 }

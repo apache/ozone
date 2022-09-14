@@ -397,7 +397,7 @@ public class KeyManagerImpl implements KeyManager {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
-    metrics.addReadKeyInfoLatency(Time.monotonicNowNanos() - start);
+    metrics.addLookupReadKeyInfoLatency(Time.monotonicNowNanos() - start);
 
     if (value == null) {
       if (LOG.isDebugEnabled()) {
@@ -417,12 +417,17 @@ public class KeyManagerImpl implements KeyManager {
     if (!args.isHeadOp()) {
 
       // add block token for read.
+      start = Time.monotonicNowNanos();
       addBlockToken4Read(value);
+      metrics.addLookupGenerateBlockTokenLatency(
+          Time.monotonicNowNanos() - start);
 
       // Refresh container pipeline info from SCM
       // based on OmKeyArgs.refreshPipeline flag
       // value won't be null as the check is done inside try/catch block.
+      start = Time.monotonicNowNanos();
       refresh(value);
+      metrics.addLookupRefreshLocationLatency(Time.monotonicNowNanos() - start);
 
       if (args.getSortDatanodes()) {
         sortDatanodes(clientAddress, value);
@@ -468,7 +473,6 @@ public class KeyManagerImpl implements KeyManager {
   private void addBlockToken4Read(OmKeyInfo value) throws IOException {
     Preconditions.checkNotNull(value, "OMKeyInfo cannot be null");
     if (grpcBlockTokenEnabled) {
-      long start = Time.monotonicNowNanos();
       String remoteUser = getRemoteUser().getShortUserName();
       for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
         key.getLocationList().forEach(k -> {
@@ -476,7 +480,6 @@ public class KeyManagerImpl implements KeyManager {
               EnumSet.of(READ), k.getLength()));
         });
       }
-      metrics.addBlockTokenLatency(Time.monotonicNowNanos() - start);
     }
   }
   /**
@@ -485,7 +488,6 @@ public class KeyManagerImpl implements KeyManager {
    */
   @VisibleForTesting
   protected void refreshPipeline(List<OmKeyInfo> keyList) throws IOException {
-    long start = Time.monotonicNowNanos();
     if (keyList == null || keyList.isEmpty()) {
       return;
     }
@@ -525,8 +527,6 @@ public class KeyManagerImpl implements KeyManager {
         }
       }
     }
-    long take = Time.monotonicNowNanos() - start;
-    metrics.addRefreshLatency(take);
   }
 
   /**

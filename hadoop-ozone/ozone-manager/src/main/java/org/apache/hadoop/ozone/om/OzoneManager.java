@@ -2376,7 +2376,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void checkAcls(ResourceType resType, StoreType store,
       ACLType acl, String vol, String bucket, String key)
       throws IOException {
-    long start = Time.monotonicNowNanos();
     UserGroupInformation user;
     if (getS3Auth() != null) {
       String principal =
@@ -2395,7 +2394,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         user != null ? user : getRemoteUser(),
         remoteIp != null ? remoteIp : omRpcAddress.getAddress(),
         remoteIp != null ? remoteIp.getHostName() : omRpcAddress.getHostName());
-    perfMetrics.addAckCheckLatency(Time.monotonicNowNanos() - start);
   }
 
   private boolean isOwner(UserGroupInformation callerUgi, String ownerName) {
@@ -2812,12 +2810,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
-    long startTime = Time.monotonicNowNanos();
+    long start = Time.monotonicNowNanos();
     ResolvedBucket bucket = resolveBucketLink(args);
+    perfMetrics.addLookupResolveBucketLatencyNs(
+        Time.monotonicNowNanos() - start);
 
     if (isAclEnabled) {
+      long startAcl = Time.monotonicNowNanos();
       checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
           bucket.realVolume(), bucket.realBucket(), args.getKeyName());
+      perfMetrics.addLookupAclCheckLatency(Time.monotonicNowNanos() - startAcl);
     }
 
     boolean auditSuccess = true;
@@ -2840,7 +2842,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             auditMap));
       }
 
-      perfMetrics.addLookupKeyLatency(Time.monotonicNowNanos() - startTime);
+      perfMetrics.addLookupLatency(Time.monotonicNowNanos() - start);
     }
   }
 
@@ -4156,7 +4158,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public ResolvedBucket resolveBucketLink(Pair<String, String> requested)
       throws IOException {
-    long start = Time.monotonicNowNanos();
     Pair<String, String> resolved;
     if (isAclEnabled) {
       UserGroupInformation ugi = getRemoteUser();
@@ -4174,8 +4175,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       resolved = resolveBucketLink(requested, new HashSet<>(),
           null, null, null);
     }
-    perfMetrics.addResolveBucketLinkLatencyNs(
-        Time.monotonicNowNanos() - start);
     return new ResolvedBucket(requested, resolved);
   }
 
