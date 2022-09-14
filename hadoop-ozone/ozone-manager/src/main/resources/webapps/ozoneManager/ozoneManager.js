@@ -128,14 +128,13 @@
             $http.get("jmx?qry=ratis:name=ratis.leader_election.*lastLeaderElectionElapsedTime")
                 .then(function (result) {
                     ctrl.elapsedTime = result.data.beans[0];
-                    ctrl.elapsedTime.Value = convertMsToTime(ctrl.elapsedTime.Value);
+                    if(ctrl.elapsedTime.Value != -1){
+                        ctrl.elapsedTime.Value = convertMsToTime(ctrl.elapsedTime.Value);
+                    }
                 });
         }
     });
         function convertMsToTime(ms) {
-          if(ms == -1){
-            return "";
-          }
           let seconds = (ms / 1000).toFixed(1);
           let minutes = (ms / (1000 * 60)).toFixed(1);
           let hours = (ms / (1000 * 60 * 60)).toFixed(1);

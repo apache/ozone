@@ -815,7 +815,7 @@ public final class OmUtils {
     }
     // Print Stand-alone if only one OM exists
     if (count == 1) {
-      return "Not Applicable";
+      return "STANDALONE";
     } else {
       return sb.toString();
     }
