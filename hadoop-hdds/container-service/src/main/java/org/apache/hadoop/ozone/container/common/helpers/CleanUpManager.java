@@ -51,10 +51,10 @@ public class CleanUpManager {
   private static final String TMP_DELETE_SERVICE_DIR =
       FILE_SEPARATOR + "tmp" + FILE_SEPARATOR + "container_delete_service";
 
-  private Path tmpDirPath;
+  private final Path tmpDirPath;
 
   public CleanUpManager(HddsVolume hddsVolume) {
-    setTmpDirPath(hddsVolume);
+    this.tmpDirPath = setTmpDirPath(hddsVolume);
 
     if (Files.notExists(tmpDirPath)) {
       try {
@@ -81,7 +81,7 @@ public class CleanUpManager {
         .isFinalizedAndEnabled(config);
   }
 
-  private void setTmpDirPath(HddsVolume hddsVolume) {
+  private Path setTmpDirPath(HddsVolume hddsVolume) {
     StringBuilder stringBuilder = new StringBuilder();
 
     // HddsVolume root directory path
@@ -117,7 +117,7 @@ public class CleanUpManager {
     stringBuilder.append(TMP_DELETE_SERVICE_DIR);
 
     String tmpPath = stringBuilder.toString();
-    this.tmpDirPath = Paths.get(tmpPath);
+    return Paths.get(tmpPath);
   }
 
   /**
