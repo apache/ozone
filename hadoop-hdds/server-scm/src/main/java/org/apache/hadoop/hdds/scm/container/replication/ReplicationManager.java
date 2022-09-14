@@ -212,8 +212,8 @@ public class ReplicationManager implements SCMService {
     // Chain together the series of checks that are needed to validate the
     // containers when they are checked by RM.
     containerCheckChain = new OpenContainerHandler(this);
-    containerCheckChain.addNext(new ClosedWithMismatchedReplicasHandler(this));
-    containerCheckChain.addNext(ecReplicationCheckHandler);
+    containerCheckChain.addNext(new ClosedWithMismatchedReplicasHandler(this))
+        .addNext(ecReplicationCheckHandler);
     start();
   }
 
