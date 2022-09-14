@@ -54,7 +54,7 @@ public class FreonReplicationOptions extends ReplicationOptions {
   @Option(names = {"--type", "--replication-type"},
       description = "Replication type. Supported types are: RATIS, EC")
   @Override
-  public void setType(ReplicationType type) {
+  public void setType(String type) {
     super.setType(type);
   }
 
