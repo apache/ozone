@@ -24,7 +24,7 @@
     </tr>
     <tr>
         <td>OM Roles (HA)	</td>
-        <td>{{$ctrl.overview.jmx.OmRatisRoles}}</td>
+        <td>{{$ctrl.overview.jmx.RatisRoles}}</td>
     </tr>
     <tr>
         <td>Current-Role</td>
@@ -33,6 +33,14 @@
     <tr>
         <td>Group-Id</td>
         <td>{{$ctrl.role.GroupId}}</td>
+    </tr>
+    <tr ng-hide="!$ctrl.electionCount.Count">
+        <td>Election-Count</td>
+        <td>{{$ctrl.electionCount.Count}}</td>
+    </tr>
+    <tr ng-hide="!$ctrl.elapsedTime.Value">
+        <td>Last Election Elapsed Time</td>
+        <td>{{$ctrl.elapsedTime.Value}}</td>
     </tr>
     </tbody>
 </table>

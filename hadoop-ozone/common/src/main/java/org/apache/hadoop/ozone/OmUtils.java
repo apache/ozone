@@ -798,8 +798,10 @@ public final class OmUtils {
     int count = 0;
     for (ServiceInfo info : nodes) {
       // Printing only the OM's running
-      String role = info.getHostname().equals(leaderId) ? "LEADER" : "FOLLOWER";
       if (info.getNodeType() == HddsProtos.NodeType.OM) {
+        String role =
+            info.getOmRoleInfo().getNodeId().equals(leaderId) ? "LEADER" :
+                "FOLLOWER";
         sb.append(
             String.format(
                 " { HostName: %s | Node-Id: %s | Ratis-Port : %d | Role: %s} ",
@@ -813,7 +815,7 @@ public final class OmUtils {
     }
     // Print Stand-alone if only one OM exists
     if (count == 1) {
-      return "STANDALONE";
+      return "Not Applicable";
     } else {
       return sb.toString();
     }
