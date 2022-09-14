@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
@@ -57,15 +58,15 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ECUnderReplicationHandler.class);
-  private final ECContainerHealthCheck ecContainerHealthCheck =
-      new ECContainerHealthCheck();
+  private final ECReplicationCheckHandler ecReplicationCheck;
   private final PlacementPolicy containerPlacement;
   private final long currentContainerSize;
   private final NodeManager nodeManager;
 
-  public ECUnderReplicationHandler(
+  public ECUnderReplicationHandler(ECReplicationCheckHandler ecReplicationCheck,
       final PlacementPolicy containerPlacement, final ConfigurationSource conf,
-      NodeManager nodeManager) {
+                                   NodeManager nodeManager) {
+    this.ecReplicationCheck = ecReplicationCheck;
     this.containerPlacement = containerPlacement;
     this.currentContainerSize = (long) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
@@ -102,9 +103,15 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         new ECContainerReplicaCount(container, replicas, pendingOps,
             remainingMaintenanceRedundancy);
 
-    ContainerHealthResult currentUnderRepRes = ecContainerHealthCheck
-        .checkHealth(container, replicas, pendingOps,
-            remainingMaintenanceRedundancy);
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setContainerInfo(container)
+        .setContainerReplicas(replicas)
+        .setPendingOps(pendingOps)
+        .setMaintenanceRedundancy(remainingMaintenanceRedundancy)
+        .build();
+
+    ContainerHealthResult currentUnderRepRes = ecReplicationCheck
+        .checkHealth(request);
 
     LOG.debug("Handling under-replicated EC container: {}", container);
     if (currentUnderRepRes

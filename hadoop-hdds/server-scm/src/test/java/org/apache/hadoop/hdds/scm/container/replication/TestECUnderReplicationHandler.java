@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
@@ -68,6 +69,7 @@ public class TestECUnderReplicationHandler {
   private PlacementPolicy policy;
   private static final int DATA = 3;
   private static final int PARITY = 2;
+  private ECReplicationCheckHandler replicationCheck;
 
   @BeforeEach
   public void setup() {
@@ -87,6 +89,7 @@ public class TestECUnderReplicationHandler {
     NodeSchema[] schemas =
         new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
+    replicationCheck = new ECReplicationCheckHandler();
   }
 
   @Test
@@ -260,7 +263,8 @@ public class TestECUnderReplicationHandler {
       int decomIndexes, int maintenanceIndexes,
       PlacementPolicy placementPolicy) throws IOException {
     ECUnderReplicationHandler ecURH =
-        new ECUnderReplicationHandler(placementPolicy, conf, nodeManager);
+        new ECUnderReplicationHandler(replicationCheck,
+            placementPolicy, conf, nodeManager);
     ContainerHealthResult.UnderReplicatedHealthResult result =
         Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
     Mockito.when(result.isUnrecoverable()).thenReturn(false);
