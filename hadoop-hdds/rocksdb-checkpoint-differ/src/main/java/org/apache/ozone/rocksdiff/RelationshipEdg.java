@@ -7,8 +7,7 @@ package org.apache.rocksdiff;
 //class RelationshipEdge extends DefaultEdge {
 class RelationshipEdge {
   //@Override
-  public String toString()
-  {
+  public String toString() {
     return "";
   }
 }

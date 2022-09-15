@@ -24,6 +24,7 @@ import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
 
+////CHECKSTYLE:OFF
 public class TestRocksDBCheckpointDiffer {
 
   private static final String dbPath   = "./rocksdb-data";
@@ -86,7 +87,8 @@ public class TestRocksDBCheckpointDiffer {
       String keyStr = " My" + array + "StringKey" + i;
       String valueStr = " My " + array + "StringValue" + i;
       byte[] key = keyStr.getBytes();
-      rocksDB.put(keyStr.getBytes(StandardCharsets.UTF_8), valueStr.getBytes(StandardCharsets.UTF_8));
+      rocksDB.put(keyStr.getBytes(StandardCharsets.UTF_8),
+          valueStr.getBytes(StandardCharsets.UTF_8));
       if (i % SNAPSHOT_EVERY_SO_MANY_KEYS == 0) {
         differ.createSnapshot(rocksDB);
       }
@@ -101,7 +103,8 @@ public class TestRocksDBCheckpointDiffer {
     System.out.println("Updating RocksDB instance at :" + dbPathArg);
     //
     try (final Options options =
-             new Options().setCreateIfMissing(true).setCompressionType(CompressionType.NO_COMPRESSION)) {
+             new Options().setCreateIfMissing(true).
+                 setCompressionType(CompressionType.NO_COMPRESSION)) {
       if (rocksDB == null) {
         rocksDB = RocksDB.open(options, dbPathArg);
       }
@@ -112,7 +115,8 @@ public class TestRocksDBCheckpointDiffer {
         String keyStr = " MyUpdated" + array + "StringKey" + i;
         String valueStr = " My Updated" + array + "StringValue" + i;
         byte[] key = keyStr.getBytes();
-        rocksDB.put(keyStr.getBytes(StandardCharsets.UTF_8), valueStr.getBytes(StandardCharsets.UTF_8));
+        rocksDB.put(keyStr.getBytes(StandardCharsets.UTF_8),
+            valueStr.getBytes(StandardCharsets.UTF_8));
         System.out.println(new String(rocksDB.get(key)));
       }
     } catch (RocksDBException e) {
@@ -135,16 +139,19 @@ public class TestRocksDBCheckpointDiffer {
         rocksDB.put("SecondKey".getBytes(), "SecondValue".getBytes());
 
         // List
-        List<byte[]> keys = Arrays.asList(key, "SecondKey".getBytes(), "missKey".getBytes());
+        List<byte[]> keys = Arrays.asList(key, "SecondKey".getBytes(),
+            "missKey".getBytes());
         List<byte[]> values = rocksDB.multiGetAsList(keys);
         for (int i = 0; i < keys.size(); i++) {
-          System.out.println("multiGet " + new String(keys.get(i)) + ":" + (values.get(i) != null ? new String(values.get(i)) : null));
+          System.out.println("multiGet " + new String(keys.get(i)) + ":" +
+              (values.get(i) != null ? new String(values.get(i)) : null));
         }
 
         // [key - value]
         RocksIterator iter = rocksDB.newIterator();
         for (iter.seekToFirst(); iter.isValid(); iter.next()) {
-          System.out.println("iterator key:" + new String(iter.key()) + ", iter value:" + new String(iter.value()));
+          System.out.println("iterator key:" + new String(iter.key()) + ", " +
+              "iter value:" + new String(iter.value()));
         }
 
         // key
@@ -153,7 +160,8 @@ public class TestRocksDBCheckpointDiffer {
 
         iter = rocksDB.newIterator();
         for (iter.seekToFirst(); iter.isValid(); iter.next()) {
-          System.out.println("iterator key:" + new String(iter.key()) + ", iter value:" + new String(iter.value()));
+          System.out.println("iterator key:" + new String(iter.key()) + ", " +
+              "iter value:" + new String(iter.value()));
         }
       }
     } catch (RocksDBException e) {
@@ -164,17 +172,21 @@ public class TestRocksDBCheckpointDiffer {
   // (table)
   public void testCertainColumnFamily() {
     System.out.println("\ntestCertainColumnFamily begin...");
-    try (final ColumnFamilyOptions cfOpts = new ColumnFamilyOptions().optimizeUniversalStyleCompaction()) {
+    try (final ColumnFamilyOptions cfOpts =
+             new ColumnFamilyOptions().optimizeUniversalStyleCompaction()) {
       String cfName = "my-first-columnfamily";
-      // list of column family descriptors, first entry must always be default column family
+      // list of column family descriptors, first entry must always be
+      // default column family
       final List<ColumnFamilyDescriptor> cfDescriptors = Arrays.asList(
           new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOpts),
           new ColumnFamilyDescriptor(cfName.getBytes(), cfOpts)
       );
 
       List<ColumnFamilyHandle> cfHandles = new ArrayList<>();
-      try (final DBOptions dbOptions = new DBOptions().setCreateIfMissing(true).setCreateMissingColumnFamilies(true);
-           final RocksDB rocksDB = RocksDB.open(dbOptions, "./rocksdb-data-cf/", cfDescriptors, cfHandles)) {
+      try (final DBOptions dbOptions = new DBOptions().setCreateIfMissing(true).
+          setCreateMissingColumnFamilies(true);
+           final RocksDB rocksDB = RocksDB.open(dbOptions, "./rocksdb-data-cf" +
+               "/", cfDescriptors, cfHandles)) {
         ColumnFamilyHandle cfHandle = cfHandles.stream().filter(x -> {
           try {
             return (new String(x.getName())).equals(cfName);
@@ -193,22 +205,26 @@ public class TestRocksDBCheckpointDiffer {
         rocksDB.put(cfHandles.get(1), "SecondKey".getBytes(),
             "SecondValue".getBytes());
 
-        List<byte[]> keys = Arrays.asList(key.getBytes(), "SecondKey".getBytes());
-        List<ColumnFamilyHandle> cfHandleList = Arrays.asList(cfHandle, cfHandle);
+        List<byte[]> keys = Arrays.asList(key.getBytes(),
+            "SecondKey".getBytes());
+        List<ColumnFamilyHandle> cfHandleList = Arrays.asList(cfHandle,
+            cfHandle);
         // key
         List<byte[]> values = rocksDB.multiGetAsList(cfHandleList, keys);
         for (int i = 0; i < keys.size(); i++) {
-          System.out.println("multiGet:" + new String(keys.get(i)) + "--" + (values.get(i) == null ? null : new String(values.get(i))));
+          System.out.println("multiGet:" + new String(keys.get(i)) + "--" +
+              (values.get(i) == null ? null : new String(values.get(i))));
         }
         //rocksDB.compactRange();
         //rocksDB.compactFiles();
-        List<LiveFileMetaData> liveFileMetaDataList = rocksDB.getLiveFilesMetaData();
+        List<LiveFileMetaData> liveFileMetaDataList =
+            rocksDB.getLiveFilesMetaData();
         for (LiveFileMetaData m : liveFileMetaDataList) {
           System.out.println("Live File Metadata");
           System.out.println("\tFile :" + m.fileName());
           System.out.println("\ttable :" + new String(m.columnFamilyName()));
-          System.out.println("\tKey Range :" + new String(m.smallestKey()) + " " +
-              "<->" + new String(m.largestKey()));
+          System.out.println("\tKey Range :" + new String(m.smallestKey()) +
+              " " + "<->" + new String(m.largestKey()));
         }
         // key
         rocksDB.delete(cfHandle, key.getBytes());
@@ -216,7 +232,8 @@ public class TestRocksDBCheckpointDiffer {
         // key
         RocksIterator iter = rocksDB.newIterator(cfHandle);
         for (iter.seekToFirst(); iter.isValid(); iter.next()) {
-          System.out.println("iterator:" + new String(iter.key()) + ":" + new String(iter.value()));
+          System.out.println("iterator:" + new String(iter.key()) + ":" +
+              new String(iter.value()));
         }
       } finally {
         // NOTE frees the column family handles before freeing the db
@@ -249,7 +266,8 @@ public class TestRocksDBCheckpointDiffer {
         createdDB = true;
       }
 
-      List<LiveFileMetaData> liveFileMetaDataList = rocksDB.getLiveFilesMetaData();
+      List<LiveFileMetaData> liveFileMetaDataList =
+          rocksDB.getLiveFilesMetaData();
       for (LiveFileMetaData m : liveFileMetaDataList) {
         System.out.println("Live File Metadata");
         System.out.println("\tFile :" + m.fileName());
