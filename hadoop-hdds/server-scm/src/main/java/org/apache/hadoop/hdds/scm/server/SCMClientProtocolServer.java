@@ -1248,14 +1248,14 @@ public class SCMClientProtocolServer implements
       Optional<Long> bandwidthInMB, Optional<Integer> parallelThread,
       Optional<List<String>> hosts) throws IOException {
     // TODO: Send message to datanodes
-    return null;
+    return new ArrayList<DatanodeAdminError>();
   }
 
   @Override
   public List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
       throws IOException {
     // TODO: Send message to datanodes
-    return null;
+    return new ArrayList<DatanodeAdminError>();
   }
 
 
@@ -1265,7 +1265,7 @@ public class SCMClientProtocolServer implements
       Optional<Integer> parallelThread, Optional<List<String>> hosts)
       throws IOException {
     // TODO: Send message to datanodes
-    return null;
+    return new ArrayList<DatanodeAdminError>();
   }
 
   /**
