@@ -28,7 +28,6 @@ import java.util.Map;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
-import org.apache.ratis.thirdparty.com.google.common.annotations.VisibleForTesting;
 
 /**
  * The DBStore interface provides the ability to create Tables, which store
@@ -101,7 +100,7 @@ public interface DBStore extends Closeable, BatchOperationHandler {
   /**
    * Returns the RocksDB checkpoint differ.
    */
-  public RocksDBCheckpointDiffer getRocksDBCheckpointDiffer();
+  RocksDBCheckpointDiffer getRocksDBCheckpointDiffer();
 
   /**
    * Compact the entire database.
