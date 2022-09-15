@@ -494,10 +494,10 @@ public class TestRootedOzoneFileSystem {
 
   /**
    * Tests listStatusIterator operation on root directory with different
-   *  numbers of numDir.
+   * numbers of numDir.
    */
   @Test
-  public void testListStatusIteratorOnPagesize() throws Exception {
+  public void testListStatusIteratorOnPageSize() throws Exception {
     int[] pageSize = {
         1, LISTING_PAGE_SIZE, LISTING_PAGE_SIZE + 1,
         LISTING_PAGE_SIZE - 1, LISTING_PAGE_SIZE + LISTING_PAGE_SIZE / 2,
