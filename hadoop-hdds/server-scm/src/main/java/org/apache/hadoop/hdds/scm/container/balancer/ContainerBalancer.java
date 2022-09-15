@@ -529,26 +529,17 @@ public class ContainerBalancer extends StatefulService {
       allFuturesResult.get(config.getMoveTimeout().toMillis(),
           TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
-      metrics.incrementNumContainerMovesFailed(1);
+      long failedCount = performMoveCancelAndFailCount();
+      metrics.incrementNumContainerMovesFailed(failedCount);
       Thread.currentThread().interrupt();
     } catch (TimeoutException e) {
-      long timeoutCounts = moveSelectionToFutureMap.entrySet().stream()
-          .filter(entry -> !entry.getValue().isDone())
-          .peek(entry -> {
-            LOG.warn("Container move canceled for container {} from source {}" +
-                    " to target {} due to timeout.",
-                entry.getKey().getContainerID(),
-                containerToSourceMap.get(entry.getKey().getContainerID())
-                    .getUuidString(),
-                entry.getKey().getTargetNode().getUuidString());
-            entry.getValue().cancel(true);
-          }).count();
+      long timeoutCounts = performTimeMoveCancelAndCount();
       LOG.warn("{} Container moves are canceled.", timeoutCounts);
       metrics.incrementNumContainerMovesTimeoutInLatestIteration(timeoutCounts);
-      metrics.incrementNumContainerMovesFailed(timeoutCounts);
     } catch (ExecutionException e) {
+      long failedCount = performMoveCancelAndFailCount();
       LOG.error("Got exception while checkIterationMoveResults", e);
-      metrics.incrementNumContainerMovesFailed(moveSelectionToFutureMap.size());
+      metrics.incrementNumContainerMovesFailed(failedCount);
     }
 
     countDatanodesInvolvedPerIteration =
@@ -570,6 +561,39 @@ public class ContainerBalancer extends StatefulService {
         sizeActuallyMovedInLatestIteration,
         metrics.getNumContainerMovesCompletedInLatestIteration());
   }
+
+  private long performTimeMoveCancelAndCount() {
+    return moveSelectionToFutureMap.entrySet().stream()
+        .filter(entry -> !entry.getValue().isDone())
+        .peek(entry -> {
+          LOG.warn("Container move canceled for container {} from source {}" +
+                  " to target {} due to timeout.",
+              entry.getKey().getContainerID(),
+              containerToSourceMap.get(entry.getKey().getContainerID())
+                  .getUuidString(),
+              entry.getKey().getTargetNode().getUuidString());
+          entry.getValue().cancel(true);
+        }).count();
+  }
+
+  private long performMoveCancelAndFailCount() {
+    long cnt = moveSelectionToFutureMap.entrySet().stream()
+        .filter(entry -> entry.getValue().isDone() && entry.getValue()
+            .isCompletedExceptionally()).count();
+    moveSelectionToFutureMap.entrySet().stream()
+        .filter(entry -> !entry.getValue().isDone())
+        .peek(entry -> {
+          LOG.warn("Container move canceled for container {} from source {}" +
+                  " to target {} due to timeout.",
+              entry.getKey().getContainerID(),
+              containerToSourceMap.get(entry.getKey().getContainerID())
+                  .getUuidString(),
+              entry.getKey().getTargetNode().getUuidString());
+          entry.getValue().cancel(true);
+        });
+    return cnt;
+  }
+
 
   /**
    * Match a source datanode with a target datanode and identify the container
@@ -671,6 +695,7 @@ public class ContainerBalancer extends StatefulService {
                   containerID.toString(),
                   source.getUuidString(),
                   moveSelection.getTargetNode().getUuidString(), ex);
+              metrics.incrementNumContainerMovesFailed(1);
             } else {
               if (result == LegacyReplicationManager.MoveResult.COMPLETED) {
                 sizeActuallyMovedInLatestIteration +=
@@ -703,7 +728,6 @@ public class ContainerBalancer extends StatefulService {
 
     if (future.isDone()) {
       if (future.isCompletedExceptionally()) {
-        metrics.incrementNumContainerMovesFailed(1);
         return false;
       } else {
         LegacyReplicationManager.MoveResult result = future.join();

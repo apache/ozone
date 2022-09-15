@@ -788,12 +788,20 @@ public class TestContainerBalancer {
       InvalidContainerBalancerConfigurationException,
       TimeoutException {
 
+    CompletableFuture<MoveResult> f = new CompletableFuture();
+    f.completeExceptionally(new RuntimeException("Runtime Exception"));
     Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
             Mockito.any(DatanodeDetails.class),
             Mockito.any(DatanodeDetails.class)))
         .thenThrow(new ContainerNotFoundException("Test Container not found"),
             new NodeNotFoundException("Test Node not found"))
-        .thenReturn(genCompletableFuture(2000));
+        .thenReturn(f).thenReturn(CompletableFuture.supplyAsync(() -> {
+          try {
+            Thread.sleep(1000);
+          } catch (Exception ex) {
+          }
+          throw new RuntimeException("Throw");
+        }));
 
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setIterations(1);
@@ -811,9 +819,9 @@ public class TestContainerBalancer {
     Assertions.assertEquals(
         ContainerBalancer.IterationResult.ITERATION_COMPLETED,
         containerBalancer.getIterationResult());
-    Assertions.assertEquals(6,
+    Assertions.assertTrue(
         containerBalancer.getMetrics()
-            .getNumContainerMovesFailed());
+            .getNumContainerMovesFailed() >= 3);
     stopBalancer();
 
   }
