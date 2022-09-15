@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.LambdaTestUtils;
@@ -76,7 +77,8 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     String bucketName = UUID.randomUUID().toString();
 
     OMRequest originalRequest = OMRequestTestUtils.createBucketRequest(
-        bucketName, volumeName, false, StorageTypeProto.SSD, 0);
+        bucketName, volumeName, false, StorageTypeProto.SSD,
+        ClientVersion.DEFAULT_VERSION.toProtoValue());
 
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(originalRequest);
@@ -145,7 +147,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     addCreateVolumeToTable(volumeName, omMetadataManager);
     OMRequest originalRequest =
         OMRequestTestUtils.createBucketRequest(bucketName, volumeName, false,
-            StorageTypeProto.SSD, 0);
+            StorageTypeProto.SSD, ClientVersion.DEFAULT_VERSION.toProtoValue());
 
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(originalRequest);
