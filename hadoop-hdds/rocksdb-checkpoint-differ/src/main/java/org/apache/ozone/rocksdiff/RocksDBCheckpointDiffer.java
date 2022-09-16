@@ -241,7 +241,8 @@ public class RocksDBCheckpointDiffer {
     final AbstractEventListener onCompactionCompletedListener =
         new AbstractEventListener() {
           @Override
-          @SuppressFBWarnings({"AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION",
+          @SuppressFBWarnings({
+              "AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION",
               "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
           public void onCompactionCompleted(
               final RocksDB db, final CompactionJobInfo compactionJobInfo) {
@@ -333,7 +334,8 @@ public class RocksDBCheckpointDiffer {
     final AbstractEventListener onCompactionCompletedListener =
         new AbstractEventListener() {
           @Override
-          @SuppressFBWarnings({"AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION",
+          @SuppressFBWarnings({
+              "AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION",
               "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
           public void onCompactionCompleted(
               final RocksDB db,final CompactionJobInfo compactionJobInfo) {
