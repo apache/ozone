@@ -32,7 +32,7 @@ import picocli.CommandLine;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadLocalRandom;
 
-import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.fileDirSeparator;
+import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.FILE_DIR_SEPARATOR;
 
 /**
  * Ozone key generator/reader for performance test.
@@ -133,7 +133,7 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
 
   private final String readTask = "READ_TASK";
   private final String writeTask = "WRITE_TASK";
-  KeyGeneratorUtil kg;
+  private KeyGeneratorUtil kg;
 
   @Override
   public Void call() throws Exception {
@@ -169,23 +169,24 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     String keyName = getKeyName(operationType, clientIndex);
     timer.time(() -> {
       try {
-          switch (operationType) {
-          case readTask:
-            processReadTasks(keyName, client);
-            break;
-          case writeTask:
-            processWriteTasks(keyName, client);
-            break;
-          default:
-            break;
-          }
+        switch (operationType) {
+        case readTask:
+          processReadTasks(keyName, client);
+          break;
+        case writeTask:
+          processWriteTasks(keyName, client);
+          break;
+        default:
+          break;
+        }
       } catch (Exception ex) {
         LOG.error(ex.getMessage());
       }
     });
   }
 
-  public void processReadTasks(String keyName, OzoneClient client) throws Exception {
+  public void processReadTasks(String keyName, OzoneClient client)
+          throws Exception {
     OzoneBucket ozbk = client.getObjectStore().getVolume(volumeName)
             .getBucket(bucketName);
 
@@ -198,7 +199,8 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
       }
     }
   }
-  public void processWriteTasks(String keyName, OzoneClient client) throws Exception {
+  public void processWriteTasks(String keyName, OzoneClient client)
+          throws Exception {
     OzoneBucket ozbk = client.getObjectStore().getVolume(volumeName)
             .getBucket(bucketName);
 
@@ -227,26 +229,28 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   public String getKeyName(String operationType, int counter) {
     int startIdx, endIdx;
     switch (operationType) {
-      case readTask:
-        startIdx = counter * readRange;
-        endIdx = startIdx + readRange;
-        break;
-      case writeTask:
-        startIdx = counter * writeRange;
-        endIdx = startIdx + writeRange;
-        break;
-      default:
-        startIdx = 0;
-        endIdx = 0;
-        break;
+    case readTask:
+      startIdx = counter * readRange;
+      endIdx = startIdx + readRange;
+      break;
+    case writeTask:
+      startIdx = counter * writeRange;
+      endIdx = startIdx + writeRange;
+      break;
+    default:
+      startIdx = 0;
+      endIdx = 0;
+      break;
     }
     StringBuilder keyNameSb = new StringBuilder();
     int randomIdxWithinRange = ThreadLocalRandom.current().
             nextInt(endIdx + 1 - startIdx) + startIdx;
     if (keySorted) {
-      keyNameSb.append(getPrefix()).append(fileDirSeparator).append(randomIdxWithinRange);
+      keyNameSb.append(getPrefix()).append(FILE_DIR_SEPARATOR).
+              append(randomIdxWithinRange);
     } else {
-      keyNameSb.append(getPrefix()).append(fileDirSeparator).append(kg.generateSimpleHashKeyName(randomIdxWithinRange));
+      keyNameSb.append(getPrefix()).append(FILE_DIR_SEPARATOR).
+              append(kg.generateSimpleHashKeyName(randomIdxWithinRange));
     }
     return keyNameSb.toString();
   }

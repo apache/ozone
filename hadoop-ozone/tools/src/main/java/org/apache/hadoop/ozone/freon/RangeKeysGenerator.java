@@ -13,8 +13,13 @@ import picocli.CommandLine;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 
-import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.*;
+import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.PURE_INDEX;
+import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.MD5;
+import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.FILE_DIR_SEPARATOR;
 
+/**
+ * Ozone range keys generator for performance test.
+ */
 public class RangeKeysGenerator extends BaseFreonGenerator
         implements Callable<Void> {
 
@@ -38,7 +43,8 @@ public class RangeKeysGenerator extends BaseFreonGenerator
   private int range;
 
   @CommandLine.Option(names = {"-k", "--key-encode"},
-          description = "The algorithm to generate key names. Options are pureIndex, md5, simpleHash",
+          description = "The algorithm to generate key names. " +
+                  "Options are pureIndex, md5, simpleHash",
           defaultValue = "simpleHash")
   private String encodeFormat;
 
@@ -60,12 +66,8 @@ public class RangeKeysGenerator extends BaseFreonGenerator
           description = "OM Service ID"
   )
   private String omServiceID = null;
-
-
-  KeyGeneratorUtil kg;
-
+  private KeyGeneratorUtil kg;
   private OzoneClient[] rpcClients;
-
   private byte[] keyContent;
   private Timer timer;
 
@@ -103,29 +105,30 @@ public class RangeKeysGenerator extends BaseFreonGenerator
     int endIndex = startIndex + range;
 
     timer.time(() -> {
-        switch (encodeFormat) {
-          case pureIndex:
-            loopRunner(kg.pureIndexKeyNameFunc(), client, startIndex, endIndex);
-            break;
-          case md5:
-            loopRunner(kg.md5KeyNameFunc(), client, startIndex, endIndex);
-            break;
-          default:
-            loopRunner(kg.simpleHashKeyNameFunc(), client, startIndex, endIndex);
-            break;
-        }
+      switch (encodeFormat) {
+      case PURE_INDEX:
+        loopRunner(kg.pureIndexKeyNameFunc(), client, startIndex, endIndex);
+        break;
+      case MD5:
+        loopRunner(kg.md5KeyNameFunc(), client, startIndex, endIndex);
+        break;
+      default:
+        loopRunner(kg.simpleHashKeyNameFunc(), client, startIndex, endIndex);
+        break;
+      }
       return null;
     });
   }
 
 
-  public void loopRunner(Function<Integer, String> f, OzoneClient client, int startIndex, int endIndex) throws Exception {
+  public void loopRunner(Function<Integer, String> f, OzoneClient client,
+                         int startIndex, int endIndex) throws Exception {
     OzoneBucket ozbk = client.getObjectStore().getVolume(volumeName)
             .getBucket(bucketName);
 
     String keyName;
     for (int i = startIndex; i < endIndex + 1; i++) {
-      keyName = getPrefix() + fileDirSeparator + f.apply(i);
+      keyName = getPrefix() + FILE_DIR_SEPARATOR + f.apply(i);
       try (OzoneOutputStream out = ozbk.createKey(keyName, writeSizeInBytes)) {
         out.write(keyContent);
         out.flush();

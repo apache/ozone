@@ -4,19 +4,22 @@ import org.apache.commons.codec.digest.DigestUtils;
 
 import java.util.function.Function;
 
+/**
+ * Utility class to generate key name from a given key index.
+ */
 public class KeyGeneratorUtil {
-  public static final String pureIndex = "pureIndex";
-  public static final String md5 = "md5";
-  public static final String simpleHash = "simpleHash";
-  public static final String fileDirSeparator = "/";
-
-  char[] saltCharArray = {'m','D','E','T','t','q','c','j','X','8'};
+  public static final String PURE_INDEX = "pureIndex";
+  public static final String MD5 = "md5";
+  public static final String SIMPLE_HASH = "simpleHash";
+  public static final String FILE_DIR_SEPARATOR = "/";
+  private char[] saltCharArray =
+      {'m', 'D', 'E', 'T', 't', 'q', 'c', 'j', 'X', '8'};
 
   public String generatePureIndexKeyName(int number) {
     return String.valueOf(number);
   }
   public Function<Integer, String> pureIndexKeyNameFunc() {
-   return number -> String.valueOf(number);
+    return number -> String.valueOf(number);
   }
 
   public String generateMd5KeyName(int number) {
@@ -56,4 +59,10 @@ public class KeyGeneratorUtil {
     };
   }
 
+  public char[] getSaltCharArray() {
+    return saltCharArray;
+  }
+  public void setSaltCharArray(char[] saltCharArray) {
+    this.saltCharArray = saltCharArray;
+  }
 }
