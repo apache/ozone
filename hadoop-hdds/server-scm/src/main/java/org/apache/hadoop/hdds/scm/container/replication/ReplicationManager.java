@@ -58,10 +58,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -485,21 +483,6 @@ public class ReplicationManager implements SCMService {
       return scm.getContainerTokenGenerator().generateEncodedToken(containerID);
     }
     return ""; // unit test
-  }
-
-  /**
-   * Creates a priority queue of UnderReplicatedHealthResult, where the elements
-   * are ordered by the weighted redundancy of the container. This means that
-   * containers with the least remaining redundancy are at the front of the
-   * queue, and will be processed first.
-   * @return An empty instance of a PriorityQueue.
-   */
-  protected PriorityQueue<ContainerHealthResult.UnderReplicatedHealthResult>
-      createUnderReplicatedQueue() {
-    return new PriorityQueue<>(Comparator.comparing(ContainerHealthResult
-            .UnderReplicatedHealthResult::getWeightedRedundancy)
-        .thenComparing(ContainerHealthResult
-            .UnderReplicatedHealthResult::getRequeueCount));
   }
 
   public ReplicationManagerReport getContainerReport() {
