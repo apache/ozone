@@ -52,6 +52,8 @@ import com.google.common.graph.MutableGraph;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 // TODO
 //  1. Create a local instance of RocksDiff-local-RocksDB. This is the
 //  rocksDB that we can use for maintaining DAG and any other state. This is
@@ -149,7 +151,6 @@ public class RocksDBCheckpointDiffer {
     public String snapshotId; // The last snapshot that was created before this
     // node came into existance;
     public long snapshotGeneration;
-    public long compactionGeneration;
     public long totalNumberOfKeys;
     public long cumulativeKeysReverseTraversal;
 
@@ -159,11 +160,10 @@ public class RocksDBCheckpointDiffer {
       snapshotGeneration = lastSnapshotCounter;
       totalNumberOfKeys = numKeys;
       cumulativeKeysReverseTraversal = 0;
-      compactionGeneration = compactionGen;
     }
   }
 
-  private class Snapshot {
+  private static class Snapshot {
     String dbPath;
     String snapshotID;
     long snapshotGeneration;
@@ -241,6 +241,8 @@ public class RocksDBCheckpointDiffer {
     final AbstractEventListener onCompactionCompletedListener =
         new AbstractEventListener() {
           @Override
+          @SuppressFBWarnings({"AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION",
+              "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
           public void onCompactionCompleted(
               final RocksDB db, final CompactionJobInfo compactionJobInfo) {
             synchronized (db) {
@@ -269,13 +271,15 @@ public class RocksDBCheckpointDiffer {
                     Paths.get(outFilePath).getFileName().toString();
                 CompactionNode outfileNode = compactionNodeTable.get(outfile);
                 if (outfileNode == null) {
+                  long numKeys = 0;
                   try {
-                    outfileNode = new CompactionNode(outfile,
-                        lastSnapshotPrefix, getSSTFileSummary(outfile),
-                        currentCompactionGen);
+                    numKeys = getSSTFileSummary(outfile);
                   } catch (Exception e) {
                     LOG.warn(e.getMessage());
                   }
+                  outfileNode = new CompactionNode(outfile,
+                      lastSnapshotPrefix, numKeys,
+                      currentCompactionGen);
                   compactionDAGFwd.addNode(outfileNode);
                   compactionDAGReverse.addNode(outfileNode);
                   compactionNodeTable.put(outfile, outfileNode);
@@ -285,13 +289,15 @@ public class RocksDBCheckpointDiffer {
                       Paths.get(inFilePath).getFileName().toString();
                   CompactionNode infileNode = compactionNodeTable.get(infile);
                   if (infileNode == null) {
+                    long numKeys = 0;
                     try {
-                      infileNode = new CompactionNode(infile,
-                          lastSnapshotPrefix,
-                          getSSTFileSummary(infile), UNKNOWN_COMPACTION_GEN);
+                      numKeys = getSSTFileSummary(infile);
                     } catch (Exception e) {
                       LOG.warn(e.getMessage());
                     }
+                    infileNode = new CompactionNode(infile,
+                        lastSnapshotPrefix,
+                        numKeys, UNKNOWN_COMPACTION_GEN);
                     compactionDAGFwd.addNode(infileNode);
                     compactionDAGReverse.addNode(infileNode);
                     compactionNodeTable.put(infile, infileNode);
@@ -327,6 +333,8 @@ public class RocksDBCheckpointDiffer {
     final AbstractEventListener onCompactionCompletedListener =
         new AbstractEventListener() {
           @Override
+          @SuppressFBWarnings({"AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION",
+              "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
           public void onCompactionCompleted(
               final RocksDB db,final CompactionJobInfo compactionJobInfo) {
             synchronized (db) {
@@ -355,13 +363,15 @@ public class RocksDBCheckpointDiffer {
                     Paths.get(outFilePath).getFileName().toString();
                 CompactionNode outfileNode = compactionNodeTable.get(outfile);
                 if (outfileNode == null) {
+                  long numKeys = 0;
                   try {
-                    outfileNode = new CompactionNode(outfile,
-                        lastSnapshotPrefix,
-                        getSSTFileSummary(outfile), currentCompactionGen);
+                    numKeys = getSSTFileSummary(outfile);
                   } catch (Exception e) {
                     LOG.warn(e.getMessage());
                   }
+                  outfileNode = new CompactionNode(outfile,
+                      lastSnapshotPrefix,
+                      numKeys, currentCompactionGen);
                   compactionDAGFwd.addNode(outfileNode);
                   compactionDAGReverse.addNode(outfileNode);
                   compactionNodeTable.put(outfile, outfileNode);
@@ -371,13 +381,15 @@ public class RocksDBCheckpointDiffer {
                       Paths.get(inFilePath).getFileName().toString();
                   CompactionNode infileNode = compactionNodeTable.get(infile);
                   if (infileNode == null) {
+                    long numKeys = 0;
                     try {
-                      infileNode = new CompactionNode(infile,
-                          lastSnapshotPrefix, getSSTFileSummary(infile),
-                          UNKNOWN_COMPACTION_GEN);
+                      numKeys = getSSTFileSummary(infile);
                     } catch (Exception e) {
                       LOG.warn(e.getMessage());
                     }
+                    infileNode = new CompactionNode(infile,
+                        lastSnapshotPrefix, numKeys,
+                        UNKNOWN_COMPACTION_GEN);
                     compactionDAGFwd.addNode(infileNode);
                     compactionDAGReverse.addNode(infileNode);
                     compactionNodeTable.put(infile, infileNode);
@@ -428,6 +440,7 @@ public class RocksDBCheckpointDiffer {
 
   // Read the current Live manifest for a given RocksDB instance (Active or
   // Checkpoint). Returns the list of currently active SST FileNames.
+  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   public HashSet<String> readRocksDBLiveFiles(String dbPathArg) {
     RocksDB rocksDB = null;
     HashSet<String> liveFiles = new HashSet<>();
@@ -490,6 +503,7 @@ public class RocksDBCheckpointDiffer {
     LOG.warn("");
   }
 
+  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   public synchronized void realPrintSnapdiffSSTFiles(
       Snapshot src, Snapshot dest,
       HashSet<String> srcSnapFiles,
@@ -578,6 +592,7 @@ public class RocksDBCheckpointDiffer {
     LOG.warn("");
   }
 
+  @SuppressFBWarnings("SIC_INNER_SHOULD_BE_STATIC")
   class NodeComparator implements Comparator<CompactionNode>
   {
     public int compare(CompactionNode a, CompactionNode b)
@@ -604,6 +619,7 @@ public class RocksDBCheckpointDiffer {
     }
   }
 
+  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   public synchronized void printMutableGraphFromAGivenNode(
       String fileName, int level, MutableGraph<CompactionNode> mutableGraph) {
     CompactionNode infileNode =
