@@ -30,5 +30,5 @@ public interface DatanodeAdminMonitor extends Runnable {
   void startMonitoring(DatanodeDetails dn);
   void stopMonitoring(DatanodeDetails dn);
   Set<DatanodeDetails> getTrackedNodes();
-
+  void setMetrics(NodeDecommissionMetrics metrics);
 }

@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManagerMetrics;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -74,6 +75,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private Queue<DatanodeDetails> pendingNodes = new ArrayDeque();
   private Queue<DatanodeDetails> cancelledNodes = new ArrayDeque();
   private Set<DatanodeDetails> trackedNodes = new HashSet<>();
+  private NodeDecommissionMetrics metrics;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeAdminMonitorImpl.class);
@@ -117,6 +119,10 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     cancelledNodes.add(dn);
   }
 
+  public synchronized void setMetrics(NodeDecommissionMetrics metrics) {
+    this.metrics = metrics;
+  }
+
   /**
    * Get the set of nodes which are currently tracked in the decommissioned
    * and maintenance workflow.
@@ -140,11 +146,16 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   public void run() {
     try {
       synchronized (this) {
+        metrics.setTotalTrackedRecommissionNodes(
+                getCancelledCount());
         processCancelledNodes();
         processPendingNodes();
       }
       processTransitioningNodes();
+      metrics.setTotalTrackedDecommissioningMaintenanceNodes(0); // clear
       if (trackedNodes.size() > 0 || pendingNodes.size() > 0) {
+        metrics.setTotalTrackedDecommissioningMaintenanceNodes(
+                trackedNodes.size());
         LOG.info("There are {} nodes tracked for decommission and " +
                 "maintenance. {} pending nodes.",
             trackedNodes.size(), pendingNodes.size());
