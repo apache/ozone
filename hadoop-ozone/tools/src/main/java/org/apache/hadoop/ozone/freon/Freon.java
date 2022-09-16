@@ -69,6 +69,7 @@ import picocli.CommandLine.Option;
         OmBucketReadWriteKeyOps.class,
         OmRPCLoadGenerator.class,
         OzoneClientKeyReadWriteOps.class,
+        RangeKeysGenerator.class
     },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
