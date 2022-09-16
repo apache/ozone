@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -44,19 +46,22 @@ public class TestOpenContainerHandler {
 
   private ReplicationManager replicationManager;
   private OpenContainerHandler openContainerHandler;
-  private ECReplicationConfig replicationConfig;
+  private ECReplicationConfig ecReplicationConfig;
+  private RatisReplicationConfig ratisReplicationConfig;
 
   @BeforeEach
   public void setup() {
-    replicationConfig = new ECReplicationConfig(3, 2);
+    ecReplicationConfig = new ECReplicationConfig(3, 2);
+    ratisReplicationConfig = RatisReplicationConfig.getInstance(
+        HddsProtos.ReplicationFactor.THREE);
     replicationManager = Mockito.mock(ReplicationManager.class);
     openContainerHandler = new OpenContainerHandler(replicationManager);
   }
 
   @Test
-  public void testClosedContainerReturnsTrue() {
+  public void testClosedContainerReturnsFalse() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        replicationConfig, 1, CLOSED);
+        ecReplicationConfig, 1, CLOSED);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
@@ -72,9 +77,9 @@ public class TestOpenContainerHandler {
   }
 
   @Test
-  public void testOpenContainerReturnsFalse() {
+  public void testOpenContainerReturnsTrue() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        replicationConfig, 1, OPEN);
+        ecReplicationConfig, 1, OPEN);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.OPEN, 1, 2, 3, 4, 5);
@@ -92,7 +97,7 @@ public class TestOpenContainerHandler {
   @Test
   public void testOpenUnhealthyContainerIsClosed() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        replicationConfig, 1, OPEN);
+        ecReplicationConfig, 1, OPEN);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
@@ -107,4 +112,57 @@ public class TestOpenContainerHandler {
         .sendCloseContainerEvent(containerInfo.containerID());
   }
 
+  @Test
+  public void testClosedRatisContainerReturnsFalse() {
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, CLOSED);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.CLOSED, 1, 2, 3);
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.EMPTY_LIST)
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+    Assertions.assertFalse(openContainerHandler.handle(request));
+    Mockito.verify(replicationManager, times(0))
+        .sendCloseContainerEvent(Mockito.any());
+  }
+
+  @Test
+  public void testOpenRatisContainerReturnsTrue() {
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, OPEN);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.OPEN, 1, 2, 3);
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.EMPTY_LIST)
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+    Assertions.assertTrue(openContainerHandler.handle(request));
+    Mockito.verify(replicationManager, times(0))
+        .sendCloseContainerEvent(Mockito.any());
+  }
+
+  @Test
+  public void testOpenUnhealthyRatisContainerIsClosed() {
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, OPEN);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.CLOSED, 1, 2, 3);
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.EMPTY_LIST)
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+    Assertions.assertTrue(openContainerHandler.handle(request));
+    Mockito.verify(replicationManager, times(1))
+        .sendCloseContainerEvent(Mockito.any());
+  }
 }
