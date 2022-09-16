@@ -2,6 +2,7 @@ package org.apache.hadoop.ozone.freon;
 
 import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -20,6 +21,11 @@ import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.FILE_DIR_SEPARATOR;
 /**
  * Ozone range keys generator for performance test.
  */
+@CommandLine.Command(name = "ork",
+        description = "write range keys with the help of the ozone clients.",
+        versionProvider = HddsVersionProvider.class,
+        mixinStandardHelpOptions = true,
+        showDefaultValues = true)
 public class RangeKeysGenerator extends BaseFreonGenerator
         implements Callable<Void> {
 
