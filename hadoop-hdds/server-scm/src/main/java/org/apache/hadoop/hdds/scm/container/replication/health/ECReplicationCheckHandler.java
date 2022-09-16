@@ -73,7 +73,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       //        handlers can be tried?
       if (!underHealth.isSufficientlyReplicatedAfterPending() &&
           !underHealth.isUnrecoverable()) {
-        request.getUnderRepQueue().add(underHealth);
+        request.getReplicationQueue().enqueue(underHealth);
       }
       return true;
     } else if (health.getHealthState()
@@ -83,7 +83,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
       if (!overHealth.isSufficientlyReplicatedAfterPending()) {
-        request.getOverRepQueue().add(overHealth);
+        request.getReplicationQueue().enqueue(overHealth);
       }
       return true;
     }
