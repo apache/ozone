@@ -848,53 +848,6 @@ public class TestOzoneFileSystem {
   }
 
   /**
-   * Tests listStatusIterator operation on large directory.
-   */
-  @Test
-  public void testListStatusIteratorOnLargeDirectory() throws Exception {
-    Path root = new Path("/");
-    try {
-      deleteRootDir(); // cleanup
-      Set<String> paths = new TreeSet<>();
-      int numDirs = LISTING_PAGE_SIZE + LISTING_PAGE_SIZE / 2;
-      for (int i = 0; i < numDirs; i++) {
-        Path p = new Path(root, String.valueOf(i));
-        fs.mkdirs(p);
-        paths.add(p.getName());
-      }
-
-      RemoteIterator<FileStatus> it = o3fs.listStatusIterator(root);
-      int iCount = 0;
-      while (it.hasNext()) {
-        iCount++;
-        FileStatus fileStatus = it.next();
-        Assert.assertNotNull(fileStatus);
-      }
-      // Added logs for debugging failures, to check any sub-path mismatches.
-      Set<String> actualPaths = new TreeSet<>();
-      ArrayList<String> actualPathList = new ArrayList<>();
-      if (numDirs != iCount) {
-        while (it.hasNext()) {
-          FileStatus fileStatus = it.next();
-          boolean duplicate =
-              actualPaths.add(fileStatus.getPath().getName());
-          if (!duplicate) {
-            LOG.info("Duplicate path:{} in FileStatusList",
-                fileStatus.getPath().getName());
-          }
-          actualPathList.add(fileStatus.getPath().getName());
-          assertTrue(paths.contains(fileStatus.getPath().getName()));
-        }
-      }
-      assertEquals(
-          "Total directories listed do not match the existing directories",
-          numDirs, iCount);
-    } finally {
-      deleteRootDir();
-    }
-  }
-
-  /**
    * Tests listStatusIterator operation on root directory with different
    * numbers of numDir.
    */
