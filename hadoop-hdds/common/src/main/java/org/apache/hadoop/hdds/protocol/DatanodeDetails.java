@@ -235,8 +235,7 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
-   * Checks if the OperationalState is Node is Decomissioned or Decomissioning
-   *
+   * Checks if the OperationalState is Node is Decomissioned or Decomissioning.
    * @return True if OperationalState is Decommissioned or Decomissioning.
    */
   public boolean isDecomissioned() {

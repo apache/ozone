@@ -85,7 +85,8 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     if (!placementStatus) {
       LOG.warn("Selected Nodes does not satisfy placement policy: {}. " +
               "Selected nodes: {}. Existing Replica Nodes: {}.",
-              containerPlacement.getClass().getName(), selectedNodes, replicaNodes);
+              containerPlacement.getClass().getName(),
+              selectedNodes, replicaNodes);
     }
     return placementStatus;
   }
