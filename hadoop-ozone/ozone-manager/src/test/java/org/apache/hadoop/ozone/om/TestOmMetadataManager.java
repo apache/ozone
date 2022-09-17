@@ -22,12 +22,14 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
@@ -37,6 +39,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -665,5 +668,67 @@ public class TestOmMetadataManager {
     Set<String> tablesInManager = omMetadataManager.listTableNames();
 
     Assert.assertEquals(tablesByDefinition, tablesInManager);
+  }
+
+  @Test
+  public void testListSnapshot() throws Exception {
+    String vol1 = "vol1";
+    String bucket1 = "bucket1";
+
+    OMRequestTestUtils.addVolumeToDB(vol1, omMetadataManager);
+    addBucketsToCache(vol1, bucket1);
+    String prefixSnapshotA = "key-a";
+    String prefixSnapshotB = "key-b";
+    TreeSet<String> snapshotsASet = new TreeSet<>();
+    TreeSet<String> snapshotsSet = new TreeSet<>();
+
+    for (int i = 1; i <= 100; i++) {
+      if (i % 2 == 0) {
+        snapshotsASet.add(prefixSnapshotA + i);
+        snapshotsSet.add(prefixSnapshotA + i);
+        OMRequestTestUtils.addSnapshotToTable(vol1, bucket1,
+            prefixSnapshotA + i, omMetadataManager);
+      } else {
+        snapshotsSet.add(prefixSnapshotB + i);
+        OMRequestTestUtils.addSnapshotToTableCache(vol1, bucket1,
+            prefixSnapshotB + i, omMetadataManager);
+      }
+    }
+
+    //Test listing snapshots with no volume name.
+    Assert.assertThrows(OMException.class, () -> omMetadataManager.listSnapshot(
+        null, null, null, null));
+
+    //Test listing snapshots with no bucket name.
+    Assert.assertThrows(OMException.class, () -> omMetadataManager.listSnapshot(
+        vol1, null, null, null));
+
+    //Test listing all snapshots which have prefix "key-a".
+    List<SnapshotInfo> snapshotInfos = omMetadataManager.listSnapshot(vol1,
+        bucket1, null, prefixSnapshotA);
+    Assert.assertEquals(snapshotInfos.size(), 50);
+    for (SnapshotInfo snapshotInfo : snapshotInfos) {
+      Assert.assertTrue(snapshotInfo.getName().startsWith(prefixSnapshotA));
+    }
+
+    //Test listing snapshots which have prefix "key-a" and start with "key-a10".
+    String startKey = prefixSnapshotA + "10";
+    snapshotInfos = omMetadataManager.listSnapshot(
+        vol1, bucket1, startKey, prefixSnapshotA);
+    Assert.assertEquals(snapshotsASet.tailSet(startKey).size()-1,
+        snapshotInfos.size());
+    for (SnapshotInfo snapshotInfo : snapshotInfos) {
+      Assert.assertFalse(snapshotInfo.getName().equals(startKey));
+      Assert.assertTrue(snapshotInfo.getName().startsWith(prefixSnapshotA));
+    }
+
+    TreeSet<String> expectedKey = new TreeSet<>();
+    //Test listing add snapshot with empty prefix.
+    snapshotInfos = omMetadataManager.listSnapshot(vol1, bucket1, null, null);
+    Assert.assertEquals(snapshotInfos.size(), 100);
+    for (SnapshotInfo snapshotInfo : snapshotInfos) {
+      expectedKey.add(snapshotInfo.getName());
+    }
+    Assert.assertEquals(snapshotsSet, expectedKey);
   }
 }

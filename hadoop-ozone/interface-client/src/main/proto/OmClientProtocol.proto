@@ -123,6 +123,7 @@ enum Type {
   SetRangerServiceVersion = 107;
   RangerBGSync = 109;
   CreateSnapshot = 110;
+  ListSnapshot = 112;
 }
 
 message OMRequest {
@@ -228,6 +229,7 @@ message OMRequest {
   optional SetRangerServiceVersionRequest   SetRangerServiceVersionRequest = 107;
   optional RangerBGSyncRequest              RangerBGSyncRequest            = 109;
   optional CreateSnapshotRequest            CreateSnapshotRequest          = 110;
+  optional ListSnapshotRequest              ListSnapshotRequest            = 112;
 }
 
 message OMResponse {
@@ -326,6 +328,7 @@ message OMResponse {
   optional SetRangerServiceVersionResponse   SetRangerServiceVersionResponse = 107;
   optional RangerBGSyncResponse              RangerBGSyncResponse          = 109;
   optional CreateSnapshotResponse            CreateSnapshotResponse        = 110;
+  optional ListSnapshotResponse              ListSnapshotResponse         = 112;
 }
 
 enum Status {
@@ -1615,6 +1618,13 @@ message CreateSnapshotRequest {
   optional string snapshotName = 3;
 }
 
+message ListSnapshotRequest {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  optional string startKey = 3;
+  optional string prefix = 4;
+}
+
 message DeleteTenantRequest {
     optional string tenantId = 1;
 }
@@ -1654,6 +1664,10 @@ message SetRangerServiceVersionResponse {
 
 message CreateSnapshotResponse {
   required SnapshotInfo snapshotInfo = 1;
+}
+
+message ListSnapshotResponse {
+  repeated SnapshotInfo snapshotInfo = 1;
 }
 
 message DeleteTenantResponse {

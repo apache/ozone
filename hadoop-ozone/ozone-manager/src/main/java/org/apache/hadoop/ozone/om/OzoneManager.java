@@ -73,6 +73,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.multitenant.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
@@ -2762,6 +2763,36 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (auditSuccess) {
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_TRASH,
             auditMap));
+      }
+    }
+  }
+
+  @Override
+  public List<SnapshotInfo> listSnapshot(String volumeName, String bucketName,
+        String startKey, String prefix) throws IOException {
+    if (isAclEnabled) {
+      omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+          ACLType.LIST, volumeName, bucketName, null);
+    }
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = buildAuditMap(volumeName);
+    auditMap.put(OzoneConsts.BUCKET, bucketName);
+    auditMap.put(OzoneConsts.START_KEY, startKey);
+    auditMap.put(OzoneConsts.PREFIX, prefix);
+    try {
+      metrics.incNumSnapshotLists();
+      return metadataManager.listSnapshot(volumeName, bucketName, startKey,
+          prefix);
+    } catch (Exception ex) {
+      metrics.incNumSnapshotListFails();
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_SNAPSHOT,
+          auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+            OMAction.LIST_SNAPSHOT, auditMap));
       }
     }
   }

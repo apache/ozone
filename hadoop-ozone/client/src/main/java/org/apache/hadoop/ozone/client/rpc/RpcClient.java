@@ -87,6 +87,7 @@ import org.apache.hadoop.ozone.client.OzoneKeyLocation;
 import org.apache.hadoop.ozone.client.OzoneMultipartUpload;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
+import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
@@ -926,6 +927,33 @@ public class RpcClient implements ClientProtocol {
         "bucket can't be null or empty.");
     return ozoneManagerClient.createSnapshot(volumeName,
         bucketName, snapshotName);
+  }
+
+  /**
+   * List snapshots in a volume/bucket, filtered by a name prefix.
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param startKey   the start snapshot name
+   * @param prefix     snapshot name prefix
+   * @return list of snapshot name
+   * @throws IOException
+   */
+  @Override
+  public List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName,
+      String startKey, String prefix) throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(volumeName),
+        "volume can't be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(bucketName),
+        "bucket can't be null or empty.");
+    return ozoneManagerClient.listSnapshot(volumeName, bucketName, startKey,
+        prefix).stream().map(snapshotInfo -> new OzoneSnapshot(
+        snapshotInfo.getVolumeName(),
+        snapshotInfo.getBucketName(),
+        snapshotInfo.getName(),
+        snapshotInfo.getCreationTime(),
+        snapshotInfo.getSnapshotStatus(),
+        snapshotInfo.getSnapshotID(),
+        snapshotInfo.getSnapshotID())).collect(Collectors.toList());
   }
 
   /**

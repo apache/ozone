@@ -69,6 +69,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numInitiateMultipartUploads;
   private @Metric MutableCounterLong numCompleteMultipartUploads;
   private @Metric MutableCounterLong numSnapshotCreates;
+  private @Metric MutableCounterLong numSnapshotLists;
 
   private @Metric MutableCounterLong numGetFileStatus;
   private @Metric MutableCounterLong numCreateDirectory;
@@ -117,6 +118,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numListMultipartUploadPartFails;
   private @Metric MutableCounterLong numOpenKeyDeleteRequestFails;
   private @Metric MutableCounterLong numSnapshotCreateFails;
+  private @Metric MutableCounterLong numSnapshotListFails;
 
   // Number of tenant operations attempted
   private @Metric MutableCounterLong numTenantOps;
@@ -430,6 +432,13 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numSnapshotCreateFails.incr();
   }
 
+  public void incNumSnapshotLists() {
+    numSnapshotLists.incr();
+  }
+
+  public void incNumSnapshotListFails() {
+    numSnapshotListFails.incr();
+  }
 
   public void incNumCompleteMultipartUploadFails() {
     numCompleteMultipartUploadFails.incr();
@@ -1103,8 +1112,16 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     return numSnapshotCreates.value();
   }
 
+  public long getNumSnapshotLists() {
+    return numSnapshotLists.value();
+  }
+
   public long getNumSnapshotCreateFails() {
     return numSnapshotCreateFails.value();
+  }
+
+  public long getNumSnapshotListFails() {
+    return numSnapshotListFails.value();
   }
 
 

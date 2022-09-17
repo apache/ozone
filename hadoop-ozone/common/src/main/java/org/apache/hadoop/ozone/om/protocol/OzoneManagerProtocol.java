@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
@@ -651,6 +652,23 @@ public interface OzoneManagerProtocol
    */
   default String createSnapshot(String volumeName,
       String bucketName, String snapshotName) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented");
+  }
+
+  /**
+   * Create snapshot.
+   *
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param startKey   the start snapshot name
+   * @param prefix     snapshot name prefix
+   * @return list of snapshot name
+   * @throws IOException
+   */
+  default List<SnapshotInfo> listSnapshot(String volumeName, String bucketName,
+                                          String startKey, String prefix)
+      throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");
   }

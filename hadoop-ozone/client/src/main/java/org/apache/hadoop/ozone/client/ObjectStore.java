@@ -538,8 +538,9 @@ public class ObjectStore {
 
   /**
    * Create snapshot.
-   * @param name name to be used
-   * @param snapshotPath snapshotPath to be used
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name to be used
    * @return name used
    * @throws IOException
    */
@@ -548,5 +549,18 @@ public class ObjectStore {
     return proxy.createSnapshot(volumeName, bucketName, snapshotName);
   }
 
-
+  /**
+   * List snapshots in a volume/bucket, filtered by a name prefix.
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param startKey   the start snapshot name
+   * @param prefix     snapshot name prefix
+   * @return list of snapshot name
+   * @throws IOException
+   */
+  public List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName,
+                                          String startKey, String prefix)
+      throws IOException {
+    return proxy.listSnapshot(volumeName, bucketName, startKey, prefix);
+  }
 }

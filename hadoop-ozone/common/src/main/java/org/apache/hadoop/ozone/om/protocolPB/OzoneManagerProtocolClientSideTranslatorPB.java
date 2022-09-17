@@ -1118,6 +1118,36 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
+  public List<SnapshotInfo> listSnapshot(String volumeName, String bucketName,
+        String startKey, String prefix) throws IOException {
+    final OzoneManagerProtocolProtos.ListSnapshotRequest.Builder
+        requestBuilder =
+        OzoneManagerProtocolProtos.ListSnapshotRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName);
+    if (startKey != null) {
+      requestBuilder.setStartKey(startKey);
+    }
+    if (prefix != null) {
+      requestBuilder.setPrefix(prefix);
+    }
+
+    final OMRequest omRequest = createOMRequest(Type.ListSnapshot)
+        .setListSnapshotRequest(requestBuilder)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+    List<SnapshotInfo> snapshotInfos = omResponse.getListSnapshotResponse()
+        .getSnapshotInfoList().stream()
+        .map(snapshotInfo -> SnapshotInfo.getFromProtobuf(snapshotInfo))
+        .collect(Collectors.toList());
+    return snapshotInfos;
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
   public void tenantAssignAdmin(String accessId, String tenantId,
       boolean delegated) throws IOException {
 
