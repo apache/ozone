@@ -204,6 +204,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
 
   /**
    * Pipeline placement choose datanodes to join the pipeline.
+   * TODO: HDDS-7227: Update Implementation to accomodate for already used
+   * nodes in pipeline to conform to existing placement policy.
    * @param usedNodes - list of the datanodes to already chosen in the
    *                      pipeline.
    * @param excludedNodes - excluded nodes

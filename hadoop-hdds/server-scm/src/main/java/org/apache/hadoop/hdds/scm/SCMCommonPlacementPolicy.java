@@ -198,6 +198,9 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
     if (excludedNodes != null) {
       healthyNodes.removeAll(excludedNodes);
     }
+    if (usedNodes != null) {
+      healthyNodes.removeAll(usedNodes);
+    }
     String msg;
     if (healthyNodes.size() == 0) {
       msg = "No healthy node found to allocate container.";

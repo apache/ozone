@@ -329,7 +329,8 @@ public final class SCMContainerPlacementRackAware
   /**
    * Choose a batch of datanodes on different rack than excludedNodes or
    * chosenNodes.
-   *
+   * TODO HDDS-7226: Update Implementation to accomodate for already used
+   * nodes to conform to existing placement policy.
    *
    * @param excludedNodes - list of the datanodes to excluded. Can be null.
    * @param chosenNodes - list of nodes already chosen. These nodes should also
