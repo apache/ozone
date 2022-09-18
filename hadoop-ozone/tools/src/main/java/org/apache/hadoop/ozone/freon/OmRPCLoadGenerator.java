@@ -34,7 +34,7 @@ import picocli.CommandLine.Option;
         aliases = "ome",
         description =
                 "Generate echo RPC request to the OM " +
-                        "with or without layload. " +
+                        "with or without payload. " +
                         "Max payload size is 2097151 KB",
         versionProvider = HddsVersionProvider.class,
         mixinStandardHelpOptions = true,
