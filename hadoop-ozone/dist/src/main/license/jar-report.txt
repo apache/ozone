@@ -40,7 +40,6 @@ share/ozone/lib/dnsjava.jar
 share/ozone/lib/error_prone_annotations.jar
 share/ozone/lib/failureaccess.jar
 share/ozone/lib/FastInfoset.jar
-share/ozone/lib/RocksDBCheckpointDiffer.jar
 share/ozone/lib/gethostname4j.jar
 share/ozone/lib/grpc-api.jar
 share/ozone/lib/grpc-context.jar
@@ -256,6 +255,7 @@ share/ozone/lib/ratis-thirdparty-misc.jar
 share/ozone/lib/ratis-tools.jar
 share/ozone/lib/re2j.jar
 share/ozone/lib/reflections.jar
+share/ozone/lib/rocksdb-checkpoint-differ.jar
 share/ozone/lib/rocksdbjni.jar
 share/ozone/lib/simpleclient_common.jar
 share/ozone/lib/simpleclient_dropwizard.jar
