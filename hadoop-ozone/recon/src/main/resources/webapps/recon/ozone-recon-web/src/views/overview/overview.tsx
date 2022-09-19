@@ -53,6 +53,10 @@ interface IOverviewState {
   keys: number;
   missingContainersCount: number;
   lastUpdated: number;
+  lastUpdatedOM:number,
+  lastUpdateOMSync:number,
+  lastUpdatedOMText:string,
+  lastUpdateOMSyncText:string
 }
 
 export class Overview extends React.Component<Record<string, object>, IOverviewState> {
@@ -75,7 +79,12 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       buckets: 0,
       keys: 0,
       missingContainersCount: 0,
-      lastUpdated: 0
+      lastUpdated: 0,
+      lastUpdatedOM:0,
+      lastUpdateOMSync:0,
+      lastUpdatedOMText:'',
+      lastUpdateOMSyncText:''
+
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -86,11 +95,15 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     });
     axios.all([
       axios.get('/api/v1/clusterState'),
-      axios.get('/api/v1/containers/missing')
-    ]).then(axios.spread((clusterStateResponse, missingContainersResponse) => {
+      axios.get('/api/v1/containers/missing'),
+      axios.get('/api/v1/task/status')
+    ]).then(axios.spread((clusterStateResponse, missingContainersResponse,taskstatusResponse) => {
+      
       const clusterState: IClusterStateResponse = clusterStateResponse.data;
-      const missingContainers: IMissingContainersResponse = missingContainersResponse.data;
+      const missingContainers: IMissingContainersResponse = missingContainersResponse.data;     
+      const taskStatus = taskstatusResponse.data && taskstatusResponse.data.filter((item:any) => item.taskName === 'OmDeltaRequest' || item.taskName === 'OmSnapshotRequest').sort((c1:any, c2:any) => c2.lastUpdatedTimestamp - c1.lastUpdatedTimestamp);
       const missingContainersCount = missingContainers.totalCount;
+      console.log("radha2",taskStatus);
       this.setState({
         loading: false,
         datanodes: `${clusterState.healthyDatanodes}/${clusterState.totalDatanodes}`,
@@ -101,7 +114,12 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         buckets: clusterState.buckets,
         keys: clusterState.keys,
         missingContainersCount,
-        lastUpdated: Number(moment())
+        lastUpdated: Number(moment()),
+        lastUpdatedOM: taskStatus[0] ? taskStatus[0] && taskStatus[0].lastUpdatedTimestamp : 0,
+        lastUpdateOMSync:taskStatus[1] ? taskStatus[1] && taskStatus[1].lastUpdatedTimestamp : 0,
+        lastUpdatedOMText:taskStatus[0] ? taskStatus[0] && taskStatus[0].taskName.toLowerCase() === 'OmDeltaRequest'.toLowerCase() ? 'Last Delta Update': 'Last Full Update': '',
+        lastUpdateOMSyncText: taskStatus[1] ? taskStatus[1] && taskStatus[1].taskName.toLowerCase() === 'OmDeltaRequest'.toLowerCase() ? 'Last Delta Update': 'Last Full Update' : ''
+
       });
     })).catch(error => {
       this.setState({
@@ -122,7 +140,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
 
   render() {
     const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets,
-      keys, missingContainersCount, lastUpdated} = this.state;
+      keys, missingContainersCount,lastUpdated,lastUpdatedOM,lastUpdateOMSync,lastUpdatedOMText,lastUpdateOMSyncText} = this.state;
     const datanodesElement = (
       <span>
         <Icon type='check-circle' theme='filled' className='icon-success icon-small'/> {datanodes} <span className='ant-card-meta-description meta'>HEALTHY</span>
@@ -145,7 +163,10 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       <div className='overview-content'>
         <div className='page-header'>
           Overview
-          <AutoReloadPanel isLoading={loading} lastUpdated={lastUpdated} togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
+          <AutoReloadPanel isLoading={loading} lastUpdated={lastUpdated} 
+          lastUpdatedOM={lastUpdatedOM}  lastUpdateOMSync={lastUpdateOMSync}
+          lastUpdatedOMText={lastUpdatedOMText}  lastUpdateOMSyncText={lastUpdateOMSyncText}
+          togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
         </div>
         <Row gutter={[25, 25]}>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>

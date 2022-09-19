@@ -27,6 +27,10 @@ import moment from 'moment';
 interface IAutoReloadPanelProps extends RouteComponentProps<object> {
   onReload: () => void;
   lastUpdated: number;
+  lastUpdatedOM:number;
+  lastUpdateOMSync:number;
+  lastUpdatedOMText:string;
+  lastUpdateOMSyncText:string;
   isLoading: boolean;
   togglePolling: (isEnabled: boolean) => void;
 }
@@ -38,8 +42,10 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
   };
 
   render() {
-    const {onReload, lastUpdated, isLoading} = this.props;
-    const lastUpdatedText = lastUpdated === 0 ? 'NA' :
+    const {onReload, lastUpdated, lastUpdatedOM,lastUpdateOMSync,isLoading,lastUpdatedOMText,lastUpdateOMSyncText} = this.props;
+    const textOMSync= <span>{lastUpdatedOMText} : {moment(lastUpdatedOM).format('ll LTS') }<br/>
+                 {lastUpdateOMSyncText} : {moment(lastUpdateOMSync).format('ll LTS')}</span>
+    const lastUpdatedText = lastUpdated === 0 || lastUpdated === undefined? 'NA' :
       (
         <Tooltip
           placement='bottom' title={moment(lastUpdated).format('ll LTS')}
@@ -47,12 +53,28 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
           {moment(lastUpdated).format('LTS')}
         </Tooltip>
       );
+      const lastUpdatedOMInfo = lastUpdatedOM === 0 || lastUpdatedOM === undefined || lastUpdateOMSync===0 || lastUpdateOMSync=== undefined ? 'NA' :
+      (
+        <Tooltip
+          placement='bottom' title={textOMSync}
+        >
+          {moment(lastUpdatedOM).format('LTS')}
+        </Tooltip>
+      );
+     const lastUpdatedOMDisplay= lastUpdatedOM === 0 || lastUpdatedOM === undefined || lastUpdateOMSync===0 || lastUpdateOMSync=== undefined ? '' :
+     (
+      <>
+      &nbsp; | OM DB Last updated at {lastUpdatedOMInfo}
+      &nbsp;<Button shape='circle' icon='reload' size='small' loading={isLoading} />
+      </>
+     );
     return (
       <div className='auto-reload-panel'>
         Auto Reload
         &nbsp;<Switch defaultChecked size='small' className='toggle-switch' onChange={this.autoReloadToggleHandler}/>
         &nbsp; | Last updated at {lastUpdatedText}
         &nbsp;<Button shape='circle' icon='reload' size='small' loading={isLoading} onClick={onReload}/>
+        {lastUpdatedOMDisplay}
       </div>
     );
   }
