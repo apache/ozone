@@ -808,7 +808,7 @@ public class TestContainerBalancer {
     balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMoveTimeout(Duration.ofMillis(1000));
+    balancerConfiguration.setMoveTimeout(Duration.ofMillis(2000));
 
     startBalancer(balancerConfiguration);
     sleepWhileBalancing(2000);

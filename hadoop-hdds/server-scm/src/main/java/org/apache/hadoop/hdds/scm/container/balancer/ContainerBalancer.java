@@ -537,9 +537,8 @@ public class ContainerBalancer extends StatefulService {
       LOG.warn("{} Container moves are canceled.", timeoutCounts);
       metrics.incrementNumContainerMovesTimeoutInLatestIteration(timeoutCounts);
     } catch (ExecutionException e) {
-      long failedCount = performMoveCancelAndFailCount();
+      performTimeMoveCancelAndCount();
       LOG.error("Got exception while checkIterationMoveResults", e);
-      metrics.incrementNumContainerMovesFailed(failedCount);
     }
 
     countDatanodesInvolvedPerIteration =
