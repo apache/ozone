@@ -212,7 +212,7 @@ public class TestECUnderReplicationHandler {
     Mockito.when(mockedPolicy.validateContainerPlacement(Mockito.anyList(),
             Mockito.anyInt())).thenReturn(mockedContainerPlacementStatus);
     testUnderReplicationWithMissingIndexes(Collections.emptyList(),
-            availableReplicas, 0, mockedPolicy);
+            availableReplicas, 0, 0, mockedPolicy);
   }
 
   @Test
