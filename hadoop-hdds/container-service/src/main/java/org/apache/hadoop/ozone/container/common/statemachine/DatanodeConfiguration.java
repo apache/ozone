@@ -42,9 +42,9 @@ public class DatanodeConfiguration {
       "hdds.datanode.container.delete.threads.max";
   static final String PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY =
       "hdds.datanode.periodic.disk.check.interval.minutes";
-  public static final String FAILED_DATA_VOLUMES_TOLERATED_KEY =
+  public static final String HDDS_DATANODE_FAILED_DATA_VOLUMES_TOLERATED_KEY =
       "hdds.datanode.failed.data.volumes.tolerated";
-  public static final String FAILED_METADATA_VOLUMES_TOLERATED_KEY =
+  public static final String HDDS_DATANODE_FAILED_METADATA_VOLUMES_TOLERATED_KEY =
       "hdds.datanode.failed.metadata.volumes.tolerated";
   public static final String FAILED_DB_VOLUMES_TOLERATED_KEY =
       "hdds.datanode.failed.db.volumes.tolerated";
@@ -367,14 +367,14 @@ public class DatanodeConfiguration {
     }
 
     if (failedDataVolumesTolerated < -1) {
-      LOG.warn(FAILED_DATA_VOLUMES_TOLERATED_KEY +
+      LOG.warn(HDDS_DATANODE_FAILED_DATA_VOLUMES_TOLERATED_KEY +
           "must be greater than -1 and was set to {}. Defaulting to {}",
           failedDataVolumesTolerated, FAILED_VOLUMES_TOLERATED_DEFAULT);
       failedDataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
     }
 
     if (failedMetadataVolumesTolerated < -1) {
-      LOG.warn(FAILED_METADATA_VOLUMES_TOLERATED_KEY +
+      LOG.warn(HDDS_DATANODE_FAILED_METADATA_VOLUMES_TOLERATED_KEY +
               "must be greater than -1 and was set to {}. Defaulting to {}",
           failedMetadataVolumesTolerated, FAILED_VOLUMES_TOLERATED_DEFAULT);
       failedMetadataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;

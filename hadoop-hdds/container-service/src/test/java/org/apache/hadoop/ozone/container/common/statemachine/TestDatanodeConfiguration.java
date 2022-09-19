@@ -31,8 +31,8 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConf
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_DB_VOLUMES_TOLERATED_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_DATA_VOLUMES_TOLERATED_KEY;
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_METADATA_VOLUMES_TOLERATED_KEY;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_FAILED_DATA_VOLUMES_TOLERATED_KEY;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_FAILED_METADATA_VOLUMES_TOLERATED_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_VOLUMES_TOLERATED_DEFAULT;
 
 import static org.junit.Assert.assertEquals;
@@ -54,9 +54,9 @@ public class TestDatanodeConfiguration {
     conf.setInt(CONTAINER_DELETE_THREADS_MAX_KEY, validDeleteThreads);
     conf.setLong(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY,
         validDiskCheckIntervalMinutes);
-    conf.setInt(FAILED_DATA_VOLUMES_TOLERATED_KEY,
+    conf.setInt(HDDS_DATANODE_FAILED_DATA_VOLUMES_TOLERATED_KEY,
         validFailedVolumesTolerated);
-    conf.setInt(FAILED_METADATA_VOLUMES_TOLERATED_KEY,
+    conf.setInt(HDDS_DATANODE_FAILED_METADATA_VOLUMES_TOLERATED_KEY,
         validFailedVolumesTolerated);
     conf.setInt(FAILED_DB_VOLUMES_TOLERATED_KEY,
         validFailedVolumesTolerated);
@@ -96,9 +96,9 @@ public class TestDatanodeConfiguration {
     conf.setInt(CONTAINER_DELETE_THREADS_MAX_KEY, invalidDeleteThreads);
     conf.setLong(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY,
         invalidDiskCheckIntervalMinutes);
-    conf.setInt(FAILED_DATA_VOLUMES_TOLERATED_KEY,
+    conf.setInt(HDDS_DATANODE_FAILED_DATA_VOLUMES_TOLERATED_KEY,
         invalidFailedVolumesTolerated);
-    conf.setInt(FAILED_METADATA_VOLUMES_TOLERATED_KEY,
+    conf.setInt(HDDS_DATANODE_FAILED_METADATA_VOLUMES_TOLERATED_KEY,
         invalidFailedVolumesTolerated);
     conf.setInt(FAILED_DB_VOLUMES_TOLERATED_KEY,
         invalidFailedVolumesTolerated);
