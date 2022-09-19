@@ -148,7 +148,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>RocksDBCheckpointDiffer</artifactId>
+      <artifactId>rocksdb-checkpoint-differ</artifactId>
       <version>${hdds.version}</version>
     </dependency>
 

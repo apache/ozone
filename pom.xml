@@ -1843,47 +1843,35 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               </goals>
               <configuration>
                 <rules>
-                  <RestrictImports>	
-                    <includeTestCode>false</includeTestCode>	
-                    <reason>Use managed RocksObjects under org.apache.hadoop.hdds.utils.db.managed instead.</reason>	
-                    <!-- By default, ban all the classes in org.rocksdb -->	
-                    <bannedImport>org.rocksdb.**</bannedImport>	
-                    <allowedImports>	
-                      <!-- Allow non-RocksObject classes. -->	
-                      <allowedImport>org.rocksdb.BlockBasedTableConfig</allowedImport>	
-                      <allowedImport>org.rocksdb.ColumnFamilyDescriptor</allowedImport>	
-                      <allowedImport>org.rocksdb.CompactionStyle</allowedImport>	
-                      <allowedImport>org.rocksdb.HistogramData</allowedImport>	
-                      <allowedImport>org.rocksdb.HistogramType</allowedImport>	
-                      <allowedImport>org.rocksdb.Holder</allowedImport>	
-                      <allowedImport>org.rocksdb.InfoLogLevel</allowedImport>	
-                      <allowedImport>org.rocksdb.OptionsUtil</allowedImport>	
-                      <allowedImport>org.rocksdb.RocksDBException</allowedImport>	
-                      <allowedImport>org.rocksdb.StatsLevel</allowedImport>	
-                      <allowedImport>org.rocksdb.TransactionLogIterator.BatchResult</allowedImport>	
-                      <allowedImport>org.rocksdb.TickerType</allowedImport>	
+                  <RestrictImports>
+                    <includeTestCode>false</includeTestCode>
+                    <reason>Use managed RocksObjects under org.apache.hadoop.hdds.utils.db.managed instead.</reason>
+                    <!-- By default, ban all the classes in org.rocksdb -->
+                    <bannedImport>org.rocksdb.**</bannedImport>
+                    <allowedImports>
+                      <!-- Allow non-RocksObject classes. -->
+                      <allowedImport>org.rocksdb.BlockBasedTableConfig</allowedImport>
+                      <allowedImport>org.rocksdb.ColumnFamilyDescriptor</allowedImport>
+                      <allowedImport>org.rocksdb.CompactionStyle</allowedImport>
+                      <allowedImport>org.rocksdb.HistogramData</allowedImport>
+                      <allowedImport>org.rocksdb.HistogramType</allowedImport>
+                      <allowedImport>org.rocksdb.Holder</allowedImport>
+                      <allowedImport>org.rocksdb.InfoLogLevel</allowedImport>
+                      <allowedImport>org.rocksdb.OptionsUtil</allowedImport>
+                      <allowedImport>org.rocksdb.RocksDBException</allowedImport>
+                      <allowedImport>org.rocksdb.StatsLevel</allowedImport>
+                      <allowedImport>org.rocksdb.TransactionLogIterator.BatchResult</allowedImport>
+                      <allowedImport>org.rocksdb.TickerType</allowedImport>
 
-                      <allowedImport>org.rocksdb.AbstractEventListener</allowedImport>	
-                      <allowedImport>org.rocksdb.Checkpoint</allowedImport>	
-                      <allowedImport>org.rocksdb.CompactionJobInfo</allowedImport>	
-                      <allowedImport>org.rocksdb.CompressionType</allowedImport>	
-                      <allowedImport>org.rocksdb.DBOptions</allowedImport>	
-                      <allowedImport>org.rocksdb.FlushOptions</allowedImport>	
-                      <allowedImport>org.rocksdb.LiveFileMetaData</allowedImport>	
-                      <allowedImport>org.rocksdb.Options</allowedImport>	
-                      <allowedImport>org.rocksdb.RocksDB</allowedImport>	
-                      <allowedImport>org.rocksdb.SstFileReader</allowedImport>	
-                      <allowedImport>org.rocksdb.TableProperties</allowedImport>	
+                      <!-- Allow RocksObjects whose native pointer is managed by RocksDB. -->
+                      <allowedImport>org.rocksdb.ColumnFamilyHandle</allowedImport>
+                      <allowedImport>org.rocksdb.Env</allowedImport>
+                      <allowedImport>org.rocksdb.Statistics</allowedImport>
 
-                      <!-- Allow RocksObjects whose native pointer is managed by RocksDB. -->	
-                      <allowedImport>org.rocksdb.ColumnFamilyHandle</allowedImport>	
-                      <allowedImport>org.rocksdb.Env</allowedImport>	
-                      <allowedImport>org.rocksdb.Statistics</allowedImport>	
-
-                      <!-- Allow RocksDB constants and static methods to be used. -->	
-                      <allowedImport>org.rocksdb.RocksDB.*</allowedImport>	
-                    </allowedImports>	
-                    <exclusion>org.apache.hadoop.hdds.utils.db.managed.*</exclusion>	
+                      <!-- Allow RocksDB constants and static methods to be used. -->
+                      <allowedImport>org.rocksdb.RocksDB.*</allowedImport>
+                    </allowedImports>
+                    <exclusion>org.apache.hadoop.hdds.utils.db.managed.*</exclusion>
                   </RestrictImports>
                 </rules>
               </configuration>
