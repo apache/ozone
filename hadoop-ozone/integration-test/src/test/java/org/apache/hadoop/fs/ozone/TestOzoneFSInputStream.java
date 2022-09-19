@@ -18,8 +18,12 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -28,6 +32,8 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -59,6 +65,7 @@ public class TestOzoneFSInputStream {
   private static FileSystem fs;
   private static Path filePath = null;
   private static byte[] data = null;
+  private static OzoneConfiguration conf = null;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -69,7 +76,7 @@ public class TestOzoneFSInputStream {
    */
   @BeforeClass
   public static void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.LEGACY.name());
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -158,5 +165,27 @@ public class TestOzoneFSInputStream {
 
       Assert.assertArrayEquals(value, buffer.array());
     }
+  }
+
+  @Test
+  public void testSequenceFileReaderSync() throws IOException {
+    File srcfile = new File("src/test/resources/testSequenceFile");
+    Path path = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
+    InputStream input = new BufferedInputStream(new FileInputStream(srcfile));
+
+    // Upload test SequenceFile file
+    FSDataOutputStream output = fs.create(path);
+    IOUtils.copyBytes(input, output, 4096, true);
+    input.close();
+
+    // Start SequenceFile.Reader test
+    SequenceFile.Reader in = new SequenceFile.Reader(fs, path, conf);
+    long blockStart = -1;
+    // EOFException should not occur.
+    in.sync(0);
+    blockStart = in.getPosition();
+    // The behavior should be consistent with HDFS
+    Assert.assertEquals(srcfile.length(), blockStart);
+    in.close();
   }
 }
