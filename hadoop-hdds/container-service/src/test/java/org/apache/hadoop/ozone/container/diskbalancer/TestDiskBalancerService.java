@@ -66,7 +66,6 @@ import static org.mockito.Mockito.when;
 public class TestDiskBalancerService {
   private File testRoot;
   private String scmId;
-  private String clusterID;
   private String datanodeUuid;
   private OzoneConfiguration conf;
 
@@ -94,7 +93,6 @@ public class TestDiskBalancerService {
       FileUtils.cleanDirectory(testRoot);
     }
     scmId = UUID.randomUUID().toString();
-    clusterID = UUID.randomUUID().toString();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         generateVolumeLocation(testRoot.getAbsolutePath(), 2));
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());

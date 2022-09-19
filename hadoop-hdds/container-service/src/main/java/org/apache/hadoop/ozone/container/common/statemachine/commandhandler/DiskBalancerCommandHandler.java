@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
@@ -63,7 +62,6 @@ public class DiskBalancerCommandHandler implements CommandHandler {
       StateContext context, SCMConnectionManager connectionManager) {
     invocationCount.incrementAndGet();
     final long startTime = Time.monotonicNow();
-    final DatanodeDetails dn = context.getParent().getDatanodeDetails();
     DiskBalancerCommand diskBalancerCommand = (DiskBalancerCommand) command;
 
     final HddsProtos.DatanodeDiskBalancerOpType opType =
