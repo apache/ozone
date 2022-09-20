@@ -122,6 +122,13 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   )
   private String omServiceID = null;
 
+  @CommandLine.Option(
+          names = "--debug",
+          description = "Enable debugging message.",
+          defaultValue = "false"
+  )
+  private boolean debug;
+
   private Timer timer;
 
   private OzoneClient[] rpcClients;
@@ -163,7 +170,11 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   }
 
   public void readWriteKeys(long counter) throws Exception {
-    int clientIndex = (int)(counter % clientsCount);
+    int clientIndex = (int)((counter) % clientsCount);
+    if (debug) {
+      LOG.error("*** *** *** counter = "+ counter + ", clientIndex = " + clientIndex);
+    }
+
     OzoneClient client = rpcClients[clientIndex];
     String operationType = decideReadOrWriteTask();
     String keyName = getKeyName(operationType, clientIndex);
@@ -226,16 +237,16 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     }
   }
 
-  public String getKeyName(String operationType, int counter) {
+  public String getKeyName(String operationType, int clientIndex) {
     int startIdx, endIdx;
     switch (operationType) {
     case readTask:
-      startIdx = counter * readRange;
-      endIdx = startIdx + readRange;
+      startIdx = clientIndex * (readRange / clientsCount) ;
+      endIdx = startIdx + (readRange / clientsCount) - 1; // separate tasks evenly to each client
       break;
     case writeTask:
-      startIdx = counter * writeRange;
-      endIdx = startIdx + writeRange;
+      startIdx = clientIndex * (writeRange / clientsCount);
+      endIdx = startIdx + (writeRange / clientsCount) - 1;
       break;
     default:
       startIdx = 0;
@@ -250,7 +261,7 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
               append(randomIdxWithinRange);
     } else {
       keyNameSb.append(getPrefix()).append(FILE_DIR_SEPARATOR).
-              append(kg.generateSimpleHashKeyName(randomIdxWithinRange));
+              append(kg.generateMd5KeyName(randomIdxWithinRange));
     }
     return keyNameSb.toString();
   }

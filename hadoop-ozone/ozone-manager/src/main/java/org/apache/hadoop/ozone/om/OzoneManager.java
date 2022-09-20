@@ -493,8 +493,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.preallocateBlocksMax = conf.getInt(
         OZONE_KEY_PREALLOCATION_BLOCKS_MAX,
         OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT);
-    this.grpcBlockTokenEnabled = conf.getBoolean(HDDS_BLOCK_TOKEN_ENABLED,
-        HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
+//    this.grpcBlockTokenEnabled = conf.getBoolean(HDDS_BLOCK_TOKEN_ENABLED,
+//        HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
+    this.grpcBlockTokenEnabled = false;
     this.useRatisForReplication = conf.getBoolean(
         DFS_CONTAINER_RATIS_ENABLED_KEY, DFS_CONTAINER_RATIS_ENABLED_DEFAULT);
     // TODO: This is a temporary check. Once fully implemented, all OM state

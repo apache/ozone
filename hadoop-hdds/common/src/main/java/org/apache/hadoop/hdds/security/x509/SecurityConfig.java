@@ -141,12 +141,15 @@ public class SecurityConfig {
     this.certificateFileName = this.configuration.get(HDDS_X509_FILE_NAME,
         HDDS_X509_FILE_NAME_DEFAULT);
 
-    this.blockTokenEnabled = this.configuration.getBoolean(
-        HDDS_BLOCK_TOKEN_ENABLED,
-        HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
-    this.containerTokenEnabled = this.configuration.getBoolean(
-        HDDS_CONTAINER_TOKEN_ENABLED,
-        HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT);
+//    this.blockTokenEnabled = this.configuration.getBoolean(
+//        HDDS_BLOCK_TOKEN_ENABLED,
+//        HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
+    this.blockTokenEnabled = false;
+
+//    this.containerTokenEnabled = this.configuration.getBoolean(
+//        HDDS_CONTAINER_TOKEN_ENABLED,
+//        HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT);
+    this.containerTokenEnabled = false;
 
     this.grpcTlsEnabled = this.configuration.getBoolean(HDDS_GRPC_TLS_ENABLED,
         HDDS_GRPC_TLS_ENABLED_DEFAULT);

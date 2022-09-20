@@ -50,8 +50,8 @@ public class RangeKeysGenerator extends BaseFreonGenerator
 
   @CommandLine.Option(names = {"-k", "--key-encode"},
           description = "The algorithm to generate key names. " +
-                  "Options are pureIndex, md5, simpleHash",
-          defaultValue = "simpleHash")
+                  "Options are pureIndex, md5",
+          defaultValue = "md5")
   private String encodeFormat;
 
   @CommandLine.Option(names = {"-g", "--size"},
@@ -119,7 +119,7 @@ public class RangeKeysGenerator extends BaseFreonGenerator
         loopRunner(kg.md5KeyNameFunc(), client, startIndex, endIndex);
         break;
       default:
-        loopRunner(kg.simpleHashKeyNameFunc(), client, startIndex, endIndex);
+        loopRunner(kg.md5KeyNameFunc(), client, startIndex, endIndex);
         break;
       }
       return null;

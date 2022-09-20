@@ -209,9 +209,10 @@ public class KeyManagerImpl implements KeyManager {
     this.preallocateBlocksMax = conf.getInt(
         OZONE_KEY_PREALLOCATION_BLOCKS_MAX,
         OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT);
-    this.grpcBlockTokenEnabled = conf.getBoolean(
-        HDDS_BLOCK_TOKEN_ENABLED,
-        HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
+//    this.grpcBlockTokenEnabled = conf.getBoolean(
+//        HDDS_BLOCK_TOKEN_ENABLED,
+//        HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
+    this.grpcBlockTokenEnabled = false;
     this.listTrashKeysMax = conf.getInt(
       OZONE_CLIENT_LIST_TRASH_KEYS_MAX,
       OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT);
