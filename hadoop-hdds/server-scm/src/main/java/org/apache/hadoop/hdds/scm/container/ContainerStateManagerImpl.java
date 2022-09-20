@@ -17,21 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import java.io.IOException;
-import java.lang.reflect.Proxy;
-import java.util.EnumMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.NavigableSet;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
 import com.google.common.base.Preconditions;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
@@ -53,23 +43,35 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
-
+import org.apache.hadoop.ozone.lock.LockManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FINALIZE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.QUASI_CLOSE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.CLOSE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FORCE_CLOSE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.DELETE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.CLEANUP;
+import java.io.IOException;
+import java.lang.reflect.Proxy;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.NavigableSet;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.CLEANUP;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.CLOSE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.DELETE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FINALIZE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FORCE_CLOSE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.QUASI_CLOSE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK_DEFAULT;
 
 /**
  * Default implementation of ContainerStateManager. This implementation
@@ -80,6 +82,10 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DE
  */
 public final class ContainerStateManagerImpl
     implements ContainerStateManager {
+
+  private ConfigurationSource confSrc;
+
+  private final LockManager<ContainerID> lockManager;
 
   /**
    * Logger instance of ContainerStateManagerImpl.
@@ -141,6 +147,7 @@ public final class ContainerStateManagerImpl
       final Table<ContainerID, ContainerInfo> containerStore,
       final DBTransactionBuffer buffer)
       throws IOException {
+    this.confSrc = OzoneConfiguration.of(conf);
     this.pipelineManager = pipelineManager;
     this.containerStore = containerStore;
     this.stateMachine = newStateMachine();
@@ -149,7 +156,10 @@ public final class ContainerStateManagerImpl
     this.lastUsedMap = new ConcurrentHashMap<>();
     this.containerStateChangeActions = getContainerStateChangeActions();
     this.transactionBuffer = buffer;
-
+    boolean fair = conf.getBoolean(OZONE_MANAGER_FAIR_LOCK,
+        OZONE_MANAGER_FAIR_LOCK_DEFAULT);
+    this.lockManager =
+        new LockManager<>(confSrc, fair);
     initialize();
   }
 
@@ -280,11 +290,11 @@ public final class ContainerStateManagerImpl
 
   @Override
   public ContainerInfo getContainer(final ContainerID id) {
-    lock.readLock().lock();
+    lockManager.readLock(id);
     try {
       return containers.getContainerInfo(id);
     } finally {
-      lock.readLock().unlock();
+      lockManager.readUnlock(id);
     }
   }
 
@@ -310,7 +320,7 @@ public final class ContainerStateManagerImpl
           if (pipelineManager.containsPipeline(pipelineID)) {
             pipelineManager.addContainerToPipeline(pipelineID, containerID);
           } else if (containerInfo.getState().
-              equals(HddsProtos.LifeCycleState.OPEN)) {
+              equals(LifeCycleState.OPEN)) {
             // Pipeline should exist, but not
             throw new PipelineNotFoundException();
           }
@@ -329,11 +339,11 @@ public final class ContainerStateManagerImpl
 
   @Override
   public boolean contains(ContainerID id) {
-    lock.readLock().lock();
+    lockManager.readLock(id);
     try {
       return containers.contains(id);
     } finally {
-      lock.readLock().unlock();
+      lockManager.readUnlock(id);
     }
   }
 
@@ -344,7 +354,7 @@ public final class ContainerStateManagerImpl
     // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
     final ContainerID id = ContainerID.getFromProtobuf(containerID);
 
-    lock.writeLock().lock();
+    lockManager.writeLock(id);
     try {
       if (containers.contains(id)) {
         final ContainerInfo oldInfo = containers.getContainerInfo(id);
@@ -365,52 +375,54 @@ public final class ContainerStateManagerImpl
         }
       }
     } finally {
-      lock.writeLock().unlock();
+      lockManager.writeUnlock(id);
     }
   }
 
 
   @Override
   public Set<ContainerReplica> getContainerReplicas(final ContainerID id) {
-    lock.readLock().lock();
+    lockManager.readLock(id);
     try {
       return containers.getContainerReplicas(id);
     } finally {
-      lock.readLock().unlock();
+      lockManager.readUnlock(id);
     }
   }
 
   @Override
   public void updateContainerReplica(final ContainerID id,
                                      final ContainerReplica replica) {
-    lock.writeLock().lock();
+    lockManager.writeLock(id);
     try {
       containers.updateContainerReplica(id, replica);
     } finally {
-      lock.writeLock().unlock();
+      lockManager.writeUnlock(id);
     }
   }
 
   @Override
   public void removeContainerReplica(final ContainerID id,
                                      final ContainerReplica replica) {
-    lock.writeLock().lock();
+    lockManager.writeLock(id);
     try {
       containers.removeContainerReplica(id,
           replica);
     } finally {
-      lock.writeLock().unlock();
+      lockManager.writeUnlock(id);
     }
   }
 
   @Override
   public void updateDeleteTransactionId(
       final Map<ContainerID, Long> deleteTransactionMap) throws IOException {
-    lock.writeLock().lock();
-    try {
-      // TODO: Refactor this. Error handling is not done.
-      for (Map.Entry<ContainerID, Long> transaction :
-          deleteTransactionMap.entrySet()) {
+
+    // TODO: Refactor this. Error handling is not done.
+    for (Map.Entry<ContainerID, Long> transaction :
+        deleteTransactionMap.entrySet()) {
+      ContainerID containerID = transaction.getKey();
+      try {
+        lockManager.writeLock(containerID);
         final ContainerInfo info = containers.getContainerInfo(
             transaction.getKey());
         if (info == null) {
@@ -420,9 +432,9 @@ public final class ContainerStateManagerImpl
         }
         info.updateDeleteTransactionId(transaction.getValue());
         transactionBuffer.addToBuffer(containerStore, info.containerID(), info);
+      } finally {
+        lockManager.writeUnlock(containerID);
       }
-    } finally {
-      lock.writeLock().unlock();
     }
   }
 
@@ -438,6 +450,7 @@ public final class ContainerStateManagerImpl
     final ContainerID lastID =
         lastUsedMap.getOrDefault(key, containerIDs.first());
 
+    lockManager.readLock(lastID);
     // There is a small issue here. The first time, we will skip the first
     // container. But in most cases it will not matter.
     NavigableSet<ContainerID> resultSet = containerIDs.tailSet(lastID, false);
@@ -445,7 +458,6 @@ public final class ContainerStateManagerImpl
       resultSet = containerIDs;
     }
 
-    lock.readLock().lock();
     try {
       ContainerInfo selectedContainer = findContainerWithSpace(size, resultSet);
       if (selectedContainer == null) {
@@ -468,7 +480,7 @@ public final class ContainerStateManagerImpl
       }
       return selectedContainer;
     } finally {
-      lock.readLock().unlock();
+      lockManager.readUnlock(lastID);
     }
   }
 
