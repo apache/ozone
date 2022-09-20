@@ -119,17 +119,14 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     final ECContainerReplicaCount replicaCount =
         new ECContainerReplicaCount(container, replicas, pendingOps,
             remainingMaintenanceRedundancy);
-
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setContainerInfo(container)
         .setContainerReplicas(replicas)
         .setPendingOps(pendingOps)
         .setMaintenanceRedundancy(remainingMaintenanceRedundancy)
         .build();
-
     ContainerHealthResult currentUnderRepRes = ecReplicationCheck
         .checkHealth(request);
-
     LOG.debug("Handling under-replicated EC container: {}", container);
     if (currentUnderRepRes
         .getHealthState() != ContainerHealthResult.HealthState
@@ -139,7 +136,6 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           container.getContainerID(), currentUnderRepRes);
       return emptyMap();
     }
-
     // don't place reconstructed replicas on exclude nodes, since they already
     // have replicas
     List<DatanodeDetails> excludedNodes = replicas.stream()
@@ -212,7 +208,6 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
             // Keeping the first target node as coordinator.
             commands.put(selectedDatanodes.get(0), reconstructionCommand);
           }
-
         } else {
           LOG.warn("Cannot proceed for EC container reconstruction for {}, due"
               + " to insufficient source replicas found. Number of source "
@@ -221,7 +216,6 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
               repConfig.getData(), sources.size(), sources);
         }
       }
-
       Set<Integer> decomIndexes = replicaCount.decommissioningOnlyIndexes(true);
       if (decomIndexes.size() > 0) {
         final List<DatanodeDetails> selectedDatanodes =
@@ -253,7 +247,6 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           }
         }
       }
-
       processMaintenanceOnlyIndexes(replicaCount, replicas, excludedNodes,
           commands);
     } catch (IOException | IllegalStateException ex) {
