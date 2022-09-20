@@ -27,11 +27,11 @@ import java.util.List;
  */
 public class DiskBalancerCommonOptions {
 
-  @CommandLine.Option(names = {"-a", "--allDatanodes"},
+  @CommandLine.Option(names = {"-a", "--all"},
       description = "Run commands on all datanodes.")
   private boolean allHosts;
 
-  @CommandLine.Option(names = {"--hosts"},
+  @CommandLine.Option(names = {"-d", "--datanodes"},
       description = "Run commands on specific datanodes.")
   private List<String> hosts = new ArrayList<>();
 
@@ -41,13 +41,14 @@ public class DiskBalancerCommonOptions {
    */
   public boolean check() {
     if (hosts.size() == 0 && !allHosts) {
-      System.out.println("Datanode not specified. Please specify at least one datanode or use " +
-          "\"--allDatanodes\" to start diskBalancer on all datanodes");
+      System.out.println("Datanode not specified. Please specify at least " +
+          "one datanode or use \"-a(--all)\" to start diskBalancer " +
+          "on all datanodes");
       return false;
     }
     if (hosts.size() != 0 && allHosts) {
-      System.out.println("Invalid option selection. Use either \"-a(--allDatanodes)\" or " +
-          "--hosts.");
+      System.out.println("Invalid option selection. " +
+          "Use either \"-a(--all)\" or \"-d(--datanodes)\".");
       return false;
     }
     return true;

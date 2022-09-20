@@ -51,7 +51,7 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
       description = "RUNNING, STOPPED, UNKNOWN. Default state is RUNNING.")
   private String state = "RUNNING";
 
-  @CommandLine.Option(names = {"--hosts"},
+  @CommandLine.Option(names = {"-d", "--datanodes"},
       description = "Get diskBalancer status on specific datanodes.")
   private List<String> hosts = new ArrayList<>();
 

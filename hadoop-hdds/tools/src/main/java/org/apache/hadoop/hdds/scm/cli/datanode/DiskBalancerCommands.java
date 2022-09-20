@@ -38,36 +38,38 @@ import java.util.concurrent.Callable;
  *      [ -t/--threshold {@literal <threshold>}]
  *      [ -b/--bandwidthInMB {@literal <bandwidthInMB>}]
  *      [ -p/--parallelThread {@literal <parallelThread>}]
- *      [ -a/--alldatanodes {@literal <alldatanodes>}]
+ *      [ -a/--all {@literal <alldatanodes>}]
+ *      [ -d/--datanodes {@literal <datanodes>}]
  *      [ {@literal <hosts>}]
  *      Examples:
- *      ozone admin datanode diskbalancer start {@literal <hosts>}
+ *      ozone admin datanode diskbalancer start -d {@literal <hosts>}
  *        start balancer with default values in the configuration on specified
  *        datanodes
  *      ozone admin datanode diskbalancer start -a
  *        start balancer with default values in the configuration on all
  *        datanodes in the cluster
- *      ozone admin datanode diskbalancer start -t 5 {@literal <hosts>}
+ *      ozone admin datanode diskbalancer start -t 5 -d {@literal <hosts>}
  *        start balancer with a threshold of 5%
- *      ozone admin datanode diskbalancer start -b 20 {@literal <hosts>}
+ *      ozone admin datanode diskbalancer start -b 20 -d {@literal <hosts>}
  *        start balancer with maximum 20MB/s diskbandwidth
- *      ozone admin datanode diskbalancer start -p 5 {@literal <hosts>}
+ *      ozone admin datanode diskbalancer start -p 5 -d {@literal <hosts>}
  *        start balancer with 5 parallel thread on each datanode
  * To stop:
  *      ozone admin datanode diskbalancer stop -a
  *        stop diskblancer on all datanodes
- *      ozone admin datanode diskbalancer stop {@literal <hosts>};
+ *      ozone admin datanode diskbalancer stop -d {@literal <hosts>};
  *        stop diskblancer on all datanodes
  * To update:
  *      ozone admin datanode diskbalancer update -a
  *        update diskblancer configuration on all datanodes
- *      ozone admin datanode diskbalancer update {@literal <hosts>};
+ *      ozone admin datanode diskbalancer update -d {@literal <hosts>};
  *        update diskblancer configuration on all datanodes
  * To get report:
  *      ozone admin datanode diskbalancer report -c 10
  *        retrieve at most 10 datanodes that needs diskbalance most
  * To get status:
- *      ozone admin datanode diskbalancer status -s RUNNING {@literal <hosts>}
+ *      ozone admin datanode diskbalancer status -s RUNNING -d
+ *      {@literal <hosts>}
  *        return the diskbalancer status on datanodes where diskbalancer are in
  *        Running state
  *
