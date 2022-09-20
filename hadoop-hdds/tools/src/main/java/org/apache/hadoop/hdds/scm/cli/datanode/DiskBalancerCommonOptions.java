@@ -46,7 +46,7 @@ public class DiskBalancerCommonOptions {
       return false;
     }
     if (hosts.size() != 0 && allHosts) {
-      System.out.println("Confused options. Omit \"-a(--allDatanodes)\" or " +
+      System.out.println("Invalid option selection. Use either \"-a(--allDatanodes)\" or " +
           "--hosts.");
       return false;
     }
