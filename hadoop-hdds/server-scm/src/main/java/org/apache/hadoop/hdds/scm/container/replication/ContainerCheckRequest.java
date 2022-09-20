@@ -21,7 +21,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 
 import java.util.List;
-import java.util.Queue;
 import java.util.Set;
 
 /**
@@ -35,10 +34,7 @@ public final class ContainerCheckRequest {
   private final List<ContainerReplicaOp> pendingOps;
   private final int maintenanceRedundancy;
   private final ReplicationManagerReport report;
-  private final Queue<ContainerHealthResult.UnderReplicatedHealthResult>
-      underRepQueue;
-  private final Queue<ContainerHealthResult.OverReplicatedHealthResult>
-      overRepQueue;
+  private final ReplicationQueue replicationQueue;
 
 
   private ContainerCheckRequest(Builder builder) {
@@ -47,8 +43,7 @@ public final class ContainerCheckRequest {
     this.pendingOps = builder.pendingOps;
     this.maintenanceRedundancy = builder.maintenanceRedundancy;
     this.report = builder.report;
-    this.overRepQueue = builder.overRepQueue;
-    this.underRepQueue = builder.underRepQueue;
+    this.replicationQueue = builder.replicationQueue;
   }
 
   public List<ContainerReplicaOp> getPendingOps() {
@@ -71,14 +66,8 @@ public final class ContainerCheckRequest {
     return report;
   }
 
-  public Queue<ContainerHealthResult.UnderReplicatedHealthResult>
-      getUnderRepQueue() {
-    return underRepQueue;
-  }
-
-  public Queue<ContainerHealthResult.OverReplicatedHealthResult>
-      getOverRepQueue() {
-    return overRepQueue;
+  public ReplicationQueue getReplicationQueue() {
+    return replicationQueue;
   }
 
   /**
@@ -91,10 +80,7 @@ public final class ContainerCheckRequest {
     private List<ContainerReplicaOp> pendingOps;
     private int maintenanceRedundancy;
     private ReplicationManagerReport report;
-    private Queue<ContainerHealthResult.UnderReplicatedHealthResult>
-        underRepQueue;
-    private Queue<ContainerHealthResult.OverReplicatedHealthResult>
-        overRepQueue;
+    private ReplicationQueue replicationQueue;
 
     public Builder setContainerInfo(ContainerInfo containerInfo) {
       this.containerInfo = containerInfo;
@@ -117,15 +103,8 @@ public final class ContainerCheckRequest {
       return this;
     }
 
-    public Builder setUnderRepQueue(
-        Queue<ContainerHealthResult.UnderReplicatedHealthResult> queue) {
-      this.underRepQueue = queue;
-      return this;
-    }
-
-    public Builder setOverRepQueue(
-        Queue<ContainerHealthResult.OverReplicatedHealthResult> queue) {
-      this.overRepQueue = queue;
+    public Builder setReplicationQueue(ReplicationQueue repQueue) {
+      this.replicationQueue = repQueue;
       return this;
     }
 
