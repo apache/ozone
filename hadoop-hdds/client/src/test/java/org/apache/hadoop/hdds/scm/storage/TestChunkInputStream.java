@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import java.io.EOFException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Random;
@@ -31,7 +30,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
-import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
