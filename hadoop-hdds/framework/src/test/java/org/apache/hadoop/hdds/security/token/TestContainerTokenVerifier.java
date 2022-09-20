@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.junit.Ignore;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -36,6 +37,7 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChun
 /**
  * Tests for {@link ContainerTokenVerifier}.
  */
+@Ignore
 public class TestContainerTokenVerifier
     extends TokenVerifierTests<ContainerTokenIdentifier> {
 

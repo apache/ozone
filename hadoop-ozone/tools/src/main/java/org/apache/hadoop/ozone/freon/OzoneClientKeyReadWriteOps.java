@@ -172,7 +172,8 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   public void readWriteKeys(long counter) throws Exception {
     int clientIndex = (int)((counter) % clientsCount);
     if (debug) {
-      LOG.error("*** *** *** counter = "+ counter + ", clientIndex = " + clientIndex);
+      LOG.error("*** *** *** counter = " +
+              counter + ", clientIndex = " + clientIndex);
     }
 
     OzoneClient client = rpcClients[clientIndex];
@@ -206,7 +207,7 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     } else {
       byte[] data = new byte[writeSizeInBytes];
       try (OzoneInputStream introStream = ozbk.readKey(keyName)) {
-        introStream.read(data);
+        int readBytes = introStream.read(data);
       }
     }
   }
@@ -241,10 +242,12 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     int startIdx, endIdx;
     switch (operationType) {
     case readTask:
-      startIdx = clientIndex * (readRange / clientsCount) ;
-      endIdx = startIdx + (readRange / clientsCount) - 1; // separate tasks evenly to each client
+      // separate tasks evenly to each client
+      startIdx = clientIndex * (readRange / clientsCount);
+      endIdx = startIdx + (readRange / clientsCount) - 1;
       break;
     case writeTask:
+      // separate tasks evenly to each client
       startIdx = clientIndex * (writeRange / clientsCount);
       endIdx = startIdx + (writeRange / clientsCount) - 1;
       break;
