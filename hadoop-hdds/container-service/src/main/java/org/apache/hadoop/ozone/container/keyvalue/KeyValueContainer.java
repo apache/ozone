@@ -44,7 +44,6 @@ import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.helpers.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -297,11 +296,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } catch (StorageContainerException ex) {
       throw ex;
     } catch (IOException ex) {
-      if (CleanUpManager.checkContainerSchemaV3Enabled(containerData)) {
-        HddsVolume hddsVolume = containerData.getVolume();
-        CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
-        cleanUpManager.cleanTmpDir();
-      }
+      // Container will be removed from tmp directory under the volume.
+      // On datanode shutdown/restart any partial artifacts left
+      // will be wiped from volume's tmp directory.
       onFailure(containerData.getVolume());
       String errMsg = String.format("Failed to cleanup container. ID: %d",
           containerId);

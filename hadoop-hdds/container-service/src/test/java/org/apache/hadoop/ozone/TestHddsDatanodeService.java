@@ -33,13 +33,11 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ozone.container.common.helpers.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.ScmTestMock;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.thirdparty.com.google.common.io.Files;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ServicePlugin;
@@ -57,13 +55,10 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
 /**
  * Test class for {@link HddsDatanodeService}.
  */
-@RunWith(Parameterized.class)
 public class TestHddsDatanodeService {
 
   @Rule
@@ -71,25 +66,13 @@ public class TestHddsDatanodeService {
 
   private final String clusterId = UUID.randomUUID().toString();
   private final OzoneConfiguration conf = new OzoneConfiguration();
-  private final String schemaVersion;
   private static final int SCM_SERVER_COUNT = 1;
   private static final String FILE_SEPARATOR = File.separator;
 
   private File testDir;
-  private CleanUpManager[] managers;
   private List<String> serverAddresses;
   private List<RPC.Server> scmServers;
   private List<ScmTestMock> mockServers;
-
-  public TestHddsDatanodeService(ContainerTestVersionInfo info) {
-    this.schemaVersion = info.getSchemaVersion();
-    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
-  }
-
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
 
   @Before
   public void setUp() throws IOException {
@@ -144,50 +127,46 @@ public class TestHddsDatanodeService {
     assertFalse(service.getDatanodeStateMachine().isDaemonStopped());
     assertNotNull(service.getCRLStore());
 
-    if (CleanUpManager.checkContainerSchemaV3Enabled(conf)) {
-      // Get volumeSet and store volumes in temp folders
-      // in order to access them after service.stop()
-      MutableVolumeSet volumeSet = service
-          .getDatanodeStateMachine().getContainer().getVolumeSet();
-      List<HddsVolume> volumes = StorageVolumeUtil.getHddsVolumesList(
-          volumeSet.getVolumesList());
-      int volumeSetSize = volumes.size();
-      File[] tempHddsVolumes = new File[volumeSetSize];
-      StringBuilder hddsDirs = new StringBuilder();
-      managers = new CleanUpManager[volumeSetSize];
+    // Get volumeSet and store volumes in temp folders
+    // in order to access them after service.stop()
+    MutableVolumeSet volumeSet = service
+        .getDatanodeStateMachine().getContainer().getVolumeSet();
+    List<HddsVolume> volumes = StorageVolumeUtil.getHddsVolumesList(
+        volumeSet.getVolumesList());
+    int volumeSetSize = volumes.size();
+    File[] tempHddsVolumes = new File[volumeSetSize];
+    StringBuilder hddsDirs = new StringBuilder();
 
-      for (int i = 0; i < volumeSetSize; i++) {
-        HddsVolume volume = volumes.get(i);
-        volume.format(clusterId);
-        volume.createWorkingDir(clusterId, null);
+    for (int i = 0; i < volumeSetSize; i++) {
+      HddsVolume volume = volumes.get(i);
+      volume.format(clusterId);
+      volume.createWorkingDir(clusterId, null);
 
-        CleanUpManager manager = new CleanUpManager(volume);
-        managers[i] = manager;
-        tempHddsVolumes[i] = tempDir.newFolder();
-        hddsDirs.append(tempHddsVolumes[i]).append(",");
+      tempHddsVolumes[i] = tempDir.newFolder();
+      hddsDirs.append(tempHddsVolumes[i]).append(",");
 
-        // Write to tmp dir under volume
-        File testFile = new File(manager.getTmpDirPath() +
-            FILE_SEPARATOR + "testFile.txt");
-        Files.touch(testFile);
-        assertTrue(testFile.exists());
+      // Write to tmp dir under volume
+      File testFile = new File(volume.getDeleteServiceDirPath() +
+          FILE_SEPARATOR + "testFile.txt");
+      Files.touch(testFile);
+      assertTrue(testFile.exists());
 
-        ListIterator<File> tmpDirIter = manager.getDeleteLeftovers();
-        List<File> tmpDirFileList = new LinkedList<>();
-        boolean testFileExistsUnderTmp = false;
+      ListIterator<File> tmpDirIter = volume.getDeleteLeftovers();
+      List<File> tmpDirFileList = new LinkedList<>();
+      boolean testFileExistsUnderTmp = false;
 
-        while (tmpDirIter.hasNext()) {
-          tmpDirFileList.add(tmpDirIter.next());
-        }
-
-        if (tmpDirFileList.contains(testFile)) {
-          testFileExistsUnderTmp = true;
-        }
-        assertTrue(testFileExistsUnderTmp);
+      while (tmpDirIter.hasNext()) {
+        tmpDirFileList.add(tmpDirIter.next());
       }
-      conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
-          Arrays.toString(tempHddsVolumes));
+
+      if (tmpDirFileList.contains(testFile)) {
+        testFileExistsUnderTmp = true;
+      }
+      assertTrue(testFileExistsUnderTmp);
     }
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+        Arrays.toString(tempHddsVolumes));
+
 
     service.stop();
     // CRL store must be stopped when the service stops
@@ -195,11 +174,9 @@ public class TestHddsDatanodeService {
     service.join();
     service.close();
 
-    if (CleanUpManager.checkContainerSchemaV3Enabled(conf)
-        && managers != null) {
-      for (CleanUpManager manager: managers) {
-        assertTrue(manager.tmpDirIsEmpty());
-      }
+    for (HddsVolume hddsVolume : volumes) {
+      ListIterator<File> deleteLeftoverIt = hddsVolume.getDeleteLeftovers();
+      assertFalse(deleteLeftoverIt.hasNext());
     }
   }
 

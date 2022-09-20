@@ -54,7 +54,6 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.metrics2.util.MBeans;
-import org.apache.hadoop.ozone.container.common.helpers.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -129,10 +128,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         getDatanodeStateMachine().getContainer().getVolumeSet();
     for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
         volumeSet.getVolumesList())) {
-      CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
-      if (!cleanUpManager.tmpDirIsEmpty()) {
-        cleanUpManager.cleanTmpDir();
-      }
+      hddsVolume.cleanTmpDir();
     }
   }
 
@@ -573,10 +569,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   @Override
   public void stop() {
-    if (CleanUpManager.checkContainerSchemaV3Enabled(conf)) {
-      cleanTmpDir();
-    }
     if (!isStopped.getAndSet(true)) {
+      // Clean <HddsVolume>/tmp/container_delete_service dir.
+      cleanTmpDir();
       if (plugins != null) {
         for (ServicePlugin plugin : plugins) {
           try {

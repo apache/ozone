@@ -22,11 +22,7 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
-import org.apache.hadoop.ozone.container.common.helpers.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,19 +84,6 @@ public class StaleRecoveringContainerScrubbingService
 
     @Override
     public BackgroundTaskResult call() throws Exception {
-      Container container = containerSet.getContainer(containerID);
-
-      if (container.getContainerData() instanceof KeyValueContainerData) {
-        KeyValueContainerData keyValueContainerData =
-            (KeyValueContainerData) container.getContainerData();
-        if (CleanUpManager
-            .checkContainerSchemaV3Enabled(keyValueContainerData)) {
-          HddsVolume hddsVolume = keyValueContainerData.getVolume();
-          CleanUpManager cleanUpManager =
-              new CleanUpManager(hddsVolume);
-          cleanUpManager.renameDir(keyValueContainerData);
-        }
-      }
       containerSet.getContainer(containerID).delete();
       containerSet.removeContainer(containerID);
       LOG.info("Delete stale recovering container {}", containerID);

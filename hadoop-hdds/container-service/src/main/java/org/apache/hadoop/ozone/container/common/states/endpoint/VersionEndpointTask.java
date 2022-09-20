@@ -22,7 +22,6 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.helpers.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -125,13 +124,10 @@ public class VersionEndpointTask implements
             scmId, clusterId, configuration, LOG,
             ozoneContainer.getDbVolumeSet());
 
-        // Check and clean /tmp/container_delete_service
+        // Clean <HddsVolume>/tmp/container_delete_service dir.
         if (volume instanceof HddsVolume) {
           HddsVolume hddsVolume = (HddsVolume) volume;
-          CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
-          if (!cleanUpManager.tmpDirIsEmpty()) {
-            cleanUpManager.cleanTmpDir();
-          }
+          hddsVolume.cleanTmpDir();
         }
 
         if (!result) {

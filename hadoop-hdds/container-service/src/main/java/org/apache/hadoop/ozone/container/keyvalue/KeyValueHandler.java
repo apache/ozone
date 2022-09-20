@@ -57,7 +57,6 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
-import org.apache.hadoop.ozone.container.common.helpers.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -1243,15 +1242,19 @@ public class KeyValueHandler extends Handler {
       if (container.getContainerData() instanceof KeyValueContainerData) {
         KeyValueContainerData keyValueContainerData =
             (KeyValueContainerData) container.getContainerData();
-        if (CleanUpManager
-            .checkContainerSchemaV3Enabled(keyValueContainerData)) {
-          HddsVolume hddsVolume = keyValueContainerData.getVolume();
+        HddsVolume hddsVolume = keyValueContainerData.getVolume();
 
-          // Initialize the directory
-          CleanUpManager cleanUpManager =
-              new CleanUpManager(hddsVolume);
-          // Rename
-          cleanUpManager.renameDir(keyValueContainerData);
+        // Rename container location
+        boolean success = hddsVolume
+            .moveToTmpDeleteDirectory(keyValueContainerData);
+
+        if (success) {
+          String containerPath = keyValueContainerData
+              .getContainerPath().toString();
+          File containerDir = new File(containerPath);
+
+          LOG.info("Container {} has been successfuly moved under {}",
+              containerDir.getName(), hddsVolume.getDeleteServiceDirPath());
         }
       }
       long containerId = container.getContainerData().getContainerID();

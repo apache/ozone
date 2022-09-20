@@ -48,7 +48,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.container.common.helpers.CleanUpManager;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -76,7 +75,6 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.create
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
-import static org.junit.Assume.assumeTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -148,10 +146,6 @@ public class TestEndPoint {
   public void testGetVersionTask() throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
 
-    // enable SchemaV3
-    ContainerTestUtils.enableSchemaV3(conf);
-    assumeTrue(CleanUpManager.checkContainerSchemaV3Enabled(conf));
-
     conf.setFromObject(new ReplicationConfig().setPort(0));
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
         serverAddress, 1000)) {
@@ -167,16 +161,15 @@ public class TestEndPoint {
       for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
           volumeSet.getVolumesList())) {
         hddsVolume.format(clusterId);
+        hddsVolume.createWorkingDir(clusterId, null);
 
-        CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
-
-        // Write to tmp dir under volume
-        File testFile = new File(cleanUpManager
-            .getTmpDirPath() + "/testFile.txt");
+        // Write to tmp/container_delete_service dir under volume
+        File testFile = new File(hddsVolume
+            .getDeleteServiceDirPath().toString() + "/testFile.txt");
         Files.touch(testFile);
         Assert.assertTrue(testFile.exists());
 
-        ListIterator<File> tmpDirIter = cleanUpManager.getDeleteLeftovers();
+        ListIterator<File> tmpDirIter = hddsVolume.getDeleteLeftovers();
         boolean testFileExistsUnderTmp = false;
 
         while (tmpDirIter.hasNext()) {
@@ -202,8 +195,7 @@ public class TestEndPoint {
       // assert that tmp dir is empty
       for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
           volumeSet.getVolumesList())) {
-        CleanUpManager cleanUpManager = new CleanUpManager(hddsVolume);
-        Assert.assertTrue(cleanUpManager.tmpDirIsEmpty());
+        Assert.assertFalse(hddsVolume.getDeleteLeftovers().hasNext());
       }
     }
   }

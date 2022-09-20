@@ -20,18 +20,26 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.slf4j.Logger;
@@ -67,6 +75,10 @@ public class HddsVolume extends StorageVolume {
   private static final Logger LOG = LoggerFactory.getLogger(HddsVolume.class);
 
   public static final String HDDS_VOLUME_DIR = "hdds";
+  private static final String FILE_SEPARATOR = File.separator;
+  private static final String TMP_DIR = FILE_SEPARATOR + "tmp";
+  private static final String TMP_DELETE_SERVICE_DIR =
+      FILE_SEPARATOR + "container_delete_service";
 
   private final VolumeIOStats volumeIOStats;
   private final VolumeInfoMetrics volumeInfoMetrics;
@@ -82,6 +94,8 @@ public class HddsVolume extends StorageVolume {
   // container db path. This is initialized only once together with dbVolume,
   // and stored as a member to prevent spawning lots of File objects.
   private File dbParentDir;
+  private Path tmpDirPath;
+  private Path deleteServiceDirPath;
   private AtomicBoolean dbLoaded = new AtomicBoolean(false);
 
   /**
@@ -133,6 +147,9 @@ public class HddsVolume extends StorageVolume {
   public void createWorkingDir(String workingDirName,
       MutableVolumeSet dbVolumeSet) throws IOException {
     super.createWorkingDir(workingDirName, dbVolumeSet);
+
+    createTmpDir(workingDirName);
+    createDeleteServiceDir();
 
     // Create DB store for a newly formatted volume
     if (VersionedDatanodeFeatures.isFinalized(
@@ -207,6 +224,14 @@ public class HddsVolume extends StorageVolume {
 
   public File getDbParentDir() {
     return this.dbParentDir;
+  }
+
+  public Path getTmpDirPath() {
+    return this.tmpDirPath;
+  }
+
+  public Path getDeleteServiceDirPath() {
+    return this.deleteServiceDirPath;
   }
 
   public boolean isDbLoaded() {
@@ -324,6 +349,134 @@ public class HddsVolume extends StorageVolume {
     if (!SchemaV3.isFinalizedAndEnabled(getConf())) {
       closeDbStore();
     }
+  }
+
+  private void createTmpDir(String id) {
+    StringBuilder stringBuilder = new StringBuilder();
+
+    // HddsVolume root directory path
+    String hddsRoot = getHddsRootDir().toString();
+
+    // HddsVolume path
+    String volPath = HddsVolumeUtil.getHddsRoot(hddsRoot);
+
+    stringBuilder.append(volPath);
+    stringBuilder.append(FILE_SEPARATOR);
+
+    stringBuilder.append(id);
+    stringBuilder.append(TMP_DIR);
+
+    String tmpPath = stringBuilder.toString();
+    tmpDirPath = Paths.get(tmpPath);
+
+    if (Files.notExists(tmpDirPath)) {
+      try {
+        Files.createDirectories(tmpDirPath);
+      } catch (IOException ex) {
+        LOG.error("Error creating {}", tmpDirPath.toString(), ex);
+      }
+    }
+  }
+
+  private void createDeleteServiceDir() {
+    try {
+      if (tmpDirPath == null) {
+        throw new IOException("tmp directory under volume " +
+            "has not been initialized");
+      }
+      String tmpPath = tmpDirPath.toString();
+      String deleteServicePath = tmpPath + TMP_DELETE_SERVICE_DIR;
+
+      deleteServiceDirPath = Paths.get(deleteServicePath);
+
+      if (Files.notExists(deleteServiceDirPath)) {
+        try {
+          Files.createDirectories(deleteServiceDirPath);
+        } catch (IOException ex) {
+          LOG.error("Error creating {}", deleteServiceDirPath.toString(), ex);
+        }
+      }
+    } catch (IOException ex) {
+      String hddsRoot = getHddsRootDir().toString();
+      String volPath = HddsVolumeUtil.getHddsRoot(hddsRoot);
+
+      LOG.error("Failed to create container_delete_service directory under {}",
+          volPath, ex);
+    }
+  }
+
+  /**
+   * Delete all files under tmp/container_delete_service.
+   */
+  public synchronized void cleanTmpDir() {
+    ListIterator<File> leftoversListIt = getDeleteLeftovers();
+
+    while (leftoversListIt.hasNext()) {
+      File file = leftoversListIt.next();
+      try {
+        if (file.isDirectory()) {
+          FileUtils.deleteDirectory(file);
+        } else {
+          FileUtils.delete(file);
+        }
+      } catch (IOException ex) {
+        LOG.error("Failed to delete directory or file inside " +
+            "{}", deleteServiceDirPath.toString(), ex);
+      }
+    }
+  }
+
+  /**
+   * Keep public, in the future might be used to gather metrics
+   * for the files left under tmp/container_delete_service.
+   * @return ListIterator to all the files
+   */
+  public ListIterator<File> getDeleteLeftovers() {
+    List<File> leftovers = new ArrayList<>();
+
+    try {
+      File tmpDir = new File(deleteServiceDirPath.toString());
+
+      for (File file : tmpDir.listFiles()) {
+        leftovers.add(file);
+      }
+    } catch (NullPointerException ex) {
+      LOG.error("tmp directory is null, path doesn't exist", ex);
+    }
+
+    ListIterator<File> leftoversListIt = leftovers.listIterator();
+    return leftoversListIt;
+  }
+
+  /**
+   * Renaming container directory path to a new location
+   * under "<HddsVolume>/tmp/container_delete_service" and
+   * updating metadata and chunks path.
+   * @param keyValueContainerData
+   * @return true if renaming was successful
+   */
+  public boolean moveToTmpDeleteDirectory(
+      KeyValueContainerData keyValueContainerData) {
+    String containerPath = keyValueContainerData.getContainerPath();
+    File container = new File(containerPath);
+    String containerDirName = container.getName();
+
+    String destinationDirPath = deleteServiceDirPath
+        .resolve(Paths.get(containerDirName)).toString();
+
+    boolean success = container.renameTo(new File(destinationDirPath));
+
+    // Updating in memory values of the container's location
+    // which is used by KeyValueContainerUtil#removeContainer().
+    // In case of a datanode restart these values won't persist but
+    // tmp delete directory will be wiped, so this won't be an issue.
+    if (success) {
+      keyValueContainerData.setMetadataPath(destinationDirPath +
+          FILE_SEPARATOR + OzoneConsts.CONTAINER_META_PATH);
+      keyValueContainerData.setChunksPath(destinationDirPath +
+          FILE_SEPARATOR + OzoneConsts.STORAGE_DIR_CHUNKS);
+    }
+    return success;
   }
 
   private void closeDbStore() {
