@@ -41,7 +41,7 @@ public class DiskBalancerCommonOptions {
    */
   public boolean check() {
     if (hosts.size() == 0 && !allHosts) {
-      System.out.println("Datanode not specified. Please specify " +
+      System.out.println("Datanode not specified. Please specify at least one datanode or use " +
           "\"--allDatanodes\" to start diskBalancer on all datanodes");
       return false;
     }
