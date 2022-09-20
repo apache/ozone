@@ -129,10 +129,8 @@ public class ContainerSet {
           "container Id " + containerId,
           ContainerProtos.Result.CONTAINER_NOT_FOUND);
     } else {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Container with container Id {} is updated to containerMap",
+      LOG.debug("Container with container Id {} is updated to containerMap",
             containerId);
-      }
       return containerMap.put(containerId, container);
     }
   }

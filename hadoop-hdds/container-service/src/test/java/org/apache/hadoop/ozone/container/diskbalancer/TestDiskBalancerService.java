@@ -45,6 +45,7 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -111,6 +112,7 @@ public class TestDiskBalancerService {
   }
 
   @Test
+  @Timeout(30)
   public void testBandwidthInMB() throws Exception {
     // Increase volume's usedBytes
     for (StorageVolume volume : volumeSet.getVolumeMap().values()) {
@@ -150,6 +152,7 @@ public class TestDiskBalancerService {
   }
 
   @Test
+  @Timeout(30)
   public void testThreshold() throws Exception {
     // Increase volume's usedBytes
     for (StorageVolume volume : volumeSet.getVolumeMap().values()) {
@@ -186,6 +189,7 @@ public class TestDiskBalancerService {
   }
 
   @Test
+  @Timeout(30)
   public void testDiskBalance() throws Exception {
     // Increase volume's usedBytes
     for (StorageVolume volume : volumeSet.getVolumeMap().values()) {
