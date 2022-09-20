@@ -281,7 +281,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case EchoRPC:
         EchoRPCResponse echoRPCResponse =
-                echoRPC(request.getEchoRPCRequest(), request.getVersion());
+                echoRPC(request.getEchoRPCRequest());
         responseBuilder.setEchoRPCResponse(echoRPCResponse);
       default:
         responseBuilder.setSuccess(false);
