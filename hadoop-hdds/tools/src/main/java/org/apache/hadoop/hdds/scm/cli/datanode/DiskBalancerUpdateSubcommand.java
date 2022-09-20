@@ -69,8 +69,7 @@ public class DiskBalancerUpdateSubcommand extends ScmSubcommand {
                 Optional.empty() : Optional.of(commonOptions.getHosts()));
 
     System.out.println("Update DiskBalancer Configuration on datanode(s):\n" +
-        (commonOptions.isAllHosts() ? "All datanodes" : String.join("\n",
-            commonOptions.getHosts())));
+        commonOptions.getHostString());
 
     if (errors.size() > 0) {
       for (DatanodeAdminError error : errors) {

@@ -32,7 +32,9 @@ public class DiskBalancerCommonOptions {
   private boolean allHosts;
 
   @CommandLine.Option(names = {"-d", "--datanodes"},
-      description = "Run commands on specific datanodes.")
+      description = "Run commands on specific datanodes, the content can be " +
+          "a list of hostnames or IPs. " +
+          "Examples: hostname1,hostname2,hostname3 or ip1,ip2,ip3")
   private List<String> hosts = new ArrayList<>();
 
   /**
@@ -52,6 +54,10 @@ public class DiskBalancerCommonOptions {
       return false;
     }
     return true;
+  }
+
+  public String getHostString() {
+    return isAllHosts() ? "All datanodes" : String.join("\n", getHosts());
   }
 
   public boolean isAllHosts() {
