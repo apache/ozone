@@ -36,6 +36,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.Comparator;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.Path;
@@ -795,8 +797,13 @@ public final class OmUtils {
   public static String format(List<ServiceInfo> nodes, int port,
                               String leaderId) {
     StringBuilder sb = new StringBuilder();
+    // Ensuring OM's are printed in correct order
+    List<ServiceInfo> omNodes = nodes.stream()
+        .filter(node -> node.getNodeType() == HddsProtos.NodeType.OM)
+        .sorted(Comparator.comparing(ServiceInfo::getHostname))
+        .collect(Collectors.toList());
     int count = 0;
-    for (ServiceInfo info : nodes) {
+    for (ServiceInfo info : omNodes) {
       // Printing only the OM's running
       if (info.getNodeType() == HddsProtos.NodeType.OM) {
         String role =
