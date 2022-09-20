@@ -18,12 +18,12 @@
 package org.apache.hadoop.ozone.protocolPB;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.google.protobuf.ByteString;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -106,6 +106,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantG
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCRequest;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.collect.Lists;
@@ -277,6 +279,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             request.getTenantListUserRequest());
         responseBuilder.setTenantListUserResponse(listUserResponse);
         break;
+      case EchoRPC:
+        EchoRPCResponse echoRPCResponse =
+                echoRPC(request.getEchoRPCRequest(), request.getVersion());
+        responseBuilder.setEchoRPCResponse(echoRPCResponse);
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
@@ -922,31 +928,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-          conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
-          processingPhase = RequestProcessingPhase.POST_PROCESS,
-          requestType = Type.EchoRPC
-  )
-  public static OMResponse echoRPC(
-          OMRequest req, OMResponse resp, ValidationContext ctx)
-          throws ServiceException {
-    if (!resp.hasEchoRPCResponse()) {
-      return resp;
-    }
-    byte[] payloadBytes = new byte[0];
-    int payloadRespSize = Math.min(
-            req.getEchoRPCRequest().getPayloadSizeResp()
-                    * RPC_PAYLOAD_MULTIPLICATION_FACTOR, MAX_SIZE_KB);
-    if (payloadRespSize > 0) {
-      payloadBytes = RandomUtils.nextBytes(payloadRespSize);
-    }
-    resp = resp.toBuilder()
-            .setMessage(new String(payloadBytes, StandardCharsets.UTF_8))
-            .clearEchoRPCResponse()
-            .build();
-    return resp;
-  }
-
-  @RequestFeatureValidator(
       conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.GetFileStatus
@@ -1195,4 +1176,18 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   public OzoneManager getOzoneManager() {
     return impl;
   }
+
+  private EchoRPCResponse echoRPC(EchoRPCRequest request)
+          throws IOException {
+    byte[] payloadBytes = new byte[0];
+    int payloadRespSize = request.getPayloadSizeResp();
+    if (payloadRespSize > 0) {
+      payloadBytes = RandomUtils.nextBytes(payloadRespSize);
+    }
+
+    return EchoRPCResponse.newBuilder()
+            .setPayload(ByteString.copyFrom(payloadBytes))
+            .build();
+  }
+
 }

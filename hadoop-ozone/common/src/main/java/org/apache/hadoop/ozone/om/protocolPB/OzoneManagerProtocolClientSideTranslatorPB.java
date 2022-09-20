@@ -2027,7 +2027,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return handleError(submitRequest(omRequest)).getCancelPrepareResponse();
   }
 
-  @Override
   public EchoRPCResponse echoRPCReq(byte[] payloadReq,
                                     int payloadSizeResp)
           throws IOException {
