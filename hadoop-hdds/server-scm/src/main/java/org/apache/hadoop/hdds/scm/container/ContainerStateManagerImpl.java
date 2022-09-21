@@ -131,7 +131,7 @@ public final class ContainerStateManagerImpl
 
   // Protect containers and containerStore against the potential
   // contentions between RaftServer and ContainerManager.
-  private final ReadWriteLock lock = new ReentrantReadWriteLock();
+  private final ReadWriteLock lock = new ReentrantReadWriteLock(true);
 
   /**
    * constructs ContainerStateManagerImpl instance and loads the containers
