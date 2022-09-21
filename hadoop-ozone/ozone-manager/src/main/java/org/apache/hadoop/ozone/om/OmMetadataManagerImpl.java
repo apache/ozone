@@ -289,7 +289,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     this.omEpoch = 0;
   }
 
-  //  metadata constructor for snapshots
+  // metadata constructor for snapshots
   private OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotName)
       throws IOException {
     lock = new OmReadOnlyLock();
