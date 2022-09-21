@@ -52,7 +52,7 @@ interface IOverviewState {
   buckets: number;
   keys: number;
   missingContainersCount: number;
-  lastUpdated: number;
+  lastRefreshed: number;
   lastUpdatedOMDBDelta:number,
   lastUpdatedOMDBFull:number,
   lastUpdatedOMDBDeltaText:string,
@@ -79,7 +79,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       buckets: 0,
       keys: 0,
       missingContainersCount: 0,
-      lastUpdated: 0,
+      lastRefreshed: 0,
       lastUpdatedOMDBDelta:0,
       lastUpdatedOMDBFull:0,
       lastUpdatedOMDBDeltaText:'',
@@ -116,7 +116,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         buckets: clusterState.buckets,
         keys: clusterState.keys,
         missingContainersCount,
-        lastUpdated: Number(moment()),
+        lastRefreshed: Number(moment()),
         lastUpdatedOMDBDelta: omDBDeltaObject ? omDBDeltaObject.lastUpdatedTimestamp : 0,
         lastUpdatedOMDBFull:  omDBFullObject ? omDBFullObject.lastUpdatedTimestamp : 0,
         lastUpdatedOMDBDeltaText:omDBDeltaObject? omDBDeltaObject.taskName === 'OmDeltaRequest' ? 'Last Delta Update': 'Last Full Update': '',
@@ -142,7 +142,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
 
   render() {
     const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets,
-      keys, missingContainersCount,lastUpdated,lastUpdatedOMDBDelta,lastUpdatedOMDBFull,lastUpdatedOMDBDeltaText,lastUpdatedOMDBFullText} = this.state;
+      keys, missingContainersCount,lastRefreshed,lastUpdatedOMDBDelta,lastUpdatedOMDBFull,lastUpdatedOMDBDeltaText,lastUpdatedOMDBFullText} = this.state;
     const datanodesElement = (
       <span>
         <Icon type='check-circle' theme='filled' className='icon-success icon-small'/> {datanodes} <span className='ant-card-meta-description meta'>HEALTHY</span>
@@ -165,7 +165,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       <div className='overview-content'>
         <div className='page-header'>
           Overview
-          <AutoReloadPanel isLoading={loading} lastUpdated={lastUpdated} 
+          <AutoReloadPanel isLoading={loading} lastRefreshed={lastRefreshed} 
           lastUpdatedOMDBDelta={lastUpdatedOMDBDelta}  lastUpdatedOMDBFull={lastUpdatedOMDBFull}
           lastUpdatedOMDBDeltaText={lastUpdatedOMDBDeltaText}  lastUpdatedOMDBFullText={lastUpdatedOMDBFullText}
           togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>

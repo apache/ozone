@@ -26,7 +26,7 @@ import moment from 'moment';
 
 interface IAutoReloadPanelProps extends RouteComponentProps<object> {
   onReload: () => void;
-  lastUpdated: number;
+  lastRefreshed: number;
   lastUpdatedOMDBDelta:number;
   lastUpdatedOMDBFull:number;
   lastUpdatedOMDBDeltaText:string;
@@ -42,21 +42,21 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
   };
 
   render() {
-    const {onReload, lastUpdated, lastUpdatedOMDBDelta,lastUpdatedOMDBFull,isLoading,lastUpdatedOMDBDeltaText,lastUpdatedOMDBFullText} = this.props;
+    const {onReload, lastRefreshed, lastUpdatedOMDBDelta,lastUpdatedOMDBFull,isLoading,lastUpdatedOMDBDeltaText,lastUpdatedOMDBFullText} = this.props;
     
-     const lastUpdatedText = lastUpdated === 0 || lastUpdated === undefined ? 'NA' :
+     const lastRefreshedRext = lastRefreshed === 0 || lastRefreshed === undefined ? 'NA' :
       (
         <Tooltip
-          placement='bottom' title={moment(lastUpdated).format('ll LTS')}
+          placement='bottom' title={moment(lastRefreshed).format('ll LTS')}
         >
-          {moment(lastUpdated).format('LTS')}
+          {moment(lastRefreshed).format('LTS')}
         </Tooltip>
       );
 
       const omDBDeltaFullToolTip = <span>{lastUpdatedOMDBDeltaText} : {moment(lastUpdatedOMDBDelta).format('ll LTS') }<br/>
       {lastUpdatedOMDBFullText} : {moment(lastUpdatedOMDBFull).format('ll LTS')}</span>
 
-      const lastUpdatedDeltaToolTip = lastUpdatedOMDBDelta === 0 || lastUpdatedOMDBDelta === undefined || lastUpdatedOMDBFull === 0 || lastUpdatedOMDBFull === undefined ? 'NA' :
+      const lastUpdatedDeltaFullToolTip = lastUpdatedOMDBDelta === 0 || lastUpdatedOMDBDelta === undefined || lastUpdatedOMDBFull === 0 || lastUpdatedOMDBFull === undefined ? 'NA' :
       (
         <Tooltip
           placement='bottom' title={omDBDeltaFullToolTip}
@@ -65,10 +65,10 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
         </Tooltip>
       );
 
-     const lastUpdatedDeltaText = lastUpdatedOMDBDelta === 0 || lastUpdatedOMDBDelta === undefined || lastUpdatedOMDBFull===0 || lastUpdatedOMDBFull === undefined ? '' :
+     const lastUpdatedDeltaFullText = lastUpdatedOMDBDelta === 0 || lastUpdatedOMDBDelta === undefined || lastUpdatedOMDBFull===0 || lastUpdatedOMDBFull === undefined ? '' :
      (
       <>
-      &nbsp; | OM DB Last updated at {lastUpdatedDeltaToolTip}
+      &nbsp; | OM DB Last updated at {lastUpdatedDeltaFullToolTip}
       &nbsp;<Button shape='circle' icon='reload' size='small' loading={isLoading} />
       </>
      );
@@ -77,9 +77,9 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
       <div className='auto-reload-panel'>
         Auto Reload
         &nbsp;<Switch defaultChecked size='small' className='toggle-switch' onChange={this.autoReloadToggleHandler}/>
-        &nbsp; | Last updated at {lastUpdatedText}
+        &nbsp; | Refreshed {lastRefreshedRext}
         &nbsp;<Button shape='circle' icon='reload' size='small' loading={isLoading} onClick={onReload}/>
-        {lastUpdatedDeltaText}
+        {lastUpdatedDeltaFullText}
       </div>
     );
   }
