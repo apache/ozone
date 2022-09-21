@@ -51,17 +51,11 @@ public class ScmClient {
 
   ScmClient(ScmBlockLocationProtocol blockClient,
             StorageContainerLocationProtocol containerClient,
-            LoadingCache<Long, Pipeline> containerLocationCache) {
+            OzoneConfiguration configuration) {
     this.containerClient = containerClient;
     this.blockClient = blockClient;
-    this.containerLocationCache = containerLocationCache;
-  }
-
-  ScmClient(ScmBlockLocationProtocol blockClient,
-            StorageContainerLocationProtocol containerClient,
-            OzoneConfiguration configuration) {
-    this(blockClient, containerClient,
-        createContainerLocationCache(configuration, containerClient));
+    this.containerLocationCache =
+        createContainerLocationCache(configuration, containerClient);
   }
 
   static LoadingCache<Long, Pipeline> createContainerLocationCache(
@@ -147,4 +141,6 @@ public class ScmClient {
     throw new IllegalStateException("Unexpected exception accessing " +
         "container location", e.getCause());
   }
+
+
 }
