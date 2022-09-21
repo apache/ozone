@@ -65,8 +65,7 @@ public class DiskBalancerUpdateSubcommand extends ScmSubcommand {
     }
     List<DatanodeAdminError> errors =
         scmClient.updateDiskBalancerConfiguration(threshold, bandwidthInMB,
-            parallelThread, commonOptions.getHosts().size() == 0 ?
-                Optional.empty() : Optional.of(commonOptions.getHosts()));
+            parallelThread, commonOptions.getSpecifiedDatanodes());
 
     System.out.println("Update DiskBalancer Configuration on datanode(s):\n" +
         commonOptions.getHostString());

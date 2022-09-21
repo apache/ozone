@@ -27,7 +27,6 @@ import picocli.CommandLine.Command;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Handler to stop disk balancer.
@@ -49,8 +48,7 @@ public class DiskBalancerStopSubcommand extends ScmSubcommand {
       return;
     }
     List<DatanodeAdminError> errors = scmClient.stopDiskBalancer(
-        commonOptions.isAllHosts() ? Optional.empty() :
-            Optional.of(commonOptions.getHosts()));
+        commonOptions.getSpecifiedDatanodes());
 
     System.out.println("Stopping DiskBalancer on datanode(s):\n" +
         commonOptions.getHostString());

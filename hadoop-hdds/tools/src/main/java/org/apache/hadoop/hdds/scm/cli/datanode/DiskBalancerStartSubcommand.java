@@ -65,8 +65,7 @@ public class DiskBalancerStartSubcommand extends ScmSubcommand {
     }
     List<DatanodeAdminError> errors =
         scmClient.startDiskBalancer(threshold, bandwidthInMB, parallelThread,
-            commonOptions.getHosts().size() == 0 ? Optional.empty() :
-                Optional.of(commonOptions.getHosts()));
+            commonOptions.getSpecifiedDatanodes());
 
     System.out.println("Start DiskBalancer on datanode(s):\n" +
         commonOptions.getHostString());

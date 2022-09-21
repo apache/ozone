@@ -21,6 +21,7 @@ import picocli.CommandLine;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Common options for DiskBalancer commands.
@@ -35,20 +36,20 @@ public class DiskBalancerCommonOptions {
       description = "Run commands on specific datanodes, the content can be " +
           "a list of hostnames or IPs. " +
           "Examples: hostname1,hostname2,hostname3 or ip1,ip2,ip3")
-  private List<String> hosts = new ArrayList<>();
+  private List<String> datanodes = new ArrayList<>();
 
   /**
    * Check the common options of DiskBalancerCommand.
    * @return if the check passed
    */
   public boolean check() {
-    if (hosts.size() == 0 && !allHosts) {
+    if (datanodes.size() == 0 && !allHosts) {
       System.out.println("Datanode not specified. Please specify at least " +
           "one datanode or use \"-a(--all)\" to start diskBalancer " +
           "on all datanodes");
       return false;
     }
-    if (hosts.size() != 0 && allHosts) {
+    if (datanodes.size() != 0 && allHosts) {
       System.out.println("Invalid option selection. " +
           "Use either \"-a(--all)\" or \"-d(--datanodes)\".");
       return false;
@@ -57,7 +58,12 @@ public class DiskBalancerCommonOptions {
   }
 
   public String getHostString() {
-    return isAllHosts() ? "All datanodes" : String.join("\n", getHosts());
+    return isAllHosts() ? "All datanodes" : String.join("\n", getDatanodes());
+  }
+
+  public Optional<List<String>> getSpecifiedDatanodes() {
+    return getDatanodes().size() == 0 ?
+        Optional.empty() : Optional.of(getDatanodes());
   }
 
   public boolean isAllHosts() {
@@ -68,11 +74,11 @@ public class DiskBalancerCommonOptions {
     this.allHosts = allHosts;
   }
 
-  public List<String> getHosts() {
-    return hosts;
+  public List<String> getDatanodes() {
+    return datanodes;
   }
 
-  public void setHosts(List<String> hosts) {
-    this.hosts = hosts;
+  public void setDatanodes(List<String> datanodes) {
+    this.datanodes = datanodes;
   }
 }
