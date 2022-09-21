@@ -1279,6 +1279,7 @@ public class TestKeyManagerImpl {
 
     StorageContainerLocationProtocol sclProtocolMock = mock(
         StorageContainerLocationProtocol.class);
+    OMPerformanceMetrics metrics = mock(OMPerformanceMetrics.class);
 
     List<Long> containerIDs = new ArrayList<>();
     containerIDs.add(100L);
@@ -1334,7 +1335,7 @@ public class TestKeyManagerImpl {
     omKeyInfo.appendNewBlocks(omKeyLocationInfoList, false);
 
     KeyManagerImpl keyManagerImpl =
-        new KeyManagerImpl(ozoneManager, scmClientMock, conf, "om1");
+        new KeyManagerImpl(ozoneManager, scmClientMock, conf, "om1", metrics);
 
     keyManagerImpl.refresh(omKeyInfo);
 
@@ -1357,6 +1358,7 @@ public class TestKeyManagerImpl {
 
     ScmClient scmClientMock = mock(ScmClient.class);
     when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);
+    OMPerformanceMetrics metrics = mock(OMPerformanceMetrics.class);
 
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo("v1",
         "b1", "k1", ReplicationType.RATIS,
@@ -1374,7 +1376,7 @@ public class TestKeyManagerImpl {
     omKeyInfo.appendNewBlocks(omKeyLocationInfoList, false);
 
     KeyManagerImpl keyManagerImpl =
-        new KeyManagerImpl(ozoneManager, scmClientMock, conf, "om1");
+        new KeyManagerImpl(ozoneManager, scmClientMock, conf, "om1", metrics);
 
     try {
       keyManagerImpl.refresh(omKeyInfo);
