@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManagerMetrics;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -215,7 +214,7 @@ public class NodeDecommissionManager {
 
     monitor = new DatanodeAdminMonitorImpl(conf, eventQueue, nodeManager,
         replicationManager);
-    this.metrics = NodeDecommissionMetrics.create(this);
+    this.metrics = NodeDecommissionMetrics.create();
     monitor.setMetrics(this.metrics);
     executor.scheduleAtFixedRate(monitor, monitorInterval, monitorInterval,
         TimeUnit.SECONDS);

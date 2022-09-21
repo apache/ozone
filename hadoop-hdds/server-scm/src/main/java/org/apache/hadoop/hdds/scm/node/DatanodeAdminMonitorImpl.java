@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManagerMetrics;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -76,6 +75,12 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private Queue<DatanodeDetails> cancelledNodes = new ArrayDeque();
   private Set<DatanodeDetails> trackedNodes = new HashSet<>();
   private NodeDecommissionMetrics metrics;
+  private long pipelinesWaitingToClose = 0;
+  private long sufficientlyReplicatedContainers = 0;
+  private long trackedDecomMaintenance = 0;
+  private long trackedRecommission = 0;
+  private long unhealthyContainers = 0;
+  private long underReplicatedContainers = 0;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeAdminMonitorImpl.class);
@@ -146,20 +151,20 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   public void run() {
     try {
       synchronized (this) {
-        metrics.setTotalTrackedRecommissionNodes(
-                getCancelledCount());
+        trackedRecommission = getCancelledCount();
         processCancelledNodes();
         processPendingNodes();
       }
       processTransitioningNodes();
-      metrics.setTotalTrackedDecommissioningMaintenanceNodes(0); // clear
       if (trackedNodes.size() > 0 || pendingNodes.size() > 0) {
-        metrics.setTotalTrackedDecommissioningMaintenanceNodes(
-                trackedNodes.size());
+        synchronized (this) {
+          trackedDecomMaintenance = getTrackedNodeCount();
+        }
         LOG.info("There are {} nodes tracked for decommission and " +
                 "maintenance. {} pending nodes.",
             trackedNodes.size(), pendingNodes.size());
       }
+      setMetricsToGauge();
     } catch (Exception e) {
       LOG.error("Caught an error in the DatanodeAdminMonitor", e);
       // Intentionally do not re-throw, as if we do the monitor thread
@@ -177,6 +182,25 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   public int getTrackedNodeCount() {
     return trackedNodes.size();
+  }
+
+  synchronized void setMetricsToGauge() {
+    metrics.setTotalTrackedContainersUnhealthy(unhealthyContainers);
+    metrics.setTotalTrackedRecommissionNodes(trackedRecommission);
+    metrics.setTotalTrackedDecommissioningMaintenanceNodes(
+            trackedDecomMaintenance);
+    metrics.setTotalTrackedContainersUnderReplicated(
+            underReplicatedContainers);
+    metrics.setTotalTrackedContainersSufficientlyReplicated(
+            sufficientlyReplicatedContainers);
+    metrics.setTotalTrackedPipelinesWaitingToClose(pipelinesWaitingToClose);
+  }
+
+  void resetContainerMetrics() {
+    pipelinesWaitingToClose = 0;
+    sufficientlyReplicatedContainers = 0;
+    unhealthyContainers = 0;
+    underReplicatedContainers = 0;
   }
 
   private void processCancelledNodes() {
@@ -199,7 +223,9 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   }
 
   private void processTransitioningNodes() {
+    resetContainerMetrics();
     Iterator<DatanodeDetails> iterator = trackedNodes.iterator();
+
     while (iterator.hasNext()) {
       DatanodeDetails dn = iterator.next();
       try {
@@ -289,6 +315,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     } else {
       LOG.info("Waiting for pipelines to close for {}. There are {} " +
           "pipelines", dn, pipelines.size());
+      pipelinesWaitingToClose += pipelines.size();
       return false;
     }
   }
@@ -338,6 +365,9 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     LOG.info("{} has {} sufficientlyReplicated, {} underReplicated and {} " +
         "unhealthy containers",
         dn, sufficientlyReplicated, underReplicated, unhealthy);
+    sufficientlyReplicatedContainers += sufficientlyReplicated;
+    underReplicatedContainers += underReplicated;
+    unhealthyContainers += unhealthy;
     if (LOG.isDebugEnabled() && underReplicatedIDs.size() < 10000 &&
         unhealthyIDs.size() < 10000) {
       LOG.debug("{} has {} underReplicated [{}] and {} unhealthy [{}] " +
