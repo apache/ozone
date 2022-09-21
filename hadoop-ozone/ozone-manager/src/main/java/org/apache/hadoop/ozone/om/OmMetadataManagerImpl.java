@@ -302,7 +302,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   /**
-   * Factory method for creating snapshot metadata manager
+   * Factory method for creating snapshot metadata manager.
    *
    * @param conf - ozone configuration
    * @param snapshotDirName - the UUID that identifies the snapshot
@@ -311,7 +311,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    */
   public static OmMetadataManagerImpl createSnapshotMetadataManager(
       OzoneConfiguration conf, String snapshotDirName) throws IOException {
-    OmMetadataManagerImpl smm = new OmMetadataManagerImpl(conf, snapshotDirName);
+    OmMetadataManagerImpl smm = new OmMetadataManagerImpl(conf,
+        snapshotDirName);
     return smm;
   }
 
