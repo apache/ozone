@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalUnit;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;

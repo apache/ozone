@@ -85,8 +85,8 @@ public class ScmClient {
 
           @NotNull
           @Override
-          public Map<Long, Pipeline> loadAll(@NotNull Iterable<? extends Long> keys)
-              throws Exception {
+          public Map<Long, Pipeline> loadAll(
+              @NotNull Iterable<? extends Long> keys) throws Exception {
             return containerClient.getContainerWithPipelineBatch(keys)
                 .stream()
                 .collect(Collectors.toMap(

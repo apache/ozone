@@ -1,6 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with this
+ * work for additional information regarding copyright ownership.  The ASF
+ * licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
 package org.apache.hadoop.ozone.om;
 
-import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -36,6 +51,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * ScmClient test-cases.
+ */
 public class TestScmClient {
   private ScmBlockLocationProtocol scmBlockLocationProtocol;
   private StorageContainerLocationProtocol containerLocationProtocol;
@@ -54,16 +72,16 @@ public class TestScmClient {
   private static Stream<Arguments> getContainerLocationTestCases() {
     return Stream.of(
         Arguments.of("New key",
-            newHashSet(1L , 2L), 3L, false, 1),
+            newHashSet(1L, 2L), 3L, false, 1),
 
         Arguments.of("Existing key",
-            newHashSet(1L , 2L), 1L, false, 1),
+            newHashSet(1L, 2L), 1L, false, 1),
 
         Arguments.of("New key with force refresh",
-            newHashSet(1L , 2L), 3L, true, 1),
+            newHashSet(1L, 2L), 3L, true, 1),
 
         Arguments.of("Existing key, force refresh",
-            newHashSet(1L , 2L), 1L, true, 2)
+            newHashSet(1L, 2L), 1L, true, 2)
     );
   }
 
@@ -85,7 +103,8 @@ public class TestScmClient {
           .thenReturn(pipeline);
       Pipeline location = scmClient.getContainerLocation(containerId, false);
       Assertions.assertEquals(pipeline.getPipeline(), location);
-      verify(containerLocationProtocol, times(1)).getContainerWithPipeline(containerId);
+      verify(containerLocationProtocol, times(1))
+          .getContainerWithPipeline(containerId);
     }
 
     if (!prepopulatedIds.contains(testId)) {
@@ -107,22 +126,27 @@ public class TestScmClient {
   private static Stream<Arguments> getContainerLocationsTestCases() {
     return Stream.of(
         Arguments.of("Existing keys",
-            newHashSet(1L , 2L, 3L), newHashSet(2L, 3L), false, newHashSet()),
+            newHashSet(1L, 2L, 3L), newHashSet(2L, 3L), false, newHashSet()),
 
         Arguments.of("New keys",
-            newHashSet(1L , 2L), newHashSet(3L, 4L), false, newHashSet(3L, 4L)),
+            newHashSet(1L, 2L), newHashSet(3L, 4L),
+            false, newHashSet(3L, 4L)),
 
         Arguments.of("Partial new keys",
-            newHashSet(1L , 2L), newHashSet(1L, 3L, 4L), false, newHashSet(3L, 4L)),
+            newHashSet(1L, 2L), newHashSet(1L, 3L, 4L),
+            false, newHashSet(3L, 4L)),
 
         Arguments.of("Existing keys with force refresh",
-            newHashSet(1L , 2L, 3L), newHashSet(2L, 3L), true, newHashSet(2L, 3L)),
+            newHashSet(1L, 2L, 3L), newHashSet(2L, 3L),
+            true, newHashSet(2L, 3L)),
 
         Arguments.of("New keys with force refresh",
-            newHashSet(1L , 2L), newHashSet(3L, 4L), true, newHashSet(3L, 4L)),
+            newHashSet(1L, 2L), newHashSet(3L, 4L),
+            true, newHashSet(3L, 4L)),
 
         Arguments.of("Partial new keys with force refresh",
-            newHashSet(1L , 2L), newHashSet(1L, 3L, 4L), true, newHashSet(1L, 3L, 4L))
+            newHashSet(1L, 2L), newHashSet(1L, 3L, 4L),
+            true, newHashSet(1L, 3L, 4L))
     );
   }
   @ParameterizedTest
@@ -142,13 +166,16 @@ public class TestScmClient {
     }
 
     // pre population of the cache.
-    when(containerLocationProtocol.getContainerWithPipelineBatch(eq(prepopulatedIds)))
+    when(containerLocationProtocol
+        .getContainerWithPipelineBatch(eq(prepopulatedIds)))
         .thenReturn(new ArrayList<>(actualLocations.values()));
-    Map<Long, Pipeline> locations = scmClient.getContainerLocations(prepopulatedIds, false);
+    Map<Long, Pipeline> locations =
+        scmClient.getContainerLocations(prepopulatedIds, false);
     locations.forEach((id, pipeline) -> {
       Assertions.assertEquals(actualLocations.get(id).getPipeline(), pipeline);
     });
-    verify(containerLocationProtocol, times(1)).getContainerWithPipelineBatch(prepopulatedIds);
+    verify(containerLocationProtocol, times(1))
+        .getContainerWithPipelineBatch(prepopulatedIds);
 
     // consecutive call
     if (!expectedScmCallIds.isEmpty()) {
@@ -158,8 +185,8 @@ public class TestScmClient {
         scmLocations.add(pipeline);
         actualLocations.put(containerId, pipeline);
       }
-      when(containerLocationProtocol.getContainerWithPipelineBatch(eq(expectedScmCallIds)))
-          .thenReturn(scmLocations);
+      when(containerLocationProtocol.getContainerWithPipelineBatch(
+          eq(expectedScmCallIds))).thenReturn(scmLocations);
     }
 
     locations = scmClient.getContainerLocations(testIds, forceRefresh);
