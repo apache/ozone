@@ -450,48 +450,49 @@ public final class ContainerStateManagerImpl
     final ContainerID lastID =
         lastUsedMap.getOrDefault(key, containerIDs.first());
 
-    lockManager.readLock(lastID);
+
     // There is a small issue here. The first time, we will skip the first
     // container. But in most cases it will not matter.
     NavigableSet<ContainerID> resultSet = containerIDs.tailSet(lastID, false);
     if (resultSet.isEmpty()) {
       resultSet = containerIDs;
     }
+    ContainerInfo selectedContainer = findContainerWithSpace(size, resultSet);
+    if (selectedContainer == null) {
 
-    try {
-      ContainerInfo selectedContainer = findContainerWithSpace(size, resultSet);
-      if (selectedContainer == null) {
+      // If we did not find any space in the tailSet, we need to look for
+      // space in the headset, we need to pass true to deal with the
+      // situation that we have a lone container that has space. That is we
+      // ignored the last used container under the assumption we can find
+      // other containers with space, but if have a single container that is
+      // not true. Hence we need to include the last used container as the
+      // last element in the sorted set.
 
-        // If we did not find any space in the tailSet, we need to look for
-        // space in the headset, we need to pass true to deal with the
-        // situation that we have a lone container that has space. That is we
-        // ignored the last used container under the assumption we can find
-        // other containers with space, but if have a single container that is
-        // not true. Hence we need to include the last used container as the
-        // last element in the sorted set.
-
-        resultSet = containerIDs.headSet(lastID, true);
-        selectedContainer = findContainerWithSpace(size, resultSet);
-      }
-
-      // TODO: cleanup entries in lastUsedMap
-      if (selectedContainer != null) {
-        lastUsedMap.put(key, selectedContainer.containerID());
-      }
-      return selectedContainer;
-    } finally {
-      lockManager.readUnlock(lastID);
+      resultSet = containerIDs.headSet(lastID, true);
+      selectedContainer = findContainerWithSpace(size, resultSet);
     }
+
+    // TODO: cleanup entries in lastUsedMap
+    if (selectedContainer != null) {
+      lastUsedMap.put(key, selectedContainer.containerID());
+    }
+    return selectedContainer;
   }
 
   private ContainerInfo findContainerWithSpace(final long size,
-      final NavigableSet<ContainerID> searchSet) {
-    // Get the container with space to meet our request.
+                                               final NavigableSet<ContainerID>
+                                                   searchSet) {
+      // Get the container with space to meet our request.
     for (ContainerID id : searchSet) {
-      final ContainerInfo containerInfo = containers.getContainerInfo(id);
-      if (containerInfo.getUsedBytes() + size <= this.containerSize) {
-        containerInfo.updateLastUsedTime();
-        return containerInfo;
+      try {
+        lockManager.readLock(id);
+        final ContainerInfo containerInfo = containers.getContainerInfo(id);
+        if (containerInfo.getUsedBytes() + size <= this.containerSize) {
+          containerInfo.updateLastUsedTime();
+          return containerInfo;
+        }
+      } finally {
+        lockManager.readUnlock(id);
       }
     }
     return null;
