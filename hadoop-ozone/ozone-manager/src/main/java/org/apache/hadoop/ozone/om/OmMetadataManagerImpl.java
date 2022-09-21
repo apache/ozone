@@ -294,7 +294,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       throws IOException {
     lock = new OmReadOnlyLock();
     omEpoch = 0;
-    String snapshotDir = OMStorage.getOmDbDir(conf).toString() +
+    String snapshotDir = OMStorage.getOmDbDir(conf) +
         OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
     setStore(loadDB(conf, new File(snapshotDir),
         OM_DB_NAME + snapshotName, true));
