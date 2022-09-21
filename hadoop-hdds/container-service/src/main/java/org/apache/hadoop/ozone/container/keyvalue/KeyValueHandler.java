@@ -471,6 +471,8 @@ public class KeyValueHandler extends Handler {
       deleteInternal(kvContainer, forceDelete);
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
+    } catch (IOException ex) {
+      LOG.error("Exception while deleting container", ex);
     }
     return getSuccessResponse(request);
   }
@@ -1215,7 +1217,7 @@ public class KeyValueHandler extends Handler {
   }
 
   private void deleteInternal(Container container, boolean force)
-      throws StorageContainerException {
+      throws IOException {
     container.writeLock();
     try {
     // If force is false, we check container state.
@@ -1244,17 +1246,21 @@ public class KeyValueHandler extends Handler {
             (KeyValueContainerData) container.getContainerData();
         HddsVolume hddsVolume = keyValueContainerData.getVolume();
 
-        // Rename container location
-        boolean success = hddsVolume
-            .moveToTmpDeleteDirectory(keyValueContainerData);
+        if (hddsVolume.getWorkingDir() != null) {
+          // Rename container location
+          boolean success = hddsVolume
+              .moveToTmpDeleteDirectory(keyValueContainerData);
 
-        if (success) {
-          String containerPath = keyValueContainerData
-              .getContainerPath().toString();
-          File containerDir = new File(containerPath);
+          if (success) {
+            String containerPath = keyValueContainerData
+                .getContainerPath().toString();
+            File containerDir = new File(containerPath);
 
-          LOG.info("Container {} has been successfuly moved under {}",
-              containerDir.getName(), hddsVolume.getDeleteServiceDirPath());
+            LOG.info("Container {} has been successfuly moved under {}",
+                containerDir.getName(), hddsVolume.getDeleteServiceDirPath());
+          }
+        } else {
+          throw new IOException("Volume working directory doesn't exist");
         }
       }
       long containerId = container.getContainerData().getContainerID();

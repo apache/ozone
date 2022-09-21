@@ -461,6 +461,11 @@ public class HddsVolume extends StorageVolume {
     File container = new File(containerPath);
     String containerDirName = container.getName();
 
+    String workingDir = getWorkingDir();
+    if (workingDir == "") {
+      LOG.info("null");
+    }
+
     String destinationDirPath = deleteServiceDirPath
         .resolve(Paths.get(containerDirName)).toString();
 
