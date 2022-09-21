@@ -290,21 +290,28 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   // metadata constructor for snapshots
-  private OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotName)
+  private OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName)
       throws IOException {
     lock = new OmReadOnlyLock();
     omEpoch = 0;
     String snapshotDir = OMStorage.getOmDbDir(conf) +
         OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
     setStore(loadDB(conf, new File(snapshotDir),
-        OM_DB_NAME + snapshotName, true));
+        OM_DB_NAME + snapshotDirName, true));
     initializeOmTables();
   }
 
-  // Factory method for creating snapshot metadata manager
+  /**
+   * Factory method for creating snapshot metadata manager
+   *
+   * @param conf - ozone configuration
+   * @param snapshotDirName - the UUID that identifies the snapshot
+   * @return the metadata manager representing the snapshot
+   * @throws IOException
+   */
   public static OmMetadataManagerImpl createSnapshotMetadataManager(
-      OzoneConfiguration conf, String snapshotName) throws IOException {
-    OmMetadataManagerImpl smm = new OmMetadataManagerImpl(conf, snapshotName);
+      OzoneConfiguration conf, String snapshotDirName) throws IOException {
+    OmMetadataManagerImpl smm = new OmMetadataManagerImpl(conf, snapshotDirName);
     return smm;
   }
 

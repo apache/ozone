@@ -135,8 +135,6 @@ public class TestOmSnapshotFileSystem {
   }
   /**
    * Create a MiniDFSCluster for testing.
-   * <p>
-   *
    */
   private void init() throws Exception {
     conf = new OzoneConfiguration();
