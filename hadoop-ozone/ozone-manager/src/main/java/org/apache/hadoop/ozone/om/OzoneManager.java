@@ -410,6 +410,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static boolean testSecureOmFlag = false;
 
   private final OzoneLockProvider ozoneLockProvider;
+  private OMPerformanceMetrics perfMetrics;
 
   /**
    * OM Startup mode.
@@ -719,8 +720,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     prefixManager = new PrefixManagerImpl(metadataManager, isRatisEnabled);
+    perfMetrics = OMPerformanceMetrics.register();
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
-        omStorage.getOmId());
+        omStorage.getOmId(), perfMetrics);
 
     if (withNewSnapshot) {
       Integer layoutVersionInDB = getLayoutVersionInDB();
@@ -2077,6 +2079,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omSnapshotProvider != null) {
         omSnapshotProvider.stop();
       }
+      OMPerformanceMetrics.unregister();
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
     }
@@ -2812,11 +2815,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
+    long start = Time.monotonicNowNanos();
     ResolvedBucket bucket = resolveBucketLink(args);
+    perfMetrics.addLookupResolveBucketLatencyNs(
+        Time.monotonicNowNanos() - start);
 
     if (isAclEnabled) {
+      long startAcl = Time.monotonicNowNanos();
       checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
           bucket.realVolume(), bucket.realBucket(), args.getKeyName());
+      perfMetrics.addLookupAclCheckLatency(Time.monotonicNowNanos() - startAcl);
     }
 
     boolean auditSuccess = true;
@@ -2838,6 +2846,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.READ_KEY,
             auditMap));
       }
+
+      perfMetrics.addLookupLatency(Time.monotonicNowNanos() - start);
     }
   }
 
@@ -3322,6 +3332,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public S3VolumeContext getS3VolumeContext() throws IOException {
+    long start = Time.monotonicNowNanos();
     // Unless the OM request contains S3 authentication info with an access
     // ID that corresponds to a tenant volume, the request will be directed
     // to the default S3 volume.
@@ -3404,7 +3415,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     final S3VolumeContext.Builder s3VolumeContext = S3VolumeContext.newBuilder()
         .setOmVolumeArgs(getVolumeInfo(s3Volume))
         .setUserPrincipal(userPrincipal);
-
+    perfMetrics.addS3VolumeContextLatencyNs(Time.monotonicNowNanos() - start);
     return s3VolumeContext.build();
   }
 
@@ -4138,7 +4149,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public ResolvedBucket resolveBucketLink(Pair<String, String> requested)
       throws IOException {
-
     Pair<String, String> resolved;
     if (isAclEnabled) {
       UserGroupInformation ugi = getRemoteUser();

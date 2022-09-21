@@ -170,37 +170,43 @@ public class KeyManagerImpl implements KeyManager {
 
   private final boolean enableFileSystemPaths;
   private BackgroundService dirDeletingService;
+  private final OMPerformanceMetrics metrics;
 
   private BackgroundService openKeyCleanupService;
 
   @VisibleForTesting
   public KeyManagerImpl(ScmBlockLocationProtocol scmBlockClient,
       OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
-      OzoneBlockTokenSecretManager secretManager) {
+      OzoneBlockTokenSecretManager secretManager,
+      OMPerformanceMetrics metrics) {
     this(null, new ScmClient(scmBlockClient, null), metadataManager,
-        conf, omId, secretManager, null, null);
+        conf, omId, secretManager, null, null, metrics);
   }
 
   @VisibleForTesting
   public KeyManagerImpl(ScmBlockLocationProtocol scmBlockClient,
       StorageContainerLocationProtocol scmContainerClient,
       OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
-      OzoneBlockTokenSecretManager secretManager) {
+      OzoneBlockTokenSecretManager secretManager,
+      OMPerformanceMetrics metrics) {
     this(null, new ScmClient(scmBlockClient, scmContainerClient),
-        metadataManager, conf, omId, secretManager, null, null);
+        metadataManager, conf, omId, secretManager, null, null,
+        metrics);
   }
 
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
-      OzoneConfiguration conf, String omId) {
+      OzoneConfiguration conf, String omId, OMPerformanceMetrics metrics) {
     this (om, scmClient, om.getMetadataManager(), conf, omId,
-        om.getBlockTokenMgr(), om.getKmsProvider(), om.getPrefixManager());
+        om.getBlockTokenMgr(), om.getKmsProvider(), om.getPrefixManager(),
+        metrics);
   }
 
   @SuppressWarnings("parameternumber")
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
       OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
       OzoneBlockTokenSecretManager secretManager,
-      KeyProviderCryptoExtension kmsProvider, PrefixManager prefixManager) {
+      KeyProviderCryptoExtension kmsProvider, PrefixManager prefixManager,
+      OMPerformanceMetrics metrics) {
     this.scmBlockSize = (long) conf
         .getStorageSize(OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT,
             StorageUnit.BYTES);
@@ -226,6 +232,7 @@ public class KeyManagerImpl implements KeyManager {
     this.prefixManager = prefixManager;
     this.secretManager = secretManager;
     this.kmsProvider = kmsProvider;
+    this.metrics = metrics;
 
   }
 
@@ -359,7 +366,7 @@ public class KeyManagerImpl implements KeyManager {
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
-
+    long start = Time.monotonicNowNanos();
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
 
@@ -390,6 +397,7 @@ public class KeyManagerImpl implements KeyManager {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
+    metrics.addLookupReadKeyInfoLatency(Time.monotonicNowNanos() - start);
 
     if (value == null) {
       if (LOG.isDebugEnabled()) {
@@ -409,12 +417,17 @@ public class KeyManagerImpl implements KeyManager {
     if (!args.isHeadOp()) {
 
       // add block token for read.
+      start = Time.monotonicNowNanos();
       addBlockToken4Read(value);
+      metrics.addLookupGenerateBlockTokenLatency(
+          Time.monotonicNowNanos() - start);
 
       // Refresh container pipeline info from SCM
       // based on OmKeyArgs.refreshPipeline flag
       // value won't be null as the check is done inside try/catch block.
+      start = Time.monotonicNowNanos();
       refresh(value);
+      metrics.addLookupRefreshLocationLatency(Time.monotonicNowNanos() - start);
 
       if (args.getSortDatanodes()) {
         sortDatanodes(clientAddress, value);
