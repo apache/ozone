@@ -1246,7 +1246,7 @@ public class KeyValueHandler extends Handler {
             (KeyValueContainerData) container.getContainerData();
         HddsVolume hddsVolume = keyValueContainerData.getVolume();
 
-        if (hddsVolume.getWorkingDir() != null) {
+        if (!hddsVolume.getWorkingDir().isEmpty()) {
           // Rename container location
           boolean success = hddsVolume
               .moveToTmpDeleteDirectory(keyValueContainerData);
