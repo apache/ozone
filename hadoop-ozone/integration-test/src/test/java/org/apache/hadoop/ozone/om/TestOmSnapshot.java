@@ -86,10 +86,8 @@ public class TestOmSnapshot {
   private static File metaDir;
   private static OzoneManager ozoneManager;
 
-
-
   @Rule
-  public Timeout timeout = new Timeout(1200000);
+  public Timeout timeout = new Timeout(180, TimeUnit.SECONDS);
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
