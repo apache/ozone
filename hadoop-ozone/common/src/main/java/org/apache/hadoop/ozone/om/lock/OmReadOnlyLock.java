@@ -66,37 +66,37 @@ public class OmReadOnlyLock implements IOzoneManagerLock {
 
   @Override
   public void releaseMultiUserLock(String firstUser, String secondUser) {
-
+  // Intentionally empty
   }
 
   @Override
   public void releaseWriteLock(OzoneManagerLock.Resource resource,
                                String... resources) {
-
+  // Intentionally empty
   }
 
   @Override
   public void releaseWriteHashedLock(OzoneManagerLock.Resource resource,
                                String resourceName) {
-
+  // Intentionally empty
   }
 
   @Override
   public void releaseReadLock(OzoneManagerLock.Resource resource,
                               String... resources) {
-
+  // Intentionally empty
   }
 
   @Override
   public void releaseReadHashedLock(OzoneManagerLock.Resource resource,
                                String resourceName) {
-
+  // Intentionally empty
   }
 
   @Override
   public void releaseLock(OzoneManagerLock.Resource resource,
                           String... resources) {
-
+  // Intentionally empty
   }
 
   @Override
@@ -156,7 +156,7 @@ public class OmReadOnlyLock implements IOzoneManagerLock {
 
   @Override
   public void cleanup() {
-
+  // Intentionally empty
   }
 
   @Override
