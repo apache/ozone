@@ -106,8 +106,8 @@ public final class OmSnapshotManager {
     // init LRU cache
     snapshotCache = CacheBuilder.newBuilder()
         .maximumSize(cacheSize).build(loader);
-    
   }
+
   /**
    * Creates snapshot checkpoint that corresponds to snapshotInfo.
    * @param omMetadataManager the metadata manager
