@@ -22,7 +22,7 @@ package org.apache.hadoop.ozone.om.lock;
  * Uses no lock.  Always returns true when aquiring
  * read lock and false for write locks
  */
-public class OmReadOnlyLock implements OmLock {
+public class OmReadOnlyLock implements IOzoneManagerLock {
   @Override
   public boolean acquireLock(OzoneManagerLock.Resource resource,
                              String... resources) {

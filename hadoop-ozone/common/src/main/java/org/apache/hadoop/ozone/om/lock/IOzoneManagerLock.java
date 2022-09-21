@@ -22,7 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 /**
  * Interface for OM Metadata locks.
  */
-public interface OmLock {
+public interface IOzoneManagerLock {
   @Deprecated
   boolean acquireLock(OzoneManagerLock.Resource resource, String... resources);
 

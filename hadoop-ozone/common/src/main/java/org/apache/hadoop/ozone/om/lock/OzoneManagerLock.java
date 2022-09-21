@@ -77,7 +77,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK;
  * <br>
  */
 
-public class OzoneManagerLock implements OmLock {
+public class OzoneManagerLock implements IOzoneManagerLock {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerLock.class);
