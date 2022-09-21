@@ -371,23 +371,8 @@ public class TestOmSnapshot {
       }
     }
     OmKeyArgs keyArgs = genKeyArgs(snapshotKeyPrefix + key1);
-
-    OmKeyInfo omKeyInfo;
-    int failCount = 0;
-    while (true) {
-      try {
-        if (failCount > 50) {
-          break;
-        }
-        omKeyInfo = writeClient.lookupKey(keyArgs);
-        break;
-      } catch(Exception e) {
-        failCount ++;
-        Thread.sleep(1000);
-      }
-    }
-    assertEquals(failCount, 0);
-    omKeyInfo = writeClient.lookupKey(keyArgs);
+    
+    OmKeyInfo omKeyInfo = writeClient.lookupKey(keyArgs);
     assertEquals(omKeyInfo.getKeyName(), snapshotKeyPrefix + key1);
     
     OmKeyInfo fileInfo = writeClient.lookupFile(keyArgs);

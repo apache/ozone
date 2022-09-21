@@ -392,21 +392,10 @@ public class TestOmSnapshotFileSystem {
 
     // ListStatus on a directory should return all subdirs along with
     // files, even if there exists a file and sub-dir with the same name.
-    int failCount = 0;
-    while (true) {
-      fileStatuses = o3fs.listStatus(snapshotParent);
-      if (fileStatuses.length == 2) {
-        break;
-      }
-      failCount++;
-      if (failCount > 50) {
-        break;
-      }
-      Thread.sleep(1000);
-    }
-    assertEquals(failCount, 0);
+    fileStatuses = o3fs.listStatus(snapshotParent);
     assertEquals("FileStatus did not return all children of the directory",
         2, fileStatuses.length);
+
     // ListStatus should return only the immediate children of a directory.
     Path file3 = new Path(parent, "dir1/key3");
     Path file4 = new Path(parent, "dir1/key4");
@@ -567,7 +556,7 @@ public class TestOmSnapshotFileSystem {
       } catch (Exception e) {
         return false;
       }
-      }, 1000, 120000);
+    }, 1000, 120000);
   }
 
   private String createSnapshot()
