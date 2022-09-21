@@ -67,6 +67,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
@@ -104,7 +105,7 @@ public class TestOmSnapshotFileSystem {
 
 
   @Rule
-  public Timeout timeout = new Timeout(1200000);
+  public Timeout timeout = new Timeout(120, TimeUnit.SECONDS);
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
