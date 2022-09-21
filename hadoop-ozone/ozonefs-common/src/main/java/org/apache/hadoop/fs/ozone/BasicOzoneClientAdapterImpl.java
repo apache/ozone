@@ -23,10 +23,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.time.Clock;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.HashSet;
+import java.util.*;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
@@ -42,6 +39,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.io.Text;
@@ -534,7 +532,10 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         owner,
         owner,
         null,
-        getBlockLocations(status)
+        getBlockLocations(status),
+        !Objects.isNull(keyInfo.getFileEncryptionInfo()),
+        keyInfo.getReplicationConfig().getReplicationType() ==
+        HddsProtos.ReplicationType.EC
     );
   }
 

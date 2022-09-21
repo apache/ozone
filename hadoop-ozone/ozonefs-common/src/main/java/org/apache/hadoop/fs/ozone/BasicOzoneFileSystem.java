@@ -1047,7 +1047,10 @@ public class BasicOzoneFileSystem extends FileSystem {
         fileStatusAdapter.getOwner(),
         fileStatusAdapter.getGroup(),
         symLink,
-        fileStatusAdapter.getPath()
+        fileStatusAdapter.getPath(),
+        false,
+        fileStatusAdapter.isEncrypted(),
+        fileStatusAdapter.isErasureCoded()
     );
 
     BlockLocation[] blockLocations = fileStatusAdapter.getBlockLocations();

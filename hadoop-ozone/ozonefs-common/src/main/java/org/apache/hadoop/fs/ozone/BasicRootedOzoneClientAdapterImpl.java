@@ -22,12 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.HashSet;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
@@ -48,6 +43,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.io.Text;
@@ -957,7 +953,10 @@ public class BasicRootedOzoneClientAdapterImpl
         owner,
         owner,
         null,
-        getBlockLocations(status)
+        getBlockLocations(status),
+        !Objects.isNull(keyInfo.getFileEncryptionInfo()),
+        keyInfo.getReplicationConfig().getReplicationType() ==
+                HddsProtos.ReplicationType.EC
     );
   }
 
@@ -1051,8 +1050,7 @@ public class BasicRootedOzoneClientAdapterImpl
     return new FileStatusAdapter(0L, path, true, (short)0, 0L,
         ozoneVolume.getCreationTime().getEpochSecond() * 1000, 0L,
         FsPermission.getDirDefault().toShort(),
-        owner, group, path,
-        new BlockLocation[0]
+        owner, group, path, new BlockLocation[0], false, false
     );
   }
 
@@ -1075,10 +1073,14 @@ public class BasicRootedOzoneClientAdapterImpl
               ozoneBucket.getName(), pathStr);
     }
     Path path = new Path(pathStr);
+
     return new FileStatusAdapter(0L, path, true, (short)0, 0L,
         ozoneBucket.getCreationTime().getEpochSecond() * 1000, 0L,
         FsPermission.getDirDefault().toShort(),
-        owner, group, path, new BlockLocation[0]);
+        owner, group, path, new BlockLocation[0],
+        !StringUtils.isEmpty(ozoneBucket.getEncryptionKeyName()),
+        ozoneBucket.getReplicationConfig().getReplicationType() ==
+                    HddsProtos.ReplicationType.EC);
   }
 
   /**
@@ -1093,8 +1095,7 @@ public class BasicRootedOzoneClientAdapterImpl
     return new FileStatusAdapter(0L, path, true, (short)0, 0L,
         System.currentTimeMillis(), 0L,
         FsPermission.getDirDefault().toShort(),
-        null, null, null, new BlockLocation[0]
-    );
+        null, null, null, new BlockLocation[0], false, false);
   }
 
   @Override
