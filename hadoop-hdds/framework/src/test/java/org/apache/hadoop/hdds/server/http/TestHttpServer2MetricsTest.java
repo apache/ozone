@@ -58,10 +58,11 @@ public class TestHttpServer2MetricsTest {
   @Test
   public void testMetrics() {
     // crate mock metrics
-    int threadCount = new Random().nextInt();
-    int maxThreadCount = new Random().nextInt();
-    int idleThreadCount = new Random().nextInt();
-    int threadQueueWaitingTaskCount = new Random().nextInt();
+    Random random = new Random();
+    int threadCount = random.nextInt();
+    int maxThreadCount = random.nextInt();
+    int idleThreadCount = random.nextInt();
+    int threadQueueWaitingTaskCount = random.nextInt();
     String name = "s3g";
 
     Mockito.doReturn(threadCount).when(threadPool).getThreads();

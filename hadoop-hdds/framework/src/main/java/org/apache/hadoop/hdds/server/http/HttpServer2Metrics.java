@@ -57,6 +57,7 @@ public final class HttpServer2Metrics implements MetricsSource {
   public static final String NAME = HttpServer2Metrics.class.getSimpleName();
 
   private final QueuedThreadPool threadPool;
+  private static HttpServer2Metrics instance;
   private final String name;
 
   private HttpServer2Metrics(QueuedThreadPool threadPool, String name) {
@@ -65,10 +66,14 @@ public final class HttpServer2Metrics implements MetricsSource {
   }
 
   public static HttpServer2Metrics create(QueuedThreadPool threadPool,
-      String name) {
+                                          String name) {
+    if (instance != null) {
+      return instance;
+    }
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(NAME, "HttpServer2 Metrics",
+    instance = ms.register(NAME, "HttpServer2 Metrics",
         new HttpServer2Metrics(threadPool, name));
+    return instance;
   }
 
   @Override
