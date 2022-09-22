@@ -59,7 +59,7 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
 
       const lastUpdatedOMLatest = lastUpdatedOMDBDelta > lastUpdatedOMDBFull ? lastUpdatedOMDBDelta : lastUpdatedOMDBFull;
 
-      const lastUpdatedDeltaFullToolTip = lastUpdatedOMDBDelta === 0 || lastUpdatedOMDBDelta === undefined || lastUpdatedOMDBFull === 0 || lastUpdatedOMDBFull === undefined ? 'N/A' :
+      const lastUpdatedDeltaFullToolTip = lastUpdatedOMDBDelta === 0 || lastUpdatedOMDBDelta === undefined || lastUpdatedOMDBFull === 0 || lastUpdatedOMDBFull === undefined ? 'NA' :
       (
         <Tooltip
           placement='bottom' title={omDBDeltaFullToolTip}

@@ -112,8 +112,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         keys: clusterState.keys,
         missingContainersCount,
         lastRefreshed: Number(moment()),
-        lastUpdatedOMDBDelta:omDBDeltaObject && omDBDeltaObject.lastUpdatedTimestamp,
-        lastUpdatedOMDBFull:omDBFullObject && omDBFullObject.lastUpdatedTimestamp
+        lastUpdatedOMDBDelta: omDBDeltaObject && omDBDeltaObject.lastUpdatedTimestamp,
+        lastUpdatedOMDBFull: omDBFullObject && omDBFullObject.lastUpdatedTimestamp
       });
     })).catch(error => {
       this.setState({
