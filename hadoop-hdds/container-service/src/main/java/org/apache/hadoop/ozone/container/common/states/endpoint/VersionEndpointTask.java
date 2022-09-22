@@ -127,7 +127,12 @@ public class VersionEndpointTask implements
         // Clean <HddsVolume>/tmp/container_delete_service dir.
         if (volume instanceof HddsVolume) {
           HddsVolume hddsVolume = (HddsVolume) volume;
-          hddsVolume.cleanTmpDir();
+          try {
+            hddsVolume.cleanTmpDir();
+          } catch (IOException ex) {
+            LOG.error("Error while cleaning tmp delete directory " +
+                "under {}", hddsVolume.getWorkingDir(), ex);
+          }
         }
 
         if (!result) {

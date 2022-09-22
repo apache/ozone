@@ -351,7 +351,18 @@ public class HddsVolume extends StorageVolume {
     }
   }
 
-  private void createTmpDir(String id) {
+  // Ensure that volume is initialized properly with
+  // cleanup path.  Should disk be re-inserted into
+  // cluster, cleanup path should already be on
+  // disk.  This method syncs the HddsVolume
+  // with the path on disk
+  public void checkCleanupDirs(String id) {
+    String tmpPath = createTmpPath(id);
+    String deleteServicePath = tmpPath + TMP_DELETE_SERVICE_DIR;
+    deleteServiceDirPath = Paths.get(deleteServicePath);
+  }
+
+  private String createTmpPath(String id) {
     StringBuilder stringBuilder = new StringBuilder();
 
     // HddsVolume root directory path
@@ -366,8 +377,12 @@ public class HddsVolume extends StorageVolume {
     stringBuilder.append(id);
     stringBuilder.append(TMP_DIR);
 
-    String tmpPath = stringBuilder.toString();
-    tmpDirPath = Paths.get(tmpPath);
+    return stringBuilder.toString();
+  }
+
+
+  private void createTmpDir(String id) {
+    tmpDirPath = Paths.get(createTmpPath(id));
 
     if (Files.notExists(tmpDirPath)) {
       try {
@@ -408,7 +423,20 @@ public class HddsVolume extends StorageVolume {
   /**
    * Delete all files under tmp/container_delete_service.
    */
-  public synchronized void cleanTmpDir() {
+  public synchronized void cleanTmpDir() throws IOException {
+    if (getStorageState() != VolumeState.NORMAL) {
+      LOG.debug("Call to clean tmp dir container_delete_service directory "
+              + "for {} while VolumeState {}",
+              getStorageDir(), getStorageState().toString());
+      return;
+    }
+
+    if (!getClusterID().isEmpty()) {
+      checkCleanupDirs(getClusterID());
+    } else {
+      throw new IOException("Volume has no ClusterId");
+    }
+
     ListIterator<File> leftoversListIt = getDeleteLeftovers();
 
     while (leftoversListIt.hasNext()) {
@@ -456,11 +484,18 @@ public class HddsVolume extends StorageVolume {
    * @return true if renaming was successful
    */
   public boolean moveToTmpDeleteDirectory(
-      KeyValueContainerData keyValueContainerData) {
+      KeyValueContainerData keyValueContainerData)
+      throws IOException {
     String containerPath = keyValueContainerData.getContainerPath();
     File container = new File(containerPath);
     String containerDirName = container.getName();
-    
+
+    if (!getClusterID().isEmpty()) {
+      checkCleanupDirs(getClusterID());
+    } else {
+      throw new IOException("Volume has no ClusterId");
+    }
+
     String destinationDirPath = deleteServiceDirPath
         .resolve(Paths.get(containerDirName)).toString();
 

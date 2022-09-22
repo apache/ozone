@@ -238,6 +238,11 @@ public final class StorageVolumeUtil {
       // skipped. Create cluster ID symlink now.
       // Else, We are still pre-finalized.
       // The existing directory should be left for backwards compatibility.
+      if (volume instanceof HddsVolume) {
+        String id = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(conf,
+                scmId, clusterId);
+        ((HddsVolume)volume).checkCleanupDirs(id);
+      }
       return VersionedDatanodeFeatures.ScmHA.
           upgradeVolumeIfNeeded(volume, clusterId);
     } else {
