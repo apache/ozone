@@ -22,14 +22,11 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Handler to stop disk balancer.
@@ -40,29 +37,21 @@ import java.util.Optional;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class DiskBalancerStopSubcommand extends ScmSubcommand {
-  @Option(names = {"-a", "--allDatanodes"},
-      description = "Stop diskBalancer on all datanodes.")
-  private boolean allHosts;
 
-  @Parameters(description = "List of fully qualified host names")
-  private List<String> hosts = new ArrayList<>();
+  @CommandLine.Mixin
+  private DiskBalancerCommonOptions commonOptions =
+      new DiskBalancerCommonOptions();
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    if (hosts.size() == 0 && !allHosts) {
-      System.out.println("Datanode not specified.");
+    if (!commonOptions.check()) {
       return;
     }
-    if (hosts.size() != 0 && allHosts) {
-      System.out.println("Confused options. Omit \"--allDatanodes\" or " +
-          "Datanodes.");
-      return;
-    }
-    List<DatanodeAdminError> errors = scmClient.stopDiskBalancer(allHosts ?
-        Optional.empty() : Optional.of(hosts));
+    List<DatanodeAdminError> errors = scmClient.stopDiskBalancer(
+        commonOptions.getSpecifiedDatanodes());
 
     System.out.println("Stopping DiskBalancer on datanode(s):\n" +
-        (allHosts ? "All datanodes" : String.join("\n", hosts)));
+        commonOptions.getHostString());
     if (errors.size() > 0) {
       for (DatanodeAdminError error : errors) {
         System.err.println("Error: " + error.getHostname() + ": "
@@ -77,6 +66,6 @@ public class DiskBalancerStopSubcommand extends ScmSubcommand {
 
   @VisibleForTesting
   public void setAllHosts(boolean allHosts) {
-    this.allHosts = allHosts;
+    this.commonOptions.setAllHosts(allHosts);
   }
 }
