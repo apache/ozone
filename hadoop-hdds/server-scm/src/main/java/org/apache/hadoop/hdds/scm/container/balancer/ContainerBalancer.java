@@ -529,15 +529,17 @@ public class ContainerBalancer extends StatefulService {
       allFuturesResult.get(config.getMoveTimeout().toMillis(),
           TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
-      long failedCount = performMoveCancelAndFailCount();
-      metrics.incrementNumContainerMovesFailed(failedCount);
+      long cancelCount = cancelAndCountPendingMoves();
+      metrics.incrementNumContainerMovesFailed(cancelCount);
+      LOG.warn("Container balancer is interrupted and moves are cancelled {}",
+          cancelCount);
       Thread.currentThread().interrupt();
     } catch (TimeoutException e) {
-      long timeoutCounts = performTimeMoveCancelAndCount();
+      long timeoutCounts = cancelAndCountPendingMoves();
       LOG.warn("{} Container moves are canceled.", timeoutCounts);
       metrics.incrementNumContainerMovesTimeoutInLatestIteration(timeoutCounts);
     } catch (ExecutionException e) {
-      performTimeMoveCancelAndCount();
+      cancelAndCountPendingMoves();
       LOG.error("Got exception while checkIterationMoveResults", e);
     }
 
@@ -561,12 +563,12 @@ public class ContainerBalancer extends StatefulService {
         metrics.getNumContainerMovesCompletedInLatestIteration());
   }
 
-  private long performTimeMoveCancelAndCount() {
+  private long cancelAndCountPendingMoves() {
     return moveSelectionToFutureMap.entrySet().stream()
         .filter(entry -> !entry.getValue().isDone())
         .peek(entry -> {
           LOG.warn("Container move canceled for container {} from source {}" +
-                  " to target {} due to timeout.",
+                  " to target {}.",
               entry.getKey().getContainerID(),
               containerToSourceMap.get(entry.getKey().getContainerID())
                   .getUuidString(),
@@ -574,25 +576,6 @@ public class ContainerBalancer extends StatefulService {
           entry.getValue().cancel(true);
         }).count();
   }
-
-  private long performMoveCancelAndFailCount() {
-    long cnt = moveSelectionToFutureMap.entrySet().stream()
-        .filter(entry -> entry.getValue().isDone() && entry.getValue()
-            .isCompletedExceptionally()).count();
-    moveSelectionToFutureMap.entrySet().stream()
-        .filter(entry -> !entry.getValue().isDone())
-        .peek(entry -> {
-          LOG.warn("Container move canceled for container {} from source {}" +
-                  " to target {} due to timeout.",
-              entry.getKey().getContainerID(),
-              containerToSourceMap.get(entry.getKey().getContainerID())
-                  .getUuidString(),
-              entry.getKey().getTargetNode().getUuidString());
-          entry.getValue().cancel(true);
-        });
-    return cnt;
-  }
-
 
   /**
    * Match a source datanode with a target datanode and identify the container
