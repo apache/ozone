@@ -55,8 +55,7 @@ interface IOverviewState {
   lastRefreshed: number;
   lastUpdatedOMDBDelta:number,
   lastUpdatedOMDBFull:number,
-  lastUpdatedOMDBDeltaText:string,
-  lastUpdatedOMDBFullText:string
+  lastUpdatedOMLatest:number
 }
 
 export class Overview extends React.Component<Record<string, object>, IOverviewState> {
@@ -82,9 +81,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       lastRefreshed: 0,
       lastUpdatedOMDBDelta:0,
       lastUpdatedOMDBFull:0,
-      lastUpdatedOMDBDeltaText:'',
-      lastUpdatedOMDBFullText:''
-
+      lastUpdatedOMLatest:0
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -103,8 +100,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       const missingContainers: IMissingContainersResponse = missingContainersResponse.data;     
       const taskStatus = taskstatusResponse.data && taskstatusResponse.data.filter((item:any) => item.taskName === 'OmDeltaRequest' || item.taskName === 'OmSnapshotRequest').sort((c1:any, c2:any) => c2.lastUpdatedTimestamp - c1.lastUpdatedTimestamp);
       const missingContainersCount = missingContainers.totalCount;
-      const omDBDeltaObject=taskStatus[0];
-      const omDBFullObject= taskStatus[1];
+      const omDBDeltaObject=taskStatus && taskStatus.find((item:any)=> item.taskName === 'OmDeltaRequest');
+      const omDBFullObject= taskStatus && taskStatus.find((item:any)=> item.taskName === 'OmSnapshotRequest');
     
       this.setState({
         loading: false,
@@ -117,11 +114,9 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         keys: clusterState.keys,
         missingContainersCount,
         lastRefreshed: Number(moment()),
-        lastUpdatedOMDBDelta: omDBDeltaObject ? omDBDeltaObject.lastUpdatedTimestamp : 0,
-        lastUpdatedOMDBFull:  omDBFullObject ? omDBFullObject.lastUpdatedTimestamp : 0,
-        lastUpdatedOMDBDeltaText:omDBDeltaObject? omDBDeltaObject.taskName === 'OmDeltaRequest' ? 'Last Delta Update': 'Last Full Update': '',
-        lastUpdatedOMDBFullText: omDBFullObject ? omDBFullObject.taskName === 'OmDeltaRequest' ? 'Last Delta Update': 'Last Full Update' : ''
-
+        lastUpdatedOMDBDelta:omDBDeltaObject && omDBDeltaObject.lastUpdatedTimestamp,
+        lastUpdatedOMDBFull:omDBFullObject && omDBFullObject.lastUpdatedTimestamp,
+        lastUpdatedOMLatest: taskStatus && taskStatus[0] &&taskStatus[0].lastUpdatedTimestamp
       });
     })).catch(error => {
       this.setState({
@@ -142,7 +137,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
 
   render() {
     const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets,
-      keys, missingContainersCount,lastRefreshed,lastUpdatedOMDBDelta,lastUpdatedOMDBFull,lastUpdatedOMDBDeltaText,lastUpdatedOMDBFullText} = this.state;
+      keys, missingContainersCount,lastRefreshed,lastUpdatedOMDBDelta,lastUpdatedOMDBFull,lastUpdatedOMLatest} = this.state;
+      
     const datanodesElement = (
       <span>
         <Icon type='check-circle' theme='filled' className='icon-success icon-small'/> {datanodes} <span className='ant-card-meta-description meta'>HEALTHY</span>
@@ -165,9 +161,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       <div className='overview-content'>
         <div className='page-header'>
           Overview
-          <AutoReloadPanel isLoading={loading} lastRefreshed={lastRefreshed} 
+          <AutoReloadPanel isLoading={loading} lastRefreshed={lastRefreshed} lastUpdatedOMLatest={lastUpdatedOMLatest}
           lastUpdatedOMDBDelta={lastUpdatedOMDBDelta}  lastUpdatedOMDBFull={lastUpdatedOMDBFull}
-          lastUpdatedOMDBDeltaText={lastUpdatedOMDBDeltaText}  lastUpdatedOMDBFullText={lastUpdatedOMDBFullText}
           togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
         </div>
         <Row gutter={[25, 25]}>
