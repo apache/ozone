@@ -21,9 +21,9 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -48,10 +48,11 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
       new HashSet<>(Arrays.asList("RUNNING", "STOPPED", "UNKNOWN"));
 
   @Option(names = {"-s", "--state"},
-      description = "RUNNING, STOPPED, UNKNOWN")
+      description = "RUNNING, STOPPED, UNKNOWN. Default state is RUNNING.")
   private String state = "RUNNING";
 
-  @Parameters(description = "List of fully qualified host names")
+  @CommandLine.Option(names = {"-d", "--datanodes"},
+      description = "Get diskBalancer status on specific datanodes.")
   private List<String> hosts = new ArrayList<>();
 
   @Override
