@@ -317,24 +317,30 @@ public final class ContainerStateManagerImpl
 
     lock.writeLock().lock();
     try {
-      if (!containers.contains(containerID)) {
-        ExecutionUtil.create(() -> {
-          transactionBuffer.addToBuffer(containerStore, containerID, container);
-          containers.addContainer(container);
-          if (pipelineManager.containsPipeline(pipelineID)) {
-            pipelineManager.addContainerToPipeline(pipelineID, containerID);
-          } else if (containerInfo.getState().
-              equals(LifeCycleState.OPEN)) {
-            // Pipeline should exist, but not
-            throw new PipelineNotFoundException();
-          }
-          //recon may receive report of closed container,
-          // no corresponding Pipeline can be synced for scm.
-          // just only add the container.
-        }).onException(() -> {
-          containers.removeContainer(containerID);
-          transactionBuffer.removeFromBuffer(containerStore, containerID);
-        }).execute();
+      lockManager.writeLock(containerID);
+      try {
+        if (!containers.contains(containerID)) {
+          ExecutionUtil.create(() -> {
+            transactionBuffer.addToBuffer(containerStore,
+                containerID, container);
+            containers.addContainer(container);
+            if (pipelineManager.containsPipeline(pipelineID)) {
+              pipelineManager.addContainerToPipeline(pipelineID, containerID);
+            } else if (containerInfo.getState().
+                equals(LifeCycleState.OPEN)) {
+              // Pipeline should exist, but not
+              throw new PipelineNotFoundException();
+            }
+            //recon may receive report of closed container,
+            // no corresponding Pipeline can be synced for scm.
+            // just only add the container.
+          }).onException(() -> {
+            containers.removeContainer(containerID);
+            transactionBuffer.removeFromBuffer(containerStore, containerID);
+          }).execute();
+        }
+      } finally {
+        lockManager.writeUnlock(containerID);
       }
     } finally {
       lock.writeLock().unlock();
@@ -506,15 +512,20 @@ public final class ContainerStateManagerImpl
   public void removeContainer(final HddsProtos.ContainerID id)
       throws IOException {
     final ContainerID cid = ContainerID.getFromProtobuf(id);
-    lockManager.writeLock(cid);
+    lock.writeLock();
     try {
-      final ContainerInfo containerInfo = containers.getContainerInfo(cid);
-      ExecutionUtil.create(() -> {
-        transactionBuffer.removeFromBuffer(containerStore, cid);
-        containers.removeContainer(cid);
-      }).onException(() -> containerStore.put(cid, containerInfo)).execute();
+      lockManager.writeLock(cid);
+      try {
+        final ContainerInfo containerInfo = containers.getContainerInfo(cid);
+        ExecutionUtil.create(() -> {
+          transactionBuffer.removeFromBuffer(containerStore, cid);
+          containers.removeContainer(cid);
+        }).onException(() -> containerStore.put(cid, containerInfo)).execute();
+      } finally {
+        lockManager.writeUnlock(cid);
+      }
     } finally {
-      lockManager.writeUnlock(cid);
+      lock.writeLock().unlock();
     }
   }
 
