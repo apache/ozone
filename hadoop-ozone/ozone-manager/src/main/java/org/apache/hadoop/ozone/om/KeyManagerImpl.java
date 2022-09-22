@@ -1209,6 +1209,8 @@ public class KeyManagerImpl implements KeyManager {
     final String keyName = args.getKeyName();
 
     OmKeyInfo fileKeyInfo = null;
+    OmKeyInfo dirKeyInfo = null;
+    OmKeyInfo fakeDirKeyInfo = null;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
@@ -1221,28 +1223,46 @@ public class KeyManagerImpl implements KeyManager {
       // Check if the key is a file.
       String fileKeyBytes = metadataManager.getOzoneKey(
               volumeName, bucketName, keyName);
-      fileKeyInfo = metadataManager
-          .getKeyTable(getBucketLayout(metadataManager, volumeName, bucketName))
-          .get(fileKeyBytes);
+      BucketLayout layout = getBucketLayout(metadataManager, volumeName, bucketName);
+      fileKeyInfo = metadataManager.getKeyTable(layout).get(fileKeyBytes);
+      String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
 
       // Check if the key is a directory.
       if (fileKeyInfo == null) {
-        String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
         String dirKeyBytes = metadataManager.getOzoneKey(
                 volumeName, bucketName, dirKey);
-        OmKeyInfo dirKeyInfo = metadataManager.getKeyTable(
-                getBucketLayout(metadataManager, volumeName, bucketName))
-            .get(dirKeyBytes);
-        if (dirKeyInfo != null) {
-          return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
+        dirKeyInfo = metadataManager.getKeyTable(layout).get(dirKeyBytes);
+
+        // Check if the key is a prefix.
+        // Some keys may contain '/' Ozone will treat '/' as directory separator
+        // such as : key name is 'a/b/c', 'a' and 'b' may not really exist,
+        // but Ozone treats 'a' and 'b' as a directory.
+        // we need create a fake directory 'a' or 'a/b'
+        if (dirKeyInfo == null) {
+          Table.KeyValue<String, OmKeyInfo> keyValue =
+              metadataManager.getKeyTable(layout).iterator().seek(fileKeyBytes);
+          if (keyValue != null) {
+            Path fullPath = Paths.get(keyValue.getValue().getKeyName());
+            Path subPath = Paths.get(dirKey);
+            OmKeyInfo omKeyInfo = keyValue.getValue();
+            if (fullPath.startsWith(subPath)) {
+              // create fake directory
+              fakeDirKeyInfo = createDirectoryKey(
+                  omKeyInfo.getVolumeName(),
+                  omKeyInfo.getBucketName(),
+                  dirKey,
+                  omKeyInfo.getAcls());
+            }
+          }
         }
       }
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
               bucketName);
+    }
 
-      // if the key is a file then do refresh pipeline info in OM by asking SCM
       if (fileKeyInfo != null) {
+        // if the key is a file then do refresh pipeline info in OM by asking SCM
         if (args.getLatestVersionLocation()) {
           slimLocationVersion(fileKeyInfo);
         }
@@ -1259,6 +1279,13 @@ public class KeyManagerImpl implements KeyManager {
         }
         return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
       }
+
+    if (dirKeyInfo != null) {
+      return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
+    }
+
+    if (fakeDirKeyInfo != null) {
+      return new OzoneFileStatus(fakeDirKeyInfo, scmBlockSize, true);
     }
 
     // Key is not found, throws exception
@@ -1349,6 +1376,7 @@ public class KeyManagerImpl implements KeyManager {
         .setVolumeName(keyInfo.getVolumeName())
         .setBucketName(keyInfo.getBucketName())
         .setKeyName(dir)
+        .setFileName(OzoneFSUtils.getFileName(keyName))
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
         .setCreationTime(Time.now())

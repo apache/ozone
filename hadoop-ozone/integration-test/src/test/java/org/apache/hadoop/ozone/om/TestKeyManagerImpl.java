@@ -1274,6 +1274,64 @@ public class TestKeyManagerImpl {
   }
 
   @Test
+  public void testGetFileStatus() throws IOException {
+    // create a key
+    String keyName = RandomStringUtils.randomAlphabetic(5);
+    OmKeyArgs keyArgs = createBuilder()
+        .setKeyName(keyName)
+        .setLatestVersionLocation(true)
+        .build();
+    writeClient.createFile(keyArgs, false, false);
+    OpenKeySession keySession = writeClient.createFile(keyArgs, true, true);
+    keyArgs.setLocationInfoList(
+        keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
+    writeClient.commitKey(keyArgs, keySession.getId());
+    OzoneFileStatus ozoneFileStatus = keyManager.getFileStatus(keyArgs);
+    Assert.assertEquals(keyName, ozoneFileStatus.getKeyInfo().getFileName());
+  }
+
+  @Test
+  public void testGetFileStatusWithFakeDir() throws IOException {
+    String parentDir = "dir1";
+    String key = "key1";
+    String fullKeyName = parentDir + OZONE_URI_DELIMITER + key;
+    OzoneFileStatus ozoneFileStatus;
+    OmKeyArgs keyArgs = createBuilder().setKeyName(fullKeyName).build();
+    OpenKeySession keySession = writeClient.createFile(keyArgs, true, true);
+    keyArgs.setLocationInfoList(
+        keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
+    writeClient.commitKey(keyArgs, keySession.getId());
+
+    // create a key "dir1/key1"
+    Assert.assertNull(
+        metadataManager.getKeyTable(getDefaultBucketLayout()).get(
+            metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, parentDir)));
+    Assert.assertNotNull(
+        metadataManager.getKeyTable(getDefaultBucketLayout())
+            .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, fullKeyName)));
+
+    // get a non-existing "dir1", since the key is prefixed "dir1/key1",
+    // a fake "/dir1" will be returned
+    keyArgs = createBuilder().setKeyName(parentDir).build();
+    ozoneFileStatus = keyManager.getFileStatus(keyArgs);
+    Assert.assertEquals(parentDir, ozoneFileStatus.getKeyInfo().getFileName());
+    Assert.assertTrue(ozoneFileStatus.isDirectory());
+
+    // get a non-existing "dir", since the key is not prefixed "dir1/key1",
+    // a `OMException` will be throw
+    keyArgs = createBuilder().setKeyName("dir").build();
+    OmKeyArgs finalKeyArgs = keyArgs;
+    Assert.assertThrows(OMException.class, () -> keyManager.getFileStatus(
+        finalKeyArgs));
+
+    // get a file "dir1/key1"
+    keyArgs = createBuilder().setKeyName(fullKeyName).build();
+    ozoneFileStatus = keyManager.getFileStatus(keyArgs);
+    Assert.assertEquals(key, ozoneFileStatus.getKeyInfo().getFileName());
+    Assert.assertTrue(ozoneFileStatus.isFile());
+  }
+
+  @Test
   public void testRefreshPipeline() throws Exception {
 
     OzoneManager ozoneManager = om;

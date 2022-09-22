@@ -153,6 +153,7 @@ public class TestOzoneFileSystem {
   private static OzoneManagerProtocol writeClient;
   private static FileSystem fs;
   private static OzoneFileSystem o3fs;
+  private static OzoneBucket bucket;
   private static String volumeName;
   private static String bucketName;
   private static Trash trash;
@@ -179,8 +180,7 @@ public class TestOzoneFileSystem {
     writeClient = cluster.getRpcClient().getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+    bucket = TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
 
@@ -332,6 +332,26 @@ public class TestOzoneFileSystem {
     Path subdir = new Path("/d1/d2/");
     boolean status = fs.mkdirs(subdir);
     assertTrue("Shouldn't send error if dir exists", status);
+  }
+
+  @Test
+  public void testMakeDirsWithAnFakeDirectory() throws Exception {
+    /*
+     * Op 1. commit a key -> "dir1/dir2/key1"
+     * Op 2. create dir -> "dir1/testDir", the dir1 is a fake dir,
+     *  "dir1/testDir" can be created normal
+     */
+
+    String fakeParentKey = "dir1/dir2";
+    String fullKeyName = fakeParentKey + "/key1";
+    TestDataUtil.createKey(bucket, fullKeyName, "");
+
+    // /dir1/dir2 should not exist
+    assertFalse(fs.exists(new Path(fakeParentKey)));
+
+    // /dir1/dir2/key2 should be created because has a fake parent directory
+    Path subdir = new Path(fakeParentKey, "key2");
+    assertTrue(fs.mkdirs(subdir));
   }
 
   @Test
@@ -725,6 +745,37 @@ public class TestOzoneFileSystem {
     for (int i = 0; i < numDirs; i++) {
       assertTrue(paths.contains(fileStatuses[i].getPath().getName()));
     }
+  }
+
+  @Test
+  public void testListStatusOnKeyNameContainDelimiter() throws Exception {
+    /*
+    * op1: create a key -> "dir1/dir2/key1"
+    * op2: `ls /` child dir "/dir1/" will be return
+    * op2: `ls /dir1` child dir "/dir1/dir2/" will be return
+    * op3: `ls /dir1/dir2` file "/dir1/dir2/key" will be return
+    *
+    * the "/dir1", "/dir1/dir2/" are fake directory
+    * */
+    String keyName = "dir1/dir2/key1";
+    TestDataUtil.createKey(bucket, keyName, "");
+    FileStatus[] fileStatuses;
+
+    fileStatuses = fs.listStatus(new Path("/"));
+    assertEquals(1, fileStatuses.length);
+    assertEquals("/dir1", fileStatuses[0].getPath().toUri().getPath());
+    assertTrue(fileStatuses[0].isDirectory());
+
+    fileStatuses = fs.listStatus(new Path("/dir1"));
+    assertEquals(1, fileStatuses.length);
+    assertEquals("/dir1/dir2", fileStatuses[0].getPath().toUri().getPath());
+    assertTrue(fileStatuses[0].isDirectory());
+
+    fileStatuses = fs.listStatus(new Path("/dir1/dir2"));
+    assertEquals(1, fileStatuses.length);
+    assertEquals("/dir1/dir2/key1",
+        fileStatuses[0].getPath().toUri().getPath());
+    assertTrue(fileStatuses[0].isFile());
   }
 
   /**
@@ -1271,6 +1322,18 @@ public class TestOzoneFileSystem {
     assertTrue("Renamed failed", fs.rename(file1Destin, abcRootPath));
     assertTrue("Renamed filed: /a/b/c/file1", fs.exists(new Path(abcRootPath,
             "file1")));
+  }
+
+  @Test
+  public void testRenameContainDelimiterFile() throws Exception {
+    String sourceKeyName = "dir1/dir2/key1";
+    String targetKeyName = "dir1/dir2/key2";
+    TestDataUtil.createKey(bucket, sourceKeyName, "");
+
+    Path sourcePath = new Path(fs.getUri().toString() + "/" + sourceKeyName);
+    Path targetPath = new Path(fs.getUri().toString() + "/" + targetKeyName);
+    assertTrue(fs.rename(sourcePath, targetPath));
+    assertTrue(fs.exists(targetPath));
   }
 
 
