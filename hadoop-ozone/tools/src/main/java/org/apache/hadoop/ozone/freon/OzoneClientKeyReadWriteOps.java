@@ -23,12 +23,15 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -75,39 +78,23 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
           defaultValue = "0")
   private int writeRange;
 
-//    @CommandLine.Option(names = {"-e", "--end-index-each-client-read"},
-//          description = "end-index of each client's read operation.",
-//          defaultValue = "0")
-//  private int endIndexForRead;
-
-//  @CommandLine.Option(names = {"-j", "--end-index-each-client-write"},
-//          description = "end-index of each client's write operation.",
-//          defaultValue = "0")
-//  private int endIndexForWrite;
-
-  @CommandLine.Option(names = {"-g", "--size"},
+  @CommandLine.Option(names = {"--size"},
           description = "Generated data size (in bytes) of " +
                   "each key/file to be " +
                   "written.",
-          defaultValue = "256")
+          defaultValue = "1")
   private int writeSizeInBytes;
 
-  @CommandLine.Option(names = {"-k", "--keySorted"},
+  @CommandLine.Option(names = {"--keySorted"},
           description = "Generated sorted key or not. The key name " +
                   "will be generated via md5 hash if choose " +
                   "to use unsorted key.",
           defaultValue = "false")
   private boolean keySorted;
 
-  @CommandLine.Option(names = {"-x", "--mix-workload"},
-          description = "Set to True if you would like to " +
-                  "generate mix workload (Read and Write).",
-          defaultValue = "false")
-  private boolean isMixWorkload;
-
   @CommandLine.Option(names = {"--percentage-read"},
           description = "Percentage of read tasks in mix workload.",
-          defaultValue = "0")
+          defaultValue = "100")
   private int percentageRead;
 
   @CommandLine.Option(names = {"--clients"},
@@ -137,9 +124,10 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
 
   private static final Logger LOG =
           LoggerFactory.getLogger(OzoneClientKeyReadWriteOps.class);
-
-  private final String readTask = "READ_TASK";
-  private final String writeTask = "WRITE_TASK";
+  public enum TaskType {
+    READTASK,
+    WRITETASK
+  }
   private KeyGeneratorUtil kg;
 
   @Override
@@ -177,79 +165,92 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     }
 
     OzoneClient client = rpcClients[clientIndex];
-    String operationType = decideReadOrWriteTask();
-    String keyName = getKeyName(operationType, clientIndex);
+    TaskType taskType = decideReadOrWriteTask();
+    String keyName = getKeyName(taskType, clientIndex);
     timer.time(() -> {
       try {
-        switch (operationType) {
-        case readTask:
+        switch (taskType) {
+          case READTASK:
           processReadTasks(keyName, client);
           break;
-        case writeTask:
+          case WRITETASK:
           processWriteTasks(keyName, client);
           break;
         default:
           break;
         }
-      } catch (Exception ex) {
+      } catch (RuntimeException ex) {
         LOG.error(ex.getMessage());
+        throw ex;
+      } catch (IOException ex) {
+        LOG.error(ex.getMessage());
+        throw new RuntimeException(ex.getMessage());
       }
+
     });
   }
 
   public void processReadTasks(String keyName, OzoneClient client)
-          throws Exception {
-    OzoneBucket ozbk = client.getObjectStore().getVolume(volumeName)
-            .getBucket(bucketName);
-
+          throws RuntimeException, IOException {
+    OzoneKeyDetails keyDetails = client.getProxy().getKeyDetails(volumeName, bucketName, keyName);
     if (readMetadataOnly) {
-      ozbk.getKey(keyName);
+      keyDetails.getModificationTime();
     } else {
       byte[] data = new byte[writeSizeInBytes];
-      try (OzoneInputStream introStream = ozbk.readKey(keyName)) {
-        int readBytes = introStream.read(data);
+      try (OzoneInputStream introStream = keyDetails.getContent()) {
+        introStream.read(data);
       }
     }
   }
   public void processWriteTasks(String keyName, OzoneClient client)
-          throws Exception {
-    OzoneBucket ozbk = client.getObjectStore().getVolume(volumeName)
-            .getBucket(bucketName);
-
-    try (OzoneOutputStream out = ozbk.createKey(keyName, writeSizeInBytes)) {
+          throws RuntimeException, IOException {
+    try (OzoneOutputStream out = client.getProxy().
+            createKey(volumeName, bucketName, keyName, writeSizeInBytes, null, new HashMap<>()))
+    {
       out.write(keyContent);
-      out.flush();
+    } catch (Exception ex) {
+      throw ex;
     }
   }
-  public String decideReadOrWriteTask() {
-    if (!isMixWorkload) {
-      if (readRange > 0) {
-        return readTask;
-      } else if (writeRange > 0) {
-        return writeTask;
+  public TaskType decideReadOrWriteTask() {
+    if (!isMixWorkload()) {
+      if (percentageRead == 100) {
+        return TaskType.READTASK;
+      } else {
+        return TaskType.WRITETASK;
       }
     }
     //mix workload
     int tmp = ThreadLocalRandom.current().nextInt(100) + 1; // 1 ~ 100
     if (tmp < percentageRead) {
-      return readTask;
+      return TaskType.READTASK;
     } else {
-      return writeTask;
+      return TaskType.WRITETASK;
     }
   }
 
-  public String getKeyName(String operationType, int clientIndex) {
+  public String getKeyName(TaskType taskType, int clientIndex) {
     int startIdx, endIdx;
-    switch (operationType) {
-    case readTask:
-      // separate tasks evenly to each client
-      startIdx = clientIndex * (readRange / clientsCount);
-      endIdx = startIdx + (readRange / clientsCount) - 1;
+    switch (taskType) {
+    case READTASK:
+    // separate tasks evenly to each client
+      if (readRange < clientsCount) {
+        startIdx = clientIndex;
+        endIdx = clientIndex;
+      }else{
+        startIdx = clientIndex * (readRange / clientsCount);
+        endIdx = startIdx + (readRange / clientsCount) - 1;
+      }
       break;
-    case writeTask:
-      // separate tasks evenly to each client
-      startIdx = clientIndex * (writeRange / clientsCount);
-      endIdx = startIdx + (writeRange / clientsCount) - 1;
+    case WRITETASK:
+    // separate tasks evenly to each client
+      if (writeRange < clientsCount) {
+        startIdx = clientIndex;
+        endIdx = clientIndex;
+      } else {
+        startIdx = clientIndex * (writeRange / clientsCount);
+        endIdx = startIdx + (writeRange / clientsCount) - 1;
+      }
       break;
     default:
       startIdx = 0;
@@ -267,6 +268,10 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
               append(kg.generateMd5KeyName(randomIdxWithinRange));
     }
     return keyNameSb.toString();
+  }
+
+  public boolean isMixWorkload() {
+    return percentageRead == 0 || percentageRead == 100;
   }
 
 }

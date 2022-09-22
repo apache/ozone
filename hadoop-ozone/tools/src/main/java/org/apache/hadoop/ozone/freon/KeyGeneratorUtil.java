@@ -29,10 +29,7 @@ import java.util.function.Function;
 public class KeyGeneratorUtil {
   public static final String PURE_INDEX = "pureIndex";
   public static final String MD5 = "md5";
-//  public static final String SIMPLE_HASH = "simpleHash";
   public static final String FILE_DIR_SEPARATOR = "/";
-//  private char[] saltCharArray =
-//      {'m', 'D', 'E', 'T', 't', 'q', 'c', 'j', 'X', '8'};
 
   public String generatePureIndexKeyName(int number) {
     return String.valueOf(number);
@@ -50,38 +47,4 @@ public class KeyGeneratorUtil {
     return number -> DigestUtils.md5Hex(String.valueOf(number)).substring(0, 7);
   }
 
-//  public String generateSimpleHashKeyName(int number) {
-//    if (number == 0) {
-//      return String.valueOf(saltCharArray[number]);
-//    }
-//
-//    StringBuilder keyName = new StringBuilder();
-//    while (number > 0) {
-//      keyName.append(saltCharArray[number % 10]);
-//      number /= 10;
-//    }
-//    return keyName.toString();
-//  }
-
-//  public Function<Integer, String> simpleHashKeyNameFunc() {
-//    return number -> {
-//      if (number == 0) {
-//        return String.valueOf(saltCharArray[number]);
-//      }
-//
-//      StringBuilder keyName = new StringBuilder();
-//      while (number > 0) {
-//        keyName.append(saltCharArray[number % 10]);
-//        number /= 10;
-//      }
-//      return keyName.toString();
-//    };
-//  }
-//
-//  public char[] getSaltCharArray() {
-//    return saltCharArray;
-//  }
-//  public void setSaltCharArray(char[] saltCharArray) {
-//    this.saltCharArray = saltCharArray;
-//  }
 }
