@@ -505,16 +505,16 @@ public final class ContainerStateManagerImpl
 
   public void removeContainer(final HddsProtos.ContainerID id)
       throws IOException {
-    lock.writeLock().lock();
+    final ContainerID cid = ContainerID.getFromProtobuf(id);
+    lockManager.writeLock(cid);
     try {
-      final ContainerID cid = ContainerID.getFromProtobuf(id);
       final ContainerInfo containerInfo = containers.getContainerInfo(cid);
       ExecutionUtil.create(() -> {
         transactionBuffer.removeFromBuffer(containerStore, cid);
         containers.removeContainer(cid);
       }).onException(() -> containerStore.put(cid, containerInfo)).execute();
     } finally {
-      lock.writeLock().unlock();
+      lockManager.writeUnlock(cid);
     }
   }
 
