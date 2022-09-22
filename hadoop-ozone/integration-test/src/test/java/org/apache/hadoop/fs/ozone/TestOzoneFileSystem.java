@@ -153,7 +153,7 @@ public class TestOzoneFileSystem {
   private static OzoneManagerProtocol writeClient;
   private static FileSystem fs;
   private static OzoneFileSystem o3fs;
-  private static OzoneBucket bucket;
+  private static OzoneBucket ozoneBucket;
   private static String volumeName;
   private static String bucketName;
   private static Trash trash;
@@ -180,9 +180,9 @@ public class TestOzoneFileSystem {
     writeClient = cluster.getRpcClient().getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     // create a volume and a bucket to be used by OzoneFileSystem
-    bucket = TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
-    volumeName = bucket.getVolumeName();
-    bucketName = bucket.getName();
+    ozoneBucket = TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+    volumeName = ozoneBucket.getVolumeName();
+    bucketName = ozoneBucket.getName();
 
     String rootPath = String.format("%s://%s.%s/",
             OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
@@ -344,7 +344,7 @@ public class TestOzoneFileSystem {
 
     String fakeParentKey = "dir1/dir2";
     String fullKeyName = fakeParentKey + "/key1";
-    TestDataUtil.createKey(bucket, fullKeyName, "");
+    TestDataUtil.createKey(ozoneBucket, fullKeyName, "");
 
     // /dir1/dir2 should not exist
     assertFalse(fs.exists(new Path(fakeParentKey)));
@@ -758,7 +758,7 @@ public class TestOzoneFileSystem {
     * the "/dir1", "/dir1/dir2/" are fake directory
     * */
     String keyName = "dir1/dir2/key1";
-    TestDataUtil.createKey(bucket, keyName, "");
+    TestDataUtil.createKey(ozoneBucket, keyName, "");
     FileStatus[] fileStatuses;
 
     fileStatuses = fs.listStatus(new Path("/"));
@@ -1328,7 +1328,7 @@ public class TestOzoneFileSystem {
   public void testRenameContainDelimiterFile() throws Exception {
     String sourceKeyName = "dir1/dir2/key1";
     String targetKeyName = "dir1/dir2/key2";
-    TestDataUtil.createKey(bucket, sourceKeyName, "");
+    TestDataUtil.createKey(ozoneBucket, sourceKeyName, "");
 
     Path sourcePath = new Path(fs.getUri().toString() + "/" + sourceKeyName);
     Path targetPath = new Path(fs.getUri().toString() + "/" + targetKeyName);

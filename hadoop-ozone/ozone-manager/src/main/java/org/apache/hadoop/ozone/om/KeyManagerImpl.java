@@ -1223,7 +1223,8 @@ public class KeyManagerImpl implements KeyManager {
       // Check if the key is a file.
       String fileKeyBytes = metadataManager.getOzoneKey(
               volumeName, bucketName, keyName);
-      BucketLayout layout = getBucketLayout(metadataManager, volumeName, bucketName);
+      BucketLayout layout =
+          getBucketLayout(metadataManager, volumeName, bucketName);
       fileKeyInfo = metadataManager.getKeyTable(layout).get(fileKeyBytes);
       String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
 
@@ -1261,24 +1262,24 @@ public class KeyManagerImpl implements KeyManager {
               bucketName);
     }
 
-      if (fileKeyInfo != null) {
-        // if the key is a file then do refresh pipeline info in OM by asking SCM
-        if (args.getLatestVersionLocation()) {
-          slimLocationVersion(fileKeyInfo);
-        }
-        // If operation is head, do not perform any additional steps
-        // As head operation does not need any of those details.
-        if (!args.isHeadOp()) {
-          // refreshPipeline flag check has been removed as part of
-          // https://issues.apache.org/jira/browse/HDDS-3658.
-          // Please refer this jira for more details.
-          refresh(fileKeyInfo);
-          if (args.getSortDatanodes()) {
-            sortDatanodes(clientAddress, fileKeyInfo);
-          }
-        }
-        return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
+    if (fileKeyInfo != null) {
+      // if the key is a file then do refresh pipeline info in OM by asking SCM
+      if (args.getLatestVersionLocation()) {
+        slimLocationVersion(fileKeyInfo);
       }
+      // If operation is head, do not perform any additional steps
+      // As head operation does not need any of those details.
+      if (!args.isHeadOp()) {
+        // refreshPipeline flag check has been removed as part of
+        // https://issues.apache.org/jira/browse/HDDS-3658.
+        // Please refer this jira for more details.
+        refresh(fileKeyInfo);
+        if (args.getSortDatanodes()) {
+          sortDatanodes(clientAddress, fileKeyInfo);
+        }
+      }
+      return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
+    }
 
     if (dirKeyInfo != null) {
       return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);

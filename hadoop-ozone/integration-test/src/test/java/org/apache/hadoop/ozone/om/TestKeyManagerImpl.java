@@ -1296,19 +1296,22 @@ public class TestKeyManagerImpl {
     String key = "key1";
     String fullKeyName = parentDir + OZONE_URI_DELIMITER + key;
     OzoneFileStatus ozoneFileStatus;
+
+    // create a key "dir1/key1"
     OmKeyArgs keyArgs = createBuilder().setKeyName(fullKeyName).build();
     OpenKeySession keySession = writeClient.createFile(keyArgs, true, true);
     keyArgs.setLocationInfoList(
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
     writeClient.commitKey(keyArgs, keySession.getId());
 
-    // create a key "dir1/key1"
+    // verify
+    String keyArg;
+    keyArg = metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, parentDir);
     Assert.assertNull(
-        metadataManager.getKeyTable(getDefaultBucketLayout()).get(
-            metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, parentDir)));
-    Assert.assertNotNull(
-        metadataManager.getKeyTable(getDefaultBucketLayout())
-            .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, fullKeyName)));
+        metadataManager.getKeyTable(getDefaultBucketLayout()).get(keyArg));
+    keyArg = metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, parentDir);
+    Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
+        .get(keyArg));
 
     // get a non-existing "dir1", since the key is prefixed "dir1/key1",
     // a fake "/dir1" will be returned
@@ -1318,7 +1321,7 @@ public class TestKeyManagerImpl {
     Assert.assertTrue(ozoneFileStatus.isDirectory());
 
     // get a non-existing "dir", since the key is not prefixed "dir1/key1",
-    // a `OMException` will be throw
+    // a `OMException` will be thrown
     keyArgs = createBuilder().setKeyName("dir").build();
     OmKeyArgs finalKeyArgs = keyArgs;
     Assert.assertThrows(OMException.class, () -> keyManager.getFileStatus(
