@@ -608,7 +608,11 @@
     <description>
       Allows everyone to list all volumes when set to true. Defaults to true.
       When set to false, non-admin users can only list the volumes they have
-      access to. Admins can always list all volumes.
+      access to. Admins can always list all volumes. Note that this config
+      only applies to OzoneNativeAuthorizer. For other authorizers, admin
+      needs to set policies accordingly to allow all volume listing
+      e.g. for Ranger, a new policy with special volume "/" can be added to
+      allow group public LIST access.
     </description>
   </property>
   <property>
