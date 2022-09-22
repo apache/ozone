@@ -78,6 +78,10 @@ public final class ContainerBalancerMetrics {
       "exceptionally across all iterations of Container Balancer.")
   private MutableCounterLong numContainerMovesFailed;
 
+  @Metric(about = "Total number container for which moves failed " +
+      "exceptionally in latest iteration of Container Balancer.")
+  private MutableCounterLong numContainerMovesFailedInLatestIteration;
+
   /**
    * Create and register metrics named {@link ContainerBalancerMetrics#NAME}
    * for {@link ContainerBalancer}.
@@ -278,5 +282,18 @@ public final class ContainerBalancerMetrics {
 
   public void incrementNumContainerMovesFailed(long valueToAdd) {
     numContainerMovesFailed.incr(valueToAdd);
+  }
+
+  public long getNumContainerMovesFailedInLatestIteration() {
+    return numContainerMovesFailedInLatestIteration.value();
+  }
+
+  public void incrementNumContainerMovesFailedInLatestIteration(
+      long valueToAdd) {
+    numContainerMovesFailedInLatestIteration.incr(valueToAdd);
+  }
+  public void resetNumContainerMovesFailedInLatestIteration() {
+    numContainerMovesFailedInLatestIteration.incr(
+        -getNumContainerMovesFailedInLatestIteration());
   }
 }

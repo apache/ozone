@@ -530,7 +530,6 @@ public class ContainerBalancer extends StatefulService {
           TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
       long cancelCount = cancelAndCountPendingMoves();
-      metrics.incrementNumContainerMovesFailed(cancelCount);
       LOG.warn("Container balancer is interrupted and moves are cancelled {}",
           cancelCount);
       Thread.currentThread().interrupt();
@@ -555,6 +554,8 @@ public class ContainerBalancer extends StatefulService {
         sizeActuallyMovedInLatestIteration / OzoneConsts.GB);
     metrics.incrementDataSizeMovedGB(
         metrics.getDataSizeMovedGBInLatestIteration());
+    metrics.incrementNumContainerMovesFailed(
+        metrics.getNumContainerMovesFailedInLatestIteration());
     LOG.info("Iteration Summary. Number of Datanodes involved: {}. Size " +
             "moved: {} ({} Bytes). Number of Container moves completed: {}.",
         countDatanodesInvolvedPerIteration,
@@ -677,7 +678,7 @@ public class ContainerBalancer extends StatefulService {
                   containerID.toString(),
                   source.getUuidString(),
                   moveSelection.getTargetNode().getUuidString(), ex);
-              metrics.incrementNumContainerMovesFailed(1);
+              metrics.incrementNumContainerMovesFailedInLatestIteration(1);
             } else {
               if (result == LegacyReplicationManager.MoveResult.COMPLETED) {
                 sizeActuallyMovedInLatestIteration +=
@@ -700,11 +701,11 @@ public class ContainerBalancer extends StatefulService {
     } catch (ContainerNotFoundException e) {
       LOG.warn("Could not find Container {} for container move",
           containerID, e);
-      metrics.incrementNumContainerMovesFailed(1);
+      metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       return false;
     } catch (NodeNotFoundException | TimeoutException e) {
       LOG.warn("Container move failed for container {}", containerID, e);
-      metrics.incrementNumContainerMovesFailed(1);
+      metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       return false;
     }
 
@@ -883,6 +884,7 @@ public class ContainerBalancer extends StatefulService {
     metrics.resetNumDatanodesInvolvedInLatestIteration();
     metrics.resetDataSizeUnbalancedGB();
     metrics.resetNumDatanodesUnbalanced();
+    metrics.resetNumContainerMovesFailedInLatestIteration();
   }
 
   /**
