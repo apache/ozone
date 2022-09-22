@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -218,8 +219,11 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
-      // Update the block length for each block
-      omKeyInfo.updateLocationInfoList(locationInfoList, false);
+      // Update the block length for each block, return the allocated but
+      // uncommitted blocks
+      List<OmKeyLocationInfo> uncommitted = omKeyInfo.updateLocationInfoList(
+          locationInfoList, false);
+
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
@@ -237,6 +241,26 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
         checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
         omBucketInfo.incrUsedNamespace(1L);
+      }
+
+      // let the uncommitted blocks pretend as key's old version blocks
+      // which will be deleted as RepeatedOmKeyInfo
+      if (uncommitted.size() > 0) {
+        LOG.info("Detect allocated but uncommitted blocks {} in key {}.",
+            uncommitted, keyName);
+        OmKeyInfo pseudoKeyInfo = omKeyInfo.copyObject();
+        // set dataSize -1 here to distinguish from normal keyInfo
+        pseudoKeyInfo.setDataSize(-1);
+        List<OmKeyLocationInfoGroup> uncommittedGroups = new ArrayList<>();
+        // version not matters in the current logic of keyDeletingService,
+        // all versions of blocks will be deleted.
+        uncommittedGroups.add(new OmKeyLocationInfoGroup(0, uncommitted));
+        pseudoKeyInfo.setKeyLocationVersions(uncommittedGroups);
+        if (oldKeyVersionsToDelete == null) {
+          oldKeyVersionsToDelete = new RepeatedOmKeyInfo(pseudoKeyInfo);
+        } else {
+          oldKeyVersionsToDelete.addOmKeyInfo(pseudoKeyInfo);
+        }
       }
 
       // Add to cache of open key table and key table.

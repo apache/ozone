@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -41,6 +42,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLoca
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -57,6 +60,9 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  * Handles CommitKey request - prefix layout.
  */
 public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMKeyCommitRequestWithFSO.class);
 
   public OMKeyCommitRequestWithFSO(OMRequest omRequest,
       BucketLayout bucketLayout) {
@@ -144,10 +150,10 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
 
-      // Update the block length for each block
-      List<OmKeyLocationInfo> allocatedLocationInfoList =
-          omKeyInfo.getLatestVersionLocations().getLocationList();
-      omKeyInfo.updateLocationInfoList(locationInfoList, false);
+      // Update the block length for each block, return the allocated but
+      // uncommitted blocks
+      List<OmKeyLocationInfo> uncommitted = omKeyInfo.updateLocationInfoList(
+          locationInfoList, false);
 
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
@@ -175,6 +181,26 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
         checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
         omBucketInfo.incrUsedNamespace(1L);
+      }
+
+      // let the uncommitted blocks pretend as key's old version blocks
+      // which will be deleted as RepeatedOmKeyInfo
+      if (uncommitted.size() > 0) {
+        LOG.info("Detect allocated but uncommitted blocks {} in key {}.",
+            uncommitted, keyName);
+        OmKeyInfo pseudoKeyInfo = omKeyInfo.copyObject();
+        // set dataSize -1 here to distinguish from normal keyInfo
+        pseudoKeyInfo.setDataSize(-1);
+        List<OmKeyLocationInfoGroup> uncommittedGroups = new ArrayList<>();
+        // version not matters in the current logic of keyDeletingService,
+        // all versions of blocks will be deleted.
+        uncommittedGroups.add(new OmKeyLocationInfoGroup(0, uncommitted));
+        pseudoKeyInfo.setKeyLocationVersions(uncommittedGroups);
+        if (oldKeyVersionsToDelete == null) {
+          oldKeyVersionsToDelete = new RepeatedOmKeyInfo(pseudoKeyInfo);
+        } else {
+          oldKeyVersionsToDelete.addOmKeyInfo(pseudoKeyInfo);
+        }
       }
 
       // Add to cache of open key table and key table.

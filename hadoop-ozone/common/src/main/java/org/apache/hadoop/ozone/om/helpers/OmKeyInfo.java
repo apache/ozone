@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileChecksum;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FileChecksumProto;
@@ -182,10 +184,11 @@ public final class OmKeyInfo extends WithParentObjectId {
    * This will be called when the key is being committed to OzoneManager.
    *
    * @param locationInfoList list of locationInfo
+   * @return allocated but uncommitted locationInfos
    */
-  public void updateLocationInfoList(List<OmKeyLocationInfo> locationInfoList,
-      boolean isMpu) {
-    updateLocationInfoList(locationInfoList, isMpu, false);
+  public List<OmKeyLocationInfo> updateLocationInfoList(
+      List<OmKeyLocationInfo> locationInfoList, boolean isMpu) {
+    return updateLocationInfoList(locationInfoList, isMpu, false);
   }
 
   /**
@@ -197,8 +200,10 @@ public final class OmKeyInfo extends WithParentObjectId {
    * @param skipBlockIDCheck a true represents that the blockId verification
    *                         check should be skipped, false represents that
    *                         the blockId verification will be required
+   * @return allocated but uncommitted locationInfos
    */
-  public void updateLocationInfoList(List<OmKeyLocationInfo> locationInfoList,
+  public List<OmKeyLocationInfo> updateLocationInfoList(
+      List<OmKeyLocationInfo> locationInfoList,
       boolean isMpu, boolean skipBlockIDCheck) {
     long latestVersion = getLatestVersionLocations().getVersion();
     OmKeyLocationInfoGroup keyLocationInfoGroup = getLatestVersionLocations();
@@ -214,17 +219,29 @@ public final class OmKeyInfo extends WithParentObjectId {
       updatedBlockLocations =
           verifyAndGetKeyLocations(locationInfoList, keyLocationInfoGroup);
     }
-    // Updates the latest locationList in the latest version only with
-    // given locationInfoList here.
-    // TODO : The original allocated list and the updated list here may vary
-    // as the containers on the Datanode on which the blocks were pre allocated
-    // might get closed. The diff of blocks between these two lists here
-    // need to be garbage collected in case the ozone client dies.
+
+    // Every time the key commits, the uncommitted blocks should be detected
+    // If client not commit, the blocks should be cleaned by Open Key CleanUp
+    // Service.
+    // keyLocationInfoGroup has the allocated block location info
+    List<OmKeyLocationInfo> uncommittedBlocks =
+        new ArrayList<>(keyLocationInfoGroup.getBlocksLatestVersionOnly());
+    // Only check ContainerBlockID here to avoid the mismatch of the pipeline
+    // field and BcsId in the OmKeyLocationInfo, as the OmKeyInfoCodec ignores
+    // the pipeline field by default and bcsId would be updated in Ratis mode.
+    List<ContainerBlockID> updatedBlockIDs = updatedBlockLocations.stream().
+        map(BlockLocationInfo::getBlockID).map(BlockID::getContainerBlockID).
+        collect(Collectors.toList());
+    uncommittedBlocks.removeIf(block -> updatedBlockIDs.
+        contains(block.getBlockID().getContainerBlockID()));
+
     keyLocationInfoGroup.removeBlocks(latestVersion);
     // set each of the locationInfo object to the latest version
     updatedBlockLocations.forEach(omKeyLocationInfo -> omKeyLocationInfo
         .setCreateVersion(latestVersion));
     keyLocationInfoGroup.addAll(latestVersion, updatedBlockLocations);
+
+    return uncommittedBlocks;
   }
 
   private List<OmKeyLocationInfo> verifyAndGetKeyLocations(
