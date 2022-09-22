@@ -27,9 +27,9 @@ import moment from 'moment';
 interface IAutoReloadPanelProps extends RouteComponentProps<object> {
   onReload: () => void;
   lastRefreshed: number;
-  lastUpdatedOMDBDelta:number;
-  lastUpdatedOMDBFull:number;
-  lastUpdatedOMLatest:number;
+  lastUpdatedOMDBDelta: number;
+  lastUpdatedOMDBFull: number;
+  lastUpdatedOMLatest: number;
   isLoading: boolean;
   togglePolling: (isEnabled: boolean) => void;
 }
@@ -48,19 +48,22 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
         <Tooltip
           placement='bottom' title={moment(lastRefreshed).format('ll LTS')}
         >
-          {moment(lastRefreshed).format('LTS')}
+          {moment(lastRefreshed).format('LT')}
         </Tooltip>
       );
 
-      const omDBDeltaFullToolTip = <span>{'Last Delta Update'} : {moment(lastUpdatedOMDBDelta).format('ll LTS') }<br/>
-      {'Last Full Update'} : {moment(lastUpdatedOMDBFull).format('ll LTS')}</span>
+      const omDBDeltaFullToolTip = <span>
+          {'Delta Update'}: {moment(lastUpdatedOMDBDelta).fromNow()}, {moment(lastUpdatedOMDBDelta).format('ll LTS')}
+          <br/>
+          {'Full Update'}: {moment(lastUpdatedOMDBFull).fromNow()}, {moment(lastUpdatedOMDBFull).format('ll LTS')}
+       </span>
 
       const lastUpdatedDeltaFullToolTip = lastUpdatedOMDBDelta === 0 || lastUpdatedOMDBDelta === undefined || lastUpdatedOMDBFull === 0 || lastUpdatedOMDBFull === undefined ? 'NA' :
       (
         <Tooltip
           placement='bottom' title={omDBDeltaFullToolTip}
         >
-          {moment(lastUpdatedOMLatest).format('LTS')}
+          {moment(lastUpdatedOMLatest).format('LT')}
         </Tooltip>
       );
 
@@ -74,9 +77,9 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
 
     return (
       <div className='auto-reload-panel'>
-        Auto Reload
+        Auto Refresh
         &nbsp;<Switch defaultChecked size='small' className='toggle-switch' onChange={this.autoReloadToggleHandler}/>
-        &nbsp; | Refreshed {lastRefreshedRext}
+        &nbsp; | Refreshed at {lastRefreshedRext}
         &nbsp;<Button shape='circle' icon='reload' size='small' loading={isLoading} onClick={onReload}/>
         {lastUpdatedDeltaFullText}
       </div>

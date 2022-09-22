@@ -53,9 +53,9 @@ interface IOverviewState {
   keys: number;
   missingContainersCount: number;
   lastRefreshed: number;
-  lastUpdatedOMDBDelta:number,
-  lastUpdatedOMDBFull:number,
-  lastUpdatedOMLatest:number
+  lastUpdatedOMDBDelta: number,
+  lastUpdatedOMDBFull: number,
+  lastUpdatedOMLatest: number
 }
 
 export class Overview extends React.Component<Record<string, object>, IOverviewState> {
