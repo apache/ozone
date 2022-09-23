@@ -143,25 +143,24 @@ public final class KeyValueContainerUtil {
     File chunksPath = new File(containerData.getChunksPath());
 
     if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
-      BlockUtils.removeContainerFromDB(containerData, conf);
-
-      // Delete parent dir that has been moved to a new location,
-      // under <volume>/<clusterId>/tmp/container_delete_service
-      File parentDir = containerMetaDataPath.getParentFile();
-      FileUtils.deleteDirectory(parentDir);
+      try {
+        BlockUtils.removeContainerFromDB(containerData, conf);
+      } catch (IOException ex) {
+        LOG.error("DB failure, unable to remove container.", ex);
+      }
     } else {
       // Close the DB connection and remove the DB handler from cache
       BlockUtils.removeDB(containerData, conf);
-
-      // Delete the Container MetaData path.
-      FileUtils.deleteDirectory(containerMetaDataPath);
-
-      //Delete the Container Chunks Path.
-      FileUtils.deleteDirectory(chunksPath);
-
-      //Delete Container directory
-      FileUtils.deleteDirectory(containerMetaDataPath.getParentFile());
     }
+
+    // Delete the Container MetaData path.
+    FileUtils.deleteDirectory(containerMetaDataPath);
+
+    //Delete the Container Chunks Path.
+    FileUtils.deleteDirectory(chunksPath);
+
+    //Delete Container directory
+    FileUtils.deleteDirectory(containerMetaDataPath.getParentFile());
   }
 
   /**

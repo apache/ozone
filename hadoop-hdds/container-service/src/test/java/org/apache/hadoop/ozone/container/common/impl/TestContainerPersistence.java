@@ -426,10 +426,13 @@ public class TestContainerPersistence {
 
     container2.delete();
 
-    // Remove container from containerSet
+    // Remove containers from containerSet
     containerSet.removeContainer(testContainerID1);
+    containerSet.removeContainer(testContainerID2);
     Assert.assertFalse(containerSet.getContainerMapCopy()
         .containsKey(testContainerID1));
+    Assert.assertFalse(containerSet.getContainerMapCopy()
+        .containsKey(testContainerID2));
 
     // 'tmp/delete_container_service' is empty
     Assert.assertFalse(hddsVolume.getDeleteLeftovers().hasNext());
