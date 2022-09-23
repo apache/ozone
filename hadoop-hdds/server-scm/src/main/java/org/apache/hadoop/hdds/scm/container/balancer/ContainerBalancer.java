@@ -529,12 +529,10 @@ public class ContainerBalancer extends StatefulService {
       allFuturesResult.get(config.getMoveTimeout().toMillis(),
           TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
-      long cancelCount = cancelAndCountPendingMoves();
-      LOG.warn("Container balancer is interrupted and moves are cancelled {}",
-          cancelCount);
+      LOG.warn("Container balancer is interrupted");
       Thread.currentThread().interrupt();
     } catch (TimeoutException e) {
-      long timeoutCounts = cancelAndCountPendingMoves();
+      long timeoutCounts = countPendingMoves();
       LOG.warn("{} Container moves are canceled.", timeoutCounts);
       metrics.incrementNumContainerMovesTimeoutInLatestIteration(timeoutCounts);
     } catch (ExecutionException e) {
@@ -563,17 +561,16 @@ public class ContainerBalancer extends StatefulService {
         metrics.getNumContainerMovesCompletedInLatestIteration());
   }
 
-  private long cancelAndCountPendingMoves() {
+  private long countPendingMoves() {
     return moveSelectionToFutureMap.entrySet().stream()
         .filter(entry -> !entry.getValue().isDone())
         .peek(entry -> {
-          LOG.warn("Container move canceled for container {} from source {}" +
+          LOG.warn("Container move timeout for container {} from source {}" +
                   " to target {}.",
               entry.getKey().getContainerID(),
               containerToSourceMap.get(entry.getKey().getContainerID())
                   .getUuidString(),
               entry.getKey().getTargetNode().getUuidString());
-          entry.getValue().cancel(true);
         }).count();
   }
 

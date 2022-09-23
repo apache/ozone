@@ -797,7 +797,7 @@ public class TestContainerBalancer {
             new NodeNotFoundException("Test Node not found"))
         .thenReturn(f).thenReturn(CompletableFuture.supplyAsync(() -> {
           try {
-            Thread.sleep(1000);
+            Thread.sleep(500);
           } catch (Exception ex) {
           }
           throw new RuntimeException("Throw");
@@ -808,14 +808,11 @@ public class TestContainerBalancer {
     balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMoveTimeout(Duration.ofMillis(2000));
+    balancerConfiguration.setMoveTimeout(Duration.ofMillis(1000));
 
     startBalancer(balancerConfiguration);
-    sleepWhileBalancing(2000);
+    sleepWhileBalancing(1000);
 
-    /*
-    Immediate failure count is 2 and timeout count is 4 together
-     */
     Assertions.assertEquals(
         ContainerBalancer.IterationResult.ITERATION_COMPLETED,
         containerBalancer.getIterationResult());
