@@ -100,9 +100,9 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 public class RocksDBCheckpointDiffer {
   private final String rocksDbPath;
   private String cpPath;
-  private final String CFDBPATH;
-  private final String SAVE_COMPACTED_FILE_PATH;
-  private final int MAX_SNAPSHOTS;
+  private String cfDBPath;
+  private String saveCompactedFilePath;
+  private int maxSnapshots;
   private static final Logger LOG =
       LoggerFactory.getLogger(RocksDBCheckpointDiffer.class);
 
@@ -111,7 +111,7 @@ public class RocksDBCheckpointDiffer {
   private String lastSnapshotPrefix;
 
   // tracks number of compactions so far
-  private final long UNKNOWN_COMPACTION_GEN = 0;
+  private static final long UNKNOWN_COMPACTION_GEN = 0;
   private long currentCompactionGen = 0;
 
   // Something to track all the snapshots created so far.
@@ -124,13 +124,13 @@ public class RocksDBCheckpointDiffer {
                                  String cfPath,
                                  int initialSnapshotCounter,
                                  String snapPrefix) {
-    MAX_SNAPSHOTS = maxSnapshots;
-    allSnapshots = new Snapshot[MAX_SNAPSHOTS];
+    this.maxSnapshots = maxSnapshots;
+    allSnapshots = new Snapshot[this.maxSnapshots];
     cpPath = checkpointPath;
 
-    SAVE_COMPACTED_FILE_PATH = sstFileSaveDir;
+    saveCompactedFilePath = sstFileSaveDir;
     rocksDbPath = dbPath;
-    CFDBPATH = cfPath;
+    cfDBPath = cfPath;
 
     // TODO: This module should be self sufficient in tracking the last
     //  snapshotCounter and currentCompactionGen for a given dbPath. It needs
@@ -252,7 +252,7 @@ public class RocksDBCheckpointDiffer {
               for (String file : compactionJobInfo.inputFiles()) {
                 LOG.warn(file);
                 String saveLinkFileName =
-                    SAVE_COMPACTED_FILE_PATH + new File(file).getName();
+                    saveCompactedFilePath + new File(file).getName();
                 Path link = Paths.get(saveLinkFileName);
                 Path srcFile = Paths.get(file);
                 try {
@@ -345,7 +345,7 @@ public class RocksDBCheckpointDiffer {
               for (String file : compactionJobInfo.inputFiles()) {
                 LOG.warn(file);
                 String saveLinkFileName =
-                    SAVE_COMPACTED_FILE_PATH + new File(file).getName();
+                    saveCompactedFilePath + new File(file).getName();
                 Path link = Paths.get(saveLinkFileName);
                 Path srcFile = Paths.get(file);
                 try {
@@ -430,7 +430,7 @@ public class RocksDBCheckpointDiffer {
     Options option = new Options();
     SstFileReader reader = new SstFileReader(option);
     try {
-      reader.open(SAVE_COMPACTED_FILE_PATH + filename);
+      reader.open(saveCompactedFilePath + filename);
     } catch (RocksDBException e) {
       reader.open(rocksDbPath + "/"+ filename);
     }

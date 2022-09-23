@@ -68,12 +68,12 @@ public class RDBStore implements DBStore {
   public RDBStore(File dbFile, ManagedDBOptions options,
                   Set<TableConfig> families) throws IOException {
     this(dbFile, options, new ManagedWriteOptions(), families,
-        new CodecRegistry(), false);
+        new CodecRegistry(), false, 1000);
   }
 
   public RDBStore(File dbFile, ManagedDBOptions dbOptions,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
-                  CodecRegistry registry, boolean readOnly)
+                  CodecRegistry registry, boolean readOnly, int maxFSSnapshots)
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
@@ -83,7 +83,8 @@ public class RDBStore implements DBStore {
 
     try {
       rocksDBCheckpointDiffer =
-          new RocksDBCheckpointDiffer(dbLocation.getAbsolutePath(), 1000,
+          new RocksDBCheckpointDiffer(
+              dbLocation.getAbsolutePath(), maxFSSnapshots,
           Paths.get(dbLocation.getParent(), "db.checkpoints").toString(),
           Paths.get(dbLocation.getParent(), "db.savedSSTFiles").toString(),
           dbLocation.getAbsolutePath(), 0, "Snapshot_");
