@@ -143,14 +143,7 @@ public final class KeyValueContainerUtil {
     File chunksPath = new File(containerData.getChunksPath());
 
     if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
-      // DB failure is catastrophic, the disk needs to be replaced.
-      // In case of an exception, LOG the message and rethrow the exception.
-      try {
-        BlockUtils.removeContainerFromDB(containerData, conf);
-      } catch (IOException ex) {
-        LOG.error("DB failure, unable to remove container.", ex);
-        throw new IOException("Disk needs replacement");
-      }
+      BlockUtils.removeContainerFromDB(containerData, conf);
     } else {
       // Close the DB connection and remove the DB handler from cache
       BlockUtils.removeDB(containerData, conf);

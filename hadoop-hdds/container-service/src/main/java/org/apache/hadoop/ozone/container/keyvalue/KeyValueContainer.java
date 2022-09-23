@@ -294,6 +294,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     try {
       KeyValueContainerUtil.removeContainer(containerData, config);
     } catch (StorageContainerException ex) {
+      // Disk needs replacement.
       throw ex;
     } catch (IOException ex) {
       // Container will be removed from tmp directory under the volume.
