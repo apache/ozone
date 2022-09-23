@@ -326,8 +326,8 @@ public class TestECBlockInputStream {
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 100);
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, true, null, null, streamFactory)) {
-        // when seek To Length, should not throw EOFException.
-        ecb.seek(100);
+      // when seek To Length, should not throw EOFException.
+      ecb.seek(100);
     }
   }
 
