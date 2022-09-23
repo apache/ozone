@@ -166,6 +166,10 @@ public class OzoneKey {
     return metadata;
   }
 
+  public void setMetadata(Map<String, String> metadata) {
+    this.metadata.putAll(metadata);
+  }
+
   @Deprecated
   @JsonIgnore
   public ReplicationType getReplicationType() {

@@ -57,7 +57,7 @@ public class OzoneKeyDetails extends OzoneKey {
         modificationTime, type, replicationFactor);
     this.ozoneKeyLocations = ozoneKeyLocations;
     this.feInfo = feInfo;
-    this.getMetadata().putAll(metadata);
+    this.setMetadata(metadata);
   }
 
 
