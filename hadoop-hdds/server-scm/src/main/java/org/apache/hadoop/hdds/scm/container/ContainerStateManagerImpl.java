@@ -512,7 +512,7 @@ public final class ContainerStateManagerImpl
   public void removeContainer(final HddsProtos.ContainerID id)
       throws IOException {
     final ContainerID cid = ContainerID.getFromProtobuf(id);
-    lock.writeLock();
+    lock.writeLock().lock();
     try {
       lockManager.writeLock(cid);
       try {
