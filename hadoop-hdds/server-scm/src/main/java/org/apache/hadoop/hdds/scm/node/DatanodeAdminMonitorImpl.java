@@ -154,12 +154,10 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
         trackedRecommission = getCancelledCount();
         processCancelledNodes();
         processPendingNodes();
+        trackedDecomMaintenance = getTrackedNodeCount();
       }
       processTransitioningNodes();
       if (trackedNodes.size() > 0 || pendingNodes.size() > 0) {
-        synchronized (this) {
-          trackedDecomMaintenance = getTrackedNodeCount();
-        }
         LOG.info("There are {} nodes tracked for decommission and " +
                 "maintenance. {} pending nodes.",
             trackedNodes.size(), pendingNodes.size());
