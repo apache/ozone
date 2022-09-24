@@ -755,10 +755,15 @@ public class BasicOzoneFileSystem extends FileSystem {
     try {
       fileStatus = convertFileStatus(
           adapter.getFileStatus(key, uri, qualifiedPath, getUsername()));
-    } catch (OMException ex) {
-      if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND)) {
-        throw new FileNotFoundException("File not found. path:" + f);
+    } catch (IOException ex) {
+      if (ex instanceof OMException) {
+        if (((OMException) ex).getResult()
+            .equals(OMException.ResultCodes.KEY_NOT_FOUND)) {
+          throw new FileNotFoundException("File not found. path:" + f);
+        }
       }
+      LOG.warn("GetFileStatus failed for path {}", f, ex);
+      throw ex;
     }
     return fileStatus;
   }

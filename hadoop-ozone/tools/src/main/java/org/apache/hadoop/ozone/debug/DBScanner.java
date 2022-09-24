@@ -18,15 +18,20 @@
 
 package org.apache.hadoop.ozone.debug;
 
+import com.google.common.primitives.Longs;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -46,7 +51,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
- * Parser for scm.db file.
+ * Parser for scm.db, om.db or container db file.
  */
 @CommandLine.Command(
         name = "scan",
@@ -76,9 +81,14 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private static String fileName;
 
   @CommandLine.Option(names = {"--dnSchema", "-d"},
-      description = "Datanode DB Schema Version : V1/V2",
+      description = "Datanode DB Schema Version : V1/V2/V3",
       defaultValue = "V2")
   private static String dnDBSchemaVersion;
+
+  @CommandLine.Option(names = {"--container-id", "-cid"},
+      description = "Container ID when datanode DB Schema is V3",
+      defaultValue = "-1")
+  private static long containerId;
 
   @CommandLine.ParentCommand
   private RDBParser parent;
@@ -90,7 +100,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private static List<Object> displayTable(ManagedRocksIterator iterator,
       DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
     List<Object> outputs = new ArrayList<>();
-    iterator.get().seekToFirst();
 
     Writer fileWriter = null;
     PrintWriter printWriter = null;
@@ -100,13 +109,25 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
             new FileOutputStream(fileName), StandardCharsets.UTF_8);
         printWriter = new PrintWriter(fileWriter);
       }
+
+      boolean schemaV3 = dnDBSchemaVersion != null &&
+          dnDBSchemaVersion.equals("V3");
       while (iterator.get().isValid()) {
         StringBuilder result = new StringBuilder();
         if (withKey) {
           Object key = dbColumnFamilyDefinition.getKeyCodec()
               .fromPersistedFormat(iterator.get().key());
           Gson gson = new GsonBuilder().setPrettyPrinting().create();
-          result.append(gson.toJson(key));
+          if (schemaV3) {
+            int index =
+                DatanodeSchemaThreeDBDefinition.getContainerKeyPrefixLength();
+            String cid = key.toString().substring(0, index);
+            String blockId = key.toString().substring(index);
+            result.append(gson.toJson(Longs.fromByteArray(
+                FixedLengthStringUtils.string2Bytes(cid)) + ": " + blockId));
+          } else {
+            result.append(gson.toJson(key));
+          }
           result.append(" -> ");
         }
         Object o = dbColumnFamilyDefinition.getValueCodec()
@@ -158,6 +179,18 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   public static void setFileName(String name) {
     DBScanner.fileName = name;
+  }
+
+  public static void setContainerId(long id) {
+    DBScanner.containerId = id;
+  }
+
+  public static void setDnDBSchemaVersion(String version) {
+    DBScanner.dnDBSchemaVersion = version;
+  }
+
+  public static void setWithKey(boolean withKey) {
+    DBScanner.withKey = withKey;
   }
 
   private static ColumnFamilyHandle getColumnFamilyHandle(
@@ -230,8 +263,24 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         if (columnFamilyHandle == null) {
           throw new IllegalArgumentException("columnFamilyHandle is null");
         }
-        ManagedRocksIterator iterator = new ManagedRocksIterator(
-            rocksDB.get().newIterator(columnFamilyHandle));
+        ManagedRocksIterator iterator;
+        if (containerId > 0 && dnDBSchemaVersion != null &&
+            dnDBSchemaVersion.equals("V3")) {
+          ManagedReadOptions readOptions = new ManagedReadOptions();
+          readOptions.setIterateUpperBound(new ManagedSlice(
+              FixedLengthStringUtils.string2Bytes(
+                  DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
+                  containerId + 1))));
+          iterator = new ManagedRocksIterator(
+              rocksDB.get().newIterator(columnFamilyHandle, readOptions));
+          iterator.get().seek(FixedLengthStringUtils.string2Bytes(
+              DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
+                  containerId)));
+        } else {
+          iterator = new ManagedRocksIterator(
+              rocksDB.get().newIterator(columnFamilyHandle));
+          iterator.get().seekToFirst();
+        }
         scannedObjects = displayTable(iterator, columnFamilyDefinition);
       }
     } else {

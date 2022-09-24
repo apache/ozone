@@ -54,6 +54,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -194,8 +195,11 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     statistics.incrementReadOps(1);
     LOG.trace("open() path: {}", path);
     final String key = pathToKey(path);
-    return new FSDataInputStream(
-        new OzoneFSInputStream(adapter.readFile(key), statistics));
+    return new FSDataInputStream(createFSInputStream(adapter.readFile(key)));
+  }
+
+  protected InputStream createFSInputStream(InputStream inputStream) {
+    return new OzoneFSInputStream(inputStream, statistics);
   }
 
   protected void incrementCounter(Statistic statistic) {
@@ -573,10 +577,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       return false;
     }
 
-    if (status == null) {
-      return false;
-    }
-
     String key = pathToKey(f);
     boolean result;
 
@@ -867,12 +867,17 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     try {
       fileStatus = convertFileStatus(
           adapter.getFileStatus(key, uri, qualifiedPath, getUsername()));
-    } catch (OMException ex) {
-      if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND) ||
-          ex.getResult().equals(OMException.ResultCodes.BUCKET_NOT_FOUND) ||
-          ex.getResult().equals(OMException.ResultCodes.VOLUME_NOT_FOUND)) {
-        throw new FileNotFoundException("File not found. path:" + f);
+    } catch (IOException e) {
+      if (e instanceof OMException) {
+        OMException ex = (OMException) e;
+        if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND) ||
+            ex.getResult().equals(OMException.ResultCodes.BUCKET_NOT_FOUND) ||
+            ex.getResult().equals(OMException.ResultCodes.VOLUME_NOT_FOUND)) {
+          throw new FileNotFoundException("File not found. path:" + f);
+        }
       }
+      LOG.warn("GetFileStatus failed for path {}", f, e);
+      throw e;
     }
     return fileStatus;
   }

@@ -45,6 +45,12 @@ Get object from s3
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 /tmp/testfile.result
     Compare files               /tmp/testfile              /tmp/testfile.result
 
+#This test depends on the previous test case. Can't be executed alone
+Get object with wrong signature
+    Pass Execution If          '${SECURITY_ENABLED}' == 'false'    Skip in unsecure cluster
+    ${result} =                 Execute and Ignore Error   curl -i -H 'Authorization: AWS scm/scm@EXAMPLE.COM:asdfqwerty' ${ENDPOINT_URL}/${BUCKET}/${PREFIX}/putobject/key=value/f1
+                                Should contain             ${result}        403 Forbidden
+
 Get Partial object from s3 with both start and endoffset
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=0-4 /tmp/testfile1.result
                                 Should contain             ${result}        ContentRange

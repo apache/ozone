@@ -226,15 +226,16 @@ public abstract class EntityHandler {
     List<OmVolumeArgs> result = new ArrayList<>();
     Table<String, OmVolumeArgs> volumeTable =
         omMetadataManager.getVolumeTable();
-    TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
-        iterator = volumeTable.iterator();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
+        iterator = volumeTable.iterator()) {
 
-    while (iterator.hasNext()) {
-      Table.KeyValue<String, OmVolumeArgs> kv = iterator.next();
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmVolumeArgs> kv = iterator.next();
 
-      OmVolumeArgs omVolumeArgs = kv.getValue();
-      if (omVolumeArgs != null) {
-        result.add(omVolumeArgs);
+        OmVolumeArgs omVolumeArgs = kv.getValue();
+        if (omVolumeArgs != null) {
+          result.add(omVolumeArgs);
+        }
       }
     }
     return result;
@@ -256,26 +257,28 @@ public abstract class EntityHandler {
     Table<String, OmBucketInfo> bucketTable =
         omMetadataManager.getBucketTable();
 
-    TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
-        iterator = bucketTable.iterator();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
+        iterator = bucketTable.iterator()) {
 
-    if (volumeName != null) {
-      if (!volumeExists(omMetadataManager, volumeName)) {
-        return result;
+      if (volumeName != null) {
+        if (!volumeExists(omMetadataManager, volumeName)) {
+          return result;
+        }
+        seekPrefix = omMetadataManager.getVolumeKey(volumeName + OM_KEY_PREFIX);
       }
-      seekPrefix = omMetadataManager.getVolumeKey(volumeName + OM_KEY_PREFIX);
-    }
 
-    while (iterator.hasNext()) {
-      Table.KeyValue<String, OmBucketInfo> kv = iterator.next();
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmBucketInfo> kv = iterator.next();
 
-      String key = kv.getKey();
-      OmBucketInfo omBucketInfo = kv.getValue();
+        String key = kv.getKey();
+        OmBucketInfo omBucketInfo = kv.getValue();
 
-      if (omBucketInfo != null) {
-        // We should return only the keys, whose keys match with the seek prefix
-        if (key.startsWith(seekPrefix)) {
-          result.add(omBucketInfo);
+        if (omBucketInfo != null) {
+          // We should return only the keys, whose keys match with
+          // the seek prefix
+          if (key.startsWith(seekPrefix)) {
+            result.add(omBucketInfo);
+          }
         }
       }
     }

@@ -76,7 +76,8 @@ public class DatanodeSchemaV3FinalizeAction
       LOG.info("Schema V3 is disabled. Won't load RocksDB in upgrade.");
       return;
     }
-    HddsVolumeUtil.loadAllHddsVolumeDbStore(dataVolumeSet, dbVolumeSet, LOG);
+    HddsVolumeUtil.loadAllHddsVolumeDbStore(
+        dataVolumeSet, dbVolumeSet, false, LOG);
   }
 }
 

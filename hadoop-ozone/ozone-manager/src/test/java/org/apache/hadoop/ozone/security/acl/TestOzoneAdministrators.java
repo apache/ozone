@@ -18,15 +18,16 @@
 
 package org.apache.hadoop.ozone.security.acl;
 
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import java.util.Arrays;
 import java.util.Collections;
 
+import static java.util.Arrays.asList;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 
 /**
@@ -43,45 +44,74 @@ public class TestOzoneAdministrators {
 
   @Test
   public void testCreateVolume() throws Exception {
-    OzoneObj obj = getTestVolumeobj("testvolume");
-    RequestContext context = getUserRequestContext("testuser",
-        IAccessAuthorizer.ACLType.CREATE);
-    testAdminOperations(obj, context);
+    UserGroupInformation.createUserForTesting("testuser",
+        new String[]{"testgroup"});
+    try {
+      OzoneObj obj = getTestVolumeobj("testvolume");
+      RequestContext context = getUserRequestContext("testuser",
+          IAccessAuthorizer.ACLType.CREATE);
+      testAdminOperations(obj, context);
+      testGroupAdminOperations(obj, context);
+    } finally {
+      UserGroupInformation.reset();
+    }
   }
 
   @Test
   public void testListAllVolume() throws Exception {
-    OzoneObj obj = getTestVolumeobj("/");
-    RequestContext context = getUserRequestContext("testuser",
-        IAccessAuthorizer.ACLType.LIST);
-    testAdminOperations(obj, context);
+    UserGroupInformation.createUserForTesting("testuser",
+        new String[]{"testgroup"});
+    try {
+      OzoneObj obj = getTestVolumeobj("/");
+      RequestContext context = getUserRequestContext("testuser",
+          IAccessAuthorizer.ACLType.LIST);
+      testAdminOperations(obj, context);
+      testGroupAdminOperations(obj, context);
+    } finally {
+      UserGroupInformation.reset();
+    }
   }
 
   private void testAdminOperations(OzoneObj obj, RequestContext context)
       throws OMException {
-    nativeAuthorizer.setOzoneAdmins(Collections.emptyList());
+    nativeAuthorizer.setOzoneAdmins(new OzoneAdmins(Collections.emptyList()));
     Assert.assertFalse("empty admin list disallow anyone to perform " +
             "admin operations", nativeAuthorizer.checkAccess(obj, context));
 
-    nativeAuthorizer.setOzoneAdmins(
-        Collections.singletonList(OZONE_ADMINISTRATORS_WILDCARD));
+    nativeAuthorizer.setOzoneAdmins(new OzoneAdmins(
+        Collections.singletonList(OZONE_ADMINISTRATORS_WILDCARD)));
     Assert.assertTrue("wildcard admin allows everyone to perform admin" +
         " operations", nativeAuthorizer.checkAccess(obj, context));
 
-    nativeAuthorizer.setOzoneAdmins(
-        Collections.singletonList("testuser"));
+    nativeAuthorizer.setOzoneAdmins(new OzoneAdmins(
+        Collections.singletonList("testuser")));
     Assert.assertTrue("matching admins are allowed to perform admin " +
             "operations", nativeAuthorizer.checkAccess(obj, context));
 
-    nativeAuthorizer.setOzoneAdmins(
-        Arrays.asList(new String[]{"testuser2", "testuser"}));
+    nativeAuthorizer.setOzoneAdmins(new OzoneAdmins(
+        asList(new String[]{"testuser2", "testuser"})));
     Assert.assertTrue("matching admins are allowed to perform admin " +
             "operations", nativeAuthorizer.checkAccess(obj, context));
 
-    nativeAuthorizer.setOzoneAdmins(
-        Arrays.asList(new String[]{"testuser2", "testuser3"}));
+    nativeAuthorizer.setOzoneAdmins(new OzoneAdmins(
+        asList(new String[]{"testuser2", "testuser3"})));
     Assert.assertFalse("mismatching admins are not allowed perform " +
         "admin operations", nativeAuthorizer.checkAccess(obj, context));
+  }
+
+  private void testGroupAdminOperations(OzoneObj obj, RequestContext context)
+      throws OMException {
+    nativeAuthorizer.setOzoneAdmins(
+        new OzoneAdmins(null, asList("testgroup", "anothergroup")));
+    Assert.assertTrue("Users from matching admin groups " +
+        "are allowed to perform admin operations",
+            nativeAuthorizer.checkAccess(obj, context));
+
+    nativeAuthorizer.setOzoneAdmins(
+            new OzoneAdmins(null, asList("wronggroup")));
+    Assert.assertFalse("Users from mismatching admin groups " +
+        "are allowed to perform admin operations",
+            nativeAuthorizer.checkAccess(obj, context));
   }
 
   private RequestContext getUserRequestContext(String username,

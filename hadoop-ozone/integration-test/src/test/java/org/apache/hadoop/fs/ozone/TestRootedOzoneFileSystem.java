@@ -21,12 +21,14 @@ package org.apache.hadoop.fs.ozone;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
@@ -1719,6 +1721,33 @@ public class TestRootedOzoneFileSystem {
     final OzoneKeyDetails key = bucket.getKey(ofsPath.getKeyName());
     Assert.assertEquals(ReplicationType.EC.name(),
         key.getReplicationConfig().getReplicationType().name());
+  }
+
+  @Test
+  public void testGetFileStatus() throws Exception {
+    String volumeNameLocal = getRandomNonExistVolumeName();
+    String bucketNameLocal = RandomStringUtils.randomNumeric(5);
+    Path volume = new Path("/" + volumeNameLocal);
+    ofs.mkdirs(volume);
+    LambdaTestUtils.intercept(OMException.class,
+        () -> ofs.getFileStatus(new Path(volume, bucketNameLocal)));
+    // Cleanup
+    ofs.delete(volume, true);
+  }
+
+  @Test
+  public void testUnbuffer() throws IOException {
+    String testKeyName = "testKey2";
+    Path path = new Path(bucketPath, testKeyName);
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.write(1);
+    }
+
+    try (FSDataInputStream stream = fs.open(path)) {
+      assertTrue(stream.hasCapability(StreamCapabilities.UNBUFFER));
+      stream.unbuffer();
+    }
+
   }
 
   public void testNonPrivilegedUserMkdirCreateBucket() throws IOException {
