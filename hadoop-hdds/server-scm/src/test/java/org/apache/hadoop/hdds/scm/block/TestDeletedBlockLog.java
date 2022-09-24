@@ -169,7 +169,7 @@ public class TestDeletedBlockLog {
             .setContainerID(cid)
             .setReplicationConfig(RatisReplicationConfig.getInstance(
                 ReplicationFactor.THREE))
-            .setState(HddsProtos.LifeCycleState.CLOSED)
+            .setState(state)
             .setOwner("TestDeletedBlockLog")
             .setPipelineID(PipelineID.randomId())
             .build();

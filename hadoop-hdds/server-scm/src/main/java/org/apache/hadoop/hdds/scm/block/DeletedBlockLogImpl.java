@@ -428,8 +428,10 @@ public class DeletedBlockLogImpl
           DeletedBlocksTransaction txn = keyValue.getValue();
           final ContainerID id = ContainerID.valueOf(txn.getContainerID());
           try {
+            // HDDS-7126. When container is under replicated, it is possible
+            // that container is deleted, but transactions are not deleted.
             if (containerManager.getContainer(id).isDeleted()) {
-              LOG.warn("Container: " + id + " was not deleted for the " +
+              LOG.warn("Container: " + id + " was deleted for the " +
                   "transaction: " + txn);
               txIDs.add(txn.getTxID());
             } else if (txn.getCount() > -1 && txn.getCount() <= maxRetry
