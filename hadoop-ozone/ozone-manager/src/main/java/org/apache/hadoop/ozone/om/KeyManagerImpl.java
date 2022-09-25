@@ -1263,7 +1263,8 @@ public class KeyManagerImpl implements KeyManager {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
               bucketName);
       if (fileKeyInfo != null) {
-        // if the key is a file then do refresh pipeline info in OM by asking SCM
+        // if the key is a file
+        // then do refresh pipeline info in OM by asking SCM
         if (args.getLatestVersionLocation()) {
           slimLocationVersion(fileKeyInfo);
         }
