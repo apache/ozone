@@ -501,7 +501,9 @@ public class TestOzoneShellHA {
     args = new String[] {"bucket", "list", startBucket, destinationVolume};
     execute(ozoneShell, args);
     // Expect empty JSON array
-    Assert.assertEquals(0, parseOutputIntoArrayList().size());
+    ArrayList test = parseOutputIntoArrayList();
+    int count = test.size();
+    Assert.assertEquals(0, count);
     Assert.assertEquals(0, getNumOfBuckets("testbucket"));
   }
 

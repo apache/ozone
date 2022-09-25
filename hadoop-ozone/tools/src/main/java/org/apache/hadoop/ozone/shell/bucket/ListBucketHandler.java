@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.shell.bucket;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -53,6 +55,7 @@ public class ListBucketHandler extends VolumeHandler {
         vol.listBuckets(listOptions.getPrefix(), listOptions.getStartItem());
 
     int counter = 0;
+    printMsg("[");
     while (bucketIterator.hasNext() && counter < listOptions.getLimit()) {
       OzoneBucket entry = bucketIterator.next();
       if (entry.getSourceBucket() != null && entry.getSourceVolume() != null) {
@@ -62,6 +65,7 @@ public class ListBucketHandler extends VolumeHandler {
       }
       counter++;
     }
+    printMsg("]");
 
     if (isVerbose()) {
       out().printf("Found : %d buckets for volume : %s ", counter, volumeName);
