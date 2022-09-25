@@ -41,6 +41,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
@@ -749,6 +750,208 @@ public class TestOzoneFileSystem {
         fileStatus1.equals(dir12.toString()));
     assertTrue(fileStatus2.equals(dir11.toString()) ||
         fileStatus2.equals(dir12.toString()));
+  }
+
+  /**
+   * Tests listStatusIterator operation on root directory.
+   */
+  @Test
+  public void testListStatusIteratorWithDir() throws Exception {
+    Path root = new Path("/");
+    Path parent = new Path(root, "testListStatus");
+    Path file1 = new Path(parent, "key1");
+    Path file2 = new Path(parent, "key2");
+    try {
+      // Iterator should have no items when dir is empty
+      RemoteIterator<FileStatus> it = o3fs.listStatusIterator(root);
+      Assert.assertFalse(it.hasNext());
+
+      ContractTestUtils.touch(fs, file1);
+      ContractTestUtils.touch(fs, file2);
+      // Iterator should have an item when dir is not empty
+      it = o3fs.listStatusIterator(root);
+      while (it.hasNext()) {
+        FileStatus fileStatus = it.next();
+        Assert.assertNotNull(fileStatus);
+        Assert.assertEquals("Parent path doesn't match",
+            fileStatus.getPath().toUri().getPath(), parent.toString());
+      }
+      // Iterator on a directory should return all subdirs along with
+      // files, even if there exists a file and sub-dir with the same name.
+      it = o3fs.listStatusIterator(parent);
+      int iCount = 0;
+      while (it.hasNext()) {
+        iCount++;
+        FileStatus fileStatus = it.next();
+        Assert.assertNotNull(fileStatus);
+      }
+      Assert.assertEquals(
+          "Iterator did not return all the file status",
+          2, iCount);
+      // Iterator should return file status for only the
+      // immediate children of a directory.
+      Path file3 = new Path(parent, "dir1/key3");
+      Path file4 = new Path(parent, "dir1/key4");
+      ContractTestUtils.touch(fs, file3);
+      ContractTestUtils.touch(fs, file4);
+      it = o3fs.listStatusIterator(parent);
+      iCount = 0;
+
+      while (it.hasNext()) {
+        iCount++;
+        FileStatus fileStatus = it.next();
+        Assert.assertNotNull(fileStatus);
+      }
+      Assert.assertEquals("Iterator did not return file status " +
+          "of all the children of the directory", 3, iCount);
+
+    } finally {
+      // Cleanup
+      fs.delete(parent, true);
+    }
+  }
+
+  /**
+   * Tests listStatusIterator operation on root directory.
+   */
+  @Test
+  public void testListStatusIteratorOnRoot() throws Exception {
+    Path root = new Path("/");
+    Path dir1 = new Path(root, "dir1");
+    Path dir12 = new Path(dir1, "dir12");
+    Path dir2 = new Path(root, "dir2");
+    try {
+      fs.mkdirs(dir12);
+      fs.mkdirs(dir2);
+
+      // ListStatusIterator on root should return dir1
+      // (even though /dir1 key does not exist)and dir2 only.
+      // dir12 is not an immediate child of root and hence should not be listed.
+      RemoteIterator<FileStatus> it = o3fs.listStatusIterator(root);
+      int iCount = 0;
+      while (it.hasNext()) {
+        iCount++;
+        FileStatus fileStatus = it.next();
+        Assert.assertNotNull(fileStatus);
+        // Verify that dir12 is not included in the result
+        // of the listStatusIterator on root.
+        assertNotEquals(fileStatus.getPath().toUri().getPath(),
+            dir12.toString());
+      }
+      assertEquals("FileStatus should return only the immediate children",
+          2, iCount);
+    } finally {
+      // Cleanup
+      fs.delete(dir2, true);
+      fs.delete(dir1, true);
+    }
+  }
+
+  /**
+   * Tests listStatusIterator operation on root directory with different
+   * numbers of numDir.
+   */
+  @Test
+  public void testListStatusIteratorOnPageSize() throws Exception {
+    int[] pageSize = {
+        1, LISTING_PAGE_SIZE, LISTING_PAGE_SIZE + 1,
+        LISTING_PAGE_SIZE - 1, LISTING_PAGE_SIZE + LISTING_PAGE_SIZE / 2,
+        LISTING_PAGE_SIZE + LISTING_PAGE_SIZE
+    };
+    for (int numDir : pageSize) {
+      int range = numDir / LISTING_PAGE_SIZE;
+      switch (range) {
+      case 0:
+        listStatusIterator(numDir);
+        break;
+      case 1:
+        listStatusIterator(numDir);
+        break;
+      case 2:
+        listStatusIterator(numDir);
+        break;
+      default:
+        listStatusIterator(numDir);
+      }
+    }
+  }
+
+  private void listStatusIterator(int numDirs) throws IOException {
+    Path root = new Path("/" + volumeName + "/" + bucketName);
+    Set<String> paths = new TreeSet<>();
+    try {
+      for (int i = 0; i < numDirs; i++) {
+        Path p = new Path(root, String.valueOf(i));
+        fs.mkdirs(p);
+        paths.add(p.getName());
+      }
+
+      RemoteIterator<FileStatus> iterator = o3fs.listStatusIterator(root);
+      int iCount = 0;
+      if (iterator != null) {
+        while (iterator.hasNext()) {
+          FileStatus fileStatus = iterator.next();
+          iCount++;
+          Assert.assertTrue(paths.contains(fileStatus.getPath().getName()));
+        }
+      }
+      Assert.assertEquals(
+          "Total directories listed do not match the existing directories",
+          numDirs, iCount);
+
+    } finally {
+      // Cleanup
+      for (int i = 0; i < numDirs; i++) {
+        Path p = new Path(root, String.valueOf(i));
+        fs.delete(p, true);
+      }
+    }
+  }
+
+  /**
+   * Tests listStatus on a path with subdirs.
+   */
+  @Test
+  public void testListStatusIteratorOnSubDirs() throws Exception {
+    // Create the following key structure
+    //      /dir1/dir11/dir111
+    //      /dir1/dir12
+    //      /dir1/dir12/file121
+    //      /dir2
+    // ListStatusIterator on /dir1 should return file status for
+    // all its immediate subdirs only which are /dir1/dir11 and
+    // /dir1/dir12. Super child files/dirs (/dir1/dir12/file121
+    // and /dir1/dir11/dir111) should not be returned by
+    // listStatusIterator.
+    Path dir1 = new Path("/dir1");
+    Path dir11 = new Path(dir1, "dir11");
+    Path dir111 = new Path(dir11, "dir111");
+    Path dir12 = new Path(dir1, "dir12");
+    Path file121 = new Path(dir12, "file121");
+    Path dir2 = new Path("/dir2");
+    try {
+      fs.mkdirs(dir111);
+      fs.mkdirs(dir12);
+      ContractTestUtils.touch(fs, file121);
+      fs.mkdirs(dir2);
+
+      RemoteIterator<FileStatus> it = o3fs.listStatusIterator(dir1);
+      int iCount = 0;
+      while (it.hasNext()) {
+        iCount++;
+        FileStatus fileStatus = it.next();
+        Assert.assertNotNull(fileStatus);
+        assertTrue(fileStatus.getPath().toUri().getPath().
+            equals(dir11.toString()) || fileStatus.getPath().toUri().getPath()
+            .equals(dir12.toString()));
+      }
+      assertEquals("FileStatus should return only the immediate children", 2,
+          iCount);
+    } finally {
+      // Cleanup
+      fs.delete(dir2, true);
+      fs.delete(dir1, true);
+    }
   }
 
   @Test
