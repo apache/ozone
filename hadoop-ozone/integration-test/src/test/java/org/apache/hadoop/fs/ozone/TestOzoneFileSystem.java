@@ -342,7 +342,8 @@ public class TestOzoneFileSystem {
      *  "dir1/testDir" can be created normal
      */
 
-    String fakeParentKey = "dir1/dir2";
+    String fakeGrandpaKey = "dir1";
+    String fakeParentKey = fakeGrandpaKey + "/dir2";
     String fullKeyName = fakeParentKey + "/key1";
     TestDataUtil.createKey(ozoneBucket, fullKeyName, "");
 
@@ -352,6 +353,9 @@ public class TestOzoneFileSystem {
     // /dir1/dir2/key2 should be created because has a fake parent directory
     Path subdir = new Path(fakeParentKey, "key2");
     assertTrue(fs.mkdirs(subdir));
+    // the intermediate directories /dir1 and /dir1/dir2 will be created too
+    assertTrue(fs.exists(new Path(fakeGrandpaKey)));
+    assertTrue(fs.exists(new Path(fakeParentKey)));
   }
 
   @Test
@@ -1326,14 +1330,20 @@ public class TestOzoneFileSystem {
 
   @Test
   public void testRenameContainDelimiterFile() throws Exception {
-    String sourceKeyName = "dir1/dir2/key1";
-    String targetKeyName = "dir1/dir2/key2";
+    String fakeGrandpaKey = "dir1";
+    String fakeParentKey = fakeGrandpaKey + "/dir2";
+    String sourceKeyName = fakeParentKey + "/key1";
+    String targetKeyName = fakeParentKey +  "/key2";
     TestDataUtil.createKey(ozoneBucket, sourceKeyName, "");
 
     Path sourcePath = new Path(fs.getUri().toString() + "/" + sourceKeyName);
     Path targetPath = new Path(fs.getUri().toString() + "/" + targetKeyName);
     assertTrue(fs.rename(sourcePath, targetPath));
+    assertFalse(fs.exists(sourcePath));
     assertTrue(fs.exists(targetPath));
+    // intermediate directories will not be created
+    assertFalse(fs.exists(new Path(fakeGrandpaKey)));
+    assertFalse(fs.exists(new Path(fakeParentKey)));
   }
 
 

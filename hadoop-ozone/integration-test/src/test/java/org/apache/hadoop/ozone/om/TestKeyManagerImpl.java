@@ -1309,7 +1309,7 @@ public class TestKeyManagerImpl {
     keyArg = metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, parentDir);
     Assert.assertNull(
         metadataManager.getKeyTable(getDefaultBucketLayout()).get(keyArg));
-    keyArg = metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, parentDir);
+    keyArg = metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, fullKeyName);
     Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
         .get(keyArg));
 

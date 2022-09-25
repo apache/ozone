@@ -1257,27 +1257,31 @@ public class KeyManagerImpl implements KeyManager {
           }
         }
       }
+    } catch (Exception e) {
+      LOG.error("Failed to get info of key {}", keyName, e);
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
               bucketName);
+      if (fileKeyInfo != null) {
+        // if the key is a file then do refresh pipeline info in OM by asking SCM
+        if (args.getLatestVersionLocation()) {
+          slimLocationVersion(fileKeyInfo);
+        }
+        // If operation is head, do not perform any additional steps
+        // As head operation does not need any of those details.
+        if (!args.isHeadOp()) {
+          // refreshPipeline flag check has been removed as part of
+          // https://issues.apache.org/jira/browse/HDDS-3658.
+          // Please refer this jira for more details.
+          refresh(fileKeyInfo);
+          if (args.getSortDatanodes()) {
+            sortDatanodes(clientAddress, fileKeyInfo);
+          }
+        }
+      }
     }
 
     if (fileKeyInfo != null) {
-      // if the key is a file then do refresh pipeline info in OM by asking SCM
-      if (args.getLatestVersionLocation()) {
-        slimLocationVersion(fileKeyInfo);
-      }
-      // If operation is head, do not perform any additional steps
-      // As head operation does not need any of those details.
-      if (!args.isHeadOp()) {
-        // refreshPipeline flag check has been removed as part of
-        // https://issues.apache.org/jira/browse/HDDS-3658.
-        // Please refer this jira for more details.
-        refresh(fileKeyInfo);
-        if (args.getSortDatanodes()) {
-          sortDatanodes(clientAddress, fileKeyInfo);
-        }
-      }
       return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
     }
 
