@@ -19,10 +19,7 @@
 package org.apache.hadoop.ozone.shell.bucket;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -59,7 +56,7 @@ public class ListBucketHandler extends VolumeHandler {
     while (bucketIterator.hasNext() && counter < listOptions.getLimit()) {
       OzoneBucket entry = bucketIterator.next();
       if (entry.getSourceBucket() != null && entry.getSourceVolume() != null) {
-        printObjectAsJson(new LinkBucket(entry));
+        printObjectAsJson(new InfoBucketHandler.LinkBucket(entry));
       } else {
         printObjectAsJson(entry);
       }
@@ -69,57 +66,6 @@ public class ListBucketHandler extends VolumeHandler {
 
     if (isVerbose()) {
       out().printf("Found : %d buckets for volume : %s ", counter, volumeName);
-    }
-  }
-
-  /**
-   * Class used for link buckets.
-   */
-  private static class LinkBucket {
-    private String volumeName;
-    private String bucketName;
-    private String sourceVolume;
-    private String sourceBucket;
-    private Instant creationTime;
-    private Instant modificationTime;
-    private String owner;
-
-    LinkBucket(OzoneBucket ozoneBucket) {
-      this.volumeName = ozoneBucket.getVolumeName();
-      this.bucketName = ozoneBucket.getName();
-      this.sourceVolume = ozoneBucket.getSourceVolume();
-      this.sourceBucket = ozoneBucket.getSourceBucket();
-      this.creationTime = ozoneBucket.getCreationTime();
-      this.modificationTime = ozoneBucket.getModificationTime();
-      this.owner = ozoneBucket.getOwner();
-    }
-
-    public String getVolumeName() {
-      return volumeName;
-    }
-
-    public String getBucketName() {
-      return bucketName;
-    }
-
-    public String getSourceVolume() {
-      return sourceVolume;
-    }
-
-    public String getSourceBucket() {
-      return sourceBucket;
-    }
-
-    public Instant getCreationTime() {
-      return creationTime;
-    }
-
-    public Instant getModificationTime() {
-      return modificationTime;
-    }
-
-    public String getOwner() {
-      return owner;
     }
   }
 
