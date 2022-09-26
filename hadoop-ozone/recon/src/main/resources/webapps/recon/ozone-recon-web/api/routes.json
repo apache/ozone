@@ -22,5 +22,6 @@
   "/namespace/du?path=/vol1/bucket1/empty&files=true": "/empty",
   "/namespace/du?path=/clunky&files=true": "/clunky",
   "/namespace/summary?path=*": "/metadata",
-  "/namespace/quota?path=*": "/quota"
+  "/namespace/quota?path=*": "/quota",
+  "/task/status": "/taskStatus"
 }
