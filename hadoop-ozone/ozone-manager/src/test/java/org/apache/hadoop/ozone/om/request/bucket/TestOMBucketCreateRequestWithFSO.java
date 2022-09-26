@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StorageTypeProto;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.util.UUID;
@@ -40,6 +41,13 @@ import static org.mockito.Mockito.when;
 public class TestOMBucketCreateRequestWithFSO
     extends TestOMBucketCreateRequest {
 
+  @Before
+  public void setupWithFSO() {
+    ozoneManager.getConfiguration()
+        .set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+            OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
+  }
+  
   @Test
   public void testValidateAndUpdateCacheWithFSO() throws Exception {
     when(ozoneManager.getOMDefaultBucketLayout()).thenReturn(

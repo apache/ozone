@@ -70,7 +70,7 @@ public class TestBucketRequest {
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
     ozoneConfiguration.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
+        OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
