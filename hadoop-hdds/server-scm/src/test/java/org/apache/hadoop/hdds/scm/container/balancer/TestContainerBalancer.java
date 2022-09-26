@@ -722,7 +722,7 @@ public class TestContainerBalancer {
     Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
             Mockito.any(DatanodeDetails.class),
             Mockito.any(DatanodeDetails.class)))
-        .thenReturn(genCompletableFuture(500), genCompletableFuture(2000));
+        .thenReturn(genCompletableFuture(500), genCompletableFuture(3000));
 
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setIterations(1);
