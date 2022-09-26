@@ -1379,12 +1379,14 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   private OmKeyInfo createDirectoryKey(String volumeName, String bucketName,
-      String keyName, List<OzoneAcl> acls) throws IOException {
+      String keyName, List<OzoneAcl> acls,
+      ReplicationConfig replicationConfig) throws IOException {
     // verify bucket exists
     OmBucketInfo bucketInfo = getBucketInfo(volumeName, bucketName);
 
     String dir = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
     FileEncryptionInfo encInfo = getFileEncryptionInfo(bucketInfo);
+
     return new OmKeyInfo.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -1394,8 +1396,7 @@ public class KeyManagerImpl implements KeyManager {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
-        .setReplicationConfig(RatisReplicationConfig
-            .getInstance(ReplicationFactor.ONE))
+        .setReplicationConfig(replicationConfig)
         .setFileEncryptionInfo(encInfo)
         .setAcls(acls)
         .build();
@@ -1690,7 +1691,8 @@ public class KeyManagerImpl implements KeyManager {
                 if (!entryKeyName.equals(immediateChild)) {
                   OmKeyInfo fakeDirEntry = createDirectoryKey(
                       omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
-                      immediateChild, omKeyInfo.getAcls());
+                      immediateChild, omKeyInfo.getAcls(),
+                      omKeyInfo.getReplicationConfig());
                   cacheKeyMap.put(entryInDb,
                       new OzoneFileStatus(fakeDirEntry,
                           scmBlockSize, true));

@@ -32,17 +32,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileAlreadyExistsException;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.InvalidPathException;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
-import org.apache.hadoop.fs.Trash;
-import org.apache.hadoop.fs.TrashPolicy;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -111,11 +101,12 @@ public class TestOzoneFileSystem {
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
-    return Arrays.asList(
-        new Object[]{true, true},
-        new Object[]{true, false},
-        new Object[]{false, true},
-        new Object[]{false, false});
+    return Collections.singletonList(new Object[]{true, true});
+//    return Arrays.asList(
+////        new Object[]{true, true},
+////        new Object[]{true, false},
+//        new Object[]{false, true},
+//        new Object[]{false, false});
   }
 
   public TestOzoneFileSystem(boolean setDefaultFs, boolean enableOMRatis) {
@@ -124,7 +115,7 @@ public class TestOzoneFileSystem {
     // TestOzoneFileSystem#init() function will be invoked only at the
     // beginning of every new set of Parameterized.Parameters.
     if (enabledFileSystemPaths != setDefaultFs ||
-            omRatisEnabled != enableOMRatis) {
+            omRatisEnabled != enableOMRatis || cluster == null) {
       enabledFileSystemPaths = setDefaultFs;
       omRatisEnabled = enableOMRatis;
       try {
@@ -209,6 +200,7 @@ public class TestOzoneFileSystem {
   @After
   public void cleanup() {
     try {
+      System.out.println("Cleaning Up");
       Path root = new Path("/");
       FileStatus[] fileStatuses = fs.listStatus(root);
       for (FileStatus fileStatus : fileStatuses) {
@@ -610,9 +602,65 @@ public class TestOzoneFileSystem {
     }
 
     FileStatus[] fileStatuses = fs.listStatus(parent);
-
     // the number of immediate children of root is 1
     Assert.assertEquals(1, fileStatuses.length);
+    writeClient.deleteKey(keyArgs);
+  }
+
+  @Test
+  public void testListStatusWithIntermediateDirWithECEnabled() throws Exception {
+    System.out.println("Executing");
+    String keyName = "object-dir/object-name1";
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setAcls(Collections.emptyList())
+            .setReplicationConfig(new ECReplicationConfig(3, 2))
+            .setLocationInfoList(new ArrayList<>())
+            .build();
+    OpenKeySession session = writeClient.openKey(keyArgs);
+
+    writeClient.commitKey(keyArgs, session.getId());
+
+
+
+
+
+
+
+    keyName = "object-dir/object-name2";
+    keyArgs = new OmKeyArgs.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setAcls(Collections.emptyList())
+            .setReplicationConfig(new ECReplicationConfig(3, 2))
+            .setLocationInfoList(new ArrayList<>())
+            .build();
+    session = writeClient.openKey(keyArgs);
+
+    writeClient.commitKey(keyArgs, session.getId());
+
+    Path parent = new Path("/");
+
+    // Wait until the filestatus is updated
+    if (!enabledFileSystemPaths) {
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return fs.listStatus(parent).length != 0;
+        } catch (IOException e) {
+          LOG.error("listStatus() Failed", e);
+          Assert.fail("listStatus() Failed");
+          return false;
+        }
+      }, 1000, 120000);
+    }
+
+    FileStatus[] fileStatuses = fs.listStatus(parent);
+    // the number of immediate children of root is 1
+    Assert.assertEquals(2, fileStatuses.length);
+    Assert.assertTrue(fileStatuses[0].isErasureCoded());
     writeClient.deleteKey(keyArgs);
   }
 

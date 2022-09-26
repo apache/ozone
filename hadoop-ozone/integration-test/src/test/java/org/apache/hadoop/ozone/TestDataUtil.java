@@ -23,9 +23,7 @@ import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Scanner;
 
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.*;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -63,7 +61,8 @@ public final class TestDataUtil {
     if (bucketLayout != null) {
       builder.setBucketLayout(bucketLayout);
     }
-    omBucketArgs = builder.build();
+    omBucketArgs =
+            builder.setDefaultReplicationConfig(new DefaultReplicationConfig(new ECReplicationConfig(3,2))).build();
 
     return createVolumeAndBucket(cluster, volumeName, bucketName, bucketLayout,
         omBucketArgs);
