@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.security.token.Token;
-import org.junit.Ignore;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +46,6 @@ import static org.mockito.Mockito.when;
 /**
  * Common test cases for {@link ShortLivedTokenVerifier} implementations.
  */
-@Ignore
 public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
 
   private static final Logger LOG =

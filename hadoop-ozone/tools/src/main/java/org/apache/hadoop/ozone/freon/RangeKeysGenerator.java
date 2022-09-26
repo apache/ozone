@@ -67,6 +67,12 @@ public class RangeKeysGenerator extends BaseFreonGenerator
           defaultValue = "0")
   private int range;
 
+  @CommandLine.Option(names = {"-s", "--key-start-index"},
+          description = "Start index of key.",
+          defaultValue = "0")
+  private int startIndex;
+
+
   @CommandLine.Option(names = {"-k", "--key-encode"},
           description = "The algorithm to generate key names. " +
                   "Options are pureIndex, md5",
@@ -74,10 +80,9 @@ public class RangeKeysGenerator extends BaseFreonGenerator
   private String encodeFormat;
 
   @CommandLine.Option(names = {"-g", "--size"},
-          description = "Generated data size (in bytes) of " +
-                  "each key/file to be " +
-                  "written.",
-          defaultValue = "256")
+          description = "Generated object size (in bytes) " +
+                  "to be written.",
+          defaultValue = "1")
   private int writeSizeInBytes;
 
   @CommandLine.Option(names = {"--clients"},
@@ -85,6 +90,14 @@ public class RangeKeysGenerator extends BaseFreonGenerator
                   "Number of clients, defaults 1.",
           defaultValue = "1")
   private int clientsCount = 1;
+
+  @CommandLine.Option(
+          names = "--debug",
+          description = "Enable debugging message.",
+          defaultValue = "false"
+  )
+  private boolean debug;
+
 
   @CommandLine.Option(
           names = "--om-service-id",
@@ -125,20 +138,25 @@ public class RangeKeysGenerator extends BaseFreonGenerator
 
   public void generateRangeKeys(long count) throws Exception {
     int clientIndex = (int)(count % clientsCount);
+    if (debug) {
+      LOG.info("*** *** *** counter = " +
+              count + ", clientIndex = " + clientIndex);
+    }
+
     OzoneClient client = rpcClients[clientIndex];
-    int startIndex = (int)count * range;
-    int endIndex = startIndex + range;
+    int start = startIndex + (int)count * range;
+    int end = start + range;
 
     timer.time(() -> {
       switch (encodeFormat) {
       case PURE_INDEX:
-        loopRunner(kg.pureIndexKeyNameFunc(), client, startIndex, endIndex);
+        loopRunner(kg.pureIndexKeyNameFunc(), client, start, end);
         break;
       case MD5:
-        loopRunner(kg.md5KeyNameFunc(), client, startIndex, endIndex);
+        loopRunner(kg.md5KeyNameFunc(), client, start, end);
         break;
       default:
-        loopRunner(kg.md5KeyNameFunc(), client, startIndex, endIndex);
+        loopRunner(kg.md5KeyNameFunc(), client, start, end);
         break;
       }
       return null;
@@ -151,9 +169,19 @@ public class RangeKeysGenerator extends BaseFreonGenerator
     OzoneBucket ozbk = client.getObjectStore().getVolume(volumeName)
             .getBucket(bucketName);
 
+//    if (debug) {
+//      LOG.info("*** *** *** start loop, startIndex = " + startIndex +
+//              ", endIndex = " + endIndex );
+//    }
+
     String keyName;
     for (int i = startIndex; i < endIndex + 1; i++) {
       keyName = getPrefix() + FILE_DIR_SEPARATOR + f.apply(i);
+//      if (debug) {
+//        LOG.info("*** *** *** in loop, i = " + i +
+//                ", keyName = " + keyName );
+//      }
+
       try (OzoneOutputStream out = ozbk.createKey(keyName, writeSizeInBytes)) {
         out.write(keyContent);
         out.flush();

@@ -54,8 +54,10 @@ import org.bouncycastle.operator.DefaultDigestAlgorithmIdentifierFinder;
 import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.bc.BcRSAContentSignerBuilder;
-import org.junit.*;
-import org.mockito.Mockito;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;import org.mockito.Mockito;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -74,7 +76,6 @@ import java.util.concurrent.TimeUnit;
 /**
  * Test class for {@link OzoneBlockTokenSecretManager}.
  */
-@Ignore
 public class TestOzoneBlockTokenSecretManager {
 
   private static final String BASEDIR = GenericTestUtils

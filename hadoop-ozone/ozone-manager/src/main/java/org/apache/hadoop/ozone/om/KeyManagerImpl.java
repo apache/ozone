@@ -102,8 +102,8 @@ import com.google.common.base.Strings;
 import org.apache.commons.lang3.StringUtils;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
-//import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
-//import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY;
@@ -209,10 +209,9 @@ public class KeyManagerImpl implements KeyManager {
     this.preallocateBlocksMax = conf.getInt(
         OZONE_KEY_PREALLOCATION_BLOCKS_MAX,
         OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT);
-//    this.grpcBlockTokenEnabled = conf.getBoolean(
-//        HDDS_BLOCK_TOKEN_ENABLED,
-//        HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
-    this.grpcBlockTokenEnabled = false;
+    this.grpcBlockTokenEnabled = conf.getBoolean(
+        HDDS_BLOCK_TOKEN_ENABLED,
+        HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
     this.listTrashKeysMax = conf.getInt(
       OZONE_CLIENT_LIST_TRASH_KEYS_MAX,
       OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT);

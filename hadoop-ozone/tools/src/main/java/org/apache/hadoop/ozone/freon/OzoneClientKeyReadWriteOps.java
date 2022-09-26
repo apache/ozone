@@ -21,9 +21,7 @@ import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.*;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.slf4j.Logger;
@@ -31,7 +29,6 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -66,24 +63,20 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
                   "Supported values are Y, F.",
           defaultValue = "false")
   private boolean readMetadataOnly;
-
-  @CommandLine.Option(names = {"-r", "--range-client-read"},
-          description = "range of read operation of each client.",
+  @CommandLine.Option(names = {"-s", "--start-index"},
+          description = "Start index of keys of read/write operation.",
           defaultValue = "0")
-  private int readRange;
+  private int startIndex;
 
-
-  @CommandLine.Option(names = {"-w", "--range-client-write"},
-          description = "range of write operation of each client.",
+  @CommandLine.Option(names = {"-r", "--range"},
+          description = "index range of read/write operations.",
           defaultValue = "0")
-  private int writeRange;
-
+  private int range;
   @CommandLine.Option(names = {"--size"},
-          description = "Generated data size (in bytes) of " +
-                  "each key/file to be " +
-                  "written.",
+          description = "Object size (in bytes) " +
+                  "to be generated.",
           defaultValue = "1")
-  private int writeSizeInBytes;
+  private int objectSizeInBytes;
 
   @CommandLine.Option(names = {"--keySorted"},
           description = "Generated sorted key or not. The key name " +
@@ -109,40 +102,40 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   )
   private String omServiceID = null;
 
-  @CommandLine.Option(
-          names = "--debug",
-          description = "Enable debugging message.",
-          defaultValue = "false"
-  )
-  private boolean debug;
-
   private Timer timer;
 
-  private OzoneClient[] rpcClients;
+  private OzoneBucket[] ozoneBuckets;
 
   private byte[] keyContent;
 
   private static final Logger LOG =
           LoggerFactory.getLogger(OzoneClientKeyReadWriteOps.class);
   public enum TaskType {
-    READTASK,
-    WRITETASK
+    READ_TASK,
+    WRITE_TASK
   }
   private KeyGeneratorUtil kg;
+
 
   @Override
   public Void call() throws Exception {
     init();
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-    rpcClients = new OzoneClient[clientsCount];
+    OzoneClient[] ozoneClients = new OzoneClient[clientsCount];
     for (int i = 0; i < clientsCount; i++) {
-      rpcClients[i] = createOzoneClient(omServiceID, ozoneConfiguration);
+      ozoneClients[i] = createOzoneClient(omServiceID, ozoneConfiguration);
     }
 
-    ensureVolumeAndBucketExist(rpcClients[0], volumeName, bucketName);
+    ensureVolumeAndBucketExist(ozoneClients[0], volumeName, bucketName);
+    ozoneBuckets = new OzoneBucket[clientsCount];
+    for (int i = 0; i < clientsCount; i++) {
+      ozoneBuckets[i] = ozoneClients[i].getObjectStore().getVolume(volumeName)
+              .getBucket(bucketName);
+    }
+
     timer = getMetrics().timer("key-read-write");
-    if (writeSizeInBytes >= 0) {
-      keyContent = RandomUtils.nextBytes(writeSizeInBytes);
+    if (objectSizeInBytes >= 0) {
+      keyContent = RandomUtils.nextBytes(objectSizeInBytes);
     }
     if (kg == null) {
       kg = new KeyGeneratorUtil();
@@ -150,8 +143,8 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     runTests(this::readWriteKeys);
 
     for (int i = 0; i < clientsCount; i++) {
-      if (rpcClients[i] != null) {
-        rpcClients[i].close();
+      if (ozoneClients[i] != null) {
+        ozoneClients[i].close();
       }
     }
     return null;
@@ -159,22 +152,18 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
 
   public void readWriteKeys(long counter) throws Exception {
     int clientIndex = (int)((counter) % clientsCount);
-    if (debug) {
-      LOG.error("*** *** *** counter = " +
-              counter + ", clientIndex = " + clientIndex);
-    }
-
-    OzoneClient client = rpcClients[clientIndex];
+    OzoneBucket ozoneBucket = ozoneBuckets[clientIndex];
     TaskType taskType = decideReadOrWriteTask();
     String keyName = getKeyName(taskType, clientIndex);
+
     timer.time(() -> {
       try {
         switch (taskType) {
-          case READTASK:
-          processReadTasks(keyName, client);
+          case READ_TASK:
+          processReadTasks(keyName, ozoneBucket);
           break;
-          case WRITETASK:
-          processWriteTasks(keyName, client);
+          case WRITE_TASK:
+          processWriteTasks(keyName, ozoneBucket);
           break;
         default:
           break;
@@ -190,22 +179,20 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     });
   }
 
-  public void processReadTasks(String keyName, OzoneClient client)
+  public void processReadTasks(String keyName, OzoneBucket ozoneBucket)
           throws RuntimeException, IOException {
-    OzoneKeyDetails keyDetails = client.getProxy().getKeyDetails(volumeName, bucketName, keyName);
     if (readMetadataOnly) {
-      keyDetails.getModificationTime();
+        ozoneBucket.getKey(keyName);
     } else {
-      byte[] data = new byte[writeSizeInBytes];
-      try (OzoneInputStream introStream = keyDetails.getContent()) {
-        introStream.read(data);
+      byte[] data = new byte[objectSizeInBytes];
+      try (OzoneInputStream inputStream = ozoneBucket.readKey(keyName)) {
+        inputStream.read(data);
       }
     }
   }
-  public void processWriteTasks(String keyName, OzoneClient client)
+  public void processWriteTasks(String keyName, OzoneBucket ozoneBucket)
           throws RuntimeException, IOException {
-    try (OzoneOutputStream out = client.getProxy().
-            createKey(volumeName, bucketName, keyName, writeSizeInBytes, null, new HashMap<>()))
+    try (OzoneOutputStream out = ozoneBucket.createKey(keyName, objectSizeInBytes))
     {
       out.write(keyContent);
     } catch (Exception ex) {
@@ -215,51 +202,34 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   public TaskType decideReadOrWriteTask() {
     if (!isMixWorkload()) {
       if (percentageRead == 100) {
-        return TaskType.READTASK;
+        return TaskType.READ_TASK;
       } else {
-        return TaskType.WRITETASK;
+        return TaskType.WRITE_TASK;
       }
     }
     //mix workload
     int tmp = ThreadLocalRandom.current().nextInt(100) + 1; // 1 ~ 100
     if (tmp < percentageRead) {
-      return TaskType.READTASK;
+      return TaskType.READ_TASK;
     } else {
-      return TaskType.WRITETASK;
+      return TaskType.WRITE_TASK;
     }
   }
 
   public String getKeyName(TaskType taskType, int clientIndex) {
-    int startIdx, endIdx;
-    switch (taskType) {
-    case READTASK:
+    int start, end;
     // separate tasks evenly to each client
-      if (readRange < clientsCount) {
-        startIdx = clientIndex;
-        endIdx = clientIndex;
-      }else{
-        startIdx = clientIndex * (readRange / clientsCount);
-        endIdx = startIdx + (readRange / clientsCount) - 1;
-      }
-      break;
-    case WRITETASK:
-    // separate tasks evenly to each client
-      if (writeRange < clientsCount) {
-        startIdx = clientIndex;
-        endIdx = clientIndex;
-      } else {
-        startIdx = clientIndex * (writeRange / clientsCount);
-        endIdx = startIdx + (writeRange / clientsCount) - 1;
-      }
-      break;
-    default:
-      startIdx = 0;
-      endIdx = 0;
-      break;
+    if (range < clientsCount) {
+      start = startIndex + clientIndex;
+      end = start;
+    }else{
+      start = startIndex + clientIndex * (range / clientsCount);
+      end = start + (range / clientsCount) - 1;
     }
+
     StringBuilder keyNameSb = new StringBuilder();
     int randomIdxWithinRange = ThreadLocalRandom.current().
-            nextInt(endIdx + 1 - startIdx) + startIdx;
+            nextInt(end + 1 - start) + start;
     if (keySorted) {
       keyNameSb.append(getPrefix()).append(FILE_DIR_SEPARATOR).
               append(randomIdxWithinRange);
@@ -271,7 +241,7 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   }
 
   public boolean isMixWorkload() {
-    return percentageRead == 0 || percentageRead == 100;
+    return !(percentageRead == 0 || percentageRead == 100);
   }
 
 }
