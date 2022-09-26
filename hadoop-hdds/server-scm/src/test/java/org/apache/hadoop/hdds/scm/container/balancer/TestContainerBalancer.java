@@ -797,7 +797,7 @@ public class TestContainerBalancer {
             new NodeNotFoundException("Test Node not found"))
         .thenReturn(f).thenReturn(CompletableFuture.supplyAsync(() -> {
           try {
-            Thread.sleep(500);
+            Thread.sleep(200);
           } catch (Exception ex) {
           }
           throw new RuntimeException("Throw");
@@ -808,7 +808,7 @@ public class TestContainerBalancer {
     balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMoveTimeout(Duration.ofMillis(1000));
+    balancerConfiguration.setMoveTimeout(Duration.ofMillis(500));
 
     startBalancer(balancerConfiguration);
     sleepWhileBalancing(1000);
