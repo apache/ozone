@@ -245,8 +245,6 @@ public class DatanodeDetails extends NodeImpl implements
             HddsProtos.NodeOperationalState.DECOMMISSIONING;
   }
 
-
-
   /**
    * Set the persistedOpState for this instance.
    *
