@@ -287,11 +287,12 @@ public class LegacyBucketHandler extends BucketHandler {
     String dirKey = bld.toString();
     OmKeyInfo dirInfo = getKeyTable().getSkipCache(dirKey);
 
-    try {
+    if (dirInfo != null) {
       dirObjectId = dirInfo.getObjectID();
-    } catch (NullPointerException e) {
-      LOG.error("OmKeyInfo for the directory is null", e);
+    } else {
+      throw new IOException("OmKeyInfo for the directory is null");
     }
+
     return dirObjectId;
   }
 

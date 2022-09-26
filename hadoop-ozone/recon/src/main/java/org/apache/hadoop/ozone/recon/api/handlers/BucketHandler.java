@@ -206,11 +206,11 @@ public abstract class BucketHandler {
     OmBucketInfo bucketInfo = omMetadataManager
         .getBucketTable().getSkipCache(bucketKey);
 
-    if (bucketInfo == null) {
-      return null;
-    } else {
+    if (bucketInfo != null) {
       return getBucketHandler(reconNamespaceSummaryManager,
           omMetadataManager, reconSCM, bucketInfo);
+    } else {
+      return null;
     }
   }
 }

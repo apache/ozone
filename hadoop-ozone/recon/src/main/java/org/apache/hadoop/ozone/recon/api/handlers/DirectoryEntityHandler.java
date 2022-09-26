@@ -91,7 +91,10 @@ public class DirectoryEntityHandler extends EntityHandler {
     for (long subdirObjectId: subdirs) {
       NSSummary subdirNSSummary =
               getReconNamespaceSummaryManager().getNSSummary(subdirObjectId);
-      // for the subdirName we need the filename, not the key name
+      // for the subdirName we need the subdir filename, not the key name
+      // Eg. /vol/bucket1/dir1/dir2,
+      // key name is /dir1/dir2
+      // we need to get dir2
       Path subdirPath = Paths.get(subdirNSSummary.getDirName());
       Path subdirFileName = subdirPath.getFileName();
       String subdirName;

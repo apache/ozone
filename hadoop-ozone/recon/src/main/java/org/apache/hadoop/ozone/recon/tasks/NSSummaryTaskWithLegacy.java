@@ -245,10 +245,11 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
           .getKeyTable(BUCKET_LAYOUT)
           .get(fullParentKeyName);
 
-      try {
+      if (parentKeyInfo != null) {
         keyInfo.setParentObjectID(parentKeyInfo.getObjectID());
-      } catch (NullPointerException e) {
-        LOG.error("ParentKeyInfo for NSSummaryTaskWithLegacy is null", e);
+      } else {
+        throw new IOException("ParentKeyInfo for " +
+            "NSSummaryTaskWithLegacy is null");
       }
     } else {
       String bucketKey = reconOMMetadataManager
@@ -256,10 +257,11 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
       OmBucketInfo parentBucketInfo =
           reconOMMetadataManager.getBucketTable().get(bucketKey);
 
-      try {
+      if (parentBucketInfo != null) {
         keyInfo.setParentObjectID(parentBucketInfo.getObjectID());
-      } catch (NullPointerException e) {
-        LOG.error("ParentBucketInfo for NSSummaryTaskWithLegacy is null", e);
+      } else {
+        throw new IOException("ParentKeyInfo for " +
+            "NSSummaryTaskWithLegacy is null");
       }
     }
   }
