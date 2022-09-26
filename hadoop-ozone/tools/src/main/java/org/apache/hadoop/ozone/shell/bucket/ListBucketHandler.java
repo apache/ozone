@@ -21,6 +21,9 @@ package org.apache.hadoop.ozone.shell.bucket;
 import java.io.IOException;
 import java.util.Iterator;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -50,23 +53,32 @@ public class ListBucketHandler extends VolumeHandler {
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     Iterator<? extends OzoneBucket> bucketIterator =
         vol.listBuckets(listOptions.getPrefix(), listOptions.getStartItem());
-
-    int counter = 0;
-    printMsg("[");
-    while (bucketIterator.hasNext() && counter < listOptions.getLimit()) {
-      OzoneBucket entry = bucketIterator.next();
-      if (entry.getSourceBucket() != null && entry.getSourceVolume() != null) {
-        printObjectAsJson(new InfoBucketHandler.LinkBucket(entry));
-      } else {
-        printObjectAsJson(entry);
-      }
-      counter++;
-    }
-    printMsg("]");
+    int counter = printBuckets(bucketIterator, listOptions.getLimit());
 
     if (isVerbose()) {
       out().printf("Found : %d buckets for volume : %s ", counter, volumeName);
     }
+  }
+
+  private int printBuckets(Iterator<? extends OzoneBucket> bucketIterator,
+                           int limit) {
+    int counter = 0;
+    final ArrayNode arrayNode = JsonUtils.createArrayNode();
+    ObjectNode jsonNode;
+    while (limit > counter && bucketIterator.hasNext()) {
+      OzoneBucket bucket = bucketIterator.next();
+      if (bucket.getSourceBucket() != null &&
+          bucket.getSourceVolume() != null) {
+        jsonNode = JsonUtils.createObjectNode(
+            new InfoBucketHandler.LinkBucket(bucket));
+      } else {
+        jsonNode = JsonUtils.createObjectNode(bucket);
+      }
+      arrayNode.add(jsonNode);
+      counter++;
+    }
+    out().println(arrayNode.toPrettyString());
+    return counter;
   }
 
 }
