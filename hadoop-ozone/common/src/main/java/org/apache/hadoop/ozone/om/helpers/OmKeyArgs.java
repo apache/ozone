@@ -49,6 +49,7 @@ public final class OmKeyArgs implements Auditable {
   private boolean latestVersionLocation;
   private boolean recursive;
   private boolean headOp;
+  private boolean forceUpdateContainerCacheFromSCM;
 
   @SuppressWarnings("parameternumber")
   private OmKeyArgs(String volumeName, String bucketName, String keyName,
@@ -57,7 +58,8 @@ public final class OmKeyArgs implements Auditable {
       String uploadID, int partNumber,
       Map<String, String> metadataMap, boolean refreshPipeline,
       List<OzoneAcl> acls, boolean sortDatanode,
-      boolean latestVersionLocation, boolean recursive, boolean headOp) {
+      boolean latestVersionLocation, boolean recursive, boolean headOp,
+      boolean forceUpdateContainerCacheFromSCM) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
@@ -68,12 +70,12 @@ public final class OmKeyArgs implements Auditable {
     this.multipartUploadID = uploadID;
     this.multipartUploadPartNumber = partNumber;
     this.metadata = metadataMap;
-    this.refreshPipeline = refreshPipeline;
     this.acls = acls;
     this.sortDatanodesInPipeline = sortDatanode;
     this.latestVersionLocation = latestVersionLocation;
     this.recursive = recursive;
     this.headOp = headOp;
+    this.forceUpdateContainerCacheFromSCM = forceUpdateContainerCacheFromSCM;
   }
 
   public boolean getIsMultipartKey() {
@@ -132,10 +134,6 @@ public final class OmKeyArgs implements Auditable {
     return locationInfoList;
   }
 
-  public boolean getRefreshPipeline() {
-    return refreshPipeline;
-  }
-
   public boolean getSortDatanodes() {
     return sortDatanodesInPipeline;
   }
@@ -150,6 +148,10 @@ public final class OmKeyArgs implements Auditable {
 
   public boolean isHeadOp() {
     return headOp;
+  }
+
+  public boolean isForceUpdateContainerCacheFromSCM() {
+    return forceUpdateContainerCacheFromSCM;
   }
 
   @Override
@@ -185,11 +187,11 @@ public final class OmKeyArgs implements Auditable {
         .setMultipartUploadID(multipartUploadID)
         .setMultipartUploadPartNumber(multipartUploadPartNumber)
         .addAllMetadata(metadata)
-        .setRefreshPipeline(refreshPipeline)
         .setSortDatanodesInPipeline(sortDatanodesInPipeline)
         .setHeadOp(headOp)
         .setLatestVersionLocation(latestVersionLocation)
-        .setAcls(acls);
+        .setAcls(acls)
+        .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM);
   }
 
   /**
@@ -212,6 +214,7 @@ public final class OmKeyArgs implements Auditable {
     private List<OzoneAcl> acls;
     private boolean recursive;
     private boolean headOp;
+    private boolean forceUpdateContainerCacheFromSCM;
 
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
@@ -298,12 +301,18 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
+    public Builder setForceUpdateContainerCacheFromSCM(boolean value) {
+      this.forceUpdateContainerCacheFromSCM = value;
+      return this;
+    }
+
     public OmKeyArgs build() {
       return new OmKeyArgs(volumeName, bucketName, keyName, dataSize,
           replicationConfig, locationInfoList, isMultipartKey,
           multipartUploadID,
           multipartUploadPartNumber, metadata, refreshPipeline, acls,
-          sortDatanodesInPipeline, latestVersionLocation, recursive, headOp);
+          sortDatanodesInPipeline, latestVersionLocation, recursive, headOp,
+          forceUpdateContainerCacheFromSCM);
     }
 
   }

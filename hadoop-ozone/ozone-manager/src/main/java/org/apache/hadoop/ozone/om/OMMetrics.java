@@ -83,6 +83,7 @@ public class OMMetrics {
   private @Metric MutableCounterLong numSetAcl;
   private @Metric MutableCounterLong numGetAcl;
   private @Metric MutableCounterLong numRemoveAcl;
+  private @Metric MutableCounterLong numGetKeyInfo;
 
   // Failure Metrics
   private @Metric MutableCounterLong numVolumeCreateFails;
@@ -150,6 +151,7 @@ public class OMMetrics {
   private @Metric MutableCounterLong numCreateFileFails;
   private @Metric MutableCounterLong numLookupFileFails;
   private @Metric MutableCounterLong numListStatusFails;
+  private @Metric MutableCounterLong getNumGetKeyInfoFails;
 
   // Metrics for total amount of data written
   private @Metric MutableCounterLong totalDataCommitted;
@@ -719,6 +721,15 @@ public class OMMetrics {
 
   public void incNumRemoveAcl() {
     numRemoveAcl.incr();
+  }
+
+  public void incNumGetKeyInfo() {
+    numGetKeyInfo.incr();
+    numKeyOps.incr();
+  }
+
+  public void incNumGetKeyInfoFails() {
+    getNumGetKeyInfoFails.incr();
   }
 
   @VisibleForTesting
