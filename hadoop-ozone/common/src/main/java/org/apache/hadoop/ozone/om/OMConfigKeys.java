@@ -207,6 +207,10 @@ public final class OMConfigKeys {
       OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT =
       TimeDuration.valueOf(5000, TimeUnit.MILLISECONDS);
 
+  public static final String OZONE_OM_FS_SNAPSHOT_MAX_LIMIT =
+      "ozone.om.fs.snapshot.max.limit";
+  public static final int OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT = 1000;
+
   public static final String OZONE_OM_KERBEROS_KEYTAB_FILE_KEY = "ozone.om."
       + "kerberos.keytab.file";
   public static final String OZONE_OM_KERBEROS_PRINCIPAL_KEY = "ozone.om"
