@@ -1928,6 +1928,15 @@
   </property>
 
   <property>
+    <name>ozone.om.fs.snapshot.max.limit</name>
+    <value>1000</value>
+    <tag>OZONE, OM, MANAGEMENT</tag>
+    <description>
+      The maximum number of filesystem snapshot allowed in an Ozone Manager.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.acl.authorizer.class</name>
     <value>org.apache.hadoop.ozone.security.acl.OzoneAccessAuthorizer</value>
     <tag>OZONE, SECURITY, ACL</tag>

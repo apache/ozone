@@ -145,6 +145,11 @@ share/ozone/lib/jetty-util-ajax.jar
 share/ozone/lib/jetty-util.jar
 share/ozone/lib/jetty-webapp.jar
 share/ozone/lib/jetty-xml.jar
+share/ozone/lib/jgrapht-core.jar
+share/ozone/lib/jgrapht-ext.jar
+share/ozone/lib/jgrapht-guava.jar
+share/ozone/lib/jgraphx.jar
+share/ozone/lib/jheaps.jar
 share/ozone/lib/jmespath-java.jar
 share/ozone/lib/jna.jar
 share/ozone/lib/jna-platform.jar
@@ -250,6 +255,7 @@ share/ozone/lib/ratis-thirdparty-misc.jar
 share/ozone/lib/ratis-tools.jar
 share/ozone/lib/re2j.jar
 share/ozone/lib/reflections.jar
+share/ozone/lib/rocksdb-checkpoint-differ.jar
 share/ozone/lib/rocksdbjni.jar
 share/ozone/lib/simpleclient_common.jar
 share/ozone/lib/simpleclient_dropwizard.jar
