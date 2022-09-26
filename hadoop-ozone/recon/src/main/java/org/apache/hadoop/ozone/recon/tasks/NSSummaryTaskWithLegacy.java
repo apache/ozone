@@ -21,7 +21,6 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -50,8 +49,6 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
 
   private static final BucketLayout BUCKET_LAYOUT = BucketLayout.LEGACY;
 
-  private final ReconOMMetadataManager reconOMMetadataManager;
-
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskWithLegacy.class);
 
@@ -60,17 +57,10 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
                                  reconNamespaceSummaryManager,
                                  ReconOMMetadataManager
                                  reconOMMetadataManager) {
-    super(reconNamespaceSummaryManager);
-    this.reconOMMetadataManager = reconOMMetadataManager;
+    super(reconNamespaceSummaryManager, reconOMMetadataManager);
   }
 
-  @Override
-  public String getTaskName() {
-    return "NSSummaryTaskWithLegacy";
-  }
-
-  @Override
-  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
+  public Pair<String, Boolean> processWithLegacy(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
@@ -184,13 +174,12 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
     return new ImmutablePair<>(getTaskName(), true);
   }
 
-  @Override
-  public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+  public Pair<String, Boolean> reprocessWithLegacy() {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
     try {
       Table<String, OmKeyInfo> keyTable =
-          omMetadataManager.getKeyTable(BUCKET_LAYOUT);
+          getReconOMMetadataManager().getKeyTable(BUCKET_LAYOUT);
 
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
           keyTableIter = keyTable.iterator()) {
@@ -239,9 +228,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
       String parentKeyName = String.join(OM_KEY_PREFIX, dirs);
       parentKeyName += OM_KEY_PREFIX;
       String fullParentKeyName =
-          reconOMMetadataManager.getOzoneKey(keyInfo.getVolumeName(),
+          getReconOMMetadataManager().getOzoneKey(keyInfo.getVolumeName(),
               keyInfo.getBucketName(), parentKeyName);
-      OmKeyInfo parentKeyInfo = reconOMMetadataManager
+      OmKeyInfo parentKeyInfo = getReconOMMetadataManager()
           .getKeyTable(BUCKET_LAYOUT)
           .get(fullParentKeyName);
 
@@ -252,10 +241,10 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
             "NSSummaryTaskWithLegacy is null");
       }
     } else {
-      String bucketKey = reconOMMetadataManager
+      String bucketKey = getReconOMMetadataManager()
           .getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
       OmBucketInfo parentBucketInfo =
-          reconOMMetadataManager.getBucketTable().get(bucketKey);
+          getReconOMMetadataManager().getBucketTable().get(bucketKey);
 
       if (parentBucketInfo != null) {
         keyInfo.setParentObjectID(parentBucketInfo.getObjectID());

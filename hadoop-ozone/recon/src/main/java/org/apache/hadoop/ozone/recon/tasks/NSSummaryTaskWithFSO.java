@@ -21,11 +21,11 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,13 +51,10 @@ public class NSSummaryTaskWithFSO extends NSSummaryTask {
 
   @Inject
   public NSSummaryTaskWithFSO(ReconNamespaceSummaryManager
-                            reconNamespaceSummaryManager) {
-    super(reconNamespaceSummaryManager);
-  }
-
-  @Override
-  public String getTaskName() {
-    return "NSSummaryTaskWithFSO";
+                              reconNamespaceSummaryManager,
+                              ReconOMMetadataManager
+                              reconOMMetadataManager) {
+    super(reconNamespaceSummaryManager, reconOMMetadataManager);
   }
 
   // We only listen to updates from FSO-enabled KeyTable(FileTable) and DirTable
@@ -65,8 +62,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTask {
     return Arrays.asList(FILE_TABLE, DIRECTORY_TABLE);
   }
 
-  @Override
-  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
+  public Pair<String, Boolean> processWithFSO(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     final Collection<String> taskTables = getTaskTables();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
@@ -167,16 +163,12 @@ public class NSSummaryTaskWithFSO extends NSSummaryTask {
     return new ImmutablePair<>(getTaskName(), true);
   }
 
-  @Override
-  public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+  public Pair<String, Boolean> reprocessWithFSO() {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
     try {
-      // reinit Recon RocksDB's namespace CF.
-      getReconNamespaceSummaryManager().clearNSSummaryTable();
-
       Table<String, OmDirectoryInfo> dirTable =
-          omMetadataManager.getDirectoryTable();
+          getReconOMMetadataManager().getDirectoryTable();
       try (TableIterator<String,
               ? extends Table.KeyValue<String, OmDirectoryInfo>>
                 dirTableIter = dirTable.iterator()) {
@@ -188,7 +180,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTask {
       }
 
       // Get fileTable used by FSO
-      Table<String, OmKeyInfo> keyTable = omMetadataManager.getFileTable();
+      Table<String, OmKeyInfo> keyTable =
+          getReconOMMetadataManager().getFileTable();
 
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
               keyTableIter = keyTable.iterator()) {

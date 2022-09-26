@@ -173,7 +173,7 @@ public final class TestNSSummaryTaskWithLegacy {
       // reinit Recon RocksDB's namespace CF.
       reconNamespaceSummaryManager.clearNSSummaryTable();
 
-      nSSummaryTaskWithLegacy.reprocess(reconOMMetadataManager);
+      nSSummaryTaskWithLegacy.reprocessWithLegacy();
       Assert.assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
 
       nsSummaryForBucket1 =
@@ -287,8 +287,8 @@ public final class TestNSSummaryTaskWithLegacy {
 
     @BeforeClass
     public static void setUp() throws IOException {
-      nSSummaryTaskWithLegacy.reprocess(reconOMMetadataManager);
-      nSSummaryTaskWithLegacy.process(processEventBatch());
+      nSSummaryTaskWithLegacy.reprocessWithLegacy();
+      nSSummaryTaskWithLegacy.processWithLegacy(processEventBatch());
 
       nsSummaryForBucket1 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);

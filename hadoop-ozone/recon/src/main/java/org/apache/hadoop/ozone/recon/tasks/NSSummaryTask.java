@@ -17,6 +17,7 @@
  */
 
 package org.apache.hadoop.ozone.recon.tasks;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -24,6 +25,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,23 +55,64 @@ public abstract class NSSummaryTask implements ReconOmTask {
           LoggerFactory.getLogger(NSSummaryTask.class);
 
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private final ReconOMMetadataManager reconOMMetadataManager;
+  private NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
+  private NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy;
 
   @Inject
   public NSSummaryTask(ReconNamespaceSummaryManager
-                                 reconNamespaceSummaryManager) {
+                       reconNamespaceSummaryManager,
+                       ReconOMMetadataManager
+                       reconOMMetadataManager) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
+    this.reconOMMetadataManager = reconOMMetadataManager;
   }
 
   public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
     return reconNamespaceSummaryManager;
   }
 
-  public abstract String getTaskName();
+  public ReconOMMetadataManager getReconOMMetadataManager() {
+    return reconOMMetadataManager;
+  }
 
-  public abstract Pair<String, Boolean> process(OMUpdateEventBatch events);
+  public String getTaskName() {
+    return "NSSummaryTask";
+  }
 
-  public abstract Pair<String, Boolean> reprocess(
-      OMMetadataManager omMetadataManager);
+  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
+    Pair<String, Boolean> pair;
+    nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
+        reconNamespaceSummaryManager, reconOMMetadataManager);
+    nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
+        reconNamespaceSummaryManager, reconOMMetadataManager);
+    pair = nsSummaryTaskWithFSO.processWithFSO(events);
+    if (pair.getValue().equals(true)) {
+      pair = nsSummaryTaskWithLegacy.processWithLegacy(events);
+    }
+    return pair;
+  }
+
+  public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+    Pair<String, Boolean> pair;
+    nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
+        reconNamespaceSummaryManager, reconOMMetadataManager);
+    nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
+        reconNamespaceSummaryManager, reconOMMetadataManager);
+    try {
+      // reinit Recon RocksDB's namespace CF.
+      reconNamespaceSummaryManager.clearNSSummaryTable();
+    } catch (IOException ioEx) {
+      LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
+          ioEx);
+      return new ImmutablePair<>(getTaskName(), false);
+    }
+    pair = nsSummaryTaskWithFSO.reprocessWithFSO();
+    if (pair.getValue().equals(true)) {
+      pair = nsSummaryTaskWithLegacy.reprocessWithLegacy();
+    }
+    return pair;
+  }
 
   protected void writeNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap)
       throws IOException {

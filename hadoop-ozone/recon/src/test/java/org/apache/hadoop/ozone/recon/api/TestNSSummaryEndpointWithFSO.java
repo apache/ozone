@@ -367,7 +367,8 @@ public class TestNSSummaryEndpointWithFSO {
     // populate OM DB and reprocess into Recon RocksDB
     populateOMDB();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
-        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager);
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
+            reconOMMetadataManager);
     nSSummaryTaskWithFso.reprocess(reconOMMetadataManager);
   }
 
