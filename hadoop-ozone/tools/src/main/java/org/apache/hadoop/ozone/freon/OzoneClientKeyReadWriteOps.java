@@ -21,7 +21,8 @@ import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.client.*;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.slf4j.Logger;
@@ -110,6 +111,10 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
 
   private static final Logger LOG =
           LoggerFactory.getLogger(OzoneClientKeyReadWriteOps.class);
+
+  /**
+   * Task type of read task, or write task.
+   */
   public enum TaskType {
     READ_TASK,
     WRITE_TASK
@@ -154,15 +159,15 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     int clientIndex = (int)((counter) % clientsCount);
     OzoneBucket ozoneBucket = ozoneBuckets[clientIndex];
     TaskType taskType = decideReadOrWriteTask();
-    String keyName = getKeyName(taskType, clientIndex);
+    String keyName = getKeyName(clientIndex);
 
     timer.time(() -> {
       try {
         switch (taskType) {
-          case READ_TASK:
+        case READ_TASK:
           processReadTasks(keyName, ozoneBucket);
           break;
-          case WRITE_TASK:
+        case WRITE_TASK:
           processWriteTasks(keyName, ozoneBucket);
           break;
         default:
@@ -182,7 +187,7 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   public void processReadTasks(String keyName, OzoneBucket ozoneBucket)
           throws RuntimeException, IOException {
     if (readMetadataOnly) {
-        ozoneBucket.getKey(keyName);
+      ozoneBucket.getKey(keyName);
     } else {
       byte[] data = new byte[objectSizeInBytes];
       try (OzoneInputStream inputStream = ozoneBucket.readKey(keyName)) {
@@ -192,8 +197,8 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   }
   public void processWriteTasks(String keyName, OzoneBucket ozoneBucket)
           throws RuntimeException, IOException {
-    try (OzoneOutputStream out = ozoneBucket.createKey(keyName, objectSizeInBytes))
-    {
+    try (OzoneOutputStream out =
+                 ozoneBucket.createKey(keyName, objectSizeInBytes)) {
       out.write(keyContent);
     } catch (Exception ex) {
       throw ex;
@@ -216,13 +221,13 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     }
   }
 
-  public String getKeyName(TaskType taskType, int clientIndex) {
+  public String getKeyName(int clientIndex) {
     int start, end;
     // separate tasks evenly to each client
     if (range < clientsCount) {
       start = startIndex + clientIndex;
       end = start;
-    }else{
+    } else {
       start = startIndex + clientIndex * (range / clientsCount);
       end = start + (range / clientsCount) - 1;
     }

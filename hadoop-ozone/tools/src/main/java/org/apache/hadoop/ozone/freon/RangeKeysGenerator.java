@@ -160,12 +160,12 @@ public class RangeKeysGenerator extends BaseFreonGenerator
 
 
   public void loopRunner(Function<Integer, String> f, OzoneClient client,
-                         int startIndex, int endIndex) throws Exception {
+                         int start, int end) throws Exception {
     OzoneBucket ozbk = client.getObjectStore().getVolume(volumeName)
             .getBucket(bucketName);
 
     String keyName;
-    for (int i = startIndex; i < endIndex + 1; i++) {
+    for (int i = start; i < end + 1; i++) {
       keyName = getPrefix() + FILE_DIR_SEPARATOR + f.apply(i);
       try (OzoneOutputStream out = ozbk.createKey(keyName, writeSizeInBytes)) {
         out.write(keyContent);
