@@ -144,7 +144,6 @@ public class SecurityConfig {
     this.blockTokenEnabled = this.configuration.getBoolean(
         HDDS_BLOCK_TOKEN_ENABLED,
         HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
-
     this.containerTokenEnabled = this.configuration.getBoolean(
         HDDS_CONTAINER_TOKEN_ENABLED,
         HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT);

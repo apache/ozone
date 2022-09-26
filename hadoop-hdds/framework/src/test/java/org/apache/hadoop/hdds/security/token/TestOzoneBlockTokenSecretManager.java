@@ -57,7 +57,8 @@ import org.bouncycastle.operator.bc.BcRSAContentSignerBuilder;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Test;import org.mockito.Mockito;
+import org.junit.Test;
+import org.mockito.Mockito;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;

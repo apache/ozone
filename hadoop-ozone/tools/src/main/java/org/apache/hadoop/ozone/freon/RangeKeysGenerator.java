@@ -138,11 +138,6 @@ public class RangeKeysGenerator extends BaseFreonGenerator
 
   public void generateRangeKeys(long count) throws Exception {
     int clientIndex = (int)(count % clientsCount);
-    if (debug) {
-      LOG.info("*** *** *** counter = " +
-              count + ", clientIndex = " + clientIndex);
-    }
-
     OzoneClient client = rpcClients[clientIndex];
     int start = startIndex + (int)count * range;
     int end = start + range;
@@ -169,19 +164,9 @@ public class RangeKeysGenerator extends BaseFreonGenerator
     OzoneBucket ozbk = client.getObjectStore().getVolume(volumeName)
             .getBucket(bucketName);
 
-//    if (debug) {
-//      LOG.info("*** *** *** start loop, startIndex = " + startIndex +
-//              ", endIndex = " + endIndex );
-//    }
-
     String keyName;
     for (int i = startIndex; i < endIndex + 1; i++) {
       keyName = getPrefix() + FILE_DIR_SEPARATOR + f.apply(i);
-//      if (debug) {
-//        LOG.info("*** *** *** in loop, i = " + i +
-//                ", keyName = " + keyName );
-//      }
-
       try (OzoneOutputStream out = ozbk.createKey(keyName, writeSizeInBytes)) {
         out.write(keyContent);
         out.flush();
