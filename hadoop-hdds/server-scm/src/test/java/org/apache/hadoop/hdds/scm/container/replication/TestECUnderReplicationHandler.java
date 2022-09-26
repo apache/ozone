@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -45,6 +46,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -85,7 +87,7 @@ public class TestECUnderReplicationHandler {
     container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
     policy = ReplicationTestUtil
-        .getSimpleTestPlacementPolicy(nodeManager, conf);
+            .getSimpleTestPlacementPolicy(nodeManager, conf);
     NodeSchema[] schemas =
         new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
@@ -193,6 +195,24 @@ public class TestECUnderReplicationHandler {
             Pair.of(IN_SERVICE, 4));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
         availableReplicas, 1, 2, policy);
+  }
+
+  @Test
+  public void testUnderReplicationWithInvalidPlacement()
+          throws IOException {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+            .createReplicas(Pair.of(DECOMMISSIONING, 1),
+                    Pair.of(DECOMMISSIONING, 2), Pair.of(IN_SERVICE, 3),
+                    Pair.of(IN_SERVICE, 4));
+    PlacementPolicy mockedPolicy = Mockito.spy(policy);
+    ContainerPlacementStatus mockedContainerPlacementStatus =
+            Mockito.mock(ContainerPlacementStatus.class);
+    Mockito.when(mockedContainerPlacementStatus.isPolicySatisfied())
+            .thenReturn(false);
+    Mockito.when(mockedPolicy.validateContainerPlacement(Mockito.anyList(),
+            Mockito.anyInt())).thenReturn(mockedContainerPlacementStatus);
+    testUnderReplicationWithMissingIndexes(Collections.emptyList(),
+            availableReplicas, 0, 0, mockedPolicy);
   }
 
   @Test
