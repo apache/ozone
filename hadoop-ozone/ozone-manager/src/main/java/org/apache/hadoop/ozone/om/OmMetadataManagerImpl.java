@@ -458,7 +458,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     DBStoreBuilder dbStoreBuilder = DBStoreBuilder.newBuilder(configuration,
         rocksDBConfiguration).setName(dbName)
         .setOpenReadOnly(readOnly)
-        .setPath(Paths.get(metaDir.getPath()));
+        .setPath(Paths.get(metaDir.getPath()))
         .setMaxFSSnapshots(maxFSSnapshots);
     DBStore dbStore = addOMTablesAndCodecs(dbStoreBuilder).build();
     return dbStore;
