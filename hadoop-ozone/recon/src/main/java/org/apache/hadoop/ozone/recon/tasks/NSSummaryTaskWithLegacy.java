@@ -17,10 +17,9 @@
  */
 
 package org.apache.hadoop.ozone.recon.tasks;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -45,7 +44,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 /**
  * Class for handling Legacy specific tasks.
  */
-public class NSSummaryTaskWithLegacy extends NSSummaryTask {
+public class NSSummaryTaskWithLegacy extends NSSummaryTaskUtils {
 
   private static final BucketLayout BUCKET_LAYOUT = BucketLayout.LEGACY;
 
@@ -60,7 +59,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
     super(reconNamespaceSummaryManager, reconOMMetadataManager);
   }
 
-  public Pair<String, Boolean> processWithLegacy(OMUpdateEventBatch events) {
+  public boolean processWithLegacy(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
@@ -159,7 +158,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
       } catch (IOException ioEx) {
         LOG.error("Unable to process Namespace Summary data in Recon DB. ",
             ioEx);
-        return new ImmutablePair<>(getTaskName(), false);
+        return false;
       }
     }
 
@@ -167,19 +166,19 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
       writeNSSummariesToDB(nsSummaryMap);
     } catch (IOException e) {
       LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
-      return new ImmutablePair<>(getTaskName(), false);
+      return false;
     }
 
     LOG.info("Completed a process run of NSSummaryTaskWithLegacy");
-    return new ImmutablePair<>(getTaskName(), true);
+    return true;
   }
 
-  public Pair<String, Boolean> reprocessWithLegacy() {
+  public boolean reprocessWithLegacy(OMMetadataManager omMetadataManager) {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
     try {
       Table<String, OmKeyInfo> keyTable =
-          getReconOMMetadataManager().getKeyTable(BUCKET_LAYOUT);
+          omMetadataManager.getKeyTable(BUCKET_LAYOUT);
 
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
           keyTableIter = keyTable.iterator()) {
@@ -206,17 +205,17 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTask {
     } catch (IOException ioEx) {
       LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
           ioEx);
-      return new ImmutablePair<>(getTaskName(), false);
+      return false;
     }
 
     try {
       writeNSSummariesToDB(nsSummaryMap);
     } catch (IOException e) {
       LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
-      return new ImmutablePair<>(getTaskName(), false);
+      return false;
     }
     LOG.info("Completed a reprocess run of NSSummaryTaskWithLegacy");
-    return new ImmutablePair<>(getTaskName(), true);
+    return true;
   }
 
   private void setKeyParentID(OmKeyInfo keyInfo) throws IOException {

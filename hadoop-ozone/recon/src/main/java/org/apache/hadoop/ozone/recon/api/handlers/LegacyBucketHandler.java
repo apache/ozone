@@ -102,8 +102,15 @@ public class LegacyBucketHandler extends BucketHandler {
     return EntityType.UNKNOWN;
   }
 
-  // KeyTable's key is in the format of "vol/bucket/keyName"
-  // Make use of RocksDB's order to seek to the prefix and avoid full iteration
+  /**
+   * KeyTable's key is in the format of "vol/bucket/keyName".
+   * Make use of RocksDB's order to seek to the prefix and avoid full iteration.
+   * Calculating DU only for keys. Skipping any directories and
+   * handling only direct keys.
+   * @param parentId
+   * @return
+   * @throws IOException
+   */
   @Override
   public long calculateDUUnderObject(long parentId)
       throws IOException {

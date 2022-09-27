@@ -168,7 +168,7 @@ public final class TestNSSummaryTaskWithFSO {
       // reinit Recon RocksDB's namespace CF.
       reconNamespaceSummaryManager.clearNSSummaryTable();
 
-      nSSummaryTaskWithFso.reprocessWithFSO();
+      nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
       Assert.assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
 
       nsSummaryForBucket1 =
@@ -276,7 +276,7 @@ public final class TestNSSummaryTaskWithFSO {
     private static OMDBUpdateEvent keyEvent7;
     @BeforeClass
     public static void setUp() throws IOException {
-      nSSummaryTaskWithFso.reprocessWithFSO();
+      nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
       nSSummaryTaskWithFso.processWithFSO(processEventBatch());
     }
 

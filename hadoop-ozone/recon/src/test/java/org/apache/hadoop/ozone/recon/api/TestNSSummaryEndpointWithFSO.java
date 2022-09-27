@@ -369,7 +369,7 @@ public class TestNSSummaryEndpointWithFSO {
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
             reconOMMetadataManager);
-    nSSummaryTaskWithFso.reprocess(reconOMMetadataManager);
+    nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
   }
 
   @Test

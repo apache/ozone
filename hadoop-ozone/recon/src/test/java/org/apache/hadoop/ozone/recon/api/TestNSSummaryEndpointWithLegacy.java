@@ -370,7 +370,7 @@ public class TestNSSummaryEndpointWithLegacy {
     NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy = 
         new NSSummaryTaskWithLegacy(reconNamespaceSummaryManager, 
                                     reconOMMetadataManager);
-    nsSummaryTaskWithLegacy.reprocess(reconOMMetadataManager);
+    nsSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
   }
 
   @Test
