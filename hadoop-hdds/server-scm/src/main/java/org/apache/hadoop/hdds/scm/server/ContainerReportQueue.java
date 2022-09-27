@@ -142,9 +142,9 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
     if (dataList != null && !dataList.isEmpty()) {
       report = dataList.remove(0);
       --reportCount;
-    }
-    if (dataList.isEmpty()) {
-      dataMap.remove(uuid);
+      if (dataList.isEmpty()) {
+        dataMap.remove(uuid);
+      }
     }
     return report;
   }
@@ -266,31 +266,31 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
   @Override
   public boolean remove(Object o) {
     // no need support this
-    return false;
+    throw new UnsupportedOperationException("not supported");
   }
 
   @Override
   public boolean containsAll(@NotNull Collection<?> c) {
     // no need support this
-    return false;
+    throw new UnsupportedOperationException("not supported");
   }
 
   @Override
   public boolean addAll(@NotNull Collection<? extends VALUE> c) {
     // no need support this
-    return false;
+    throw new UnsupportedOperationException("not supported");
   }
 
   @Override
   public boolean removeAll(@NotNull Collection<?> c) {
     // no need support this
-    return false;
+    throw new UnsupportedOperationException("not supported");
   }
 
   @Override
   public boolean retainAll(@NotNull Collection<?> c) {
     // no need support this
-    return false;
+    throw new UnsupportedOperationException("not supported");
   }
 
   @Override
@@ -317,40 +317,40 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
   @Override
   public boolean contains(Object o) {
     // no need support this
-    return false;
+    throw new UnsupportedOperationException("not supported");
   }
 
   @NotNull
   @Override
   public Iterator<VALUE> iterator() {
     // no need support this
-    return null;
+    throw new UnsupportedOperationException("not supported");
   }
 
   @NotNull
   @Override
   public Object[] toArray() {
     // no need support this
-    return new Object[0];
+    throw new UnsupportedOperationException("not supported");
   }
 
   @NotNull
   @Override
   public <T> T[] toArray(@NotNull T[] a) {
     // no need support this
-    return null;
+    throw new UnsupportedOperationException("not supported");
   }
 
   @Override
   public int drainTo(@NotNull Collection<? super VALUE> c) {
     // no need support this
-    return 0;
+    throw new UnsupportedOperationException("not supported");
   }
 
   @Override
   public int drainTo(@NotNull Collection<? super VALUE> c, int maxElements) {
     // no need support this
-    return 0;
+    throw new UnsupportedOperationException("not supported");
   }
 
   @Override

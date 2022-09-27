@@ -69,13 +69,13 @@ public class TestEventQueue {
   }
 
   @Test
-  public void simpleEventWithFixedThreadPoolExecutor() {
+  public void simpleEventWithFixedThreadPoolExecutor()
+      throws InterruptedException {
 
     TestHandler testHandler = new TestHandler();
     BlockingQueue<Long> eventQueue = new LinkedBlockingQueue<>();
     List<BlockingQueue<Long>> queues = new ArrayList<>();
     queues.add(eventQueue);
-    EVENT1.getName();
     queue.addHandler(EVENT1,
         new FixedThreadPoolWithAffinityExecutor<>(
             EventQueue.getExecutorName(EVENT1, testHandler),
@@ -101,6 +101,7 @@ public class TestEventQueue {
     // As it is fixed threadpool executor with 10 threads, all should be
     // scheduled.
     Assertions.assertEquals(11, eventExecutor.queuedEvents());
+    Thread.currentThread().sleep(500);
 
     // As we don't see all 10 events scheduled.
     Assertions.assertTrue(eventExecutor.scheduledEvents() >= 1 &&
