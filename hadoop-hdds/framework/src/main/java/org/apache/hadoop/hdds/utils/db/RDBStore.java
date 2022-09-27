@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
 import com.google.common.base.Preconditions;
 import org.apache.ratis.thirdparty.com.google.common.annotations.VisibleForTesting;
@@ -61,17 +62,18 @@ public class RDBStore implements DBStore {
   private final String checkpointsParentDir;
   private final String snapshotsParentDir;
   private final RDBMetrics rdbMetrics;
+  private final RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
 
   @VisibleForTesting
   public RDBStore(File dbFile, ManagedDBOptions options,
                   Set<TableConfig> families) throws IOException {
     this(dbFile, options, new ManagedWriteOptions(), families,
-        new CodecRegistry(), false);
+        new CodecRegistry(), false, 1000);
   }
 
   public RDBStore(File dbFile, ManagedDBOptions dbOptions,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
-                  CodecRegistry registry, boolean readOnly)
+                  CodecRegistry registry, boolean readOnly, int maxFSSnapshots)
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
@@ -80,6 +82,14 @@ public class RDBStore implements DBStore {
     dbLocation = dbFile;
 
     try {
+      rocksDBCheckpointDiffer =
+          new RocksDBCheckpointDiffer(
+              dbLocation.getAbsolutePath(), maxFSSnapshots,
+          Paths.get(dbLocation.getParent(), "db.checkpoints").toString(),
+          Paths.get(dbLocation.getParent(), "db.savedSSTFiles").toString(),
+          dbLocation.getAbsolutePath(), 0, "Snapshot_");
+      rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
+
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
           families, readOnly);
 
@@ -126,7 +136,7 @@ public class RDBStore implements DBStore {
       checkPointManager = new RDBCheckpointManager(db, dbLocation.getName());
       rdbMetrics = RDBMetrics.create();
 
-    } catch (IOException e) {
+    } catch (IOException | RocksDBException e) {
       String msg = "Failed init RocksDB, db path : " + dbFile.getAbsolutePath()
           + ", " + "exception :" + (e.getCause() == null ?
           e.getClass().getCanonicalName() + " " + e.getMessage() :
@@ -142,6 +152,11 @@ public class RDBStore implements DBStore {
       LOG.debug("[Option] createIfMissing = {}", dbOptions.createIfMissing());
       LOG.debug("[Option] maxOpenFiles= {}", dbOptions.maxOpenFiles());
     }
+  }
+
+  @VisibleForTesting
+  public RocksDBCheckpointDiffer getRocksDBCheckpointDiffer() {
+    return rocksDBCheckpointDiffer;
   }
 
   @Override

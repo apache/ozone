@@ -226,6 +226,8 @@ BSD
 =====================
 
    org.codehaus.woodstox:stax2-api
+   com.github.vlsi.mxgraph:jgraphx
+
 
 CDDL
 =====================
@@ -337,6 +339,7 @@ Apache License
    org.hamcrest:hamcrest-all
    org.javassist:javassist
    org.jboss.weld.servlet:weld-servlet
+   org.jheaps:jheaps
    org.jooq:jooq
    org.jooq:jooq-codegen
    org.jooq:jooq-meta
@@ -365,6 +368,9 @@ EPL 2.0
 
    jakarta.annotation:jakarta.annotation-api
    jakarta.ws.rs:jakarta.ws.rs-api
+   org.jgrapht:jgrapht-core
+   org.jgrapht:jgrapht-guava
+   org.jgrapht:jgrapht-ext
 
 
 CDDL + GPLv2 with classpath exception

@@ -90,6 +90,7 @@ public final class DBStoreBuilder {
   private RocksDBConfiguration rocksDBConfiguration;
   // Flag to indicate if the RocksDB should be opened readonly.
   private boolean openReadOnly = false;
+  private int maxFSSnapshots = 0;
 
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
@@ -190,7 +191,12 @@ public final class DBStoreBuilder {
     }
 
     return new RDBStore(dbFile, rocksDBOption, writeOptions, tableConfigs,
-        registry, openReadOnly);
+        registry, openReadOnly, maxFSSnapshots);
+  }
+
+  public DBStoreBuilder setMaxFSSnapshots(int maxFSSnapshots) {
+    this.maxFSSnapshots = maxFSSnapshots;
+    return this;
   }
 
   public DBStoreBuilder setName(String name) {
