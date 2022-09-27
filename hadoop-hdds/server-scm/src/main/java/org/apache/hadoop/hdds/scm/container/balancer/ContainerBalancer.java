@@ -529,19 +529,10 @@ public class ContainerBalancer extends StatefulService {
       allFuturesResult.get(config.getMoveTimeout().toMillis(),
           TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
+      LOG.warn("Container balancer is interrupted");
       Thread.currentThread().interrupt();
     } catch (TimeoutException e) {
-      long timeoutCounts = moveSelectionToFutureMap.entrySet().stream()
-          .filter(entry -> !entry.getValue().isDone())
-          .peek(entry -> {
-            LOG.warn("Container move canceled for container {} from source {}" +
-                    " to target {} due to timeout.",
-                entry.getKey().getContainerID(),
-                containerToSourceMap.get(entry.getKey().getContainerID())
-                    .getUuidString(),
-                entry.getKey().getTargetNode().getUuidString());
-            entry.getValue().cancel(true);
-          }).count();
+      long timeoutCounts = cancelAndCountPendingMoves();
       LOG.warn("{} Container moves are canceled.", timeoutCounts);
       metrics.incrementNumContainerMovesTimeoutInLatestIteration(timeoutCounts);
     } catch (ExecutionException e) {
@@ -560,12 +551,28 @@ public class ContainerBalancer extends StatefulService {
         sizeActuallyMovedInLatestIteration / OzoneConsts.GB);
     metrics.incrementDataSizeMovedGB(
         metrics.getDataSizeMovedGBInLatestIteration());
+    metrics.incrementNumContainerMovesFailed(
+        metrics.getNumContainerMovesFailedInLatestIteration());
     LOG.info("Iteration Summary. Number of Datanodes involved: {}. Size " +
             "moved: {} ({} Bytes). Number of Container moves completed: {}.",
         countDatanodesInvolvedPerIteration,
         StringUtils.byteDesc(sizeActuallyMovedInLatestIteration),
         sizeActuallyMovedInLatestIteration,
         metrics.getNumContainerMovesCompletedInLatestIteration());
+  }
+
+  private long cancelAndCountPendingMoves() {
+    return moveSelectionToFutureMap.entrySet().stream()
+        .filter(entry -> !entry.getValue().isDone())
+        .peek(entry -> {
+          LOG.warn("Container move timeout for container {} from source {}" +
+                  " to target {}.",
+              entry.getKey().getContainerID(),
+              containerToSourceMap.get(entry.getKey().getContainerID())
+                  .getUuidString(),
+              entry.getKey().getTargetNode().getUuidString());
+          entry.getValue().cancel(true);
+        }).count();
   }
 
   /**
@@ -668,6 +675,7 @@ public class ContainerBalancer extends StatefulService {
                   containerID.toString(),
                   source.getUuidString(),
                   moveSelection.getTargetNode().getUuidString(), ex);
+              metrics.incrementNumContainerMovesFailedInLatestIteration(1);
             } else {
               if (result == LegacyReplicationManager.MoveResult.COMPLETED) {
                 sizeActuallyMovedInLatestIteration +=
@@ -690,9 +698,11 @@ public class ContainerBalancer extends StatefulService {
     } catch (ContainerNotFoundException e) {
       LOG.warn("Could not find Container {} for container move",
           containerID, e);
+      metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       return false;
     } catch (NodeNotFoundException | TimeoutException e) {
       LOG.warn("Container move failed for container {}", containerID, e);
+      metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       return false;
     }
 
@@ -871,6 +881,7 @@ public class ContainerBalancer extends StatefulService {
     metrics.resetNumDatanodesInvolvedInLatestIteration();
     metrics.resetDataSizeUnbalancedGB();
     metrics.resetNumDatanodesUnbalanced();
+    metrics.resetNumContainerMovesFailedInLatestIteration();
   }
 
   /**
