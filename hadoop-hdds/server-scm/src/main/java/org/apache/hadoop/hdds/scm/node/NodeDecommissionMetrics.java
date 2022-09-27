@@ -56,19 +56,28 @@ public final class NodeDecommissionMetrics implements MetricsSource {
 
   private MetricsRegistry registry;
 
+  /** Private constructor. */
   private NodeDecommissionMetrics() {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
   }
 
+  /**
+   * Create and returns NodeDecommissionMetrics instance.
+   *
+   * @return NodeDecommissionMetrics
+   */
   public static NodeDecommissionMetrics create() {
     return DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
             "Metrics tracking the progress of nodes in the "
                     + "Decommissioning and Maintenance workflows.  "
                     + "Tracks num nodes in mode and container "
-                    + "replications state and pipeline state",
+                    + "replications state and pipelines waiting to close",
             new NodeDecommissionMetrics());
   }
 
+  /**
+   * Get aggregated gauge metrics.
+   */
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector
@@ -79,9 +88,11 @@ public final class NodeDecommissionMetrics implements MetricsSource {
     totalTrackedContainersUnderReplicated.snapshot(builder, all);
     totalTrackedContainersUnhealthy.snapshot(builder, all);
     totalTrackedContainersSufficientlyReplicated.snapshot(builder, all);
-
   }
 
+  /**
+   * Unregister the metrics instance.
+   */
   public void unRegister() {
     DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
   }
@@ -138,7 +149,7 @@ public final class NodeDecommissionMetrics implements MetricsSource {
   }
 
   public long getTotalTrackedContainersUnhealthy() {
-    return totalTrackedContainersUnderReplicated.value();
+    return totalTrackedContainersUnhealthy.value();
   }
 
   public long getTotalTrackedContainersSufficientlyReplicated() {

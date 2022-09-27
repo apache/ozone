@@ -60,9 +60,7 @@ public class NodeDecommissionManager {
   private boolean useHostnames;
   private long monitorInterval;
 
-  /**
-   * Decommisioning and Maintenance mode progress related metrics.
-   */
+  // Decommissioning and Maintenance mode progress related metrics.
   private NodeDecommissionMetrics metrics;
 
   private static final Logger LOG =

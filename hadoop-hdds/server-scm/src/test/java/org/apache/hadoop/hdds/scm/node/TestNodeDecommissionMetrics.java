@@ -77,6 +77,10 @@ public class TestNodeDecommissionMetrics {
     metrics.unRegister();
   }
 
+  /**
+   * Test for collecting metric for nodes tracked in decommissioning
+   * and maintenance workflow.  Dn in entering maintenance mode.
+   */
   @Test
   public void testDecommMonitorCollectTrackedNodes() {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
@@ -89,6 +93,10 @@ public class TestNodeDecommissionMetrics {
             metrics.getTotalTrackedDecommissioningMaintenanceNodes());
   }
 
+  /**
+   * Test for collecting metric for nodes tracked in workflow that are
+   * in recommission workflow.  Dn decommissioned, and recommissioned.
+   */
   @Test
   public void testDecommMonitorCollectRecommissionNodes() {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
@@ -97,7 +105,8 @@ public class TestNodeDecommissionMetrics {
                     HddsProtos.NodeState.HEALTHY));
     monitor.startMonitoring(dn1);
     monitor.run();
-    // recommission
+    // Recommission by putting node back in service.
+    // Stop monitor and run.
     monitor.stopMonitoring(dn1);
     monitor.run();
     Assertions.assertEquals(0,
@@ -106,6 +115,10 @@ public class TestNodeDecommissionMetrics {
             metrics.getTotalTrackedRecommissionNodes());
   }
 
+  /**
+   * Test for collecting metric for pipelines waiting to be closed when
+   * datanode enters decommissioning workflow.
+   */
   @Test
   public void testDecommMonitorCollectPipelinesWaitingClosed() {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
@@ -117,10 +130,16 @@ public class TestNodeDecommissionMetrics {
     // Add the node to the monitor
     monitor.startMonitoring(dn1);
     monitor.run();
+    // Ensure a StartAdmin event was fired
+    eventQueue.processAll(20000);
     Assertions.assertEquals(2,
             metrics.getTotalTrackedPipelinesWaitingToClose());
   }
 
+  /**
+   * Test for collecting metric for under replicated containers
+   * from nodes in decommissioning and maintenance workflow.
+   */
   @Test
   public void testDecommMonitorCollectUnderReplicated()
           throws ContainerNotFoundException, NodeNotFoundException {
@@ -132,6 +151,9 @@ public class TestNodeDecommissionMetrics {
     Set<ContainerID> containers = new HashSet<>();
     containers.add(ContainerID.valueOf(1));
 
+    // create container with 3 replicas, 2 replicas in-service
+    // 1 decommissioned; will result in an under-replicated
+    // container
     nodeManager.setContainers(dn1, containers);
     DatanodeAdminMonitorTestUtil
             .mockGetContainerReplicaCount(
@@ -141,14 +163,18 @@ public class TestNodeDecommissionMetrics {
                     IN_SERVICE,
                     IN_SERVICE);
 
-    // Add the node to the monitor, it should have 1 under-replicated containers
-    // after the first run
+    // Add the node to the monitor, it should have 1 under-replicated
+    // container after the first run
     monitor.startMonitoring(dn1);
     monitor.run();
     Assertions.assertEquals(1,
             metrics.getTotalTrackedContainersUnderReplicated());
   }
 
+  /**
+   * Test for collecting metric for sufficiently replicated containers
+   * from nodes in decommissioning and maintenance workflow.
+   */
   @Test
   public void testDecommMonitorCollectSufficientlyReplicated()
           throws ContainerNotFoundException, NodeNotFoundException {
@@ -159,6 +185,8 @@ public class TestNodeDecommissionMetrics {
     Set<ContainerID> containers = new HashSet<>();
     containers.add(ContainerID.valueOf(1));
 
+    // create container with 3 replicas,
+    // all in-service
     nodeManager.setContainers(dn1, containers);
     DatanodeAdminMonitorTestUtil
             .mockGetContainerReplicaCount(
@@ -170,11 +198,17 @@ public class TestNodeDecommissionMetrics {
     monitor.startMonitoring(dn1);
 
     monitor.run();
+    // expect dn in decommissioning workflow with container
+    // sufficiently replicated
     Assertions.assertEquals(1,
             metrics.getTotalTrackedContainersSufficientlyReplicated());
 
   }
 
+  /**
+   * Test for collecting metric for unhealthy containers
+   * from nodes in decommissioning and maintenance workflow.
+   */
   @Test
   public void testDecommMonitorCollectUnhealthyContainers()
           throws ContainerNotFoundException, NodeNotFoundException {
@@ -185,13 +219,13 @@ public class TestNodeDecommissionMetrics {
     Set<ContainerID> containers = new HashSet<>();
     containers.add(ContainerID.valueOf(1));
 
+    // set OPEN container with 1 replica CLOSED replica state,
+    // in-service node, generates monitored  unhealthy container replica
     nodeManager.setContainers(dn1, containers);
     DatanodeAdminMonitorTestUtil
             .mockGetContainerReplicaCount(
                     repManager,
-                    HddsProtos.LifeCycleState.CLOSED,
-                    DECOMMISSIONED,
-                    IN_SERVICE,
+                    HddsProtos.LifeCycleState.OPEN,
                     IN_SERVICE);
     monitor.startMonitoring(dn1);
 
@@ -201,6 +235,11 @@ public class TestNodeDecommissionMetrics {
 
   }
 
+  /**
+   * Test for collecting aggregated metric for replicated state -
+   * total number of under-replicated containers over multiple
+   * datanodes in the decommissioning and maintenance workflow.
+   */
   @Test
   public void testDecommMonitorCollectionMultipleDnContainers()
           throws ContainerNotFoundException, NodeNotFoundException {
@@ -242,6 +281,11 @@ public class TestNodeDecommissionMetrics {
 
   }
 
+  /**
+   * Test for collecting aggregated metric for total number
+   * of pipelines waiting to close - over multiple
+   * datanodes in the decommissioning and maintenance workflow.
+   */
   @Test
   public void testDecommMonitorCollectionMultipleDnPipelines() {
     // test metric aggregation over several datanodes
