@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -62,6 +63,8 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
   private List<BlockingQueue<Q>> workQueues;
 
   private List<ThreadPoolExecutor> executors;
+
+  private List<Future<?>> futureTaskList = new ArrayList<>();
 
   // MutableCounterLong is thread safe.
   @Metric
@@ -98,6 +101,18 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
 
     EXECUTOR_MAP.put(clazz.getName(), this);
 
+    // Add runnable which will wait for task over another queue
+    // This needs terminate canceling each task in shutdown
+    int i = 0;
+    for (BlockingQueue<Q> queue : workQueues) {
+      ThreadPoolExecutor threadPoolExecutor = executors.get(i);
+      if (threadPoolExecutor.getQueue().size() == 0) {
+        Future<?> task = threadPoolExecutor.submit(new ReportExecutor<>(queue));
+        futureTaskList.add(task);
+      }
+      ++i;
+    }
+
     DefaultMetricsSystem.instance()
         .register(EVENT_QUEUE + name,
             "Event Executor metrics ",
@@ -121,12 +136,6 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
           TimeUnit.SECONDS,
           poolQueue,
           threadFactory));
-    }
-    int i = 0;
-    for (BlockingQueue<Q> queue : workQueues) {
-      ThreadPoolExecutor threadPoolExecutor = executors.get(i);
-      threadPoolExecutor.execute(new ReportExecutor<>(queue));
-      ++i;
     }
     return executors;
   }
@@ -174,8 +183,11 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
 
   @Override
   public void close() {
+    for (Future<?> future : futureTaskList) {
+      future.cancel(true);
+    }
     for (ThreadPoolExecutor executor : executors) {
-      executor.shutdown();
+      executor.shutdownNow();
     }
   }
 
@@ -216,6 +228,10 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
           } catch (Exception ex) {
             LOG.error("Error on execution message {}", report, ex);
             executor.failed.incr();
+          }
+          if (Thread.currentThread().isInterrupted()) {
+            LOG.warn("Interrupt of execution of Reports");
+            return;
           }
         } catch (InterruptedException e) {
           LOG.warn("Interrupt of execution of Reports");

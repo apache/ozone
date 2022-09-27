@@ -856,7 +856,6 @@ public class TestStorageContainerManager {
         .build();
     ContainerReportFromDatanode dndata
         = new ContainerReportFromDatanode(dn, report);
-    SCMDatanodeHeartbeatDispatcher.ContainerReportBase p = dndata;
     ContainerReportHandler containerReportHandler =
         Mockito.mock(ContainerReportHandler.class);
     Mockito.doAnswer((inv) -> {
@@ -883,6 +882,8 @@ public class TestStorageContainerManager {
     Assert.assertEquals(containerReportExecutors.droppedEvents()
             + containerReportExecutors.scheduledEvents(),
         containerReportExecutors.queuedEvents());
+    containerReportExecutors.close();
+    Thread.currentThread().sleep(90000);
   }
 
   @Test
@@ -899,7 +900,6 @@ public class TestStorageContainerManager {
         = IncrementalContainerReportProto.getDefaultInstance();
     IncrementalContainerReportFromDatanode dndata
         = new IncrementalContainerReportFromDatanode(dn, report);
-    SCMDatanodeHeartbeatDispatcher.ContainerReportBase p = dndata;
     IncrementalContainerReportHandler icr =
         mock(IncrementalContainerReportHandler.class);
     Mockito.doAnswer((inv) -> {
@@ -915,8 +915,8 @@ public class TestStorageContainerManager {
                 icr),
             icr, queues, eventQueue,
             IncrementalContainerReportFromDatanode.class, executors);
-    eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT, containerReportExecutors,
-        icr);
+    eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT,
+        containerReportExecutors, icr);
     eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);
     eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);
     eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);
@@ -925,6 +925,7 @@ public class TestStorageContainerManager {
     Thread.currentThread().sleep(3000);
     Assert.assertEquals(containerReportExecutors.scheduledEvents(),
         containerReportExecutors.queuedEvents());
+    containerReportExecutors.close();
   }
 
   private void addTransactions(StorageContainerManager scm,

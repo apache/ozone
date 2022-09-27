@@ -70,7 +70,7 @@ public class TestEventQueue {
 
   @Test
   public void simpleEventWithFixedThreadPoolExecutor()
-      throws InterruptedException {
+      throws Exception {
 
     TestHandler testHandler = new TestHandler();
     BlockingQueue<Long> eventQueue = new LinkedBlockingQueue<>();
@@ -115,7 +115,7 @@ public class TestEventQueue {
 
     Assertions.assertEquals(11, eventExecutor.successfulEvents());
     eventTotal.set(0);
-
+    eventExecutor.close();
   }
 
   /**
