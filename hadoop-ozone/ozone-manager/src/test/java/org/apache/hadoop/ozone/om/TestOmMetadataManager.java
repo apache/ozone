@@ -39,7 +39,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -715,7 +714,7 @@ public class TestOmMetadataManager {
     String startKey = prefixSnapshotA + "10";
     snapshotInfos = omMetadataManager.listSnapshot(
         vol1, bucket1, startKey, prefixSnapshotA);
-    Assert.assertEquals(snapshotsASet.tailSet(startKey).size()-1,
+    Assert.assertEquals(snapshotsASet.tailSet(startKey).size() - 1,
         snapshotInfos.size());
     for (SnapshotInfo snapshotInfo : snapshotInfos) {
       Assert.assertFalse(snapshotInfo.getName().equals(startKey));
