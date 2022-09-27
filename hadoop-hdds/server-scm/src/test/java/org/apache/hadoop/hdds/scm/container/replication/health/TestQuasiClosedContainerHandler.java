@@ -65,7 +65,7 @@ public class TestQuasiClosedContainerHandler {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         new ECReplicationConfig(3, 2), 1, QUASI_CLOSED);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
-        .createReplicasWithSameOrigin(containerInfo.containerID(),
+        .createReplicas(containerInfo.containerID(),
             State.QUASI_CLOSED, 1, 2, 3);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.EMPTY_LIST)
@@ -73,6 +73,7 @@ public class TestQuasiClosedContainerHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
+
     Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
     Mockito.verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
@@ -83,7 +84,7 @@ public class TestQuasiClosedContainerHandler {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         ratisReplicationConfig, 1, OPEN);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
-        .createReplicasWithSameOrigin(containerInfo.containerID(),
+        .createReplicas(containerInfo.containerID(),
             State.OPEN, 1, 2, 3);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.EMPTY_LIST)
@@ -91,6 +92,7 @@ public class TestQuasiClosedContainerHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
+
     Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
     Mockito.verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
@@ -119,6 +121,7 @@ public class TestQuasiClosedContainerHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
+
     Assertions.assertTrue(quasiClosedContainerHandler.handle(request));
     Mockito.verify(replicationManager, times(2))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
@@ -142,6 +145,7 @@ public class TestQuasiClosedContainerHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
+
     Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
     Mockito.verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
@@ -156,16 +160,17 @@ public class TestQuasiClosedContainerHandler {
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicasWithSameOrigin(containerInfo.containerID(),
             State.OPEN, 1, 2);
-    ContainerReplica openReplica = ReplicationTestUtil.createContainerReplica(
+    ContainerReplica quasiClosed = ReplicationTestUtil.createContainerReplica(
         containerInfo.containerID(), 3,
         HddsProtos.NodeOperationalState.IN_SERVICE, State.QUASI_CLOSED);
-    containerReplicas.add(openReplica);
+    containerReplicas.add(quasiClosed);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.EMPTY_LIST)
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
+
     Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
     Mockito.verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
