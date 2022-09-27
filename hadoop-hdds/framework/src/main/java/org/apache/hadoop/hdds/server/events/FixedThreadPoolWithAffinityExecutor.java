@@ -141,8 +141,9 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
     int index = message.hashCode() & (workQueues.size() - 1);
     BlockingQueue<Q> queue = workQueues.get(index);
     queue.add((Q) message);
-    if (queue instanceof FixedThreadPoolWithAffinityExecutor.IQueueMetrics) {
-      dropped.incr(((IQueueMetrics) queue).getAndResetDropCount());
+    if (queue instanceof IQueueMetrics) {
+      dropped.incr(((IQueueMetrics) queue).getAndResetDropCount(
+          message.getClass().getSimpleName()));
     }
   }
 
@@ -164,6 +165,11 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
   @Override
   public long scheduledEvents() {
     return scheduled.value();
+  }
+
+  @Override
+  public long droppedEvents() {
+    return dropped.value();
   }
 
   @Override
@@ -223,6 +229,6 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
    * Capture the metrics specific to customized queue.
    */
   public interface IQueueMetrics {
-    int getAndResetDropCount();
+    int getAndResetDropCount(String type);
   }
 }

@@ -354,7 +354,11 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
   }
 
   @Override
-  public int getAndResetDropCount() {
-    return droppedCount.getAndSet(0);
+  public int getAndResetDropCount(String type) {
+    if (ContainerReportFromDatanode.class.getSimpleName().equals(type)) {
+      // dropped count for only FCR report
+      return droppedCount.getAndSet(0);
+    }
+    return 0;
   }
 }
