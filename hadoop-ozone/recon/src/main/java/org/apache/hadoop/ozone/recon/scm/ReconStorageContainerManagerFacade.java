@@ -18,18 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.time.ZoneId;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeoutException;
-
+import com.google.inject.Inject;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -40,16 +29,16 @@ import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
-import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBTransactionBufferImpl;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -62,7 +51,11 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
+import org.apache.hadoop.hdds.scm.server.ContainerReportQueue;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportBase;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventExecutor;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -85,17 +78,32 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
-import com.google.inject.Inject;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREFIX;
-import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
-
+import org.apache.hadoop.util.StringUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeoutException;
+
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREFIX;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_PREFIX;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT;
+import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
  * Recon's 'lite' version of SCM.
@@ -212,25 +220,26 @@ public class ReconStorageContainerManagerFacade
     // Use the same executor for both ICR and FCR.
     // The Executor maps the event to a thread for DN.
     // Dispatcher should always dispatch FCR first followed by ICR
-    List<ThreadPoolExecutor> executors =
-        FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(
-            SCMEvents.CONTAINER_REPORT.getName()
-                + "_OR_"
-                + SCMEvents.INCREMENTAL_CONTAINER_REPORT.getName());
+    List<BlockingQueue<ContainerReportBase>> queues
+        = initContainerReportQueue();
+    List<ThreadPoolExecutor> executors
+        = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(queues);
 
     EventExecutor<ContainerReportFromDatanode>
         containerReportExecutors =
         new FixedThreadPoolWithAffinityExecutor<>(
             EventQueue.getExecutorName(SCMEvents.CONTAINER_REPORT,
                 containerReportHandler),
-            executors);
+            containerReportHandler, queues, eventQueue,
+            ContainerReportFromDatanode.class, executors);
     EventExecutor<IncrementalContainerReportFromDatanode>
         incrementalReportExecutors =
         new FixedThreadPoolWithAffinityExecutor<>(
             EventQueue.getExecutorName(
                 SCMEvents.INCREMENTAL_CONTAINER_REPORT,
                 icrHandler),
-            executors);
+            icrHandler, queues, eventQueue,
+            IncrementalContainerReportFromDatanode.class, executors);
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
         containerReportHandler);
     eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT,
@@ -258,6 +267,22 @@ public class ReconStorageContainerManagerFacade
         reconTaskStatusDao, containerHealthSchemaManager,
         containerPlacementPolicy,
         reconTaskConfig));
+  }
+
+  @NotNull
+  private List<BlockingQueue<ContainerReportBase>> initContainerReportQueue() {
+    int threadPoolSize = ozoneConfiguration.getInt(OZONE_SCM_EVENT_PREFIX +
+            StringUtils.camelize(SCMEvents.CONTAINER_REPORT.getName()
+                + "_OR_"
+                + SCMEvents.INCREMENTAL_CONTAINER_REPORT.getName())
+            + ".thread.pool.size",
+        OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT);
+    List<BlockingQueue<ContainerReportBase>>
+        queues = new ArrayList<>();
+    for (int i = 0; i < threadPoolSize; ++i) {
+      queues.add(new ContainerReportQueue<>());
+    }
+    return queues;
   }
 
   /**

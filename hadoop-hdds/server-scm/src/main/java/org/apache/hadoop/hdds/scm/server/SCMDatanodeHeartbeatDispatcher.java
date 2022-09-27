@@ -266,10 +266,17 @@ public final class SCMDatanodeHeartbeatDispatcher {
   }
 
   /**
+   * Container report payload base reference.
+   */
+  public interface ContainerReportBase {
+  }
+
+  /**
    * Container report event payload with origin.
    */
   public static class ContainerReportFromDatanode
-      extends ReportFromDatanode<ContainerReportsProto> {
+      extends ReportFromDatanode<ContainerReportsProto>
+      implements ContainerReportBase {
 
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
         ContainerReportsProto report) {
@@ -291,7 +298,8 @@ public final class SCMDatanodeHeartbeatDispatcher {
    * Incremental Container report event payload with origin.
    */
   public static class IncrementalContainerReportFromDatanode
-      extends ReportFromDatanode<IncrementalContainerReportProto> {
+      extends ReportFromDatanode<IncrementalContainerReportProto>
+      implements ContainerReportBase {
 
     public IncrementalContainerReportFromDatanode(
         DatanodeDetails datanodeDetails,
