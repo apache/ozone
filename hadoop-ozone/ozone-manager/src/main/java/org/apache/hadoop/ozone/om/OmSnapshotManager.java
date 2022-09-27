@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.cache.RemovalListener;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -103,9 +104,21 @@ public final class OmSnapshotManager {
       }
     };
 
+    RemovalListener<String, OmSnapshot> removalListener
+        = notification -> {
+          try {
+            // close snapshot's rocksdb on eviction
+            notification.getValue().close();
+          } catch (IOException e) {
+            LOG.error("Failed to close snapshot: {} {}",
+                notification.getKey(), e);
+          }
+        };
     // init LRU cache
     snapshotCache = CacheBuilder.newBuilder()
-        .maximumSize(cacheSize).build(loader);
+        .maximumSize(cacheSize)
+        .removalListener(removalListener)
+        .build(loader);
   }
 
   /**

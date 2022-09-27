@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -32,6 +33,7 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -52,7 +54,7 @@ import java.util.stream.Collectors;
  * 2. It normalizes/denormalizes each request as it comes in to
  * remove/replace the ".snapshot/snapshotName" prefix.
  */
-public class OmSnapshot implements IOmMetadataReader {
+public class OmSnapshot implements IOmMetadataReader, Closeable {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OmSnapshot.class);
@@ -64,6 +66,7 @@ public class OmSnapshot implements IOmMetadataReader {
   private final String volumeName;
   private final String bucketName;
   private final String snapshotName;
+  private final OMMetadataManager omMetadataManager;
 
   public OmSnapshot(KeyManager keyManager,
                     PrefixManager prefixManager,
@@ -77,6 +80,7 @@ public class OmSnapshot implements IOmMetadataReader {
     this.snapshotName = snapshotName;
     this.bucketName = bucketName;
     this.volumeName = volumeName;
+    this.omMetadataManager = keyManager.getMetadataManager();
   }
 
 
@@ -224,5 +228,15 @@ public class OmSnapshot implements IOmMetadataReader {
       .setReplicationConfig(RatisReplicationConfig
           .getInstance(HddsProtos.ReplicationFactor.ZERO))
       .build();
+  }
+
+  @Override
+  public void close() throws IOException {
+    omMetadataManager.getStore().close();
+  }
+
+  @VisibleForTesting
+  public OMMetadataManager getMetadataManager() {
+    return omMetadataManager;
   }
 }
