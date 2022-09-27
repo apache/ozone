@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
@@ -83,13 +84,34 @@ public final class ReplicationTestUtil {
     return replicas;
   }
 
+  public static Set<ContainerReplica> createReplicasWithSameOrigin(
+      ContainerID containerID, ContainerReplicaProto.State replicaState,
+      int... indexes) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    UUID originNodeId = MockDatanodeDetails.randomDatanodeDetails().getUuid();
+    for (int i : indexes) {
+      replicas.add(createContainerReplica(
+          containerID, i, IN_SERVICE, replicaState,
+          MockDatanodeDetails.randomDatanodeDetails(), originNodeId));
+    }
+    return replicas;
+  }
+
   public static ContainerReplica createContainerReplica(ContainerID containerID,
       int replicaIndex, HddsProtos.NodeOperationalState opState,
       ContainerReplicaProto.State replicaState) {
-    ContainerReplica.ContainerReplicaBuilder builder
-        = ContainerReplica.newBuilder();
     DatanodeDetails datanodeDetails
         = MockDatanodeDetails.randomDatanodeDetails();
+    return createContainerReplica(containerID, replicaIndex, opState,
+        replicaState, datanodeDetails, datanodeDetails.getUuid());
+  }
+
+  public static ContainerReplica createContainerReplica(ContainerID containerID,
+      int replicaIndex, HddsProtos.NodeOperationalState opState,
+      ContainerReplicaProto.State replicaState,
+      DatanodeDetails datanodeDetails, UUID originNodeId) {
+    ContainerReplica.ContainerReplicaBuilder builder
+        = ContainerReplica.newBuilder();
     datanodeDetails.setPersistedOpState(opState);
     builder.setContainerID(containerID);
     builder.setReplicaIndex(replicaIndex);
@@ -98,9 +120,10 @@ public final class ReplicationTestUtil {
     builder.setContainerState(replicaState);
     builder.setDatanodeDetails(datanodeDetails);
     builder.setSequenceId(0);
-    builder.setOriginNodeId(datanodeDetails.getUuid());
+    builder.setOriginNodeId(originNodeId);
     return builder.build();
   }
+
 
   public static ContainerInfo createContainerInfo(ReplicationConfig repConfig) {
     return createContainerInfo(repConfig, 1, HddsProtos.LifeCycleState.CLOSED);
