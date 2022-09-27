@@ -51,7 +51,6 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskUtils {
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskWithLegacy.class);
 
-  @Inject
   public NSSummaryTaskWithLegacy(ReconNamespaceSummaryManager
                                  reconNamespaceSummaryManager,
                                  ReconOMMetadataManager

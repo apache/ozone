@@ -108,7 +108,7 @@ public class LegacyBucketHandler extends BucketHandler {
    * Calculating DU only for keys. Skipping any directories and
    * handling only direct keys.
    * @param parentId
-   * @return
+   * @return total DU of direct keys under object
    * @throws IOException
    */
   @Override

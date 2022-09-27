@@ -44,12 +44,12 @@ import java.io.IOException;
  * Write logic is the same as above. For update action, we will treat it as
  * delete old value first, and write updated value then.
  */
-public abstract class NSSummaryTask implements ReconOmTask {
+public class NSSummaryTask implements ReconOmTask {
   private static final Logger LOG =
           LoggerFactory.getLogger(NSSummaryTask.class);
 
-  private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
-  private final ReconOMMetadataManager reconOMMetadataManager;
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private ReconOMMetadataManager reconOMMetadataManager;
   private NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
   private NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy;
 
@@ -57,9 +57,13 @@ public abstract class NSSummaryTask implements ReconOmTask {
   public NSSummaryTask(ReconNamespaceSummaryManager
                        reconNamespaceSummaryManager,
                        ReconOMMetadataManager
-                       reconOMMetadataManager) {
+                           reconOMMetadataManager) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
+    this.nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
+        reconNamespaceSummaryManager, reconOMMetadataManager);
+    this.nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
+        reconNamespaceSummaryManager, reconOMMetadataManager);
   }
 
   public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
@@ -78,10 +82,6 @@ public abstract class NSSummaryTask implements ReconOmTask {
   @Override
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
     boolean success;
-    nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
-        reconNamespaceSummaryManager, reconOMMetadataManager);
-    nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
-        reconNamespaceSummaryManager, reconOMMetadataManager);
     success = nsSummaryTaskWithFSO.processWithFSO(events);
     if (success) {
       success = nsSummaryTaskWithLegacy.processWithLegacy(events);
@@ -92,15 +92,11 @@ public abstract class NSSummaryTask implements ReconOmTask {
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
     boolean success;
-    nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
-        reconNamespaceSummaryManager, reconOMMetadataManager);
-    nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
-        reconNamespaceSummaryManager, reconOMMetadataManager);
     try {
       // reinit Recon RocksDB's namespace CF.
       reconNamespaceSummaryManager.clearNSSummaryTable();
     } catch (IOException ioEx) {
-      LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
+      LOG.error("Unable to clear NSSummary table in Recon DB. ",
           ioEx);
       return new ImmutablePair<>(getTaskName(), false);
     }

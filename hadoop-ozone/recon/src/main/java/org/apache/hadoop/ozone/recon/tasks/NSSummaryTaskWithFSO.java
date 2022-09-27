@@ -48,7 +48,6 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskUtils {
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskWithFSO.class);
 
-  @Inject
   public NSSummaryTaskWithFSO(ReconNamespaceSummaryManager
                               reconNamespaceSummaryManager,
                               ReconOMMetadataManager
