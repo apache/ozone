@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 /**
  * Class for handling containers that are in QUASI_CLOSED state. This will
  * send commands to Datanodes to force close these containers if they satisfy
- * the requirements to be force closed.
+ * the requirements to be force closed. Only meant for RATIS containers.
  */
 public class QuasiClosedContainerHandler extends AbstractCheck {
   public static final Logger LOG =
@@ -56,7 +56,8 @@ public class QuasiClosedContainerHandler extends AbstractCheck {
   @Override
   public boolean handle(ContainerCheckRequest request) {
     ContainerInfo containerInfo = request.getContainerInfo();
-    if (containerInfo.getReplicationType() == HddsProtos.ReplicationType.EC) {
+    if (containerInfo.getReplicationType() !=
+        HddsProtos.ReplicationType.RATIS) {
       return false;
     }
 

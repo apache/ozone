@@ -20,8 +20,10 @@ package org.apache.hadoop.hdds.scm.container.replication.health;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -34,12 +36,17 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 
 /**
@@ -85,7 +92,7 @@ public class TestQuasiClosedContainerHandler {
         ratisReplicationConfig, 1, OPEN);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
-            State.OPEN, 1, 2, 3);
+            State.OPEN, 0, 0, 0);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.EMPTY_LIST)
         .setReport(new ReplicationManagerReport())
@@ -110,9 +117,9 @@ public class TestQuasiClosedContainerHandler {
         ratisReplicationConfig, 1, QUASI_CLOSED);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
-            State.QUASI_CLOSED, 1, 2);
+            State.QUASI_CLOSED, 0, 0);
     ContainerReplica openReplica = ReplicationTestUtil.createContainerReplica(
-        containerInfo.containerID(), 3,
+        containerInfo.containerID(), 0,
         HddsProtos.NodeOperationalState.IN_SERVICE, State.OPEN);
     containerReplicas.add(openReplica);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
@@ -129,8 +136,8 @@ public class TestQuasiClosedContainerHandler {
 
   /**
    * The replicas are QUASI_CLOSED, but all of them have the same origin node
-   * id. Since a quorum with unique origin node ids (greater than 50% of
-   * replicas) is not formed, the handler should return false.
+   * id. Since a quorum (greater than 50% of replicas with unique origin node
+   * ids in QUASI_CLOSED state) is not formed, the handler should return false.
    */
   @Test
   public void testHealthyQuasiClosedContainerReturnsFalse() {
@@ -138,7 +145,7 @@ public class TestQuasiClosedContainerHandler {
         ratisReplicationConfig, 1, QUASI_CLOSED);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicasWithSameOrigin(containerInfo.containerID(),
-            State.QUASI_CLOSED, 1, 2, 3);
+            State.QUASI_CLOSED, 0, 0, 0);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.EMPTY_LIST)
         .setReport(new ReplicationManagerReport())
@@ -153,15 +160,20 @@ public class TestQuasiClosedContainerHandler {
         ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
   }
 
+  /**
+   * Only one replica is in QUASI_CLOSED state. This fails the condition of
+   * having greater than 50% of replicas with unique origin nodes in
+   * QUASI_CLOSED state. The handler should return false.
+   */
   @Test
   public void testQuasiClosedWithTwoOpenReplicasReturnsFalse() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         ratisReplicationConfig, 1, QUASI_CLOSED);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicasWithSameOrigin(containerInfo.containerID(),
-            State.OPEN, 1, 2);
+            State.OPEN, 0, 0);
     ContainerReplica quasiClosed = ReplicationTestUtil.createContainerReplica(
-        containerInfo.containerID(), 3,
+        containerInfo.containerID(), 0,
         HddsProtos.NodeOperationalState.IN_SERVICE, State.QUASI_CLOSED);
     containerReplicas.add(quasiClosed);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
@@ -176,5 +188,51 @@ public class TestQuasiClosedContainerHandler {
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
     Assertions.assertEquals(1, request.getReport().getStat(
         ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
+  }
+
+  /**
+   * If it's possible to force close replicas then only replicas with the
+   * highest Sequence ID (also known as BCSID) should be closed.
+   */
+  @Test
+  public void testReplicasWithHighestBCSIDAreClosed() {
+    final ContainerInfo containerInfo =
+        getContainer(HddsProtos.LifeCycleState.QUASI_CLOSED);
+    containerInfo.setUsedBytes(99);
+    final ContainerID id = containerInfo.containerID();
+
+    // create replicas with unique origin DNs
+    DatanodeDetails dnOne = randomDatanodeDetails();
+    DatanodeDetails dnTwo = randomDatanodeDetails();
+    DatanodeDetails dnThree = randomDatanodeDetails();
+
+    // 1001 is the highest sequence id
+    final ContainerReplica replicaOne = getReplicas(
+        id, State.QUASI_CLOSED, 1000L, dnOne.getUuid(), dnOne);
+    final ContainerReplica replicaTwo = getReplicas(
+        id, State.QUASI_CLOSED, 1001L, dnTwo.getUuid(), dnTwo);
+    final ContainerReplica replicaThree = getReplicas(
+        id, State.QUASI_CLOSED, 1001L, dnThree.getUuid(), dnThree);
+    Set<ContainerReplica> containerReplicas = new HashSet<>();
+    containerReplicas.add(replicaOne);
+    containerReplicas.add(replicaTwo);
+    containerReplicas.add(replicaThree);
+
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.EMPTY_LIST)
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+
+    Assertions.assertTrue(quasiClosedContainerHandler.handle(request));
+    // verify close command was sent for replicas with sequence ID 1001, that
+    // is dnTwo and dnThree
+    Mockito.verify(replicationManager, times(1))
+        .sendCloseContainerReplicaCommand(eq(containerInfo), eq(dnTwo),
+            anyBoolean());
+    Mockito.verify(replicationManager, times(1))
+        .sendCloseContainerReplicaCommand(eq(containerInfo), eq(dnThree),
+            anyBoolean());
   }
 }
