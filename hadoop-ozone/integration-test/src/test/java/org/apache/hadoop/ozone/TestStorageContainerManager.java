@@ -883,7 +883,6 @@ public class TestStorageContainerManager {
             + containerReportExecutors.scheduledEvents(),
         containerReportExecutors.queuedEvents());
     containerReportExecutors.close();
-    Thread.currentThread().sleep(90000);
   }
 
   @Test

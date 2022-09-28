@@ -54,7 +54,7 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
       = new LinkedBlockingQueue<>();
   private Map<String, List<VALUE>> dataMap = new HashMap<>();
 
-  private int reportCount = 0;
+  private int capacity = 0;
 
   private AtomicInteger droppedCount = new AtomicInteger();
 
@@ -67,7 +67,7 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
       if (!dataMap.containsKey(dn.getUuidString())) {
         ArrayList<VALUE> dataList = new ArrayList<>();
         dataList.add(val);
-        ++reportCount;
+        ++capacity;
         dataMap.put(dn.getUuidString(), dataList);
         orderingQueue.add(dn.getUuidString());
         return true;
@@ -83,7 +83,7 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
           // if FCR, its last FCR report, remove directly
           if (isFCRReport(reportInfo)) {
             dataList.remove(i);
-            --reportCount;
+            --capacity;
             droppedCount.incrementAndGet();
             isReportRemoved = true;
             break;
@@ -92,7 +92,7 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
       }
 
       dataList.add(val);
-      ++reportCount;
+      ++capacity;
       if (!isReportRemoved) {
         orderingQueue.add(dn.getUuidString());
       }
@@ -109,7 +109,7 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
       if (!dataMap.containsKey(dn.getUuidString())) {
         ArrayList<VALUE> dataList = new ArrayList<>();
         dataList.add(val);
-        ++reportCount;
+        ++capacity;
         dataMap.put(dn.getUuidString(), dataList);
         orderingQueue.add(dn.getUuidString());
         return true;
@@ -118,7 +118,7 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
       // 2. Add ICR report or merge to previous ICR
       List<VALUE> dataList = dataMap.get(dn.getUuidString());
       dataList.add(val);
-      ++reportCount;
+      ++capacity;
       orderingQueue.add(dn.getUuidString());
     }
     return true;
@@ -141,7 +141,7 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
     VALUE report = null;
     if (dataList != null && !dataList.isEmpty()) {
       report = dataList.remove(0);
-      --reportCount;
+      --capacity;
       if (dataList.isEmpty()) {
         dataMap.remove(uuid);
       }
@@ -259,7 +259,7 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
   @Override
   public int remainingCapacity() {
     synchronized (this) {
-      return MAX_CAPACITY - reportCount;
+      return MAX_CAPACITY - capacity;
     }
   }
 
@@ -298,14 +298,14 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
     synchronized (this) {
       orderingQueue.clear();
       dataMap.clear();
-      reportCount = 0;
+      capacity = 0;
     }
   }
 
   @Override
   public int size() {
     synchronized (this) {
-      return reportCount;
+      return capacity;
     }
   }
 

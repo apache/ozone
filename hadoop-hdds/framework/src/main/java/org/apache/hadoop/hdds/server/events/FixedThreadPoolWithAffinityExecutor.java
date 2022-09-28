@@ -30,11 +30,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Fixed thread pool EventExecutor to call all the event handler one-by-one.
@@ -64,8 +64,6 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
 
   private List<ThreadPoolExecutor> executors;
 
-  private List<Future<?>> futureTaskList = new ArrayList<>();
-
   // MutableCounterLong is thread safe.
   @Metric
   private MutableCounterLong queued;
@@ -81,6 +79,8 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
 
   @Metric
   private MutableCounterLong dropped;
+
+  private AtomicBoolean isRunning = new AtomicBoolean(true);
 
   /**
    * Create FixedThreadPoolExecutor with affinity.
@@ -107,8 +107,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
     for (BlockingQueue<Q> queue : workQueues) {
       ThreadPoolExecutor threadPoolExecutor = executors.get(i);
       if (threadPoolExecutor.getQueue().size() == 0) {
-        Future<?> task = threadPoolExecutor.submit(new ReportExecutor<>(queue));
-        futureTaskList.add(task);
+        threadPoolExecutor.submit(new ReportExecutor<>(queue, isRunning));
       }
       ++i;
     }
@@ -183,12 +182,11 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
 
   @Override
   public void close() {
-    for (Future<?> future : futureTaskList) {
-      future.cancel(true);
-    }
+    isRunning.set(false);
     for (ThreadPoolExecutor executor : executors) {
-      executor.shutdownNow();
+      executor.shutdown();
     }
+    EXECUTOR_MAP.clear();
   }
 
   @Override
@@ -201,15 +199,18 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
    */
   public static class ReportExecutor<P> implements Runnable {
     private BlockingQueue<P> queue;
-    public ReportExecutor(BlockingQueue<P> queue) {
+    private AtomicBoolean isRunning;
+
+    public ReportExecutor(BlockingQueue<P> queue, AtomicBoolean isRunning) {
       this.queue = queue;
+      this.isRunning = isRunning;
     }
 
     @Override
     public void run() {
-      while (true) {
+      while (isRunning.get()) {
         try {
-          Object report = queue.take();
+          Object report = queue.poll(1, TimeUnit.MILLISECONDS);
           if (report == null) {
             continue;
           }
