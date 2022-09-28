@@ -95,7 +95,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     }
     return omRequest;
   }
-  
+
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long transactionLogIndex,
@@ -172,5 +172,5 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     }
     return omClientResponse;
   }
-  
+
 }

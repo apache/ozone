@@ -22,7 +22,13 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.getChkptCompactionLogFilename;
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.getCurrentCompactionLogFilename;
 
 /**
  * This class is used to manage/create OM snapshots.
@@ -39,8 +45,40 @@ public final class SnapshotManager {
   public static DBCheckpoint createSnapshot(
       OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo)
       throws IOException {
+
     RDBStore store = (RDBStore) omMetadataManager.getStore();
-    return store.getSnapshot(snapshotInfo.getCheckpointDirName());
+
+    final DBCheckpoint dbCheckpoint;
+    try {
+      // The call blocks waiting for all ongoing background work to finish,
+      // and pauses any future compactions.
+      store.getDb().pauseBackgroundWork();
+
+      final String compactionLogPathStr = getCurrentCompactionLogFilename();
+      final String destFilename =
+          getChkptCompactionLogFilename(snapshotInfo.getCheckpointDirName());
+
+      if (new File(compactionLogPathStr).exists()) {
+        // TODO: Alternatively, if file does not exist (no compaction happened),
+        //  create empty file instead.
+        Files.move(Paths.get(compactionLogPathStr),
+            Paths.get(store.getSnapshotsParentDir(), destFilename));
+      }
+
+      // Create DB checkpoint
+      dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
+
+      // Rename compaction log to correspond to the checkpoint dir name
+      // The compaction log contains all the compaction history since last
+      // checkpoint, which is used to track all the SST file diffs.
+
+      // TODO: Double check failure recovery paths
+
+    } finally {
+      store.getDb().continueBackgroundWork();
+    }
+
+    return dbCheckpoint;
   }
 
   private SnapshotManager() { }

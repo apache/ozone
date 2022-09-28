@@ -21,6 +21,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_NODES;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_DB_KEYS;
 
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -39,13 +40,18 @@ import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 ////CHECKSTYLE:OFF
 public class TestRocksDBCheckpointDiffer {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestRocksDBCheckpointDiffer.class);
+
   private static final String dbPath   = "./rocksdb-data";
-  private static final int NUM_ROW = 25000000;
-  private static final int SNAPSHOT_EVERY_SO_MANY_KEYS = 999999;
+  private static final int NUM_ROW = 250000;
+  private static final int SNAPSHOT_EVERY_SO_MANY_KEYS = 49999;
 
   // keeps track of all the snapshots created so far.
   private static int lastSnapshotCounter = 0;
@@ -63,8 +69,15 @@ public class TestRocksDBCheckpointDiffer {
         0,
         "snap_id_");
     lastSnapshotPrefix = "snap_id_" + lastSnapshotCounter;
+
+//    // Delete the test DB dir if it already exists
+//    File dir = new File(dbPath);
+//    if (dir.exists()) {
+//      deleteDirectory(dir);
+//    }
+
     RocksDB rocksDB = tester.createRocksDBInstance(dbPath, differ);
-    Thread.sleep(10000);
+    Thread.sleep(1000);
 
     tester.readRocksDBInstance(dbPath, rocksDB, null, differ);
     differ.printAllSnapshots();
@@ -104,9 +117,15 @@ public class TestRocksDBCheckpointDiffer {
                                        RocksDBCheckpointDiffer differ)
       throws RocksDBException, InterruptedException {
 
-    System.out.println("Creating RocksDB instance at :" + dbPathArg);
+    LOG.info("Creating RocksDB instance at {}", dbPathArg);
 
-    RocksDB rocksDB = null;
+    // Delete the test DB dir if it already exists
+    File dir = new File(dbPathArg);
+    if (dir.exists()) {
+      deleteDirectory(dir);
+    }
+
+    RocksDB rocksDB;
     rocksDB = differ.getRocksDBInstanceWithCompactionTracking(dbPathArg);
 
     Random random = new Random();
@@ -124,6 +143,18 @@ public class TestRocksDBCheckpointDiffer {
     }
     differ.createSnapshot(rocksDB);
     return rocksDB;
+  }
+
+  static boolean deleteDirectory(java.io.File directoryToBeDeleted) {
+    File[] allContents = directoryToBeDeleted.listFiles();
+    if (allContents != null) {
+      for (java.io.File file : allContents) {
+        if (!deleteDirectory(file)) {
+          return false;
+        }
+      }
+    }
+    return directoryToBeDeleted.delete();
   }
 
   //  RocksDB.DEFAULT_COLUMN_FAMILY

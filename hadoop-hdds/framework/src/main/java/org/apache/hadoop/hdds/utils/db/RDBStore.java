@@ -90,6 +90,9 @@ public class RDBStore implements DBStore {
           dbLocation.getAbsolutePath(), 0, "Snapshot_");
       rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
 
+      // TODO: DEV OPTION. Makes compaction much much more frequent. Remove later.
+      dbOptions.setDbWriteBufferSize(6000000L);
+
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
           families, readOnly);
 
@@ -152,6 +155,10 @@ public class RDBStore implements DBStore {
       LOG.debug("[Option] createIfMissing = {}", dbOptions.createIfMissing());
       LOG.debug("[Option] maxOpenFiles= {}", dbOptions.maxOpenFiles());
     }
+  }
+
+  public String getSnapshotsParentDir() {
+    return snapshotsParentDir;
   }
 
   @VisibleForTesting
@@ -281,6 +288,7 @@ public class RDBStore implements DBStore {
 
   public DBCheckpoint getSnapshot(String name) throws IOException {
     this.flushLog(true);
+//    this.getDb().pauseBackgroundWork();
     return checkPointManager.createCheckpoint(snapshotsParentDir, name);
   }
 
