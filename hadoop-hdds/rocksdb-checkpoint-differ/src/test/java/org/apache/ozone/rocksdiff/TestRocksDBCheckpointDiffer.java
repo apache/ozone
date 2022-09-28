@@ -84,6 +84,7 @@ public class TestRocksDBCheckpointDiffer {
     differ.traverseGraph(
         differ.getCompactionReverseDAG(),
         differ.getCompactionFwdDAG());
+
     differ.diffAllSnapshots();
     differ.dumpCompactioNodeTable();
     for (RocksDBCheckpointDiffer.GType gtype :
