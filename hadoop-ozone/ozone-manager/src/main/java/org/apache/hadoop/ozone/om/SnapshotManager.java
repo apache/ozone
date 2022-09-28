@@ -52,7 +52,7 @@ public final class SnapshotManager {
     try {
       // The call blocks waiting for all ongoing background work to finish,
       // and pauses any future compactions.
-      store.getDb().pauseBackgroundWork();
+//      store.getDb().pauseBackgroundWork();
 
       final String compactionLogPathStr = getCurrentCompactionLogFilename();
       final String destFilename =
@@ -75,7 +75,7 @@ public final class SnapshotManager {
       // TODO: Double check failure recovery paths
 
     } finally {
-      store.getDb().continueBackgroundWork();
+//      store.getDb().continueBackgroundWork();
     }
 
     return dbCheckpoint;
