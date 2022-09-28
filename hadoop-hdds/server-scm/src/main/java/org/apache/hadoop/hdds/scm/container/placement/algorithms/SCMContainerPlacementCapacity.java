@@ -88,7 +88,8 @@ public final class SCMContainerPlacementCapacity
   /**
    * Called by SCM to choose datanodes.
    *
-   *
+   * @param usedNodes - list of the datanodes to already chosen in the
+   *                    pipeline.
    * @param excludedNodes - list of the datanodes to exclude.
    * @param favoredNodes - list of nodes preferred.
    * @param nodesRequired - number of datanodes required.
@@ -99,11 +100,12 @@ public final class SCMContainerPlacementCapacity
    */
   @Override
   protected List<DatanodeDetails> chooseDatanodesInternal(
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      final int nodesRequired,
-      long metadataSizeRequired, long dataSizeRequired) throws SCMException {
+          List<DatanodeDetails> usedNodes, List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes,
+          final int nodesRequired, long metadataSizeRequired,
+          long dataSizeRequired) throws SCMException {
     List<DatanodeDetails> healthyNodes = super.chooseDatanodesInternal(
-            excludedNodes, favoredNodes, nodesRequired,
+            usedNodes, excludedNodes, favoredNodes, nodesRequired,
             metadataSizeRequired, dataSizeRequired);
     if (healthyNodes.size() == nodesRequired) {
       return healthyNodes;
