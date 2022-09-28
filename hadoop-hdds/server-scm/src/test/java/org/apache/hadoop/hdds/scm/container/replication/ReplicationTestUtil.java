@@ -172,9 +172,10 @@ public final class ReplicationTestUtil {
     return new SCMCommonPlacementPolicy(nodeManager, conf) {
       @Override
       protected List<DatanodeDetails> chooseDatanodesInternal(
-          List<DatanodeDetails> excludedNodes,
-          List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
-          long metadataSizeRequired, long dataSizeRequired) {
+              List<DatanodeDetails> usedNodes,
+              List<DatanodeDetails> excludedNodes,
+              List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
+              long metadataSizeRequired, long dataSizeRequired) {
         List<DatanodeDetails> dns = new ArrayList<>();
         for (int i = 0; i < nodesRequiredToChoose; i++) {
           dns.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -195,10 +196,11 @@ public final class ReplicationTestUtil {
     return new SCMCommonPlacementPolicy(nodeManager, conf) {
       @Override
       protected List<DatanodeDetails> chooseDatanodesInternal(
-          List<DatanodeDetails> excludedNodes,
-          List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
-          long metadataSizeRequired, long dataSizeRequired)
-          throws SCMException {
+              List<DatanodeDetails> usedNodes,
+              List<DatanodeDetails> excludedNodes,
+              List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
+              long metadataSizeRequired, long dataSizeRequired)
+              throws SCMException {
         if (nodesRequiredToChoose > 1) {
           throw new IllegalArgumentException("Only one node is allowed");
         }
@@ -223,12 +225,13 @@ public final class ReplicationTestUtil {
     return new SCMCommonPlacementPolicy(nodeManager, conf) {
       @Override
       protected List<DatanodeDetails> chooseDatanodesInternal(
-          List<DatanodeDetails> excludedNodes,
-          List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
-          long metadataSizeRequired, long dataSizeRequired)
-          throws SCMException {
+              List<DatanodeDetails> usedNodes,
+              List<DatanodeDetails> excludedNodes,
+              List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
+              long metadataSizeRequired, long dataSizeRequired)
+              throws SCMException {
         throw new SCMException("No nodes available",
-            FAILED_TO_FIND_SUITABLE_NODE);
+                FAILED_TO_FIND_SUITABLE_NODE);
       }
 
       @Override
