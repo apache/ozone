@@ -120,6 +120,20 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   }
 
   /**
+   * Null Check for List and returns empty list.
+   * @param dns
+   * @return Non null List
+   */
+  private List<DatanodeDetails> validateDatanodes(List<DatanodeDetails> dns) {
+    return Objects.isNull(dns) ? Collections.emptyList() :
+            dns.stream().map(node -> {
+              DatanodeDetails datanodeDetails =
+                      nodeManager.getNodeByUuid(node.getUuidString());
+              return datanodeDetails != null ? datanodeDetails : node;
+            }).collect(Collectors.toList());
+  }
+
+  /**
    * Given size required, return set of datanodes
    * that satisfy the nodes and size requirement.
    * <p>
@@ -158,21 +172,8 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   object of DatanodeDetails(with Topology Information) while trying to get the
   random node from NetworkTopology should fix this. Check HDDS-7015
  */
-    return chooseDatanodesInternal(
-            Objects.isNull(usedNodes) ? Collections.emptyList()
-                    : usedNodes.stream().map(node -> {
-                      DatanodeDetails datanodeDetails =
-                              nodeManager.getNodeByUuid(node.getUuidString());
-                      return datanodeDetails != null ? datanodeDetails : node;
-                    }).collect(Collectors.toList()),
-            Objects.isNull(excludedNodes)
-                    ? Collections.emptyList() : excludedNodes.stream()
-                    .map(node -> {
-                      DatanodeDetails datanodeDetails =
-                              nodeManager.getNodeByUuid(node.getUuidString());
-                      return datanodeDetails != null ? datanodeDetails : node;
-                    }).collect(Collectors.toList()),
-            favoredNodes, nodesRequired,
+    return chooseDatanodesInternal(validateDatanodes(usedNodes),
+            validateDatanodes(excludedNodes), favoredNodes, nodesRequired,
             metadataSizeRequired, dataSizeRequired);
   }
 
