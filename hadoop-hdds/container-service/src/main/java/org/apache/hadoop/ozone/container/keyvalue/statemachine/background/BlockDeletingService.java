@@ -560,9 +560,11 @@ public class BlockDeletingService extends BackgroundService {
             continue;
           }
 
+          boolean deleted = false;
           try {
             handler.deleteBlock(container, blkInfo);
             blocksDeleted++;
+            deleted = true;
           } catch (IOException e) {
             // TODO: if deletion of certain block retries exceed the certain
             //  number of times, service should skip deleting it,
@@ -571,10 +573,13 @@ public class BlockDeletingService extends BackgroundService {
             LOG.error("Failed to delete files for block {}", blkLong, e);
           }
 
-          try {
-            bytesReleased += KeyValueContainerUtil.getBlockLength(blkInfo);
-          } catch (IOException e) {
-            LOG.error("Failed to get block length for block {}", blkLong, e);
+          if (deleted) {
+            try {
+              bytesReleased += KeyValueContainerUtil.getBlockLength(blkInfo);
+            } catch (IOException e) {
+              // TODO: handle the bytesReleased correctly even when exception
+              LOG.error("Failed to get block length for block {}", blkLong, e);
+            }
           }
         }
       }
