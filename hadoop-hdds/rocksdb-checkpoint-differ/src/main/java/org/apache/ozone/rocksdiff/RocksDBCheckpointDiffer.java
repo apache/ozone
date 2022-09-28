@@ -615,7 +615,8 @@ public class RocksDBCheckpointDiffer {
    * @param dest
    * @throws RocksDBException
    */
-  private synchronized void printSnapdiffSSTFiles(Snapshot src, Snapshot dest) {
+  private synchronized List<String> printSnapdiffSSTFiles(
+      Snapshot src, Snapshot dest) {
 
     LOG.warn("src db checkpoint:" + src.dbPath);  // from
     HashSet<String> srcSnapFiles = readRocksDBLiveFiles(src.dbPath);
@@ -635,7 +636,7 @@ public class RocksDBCheckpointDiffer {
           + "destIndex=" + destIndex);
     } else if (srcIndex == destIndex) {
       LOG.warn("src and dest are the same");
-      return;
+      return Collections.emptyList();
     }
 
     // TODO: Clear dag
@@ -672,12 +673,18 @@ public class RocksDBCheckpointDiffer {
       System.out.print(file + ", ");
     }
     LOG.warn("");
+
+    List<String> res = new ArrayList<>();
+
     System.out.print("\nFwd DAG Different files :");
     for (String file : fwdDAGDifferentFiles) {
       CompactionNode n = compactionNodeTable.get(file);
       System.out.print(file + ", ");
+      res.add(file);
     }
     LOG.warn("");
+
+    return res;
   }
 
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
@@ -932,12 +939,14 @@ public class RocksDBCheckpointDiffer {
     }
   }
 
-  public void diffAllSnapshots() throws InterruptedException, RocksDBException {
+  public void diffAllSnapshots() {
     for (Snapshot snap : allSnapshots) {
       if (snap == null) {
         break;
       }
-      printSnapdiffSSTFiles(allSnapshots[lastSnapshotCounter - 1], snap);
+      // Returns a list of SST files to be fed into RocksDiff
+      List<String> sstListForRocksDiff =
+          printSnapdiffSSTFiles(allSnapshots[lastSnapshotCounter - 1], snap);
     }
   }
 
