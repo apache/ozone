@@ -18,11 +18,9 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
-import java.io.IOException;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -59,17 +57,18 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.security.UserGroupInformation;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.protobuf.ServiceException;
-import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
-import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
-
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 
 /**
  * Ozone Container dispatcher takes a call from the netty server and routes it
@@ -332,11 +331,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       // state here.
 
       Result result = responseProto.getResult();
-      if (cmdType == Type.CreateContainer
-          && result == Result.SUCCESS && dispatcherContext != null) {
-        Preconditions.checkNotNull(dispatcherContext.getContainer2BCSIDMap());
-        container2BCSIDMap.putIfAbsent(containerID, Long.valueOf(0));
-      }
       if (!HddsUtils.isReadOnly(msg) && !canIgnoreException(result)) {
         // If the container is open/closing and the container operation
         // has failed, it should be first marked unhealthy and the initiate the
@@ -373,7 +367,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             container.getContainerData().getState() == State.UNHEALTHY);
         sendCloseContainerActionIfNeeded(container);
       }
-
+      if (cmdType == Type.CreateContainer
+          && result == Result.SUCCESS && dispatcherContext != null) {
+        Preconditions.checkNotNull(dispatcherContext.getContainer2BCSIDMap());
+        container2BCSIDMap.putIfAbsent(containerID, Long.valueOf(0));
+      }
       if (result == Result.SUCCESS) {
         updateBCSID(container, dispatcherContext, cmdType);
         audit(action, eventType, params, AuditEventStatus.SUCCESS, null);
