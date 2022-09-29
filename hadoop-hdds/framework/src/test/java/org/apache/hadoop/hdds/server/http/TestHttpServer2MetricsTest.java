@@ -65,11 +65,11 @@ public class TestHttpServer2MetricsTest {
     int threadQueueWaitingTaskCount = random.nextInt();
     String name = "s3g";
 
-    Mockito.doReturn(threadCount).when(threadPool).getThreads();
-    Mockito.doReturn(maxThreadCount).when(threadPool).getMaxThreads();
-    Mockito.doReturn(idleThreadCount).when(threadPool).getIdleThreads();
-    Mockito.doReturn(threadQueueWaitingTaskCount).when(threadPool)
-        .getQueueSize();
+    Mockito.when(threadPool.getThreads()).thenReturn(threadCount);
+    Mockito.when(threadPool.getMaxThreads()).thenReturn(maxThreadCount);
+    Mockito.when(threadPool.getIdleThreads()).thenReturn(idleThreadCount);
+    Mockito.when(threadPool.getQueueSize())
+            .thenReturn(threadQueueWaitingTaskCount);
     when(recorder.addGauge(any(MetricsInfo.class), anyInt()))
         .thenReturn(recorder);
     when(recorder.setContext(anyString())).thenReturn(recorder);
