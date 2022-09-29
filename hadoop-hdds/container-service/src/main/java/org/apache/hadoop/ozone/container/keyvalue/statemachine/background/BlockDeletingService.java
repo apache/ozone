@@ -577,7 +577,8 @@ public class BlockDeletingService extends BackgroundService {
             try {
               bytesReleased += KeyValueContainerUtil.getBlockLength(blkInfo);
             } catch (IOException e) {
-              // TODO: handle the bytesReleased correctly even when exception
+              // TODO: handle the bytesReleased correctly for the unexpected
+              //  exception.
               LOG.error("Failed to get block length for block {}", blkLong, e);
             }
           }

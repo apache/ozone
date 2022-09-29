@@ -79,6 +79,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -488,6 +489,74 @@ public class TestBlockDeletingService {
           deletingServiceMetrics.getSuccessCount()
               - deleteSuccessCount);
     }
+
+    svc.shutdown();
+  }
+
+  @Test
+  public void testWithUnrecordedBlocks() throws Exception {
+    // Skip schemaV1, when markBlocksForDeletionSchemaV1, the unrecorded blocks
+    // from received TNXs will be skipped to delete and will not be added into
+    // the NumPendingDeletionBlocks
+    if (Objects.equals(schemaVersion, SCHEMA_V1)) {
+      return;
+    }
+
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionLimit(2);
+    this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    conf.setFromObject(dnConf);
+    ContainerSet containerSet = new ContainerSet(1000);
+
+    createToDeleteBlocks(containerSet, 2, 3, 1);
+
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        });
+    BlockDeletingServiceTestImpl svc =
+        getBlockDeletingService(containerSet, conf, keyValueHandler);
+    svc.start();
+    GenericTestUtils.waitFor(svc::isStarted, 100, 3000);
+
+    // Ensure 2 container was created
+    List<ContainerData> containerData = Lists.newArrayList();
+    containerSet.listContainer(0L, 2, containerData);
+    Assert.assertEquals(2, containerData.size());
+    KeyValueContainerData ctr1 = (KeyValueContainerData) containerData.get(0);
+    KeyValueContainerData ctr2 = (KeyValueContainerData) containerData.get(1);
+
+    try (DBHandle meta = BlockUtils.getDB(ctr1, conf)) {
+      // create unrecorded blocks in a new txn and update metadata,
+      // service shall first choose the top pendingDeletion container
+      // if using the TopNOrderedContainerDeletionChoosingPolicy
+      List<Long> unrecordedBlocks = new ArrayList<>();
+      int numUnrecorded = 4;
+      for (int i = 0; i < numUnrecorded; i++) {
+        unrecordedBlocks.add(System.nanoTime() + i);
+      }
+      createTxn(ctr1, unrecordedBlocks, 100, ctr1.getContainerID());
+      ctr1.updateDeleteTransactionId(100);
+      ctr1.incrPendingDeletionBlocks(numUnrecorded);
+      updateMetaData(ctr1, (KeyValueContainer) containerSet.getContainer(
+          ctr1.getContainerID()), 3, 1);
+      // Ensure there are 3 + 4 = 7 blocks under deletion
+      Assert.assertEquals(7, getUnderDeletionBlocksCount(meta, ctr1));
+    }
+
+    Assert.assertEquals(3, ctr2.getNumPendingDeletionBlocks());
+
+    // Totally 2 container * 3 blocks + 4 unrecorded block = 10 blocks
+    // So we shall experience 5 rounds to delete all blocks
+    // Unrecorded blocks should not affect the actual NumPendingDeletionBlocks
+    deleteAndWait(svc, 1);
+    deleteAndWait(svc, 2);
+    deleteAndWait(svc, 3);
+    deleteAndWait(svc, 4);
+    deleteAndWait(svc, 5);
+    GenericTestUtils.waitFor(() -> ctr2.getNumPendingDeletionBlocks() == 0,
+        200, 2000);
 
     svc.shutdown();
   }
