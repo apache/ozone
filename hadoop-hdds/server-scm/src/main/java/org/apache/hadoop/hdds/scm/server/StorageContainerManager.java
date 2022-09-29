@@ -1648,6 +1648,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     scmSafeModeManager.stop();
+    RatisDropwizardExports.clear(ratisMetricsMap);
   }
 
   @Override
