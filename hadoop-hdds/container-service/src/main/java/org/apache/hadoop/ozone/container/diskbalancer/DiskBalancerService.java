@@ -85,7 +85,7 @@ public class DiskBalancerService extends BackgroundService {
 
   private AtomicLong totalBalancedBytes = new AtomicLong(0L);
   private AtomicLong balancedBytesInLastWindow = new AtomicLong(0L);
-  private long nextAvailableTime = Time.monotonicNow();
+  private AtomicLong nextAvailableTime = new AtomicLong(Time.monotonicNow());
 
   private Map<DiskBalancerTask, Integer> inProgressTasks;
   private Set<Long> inProgressContainers;
@@ -326,6 +326,7 @@ public class DiskBalancerService extends BackgroundService {
               - containerData.getBytesUsed());
           deltaSizes.put(destVolume, deltaSizes.getOrDefault(destVolume, 0L)
               + containerData.getBytesUsed());
+          break;
         }
       }
     }
@@ -337,7 +338,7 @@ public class DiskBalancerService extends BackgroundService {
 
   private boolean shouldDelay() {
     // We should wait for next AvailableTime.
-    if (Time.monotonicNow() <= nextAvailableTime) {
+    if (Time.monotonicNow() <= nextAvailableTime.get()) {
       return true;
     }
     // Calculate the next AvailableTime based on bandwidth
@@ -346,9 +347,9 @@ public class DiskBalancerService extends BackgroundService {
     final int megaByte = 1024 * 1024;
 
     // converting disk bandwidth in byte/millisec
-    float bandwidth = bandwidthInMB * megaByte / 1000f;
-    nextAvailableTime = Time.monotonicNow() +
-        ((long) (bytesBalanced / bandwidth));
+    float bytesPerMillisec = bandwidthInMB * megaByte / 1000f;
+    nextAvailableTime.set(Time.monotonicNow() +
+        ((long) (bytesBalanced / bytesPerMillisec)));
     return false;
   }
 
