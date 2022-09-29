@@ -126,7 +126,6 @@ public final class BackgroundSCMService implements SCMService {
         log.info("{} Service is not running, skip stop.", getServiceName());
         return;
       }
-      backgroundThread.interrupt();
     }
     log.info("Stopping {} Service.", getServiceName());
   }
