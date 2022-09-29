@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
@@ -376,6 +377,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         updateBCSID(container, dispatcherContext, cmdType);
         audit(action, eventType, params, AuditEventStatus.SUCCESS, null);
       } else {
+        //Other places could use on-demand scanning, this seemed like the
+        //easiest place to add a collective on-demand scanning.
+        //It would be also possible to add it to all the error cases
+        //inside KeyValueHandler
+        //It's possible to arrive here with an open container throwing a read
+        //error. We need to figure out if those containers can be closed
+        //to perform scanning.
+        scanContainerIfNeeded(container);
         audit(action, eventType, params, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
       }
@@ -559,9 +568,16 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
   private boolean isContainerUnhealthy(Container container) {
     return Optional.ofNullable(container).map(
-        cont -> (cont.getContainerState() ==
-            ContainerDataProto.State.UNHEALTHY))
+            cont -> (cont.getContainerState() ==
+                ContainerDataProto.State.UNHEALTHY))
         .orElse(Boolean.FALSE);
+  }
+
+  private void scanContainerIfNeeded(Container<?> container) {
+    if (container.getContainerState() == State.CLOSED ||
+        container.getContainerState() == State.QUASI_CLOSED) {
+      OnDemandContainerScanner.getInstance().scanContainer(container);
+    }
   }
 
   @Override

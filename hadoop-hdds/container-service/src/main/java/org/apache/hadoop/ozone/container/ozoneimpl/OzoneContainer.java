@@ -330,6 +330,7 @@ public class OzoneContainer {
         s.start();
         dataScanners.add(s);
       }
+      OnDemandContainerScanner.init(c, controller);
     }
   }
 
@@ -349,6 +350,7 @@ public class OzoneContainer {
     for (ContainerDataScanner s : dataScanners) {
       s.shutdown();
     }
+    OnDemandContainerScanner.getInstance().shutdown();
   }
 
   /**

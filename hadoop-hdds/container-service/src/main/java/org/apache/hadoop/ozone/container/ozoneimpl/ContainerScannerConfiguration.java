@@ -45,12 +45,16 @@ public class ContainerScannerConfiguration {
       "hdds.container.scrub.data.scan.interval";
   public static final String VOLUME_BYTES_PER_SECOND_KEY =
       "hdds.container.scrub.volume.bytes.per.second";
+  public static final String ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY =
+      "hdds.container.scrub.on.demand.volume.bytes.per.second";
 
   public static final long METADATA_SCAN_INTERVAL_DEFAULT =
       Duration.ofHours(3).toMillis();
   public static final long DATA_SCAN_INTERVAL_DEFAULT =
       Duration.ofDays(7).toMillis();
   public static final long BANDWIDTH_PER_VOLUME_DEFAULT = 1048576;   // 1MB
+  // 1MB
+  public static final long ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT = 1048576;
 
   @Config(key = "enabled",
       type = ConfigType.BOOLEAN,
@@ -86,6 +90,15 @@ public class ContainerScannerConfiguration {
           + " by scanner per volume.")
   private long bandwidthPerVolume = BANDWIDTH_PER_VOLUME_DEFAULT;
 
+  @Config(key = "on.demand.volume.bytes.per.second",
+      type = ConfigType.LONG,
+      defaultValue = "1048576",
+      tags = {ConfigTag.STORAGE},
+      description = "Config parameter to throttle I/O bandwidth used"
+          + " by on demand scanner per volume.")
+  private long onDemandBandwidthPerVolume
+      = ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT;
+
   @PostConstruct
   public void validate() {
     if (metadataScanInterval < 0) {
@@ -107,6 +120,12 @@ public class ContainerScannerConfiguration {
               " must be >= 0 and was set to {}. Defaulting to {}",
           bandwidthPerVolume, BANDWIDTH_PER_VOLUME_DEFAULT);
       bandwidthPerVolume = BANDWIDTH_PER_VOLUME_DEFAULT;
+    }
+    if (onDemandBandwidthPerVolume < 0) {
+      LOG.warn(ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY +
+              " must be >= 0 and was set to {}. Defaulting to {}",
+          onDemandBandwidthPerVolume, ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT);
+      onDemandBandwidthPerVolume = ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT;
     }
   }
 
@@ -136,5 +155,9 @@ public class ContainerScannerConfiguration {
 
   public long getBandwidthPerVolume() {
     return bandwidthPerVolume;
+  }
+
+  public long getOnDemandBandwidthPerVolume() {
+    return onDemandBandwidthPerVolume;
   }
 }
