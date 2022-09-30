@@ -485,6 +485,7 @@ public final class OzoneConsts {
 
   // EC Constants
   public static final String BLOCK_GROUP_LEN_KEY_IN_PUT_BLOCK = "blockGroupLen";
+  public static final String STRIPE_CHECKSUM = "stripeChecksum";
 
   public static final String OZONE_OM_RANGER_ADMIN_CREATE_USER_HTTP_ENDPOINT =
       "/service/xusers/secure/users";

@@ -244,10 +244,11 @@ public final class ECKeyOutputStream extends KeyOutputStream {
 
     // By this time, we should have finished full stripe. So, lets call
     // executePutBlock for all.
-    // TODO: we should alter the put block calls to share CRC to each stream.
     final boolean isLastStripe = streamEntry.getRemaining() <= 0 ||
         ecChunkBufferCache.getLastDataCell().limit() < ecChunkSize;
-    streamEntry.executePutBlock(isLastStripe, streamEntry.getCurrentPosition());
+    String checksum = streamEntry.calculateChecksum();
+    streamEntry.executePutBlock(isLastStripe,
+        streamEntry.getCurrentPosition(), checksum);
 
     failedStreams = streamEntry.streamsWithPutBlockFailure();
     if (!failedStreams.isEmpty()) {

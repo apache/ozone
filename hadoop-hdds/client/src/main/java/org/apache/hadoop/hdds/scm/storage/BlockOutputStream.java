@@ -230,7 +230,7 @@ public class BlockOutputStream extends OutputStream {
     return this.xceiverClient;
   }
 
-  BlockData.Builder getContainerBlockData() {
+  public BlockData.Builder getContainerBlockData() {
     return this.containerBlockData;
   }
 

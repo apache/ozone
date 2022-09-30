@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -33,6 +34,7 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -41,6 +43,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
+import static org.apache.hadoop.ozone.OzoneConsts.STRIPE_CHECKSUM;
 
 /**
  * Handles the chunk EC writes for an EC internal block.
@@ -90,6 +93,16 @@ public class ECBlockOutputStream extends BlockOutputStream {
 
   public CompletableFuture<ContainerProtos.
       ContainerCommandResponseProto> executePutBlock(boolean close,
+      boolean force, long blockGroupLength, String checksum)
+      throws IOException {
+    if (checksum != null) {
+      updateChecksum(checksum);
+    }
+    return executePutBlock(close, force, blockGroupLength);
+  }
+
+  public CompletableFuture<ContainerProtos.
+      ContainerCommandResponseProto> executePutBlock(boolean close,
       boolean force, long blockGroupLength) throws IOException {
     updateBlockGroupLengthInPutBlockMeta(blockGroupLength);
     return executePutBlock(close, force);
@@ -106,6 +119,20 @@ public class ECBlockOutputStream extends BlockOutputStream {
     metadataList.add(keyValue);
     getContainerBlockData().clearMetadata(); // Clears old meta.
     getContainerBlockData().addAllMetadata(metadataList); // Add updated meta.
+  }
+
+  private void updateChecksum(String checksum) {
+    List<ChunkInfo> chunkInfos = getContainerBlockData().getChunksList();
+    ContainerProtos.KeyValue keyValue = ContainerProtos.KeyValue.newBuilder()
+        .setKey(STRIPE_CHECKSUM).setValue(checksum).build();
+    List<ChunkInfo> chunks = new ArrayList<>();
+    for (ChunkInfo info: chunkInfos) {
+      ChunkInfo newInfo = ChunkInfo.newBuilder(info)
+          .addMetadata(keyValue).build();
+      chunks.add(newInfo);
+    }
+    getContainerBlockData().clearChunks();
+    getContainerBlockData().addAllChunks(chunks);
   }
 
   /**
