@@ -36,15 +36,15 @@ import java.util.Map;
  * related to DB operations so that they can commonly be
  * used in NSSummaryTaskWithFSO and NSSummaryTaskWithLegacy.
  */
-public class NSSummaryTaskUtils {
+public class NSSummaryTaskDbEventHandler {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(NSSummaryTaskUtils.class);
+      LoggerFactory.getLogger(NSSummaryTaskDbEventHandler.class);
 
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
 
-  public NSSummaryTaskUtils(ReconNamespaceSummaryManager
+  public NSSummaryTaskDbEventHandler(ReconNamespaceSummaryManager
                                reconNamespaceSummaryManager,
                             ReconOMMetadataManager
                                 reconOMMetadataManager) {

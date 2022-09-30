@@ -42,7 +42,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 /**
  * Class for handling FSO specific tasks.
  */
-public class NSSummaryTaskWithFSO extends NSSummaryTaskUtils {
+public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskWithFSO.class);

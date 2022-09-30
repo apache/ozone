@@ -43,7 +43,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 /**
  * Class for handling Legacy specific tasks.
  */
-public class NSSummaryTaskWithLegacy extends NSSummaryTaskUtils {
+public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
   private static final BucketLayout BUCKET_LAYOUT = BucketLayout.LEGACY;
 
