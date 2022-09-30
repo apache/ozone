@@ -24,7 +24,6 @@ import java.util.UUID;
 
 import mockit.Mock;
 import mockit.MockUp;
-import org.apache.hadoop.ozone.ClientVersion;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -96,8 +95,7 @@ public class TestOMClientRequestWithUserInfo {
     String volumeName = UUID.randomUUID().toString();
     OzoneManagerProtocolProtos.OMRequest omRequest =
         OMRequestTestUtils.createBucketRequest(bucketName, volumeName, true,
-            OzoneManagerProtocolProtos.StorageTypeProto.DISK,
-            ClientVersion.DEFAULT_VERSION.toProtoValue());
+            OzoneManagerProtocolProtos.StorageTypeProto.DISK);
 
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(omRequest);

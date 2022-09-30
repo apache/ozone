@@ -531,8 +531,7 @@ public final class OMRequestTestUtils {
 
   public static OzoneManagerProtocolProtos.OMRequest createBucketRequest(
       String bucketName, String volumeName, boolean isVersionEnabled,
-      OzoneManagerProtocolProtos.StorageTypeProto storageTypeProto,
-      int clientVersion) {
+      OzoneManagerProtocolProtos.StorageTypeProto storageTypeProto) {
     OzoneManagerProtocolProtos.BucketInfo bucketInfo =
         OzoneManagerProtocolProtos.BucketInfo.newBuilder()
             .setBucketName(bucketName)
@@ -545,15 +544,13 @@ public final class OMRequestTestUtils {
     req.setBucketInfo(bucketInfo);
     return OzoneManagerProtocolProtos.OMRequest.newBuilder()
         .setCreateBucketRequest(req)
-        .setVersion(clientVersion)
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
         .setClientId(UUID.randomUUID().toString()).build();
   }
 
   public static OzoneManagerProtocolProtos.OMRequest createBucketReqFSO(
           String bucketName, String volumeName, boolean isVersionEnabled,
-          OzoneManagerProtocolProtos.StorageTypeProto storageTypeProto,
-          int clientVersion) {
+          OzoneManagerProtocolProtos.StorageTypeProto storageTypeProto) {
     OzoneManagerProtocolProtos.BucketInfo bucketInfo =
         OzoneManagerProtocolProtos.BucketInfo.newBuilder()
             .setBucketName(bucketName)
@@ -569,7 +566,6 @@ public final class OMRequestTestUtils {
     req.setBucketInfo(bucketInfo);
     return OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setCreateBucketRequest(req)
-            .setVersion(clientVersion)
             .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
             .setClientId(UUID.randomUUID().toString()).build();
   }
