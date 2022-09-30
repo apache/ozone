@@ -119,7 +119,6 @@ public final class OnDemandContainerScanner {
   }
 
   public synchronized void shutdown() {
-    scanner = null;
     scanExecutor.shutdown();
     try {
       long timeoutSeconds = 5;
