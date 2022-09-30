@@ -65,14 +65,13 @@ public final class HttpServer2Metrics implements MetricsSource {
     this.name = name;
   }
 
-  public static HttpServer2Metrics create(QueuedThreadPool threadPool,
-                                          String name) {
-    if (instance != null) {
-      return instance;
+  public static synchronized HttpServer2Metrics create(
+          QueuedThreadPool threadPool, String name) {
+    if (instance == null) {
+      MetricsSystem ms = DefaultMetricsSystem.instance();
+      instance = ms.register(NAME, "HttpServer2 Metrics",
+              new HttpServer2Metrics(threadPool, name));
     }
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    instance = ms.register(NAME, "HttpServer2 Metrics",
-        new HttpServer2Metrics(threadPool, name));
     return instance;
   }
 
@@ -90,5 +89,11 @@ public final class HttpServer2Metrics implements MetricsSource {
             threadPool.getMaxThreads())
         .addGauge(HttpServer2MetricsInfo.HttpServerThreadQueueWaitingTaskCount,
             threadPool.getQueueSize());
+  }
+
+  public void unRegister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(NAME);
+    instance = null;
   }
 }
