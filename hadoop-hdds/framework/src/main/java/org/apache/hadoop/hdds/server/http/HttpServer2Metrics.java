@@ -91,7 +91,7 @@ public final class HttpServer2Metrics implements MetricsSource {
             threadPool.getQueueSize());
   }
 
-  public void unRegister() {
+  public synchronized void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(NAME);
     instance = null;
