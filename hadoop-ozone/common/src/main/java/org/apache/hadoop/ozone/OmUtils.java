@@ -57,6 +57,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY;
@@ -811,5 +812,10 @@ public final class OmUtils {
     }
     printString.append("]");
     return printString.toString();
+  }
+
+  // Key points to entire bucket's snapshot
+  public static boolean isBucketSnapshotIndicator(String key) {
+    return key.startsWith(OM_SNAPSHOT_INDICATOR) && key.split("/").length == 2;
   }
 }

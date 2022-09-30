@@ -511,6 +511,10 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_OMAUDIT =
       "ozone.audit.log.debug.cmd.list.omaudit";
+
+  public static final String OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE =
+      "ozone.om.snapshot.cache.max.size";
+  public static final int OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT = 10;
   /**
    * There is no need to instantiate this class.
    */

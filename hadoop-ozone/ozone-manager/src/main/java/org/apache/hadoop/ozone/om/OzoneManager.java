@@ -427,6 +427,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   // This metadata reader points to the active filesystem
   private OmMetadataReader omMetadataReader;
+  private OmSnapshotManager omSnapshotManager;
 
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
@@ -706,7 +707,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         omStorage.getOmId());
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
-        metadataManager, this, LOG, AUDIT, metrics);
+        this, LOG, AUDIT, metrics);
+    omSnapshotManager = new OmSnapshotManager(this);
 
     if (withNewSnapshot) {
       Integer layoutVersionInDB = getLayoutVersionInDB();
@@ -2718,14 +2720,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
-    return omMetadataReader.lookupKey(args);
+    return getReader(args).lookupKey(args);
   }
 
   @Override
   public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
       String startKey, String keyPrefix, int maxKeys) throws IOException {
-    return omMetadataReader.listKeys(volumeName, bucketName,
-        startKey, keyPrefix, maxKeys);
+    return getReader(volumeName, bucketName, keyPrefix).listKeys(
+        volumeName, bucketName, startKey, keyPrefix, maxKeys);
   }
 
   @Override
@@ -3297,26 +3299,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
-    return omMetadataReader.getFileStatus(args);
+    return getReader(args).getFileStatus(args);
   }
 
   @Override
   public OmKeyInfo lookupFile(OmKeyArgs args) throws IOException {
-    return omMetadataReader.lookupFile(args);
+    return getReader(args).lookupFile(args);
   }
 
   @Override
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
-      String startKey, long numEntries)
-      throws IOException {
-    return listStatus(args, recursive, startKey, numEntries, false);
-  }
-
-  public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, boolean allowPartialPrefixes)
       throws IOException {
 
-    return omMetadataReader.listStatus(args, recursive,
+    return getReader(args).listStatus(args, recursive,
         startKey, numEntries, allowPartialPrefixes);
   }
 
@@ -3328,7 +3324,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
-    return omMetadataReader.getAcl(obj);
+    return getReader(obj).getAcl(obj);
   }
 
   /**
@@ -4198,5 +4194,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
+  }
+  private IOmMetadataReader getReader(OmKeyArgs keyArgs) throws IOException {
+    return omSnapshotManager.checkForSnapshot(
+        keyArgs.getVolumeName(), keyArgs.getBucketName(), keyArgs.getKeyName());
+  }
+
+  private IOmMetadataReader getReader(String volumeName, String bucketName,
+      String key) throws IOException {
+    return omSnapshotManager.checkForSnapshot(volumeName, bucketName, key);
+  }
+
+  private IOmMetadataReader getReader(OzoneObj ozoneObj) throws IOException {
+    return omSnapshotManager.checkForSnapshot(
+        ozoneObj.getVolumeName(), ozoneObj.getBucketName(),
+        ozoneObj.getKeyName());
   }
 }
