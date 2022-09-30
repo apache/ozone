@@ -26,7 +26,9 @@ import moment from 'moment';
 
 interface IAutoReloadPanelProps extends RouteComponentProps<object> {
   onReload: () => void;
-  lastUpdated: number;
+  lastRefreshed: number;
+  lastUpdatedOMDBDelta: number;
+  lastUpdatedOMDBFull: number;
   isLoading: boolean;
   togglePolling: (isEnabled: boolean) => void;
 }
@@ -38,21 +40,49 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
   };
 
   render() {
-    const {onReload, lastUpdated, isLoading} = this.props;
-    const lastUpdatedText = lastUpdated === 0 ? 'NA' :
+    const {onReload, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, isLoading} = this.props;
+    
+     const lastRefreshedText = lastRefreshed === 0 || lastRefreshed === undefined ? 'NA' :
       (
         <Tooltip
-          placement='bottom' title={moment(lastUpdated).format('ll LTS')}
+          placement='bottom' title={moment(lastRefreshed).format('ll LTS')}
         >
-          {moment(lastUpdated).format('LTS')}
+          {moment(lastRefreshed).format('LT')}
         </Tooltip>
       );
+
+      const omDBDeltaFullToolTip = <span>
+          {'Delta Update'}: {moment(lastUpdatedOMDBDelta).fromNow()}, {moment(lastUpdatedOMDBDelta).format('LT')}
+          <br/>
+          {'Full Update'}: {moment(lastUpdatedOMDBFull).fromNow()}, {moment(lastUpdatedOMDBFull).format('LT')}
+       </span>
+
+      const lastUpdatedOMLatest = lastUpdatedOMDBDelta > lastUpdatedOMDBFull ? lastUpdatedOMDBDelta : lastUpdatedOMDBFull;
+
+      const lastUpdatedDeltaFullToolTip = lastUpdatedOMDBDelta === 0 || lastUpdatedOMDBDelta === undefined || lastUpdatedOMDBFull === 0 || lastUpdatedOMDBFull === undefined ? 'NA' :
+      (
+        <Tooltip
+          placement='bottom' title={omDBDeltaFullToolTip}
+        >
+          {moment(lastUpdatedOMLatest).format('LT')}
+        </Tooltip>
+      );
+
+     const lastUpdatedDeltaFullText = lastUpdatedOMDBDelta === 0 || lastUpdatedOMDBDelta === undefined || lastUpdatedOMDBFull === 0 || lastUpdatedOMDBFull === undefined ? '' :
+     (
+      <>
+      &nbsp; | OM DB updated at {lastUpdatedDeltaFullToolTip}
+      &nbsp;<Button shape='circle' icon='reload' size='small' loading={isLoading} />
+      </>
+     );
+
     return (
       <div className='auto-reload-panel'>
-        Auto Reload
+        Auto Refresh
         &nbsp;<Switch defaultChecked size='small' className='toggle-switch' onChange={this.autoReloadToggleHandler}/>
-        &nbsp; | Last updated at {lastUpdatedText}
+        &nbsp; | Refreshed at {lastRefreshedText}
         &nbsp;<Button shape='circle' icon='reload' size='small' loading={isLoading} onClick={onReload}/>
+        {lastUpdatedDeltaFullText}
       </div>
     );
   }
