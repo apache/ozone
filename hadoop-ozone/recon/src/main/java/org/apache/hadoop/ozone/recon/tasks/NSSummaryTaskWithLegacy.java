@@ -185,6 +185,21 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
           Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
           OmKeyInfo keyInfo = kv.getValue();
 
+          // KeyTable entries belong to both Legacy and OBS buckets.
+          // Check bucket layout and if it's OBS
+          // continue to the next iteration.
+          String volumeName = keyInfo.getVolumeName();
+          String bucketName = keyInfo.getBucketName();
+          String bucketDBKey = omMetadataManager
+              .getBucketKey(volumeName, bucketName);
+          // Get bucket info from bucket table
+          OmBucketInfo omBucketInfo = omMetadataManager
+              .getBucketTable().getSkipCache(bucketDBKey);
+
+          if (omBucketInfo.getBucketLayout().isObjectStore()) {
+            continue;
+          }
+
           setKeyParentID(keyInfo);
 
           if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
