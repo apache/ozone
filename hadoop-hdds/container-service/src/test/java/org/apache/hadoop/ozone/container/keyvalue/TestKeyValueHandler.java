@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
@@ -413,7 +414,8 @@ public class TestKeyValueHandler {
       Assert.assertEquals(2, icrReceived.get());
       Assert.assertNull(containerSet.getContainer(containerID));
 
-      assertFalse(hddsVolume.getDeleteLeftovers().hasNext());
+      assertFalse(KeyValueContainerUtil.ContainerDeleteDirectory
+          .getDeleteLeftovers(hddsVolume).hasNext());
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }

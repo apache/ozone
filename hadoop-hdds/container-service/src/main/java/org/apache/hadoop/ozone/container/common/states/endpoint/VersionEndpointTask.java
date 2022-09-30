@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
@@ -128,7 +129,8 @@ public class VersionEndpointTask implements
         if (volume instanceof HddsVolume) {
           HddsVolume hddsVolume = (HddsVolume) volume;
           try {
-            hddsVolume.cleanTmpDir();
+            KeyValueContainerUtil.ContainerDeleteDirectory
+                .cleanTmpDir(hddsVolume);
           } catch (IOException ex) {
             LOG.error("Error while cleaning tmp delete directory " +
                 "under {}", hddsVolume.getWorkingDir(), ex);

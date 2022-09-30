@@ -22,26 +22,37 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.ListIterator;
+
+import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +69,8 @@ public final class KeyValueContainerUtil {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       KeyValueContainerUtil.class);
+
+  private static final String FILE_SEPARATOR = File.separator;
 
   /**
    *
@@ -402,5 +415,169 @@ public final class KeyValueContainerUtil {
 
     return Paths.get(metadataPath);
 
+  }
+
+  /**
+   * Utilities for container_delete_service directory
+   * which is located under <volume>/hdds/<cluster-id>/tmp/.
+   * Containers will be moved under it before getting deleted
+   * to avoid, in case of failure, having artifact leftovers
+   * on the default container path on the disk.
+   */
+  public static class ContainerDeleteDirectory {
+
+    /**
+     * Delete all files under
+     * <volume>/hdds/<cluster-id>/tmp/container_delete_service.
+     */
+    public static synchronized void cleanTmpDir(HddsVolume hddsVolume)
+        throws IOException {
+      if (hddsVolume.getStorageState() != StorageVolume.VolumeState.NORMAL) {
+        LOG.debug("Call to clean tmp dir container_delete_service directory "
+                + "for {} while VolumeState {}",
+            hddsVolume.getStorageDir(),
+            hddsVolume.getStorageState().toString());
+        return;
+      }
+
+      if (!hddsVolume.getClusterID().isEmpty()) {
+        // Initialize delete directory
+        hddsVolume.createDeleteServiceDir();
+      } else {
+        throw new IOException("Volume has no ClusterId");
+      }
+
+      ListIterator<File> leftoversListIt = getDeleteLeftovers(hddsVolume);
+
+      while (leftoversListIt.hasNext()) {
+        File file = leftoversListIt.next();
+
+        // If SchemaV3 is enabled and we have a RocksDB
+        if (VersionedDatanodeFeatures.isFinalized(
+            HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
+          // Get container file
+          File containerFile = getContainerFile(file);
+
+          // If file exists
+          if (containerFile != null) {
+            ContainerData containerData = ContainerDataYaml
+                .readContainerFile(containerFile);
+            KeyValueContainerData keyValueContainerData =
+                (KeyValueContainerData) containerData;
+
+            // Remove container from Rocks DB
+            String dbPath = hddsVolume.getDbParentDir().getAbsolutePath();
+            DatanodeStoreSchemaThreeImpl store =
+                new DatanodeStoreSchemaThreeImpl(hddsVolume.getConf(),
+                    dbPath, false);
+            store.removeKVContainerData(keyValueContainerData.getContainerID());
+          }
+        }
+
+        try {
+          if (file.isDirectory()) {
+            FileUtils.deleteDirectory(file);
+          } else {
+            FileUtils.delete(file);
+          }
+        } catch (IOException ex) {
+          LOG.error("Failed to delete directory or file inside " +
+              "{}", hddsVolume.getDeleteServiceDirPath().toString(), ex);
+        }
+      }
+    }
+
+    /**
+     * Search recursively for the container file under a
+     * directory. Return null if the file is not found.
+     * @param file
+     * @return container file or null if it doesn't exist
+     * @throws IOException
+     */
+    public static File getContainerFile(File file) throws IOException {
+      if (file.isDirectory()) {
+        for (File subFile : file.listFiles()) {
+          if (subFile.isDirectory()) {
+            File containerFile = getContainerFile(subFile);
+            if (containerFile != null) {
+              return containerFile;
+            }
+          } else {
+            if (FilenameUtils.getExtension(subFile.getName())
+                .equals("container")) {
+              return subFile;
+            }
+          }
+        }
+      } else {
+        if (FilenameUtils.getExtension(file.getName())
+            .equals("container")) {
+          return file;
+        }
+      }
+      return null;
+    }
+
+    /**
+     * In the future might be used to gather metrics
+     * for the files left under
+     * <volume>/hdds/<cluster-id>/tmp/container_delete_service.
+     * @return ListIterator to all the files
+     */
+    public static ListIterator<File> getDeleteLeftovers(HddsVolume hddsVolume) {
+      List<File> leftovers = new ArrayList<>();
+
+      File tmpDir = new File(hddsVolume.getDeleteServiceDirPath().toString());
+
+      if (tmpDir.exists()) {
+        for (File file : tmpDir.listFiles()) {
+          leftovers.add(file);
+        }
+      } else {
+        LOG.error("tmp directory is null, path doesn't exist");
+      }
+
+      ListIterator<File> leftoversListIt = leftovers.listIterator();
+      return leftoversListIt;
+    }
+
+    /**
+     * Renaming container directory path to a new location
+     * under "<volume>/hdds/<cluster-id>/tmp/container_delete_service"
+     * and updating metadata and chunks path.
+     * @param keyValueContainerData
+     * @return true if renaming was successful
+     */
+    public static boolean moveToTmpDeleteDirectory(
+        KeyValueContainerData keyValueContainerData,
+        HddsVolume hddsVolume) throws IOException {
+      String containerPath = keyValueContainerData.getContainerPath();
+      File container = new File(containerPath);
+      String containerDirName = container.getName();
+
+      if (!hddsVolume.getClusterID().isEmpty()) {
+        // Initialize delete directory
+        hddsVolume.createDeleteServiceDir();
+      } else {
+        throw new IOException("Volume has no ClusterId");
+      }
+
+      String destinationDirPath = hddsVolume.getDeleteServiceDirPath()
+          .resolve(Paths.get(containerDirName)).toString();
+
+      boolean success = container.renameTo(new File(destinationDirPath));
+
+      // Updating in memory values of the container's location
+      // which is used by KeyValueContainerUtil#removeContainer().
+      // In case of a datanode restart these values won't persist but
+      // tmp delete directory will be wiped, so this won't be an issue.
+      if (success) {
+        keyValueContainerData.setMetadataPath(destinationDirPath +
+            FILE_SEPARATOR + OzoneConsts.CONTAINER_META_PATH);
+        keyValueContainerData.setChunksPath(destinationDirPath +
+            FILE_SEPARATOR + OzoneConsts.STORAGE_DIR_CHUNKS);
+      }
+      return success;
+    }
   }
 }

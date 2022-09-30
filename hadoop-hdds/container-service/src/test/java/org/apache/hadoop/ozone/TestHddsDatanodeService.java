@@ -38,6 +38,8 @@ import org.apache.hadoop.ozone.container.common.ScmTestMock;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.thirdparty.com.google.common.io.Files;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ServicePlugin;
@@ -55,10 +57,13 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 /**
  * Test class for {@link HddsDatanodeService}.
  */
+@RunWith(Parameterized.class)
 public class TestHddsDatanodeService {
 
   @Rule
@@ -66,6 +71,7 @@ public class TestHddsDatanodeService {
 
   private final String clusterId = UUID.randomUUID().toString();
   private final OzoneConfiguration conf = new OzoneConfiguration();
+  private final String schemaVersion;
   private static final int SCM_SERVER_COUNT = 1;
   private static final String FILE_SEPARATOR = File.separator;
 
@@ -73,6 +79,16 @@ public class TestHddsDatanodeService {
   private List<String> serverAddresses;
   private List<RPC.Server> scmServers;
   private List<ScmTestMock> mockServers;
+
+  public TestHddsDatanodeService(ContainerTestVersionInfo info) {
+    this.schemaVersion = info.getSchemaVersion();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+  }
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return ContainerTestVersionInfo.versionParameters();
+  }
 
   @Before
   public void setUp() throws IOException {
@@ -141,7 +157,7 @@ public class TestHddsDatanodeService {
       HddsVolume volume = volumes.get(i);
       volume.format(clusterId);
       volume.createWorkingDir(clusterId, null);
-
+      volume.createDeleteServiceDir();
       tempHddsVolumes[i] = tempDir.newFolder();
       hddsDirs.append(tempHddsVolumes[i]).append(",");
 
@@ -151,7 +167,8 @@ public class TestHddsDatanodeService {
       Files.touch(testFile);
       assertTrue(testFile.exists());
 
-      ListIterator<File> tmpDirIter = volume.getDeleteLeftovers();
+      ListIterator<File> tmpDirIter = KeyValueContainerUtil
+          .ContainerDeleteDirectory.getDeleteLeftovers(volume);
       List<File> tmpDirFileList = new LinkedList<>();
       boolean testFileExistsUnderTmp = false;
 
@@ -167,7 +184,6 @@ public class TestHddsDatanodeService {
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         Arrays.toString(tempHddsVolumes));
 
-
     service.stop();
     // CRL store must be stopped when the service stops
     assertNull(service.getCRLStore().getStore());
@@ -175,7 +191,8 @@ public class TestHddsDatanodeService {
     service.close();
 
     for (HddsVolume hddsVolume : volumes) {
-      ListIterator<File> deleteLeftoverIt = hddsVolume.getDeleteLeftovers();
+      ListIterator<File> deleteLeftoverIt = KeyValueContainerUtil
+          .ContainerDeleteDirectory.getDeleteLeftovers(hddsVolume);
       assertFalse(deleteLeftoverIt.hasNext());
     }
   }

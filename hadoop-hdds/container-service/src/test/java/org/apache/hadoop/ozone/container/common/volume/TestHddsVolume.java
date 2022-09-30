@@ -104,13 +104,11 @@ public class TestHddsVolume {
     assertEquals(HddsVolume.VolumeState.NORMAL, volume.getStorageState());
 
     // Create a working directory
-    // tmp directory and container_service_directory should be initialized.
+    // tmp directory should be initialized.
     volume.createWorkingDir(CLUSTER_ID, null);
 
     File tmpDir = new File(volume.getTmpDirPath().toString());
-    File deleteDir = new File(volume.getDeleteServiceDirPath().toString());
     assertTrue(tmpDir.exists());
-    assertTrue(deleteDir.exists());
   }
 
   @Test

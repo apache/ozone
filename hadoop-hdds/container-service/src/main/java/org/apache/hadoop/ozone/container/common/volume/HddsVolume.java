@@ -23,23 +23,18 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.slf4j.Logger;
@@ -149,7 +144,6 @@ public class HddsVolume extends StorageVolume {
     super.createWorkingDir(workingDirName, dbVolumeSet);
 
     createTmpDir(workingDirName);
-    createDeleteServiceDir();
 
     // Create DB store for a newly formatted volume
     if (VersionedDatanodeFeatures.isFinalized(
@@ -356,7 +350,7 @@ public class HddsVolume extends StorageVolume {
   // cluster, cleanup path should already be on
   // disk.  This method syncs the HddsVolume
   // with the path on disk
-  public void checkCleanupDirs(String id) {
+  public void checkTmpDirPaths(String id) {
     String tmpPath = createTmpPath(id);
     String deleteServicePath = tmpPath + TMP_DELETE_SERVICE_DIR;
     deleteServiceDirPath = Paths.get(deleteServicePath);
@@ -393,7 +387,7 @@ public class HddsVolume extends StorageVolume {
     }
   }
 
-  private void createDeleteServiceDir() {
+  public void createDeleteServiceDir() {
     try {
       if (tmpDirPath == null) {
         throw new IOException("tmp directory under volume " +
@@ -418,100 +412,6 @@ public class HddsVolume extends StorageVolume {
       LOG.error("Failed to create container_delete_service directory under {}",
           volPath, ex);
     }
-  }
-
-  /**
-   * Delete all files under tmp/container_delete_service.
-   */
-  public synchronized void cleanTmpDir() throws IOException {
-    if (getStorageState() != VolumeState.NORMAL) {
-      LOG.debug("Call to clean tmp dir container_delete_service directory "
-              + "for {} while VolumeState {}",
-              getStorageDir(), getStorageState().toString());
-      return;
-    }
-
-    if (!getClusterID().isEmpty()) {
-      checkCleanupDirs(getClusterID());
-    } else {
-      throw new IOException("Volume has no ClusterId");
-    }
-
-    ListIterator<File> leftoversListIt = getDeleteLeftovers();
-
-    while (leftoversListIt.hasNext()) {
-      File file = leftoversListIt.next();
-      try {
-        if (file.isDirectory()) {
-          FileUtils.deleteDirectory(file);
-        } else {
-          FileUtils.delete(file);
-        }
-      } catch (IOException ex) {
-        LOG.error("Failed to delete directory or file inside " +
-            "{}", deleteServiceDirPath.toString(), ex);
-      }
-    }
-  }
-
-  /**
-   * Keep public, in the future might be used to gather metrics
-   * for the files left under tmp/container_delete_service.
-   * @return ListIterator to all the files
-   */
-  public ListIterator<File> getDeleteLeftovers() {
-    List<File> leftovers = new ArrayList<>();
-
-    try {
-      File tmpDir = new File(deleteServiceDirPath.toString());
-
-      for (File file : tmpDir.listFiles()) {
-        leftovers.add(file);
-      }
-    } catch (NullPointerException ex) {
-      LOG.error("tmp directory is null, path doesn't exist", ex);
-    }
-
-    ListIterator<File> leftoversListIt = leftovers.listIterator();
-    return leftoversListIt;
-  }
-
-  /**
-   * Renaming container directory path to a new location
-   * under "<HddsVolume>/tmp/container_delete_service" and
-   * updating metadata and chunks path.
-   * @param keyValueContainerData
-   * @return true if renaming was successful
-   */
-  public boolean moveToTmpDeleteDirectory(
-      KeyValueContainerData keyValueContainerData)
-      throws IOException {
-    String containerPath = keyValueContainerData.getContainerPath();
-    File container = new File(containerPath);
-    String containerDirName = container.getName();
-
-    if (!getClusterID().isEmpty()) {
-      checkCleanupDirs(getClusterID());
-    } else {
-      throw new IOException("Volume has no ClusterId");
-    }
-
-    String destinationDirPath = deleteServiceDirPath
-        .resolve(Paths.get(containerDirName)).toString();
-
-    boolean success = container.renameTo(new File(destinationDirPath));
-
-    // Updating in memory values of the container's location
-    // which is used by KeyValueContainerUtil#removeContainer().
-    // In case of a datanode restart these values won't persist but
-    // tmp delete directory will be wiped, so this won't be an issue.
-    if (success) {
-      keyValueContainerData.setMetadataPath(destinationDirPath +
-          FILE_SEPARATOR + OzoneConsts.CONTAINER_META_PATH);
-      keyValueContainerData.setChunksPath(destinationDirPath +
-          FILE_SEPARATOR + OzoneConsts.STORAGE_DIR_CHUNKS);
-    }
-    return success;
   }
 
   private void closeDbStore() {

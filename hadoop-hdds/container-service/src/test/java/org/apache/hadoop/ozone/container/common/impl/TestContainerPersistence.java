@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
@@ -380,10 +381,12 @@ public class TestContainerPersistence {
     }
 
     // Rename container1 dir
-    Assert.assertTrue(hddsVolume.moveToTmpDeleteDirectory(container1Data));
+    Assert.assertTrue(KeyValueContainerUtil.ContainerDeleteDirectory
+        .moveToTmpDeleteDirectory(container1Data, hddsVolume));
 
     // Rename container2 dir
-    Assert.assertTrue(hddsVolume.moveToTmpDeleteDirectory(container2Data));
+    Assert.assertTrue(KeyValueContainerUtil.ContainerDeleteDirectory
+        .moveToTmpDeleteDirectory(container2Data, hddsVolume));
 
     File container1File =
         new File(container1Data.getContainerPath());
@@ -391,7 +394,8 @@ public class TestContainerPersistence {
     File container2File =
         new File(container2Data.getContainerPath());
 
-    ListIterator<File> tmpDirIter = hddsVolume.getDeleteLeftovers();
+    ListIterator<File> tmpDirIter = KeyValueContainerUtil
+        .ContainerDeleteDirectory.getDeleteLeftovers(hddsVolume);
     List<File> tmpDirFileList = new LinkedList<>();
     boolean container1ExistsUnderTmpDir = false;
     boolean container2ExistsUnderTmpDir = false;
@@ -414,9 +418,11 @@ public class TestContainerPersistence {
     // Delete container1
     container1.delete();
 
-    Assert.assertTrue(hddsVolume.getDeleteLeftovers().hasNext());
+    Assert.assertTrue(KeyValueContainerUtil.ContainerDeleteDirectory
+        .getDeleteLeftovers(hddsVolume).hasNext());
 
-    ListIterator<File> iterator = hddsVolume.getDeleteLeftovers();
+    ListIterator<File> iterator = KeyValueContainerUtil
+        .ContainerDeleteDirectory.getDeleteLeftovers(hddsVolume);
 
     File metadata2Dir = container2.getContainerFile().getParentFile();
     File container2Dir = metadata2Dir.getParentFile();
@@ -435,7 +441,8 @@ public class TestContainerPersistence {
         .containsKey(testContainerID2));
 
     // 'tmp/delete_container_service' is empty
-    Assert.assertFalse(hddsVolume.getDeleteLeftovers().hasNext());
+    Assert.assertFalse(KeyValueContainerUtil.ContainerDeleteDirectory
+        .getDeleteLeftovers(hddsVolume).hasNext());
   }
 
   @Test

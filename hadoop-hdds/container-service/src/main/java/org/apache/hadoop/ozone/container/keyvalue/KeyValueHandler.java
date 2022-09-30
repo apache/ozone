@@ -77,6 +77,7 @@ import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingP
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
@@ -471,6 +472,8 @@ public class KeyValueHandler extends Handler {
       deleteInternal(kvContainer, forceDelete);
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
+    } catch (IOException ex) {
+      LOG.error("Failed to delete container", ex);
     }
     return getSuccessResponse(request);
   }
@@ -1071,7 +1074,7 @@ public class KeyValueHandler extends Handler {
         try {
           container.markContainerUnhealthy();
         } catch (IOException ex) {
-          // explicitly catch IOException here since the this operation
+          // explicitly catch IOException here since this operation
           // will fail if the Rocksdb metadata is corrupted.
           long id = container.getContainerData().getContainerID();
           LOG.warn("Unexpected error while marking container " + id
@@ -1215,7 +1218,7 @@ public class KeyValueHandler extends Handler {
   }
 
   private void deleteInternal(Container container, boolean force)
-      throws StorageContainerException {
+      throws StorageContainerException, IOException {
     container.writeLock();
     try {
     // If force is false, we check container state.
@@ -1244,24 +1247,20 @@ public class KeyValueHandler extends Handler {
             (KeyValueContainerData) container.getContainerData();
         HddsVolume hddsVolume = keyValueContainerData.getVolume();
 
-        if (hddsVolume.getClusterID() != null) {
-          try {
-            // Rename container location
-            boolean success = hddsVolume
-                .moveToTmpDeleteDirectory(keyValueContainerData);
+        // Rename container location
+        boolean success = KeyValueContainerUtil.ContainerDeleteDirectory
+            .moveToTmpDeleteDirectory(keyValueContainerData, hddsVolume);
 
-            if (success) {
-              String containerPath = keyValueContainerData
-                  .getContainerPath().toString();
-              File containerDir = new File(containerPath);
+        if (success) {
+          String containerPath = keyValueContainerData
+              .getContainerPath().toString();
+          File containerDir = new File(containerPath);
 
-              LOG.info("Container {} has been successfuly moved under {}",
-                  containerDir.getName(), hddsVolume.getDeleteServiceDirPath());
-            }
-          } catch (IOException ex) {
-            LOG.error("Moving a container under tmp delete directory " +
-                "while volume has not been initialized", ex);
-          }
+          LOG.info("Container {} has been successfuly moved under {}",
+              containerDir.getName(), hddsVolume.getDeleteServiceDirPath());
+        } else {
+          throw new IOException("Failed to move container under " +
+              hddsVolume.getDeleteServiceDirPath());
         }
       }
       long containerId = container.getContainerData().getContainerID();

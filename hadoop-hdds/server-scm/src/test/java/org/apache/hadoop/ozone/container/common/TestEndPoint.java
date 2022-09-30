@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointT
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
@@ -169,7 +170,8 @@ public class TestEndPoint {
         Files.touch(testFile);
         Assert.assertTrue(testFile.exists());
 
-        ListIterator<File> tmpDirIter = hddsVolume.getDeleteLeftovers();
+        ListIterator<File> tmpDirIter = KeyValueContainerUtil
+            .ContainerDeleteDirectory.getDeleteLeftovers(hddsVolume);
         boolean testFileExistsUnderTmp = false;
 
         while (tmpDirIter.hasNext()) {
@@ -195,7 +197,8 @@ public class TestEndPoint {
       // assert that tmp dir is empty
       for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
           volumeSet.getVolumesList())) {
-        Assert.assertFalse(hddsVolume.getDeleteLeftovers().hasNext());
+        Assert.assertFalse(KeyValueContainerUtil.ContainerDeleteDirectory
+            .getDeleteLeftovers(hddsVolume).hasNext());
       }
     }
   }
