@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Inject;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -217,6 +216,13 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskUtils {
     return true;
   }
 
+  /**
+   * KeyTable entries don't have the parentId set.
+   * In order to reuse the existing FSO methods that rely on
+   * the parentId, we have to set it explicitly.
+   * @param keyInfo
+   * @throws IOException
+   */
   private void setKeyParentID(OmKeyInfo keyInfo) throws IOException {
     String[] keyPath = keyInfo.getKeyName().split(OM_KEY_PREFIX);
 
