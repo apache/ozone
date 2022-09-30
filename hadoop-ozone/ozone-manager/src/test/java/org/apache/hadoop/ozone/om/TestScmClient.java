@@ -98,7 +98,7 @@ public class TestScmClient {
   }
   @ParameterizedTest
   @MethodSource("getContainerLocationsTestCases")
-  public void testGetContainerLocations(String testCases,
+  public void testGetContainerLocations(String testCaseName,
                                        Set<Long> prepopulatedIds,
                                        Set<Long> testContainerIds,
                                        boolean forceRefresh,
