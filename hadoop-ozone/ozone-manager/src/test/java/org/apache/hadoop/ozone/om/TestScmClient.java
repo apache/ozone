@@ -90,7 +90,7 @@ public class TestScmClient {
   @MethodSource("getContainerLocationTestCases")
   public void testGetContainerLocation(String testCases,
                                        Set<Long> prepopulatedIds,
-                                       long testId,
+                                       long containerIdToTest,
                                        boolean forceRefresh,
                                        int expectedScmCalls)
       throws IOException {
