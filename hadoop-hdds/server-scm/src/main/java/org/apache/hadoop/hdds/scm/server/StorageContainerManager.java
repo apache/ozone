@@ -821,9 +821,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       }
     } else {
       // On an upgraded cluster primary scm nodeId will not be set as init will
-      // not be run again after upgrade. So for an upgraded cluster where init
-      // has not happened again we will have to set up like before where it has
-      // one CA server which is issuing certificates to DN and OM.
+      // not be run again after upgrade. For an upgraded cluster, besides one
+      // intermediate CA server which is issuing certificates to DN and OM,
+      // we will have one root CA server too.
       rootCertificateServer =
           HASecurityUtils.initializeRootCertificateServer(conf,
               certificateStore, scmStorageConfig, new DefaultProfile());
