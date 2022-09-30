@@ -70,77 +70,6 @@ public class TestScmClient {
         containerLocationProtocol, conf);
   }
 
-  private static Stream<Arguments> getContainerLocationTestCases() {
-    return Stream.of(
-        Arguments.of("New key",
-            newHashSet(1L, 2L), 3L, false, 1),
-
-        Arguments.of("Existing key",
-            newHashSet(1L, 2L), 1L, false, 1),
-
-        Arguments.of("New key with force refresh",
-            newHashSet(1L, 2L), 3L, true, 1),
-
-        Arguments.of("Existing key, force refresh",
-            newHashSet(1L, 2L), 1L, true, 2)
-    );
-  }
-
-  @ParameterizedTest
-  @MethodSource("getContainerLocationTestCases")
-  public void testGetContainerLocation(String testCases,
-                                       Set<Long> prepopulatedIds,
-                                       long containerIdToTest,
-                                       boolean forceRefresh,
-                                       int expectedScmCalls)
-      throws IOException {
-
-    Map<Long, ContainerWithPipeline> actualLocations = new HashMap<>();
-    // pre population of the cache.
-    for (long containerId : prepopulatedIds) {
-      ContainerWithPipeline pipeline = createPipeline(containerId);
-      actualLocations.put(containerId, pipeline);
-      when(containerLocationProtocol.getContainerWithPipeline(eq(containerId)))
-          .thenReturn(pipeline);
-      Pipeline location = scmClient.getContainerLocation(containerId, false);
-      Assertions.assertEquals(pipeline.getPipeline(), location);
-      verify(containerLocationProtocol, times(1))
-          .getContainerWithPipeline(containerId);
-    }
-
-    if (!prepopulatedIds.contains(testId)) {
-      ContainerWithPipeline pipeline = createPipeline(testId);
-      actualLocations.put(testId, pipeline);
-      when(containerLocationProtocol.getContainerWithPipeline(eq(testId)))
-          .thenReturn(pipeline);
-    }
-
-    // consecutive call.
-    Pipeline location = scmClient.getContainerLocation(testId, forceRefresh);
-    Assertions.assertEquals(actualLocations.get(testId).getPipeline(),
-        location);
-
-    verify(containerLocationProtocol, times(expectedScmCalls))
-        .getContainerWithPipeline(testId);
-  }
-
-  @Test
-  public void testGetContainerLocationWithScmFailures() throws IOException {
-    IOException ioException = new IOException("Exception");
-    when(containerLocationProtocol.getContainerWithPipeline(eq(1L)))
-        .thenThrow(ioException);
-    IOException actual = Assertions.assertThrows(IOException.class,
-        () -> scmClient.getContainerLocation(1L, false));
-    Assertions.assertEquals(ioException, actual);
-
-    RuntimeException runtimeException = new IllegalStateException("Test");
-    when(containerLocationProtocol.getContainerWithPipeline(eq(2L)))
-        .thenThrow(runtimeException);
-    RuntimeException actualRt = Assertions.assertThrows(RuntimeException.class,
-        () -> scmClient.getContainerLocation(2L, false));
-    Assertions.assertEquals(runtimeException, actualRt.getCause());
-  }
-
   private static Stream<Arguments> getContainerLocationsTestCases() {
     return Stream.of(
         Arguments.of("Existing keys",
@@ -171,7 +100,7 @@ public class TestScmClient {
   @MethodSource("getContainerLocationsTestCases")
   public void testGetContainerLocations(String testCases,
                                        Set<Long> prepopulatedIds,
-                                       Set<Long> testIds,
+                                       Set<Long> testContainerIds,
                                        boolean forceRefresh,
                                         Set<Long> expectedScmCallIds)
       throws IOException {
@@ -207,7 +136,7 @@ public class TestScmClient {
           eq(expectedScmCallIds))).thenReturn(scmLocations);
     }
 
-    locations = scmClient.getContainerLocations(testIds, forceRefresh);
+    locations = scmClient.getContainerLocations(testContainerIds, forceRefresh);
     locations.forEach((id, pipeline) -> {
       Assertions.assertEquals(actualLocations.get(id).getPipeline(), pipeline);
     });

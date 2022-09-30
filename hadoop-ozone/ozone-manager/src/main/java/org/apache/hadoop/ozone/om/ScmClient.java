@@ -108,18 +108,6 @@ public class ScmClient {
     return updateServiceGrpcClient;
   }
 
-  public Pipeline getContainerLocation(long containerId, boolean forceRefresh)
-      throws IOException {
-    if (forceRefresh) {
-      containerLocationCache.invalidate(containerId);
-    }
-    try {
-      return containerLocationCache.get(containerId);
-    } catch (ExecutionException e) {
-      return handleCacheExecutionException(e);
-    }
-  }
-
   public Map<Long, Pipeline> getContainerLocations(Iterable<Long> containerIds,
                                                   boolean forceRefresh)
       throws IOException {
