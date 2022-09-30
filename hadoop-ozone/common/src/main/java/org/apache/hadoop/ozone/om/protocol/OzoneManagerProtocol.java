@@ -24,6 +24,7 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
@@ -32,7 +33,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
@@ -71,7 +70,7 @@ import org.apache.hadoop.security.token.TokenInfo;
     serverPrincipal = OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY)
 @TokenInfo(OzoneDelegationTokenSelector.class)
 public interface OzoneManagerProtocol
-    extends OzoneManagerSecurityProtocol, Closeable {
+    extends IOmMetadataReader, OzoneManagerSecurityProtocol, Closeable {
 
   @SuppressWarnings("checkstyle:ConstantName")
   /**
@@ -263,15 +262,6 @@ public interface OzoneManagerProtocol
   }
 
   /**
-   * Look up for the container of an existing key.
-   *
-   * @param args the args of the key.
-   * @return OmKeyInfo instance that client uses to talk to container.
-   * @throws IOException
-   */
-  OmKeyInfo lookupKey(OmKeyArgs args) throws IOException;
-
-  /**
    * Rename an existing key within a bucket.
    * @param args the args of the key.
    * @param toKeyName New name to be used for the Key
@@ -354,31 +344,6 @@ public interface OzoneManagerProtocol
    */
   List<OmBucketInfo> listBuckets(String volumeName,
       String startBucketName, String bucketPrefix, int maxNumOfBuckets)
-      throws IOException;
-
-  /**
-   * Returns a list of keys represented by {@link OmKeyInfo}
-   * in the given bucket. Argument volumeName, bucketName is required,
-   * others are optional.
-   *
-   * @param volumeName
-   *   the name of the volume.
-   * @param bucketName
-   *   the name of the bucket.
-   * @param startKeyName
-   *   the start key name, only the keys whose name is
-   *   after this value will be included in the result.
-   * @param keyPrefix
-   *   key name prefix, only the keys whose name has
-   *   this prefix will be included in the result.
-   * @param maxKeys
-   *   the maximum number of keys to return. It ensures
-   *   the size of the result will not exceed this limit.
-   * @return a list of keys.
-   * @throws IOException
-   */
-  List<OmKeyInfo> listKeys(String volumeName,
-      String bucketName, String startKeyName, String keyPrefix, int maxKeys)
       throws IOException;
 
   /**
@@ -702,17 +667,6 @@ public interface OzoneManagerProtocol
   TenantStateList listTenant() throws IOException;
 
   /**
-   * OzoneFS api to get file status for an entry.
-   *
-   * @param keyArgs Key args
-   * @throws OMException if file does not exist
-   *                     if bucket does not exist
-   * @throws IOException if there is error in the db
-   *                     invalid arguments
-   */
-  OzoneFileStatus getFileStatus(OmKeyArgs keyArgs) throws IOException;
-
-  /**
    * Ozone FS api to create a directory. Parent directories if do not exist
    * are created for the input directory.
    *
@@ -748,49 +702,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
-  /**
-   * OzoneFS api to lookup for a file.
-   *
-   * @param keyArgs Key args
-   * @throws OMException if given key is not found or it is not a file
-   *                     if bucket does not exist
-   * @throws IOException if there is error in the db
-   *                     invalid arguments
-   */
-  OmKeyInfo lookupFile(OmKeyArgs keyArgs) throws IOException;
-
-  /**
-   * List the status for a file or a directory and its contents.
-   *
-   * @param keyArgs    Key args
-   * @param recursive  For a directory if true all the descendants of a
-   *                   particular directory are listed
-   * @param startKey   Key from which listing needs to start. If startKey exists
-   *                   its status is included in the final list.
-   * @param numEntries Number of entries to list from the start key
-   * @return list of file status
-   */
-  List<OzoneFileStatus> listStatus(OmKeyArgs keyArgs, boolean recursive,
-      String startKey, long numEntries) throws IOException;
-
-  /**
-   * List the status for a file or a directory and its contents.
-   *
-   * @param keyArgs    Key args
-   * @param recursive  For a directory if true all the descendants of a
-   *                   particular directory are listed
-   * @param startKey   Key from which listing needs to start. If startKey exists
-   *                   its status is included in the final list.
-   * @param numEntries Number of entries to list from the start key
-   * @param allowPartialPrefixes if partial prefixes should be allowed,
-   *                             this is needed in context of ListKeys
-   * @return list of file status
-   */
-  List<OzoneFileStatus> listStatus(OmKeyArgs keyArgs, boolean recursive,
-                                   String startKey, long numEntries,
-                                   boolean allowPartialPrefixes)
-      throws IOException;
 
   /**
    * Add acl for Ozone object. Return true if acl is added successfully else
@@ -832,15 +743,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
-
-  /**
-   * Returns list of ACLs for given Ozone object.
-   * @param obj Ozone object.
-   *
-   * @throws IOException if there is error.
-   * */
-  List<OzoneAcl> getAcl(OzoneObj obj) throws IOException;
 
   /**
    * Get DB updates since a specific sequence number.

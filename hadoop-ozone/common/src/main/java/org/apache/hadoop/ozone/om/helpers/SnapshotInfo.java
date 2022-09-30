@@ -414,7 +414,13 @@ public final class SnapshotInfo implements Auditable {
    * Get the table key for this snapshot.
    */
   public String getTableKey() {
-    return OM_KEY_PREFIX + snapshotPath + OM_KEY_PREFIX + name;
+    return getTableKey(volumeName, bucketName, name);
+  }
+
+  public static String getTableKey(String volumeName, String bucketName,
+      String snapshotName) {
+    return OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName
+        + OM_KEY_PREFIX + snapshotName;
   }
 
   /**
