@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Progressable;
+import org.apache.http.client.utils.URIBuilder;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
@@ -52,6 +53,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -60,6 +62,7 @@ import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.addTrailingSlashIfNeeded;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.pathToKey;
 
@@ -123,8 +126,15 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   @Override
   public URI getUri() {
-    throw new UnsupportedOperationException(
-        "fs.getUri() not implemented in TrashOzoneFileSystem");
+    URI uri = null;
+    try {
+      uri = new URIBuilder().setScheme(OZONE_URI_SCHEME)
+              .setHost("ofs.trash")
+              .build();
+    } catch (URISyntaxException e) {
+      LOG.error("Invalid syntax while building URI");
+    }
+    return uri;
   }
 
   @Override
