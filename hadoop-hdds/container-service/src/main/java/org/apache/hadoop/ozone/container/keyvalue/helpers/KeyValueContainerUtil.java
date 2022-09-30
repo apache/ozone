@@ -495,25 +495,29 @@ public final class KeyValueContainerUtil {
      * @throws IOException
      */
     public static File getContainerFile(File file) throws IOException {
-      if (file.isDirectory()) {
-        for (File subFile : file.listFiles()) {
-          if (subFile.isDirectory()) {
-            File containerFile = getContainerFile(subFile);
-            if (containerFile != null) {
-              return containerFile;
-            }
-          } else {
-            if (FilenameUtils.getExtension(subFile.getName())
-                .equals("container")) {
-              return subFile;
+      try {
+        if (file.isDirectory()) {
+          for (File subFile : file.listFiles()) {
+            if (subFile.isDirectory()) {
+              File containerFile = getContainerFile(subFile);
+              if (containerFile != null) {
+                return containerFile;
+              }
+            } else {
+              if (FilenameUtils.getExtension(subFile.getName())
+                  .equals("container")) {
+                return subFile;
+              }
             }
           }
+        } else {
+          if (FilenameUtils.getExtension(file.getName())
+              .equals("container")) {
+            return file;
+          }
         }
-      } else {
-        if (FilenameUtils.getExtension(file.getName())
-            .equals("container")) {
-          return file;
-        }
+      } catch (NullPointerException ex) {
+        LOG.error("File object is null.", ex);
       }
       return null;
     }
@@ -527,14 +531,16 @@ public final class KeyValueContainerUtil {
     public static ListIterator<File> getDeleteLeftovers(HddsVolume hddsVolume) {
       List<File> leftovers = new ArrayList<>();
 
-      File tmpDir = new File(hddsVolume.getDeleteServiceDirPath().toString());
+      try {
+        File tmpDir = new File(hddsVolume.getDeleteServiceDirPath().toString());
 
-      if (tmpDir.exists()) {
-        for (File file : tmpDir.listFiles()) {
-          leftovers.add(file);
+        if (tmpDir.exists()) {
+          for (File file : tmpDir.listFiles()) {
+            leftovers.add(file);
+          }
         }
-      } else {
-        LOG.error("tmp directory is null, path doesn't exist");
+      } catch (NullPointerException ex) {
+        LOG.error("tmp delete directory is null, path doesn't exist", ex);
       }
 
       ListIterator<File> leftoversListIt = leftovers.listIterator();
