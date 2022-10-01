@@ -55,8 +55,7 @@ public class ListBucketHandler extends VolumeHandler {
     List<Object> bucketList = new ArrayList<>();
     while (bucketIterator.hasNext()) {
       OzoneBucket bucket = bucketIterator.next();
-      if (bucket.getSourceBucket() != null &&
-          bucket.getSourceVolume() != null) {
+      if (bucket.isLink()) {
         bucketList.add(new InfoBucketHandler.LinkBucket(bucket));
       } else {
         bucketList.add(bucket);
