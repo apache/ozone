@@ -21,6 +21,9 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -57,15 +60,19 @@ import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.SEQUENCE_ID;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.META;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 
+import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.management.ObjectName;
 
 /**
  * A RocksDB based implementation of SCM Metadata Store.
  *
  */
-public class SCMMetadataStoreImpl implements SCMMetadataStore {
+public class SCMMetadataStoreImpl implements SCMMetadataStore,
+    SCMMetadataStoreMXBean {
 
   private Table<Long, DeletedBlocksTransaction> deletedBlocksTable;
 
@@ -99,6 +106,9 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
       LoggerFactory.getLogger(SCMMetadataStoreImpl.class);
   private DBStore store;
   private final OzoneConfiguration configuration;
+
+  private ObjectName mxBean;
+  private Map<String, Table<?, ?>> tableMap = new ConcurrentHashMap<>();
 
   /**
    * Constructs the metadata store and starts the DB Services.
@@ -190,6 +200,9 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
       checkTableStatus(statefulServiceConfigTable,
           STATEFUL_SERVICE_CONFIG.getName());
+
+      mxBean = MBeans.register("SCMMetadataStore", "SCMMetadataStoreImpl",
+          this);
     }
   }
 
@@ -313,6 +326,20 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
       LOG.error(String.format(logMessage, name));
       throw new IOException(String.format(errMsg, name));
     }
+    tableMap.put(name, table);
+  }
+
+  @Override
+  public String getEstimatedKeyCount() {
+    return tableMap.entrySet().stream().map(e -> {
+      try {
+        return e.getKey() + " : " + e.getValue().getEstimatedKeyCount();
+      } catch (IOException ex) {
+        ex.printStackTrace();
+      }
+      return "N/A";
+    }).collect(
+        Collectors.joining(", "));
   }
 
 }
