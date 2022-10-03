@@ -1083,7 +1083,8 @@ public class BasicRootedOzoneClientAdapterImpl
         FsPermission.getDirDefault().toShort(),
         owner, group, path, new BlockLocation[0],
         !StringUtils.isEmpty(ozoneBucket.getEncryptionKeyName()),
-        ozoneBucket.getReplicationConfig().getReplicationType() ==
+        ozoneBucket.getReplicationConfig() != null &&
+                    ozoneBucket.getReplicationConfig().getReplicationType() ==
                     HddsProtos.ReplicationType.EC);
   }
 
