@@ -162,7 +162,7 @@ public class TestClosedWithMismatchedReplicasHandler {
         ratisReplicationConfig, 1, CLOSED);
     Set<ContainerReplica> containerReplicas =
         ReplicationTestUtil.createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.CLOSED, 1, 2, 3);
+            ContainerReplicaProto.State.CLOSED, 0, 0, 0);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.EMPTY_LIST)
         .setReport(new ReplicationManagerReport())
@@ -181,15 +181,15 @@ public class TestClosedWithMismatchedReplicasHandler {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         ratisReplicationConfig, 1, CLOSED);
     ContainerReplica mismatch1 = ReplicationTestUtil.createContainerReplica(
-        containerInfo.containerID(), 1,
+        containerInfo.containerID(), 0,
         HddsProtos.NodeOperationalState.IN_SERVICE,
         ContainerReplicaProto.State.OPEN);
     ContainerReplica mismatch2 = ReplicationTestUtil.createContainerReplica(
-        containerInfo.containerID(), 2,
+        containerInfo.containerID(), 0,
         HddsProtos.NodeOperationalState.IN_SERVICE,
         ContainerReplicaProto.State.CLOSING);
     ContainerReplica mismatch3 = ReplicationTestUtil.createContainerReplica(
-        containerInfo.containerID(), 3,
+        containerInfo.containerID(), 0,
         HddsProtos.NodeOperationalState.IN_SERVICE,
         ContainerReplicaProto.State.UNHEALTHY);
     Set<ContainerReplica> containerReplicas = new HashSet<>();
