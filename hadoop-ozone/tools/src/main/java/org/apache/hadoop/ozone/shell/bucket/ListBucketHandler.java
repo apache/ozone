@@ -53,16 +53,17 @@ public class ListBucketHandler extends VolumeHandler {
     Iterator<? extends OzoneBucket> bucketIterator =
         vol.listBuckets(listOptions.getPrefix(), listOptions.getStartItem());
     List<Object> bucketList = new ArrayList<>();
-    while (bucketIterator.hasNext()) {
+    int counter = 0;
+    while (bucketIterator.hasNext() && counter < listOptions.getLimit()) {
       OzoneBucket bucket = bucketIterator.next();
       if (bucket.isLink()) {
         bucketList.add(new InfoBucketHandler.LinkBucket(bucket));
       } else {
         bucketList.add(bucket);
       }
+      counter++;
     }
-    int counter = printAsJsonArray(bucketList.iterator(),
-        listOptions.getLimit());
+    printAsJsonArray(bucketList.iterator(), listOptions.getLimit());
     if (isVerbose()) {
       out().printf("Found : %d buckets for volume : %s ", counter, volumeName);
     }
