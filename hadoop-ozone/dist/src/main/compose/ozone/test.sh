@@ -47,6 +47,7 @@ for bucket in erasure link generated; do
 done
 
 execute_robot_test scm recon
+execute_robot_test scm -v BUCKET_LAYOUT:LEGACY recon/recon-nssummary.robot
 
 execute_robot_test scm om-ratis
 
