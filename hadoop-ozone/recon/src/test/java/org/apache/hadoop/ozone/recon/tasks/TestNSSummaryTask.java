@@ -24,7 +24,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.helpers.*;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
@@ -369,7 +373,8 @@ public final class TestNSSummaryTask {
           .setKey(omDirPutKey2)
           .setValue(omDirPutValue2)
           .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
-          .setTable(omMetadataManager.getKeyTable(getLegacyBucketLayout()).getName())
+          .setTable(omMetadataManager
+              .getKeyTable(getLegacyBucketLayout()).getName())
           .build();
 
       // delete dir 3 under dir 1
@@ -401,14 +406,14 @@ public final class TestNSSummaryTask {
 
       OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(
           new ArrayList<OMDBUpdateEvent>() {{
-            add(keyEvent1);
-            add(keyEvent2);
-            add(keyEvent3);
-            add(keyEvent4);
-            add(keyEvent5);
-            add(keyEvent6);
-            add(keyEvent7);
-          }});
+              add(keyEvent1);
+              add(keyEvent2);
+              add(keyEvent3);
+              add(keyEvent4);
+              add(keyEvent5);
+              add(keyEvent6);
+              add(keyEvent7);
+              }});
 
       return omUpdateEventBatch;
     }
