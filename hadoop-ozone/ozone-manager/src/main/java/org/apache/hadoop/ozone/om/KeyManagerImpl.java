@@ -179,7 +179,7 @@ public class KeyManagerImpl implements KeyManager {
       OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
       OzoneBlockTokenSecretManager secretManager,
       OMPerformanceMetrics metrics) {
-    this(null, new ScmClient(scmBlockClient, null), metadataManager,
+    this(null, new ScmClient(scmBlockClient, null, conf), metadataManager,
         conf, omId, secretManager, null, null, metrics);
   }
 
@@ -189,7 +189,7 @@ public class KeyManagerImpl implements KeyManager {
       OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
       OzoneBlockTokenSecretManager secretManager,
       OMPerformanceMetrics metrics) {
-    this(null, new ScmClient(scmBlockClient, scmContainerClient),
+    this(null, new ScmClient(scmBlockClient, scmContainerClient, conf),
         metadataManager, conf, omId, secretManager, null, null,
         metrics);
   }

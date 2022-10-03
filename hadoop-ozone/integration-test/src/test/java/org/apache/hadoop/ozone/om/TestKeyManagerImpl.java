@@ -253,14 +253,15 @@ public class TestKeyManagerImpl {
 
   private static void mockContainerClient() {
     ScmClient scmClient = new ScmClient(scm.getBlockProtocolServer(),
-        mockScmContainerClient);
+        mockScmContainerClient, conf);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
         "scmClient", scmClient);
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmClient", scmClient);
   }
   private static void mockBlockClient() {
-    ScmClient scmClient = new ScmClient(mockScmBlockLocationProtocol, null);
+    ScmClient scmClient = new ScmClient(mockScmBlockLocationProtocol, null,
+        conf);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
         "scmClient", scmClient);
     HddsWhiteboxTestUtils.setInternalState(om,
