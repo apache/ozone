@@ -65,15 +65,7 @@ public class NSSummaryTask implements ReconOmTask {
     this.nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager, reconOMMetadataManager);
   }
-
-  public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
-    return reconNamespaceSummaryManager;
-  }
-
-  public ReconOMMetadataManager getReconOMMetadataManager() {
-    return reconOMMetadataManager;
-  }
-
+  
   @Override
   public String getTaskName() {
     return "NSSummaryTask";
