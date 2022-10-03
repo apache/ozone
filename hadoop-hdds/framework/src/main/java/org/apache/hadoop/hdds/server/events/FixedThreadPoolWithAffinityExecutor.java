@@ -107,7 +107,8 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
     for (BlockingQueue<Q> queue : workQueues) {
       ThreadPoolExecutor threadPoolExecutor = executors.get(i);
       if (threadPoolExecutor.getQueue().size() == 0) {
-        threadPoolExecutor.submit(new ReportExecutor<>(queue, isRunning));
+        threadPoolExecutor.submit(new ContainerReportProcessTask<>(queue,
+            isRunning));
       }
       ++i;
     }
@@ -187,6 +188,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
       executor.shutdown();
     }
     EXECUTOR_MAP.clear();
+    DefaultMetricsSystem.instance().unregisterSource(EVENT_QUEUE + name);
   }
 
   @Override
@@ -197,11 +199,12 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
   /**
    * Runnable class to perform execution of payload.
    */
-  public static class ReportExecutor<P> implements Runnable {
+  public static class ContainerReportProcessTask<P> implements Runnable {
     private BlockingQueue<P> queue;
     private AtomicBoolean isRunning;
 
-    public ReportExecutor(BlockingQueue<P> queue, AtomicBoolean isRunning) {
+    public ContainerReportProcessTask(BlockingQueue<P> queue,
+                                      AtomicBoolean isRunning) {
       this.queue = queue;
       this.isRunning = isRunning;
     }
@@ -218,6 +221,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
           FixedThreadPoolWithAffinityExecutor executor = EXECUTOR_MAP.get(
               report.getClass().getName());
           if (null == executor) {
+            LOG.warn("Executor for report is not found");
             continue;
           }
 
@@ -236,6 +240,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
           }
         } catch (InterruptedException e) {
           LOG.warn("Interrupt of execution of Reports");
+          Thread.currentThread().interrupt();
           return;
         }
       }

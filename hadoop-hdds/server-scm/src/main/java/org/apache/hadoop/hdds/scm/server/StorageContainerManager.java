@@ -183,6 +183,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_CONTAINER_REPORT_QUEUE_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_PREFIX;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
@@ -531,10 +532,16 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
                 + SCMEvents.INCREMENTAL_CONTAINER_REPORT.getName())
             + ".thread.pool.size",
         OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT);
+    int queueSize = configuration.getInt(OZONE_SCM_EVENT_PREFIX +
+            StringUtils.camelize(SCMEvents.CONTAINER_REPORT.getName()
+                + "_OR_"
+                + SCMEvents.INCREMENTAL_CONTAINER_REPORT.getName())
+            + ".queue.size",
+        OZONE_SCM_EVENT_CONTAINER_REPORT_QUEUE_SIZE_DEFAULT);
     List<BlockingQueue<ContainerReportBase>>
         queues = new ArrayList<>();
     for (int i = 0; i < threadPoolSize; ++i) {
-      queues.add(new ContainerReportQueue<>());
+      queues.add(new ContainerReportQueue<>(queueSize));
     }
     return queues;
   }
