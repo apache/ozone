@@ -17,9 +17,27 @@
 
 package org.apache.hadoop.ozone.om;
 
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.update.client.SCMUpdateServiceGrpcClient;
+import org.jetbrains.annotations.NotNull;
+
+import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_CACHE_TTL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_CACHE_TTL_DEFAULT;
 
 /**
  * Wrapper class for Scm protocol clients.
@@ -28,12 +46,49 @@ public class ScmClient {
 
   private final ScmBlockLocationProtocol blockClient;
   private final StorageContainerLocationProtocol containerClient;
+  private final LoadingCache<Long, Pipeline> containerLocationCache;
   private SCMUpdateServiceGrpcClient updateServiceGrpcClient;
 
   ScmClient(ScmBlockLocationProtocol blockClient,
-            StorageContainerLocationProtocol containerClient) {
+            StorageContainerLocationProtocol containerClient,
+            OzoneConfiguration configuration) {
     this.containerClient = containerClient;
     this.blockClient = blockClient;
+    this.containerLocationCache =
+        createContainerLocationCache(configuration, containerClient);
+  }
+
+  static LoadingCache<Long, Pipeline> createContainerLocationCache(
+      OzoneConfiguration configuration,
+      StorageContainerLocationProtocol containerClient) {
+    int maxSize = configuration.getInt(OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE,
+        OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE_DEFAULT);
+    TimeUnit unit =  OZONE_OM_CONTAINER_LOCATION_CACHE_TTL_DEFAULT.getUnit();
+    long ttl = configuration.getTimeDuration(
+        OZONE_OM_CONTAINER_LOCATION_CACHE_TTL,
+        OZONE_OM_CONTAINER_LOCATION_CACHE_TTL_DEFAULT.getDuration(), unit);
+    return CacheBuilder.newBuilder()
+        .maximumSize(maxSize)
+        .expireAfterWrite(ttl, unit)
+        .build(new CacheLoader<Long, Pipeline>() {
+          @NotNull
+          @Override
+          public Pipeline load(@NotNull Long key) throws Exception {
+            return containerClient.getContainerWithPipeline(key).getPipeline();
+          }
+
+          @NotNull
+          @Override
+          public Map<Long, Pipeline> loadAll(
+              @NotNull Iterable<? extends Long> keys) throws Exception {
+            return containerClient.getContainerWithPipelineBatch(keys)
+                .stream()
+                .collect(Collectors.toMap(
+                    x -> x.getContainerInfo().getContainerID(),
+                    ContainerWithPipeline::getPipeline
+                ));
+          }
+        });
   }
 
   public ScmBlockLocationProtocol getBlockClient() {
@@ -52,4 +107,28 @@ public class ScmClient {
   public SCMUpdateServiceGrpcClient getUpdateServiceGrpcClient() {
     return updateServiceGrpcClient;
   }
+
+  public Map<Long, Pipeline> getContainerLocations(Iterable<Long> containerIds,
+                                                  boolean forceRefresh)
+      throws IOException {
+    if (forceRefresh) {
+      containerLocationCache.invalidateAll(containerIds);
+    }
+    try {
+      return containerLocationCache.getAll(containerIds);
+    } catch (ExecutionException e) {
+      return handleCacheExecutionException(e);
+    }
+  }
+
+  private <T> T handleCacheExecutionException(ExecutionException e)
+      throws IOException {
+    if (e.getCause() instanceof IOException) {
+      throw (IOException) e.getCause();
+    }
+    throw new IllegalStateException("Unexpected exception accessing " +
+        "container location", e.getCause());
+  }
+
+
 }

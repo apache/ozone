@@ -530,7 +530,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     scmContainerClient = getScmContainerClient(configuration);
     // verifies that the SCM info in the OM Version file is correct.
     scmBlockClient = getScmBlockClient(configuration);
-    this.scmClient = new ScmClient(scmBlockClient, scmContainerClient);
+    this.scmClient = new ScmClient(scmBlockClient, scmContainerClient,
+        configuration);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
         getEnableFileSystemPaths());
 
