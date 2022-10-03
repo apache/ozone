@@ -635,7 +635,7 @@ public class TestOzoneFileSystem {
     Assert.assertEquals(fileStatuses[0].isErasureCoded(),
             !bucketLayout.isFileSystemOptimized());
     fileStatuses = fs.listStatus(new Path(
-            fileStatuses[0].getPath().toString()+"/object-name1"));
+            fileStatuses[0].getPath().toString() + "/object-name1"));
     Assert.assertEquals(1, fileStatuses.length);
     Assert.assertTrue(fileStatuses[0].isErasureCoded());
     writeClient.deleteKey(keyArgs);
