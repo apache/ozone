@@ -53,7 +53,7 @@ public class DeleteContainerCommandHandler implements CommandHandler {
 
   public DeleteContainerCommandHandler(int threadPoolSize) {
     this.executor = new ThreadPoolExecutor(
-        0, threadPoolSize, 60, TimeUnit.SECONDS,
+        threadPoolSize, threadPoolSize, 60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder().setDaemon(true)
             .setNameFormat("DeleteContainerThread-%d")

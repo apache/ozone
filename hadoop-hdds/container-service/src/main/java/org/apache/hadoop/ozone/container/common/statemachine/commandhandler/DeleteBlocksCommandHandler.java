@@ -93,7 +93,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     this.containerSet = cset;
     this.conf = conf;
     this.executor = new ThreadPoolExecutor(
-        0, threadPoolSize, 60, TimeUnit.SECONDS,
+        threadPoolSize, threadPoolSize, 60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder().setDaemon(true)
             .setNameFormat("DeleteBlocksCommandHandlerThread-%d")
