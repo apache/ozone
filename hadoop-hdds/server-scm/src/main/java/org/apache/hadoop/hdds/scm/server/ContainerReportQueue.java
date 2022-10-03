@@ -44,356 +44,356 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ContainerReportQueue<VALUE extends ContainerReportBase>
     implements BlockingQueue<VALUE>, IQueueMetrics {
 
-    private final Integer maxCapacity;
+  private final Integer maxCapacity;
 
-    /* ordering queue provides ordering of execution in fair manner
-     * i.e. report execution from multiple datanode will be executed in same
-     * order as added to queue.
-     */
-    private LinkedBlockingQueue<String> orderingQueue
-        = new LinkedBlockingQueue<>();
-    private Map<String, List<VALUE>> dataMap = new HashMap<>();
+  /* ordering queue provides ordering of execution in fair manner
+   * i.e. report execution from multiple datanode will be executed in same
+   * order as added to queue.
+   */
+  private LinkedBlockingQueue<String> orderingQueue
+      = new LinkedBlockingQueue<>();
+  private Map<String, List<VALUE>> dataMap = new HashMap<>();
 
-    private int capacity = 0;
+  private int capacity = 0;
 
-    private AtomicInteger droppedCount = new AtomicInteger();
+  private AtomicInteger droppedCount = new AtomicInteger();
 
-    public ContainerReportQueue() {
-        this(100000);
-    }
+  public ContainerReportQueue() {
+    this(100000);
+  }
+  
+  public ContainerReportQueue(int maxCapacity) {
+    super();
+    this.maxCapacity = maxCapacity;
+  }
 
-    public ContainerReportQueue(int maxCapacity) {
-        super();
-        this.maxCapacity = maxCapacity;
-    }
-
-    private boolean addContainerReport(VALUE val) {
-        ContainerReportFromDatanode report
-            = (ContainerReportFromDatanode) val;
-        synchronized (this) {
-            // 1. check if no previous report available, else add the report
-            DatanodeDetails dn = report.getDatanodeDetails();
-            if (!dataMap.containsKey(dn.getUuidString())) {
-                ArrayList<VALUE> dataList = new ArrayList<>();
-                dataList.add(val);
-                ++capacity;
-                dataMap.put(dn.getUuidString(), dataList);
-                orderingQueue.add(dn.getUuidString());
-                return true;
-            }
-
-            // 2. FCR report available
-            List<VALUE> dataList = dataMap.get(dn.getUuidString());
-            boolean isReportRemoved = false;
-            if (!dataList.isEmpty()) {
-                // remove FCR if present
-                for (int i = dataList.size() - 1; i >= 0; --i) {
-                    ContainerReportBase reportInfo = dataList.get(i);
-                    // if FCR, its last FCR report, remove directly
-                    if (isFCRReport(reportInfo)) {
-                        dataList.remove(i);
-                        --capacity;
-                        droppedCount.incrementAndGet();
-                        isReportRemoved = true;
-                        break;
-                    }
-                }
-            }
-
-            dataList.add(val);
-            ++capacity;
-            if (!isReportRemoved) {
-                orderingQueue.add(dn.getUuidString());
-            }
-        }
+  private boolean addContainerReport(VALUE val) {
+    ContainerReportFromDatanode report
+        = (ContainerReportFromDatanode) val;
+    synchronized (this) {
+      // 1. check if no previous report available, else add the report
+      DatanodeDetails dn = report.getDatanodeDetails();
+      if (!dataMap.containsKey(dn.getUuidString())) {
+        ArrayList<VALUE> dataList = new ArrayList<>();
+        dataList.add(val);
+        ++capacity;
+        dataMap.put(dn.getUuidString(), dataList);
+        orderingQueue.add(dn.getUuidString());
         return true;
-    }
+      }
 
-    private boolean addIncrementalReport(VALUE val) {
-        IncrementalContainerReportFromDatanode report
-            = (IncrementalContainerReportFromDatanode) val;
-        synchronized (this) {
-            // 1. check if no previous report available, else add the report
-            DatanodeDetails dn = report.getDatanodeDetails();
-            if (!dataMap.containsKey(dn.getUuidString())) {
-                ArrayList<VALUE> dataList = new ArrayList<>();
-                dataList.add(val);
-                ++capacity;
-                dataMap.put(dn.getUuidString(), dataList);
-                orderingQueue.add(dn.getUuidString());
-                return true;
-            }
-
-            // 2. Add ICR report or merge to previous ICR
-            List<VALUE> dataList = dataMap.get(dn.getUuidString());
-            dataList.add(val);
-            ++capacity;
-            orderingQueue.add(dn.getUuidString());
-        }
-        return true;
-    }
-
-    private boolean isFCRReport(Object report) {
-        return report instanceof ContainerReportFromDatanode;
-    }
-
-    private boolean isICRReport(Object report) {
-        return report instanceof IncrementalContainerReportFromDatanode;
-    }
-
-    private VALUE removeAndGet(String uuid) {
-        if (uuid == null) {
-            return null;
-        }
-
-        List<VALUE> dataList = dataMap.get(uuid);
-        VALUE report = null;
-        if (dataList != null && !dataList.isEmpty()) {
-            report = dataList.remove(0);
+      // 2. FCR report available
+      List<VALUE> dataList = dataMap.get(dn.getUuidString());
+      boolean isReportRemoved = false;
+      if (!dataList.isEmpty()) {
+        // remove FCR if present
+        for (int i = dataList.size() - 1; i >= 0; --i) {
+          ContainerReportBase reportInfo = dataList.get(i);
+          // if FCR, its last FCR report, remove directly
+          if (isFCRReport(reportInfo)) {
+            dataList.remove(i);
             --capacity;
-            if (dataList.isEmpty()) {
-                dataMap.remove(uuid);
-            }
+            droppedCount.incrementAndGet();
+            isReportRemoved = true;
+            break;
+          }
         }
-        return report;
+      }
+
+      dataList.add(val);
+      ++capacity;
+      if (!isReportRemoved) {
+        orderingQueue.add(dn.getUuidString());
+      }
+    }
+    return true;
+  }
+
+  private boolean addIncrementalReport(VALUE val) {
+    IncrementalContainerReportFromDatanode report
+        = (IncrementalContainerReportFromDatanode) val;
+    synchronized (this) {
+      // 1. check if no previous report available, else add the report
+      DatanodeDetails dn = report.getDatanodeDetails();
+      if (!dataMap.containsKey(dn.getUuidString())) {
+        ArrayList<VALUE> dataList = new ArrayList<>();
+        dataList.add(val);
+        ++capacity;
+        dataMap.put(dn.getUuidString(), dataList);
+        orderingQueue.add(dn.getUuidString());
+        return true;
+      }
+
+      // 2. Add ICR report or merge to previous ICR
+      List<VALUE> dataList = dataMap.get(dn.getUuidString());
+      dataList.add(val);
+      ++capacity;
+      orderingQueue.add(dn.getUuidString());
+    }
+    return true;
+  }
+
+  private boolean isFCRReport(Object report) {
+    return report instanceof ContainerReportFromDatanode;
+  }
+
+  private boolean isICRReport(Object report) {
+    return report instanceof IncrementalContainerReportFromDatanode;
+  }
+
+  private VALUE removeAndGet(String uuid) {
+    if (uuid == null) {
+      return null;
     }
 
-    private VALUE getReport(String uuid) {
-        if (uuid == null) {
-            return null;
-        }
+    List<VALUE> dataList = dataMap.get(uuid);
+    VALUE report = null;
+    if (dataList != null && !dataList.isEmpty()) {
+      report = dataList.remove(0);
+      --capacity;
+      if (dataList.isEmpty()) {
+        dataMap.remove(uuid);
+      }
+    }
+    return report;
+  }
 
-        List<VALUE> dataList = dataMap.get(uuid);
-        if (dataList != null && !dataList.isEmpty()) {
-            return dataList.get(0);
-        }
-        return null;
+  private VALUE getReport(String uuid) {
+    if (uuid == null) {
+      return null;
     }
 
-    private static void checkNotNull(Object v) {
-        if (v == null) {
-            throw new NullPointerException();
-        }
+    List<VALUE> dataList = dataMap.get(uuid);
+    if (dataList != null && !dataList.isEmpty()) {
+      return dataList.get(0);
     }
+    return null;
+  }
 
-    public boolean addValue(@NotNull VALUE value) {
-        synchronized (this) {
-            if (remainingCapacity() == 0) {
-                return false;
-            }
-
-            if (isFCRReport(value)) {
-                return addContainerReport(value);
-            } else if (isICRReport(value)) {
-                return addIncrementalReport(value);
-            }
-            return false;
-        }
+  private static void checkNotNull(Object v) {
+    if (v == null) {
+      throw new NullPointerException();
     }
+  }
 
-    @Override
-    public boolean add(@NotNull VALUE value) {
-        checkNotNull(value);
-        synchronized (this) {
-            if (remainingCapacity() == 0) {
-                throw new IllegalStateException("capacity not available");
-            }
-
-            return addValue(value);
-        }
-    }
-
-    @Override
-    public boolean offer(@NotNull VALUE value) {
-        checkNotNull(value);
-        synchronized (this) {
-            return addValue(value);
-        }
-    }
-
-    @Override
-    public VALUE remove() {
-        synchronized (this) {
-            String uuid = orderingQueue.remove();
-            if (null == uuid) {
-                throw new NoSuchElementException();
-            }
-            return removeAndGet(uuid);
-        }
-    }
-
-    @Override
-    public VALUE poll() {
-        synchronized (this) {
-            String uuid = orderingQueue.poll();
-            return removeAndGet(uuid);
-        }
-    }
-
-    @Override
-    public VALUE element() {
-        synchronized (this) {
-            String uuid = orderingQueue.element();
-            if (null == uuid) {
-                throw new NoSuchElementException();
-            }
-            return getReport(uuid);
-        }
-    }
-
-    @Override
-    public VALUE peek() {
-        synchronized (this) {
-            String uuid = orderingQueue.peek();
-            return getReport(uuid);
-        }
-    }
-
-    @Override
-    public void put(@NotNull VALUE value) throws InterruptedException {
-        checkNotNull(value);
-        while (!addValue(value)) {
-            Thread.currentThread().sleep(10);
-        }
-    }
-
-    @Override
-    public boolean offer(VALUE value, long timeout, @NotNull TimeUnit unit)
-        throws InterruptedException {
-        checkNotNull(value);
-        long timeoutMillis = unit.toMillis(timeout);
-        while (timeoutMillis > 0) {
-            if (addValue(value)) {
-                return true;
-            }
-            Thread.currentThread().sleep(10);
-            timeoutMillis -= 10;
-        }
+  public boolean addValue(@NotNull VALUE value) {
+    synchronized (this) {
+      if (remainingCapacity() == 0) {
         return false;
-    }
+      }
 
-    @NotNull
-    @Override
-    public VALUE take() throws InterruptedException {
-        String uuid = orderingQueue.take();
-        synchronized (this) {
-            return removeAndGet(uuid);
-        }
+      if (isFCRReport(value)) {
+        return addContainerReport(value);
+      } else if (isICRReport(value)) {
+        return addIncrementalReport(value);
+      }
+      return false;
     }
+  }
 
-    @Nullable
-    @Override
-    public VALUE poll(long timeout, @NotNull TimeUnit unit)
-        throws InterruptedException {
-        String uuid = orderingQueue.poll(timeout, unit);
-        synchronized (this) {
-            return removeAndGet(uuid);
-        }
-    }
+  @Override
+  public boolean add(@NotNull VALUE value) {
+    checkNotNull(value);
+    synchronized (this) {
+      if (remainingCapacity() == 0) {
+        throw new IllegalStateException("capacity not available");
+      }
 
-    @Override
-    public int remainingCapacity() {
-        synchronized (this) {
-            return maxCapacity - capacity;
-        }
+      return addValue(value);
     }
+  }
 
-    @Override
-    public boolean remove(Object o) {
-        // no need support this
-        throw new UnsupportedOperationException("not supported");
+  @Override
+  public boolean offer(@NotNull VALUE value) {
+    checkNotNull(value);
+    synchronized (this) {
+      return addValue(value);
     }
+  }
 
-    @Override
-    public boolean containsAll(@NotNull Collection<?> c) {
-        // no need support this
-        throw new UnsupportedOperationException("not supported");
+  @Override
+  public VALUE remove() {
+    synchronized (this) {
+      String uuid = orderingQueue.remove();
+      if (null == uuid) {
+        throw new NoSuchElementException();
+      }
+      return removeAndGet(uuid);
     }
+  }
 
-    @Override
-    public boolean addAll(@NotNull Collection<? extends VALUE> c) {
-        // no need support this
-        throw new UnsupportedOperationException("not supported");
+  @Override
+  public VALUE poll() {
+    synchronized (this) {
+      String uuid = orderingQueue.poll();
+      return removeAndGet(uuid);
     }
+  }
 
-    @Override
-    public boolean removeAll(@NotNull Collection<?> c) {
-        // no need support this
-        throw new UnsupportedOperationException("not supported");
+  @Override
+  public VALUE element() {
+    synchronized (this) {
+      String uuid = orderingQueue.element();
+      if (null == uuid) {
+        throw new NoSuchElementException();
+      }
+      return getReport(uuid);
     }
+  }
 
-    @Override
-    public boolean retainAll(@NotNull Collection<?> c) {
-        // no need support this
-        throw new UnsupportedOperationException("not supported");
+  @Override
+  public VALUE peek() {
+    synchronized (this) {
+      String uuid = orderingQueue.peek();
+      return getReport(uuid);
     }
+  }
 
-    @Override
-    public void clear() {
-        synchronized (this) {
-            orderingQueue.clear();
-            dataMap.clear();
-            capacity = 0;
-        }
+  @Override
+  public void put(@NotNull VALUE value) throws InterruptedException {
+    checkNotNull(value);
+    while (!addValue(value)) {
+      Thread.currentThread().sleep(10);
     }
+  }
 
-    @Override
-    public int size() {
-        synchronized (this) {
-            return capacity;
-        }
+  @Override
+  public boolean offer(VALUE value, long timeout, @NotNull TimeUnit unit)
+      throws InterruptedException {
+    checkNotNull(value);
+    long timeoutMillis = unit.toMillis(timeout);
+    while (timeoutMillis > 0) {
+      if (addValue(value)) {
+        return true;
+      }
+      Thread.currentThread().sleep(10);
+      timeoutMillis -= 10;
     }
+    return false;
+  }
 
-    @Override
-    public boolean isEmpty() {
-        return orderingQueue.isEmpty();
+  @NotNull
+  @Override
+  public VALUE take() throws InterruptedException {
+    String uuid = orderingQueue.take();
+    synchronized (this) {
+      return removeAndGet(uuid);
     }
+  }
 
-    @Override
-    public boolean contains(Object o) {
-        // no need support this
-        throw new UnsupportedOperationException("not supported");
+  @Nullable
+  @Override
+  public VALUE poll(long timeout, @NotNull TimeUnit unit)
+      throws InterruptedException {
+    String uuid = orderingQueue.poll(timeout, unit);
+    synchronized (this) {
+      return removeAndGet(uuid);
     }
+  }
 
-    @NotNull
-    @Override
-    public Iterator<VALUE> iterator() {
-        // no need support this
-        throw new UnsupportedOperationException("not supported");
+  @Override
+  public int remainingCapacity() {
+    synchronized (this) {
+      return maxCapacity - capacity;
     }
+  }
 
-    @NotNull
-    @Override
-    public Object[] toArray() {
-        // no need support this
-        throw new UnsupportedOperationException("not supported");
-    }
+  @Override
+  public boolean remove(Object o) {
+    // no need support this
+    throw new UnsupportedOperationException("not supported");
+  }
 
-    @NotNull
-    @Override
-    public <T> T[] toArray(@NotNull T[] a) {
-        // no need support this
-        throw new UnsupportedOperationException("not supported");
-    }
+  @Override
+  public boolean containsAll(@NotNull Collection<?> c) {
+    // no need support this
+    throw new UnsupportedOperationException("not supported");
+  }
 
-    @Override
-    public int drainTo(@NotNull Collection<? super VALUE> c) {
-        // no need support this
-        throw new UnsupportedOperationException("not supported");
-    }
+  @Override
+  public boolean addAll(@NotNull Collection<? extends VALUE> c) {
+    // no need support this
+    throw new UnsupportedOperationException("not supported");
+  }
 
-    @Override
-    public int drainTo(@NotNull Collection<? super VALUE> c, int maxElements) {
-        // no need support this
-        throw new UnsupportedOperationException("not supported");
-    }
+  @Override
+  public boolean removeAll(@NotNull Collection<?> c) {
+    // no need support this
+    throw new UnsupportedOperationException("not supported");
+  }
 
-    @Override
-    public int getAndResetDropCount(String type) {
-        if (ContainerReportFromDatanode.class.getSimpleName().equals(type)) {
-            // dropped count for only FCR report
-            return droppedCount.getAndSet(0);
-        }
-        return 0;
+  @Override
+  public boolean retainAll(@NotNull Collection<?> c) {
+    // no need support this
+    throw new UnsupportedOperationException("not supported");
+  }
+
+  @Override
+  public void clear() {
+    synchronized (this) {
+      orderingQueue.clear();
+      dataMap.clear();
+      capacity = 0;
     }
+  }
+
+  @Override
+  public int size() {
+    synchronized (this) {
+      return capacity;
+    }
+  }
+
+  @Override
+  public boolean isEmpty() {
+    return orderingQueue.isEmpty();
+  }
+
+  @Override
+  public boolean contains(Object o) {
+    // no need support this
+    throw new UnsupportedOperationException("not supported");
+  }
+
+  @NotNull
+  @Override
+  public Iterator<VALUE> iterator() {
+    // no need support this
+    throw new UnsupportedOperationException("not supported");
+  }
+
+  @NotNull
+  @Override
+  public Object[] toArray() {
+    // no need support this
+    throw new UnsupportedOperationException("not supported");
+  }
+
+  @NotNull
+  @Override
+  public <T> T[] toArray(@NotNull T[] a) {
+    // no need support this
+    throw new UnsupportedOperationException("not supported");
+  }
+
+  @Override
+  public int drainTo(@NotNull Collection<? super VALUE> c) {
+    // no need support this
+    throw new UnsupportedOperationException("not supported");
+  }
+
+  @Override
+  public int drainTo(@NotNull Collection<? super VALUE> c, int maxElements) {
+    // no need support this
+    throw new UnsupportedOperationException("not supported");
+  }
+
+  @Override
+  public int getAndResetDropCount(String type) {
+    if (ContainerReportFromDatanode.class.getSimpleName().equals(type)) {
+      // dropped count for only FCR report
+      return droppedCount.getAndSet(0);
+    }
+    return 0;
+  }
 }
