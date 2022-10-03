@@ -212,6 +212,10 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore,
       store.close();
       store = null;
     }
+    if (mxBean != null) {
+      MBeans.unregister(mxBean);
+      mxBean = null;
+    }
   }
 
   @Override
