@@ -51,7 +51,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <repository>
       <id>ratis-240-rc2</id>
       <name>Apache Ratis 2.4.0 RC2</name>
-      <url>https://repository.apache.org/content/repositories/orgapacheratis-1118/</url>
+      <url>https://repository.apache.org/content/repositories/orgapacheratis-1127/</url>
     </repository>
   </repositories>
 
