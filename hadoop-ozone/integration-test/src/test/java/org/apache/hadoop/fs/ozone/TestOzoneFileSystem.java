@@ -632,6 +632,11 @@ public class TestOzoneFileSystem {
     FileStatus[] fileStatuses = fs.listStatus(parent);
     // the number of immediate children of root is 1
     Assert.assertEquals(1, fileStatuses.length);
+    Assert.assertEquals(fileStatuses[0].isErasureCoded(),
+            !bucketLayout.isFileSystemOptimized());
+    fileStatuses = fs.listStatus(new Path(
+            fileStatuses[0].getPath().toString()+"/object-name1"));
+    Assert.assertEquals(1, fileStatuses.length);
     Assert.assertTrue(fileStatuses[0].isErasureCoded());
     writeClient.deleteKey(keyArgs);
   }
