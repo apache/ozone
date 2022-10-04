@@ -629,6 +629,18 @@ public class TestOzoneFileSystem {
     OpenKeySession session = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, session.getId());
     Path parent = new Path("/");
+    // Wait until the filestatus is updated
+    if (!enabledFileSystemPaths) {
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return fs.listStatus(parent).length != 0;
+        } catch (IOException e) {
+          LOG.error("listStatus() Failed", e);
+          Assert.fail("listStatus() Failed");
+          return false;
+        }
+      }, 1000, 120000);
+    }
     FileStatus[] fileStatuses = fs.listStatus(parent);
     // the number of immediate children of root is 1
     Assert.assertEquals(1, fileStatuses.length);
