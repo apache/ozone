@@ -60,9 +60,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -92,12 +92,9 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       ConfigurationSource conf, int threadPoolSize, int queueLimit) {
     this.containerSet = cset;
     this.conf = conf;
-    this.executor = new ThreadPoolExecutor(
-        0, threadPoolSize, 60, TimeUnit.SECONDS,
-        new LinkedBlockingQueue<>(),
-        new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("DeleteBlocksCommandHandlerThread-%d")
-            .build());
+    this.executor = Executors.newFixedThreadPool(
+        threadPoolSize, new ThreadFactoryBuilder()
+            .setNameFormat("DeleteBlocksCommandHandlerThread-%d").build());
     this.deleteCommandQueues = new LinkedBlockingQueue<>(queueLimit);
     handlerThread = new Daemon(new DeleteCmdWorker());
     handlerThread.start();
