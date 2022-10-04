@@ -152,7 +152,7 @@ public class TestChunkInputStream {
       Assert.fail("Seeking to more than the length of Chunk should fail.");
     } catch (EOFException e) {
       GenericTestUtils.assertExceptionContains("EOF encountered at pos: "
-          + (CHUNK_SIZE + 1) +" for chunk: " + CHUNK_NAME, e);
+          + (CHUNK_SIZE + 1) + " for chunk: " + CHUNK_NAME, e);
     }
     // Seek before read should update the ChunkInputStream#chunkPosition
     seekAndVerify(25);
