@@ -28,39 +28,7 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env 5
 
-execute_robot_test scm lib
-execute_robot_test scm ozone-lib
-
-execute_robot_test om auditparser
-
-execute_robot_test scm basic
-
-execute_robot_test scm gdpr
-
-execute_robot_test scm security/ozone-secure-token.robot
-
-exclude=""
-for bucket in erasure link generated; do
-  execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
-  # some tests are independent of the bucket type, only need to be run once
-  exclude="--exclude no-bucket-type"
-done
-
-execute_robot_test scm recon
-
-execute_robot_test scm om-ratis
-
-execute_robot_test scm freon
-
-execute_robot_test scm cli
-execute_robot_test scm admincli
-
-execute_debug_tests
-
-execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-ofs-link ozonefs/ozonefs.robot
-execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-o3fs-bucket ozonefs/ozonefs.robot
-
-execute_robot_test scm ec/basic.robot
+execute_robot_test scm -v BUCKET_LAYOUT:LEGACY recon/recon-nssummary.robot
 
 stop_docker_env
 

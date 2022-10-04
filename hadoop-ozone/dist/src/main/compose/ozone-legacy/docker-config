@@ -18,6 +18,7 @@ CORE-SITE.XML_fs.defaultFS=ofs://om
 CORE-SITE.XML_fs.trash.interval=1
 
 OZONE-SITE.XML_ozone.om.address=om
+OZONE-SITE.XML_ozone.om.enable.filesystem.paths=true
 OZONE-SITE.XML_ozone.om.http-address=om:9874
 OZONE-SITE.XML_ozone.scm.http-address=scm:9876
 OZONE-SITE.XML_ozone.scm.container.size=1GB
