@@ -28,6 +28,9 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Path;
 
+import static org.apache.hadoop.test.MetricsAsserts.getLongGauge;
+import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+
 
 /**
  * Testing of SCMMetadataStoreImpl.
@@ -47,7 +50,8 @@ public class TestSCMMetadataStoreImpl {
   @Test
   public void testEstimatedKeyCount() {
     Assertions.assertTrue(((SCMMetadataStoreImpl) scmMetadataStore)
-        .getEstimatedKeyCount().contains("sequenceId : 0"));
+        .getEstimatedKeyCountStr().contains("sequenceId : 0"));
+    Assertions.assertEquals(0, getGauge("SequenceIdEstimatedKeyCount"));
 
     try {
       scmMetadataStore.getSequenceIdTable().put("TestKey", 1L);
@@ -56,7 +60,12 @@ public class TestSCMMetadataStoreImpl {
     }
 
     Assertions.assertFalse(((SCMMetadataStoreImpl) scmMetadataStore)
-        .getEstimatedKeyCount().contains("sequenceId : 0"));
+        .getEstimatedKeyCountStr().contains("sequenceId : 0"));
+    Assertions.assertEquals(1, getGauge("SequenceIdEstimatedKeyCount"));
   }
 
+  private long getGauge(String metricName) {
+    return getLongGauge(metricName,
+        getMetrics(SCMMetadataStoreMetrics.METRICS_SOURCE_NAME));
+  }
 }

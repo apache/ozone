@@ -21,10 +21,14 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import com.google.gson.Gson;
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -39,6 +43,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -60,19 +65,32 @@ import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.SEQUENCE_ID;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.META;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 
-import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.management.ObjectName;
 
 /**
  * A RocksDB based implementation of SCM Metadata Store.
  *
  */
-public class SCMMetadataStoreImpl implements SCMMetadataStore,
-    SCMMetadataStoreMXBean {
+public class SCMMetadataStoreImpl implements SCMMetadataStore {
+
+  public static final Set<DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES =
+      new HashSet<>(Arrays.asList(
+          DELETED_BLOCKS,
+          VALID_CERTS,
+          VALID_SCM_CERTS,
+          REVOKED_CERTS,
+          REVOKED_CERTS_V2,
+          CONTAINERS,
+          PIPELINES,
+          TRANSACTIONINFO,
+          CRLS,
+          SEQUENCE_ID,
+          MOVE,
+          META,
+          STATEFUL_SERVICE_CONFIG
+      ));
 
   private Table<Long, DeletedBlocksTransaction> deletedBlocksTable;
 
@@ -107,7 +125,7 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore,
   private DBStore store;
   private final OzoneConfiguration configuration;
 
-  private ObjectName mxBean;
+  private SCMMetadataStoreMetrics metrics;
   private Map<String, Table<?, ?>> tableMap = new ConcurrentHashMap<>();
 
   /**
@@ -149,60 +167,62 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore,
       deletedBlocksTable =
           DELETED_BLOCKS.getTable(this.store);
 
-      checkTableStatus(deletedBlocksTable,
-          DELETED_BLOCKS.getName());
+      checkAndPopulateTable(deletedBlocksTable, DELETED_BLOCKS.getName());
 
       validCertsTable = VALID_CERTS.getTable(store);
 
-      checkTableStatus(validCertsTable, VALID_CERTS.getName());
+      checkAndPopulateTable(validCertsTable, VALID_CERTS.getName());
 
       validSCMCertsTable = VALID_SCM_CERTS.getTable(store);
 
-      checkTableStatus(validSCMCertsTable, VALID_SCM_CERTS.getName());
+      checkAndPopulateTable(validSCMCertsTable, VALID_SCM_CERTS.getName());
 
       revokedCertsTable = REVOKED_CERTS.getTable(store);
 
-      checkTableStatus(revokedCertsTable, REVOKED_CERTS.getName());
+      checkAndPopulateTable(revokedCertsTable, REVOKED_CERTS.getName());
 
       revokedCertsV2Table = REVOKED_CERTS_V2.getTable(store);
 
-      checkTableStatus(revokedCertsV2Table, REVOKED_CERTS_V2.getName());
+      checkAndPopulateTable(revokedCertsV2Table, REVOKED_CERTS_V2.getName());
 
       pipelineTable = PIPELINES.getTable(store);
 
-      checkTableStatus(pipelineTable, PIPELINES.getName());
+      checkAndPopulateTable(pipelineTable, PIPELINES.getName());
 
       containerTable = CONTAINERS.getTable(store);
 
-      checkTableStatus(containerTable, CONTAINERS.getName());
+      checkAndPopulateTable(containerTable, CONTAINERS.getName());
 
       transactionInfoTable = TRANSACTIONINFO.getTable(store);
 
-      checkTableStatus(transactionInfoTable, TRANSACTIONINFO.getName());
+      checkAndPopulateTable(transactionInfoTable, TRANSACTIONINFO.getName());
 
       crlInfoTable = CRLS.getTable(store);
 
+      checkAndPopulateTable(crlInfoTable, CRLS.getName());
+
       crlSequenceIdTable = CRL_SEQUENCE_ID.getTable(store);
+
+      checkAndPopulateTable(crlInfoTable, CRL_SEQUENCE_ID.getName());
 
       sequenceIdTable = SEQUENCE_ID.getTable(store);
 
-      checkTableStatus(sequenceIdTable, SEQUENCE_ID.getName());
+      checkAndPopulateTable(sequenceIdTable, SEQUENCE_ID.getName());
 
       moveTable = MOVE.getTable(store);
 
-      checkTableStatus(moveTable, MOVE.getName());
+      checkAndPopulateTable(moveTable, MOVE.getName());
 
       metaTable = META.getTable(store);
 
-      checkTableStatus(moveTable, META.getName());
+      checkAndPopulateTable(moveTable, META.getName());
 
       statefulServiceConfigTable = STATEFUL_SERVICE_CONFIG.getTable(store);
 
-      checkTableStatus(statefulServiceConfigTable,
+      checkAndPopulateTable(statefulServiceConfigTable,
           STATEFUL_SERVICE_CONFIG.getName());
 
-      mxBean = MBeans.register("SCMMetadataStore", "SCMMetadataStoreImpl",
-          this);
+      metrics = SCMMetadataStoreMetrics.create(this);
     }
   }
 
@@ -212,9 +232,9 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore,
       store.close();
       store = null;
     }
-    if (mxBean != null) {
-      MBeans.unregister(mxBean);
-      mxBean = null;
+    if (metrics != null) {
+      metrics.unRegister();
+      metrics = null;
     }
   }
 
@@ -321,7 +341,8 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore,
     return statefulServiceConfigTable;
   }
 
-  private void checkTableStatus(Table table, String name) throws IOException {
+  private void checkAndPopulateTable(Table table, String name)
+      throws IOException {
     String logMessage = "Unable to get a reference to %s table. Cannot " +
         "continue.";
     String errMsg = "Inconsistent DB state, Table - %s. Please check the" +
@@ -333,17 +354,23 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore,
     tableMap.put(name, table);
   }
 
-  @Override
-  public String getEstimatedKeyCount() {
-    return tableMap.entrySet().stream().map(e -> {
+  public String getEstimatedKeyCountStr() {
+    Gson gson = new Gson();
+    return gson.toJson(tableMap.entrySet().stream().map(e -> {
       try {
         return e.getKey() + " : " + e.getValue().getEstimatedKeyCount();
       } catch (IOException ex) {
         ex.printStackTrace();
       }
       return "N/A";
-    }).collect(
-        Collectors.joining(", "));
+    }).collect(Collectors.toList()));
   }
 
+  Map<String, Table<?, ?>> getTableMap() {
+    return tableMap;
+  }
+
+  SCMMetadataStoreMetrics getMetrics() {
+    return metrics;
+  }
 }
