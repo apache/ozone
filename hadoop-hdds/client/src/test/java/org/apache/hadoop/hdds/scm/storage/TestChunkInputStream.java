@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import java.io.EOFException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Random;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
 
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Before;
@@ -145,6 +147,13 @@ public class TestChunkInputStream {
   public void testSeek() throws Exception {
     seekAndVerify(0);
 
+    try {
+      seekAndVerify(CHUNK_SIZE + 1);
+      Assert.fail("Seeking to more than the length of Chunk should fail.");
+    } catch (EOFException e) {
+      GenericTestUtils.assertExceptionContains("EOF encountered at pos: "
+          + (CHUNK_SIZE + 1) +" for chunk: " + CHUNK_NAME, e);
+    }
     // Seek before read should update the ChunkInputStream#chunkPosition
     seekAndVerify(25);
     Assert.assertEquals(25, chunkStream.getChunkPosition());
