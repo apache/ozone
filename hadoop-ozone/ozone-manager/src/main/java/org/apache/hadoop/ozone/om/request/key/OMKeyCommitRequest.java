@@ -224,19 +224,20 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       long correctedSpace = omKeyInfo.getReplicatedSize();
+      // if keyToDelete isn't null, usedNamespace needn't check and
+      // increase.
       if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
         // Subtract the size of blocks to be overwritten.
         correctedSpace -= keyToDelete.getReplicatedSize();
         oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
             keyToDelete, omMetadataManager,
             trxnLogIndex, ozoneManager.isRatisEnabled());
+        checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
       } else {
-        // if keyToDelete isn't null, usedNamespace needn't check and
-        // increase.
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
+        checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
         omBucketInfo.incrUsedNamespace(1L);
       }
-      checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
 
       // Add to cache of open key table and key table.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(

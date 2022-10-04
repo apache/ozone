@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -100,9 +101,11 @@ public class ECReconstructionCoordinator implements Closeable {
 
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final TokenHelper tokenHelper;
+  private final ContainerClientMetrics clientMetrics;
 
   public ECReconstructionCoordinator(ConfigurationSource conf,
-      CertificateClient certificateClient) throws IOException {
+                                     CertificateClient certificateClient)
+      throws IOException {
     this.containerOperationClient = new ECContainerOperationClient(conf,
         certificateClient);
     this.byteBufferPool = new ElasticByteBufferPool();
@@ -117,6 +120,7 @@ public class ECReconstructionCoordinator implements Closeable {
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, () -> ecReconstructExecutor);
     tokenHelper = new TokenHelper(conf, certificateClient);
+    this.clientMetrics = ContainerClientMetrics.acquire();
   }
 
   public void reconstructECContainerGroup(long containerID,
@@ -135,25 +139,52 @@ public class ECReconstructionCoordinator implements Closeable {
 
     // 1. create target recovering containers.
     String containerToken = encode(tokenHelper.getContainerToken(cid));
-    for (Map.Entry<Integer, DatanodeDetails> indexDnPair : targetNodeMap
-        .entrySet()) {
-      DatanodeDetails dn = indexDnPair.getValue();
-      Integer index = indexDnPair.getKey();
-      containerOperationClient.createRecoveringContainer(containerID, dn,
-          repConfig, containerToken, index);
-    }
+    List<DatanodeDetails> recoveringContainersCreatedDNs = new ArrayList<>();
+    try {
+      for (Map.Entry<Integer, DatanodeDetails> indexDnPair : targetNodeMap
+          .entrySet()) {
+        DatanodeDetails dn = indexDnPair.getValue();
+        Integer index = indexDnPair.getKey();
+        containerOperationClient
+            .createRecoveringContainer(containerID, dn, repConfig,
+                containerToken, index);
+        recoveringContainersCreatedDNs.add(dn);
+      }
 
-    // 2. Reconstruct and transfer to targets
-    for (BlockLocationInfo blockLocationInfo : blockLocationInfoMap.values()) {
-      reconstructECBlockGroup(blockLocationInfo, repConfig, targetNodeMap);
-    }
+      // 2. Reconstruct and transfer to targets
+      for (BlockLocationInfo blockLocationInfo : blockLocationInfoMap
+          .values()) {
+        reconstructECBlockGroup(blockLocationInfo, repConfig, targetNodeMap);
+      }
 
-    // 3. Close containers
-    for (Map.Entry<Integer, DatanodeDetails> indexDnPair : targetNodeMap
-        .entrySet()) {
-      DatanodeDetails dn = indexDnPair.getValue();
-      containerOperationClient.closeContainer(containerID, dn, repConfig,
-          containerToken);
+      // 3. Close containers
+      for (DatanodeDetails dn: recoveringContainersCreatedDNs) {
+        containerOperationClient
+            .closeContainer(containerID, dn, repConfig, containerToken);
+      }
+    } catch (Exception e) {
+      // Any exception let's delete the recovering containers.
+      LOG.warn(
+          "Exception while reconstructing the container {}. Cleaning up"
+              + " all the recovering containers in the reconstruction process.",
+          containerID, e);
+      // Delete only the current thread successfully created recovering
+      // containers.
+      for (DatanodeDetails dn : recoveringContainersCreatedDNs) {
+        try {
+          containerOperationClient
+              .deleteRecoveringContainer(containerID, dn, repConfig,
+                  containerToken);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Deleted the container {}, at the target: {}",
+                containerID, dn);
+          }
+        } catch (IOException ioe) {
+          LOG.error("Exception while deleting the container {} at target: {}",
+              containerID, dn, ioe);
+        }
+      }
+      throw e;
     }
 
   }
@@ -215,7 +246,7 @@ public class ECReconstructionCoordinator implements Closeable {
                 this.containerOperationClient.getXceiverClientManager(),
                 this.containerOperationClient
                     .singleNodePipeline(datanodeDetails, repConfig), bufferPool,
-                configuration, blockLocationInfo.getToken());
+                configuration, blockLocationInfo.getToken(), clientMetrics);
         bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
         // Make sure it's clean. Don't want to reuse the erroneously returned
         // buffers from the pool.

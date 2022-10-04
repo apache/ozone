@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.ozone.scm;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -30,9 +30,10 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.ContainerStat;
-import org.junit.BeforeClass;
-import org.junit.AfterClass;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import java.io.IOException;
@@ -48,32 +49,25 @@ import java.util.concurrent.TimeoutException;
 import javax.management.openmbean.CompositeData;
 import javax.management.openmbean.TabularData;
 
-import org.junit.Rule;
-import org.junit.rules.Timeout;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  *
  * This class is to test JMX management interface for scm information.
  */
+@Timeout(300)
 public class TestSCMMXBean {
 
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
-
-  public static final Log LOG = LogFactory.getLog(TestSCMMXBean.class);
+  public static final Logger LOG = LoggerFactory.getLogger(TestSCMMXBean.class);
   private static int numOfDatanodes = 3;
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
   private static StorageContainerManager scm;
   private static MBeanServer mbs;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws IOException, TimeoutException,
       InterruptedException {
     conf = new OzoneConfiguration();
@@ -85,7 +79,7 @@ public class TestSCMMXBean {
     mbs = ManagementFactory.getPlatformMBeanServer();
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -205,9 +199,8 @@ public class TestSCMMXBean {
    */
   private void verifyEquals(TabularData actualData,
       Map<String, Integer> expectedData) {
-    if (actualData == null || expectedData == null) {
-      fail("Data should not be null.");
-    }
+    assertNotNull(actualData);
+    assertNotNull(expectedData);
     for (Object obj : actualData.values()) {
       // Each TabularData is a set of CompositeData
       assertTrue(obj instanceof CompositeData);

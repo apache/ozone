@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -93,7 +94,7 @@ import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -149,10 +150,12 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.slf4j.event.Level.DEBUG;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
@@ -196,7 +199,7 @@ public abstract class TestOzoneRpcClientAbstract {
     //  for testZReadKeyWithUnhealthyContainerReplica.
     conf.set("ozone.scm.stale.node.interval", "10s");
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(5)
+        .setNumDatanodes(14)
         .setTotalPipelineNumLimit(10)
         .setScmId(scmId)
         .setClusterId(clusterId)
@@ -263,7 +266,7 @@ public abstract class TestOzoneRpcClientAbstract {
   @Test
   public void testOMClientProxyProvider() {
 
-    OMFailoverProxyProvider omFailoverProxyProvider =
+    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
         OmFailoverProxyUtil.getFailoverProxyProvider(store.getClientProxy());
 
     List<OMProxyInfo> omProxies = omFailoverProxyProvider.getOMProxyInfos();
@@ -860,6 +863,42 @@ public abstract class TestOzoneRpcClientAbstract {
       ContainerInfo container =
           storageContainerLocationClient.getContainer(info.getContainerID());
       Assert.assertEquals(replication, container.getReplicationConfig());
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"rs-3-3-1024k,false", "xor-3-5-2048k,false",
+              "rs-3-2-1024k,true", "rs-6-3-1024k,true", "rs-10-4-1024k,true"})
+  public void testPutKeyWithReplicationConfig(String replicationValue,
+                                              boolean isValidReplicationConfig)
+          throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    String keyName = UUID.randomUUID().toString();
+    String value = UUID.randomUUID().toString();
+    ReplicationConfig replicationConfig =
+            new ECReplicationConfig(replicationValue);
+    if (isValidReplicationConfig) {
+      OzoneOutputStream out = bucket.createKey(keyName,
+              value.getBytes(UTF_8).length, replicationConfig, new HashMap<>());
+      out.write(value.getBytes(UTF_8));
+      out.close();
+      OzoneKey key = bucket.getKey(keyName);
+      Assert.assertEquals(keyName, key.getName());
+      OzoneInputStream is = bucket.readKey(keyName);
+      byte[] fileContent = new byte[value.getBytes(UTF_8).length];
+      is.read(fileContent);
+      Assert.assertEquals(value, new String(fileContent, UTF_8));
+    } else {
+      Assertions.assertThrows(IllegalArgumentException.class,
+              () -> bucket.createKey(keyName, "dummy".getBytes(UTF_8).length,
+                      replicationConfig, new HashMap<>()));
     }
   }
 
@@ -1578,10 +1617,6 @@ public abstract class TestOzoneRpcClientAbstract {
     out.write(keyValue.getBytes(UTF_8));
     out.close();
 
-    OzoneInputStream is = bucket.readKey(keyName);
-    byte[] fileContent = new byte[32];
-    is.read(fileContent);
-
     // First, confirm the key info from the client matches the info in OM.
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder();
     builder.setVolumeName(volumeName).setBucketName(bucketName)
@@ -1640,6 +1675,15 @@ public abstract class TestOzoneRpcClientAbstract {
         }
       }
     }
+
+    assertInputStreamContent(keyValue, keyDetails.getContent());
+  }
+
+  private void assertInputStreamContent(String expected, InputStream is)
+      throws IOException {
+    byte[] fileContent = new byte[expected.getBytes(UTF_8).length];
+    is.read(fileContent);
+    assertEquals(expected, new String(fileContent, UTF_8));
   }
 
   /**
@@ -3660,11 +3704,9 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertNotNull(key.getMetadata().get(OzoneConsts.GDPR_SECRET));
 
     OzoneInputStream is = bucket.readKey(keyName);
-    byte[] fileContent = new byte[text.getBytes(UTF_8).length];
-    is.read(fileContent);
+    assertInputStreamContent(text, is);
     verifyReplication(volumeName, bucketName, keyName,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
-    Assert.assertEquals(text, new String(fileContent, UTF_8));
 
     //Step 4
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
@@ -3682,7 +3724,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(keyName, key.getName());
     Assert.assertNull(key.getMetadata().get(OzoneConsts.GDPR_FLAG));
     is = bucket.readKey(keyName);
-    fileContent = new byte[text.getBytes(UTF_8).length];
+    byte[] fileContent = new byte[text.getBytes(UTF_8).length];
     is.read(fileContent);
 
     //Step 6
@@ -3739,11 +3781,9 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertTrue(key.getMetadata().get(OzoneConsts.GDPR_SECRET) != null);
 
     OzoneInputStream is = bucket.readKey(keyName);
-    byte[] fileContent = new byte[text.getBytes(UTF_8).length];
-    is.read(fileContent);
+    assertInputStreamContent(text, is);
     verifyReplication(volumeName, bucketName, keyName,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
-    Assert.assertEquals(text, new String(fileContent, UTF_8));
 
     //Step 4
     bucket.deleteKey(keyName);

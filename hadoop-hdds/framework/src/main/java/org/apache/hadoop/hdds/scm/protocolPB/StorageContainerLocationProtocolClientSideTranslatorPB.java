@@ -87,6 +87,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -285,7 +286,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<ContainerWithPipeline> getContainerWithPipelineBatch(
-      List<Long> containerIDs) throws IOException {
+      Iterable<? extends Long> containerIDs) throws IOException {
     for (Long containerID: containerIDs) {
       Preconditions.checkState(containerID >= 0,
           "Container ID cannot be negative");
@@ -699,6 +700,18 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     return builder.build();
 
+  }
+
+  @Override
+  public int resetDeletedBlockRetryCount(List<Long> txIDs)
+      throws IOException {
+    ResetDeletedBlockRetryCountRequestProto request =
+        ResetDeletedBlockRetryCountRequestProto.newBuilder()
+            .addAllTransactionId(txIDs)
+            .build();
+    return submitRequest(Type.ResetDeletedBlockRetryCount,
+        builder -> builder.setResetDeletedBlockRetryCountRequest(request)).
+        getResetDeletedBlockRetryCountResponse().getResetCount();
   }
 
   /**

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.multitenant;
 
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -40,36 +41,38 @@ public interface MultiTenantAccessController {
    *
    * Roles defined in this policy that do not already exist will be created.
    */
-  void createPolicy(Policy policy) throws Exception;
+  Policy createPolicy(Policy policy) throws IOException;
 
-  Policy getPolicy(String policyName) throws Exception;
+  Policy getPolicy(String policyName) throws IOException;
 
-  List<Policy> getLabeledPolicies(String label) throws Exception;
+  List<Policy> getLabeledPolicies(String label) throws IOException;
 
-  void updatePolicy(Policy policy) throws Exception;
+  Policy updatePolicy(Policy policy) throws IOException;
 
-  void deletePolicy(String policyName) throws Exception;
+  void deletePolicy(String policyName) throws IOException;
 
   /**
    * This operation will fail if a role with the same name already exists.
+   *
+   * @return Role ID returned from remote server.
    */
-  void createRole(Role role) throws Exception;
+  Role createRole(Role role) throws IOException;
 
-  Role getRole(String roleName) throws Exception;
+  Role getRole(String roleName) throws IOException;
 
   /**
-   * Replaces the role given by {@code roleID} with the contents of {@code
-   * role}. If {@code roleID} does not correspond to a role, an exception is
+   * Replaces the role given by {@code roleId} with the contents of {@code
+   * role}. If {@code roleId} does not correspond to a role, an exception is
    * thrown.
    *
-   * The roleID of a given role can be retrieved from the {@code getRole}
+   * The roleId of a given role can be retrieved from the {@code getRole}
    * method.
    */
-  void updateRole(long roleID, Role role) throws Exception;
+  Role updateRole(long roleId, Role role) throws IOException;
 
-  void deleteRole(String roleName) throws Exception;
+  void deleteRole(String roleName) throws IOException;
 
-  long getRangerServiceVersion() throws Exception;
+  long getRangerServicePolicyVersion() throws IOException;
 
   static Map<IAccessAuthorizer.ACLType, String> getRangerAclStrings() {
     Map<IAccessAuthorizer.ACLType, String> rangerAclStrings =
@@ -137,31 +140,39 @@ public interface MultiTenantAccessController {
    */
   class Role {
     private final String name;
-    private final Set<String> users;
+    private final Map<String, Boolean> usersMap;
+    private final Map<String, Boolean> rolesMap;
     private final String description;
-    private final Long roleID;
+    private final Long id;
+    private final String createdByUser;
 
     private Role(Builder builder) {
-      name = builder.name;
-      users = builder.users;
-      description = builder.description;
-      roleID = builder.roleID;
+      this.name = builder.name;
+      this.usersMap = builder.usersMap;
+      this.rolesMap = builder.rolesMap;
+      this.description = builder.description;
+      this.id = builder.id;
+      this.createdByUser = builder.createdByUser;
     }
 
     public String getName() {
       return name;
     }
 
-    public Set<String> getUsers() {
-      return users;
+    public Map<String, Boolean> getUsersMap() {
+      return usersMap;
+    }
+
+    public Map<String, Boolean> getRolesMap() {
+      return rolesMap;
     }
 
     public Optional<String> getDescription() {
       return Optional.ofNullable(description);
     }
 
-    public Optional<Long> getRoleID() {
-      return Optional.ofNullable(roleID);
+    public Optional<Long> getId() {
+      return Optional.ofNullable(id);
     }
 
     @Override
@@ -181,14 +192,18 @@ public interface MultiTenantAccessController {
       // If one role does not have the ID set, still consider them equal.
       // Role ID may not be set if the policy is being sent to Ranger for
       // creation, but will be set if the same policy is retrieved from Ranger.
-      boolean roleIDsMatch = true;
-      if (getRoleID().isPresent() && role.getRoleID().isPresent()) {
-        roleIDsMatch = getRoleID().equals(role.getRoleID());
+      boolean roleIdsMatch = true;
+      if (getId().isPresent() && role.getId().isPresent()) {
+        roleIdsMatch = getId().equals(role.getId());
       }
       return Objects.equals(getName(), role.getName()) &&
-          Objects.equals(getUsers(), role.getUsers()) &&
+          Objects.equals(getUsersMap(), role.getUsersMap()) &&
           Objects.equals(getDescription(), role.getDescription()) &&
-          roleIDsMatch;
+          roleIdsMatch;
+    }
+
+    public String getCreatedByUser() {
+      return createdByUser;
     }
 
     /**
@@ -196,19 +211,26 @@ public interface MultiTenantAccessController {
      */
     public static final class Builder {
       private String name;
-      private final Set<String> users;
+      // userName -> isRoleAdmin
+      private final Map<String, Boolean> usersMap;
+      // roleName -> isRoleAdmin
+      private final Map<String, Boolean> rolesMap;
       private String description;
-      private Long roleID;
+      private Long id;
+      private String createdByUser;
 
       public Builder() {
-        this.users = new HashSet<>();
+        this.usersMap = new HashMap<>();
+        this.rolesMap = new HashMap<>();
       }
 
       public Builder(Role other) {
         this.name = other.getName();
-        this.users = new HashSet<>(other.getUsers());
+        this.usersMap = new HashMap<>(other.getUsersMap());
+        this.rolesMap = new HashMap<>(other.getRolesMap());
         other.getDescription().ifPresent(desc -> this.description = desc);
-        other.getRoleID().ifPresent(id -> this.roleID = id);
+        other.getId().ifPresent(roleId -> this.id = roleId);
+        this.createdByUser = other.getCreatedByUser();
       }
 
       public Builder setName(String roleName) {
@@ -216,13 +238,56 @@ public interface MultiTenantAccessController {
         return this;
       }
 
-      public Builder addUser(String user) {
-        this.users.add(user);
+      /**
+       * Add one user to this role.
+       */
+      public Builder addUser(String userName, boolean isRoleAdmin) {
+        this.usersMap.put(userName, isRoleAdmin);
         return this;
       }
 
-      public Builder addUsers(Collection<String> roleUsers) {
-        this.users.addAll(roleUsers);
+      /**
+       * Add a list of users as role non-admins.
+       */
+      public Builder addUsers(Collection<String> userNamesList) {
+        userNamesList.forEach(userName -> this.usersMap.put(userName, false));
+        return this;
+      }
+
+      /**
+       * Merge with another users map.
+       */
+      public Builder addUsersMap(Map<String, Boolean> userNamesList) {
+        this.usersMap.putAll(userNamesList);
+        return this;
+      }
+
+      public Builder removeUser(String userName) {
+        this.usersMap.remove(userName);
+        return this;
+      }
+
+      /**
+       * Clear users map.
+       */
+      public Builder clearUsers() {
+        this.usersMap.clear();
+        return this;
+      }
+
+      /**
+       * Add one other role to this role.
+       */
+      public Builder addRole(String roleName, boolean isRoleAdmin) {
+        this.rolesMap.put(roleName, isRoleAdmin);
+        return this;
+      }
+
+      /**
+       * Add a list of other roles as role non-admins.
+       */
+      public Builder addRoles(Collection<String> roleNamesList) {
+        roleNamesList.forEach(userName -> this.rolesMap.put(userName, false));
         return this;
       }
 
@@ -232,7 +297,12 @@ public interface MultiTenantAccessController {
       }
 
       public Builder setID(long roleId) {
-        this.roleID = roleId;
+        this.id = roleId;
+        return this;
+      }
+
+      public Builder setCreatedByUser(String createdByUser) {
+        this.createdByUser = createdByUser;
         return this;
       }
 
@@ -246,24 +316,27 @@ public interface MultiTenantAccessController {
    * Define a policy to be created.
    */
   class Policy {
+    private final long id;
     private final String name;
     private final Set<String> volumes;
     private final Set<String> buckets;
     private final Set<String> keys;
     private final String description;
-    private final Map<String, Collection<Acl>> roleAcls;
+    private final Map<String, Collection<Acl>> userAcls, roleAcls;
     private final Set<String> labels;
     private final boolean isEnabled;
 
     private Policy(Builder builder) {
-      name = builder.name;
-      volumes = builder.volumes;
-      buckets = builder.buckets;
-      keys = builder.keys;
-      description = builder.description;
-      roleAcls = builder.roleAcls;
-      labels = builder.labels;
-      isEnabled = builder.isEnabled;
+      this.id = builder.id;
+      this.name = builder.name;
+      this.volumes = builder.volumes;
+      this.buckets = builder.buckets;
+      this.keys = builder.keys;
+      this.description = builder.description;
+      this.userAcls = builder.userAcls;
+      this.roleAcls = builder.roleAcls;
+      this.labels = builder.labels;
+      this.isEnabled = builder.isEnabled;
     }
 
     public Set<String> getVolumes() {
@@ -278,6 +351,10 @@ public interface MultiTenantAccessController {
       return keys;
     }
 
+    public long getId() {
+      return id;
+    }
+
     public String getName() {
       return name;
     }
@@ -288,6 +365,10 @@ public interface MultiTenantAccessController {
 
     public Set<String> getLabels() {
       return (labels);
+    }
+
+    public Map<String, Collection<Acl>> getUserAcls() {
+      return userAcls;
     }
 
     public Map<String, Collection<Acl>> getRoleAcls() {
@@ -313,6 +394,7 @@ public interface MultiTenantAccessController {
           Objects.equals(getBuckets(), policy.getBuckets()) &&
           Objects.equals(getKeys(), policy.getKeys()) &&
           Objects.equals(getDescription(), policy.getDescription()) &&
+          Objects.equals(getUserAcls(), policy.getUserAcls()) &&
           Objects.equals(getRoleAcls(), policy.getRoleAcls()) &&
           Objects.equals(getLabels(), policy.getLabels());
     }
@@ -325,12 +407,13 @@ public interface MultiTenantAccessController {
      * Builder class for a policy.
      */
     public static final class Builder {
+      private long id;
       private String name;
       private final Set<String> volumes;
       private final Set<String> buckets;
       private final Set<String> keys;
       private String description;
-      private final Map<String, Collection<Acl>> roleAcls;
+      private final Map<String, Collection<Acl>> userAcls, roleAcls;
       private final Set<String> labels;
       private boolean isEnabled;
 
@@ -338,8 +421,14 @@ public interface MultiTenantAccessController {
         this.volumes = new HashSet<>();
         this.buckets = new HashSet<>();
         this.keys = new HashSet<>();
+        this.userAcls = new HashMap<>();
         this.roleAcls = new HashMap<>();
         this.labels = new HashSet<>();
+      }
+
+      public Builder setId(Long policyId) {
+        this.id = policyId;
+        return this;
       }
 
       public Builder setName(String policyName) {
@@ -384,6 +473,11 @@ public interface MultiTenantAccessController {
 
       public Builder setDescription(String policyDescription) {
         this.description = policyDescription;
+        return this;
+      }
+
+      public Builder addUserAcl(String userName, Collection<Acl> acls) {
+        this.userAcls.put(userName, new ArrayList<>(acls));
         return this;
       }
 

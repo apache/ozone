@@ -24,7 +24,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   <packaging>pom</packaging>
 
   <modules>
-    <module>dev-support/annotations</module>
     <module>hadoop-hdds</module>
     <module>hadoop-ozone</module>
   </modules>
@@ -79,7 +78,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <ratis.thirdparty.version>1.0.0</ratis.thirdparty.version>
 
     <!-- Apache Ranger plugin version -->
-    <ranger.version>3.0.0-SNAPSHOT</ranger.version>
+    <ranger.version>2.3.0</ranger.version>
 
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
@@ -134,7 +133,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- jersey version -->
     <jersey.version>1.19</jersey.version>
-    <jersey2.version>2.33</jersey2.version>
+    <jersey2.version>2.34</jersey2.version>
 
     <!-- jackson versions -->
     <jackson2.version>2.13.2</jackson2.version>
@@ -151,10 +150,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <httpcore.version>4.4.13</httpcore.version>
 
     <!-- SLF4J/LOG4J version -->
-    <slf4j.version>1.7.30</slf4j.version>
+    <slf4j.version>1.7.36</slf4j.version>
     <log4j.version>1.2.17</log4j.version>
     <log4j2.version>2.17.1</log4j2.version>
     <disruptor.version>3.4.2</disruptor.version>
+    <reload4j.version>1.2.22</reload4j.version>
 
     <prometheus.version>0.7.0</prometheus.version>
 
@@ -168,16 +168,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <hadoop-thirdparty.version>1.1.1</hadoop-thirdparty.version>
 
     <findbugs.version>3.0.0</findbugs.version>
-    <!--
-      | Keep this in sync with the version used in
-      | /dev-support/annotatons/pom.xml
-      -->
     <spotbugs.version>3.1.12</spotbugs.version>
     <dnsjava.version>2.1.7</dnsjava.version>
 
     <guava.version>31.1-jre</guava.version>
     <guice.version>4.0</guice.version>
-    <gson.version>2.8.9</gson.version>
+    <gson.version>2.9.0</gson.version>
 
     <!-- Required for testing LDAP integration -->
     <apacheds.version>2.0.0-M21</apacheds.version>
@@ -201,11 +197,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <grpc.protobuf-compile.version>3.19.2</grpc.protobuf-compile.version>
     <os-maven-plugin.version>1.5.0.Final</os-maven-plugin.version>
 
-    <netty.version>4.1.74.Final</netty.version>
-    <io.grpc.version>1.44.0</io.grpc.version>
-    <tcnative.version>2.0.48.Final</tcnative.version> <!-- See table for correct version -->
-    <!-- Table for netty, grpc & tcnative version combinations  -->
-    <!-- https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty -->
+    <netty.version>4.1.79.Final</netty.version>
+    <io.grpc.version>1.48.1</io.grpc.version>
 
     <!-- define the Java language version used by the compiler -->
     <javac.version>1.8</javac.version>
@@ -244,19 +237,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <exec-maven-plugin.version>1.3.1</exec-maven-plugin.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
     <native-maven-plugin.version>1.0-alpha-8</native-maven-plugin.version>
-    <!--
-     | Keep this in sync with the version used in
-     | /dev-support/annotatons/pom.xml
-     -->
     <maven-checkstyle-plugin.version>3.1.2</maven-checkstyle-plugin.version>
     <maven-site-plugin.version>3.9.1</maven-site-plugin.version>
-    <!--
-     | Keep this in sync with the version used in
-     | /dev-support/annotatons/pom.xml
-     -->
     <checkstyle.version>9.3</checkstyle.version>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
-    <aws-java-sdk.version>1.12.124</aws-java-sdk.version>
+    <aws-java-sdk.version>1.12.261</aws-java-sdk.version>
     <hsqldb.version>2.3.4</hsqldb.version>
     <frontend-maven-plugin.version>1.12.0</frontend-maven-plugin.version>
     <!-- the version of Hadoop declared in the version resources; can be overridden
@@ -265,11 +250,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <proto-backwards-compatibility.version>1.0.7</proto-backwards-compatibility.version>
 
     <swagger-annotations-version>1.5.4</swagger-annotations-version>
-    <snakeyaml.version>1.26</snakeyaml.version>
+    <snakeyaml.version>1.32</snakeyaml.version>
     <sonar.java.binaries>${basedir}/target/classes</sonar.java.binaries>
 
     <aspectj.version>1.9.7</aspectj.version>
     <aspectj-plugin.version>1.14.0</aspectj-plugin.version>
+    <restrict-imports.enforcer.version>2.0.0</restrict-imports.enforcer.version>
   </properties>
 
 
@@ -380,12 +366,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-hdfs-rbf</artifactId>
         <version>${hadoop.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-hdfs</artifactId>
-        <version>${hadoop.version}</version>
-        <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -895,17 +875,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
 
       <dependency>
-        <groupId>org.codehaus.plexus</groupId>
-        <artifactId>plexus-utils</artifactId>
-        <version>2.0.5</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.plexus</groupId>
-        <artifactId>plexus-component-annotations</artifactId>
-        <version>1.5.5</version>
-      </dependency>
-
-      <dependency>
         <groupId>org.ow2.asm</groupId>
         <artifactId>asm</artifactId>
         <version>5.0.4</version>
@@ -1091,9 +1060,9 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${commons-logging-api.version}</version>
       </dependency>
       <dependency>
-        <groupId>log4j</groupId>
-        <artifactId>log4j</artifactId>
-        <version>${log4j.version}</version>
+        <groupId>ch.qos.reload4j</groupId>
+        <artifactId>reload4j</artifactId>
+        <version>${reload4j.version}</version>
         <exclusions>
           <exclusion>
             <groupId>com.sun.jdmk</groupId>
@@ -1236,7 +1205,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-log4j12</artifactId>
+        <artifactId>slf4j-reload4j</artifactId>
         <version>${slf4j.version}</version>
       </dependency>
       <dependency>
@@ -1643,7 +1612,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>org.rocksdb</groupId>
         <artifactId>rocksdbjni</artifactId>
-        <version>6.29.5</version>
+        <version>7.4.5</version>
       </dependency>
       <dependency>
         <groupId>org.xerial</groupId>
@@ -1652,13 +1621,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
     </dependencies>
   </dependencyManagement>
-  <dependencies>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-annotation-processing</artifactId>
-      <version>${ozone.version}</version>
-    </dependency>
-  </dependencies>
 
   <build>
     <extensions>
@@ -1840,6 +1802,55 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               </requireJavaVersion>
             </rules>
           </configuration>
+          <dependencies>
+            <dependency>
+              <groupId>de.skuzzle.enforcer</groupId>
+              <artifactId>restrict-imports-enforcer-rule</artifactId>
+              <version>${restrict-imports.enforcer.version}</version>
+            </dependency>
+          </dependencies>
+          <executions>
+            <execution>
+              <id>banned-rocksdb-imports</id>
+              <phase>process-sources</phase>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <configuration>
+                <rules>
+                  <RestrictImports>
+                    <includeTestCode>false</includeTestCode>
+                    <reason>Use managed RocksObjects under org.apache.hadoop.hdds.utils.db.managed instead.</reason>
+                    <!-- By default, ban all the classes in org.rocksdb -->
+                    <bannedImport>org.rocksdb.**</bannedImport>
+                    <allowedImports>
+                      <!-- Allow non-RocksObject classes. -->
+                      <allowedImport>org.rocksdb.ColumnFamilyDescriptor</allowedImport>
+                      <allowedImport>org.rocksdb.CompactionStyle</allowedImport>
+                      <allowedImport>org.rocksdb.HistogramData</allowedImport>
+                      <allowedImport>org.rocksdb.HistogramType</allowedImport>
+                      <allowedImport>org.rocksdb.Holder</allowedImport>
+                      <allowedImport>org.rocksdb.InfoLogLevel</allowedImport>
+                      <allowedImport>org.rocksdb.OptionsUtil</allowedImport>
+                      <allowedImport>org.rocksdb.RocksDBException</allowedImport>
+                      <allowedImport>org.rocksdb.StatsLevel</allowedImport>
+                      <allowedImport>org.rocksdb.TransactionLogIterator.BatchResult</allowedImport>
+                      <allowedImport>org.rocksdb.TickerType</allowedImport>
+
+                      <!-- Allow RocksObjects whose native pointer is managed by RocksDB. -->
+                      <allowedImport>org.rocksdb.ColumnFamilyHandle</allowedImport>
+                      <allowedImport>org.rocksdb.Env</allowedImport>
+                      <allowedImport>org.rocksdb.Statistics</allowedImport>
+
+                      <!-- Allow RocksDB constants and static methods to be used. -->
+                      <allowedImport>org.rocksdb.RocksDB.*</allowedImport>
+                    </allowedImports>
+                    <exclusion>org.apache.hadoop.hdds.utils.db.managed.*</exclusion>
+                  </RestrictImports>
+                </rules>
+              </configuration>
+            </execution>
+          </executions>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>

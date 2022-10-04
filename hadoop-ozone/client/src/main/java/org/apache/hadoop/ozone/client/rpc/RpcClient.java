@@ -53,13 +53,16 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -202,6 +205,7 @@ public class RpcClient implements ClientProtocol {
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final OzoneManagerVersion omVersion;
   private volatile ExecutorService ecReconstructExecutor;
+  private final ContainerClientMetrics clientMetrics;
 
   /**
    * Creates RpcClient instance with the given configuration.
@@ -330,6 +334,7 @@ public class RpcClient implements ClientProtocol {
     this.byteBufferPool = new ElasticByteBufferPool();
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, this::getECReconstructExecutor);
+    this.clientMetrics = ContainerClientMetrics.acquire();
   }
 
   public XceiverClientFactory getXceiverClientManager() {
@@ -663,10 +668,12 @@ public class RpcClient implements ClientProtocol {
       builder.setDefaultReplicationConfig(defaultReplicationConfig);
     }
 
-    LOG.info("Creating Bucket: {}/{}, with the Bucket Layout {}, {} as " +
-            "owner, Versioning {}, Storage Type set to {} and Encryption set " +
-            "to {} ",
-        volumeName, bucketName, bucketLayout, owner, isVersionEnabled,
+    String layoutMsg = bucketLayout != null
+        ? "with bucket layout " + bucketLayout
+        : "with server-side default bucket layout";
+    LOG.info("Creating Bucket: {}/{}, {}, {} as owner, Versioning {}, " +
+            "Storage Type set to {} and Encryption set to {} ",
+        volumeName, bucketName, layoutMsg, owner, isVersionEnabled,
         storageType, bek != null);
     ozoneManagerClient.createBucket(builder.build());
   }
@@ -1153,6 +1160,12 @@ public class RpcClient implements ClientProtocol {
             + " Erasure Coded replication.");
       }
     }
+
+    if (replicationConfig != null) {
+      ReplicationConfigValidator validator =
+              this.conf.getObject(ReplicationConfigValidator.class);
+      validator.validate(replicationConfig);
+    }
     String requestId = UUID.randomUUID().toString();
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
@@ -1415,11 +1428,16 @@ public class RpcClient implements ClientProtocol {
           lastKeyOffset));
       lastKeyOffset += info.getLength();
     }
+
+    SupplierWithIOException<OzoneInputStream> getInputStream =
+        () -> getInputStreamWithRetryFunction(keyInfo);
+
     return new OzoneKeyDetails(keyInfo.getVolumeName(), keyInfo.getBucketName(),
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), ozoneKeyLocations,
         keyInfo.getReplicationConfig(), keyInfo.getMetadata(),
-        keyInfo.getFileEncryptionInfo());
+        keyInfo.getFileEncryptionInfo(),
+        getInputStream);
   }
 
   @Override
@@ -1431,6 +1449,7 @@ public class RpcClient implements ClientProtocol {
     IOUtils.cleanupWithLogger(LOG, ozoneManagerClient, xceiverClientManager);
     keyProviderCache.invalidateAll();
     keyProviderCache.cleanUp();
+    ContainerClientMetrics.release();
   }
 
   @Deprecated
@@ -1925,7 +1944,8 @@ public class RpcClient implements ClientProtocol {
         .setOmClient(ozoneManagerClient)
         .setRequestID(requestId)
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-        .setConfig(clientConfig);
+        .setConfig(clientConfig)
+        .setClientMetrics(clientMetrics);
   }
 
   @Override
@@ -1974,8 +1994,8 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneKey headObject(String volumeName, String bucketName,
       String keyName) throws IOException {
-    Preconditions.checkNotNull(volumeName);
-    Preconditions.checkNotNull(bucketName);
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
     Preconditions.checkNotNull(keyName);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)

@@ -19,7 +19,9 @@ package org.apache.hadoop.hdds.scm;
 
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 import java.util.stream.Collectors;
 
@@ -106,6 +108,31 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
     return conf;
   }
 
+  @Override
+  public final List<DatanodeDetails> chooseDatanodes(
+          List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes, int nodesRequired,
+          long metadataSizeRequired,
+          long dataSizeRequired) throws SCMException {
+    return this.chooseDatanodes(Collections.emptyList(), excludedNodes,
+            favoredNodes, nodesRequired, metadataSizeRequired,
+            dataSizeRequired);
+  }
+
+  /**
+   * Null Check for List and returns empty list.
+   * @param dns
+   * @return Non null List
+   */
+  private List<DatanodeDetails> validateDatanodes(List<DatanodeDetails> dns) {
+    return Objects.isNull(dns) ? Collections.emptyList() :
+            dns.stream().map(node -> {
+              DatanodeDetails datanodeDetails =
+                      nodeManager.getNodeByUuid(node.getUuidString());
+              return datanodeDetails != null ? datanodeDetails : node;
+            }).collect(Collectors.toList());
+  }
+
   /**
    * Given size required, return set of datanodes
    * that satisfy the nodes and size requirement.
@@ -116,8 +143,8 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    * 2. We place containers on nodes with enough space for that container.
    * 3. if a set of containers are requested, we either meet the required
    * number of nodes or we fail that request.
-   *
-   * @param excludedNodes - datanodes with existing replicas
+   * @param usedNodes - datanodes with existing replicas
+   * @param excludedNodes - datanodes with failures
    * @param favoredNodes  - list of nodes preferred.
    * @param nodesRequired - number of datanodes required.
    * @param dataSizeRequired - size required for the container.
@@ -126,14 +153,54 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    * @throws SCMException SCM exception.
    */
   @Override
-  public List<DatanodeDetails> chooseDatanodes(
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
+  public final List<DatanodeDetails> chooseDatanodes(
+          List<DatanodeDetails> usedNodes,
+          List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes,
+          int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
+          throws SCMException {
+/*
+  This method calls the chooseDatanodeInternal after fixing
+  the excludeList to get the DatanodeDetails from the node manager.
+  When the object of the Class DataNodeDetails is built from protobuf
+  only UUID of the datanode is added which is used for the hashcode.
+  Thus not passing any information about the topology. While excluding
+  datanodes the object is built from protobuf @Link {ExcludeList.java}.
+  NetworkTopology removes all nodes from the list which does not fall under
+  the scope while selecting a random node. Default scope value is
+  "/default-rack/" which won't match the required scope. Thus passing the proper
+  object of DatanodeDetails(with Topology Information) while trying to get the
+  random node from NetworkTopology should fix this. Check HDDS-7015
+ */
+    return chooseDatanodesInternal(validateDatanodes(usedNodes),
+            validateDatanodes(excludedNodes), favoredNodes, nodesRequired,
+            metadataSizeRequired, dataSizeRequired);
+  }
+
+  /**
+   * Pipeline placement choose datanodes to join the pipeline.
+   * @param usedNodes - list of the datanodes to already chosen in the
+   *                      pipeline.
+   * @param excludedNodes - excluded nodes
+   * @param favoredNodes  - list of nodes preferred.
+   * @param nodesRequired - number of datanodes required.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
+   * @return a list of chosen datanodeDetails
+   * @throws SCMException when chosen nodes are not enough in numbers
+   */
+  protected List<DatanodeDetails> chooseDatanodesInternal(
+      List<DatanodeDetails> usedNodes, List<DatanodeDetails> excludedNodes,
+      List<DatanodeDetails> favoredNodes,
       int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(NodeStatus.inServiceHealthy());
     if (excludedNodes != null) {
       healthyNodes.removeAll(excludedNodes);
+    }
+    if (usedNodes != null) {
+      healthyNodes.removeAll(usedNodes);
     }
     String msg;
     if (healthyNodes.size() == 0) {

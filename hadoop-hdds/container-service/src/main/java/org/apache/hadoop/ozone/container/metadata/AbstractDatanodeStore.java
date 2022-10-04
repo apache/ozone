@@ -30,13 +30,15 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
-import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.DBOptions;
-import org.rocksdb.Statistics;
+import org.rocksdb.InfoLogLevel;
 import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +71,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       LoggerFactory.getLogger(AbstractDatanodeStore.class);
   private volatile DBStore store;
   private final AbstractDatanodeDBDefinition dbDef;
-  private final ColumnFamilyOptions cfOptions;
+  private final ManagedColumnFamilyOptions cfOptions;
 
   private static DatanodeDBProfile dbProfile;
   private final boolean openReadOnly;
@@ -101,7 +103,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   public void start(ConfigurationSource config)
       throws IOException {
     if (this.store == null) {
-      DBOptions options = dbProfile.getDBOptions();
+      ManagedDBOptions options = dbProfile.getDBOptions();
       options.setCreateIfMissing(true);
       options.setCreateMissingColumnFamilies(true);
 
@@ -112,20 +114,43 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       }
 
       String rocksDbStat = config.getTrimmed(
-              OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
-              OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
+          OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
+          OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
 
       if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
-        Statistics statistics = new Statistics();
+        ManagedStatistics statistics = new ManagedStatistics();
         statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
         options.setStatistics(statistics);
       }
 
-      this.store = DBStoreBuilder.newBuilder(config, dbDef)
-              .setDBOptions(options)
-              .setDefaultCFOptions(cfOptions)
-              .setOpenReadOnly(openReadOnly)
-              .build();
+      if (this.dbDef instanceof DatanodeSchemaThreeDBDefinition) {
+        DatanodeConfiguration dc =
+            config.getObject(DatanodeConfiguration.class);
+        // Config user log files
+        InfoLogLevel level = InfoLogLevel.valueOf(
+            dc.getRocksdbLogLevel() + "_LEVEL");
+        options.setInfoLogLevel(level);
+        options.setMaxLogFileSize(dc.getRocksdbMaxFileSize());
+        options.setKeepLogFileNum(dc.getRocksdbMaxFileNum());
+        options.setDeleteObsoleteFilesPeriodMicros(
+            dc.getRocksdbDeleteObsoleteFilesPeriod());
+
+        // For V3, all Rocksdb dir has the same "container.db" name. So use
+        // parentDirName(storage UUID)-dbDirName as db metrics name
+        this.store = DBStoreBuilder.newBuilder(config, dbDef)
+            .setDBOptions(options)
+            .setDefaultCFOptions(cfOptions)
+            .setOpenReadOnly(openReadOnly)
+            .setDBJmxBeanNameName(dbDef.getDBLocation(config).getName() + "-" +
+                dbDef.getName())
+            .build();
+      } else {
+        this.store = DBStoreBuilder.newBuilder(config, dbDef)
+            .setDBOptions(options)
+            .setDefaultCFOptions(cfOptions)
+            .setOpenReadOnly(openReadOnly)
+            .build();
+      }
 
       // Use the DatanodeTable wrapper to disable the table iterator on
       // existing Table implementations retrieved from the DBDefinition.
@@ -208,6 +233,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   @Override
   public void close() throws IOException {
     this.store.close();
+    this.cfOptions.close();
   }
 
   @Override

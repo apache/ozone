@@ -25,23 +25,35 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
-import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
+import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithMismatchedReplicasHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.ClosingContainerHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.HealthCheck;
+import org.apache.hadoop.hdds.scm.container.replication.health.OpenContainerHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.QuasiClosedContainerHandler;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
-import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.ExitUtil;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,13 +62,16 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 
 /**
  * Replication Manager (RM) is the one which is responsible for making sure
@@ -84,6 +99,7 @@ public class ReplicationManager implements SCMService {
    * ReplicationManager specific configuration.
    */
   private final ReplicationManagerConfiguration rmConf;
+  private final NodeManager nodeManager;
 
   /**
    * ReplicationMonitor thread is the one which wakes up at configured
@@ -125,6 +141,18 @@ public class ReplicationManager implements SCMService {
   private long lastTimeToBeReadyInMillis = 0;
   private final Clock clock;
   private final ContainerReplicaPendingOps containerReplicaPendingOps;
+  private final ECReplicationCheckHandler ecReplicationCheckHandler;
+  private final EventPublisher eventPublisher;
+  private final ReentrantLock lock = new ReentrantLock();
+  private ReplicationQueue replicationQueue;
+  private final ECUnderReplicationHandler ecUnderReplicationHandler;
+  private final ECOverReplicationHandler ecOverReplicationHandler;
+  private final int maintenanceRedundancy;
+  private Thread underReplicatedProcessorThread;
+  private Thread overReplicatedProcessorThread;
+  private final UnderReplicatedProcessor underReplicatedProcessor;
+  private final OverReplicatedProcessor overReplicatedProcessor;
+  private final HealthCheck containerCheckChain;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -140,11 +168,9 @@ public class ReplicationManager implements SCMService {
              final PlacementPolicy containerPlacement,
              final EventPublisher eventPublisher,
              final SCMContext scmContext,
-             final SCMServiceManager serviceManager,
              final NodeManager nodeManager,
              final Clock clock,
-             final SCMHAManager scmhaManager,
-             final Table<ContainerID, MoveDataNodePair> moveTable,
+             final LegacyReplicationManager legacyReplicationManager,
              final ContainerReplicaPendingOps replicaPendingOps)
              throws IOException {
     this.containerManager = containerManager;
@@ -154,19 +180,37 @@ public class ReplicationManager implements SCMService {
     this.clock = clock;
     this.containerReport = new ReplicationManagerReport();
     this.metrics = null;
+    this.eventPublisher = eventPublisher;
     this.waitTimeInMillis = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
         TimeUnit.MILLISECONDS);
     this.containerReplicaPendingOps = replicaPendingOps;
-    this.legacyReplicationManager = new LegacyReplicationManager(
-        conf, containerManager, containerPlacement, eventPublisher,
-        scmContext, nodeManager, scmhaManager, clock, moveTable);
+    this.legacyReplicationManager = legacyReplicationManager;
+    this.ecReplicationCheckHandler = new ECReplicationCheckHandler();
+    this.nodeManager = nodeManager;
+    this.replicationQueue = new ReplicationQueue();
+    this.maintenanceRedundancy = rmConf.maintenanceRemainingRedundancy;
+    ecUnderReplicationHandler = new ECUnderReplicationHandler(
+        ecReplicationCheckHandler, containerPlacement, conf, nodeManager);
+    ecOverReplicationHandler =
+        new ECOverReplicationHandler(ecReplicationCheckHandler,
+            containerPlacement, nodeManager);
+    underReplicatedProcessor =
+        new UnderReplicatedProcessor(this, containerReplicaPendingOps,
+            eventPublisher, rmConf.getUnderReplicatedInterval());
+    overReplicatedProcessor =
+        new OverReplicatedProcessor(this, containerReplicaPendingOps,
+            eventPublisher, rmConf.getOverReplicatedInterval());
 
-    // register ReplicationManager to SCMServiceManager.
-    serviceManager.register(this);
-
-    // start ReplicationManager.
+    // Chain together the series of checks that are needed to validate the
+    // containers when they are checked by RM.
+    containerCheckChain = new OpenContainerHandler(this);
+    containerCheckChain
+        .addNext(new ClosingContainerHandler(this))
+        .addNext(new QuasiClosedContainerHandler(this))
+        .addNext(new ClosedWithMismatchedReplicasHandler(this))
+        .addNext(ecReplicationCheckHandler);
     start();
   }
 
@@ -184,6 +228,7 @@ public class ReplicationManager implements SCMService {
       replicationMonitor.setName("ReplicationMonitor");
       replicationMonitor.setDaemon(true);
       replicationMonitor.start();
+      startSubServices();
     } else {
       LOG.info("Replication Monitor Thread is already running.");
     }
@@ -210,6 +255,8 @@ public class ReplicationManager implements SCMService {
   public synchronized void stop() {
     if (running) {
       LOG.info("Stopping Replication Monitor Thread.");
+      underReplicatedProcessorThread.interrupt();
+      overReplicatedProcessorThread.interrupt();
       running = false;
       legacyReplicationManager.clearInflightActions();
       metrics.unRegister();
@@ -217,6 +264,22 @@ public class ReplicationManager implements SCMService {
     } else {
       LOG.info("Replication Monitor Thread is not running.");
     }
+  }
+
+  /**
+   * Create Replication Manager sub services such as Over and Under Replication
+   * processors.
+   */
+  private void startSubServices() {
+    underReplicatedProcessorThread = new Thread(underReplicatedProcessor);
+    underReplicatedProcessorThread.setName("Under Replicated Processor");
+    underReplicatedProcessorThread.setDaemon(true);
+    underReplicatedProcessorThread.start();
+
+    overReplicatedProcessorThread = new Thread(overReplicatedProcessor);
+    overReplicatedProcessorThread.setName("Over Replicated Processor");
+    overReplicatedProcessorThread.setDaemon(true);
+    overReplicatedProcessorThread.start();
   }
 
   /**
@@ -233,22 +296,198 @@ public class ReplicationManager implements SCMService {
     final List<ContainerInfo> containers =
         containerManager.getContainers();
     ReplicationManagerReport report = new ReplicationManagerReport();
+    ReplicationQueue newRepQueue = new ReplicationQueue();
     for (ContainerInfo c : containers) {
       if (!shouldRun()) {
         break;
       }
-      switch (c.getReplicationType()) {
-      case EC:
-        break;
-      default:
+      report.increment(c.getState());
+      if (c.getReplicationType() != EC) {
         legacyReplicationManager.processContainer(c, report);
+        continue;
+      }
+      try {
+        processContainer(c, newRepQueue, report);
+        // TODO - send any commands contained in the health result
+      } catch (ContainerNotFoundException e) {
+        LOG.error("Container {} not found", c.getContainerID(), e);
       }
     }
     report.setComplete();
+    lock.lock();
+    try {
+      replicationQueue = newRepQueue;
+    } finally {
+      lock.unlock();
+    }
     this.containerReport = report;
     LOG.info("Replication Monitor Thread took {} milliseconds for" +
             " processing {} containers.", clock.millis() - start,
         containers.size());
+  }
+
+  /**
+   * Retrieve the new highest priority container to be replicated from the
+   * under replicated queue.
+   * @return The new underReplicated container to be processed, or null if the
+   *         queue is empty.
+   */
+  public ContainerHealthResult.UnderReplicatedHealthResult
+      dequeueUnderReplicatedContainer() {
+    lock.lock();
+    try {
+      return replicationQueue.dequeueUnderReplicatedContainer();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /**
+   * Retrieve the new highest priority container to be replicated from the
+   * under replicated queue.
+   * @return The next over-replicated container to be processed, or null if the
+   *         queue is empty.
+   */
+  public ContainerHealthResult.OverReplicatedHealthResult
+      dequeueOverReplicatedContainer() {
+    lock.lock();
+    try {
+      return replicationQueue.dequeueOverReplicatedContainer();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  public void sendCloseContainerEvent(ContainerID containerID) {
+    eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
+  }
+
+  /**
+   * Add an under replicated container back to the queue if it was unable to
+   * be processed. Its retry count will be incremented before it is re-queued,
+   * reducing its priority.
+   * Note that the queue could have been rebuilt and replaced after this
+   * message was removed but before it is added back. This will result in a
+   * duplicate entry on the queue. However, when it is processed again, the
+   * result of the processing will end up with pending replicas scheduled. If
+   * instance 1 is processed and creates the pending replicas, when instance 2
+   * is processed, it will find the pending containers and know it has no work
+   * to do, and be discarded. Additionally, the queue will be refreshed
+   * periodically removing any duplicates.
+   * @param underReplicatedHealthResult
+   */
+  public void requeueUnderReplicatedContainer(ContainerHealthResult
+      .UnderReplicatedHealthResult underReplicatedHealthResult) {
+    underReplicatedHealthResult.incrementRequeueCount();
+    lock.lock();
+    try {
+      replicationQueue.enqueue(underReplicatedHealthResult);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  public void requeueOverReplicatedContainer(ContainerHealthResult
+      .OverReplicatedHealthResult overReplicatedHealthResult) {
+    lock.lock();
+    try {
+      replicationQueue.enqueue(overReplicatedHealthResult);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  public Map<DatanodeDetails, SCMCommand<?>> processUnderReplicatedContainer(
+      final ContainerHealthResult result) throws IOException {
+    ContainerID containerID = result.getContainerInfo().containerID();
+    Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
+        containerID);
+    List<ContainerReplicaOp> pendingOps =
+        containerReplicaPendingOps.getPendingOps(containerID);
+    return ecUnderReplicationHandler.processAndCreateCommands(replicas,
+        pendingOps, result, maintenanceRedundancy);
+  }
+
+  public Map<DatanodeDetails, SCMCommand<?>> processOverReplicatedContainer(
+      final ContainerHealthResult result) throws IOException {
+    ContainerID containerID = result.getContainerInfo().containerID();
+    Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
+        containerID);
+    List<ContainerReplicaOp> pendingOps =
+        containerReplicaPendingOps.getPendingOps(containerID);
+    return ecOverReplicationHandler.processAndCreateCommands(replicas,
+        pendingOps, result, maintenanceRedundancy);
+  }
+
+  public long getScmTerm() throws NotLeaderException {
+    return scmContext.getTermOfLeader();
+  }
+
+  protected void processContainer(ContainerInfo containerInfo,
+      ReplicationQueue repQueue, ReplicationManagerReport report)
+      throws ContainerNotFoundException {
+
+    ContainerID containerID = containerInfo.containerID();
+    Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
+        containerID);
+    List<ContainerReplicaOp> pendingOps =
+        containerReplicaPendingOps.getPendingOps(containerID);
+
+    ContainerCheckRequest checkRequest = new ContainerCheckRequest.Builder()
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(replicas)
+        .setMaintenanceRedundancy(maintenanceRedundancy)
+        .setReport(report)
+        .setPendingOps(pendingOps)
+        .setReplicationQueue(repQueue)
+        .build();
+    // This will call the chain of container health handlers in turn which
+    // will issue commands as needed, update the report and perhaps add
+    // containers to the over and under replicated queue.
+    boolean handled = containerCheckChain.handleChain(checkRequest);
+    if (!handled) {
+      LOG.debug("Container {} had no actions after passing through the " +
+          "check chain", containerInfo.containerID());
+    }
+  }
+
+  /**
+   * Sends close container command for the given container to the given
+   * datanode.
+   *
+   * @param container Container to be closed
+   * @param datanode The datanode on which the container
+   *                  has to be closed
+   * @param force Should be set to true if we want to force close.
+   */
+  public void sendCloseContainerReplicaCommand(final ContainerInfo container,
+      final DatanodeDetails datanode, final boolean force) {
+
+    ContainerID containerID = container.containerID();
+    LOG.info("Sending close container command for container {}" +
+        " to datanode {}.", containerID, datanode);
+    CloseContainerCommand closeContainerCommand =
+        new CloseContainerCommand(container.getContainerID(),
+            container.getPipelineID(), force);
+    try {
+      closeContainerCommand.setTerm(scmContext.getTermOfLeader());
+    } catch (NotLeaderException nle) {
+      LOG.warn("Skip sending close container command,"
+          + " since current SCM is not leader.", nle);
+      return;
+    }
+    closeContainerCommand.setEncodedToken(getContainerToken(containerID));
+    eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
+        new CommandForDatanode<>(datanode.getUuid(), closeContainerCommand));
+  }
+
+  private String getContainerToken(ContainerID containerID) {
+    if (scmContext.getScm() instanceof StorageContainerManager) {
+      StorageContainerManager scm =
+          (StorageContainerManager) scmContext.getScm();
+      return scm.getContainerTokenGenerator().generateEncodedToken(containerID);
+    }
+    return ""; // unit test
   }
 
   public ReplicationManagerReport getContainerReport() {
@@ -286,7 +525,49 @@ public class ReplicationManager implements SCMService {
    */
   public ContainerReplicaCount getContainerReplicaCount(ContainerID containerID)
       throws ContainerNotFoundException {
-    return legacyReplicationManager.getContainerReplicaCount(containerID);
+    ContainerInfo container = containerManager.getContainer(containerID);
+    if (container.getReplicationType() == EC) {
+      return getECContainerReplicaCount(container);
+    }
+    return legacyReplicationManager.getContainerReplicaCount(container);
+  }
+
+  /**
+   * An open container is healthy if all its replicas are in the same state as
+   * the container.
+   * @param container The container to check
+   * @param replicas The replicas belonging to the container
+   * @return True if the container is healthy, false otherwise
+   */
+  private boolean isOpenContainerHealthy(
+      ContainerInfo container, Set<ContainerReplica> replicas) {
+    HddsProtos.LifeCycleState state = container.getState();
+    return replicas.stream()
+        .allMatch(r -> compareState(state, r.getState()));
+  }
+
+  /**
+   * Compares the container state with the replica state.
+   *
+   * @param containerState ContainerState
+   * @param replicaState ReplicaState
+   * @return true if the state matches, false otherwise
+   */
+  public static boolean compareState(
+      final HddsProtos.LifeCycleState containerState,
+      final ContainerReplicaProto.State replicaState) {
+    switch (containerState) {
+    case OPEN:
+      return replicaState == ContainerReplicaProto.State.OPEN;
+    case CLOSING:
+      return replicaState == ContainerReplicaProto.State.CLOSING;
+    case QUASI_CLOSED:
+      return replicaState == ContainerReplicaProto.State.QUASI_CLOSED;
+    case CLOSED:
+      return replicaState == ContainerReplicaProto.State.CLOSED;
+    default:
+      return false;
+    }
   }
 
   /**
@@ -307,6 +588,30 @@ public class ReplicationManager implements SCMService {
             "which that thread runs."
     )
     private long interval = Duration.ofSeconds(300).toMillis();
+
+    /**
+     * The frequency in which the Under Replicated queue is processed.
+     */
+    @Config(key = "under.replicated.interval",
+        type = ConfigType.TIME,
+        defaultValue = "30s",
+        tags = {SCM, OZONE},
+        description = "How frequently to check if there are work to process " +
+            " on the under replicated queue"
+    )
+    private long underReplicatedInterval = Duration.ofSeconds(30).toMillis();
+
+    /**
+     * The frequency in which the Over Replicated queue is processed.
+     */
+    @Config(key = "over.replicated.interval",
+        type = ConfigType.TIME,
+        defaultValue = "30s",
+        tags = {SCM, OZONE},
+        description = "How frequently to check if there are work to process " +
+            " on the over replicated queue"
+    )
+    private long overReplicatedInterval = Duration.ofSeconds(30).toMillis();
 
     /**
      * Timeout for container replication & deletion command issued by
@@ -347,8 +652,59 @@ public class ReplicationManager implements SCMService {
       this.maintenanceReplicaMinimum = replicaCount;
     }
 
+    /**
+     * Defines how many redundant replicas of a container must be online for a
+     * node to enter maintenance. Currently, only used for EC containers. We
+     * need to consider removing the "maintenance.replica.minimum" setting
+     * and having both Ratis and EC use this new one.
+     */
+    @Config(key = "maintenance.remaining.redundancy",
+        type = ConfigType.INT,
+        defaultValue = "1",
+        tags = {SCM, OZONE},
+        description = "The number of redundant containers in a group which" +
+            " must be available for a node to enter maintenance. If putting" +
+            " a node into maintenance reduces the redundancy below this value" +
+            " , the node will remain in the ENTERING_MAINTENANCE state until" +
+            " a new replica is created. For Ratis containers, the default" +
+            " value of 1 ensures at least two replicas are online, meaning 1" +
+            " more can be lost without data becoming unavailable. For any EC" +
+            " container it will have at least dataNum + 1 online, allowing" +
+            " the loss of 1 more replica before data becomes unavailable." +
+            " Currently only EC containers use this setting. Ratis containers" +
+            " use hdds.scm.replication.maintenance.replica.minimum. For EC," +
+            " if nodes are in maintenance, it is likely reconstruction reads" +
+            " will be required if some of the data replicas are offline. This" +
+            " is seamless to the client, but will affect read performance."
+    )
+    private int maintenanceRemainingRedundancy = 1;
+
+    public void setMaintenanceRemainingRedundancy(int redundancy) {
+      this.maintenanceRemainingRedundancy = redundancy;
+    }
+
+    public int getMaintenanceRemainingRedundancy() {
+      return maintenanceRemainingRedundancy;
+    }
+
     public long getInterval() {
       return interval;
+    }
+
+    public long getUnderReplicatedInterval() {
+      return underReplicatedInterval;
+    }
+
+    public void setUnderReplicatedInterval(Duration duration) {
+      this.underReplicatedInterval = duration.toMillis();
+    }
+
+    public void setOverReplicatedInterval(Duration duration) {
+      this.overReplicatedInterval = duration.toMillis();
+    }
+
+    public long getOverReplicatedInterval() {
+      return overReplicatedInterval;
     }
 
     public long getEventTimeout() {
@@ -407,11 +763,12 @@ public class ReplicationManager implements SCMService {
 
 
   /**
-  * following functions will be refactored in a seperate jira.
+  * following functions will be refactored in a separate jira.
   */
   public CompletableFuture<LegacyReplicationManager.MoveResult> move(
       ContainerID cid, DatanodeDetails src, DatanodeDetails tgt)
-      throws NodeNotFoundException, ContainerNotFoundException {
+      throws NodeNotFoundException, ContainerNotFoundException,
+      TimeoutException {
     CompletableFuture<LegacyReplicationManager.MoveResult> ret =
         new CompletableFuture<>();
     if (!isRunning()) {
@@ -440,6 +797,30 @@ public class ReplicationManager implements SCMService {
   public boolean isContainerReplicatingOrDeleting(ContainerID containerID) {
     return legacyReplicationManager
         .isContainerReplicatingOrDeleting(containerID);
+  }
+
+  private ECContainerReplicaCount getECContainerReplicaCount(
+      ContainerInfo containerInfo) throws ContainerNotFoundException {
+    Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
+        containerInfo.containerID());
+    List<ContainerReplicaOp> pendingOps =
+        containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
+    return new ECContainerReplicaCount(
+        containerInfo, replicas, pendingOps, maintenanceRedundancy);
+  }
+
+  /**
+   * Wrap the call to nodeManager.getNodeStatus, catching any
+   * NodeNotFoundException and instead throwing an IllegalStateException.
+   * @param dn The datanodeDetails to obtain the NodeStatus for
+   * @return NodeStatus corresponding to the given Datanode.
+   */
+  static NodeStatus getNodeStatus(DatanodeDetails dn, NodeManager nm) {
+    try {
+      return nm.getNodeStatus(dn);
+    } catch (NodeNotFoundException e) {
+      throw new IllegalStateException("Unable to find NodeStatus for " + dn, e);
+    }
   }
 }
 

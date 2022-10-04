@@ -113,7 +113,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     CertificateClientTestImpl certificateClientTest =
         new CertificateClientTestImpl(conf);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(10)
+        .setNumDatanodes(14)
         .setScmId(SCM_ID)
         .setClusterId(CLUSTER_ID)
         .setCertificateClient(certificateClientTest)

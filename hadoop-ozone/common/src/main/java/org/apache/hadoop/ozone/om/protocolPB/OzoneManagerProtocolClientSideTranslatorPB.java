@@ -141,6 +141,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclRequest;
@@ -171,6 +173,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantRevokeUserAccessIdRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -1448,6 +1452,22 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  public boolean triggerRangerBGSync(boolean noWait) throws IOException {
+    RangerBGSyncRequest req = RangerBGSyncRequest.newBuilder()
+        .setNoWait(noWait)
+        .build();
+
+    OMRequest omRequest = createOMRequest(Type.RangerBGSync)
+        .setRangerBGSyncRequest(req)
+        .build();
+
+    RangerBGSyncResponse resp = handleError(submitRequest(omRequest))
+        .getRangerBGSyncResponse();
+
+    return resp.getRunSuccess();
+  }
+
+  @Override
   public StatusAndMessages finalizeUpgrade(String upgradeClientID)
       throws IOException {
     FinalizeUpgradeRequest req = FinalizeUpgradeRequest.newBuilder()
@@ -2005,6 +2025,24 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setCancelPrepareRequest(cancelPrepareRequest).build();
 
     return handleError(submitRequest(omRequest)).getCancelPrepareResponse();
+  }
+
+  @Override
+  public EchoRPCResponse echoRPCReq(byte[] payloadReq,
+                                    int payloadSizeResp)
+          throws IOException {
+    EchoRPCRequest echoRPCRequest =
+            EchoRPCRequest.newBuilder()
+                    .setPayloadReq(ByteString.copyFrom(payloadReq))
+                    .setPayloadSizeResp(payloadSizeResp)
+                    .build();
+
+    OMRequest omRequest = createOMRequest(Type.EchoRPC)
+            .setEchoRPCRequest(echoRPCRequest).build();
+
+    EchoRPCResponse echoRPCResponse =
+            handleError(submitRequest(omRequest)).getEchoRPCResponse();
+    return echoRPCResponse;
   }
 
   @VisibleForTesting

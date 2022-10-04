@@ -546,15 +546,9 @@ public final class OMFileRequest {
    * @throws IOException DB failure
    */
   public static void addToOpenFileTable(OMMetadataManager omMetadataMgr,
-                                        BatchOperation batchOp,
-                                        OmKeyInfo omFileInfo,
-                                        long openKeySessionID)
-          throws IOException {
+      BatchOperation batchOp, OmKeyInfo omFileInfo, long openKeySessionID,
+      long volumeId, long bucketId) throws IOException {
 
-    final long volumeId = omMetadataMgr.getVolumeId(
-            omFileInfo.getVolumeName());
-    final long bucketId = omMetadataMgr.getBucketId(
-            omFileInfo.getVolumeName(), omFileInfo.getBucketName());
     String dbOpenFileKey = omMetadataMgr.getOpenFileName(volumeId, bucketId,
             omFileInfo.getParentObjectID(), omFileInfo.getFileName(),
             openKeySessionID);
@@ -574,13 +568,8 @@ public final class OMFileRequest {
    * @throws IOException DB failure
    */
   public static String addToOpenFileTable(OMMetadataManager omMetadataMgr,
-      BatchOperation batchOp, OmKeyInfo omFileInfo, String uploadID)
-          throws IOException {
-
-    final long volumeId = omMetadataMgr.getVolumeId(
-            omFileInfo.getVolumeName());
-    final long bucketId = omMetadataMgr.getBucketId(
-            omFileInfo.getVolumeName(), omFileInfo.getBucketName());
+      BatchOperation batchOp, OmKeyInfo omFileInfo, String uploadID,
+      long volumeId, long bucketId) throws IOException {
 
     String multipartFileKey = omMetadataMgr.getMultipartKey(volumeId,
             bucketId, omFileInfo.getParentObjectID(),
@@ -602,13 +591,9 @@ public final class OMFileRequest {
    * @throws IOException
    */
   public static String addToFileTable(OMMetadataManager omMetadataMgr,
-                                    BatchOperation batchOp,
-                                    OmKeyInfo omFileInfo)
-          throws IOException {
-    final long volumeId = omMetadataMgr.getVolumeId(
-            omFileInfo.getVolumeName());
-    final long bucketId = omMetadataMgr.getBucketId(
-            omFileInfo.getVolumeName(), omFileInfo.getBucketName());
+      BatchOperation batchOp, OmKeyInfo omFileInfo, long volumeId,
+      long bucketId) throws IOException {
+
     String dbFileKey = omMetadataMgr.getOzonePathKey(volumeId, bucketId,
             omFileInfo.getParentObjectID(), omFileInfo.getFileName());
 
@@ -902,16 +887,19 @@ public final class OMFileRequest {
     // Check dirTable entries for any sub paths.
     String seekDirInDB = metaMgr.getOzonePathKey(volumeId, bucketId,
             omKeyInfo.getObjectID(), "");
-    TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
-            iterator = dirTable.iterator();
+    try (TableIterator<String, ? extends
+        Table.KeyValue<String, OmDirectoryInfo>>
+            iterator = dirTable.iterator()) {
 
-    iterator.seek(seekDirInDB);
+      iterator.seek(seekDirInDB);
 
-    if (iterator.hasNext()) {
-      Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
-      OmDirectoryInfo dirInfo = entry.getValue();
-      return isImmediateChild(dirInfo.getParentObjectID(),
-              omKeyInfo.getObjectID());
+      if (iterator.hasNext()) {
+        Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
+        OmDirectoryInfo dirInfo = entry.getValue();
+        return isImmediateChild(dirInfo.getParentObjectID(),
+            omKeyInfo.getObjectID());
+      }
+
     }
     return false; // no sub paths found
   }
@@ -946,16 +934,17 @@ public final class OMFileRequest {
     // Check fileTable entries for any sub paths.
     String seekFileInDB = metaMgr.getOzonePathKey(volumeId, bucketId,
             omKeyInfo.getObjectID(), "");
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            iterator = fileTable.iterator();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+            iterator = fileTable.iterator()) {
 
-    iterator.seek(seekFileInDB);
+      iterator.seek(seekFileInDB);
 
-    if (iterator.hasNext()) {
-      Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
-      OmKeyInfo fileInfo = entry.getValue();
-      return isImmediateChild(fileInfo.getParentObjectID(),
-              omKeyInfo.getObjectID()); // found a sub path file
+      if (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
+        OmKeyInfo fileInfo = entry.getValue();
+        return isImmediateChild(fileInfo.getParentObjectID(),
+            omKeyInfo.getObjectID()); // found a sub path file
+      }
     }
     return false; // no sub paths found
   }

@@ -162,19 +162,20 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       long correctedSpace = omKeyInfo.getReplicatedSize();
 
+      // if keyToDelete isn't null, usedNamespace shouldn't check and
+      // increase.
       if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
         // Subtract the size of blocks to be overwritten.
         correctedSpace -= keyToDelete.getReplicatedSize();
         oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbFileKey,
             keyToDelete, omMetadataManager,
             trxnLogIndex, ozoneManager.isRatisEnabled());
+        checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
       } else {
-        // if keyToDelete isn't null, usedNamespace shouldn't check and
-        // increase.
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
+        checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
         omBucketInfo.incrUsedNamespace(1L);
       }
-      checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
 
       // Add to cache of open key table and key table.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, dbFileKey,
@@ -192,7 +193,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
               omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject(),
-              oldKeyVersionsToDelete);
+              oldKeyVersionsToDelete, volumeId);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

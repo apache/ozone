@@ -25,6 +25,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -34,7 +35,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Class to test handling of known and new pipelines by Recon's pipeline
@@ -43,7 +44,8 @@ import org.junit.Test;
 public class TestReconPipelineReportHandler {
 
   @Test
-  public void testProcessPipelineReport() throws IOException {
+  public void testProcessPipelineReport()
+      throws IOException, TimeoutException {
 
     // Check with pipeline which does not exist in Recon.
     Pipeline pipeline = getRandomPipeline();

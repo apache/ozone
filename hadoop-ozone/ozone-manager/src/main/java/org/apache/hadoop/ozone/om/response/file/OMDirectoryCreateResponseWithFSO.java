@@ -47,23 +47,20 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
   private OmDirectoryInfo dirInfo;
   private List<OmDirectoryInfo> parentDirInfos;
   private Result result;
-  private String volume;
-  private String bucket;
+  private long volumeId;
+  private long bucketId;
 
   public OMDirectoryCreateResponseWithFSO(@Nonnull OMResponse omResponse,
-                                          @Nonnull String volume,
-                                          @Nonnull String bucket,
-                                          @Nonnull OmDirectoryInfo dirInfo,
-                                          @Nonnull
-                                              List<OmDirectoryInfo> pDirInfos,
-                                          @Nonnull Result result, @Nonnull
-                                          BucketLayout bucketLayout) {
+      @Nonnull long volumeId, @Nonnull long bucketId,
+      @Nonnull OmDirectoryInfo dirInfo,
+      @Nonnull List<OmDirectoryInfo> pDirInfos, @Nonnull Result result,
+      @Nonnull BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
     this.dirInfo = dirInfo;
     this.parentDirInfos = pDirInfos;
     this.result = result;
-    this.volume = volume;
-    this.bucket = bucket;
+    this.volumeId = volumeId;
+    this.bucketId = bucketId;
   }
 
   /**
@@ -86,8 +83,6 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
                                 BatchOperation batchOperation)
           throws IOException {
     if (dirInfo != null) {
-      final long volumeId = omMetadataManager.getVolumeId(volume);
-      final long bucketId = omMetadataManager.getBucketId(volume, bucket);
       if (parentDirInfos != null) {
         for (OmDirectoryInfo parentDirInfo : parentDirInfos) {
           String parentKey = omMetadataManager

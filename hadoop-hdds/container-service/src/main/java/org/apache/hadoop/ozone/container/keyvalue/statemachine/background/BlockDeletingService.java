@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -86,6 +87,8 @@ public class BlockDeletingService extends BackgroundService {
 
   private final int blockLimitPerInterval;
 
+  private final BlockDeletingServiceMetrics metrics;
+
   // Task priority is useful when a to-delete block has weight.
   private static final int TASK_PRIORITY_DEFAULT = 1;
 
@@ -107,6 +110,7 @@ public class BlockDeletingService extends BackgroundService {
     this.conf = conf;
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    metrics = BlockDeletingServiceMetrics.create();
   }
 
   /**
@@ -164,9 +168,7 @@ public class BlockDeletingService extends BackgroundService {
           + "Retry in next interval. ", e);
     } catch (Exception e) {
       // In case listContainer call throws any uncaught RuntimeException.
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Unexpected error occurs during deleting blocks.", e);
-      }
+      LOG.error("Unexpected error occurs during deleting blocks.", e);
     }
     return queue;
   }
@@ -194,9 +196,22 @@ public class BlockDeletingService extends BackgroundService {
       if (ozoneContainer.getWriteChannel() instanceof XceiverServerRatis) {
         XceiverServerRatis ratisServer =
             (XceiverServerRatis) ozoneContainer.getWriteChannel();
-        PipelineID pipelineID = PipelineID
-            .valueOf(UUID.fromString(containerData.getOriginPipelineId()));
-        // in case te ratis group does not exist, just mark it for deletion.
+        final String originPipelineId = containerData.getOriginPipelineId();
+        if (originPipelineId == null || originPipelineId.isEmpty()) {
+          // In case the pipelineID is empty, just mark it for deletion.
+          // TODO: currently EC container goes through this path.
+          return true;
+        }
+        UUID pipelineUUID;
+        try {
+          pipelineUUID = UUID.fromString(originPipelineId);
+        } catch (IllegalArgumentException e) {
+          LOG.warn("Invalid pipelineID {} for container {}",
+              originPipelineId, containerData.getContainerID());
+          return false;
+        }
+        PipelineID pipelineID = PipelineID.valueOf(pipelineUUID);
+        // in case the ratis group does not exist, just mark it for deletion.
         if (!ratisServer.isExist(pipelineID.getProtobuf())) {
           return true;
         }
@@ -380,6 +395,8 @@ public class BlockDeletingService extends BackgroundService {
           containerData.decrBlockCount(deletedBlocksCount);
           containerData.decrBytesUsed(releasedBytes);
           containerData.getVolume().decrementUsedSpace(releasedBytes);
+          metrics.incrSuccessCount(deletedBlocksCount);
+          metrics.incrSuccessBytes(releasedBytes);
         }
 
         if (!succeedBlocks.isEmpty()) {
@@ -393,6 +410,7 @@ public class BlockDeletingService extends BackgroundService {
       } catch (IOException exception) {
         LOG.warn("Deletion operation was not successful for container: " +
             container.getContainerData().getContainerID(), exception);
+        metrics.incrFailureCount();
         throw exception;
       }
     }
@@ -408,9 +426,13 @@ public class BlockDeletingService extends BackgroundService {
       Table<Long, DeletedBlocksTransaction> deleteTxns =
           ((DeleteTransactionStore<Long>) meta.getStore())
               .getDeleteTransactionTable();
-      return deleteViaTransactionStore(
-          deleteTxns.iterator(), meta,
-          container, dataDir, startTime, schema2Deleter);
+      try (TableIterator<Long,
+          ? extends Table.KeyValue<Long, DeletedBlocksTransaction>>
+          iterator = deleteTxns.iterator()) {
+        return deleteViaTransactionStore(
+            iterator, meta,
+            container, dataDir, startTime, schema2Deleter);
+      }
     }
 
     public ContainerBackgroundTaskResult deleteViaSchema3(
@@ -424,12 +446,16 @@ public class BlockDeletingService extends BackgroundService {
       Table<String, DeletedBlocksTransaction> deleteTxns =
           ((DeleteTransactionStore<String>) meta.getStore())
               .getDeleteTransactionTable();
-      return deleteViaTransactionStore(
-          deleteTxns.iterator(containerData.containerPrefix()), meta,
-          container, dataDir, startTime, schema3Deleter);
+      try (TableIterator<String,
+          ? extends Table.KeyValue<String, DeletedBlocksTransaction>>
+          iterator = deleteTxns.iterator(containerData.containerPrefix())) {
+        return deleteViaTransactionStore(
+            iterator, meta,
+            container, dataDir, startTime, schema3Deleter);
+      }
     }
 
-    public ContainerBackgroundTaskResult deleteViaTransactionStore(
+    private ContainerBackgroundTaskResult deleteViaTransactionStore(
         TableIterator<?, ? extends Table.KeyValue<?, DeletedBlocksTransaction>>
             iter, DBHandle meta, Container container, File dataDir,
         long startTime, Deleter deleter) throws IOException {
@@ -451,7 +477,6 @@ public class BlockDeletingService extends BackgroundService {
           numBlocks += delTx.getLocalIDList().size();
           delBlocks.add(delTx);
         }
-        iter.close();
         if (delBlocks.isEmpty()) {
           LOG.debug("No transaction found in container : {}",
               containerData.getContainerID());
@@ -495,6 +520,8 @@ public class BlockDeletingService extends BackgroundService {
           containerData.decrBlockCount(deletedBlocksCount);
           containerData.decrBytesUsed(releasedBytes);
           containerData.getVolume().decrementUsedSpace(releasedBytes);
+          metrics.incrSuccessCount(deletedBlocksCount);
+          metrics.incrSuccessBytes(releasedBytes);
         }
 
         LOG.debug("Container: {}, deleted blocks: {}, space reclaimed: {}, " +
@@ -505,6 +532,7 @@ public class BlockDeletingService extends BackgroundService {
       } catch (IOException exception) {
         LOG.warn("Deletion operation was not successful for container: " +
             container.getContainerData().getContainerID(), exception);
+        metrics.incrFailureCount();
         throw exception;
       }
     }
@@ -553,5 +581,9 @@ public class BlockDeletingService extends BackgroundService {
   private interface Deleter {
     void apply(Table<?, DeletedBlocksTransaction> deleteTxnsTable,
         BatchOperation batch, long txnID) throws IOException;
+  }
+
+  public BlockDeletingServiceMetrics getMetrics() {
+    return metrics;
   }
 }

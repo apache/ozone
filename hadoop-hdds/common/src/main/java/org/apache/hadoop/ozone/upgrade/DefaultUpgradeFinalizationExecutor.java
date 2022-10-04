@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
 import java.io.IOException;
@@ -43,8 +42,6 @@ public class DefaultUpgradeFinalizationExecutor<T>
       throws IOException {
     try {
       finalizer.emitStartingMsg();
-      finalizer.getVersionManager()
-          .setUpgradeState(FINALIZATION_IN_PROGRESS);
 
       finalizer.preFinalizeUpgrade(component);
 
@@ -59,9 +56,10 @@ public class DefaultUpgradeFinalizationExecutor<T>
       if (finalizer.getVersionManager().needsFinalization()) {
         finalizer.getVersionManager()
             .setUpgradeState(FINALIZATION_REQUIRED);
-        throw (e);
+        throw e;
       }
     } finally {
+      // Used for testing.
       finalizer.markFinalizationDone();
     }
   }

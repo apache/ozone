@@ -48,7 +48,7 @@ grep -A1 'Crashed tests' "${REPORT_DIR}/output.log" \
   | tee -a "${REPORT_DIR}/summary.txt"
 
 # Check for tests that started but were not finished
-if grep -q 'There was a timeout or other error in the fork' "${REPORT_DIR}/output.log"; then
+if grep -q 'There was a timeout.*in the fork' "${REPORT_DIR}/output.log"; then
   diff -uw \
     <(grep -e 'Running org' "${REPORT_DIR}/output.log" \
       | sed -e 's/.* \(org[^ ]*\)/\1/' \

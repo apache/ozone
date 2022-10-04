@@ -42,6 +42,8 @@ Execute AWSS3Cli
     [return]          ${output}
 
 Install aws cli
+    ${rc}              ${output} =                 Run And Return Rc And Output           which aws
+    Return From Keyword If    '${rc}' == '0'
     ${rc}              ${output} =                 Run And Return Rc And Output           which apt-get
     Run Keyword if     '${rc}' == '0'              Install aws cli s3 debian
     ${rc}              ${output} =                 Run And Return Rc And Output           yum --help
@@ -65,7 +67,8 @@ Setup v4 headers
 Setup secure v4 headers
     ${result} =         Execute                    ozone s3 getsecret ${OM_HA_PARAM}
     ${accessKey} =      Get Regexp Matches         ${result}     (?<=awsAccessKey=).*
-    ${accessKey} =      Get Variable Value         ${accessKey}  sdsdasaasdasd
+    # Use a valid user that are created in the Docket image Ex: testuser if it is not a secure cluster
+    ${accessKey} =      Get Variable Value         ${accessKey}  testuser
     ${secret} =         Get Regexp Matches         ${result}     (?<=awsSecret=).*
     ${accessKey} =      Set Variable               ${accessKey[0]}
     ${secret} =         Set Variable               ${secret[0]}

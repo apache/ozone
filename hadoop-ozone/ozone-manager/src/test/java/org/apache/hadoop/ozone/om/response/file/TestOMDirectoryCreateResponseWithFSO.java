@@ -86,7 +86,7 @@ public class TestOMDirectoryCreateResponseWithFSO {
             .build();
 
     OMDirectoryCreateResponseWithFSO omDirectoryCreateResponseWithFSO =
-        new OMDirectoryCreateResponseWithFSO(omResponse, volume, bucket,
+        new OMDirectoryCreateResponseWithFSO(omResponse, volumeId, bucketId,
                 omDirInfo, new ArrayList<>(),
                 OMDirectoryCreateRequestWithFSO.Result.SUCCESS,
                 BucketLayout.FILE_SYSTEM_OPTIMIZED);

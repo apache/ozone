@@ -250,10 +250,10 @@ public final class SCMContext {
     }
   }
 
-  public boolean isFinalizationCheckpointCrossed(FinalizationCheckpoint query) {
+  public FinalizationCheckpoint getFinalizationCheckpoint() {
     lock.readLock().lock();
     try {
-      return this.finalizationCheckpoint.hasCrossed(query);
+      return this.finalizationCheckpoint;
     } finally {
       lock.readLock().unlock();
     }

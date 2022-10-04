@@ -21,10 +21,10 @@ mkdir -p "$REPORT_DIR"
 
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-dirs="dev-support/annotations hadoop-hdds hadoop-ozone"
+dirs="hadoop-hdds hadoop-ozone"
 
 for d in $dirs; do
-  pushd "$d"
+  pushd "$d" || exit 1
   mvn -B --no-transfer-progress -fn org.apache.rat:apache-rat-plugin:0.13:check
   popd
 done

@@ -41,7 +41,9 @@ import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.crl.CRLStatusReportHandler;
 import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
@@ -73,6 +75,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.De
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.server.events.EventExecutor;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
@@ -178,7 +181,6 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
@@ -244,7 +246,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * SCM super user.
    */
-  private final Collection<String> scmAdminUsernames;
+  private final OzoneAdmins scmAdmins;
   /**
    * SCM mxbean.
    */
@@ -267,6 +269,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
+  private PlacementPolicy ecContainerPlacementPolicy;
+  private PlacementPolicyValidateProxy placementPolicyValidateProxy;
   private MetricsSystem ms;
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
@@ -380,14 +384,20 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       securityProtocolServer = null;
     }
 
-    scmAdminUsernames = conf.getTrimmedStringCollection(OzoneConfigKeys
-        .OZONE_ADMINISTRATORS);
+    Collection<String> scmAdminUsernames =
+        conf.getTrimmedStringCollection(OzoneConfigKeys.OZONE_ADMINISTRATORS);
     String scmShortUsername =
         UserGroupInformation.getCurrentUser().getShortUserName();
 
     if (!scmAdminUsernames.contains(scmShortUsername)) {
       scmAdminUsernames.add(scmShortUsername);
     }
+
+    Collection<String> scmAdminGroups =
+        conf.getTrimmedStringCollection(
+            OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS);
+
+    scmAdmins = new OzoneAdmins(scmAdminUsernames, scmAdminGroups);
 
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
         eventQueue);
@@ -566,7 +576,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @SuppressWarnings("methodLength")
   private void initializeSystemManagers(OzoneConfiguration conf,
       SCMConfigurator configurator) throws IOException {
-
     Clock clock = new MonotonicClock(ZoneOffset.UTC);
 
     if (configurator.getNetworkTopology() != null) {
@@ -635,6 +644,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     containerPlacementPolicy =
         ContainerPlacementPolicyFactory.getPolicy(conf, scmNodeManager,
             clusterMap, true, placementMetrics);
+
+    ecContainerPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(
+        conf, scmNodeManager, clusterMap, true, placementMetrics);
+
+    placementPolicyValidateProxy = new PlacementPolicyValidateProxy(
+        containerPlacementPolicy, ecContainerPlacementPolicy);
 
     if (configurator.getPipelineManager() != null) {
       pipelineManager = configurator.getPipelineManager();
@@ -708,19 +723,22 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getReplicationManager() != null) {
       replicationManager = configurator.getReplicationManager();
     }  else {
+      LegacyReplicationManager legacyRM = new LegacyReplicationManager(
+          conf, containerManager, containerPlacementPolicy, eventQueue,
+          scmContext, scmNodeManager, scmHAManager, clock,
+          getScmMetadataStore().getMoveTable());
       replicationManager = new ReplicationManager(
           conf,
           containerManager,
           containerPlacementPolicy,
           eventQueue,
           scmContext,
-          serviceManager,
           scmNodeManager,
           clock,
-          scmHAManager,
-          getScmMetadataStore().getMoveTable(),
+          legacyRM,
           containerReplicaPendingOps);
     }
+    serviceManager.register(replicationManager);
     if (configurator.getScmSafeModeManager() != null) {
       scmSafeModeManager = configurator.getScmSafeModeManager();
     } else {
@@ -1563,6 +1581,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.error("Storage Container Manager HTTP server stop failed.", ex);
     }
 
+    LOG.info("Stopping SCM LayoutVersionManager Service.");
+    scmLayoutVersionManager.close();
+
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().stop();
     }
@@ -1741,6 +1762,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return containerPlacementPolicy;
   }
 
+  public PlacementPolicyValidateProxy getPlacementPolicyValidateProxy() {
+    return placementPolicyValidateProxy;
+  }
+
   @VisibleForTesting
   @Override
   public ContainerBalancer getContainerBalancer() {
@@ -1765,10 +1790,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public void checkAdminAccess(UserGroupInformation remoteUser)
       throws IOException {
-    if (remoteUser != null
-        && !scmAdminUsernames.contains(remoteUser.getUserName()) &&
-        !scmAdminUsernames.contains(remoteUser.getShortUserName()) &&
-        !scmAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
+    if (remoteUser != null && !scmAdmins.isAdmin(remoteUser)) {
       throw new AccessControlException(
           "Access denied for user " + remoteUser.getUserName() +
               ". Superuser privilege is required.");

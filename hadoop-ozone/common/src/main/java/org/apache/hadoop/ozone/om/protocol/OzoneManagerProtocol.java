@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
@@ -390,6 +391,18 @@ public interface OzoneManagerProtocol
   List<ServiceInfo> getServiceList() throws IOException;
 
   ServiceInfoEx getServiceInfo() throws IOException;
+
+  /**
+   * Triggers Ranger background sync task immediately.
+   *
+   * Requires Ozone administrator privilege.
+   *
+   * @param noWait set to true if client won't wait for the result.
+   * @return true if noWait is true or when task completed successfully,
+   *         false otherwise.
+   * @throws IOException OMException (e.g. PERMISSION_DENIED)
+   */
+  boolean triggerRangerBGSync(boolean noWait) throws IOException;
 
   /**
    * Initiate metadata upgrade finalization.
@@ -896,4 +909,17 @@ public interface OzoneManagerProtocol
   default CancelPrepareResponse cancelOzoneManagerPrepare() throws IOException {
     return CancelPrepareResponse.newBuilder().build();
   }
+
+  /**
+   * Send RPC request with or without payload to OM
+   * to benchmark RPC communication performance.
+   * @param payloadReq payload in request.
+   * @param payloadSizeResp payload size of response.
+   * @throws IOException if there is error in the RPC communication.
+   * @return EchoRPCResponse.
+   */
+  EchoRPCResponse echoRPCReq(byte[] payloadReq,
+                             int payloadSizeResp)
+          throws IOException;
+
 }

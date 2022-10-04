@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
@@ -120,6 +121,8 @@ public class BlockOutputStream extends OutputStream {
   private ChunkBuffer currentBuffer;
   private final Token<? extends TokenIdentifier> token;
   private int replicationIndex;
+  private Pipeline pipeline;
+  private final ContainerClientMetrics clientMetrics;
 
   /**
    * Creates a new BlockOutputStream.
@@ -135,21 +138,29 @@ public class BlockOutputStream extends OutputStream {
       Pipeline pipeline,
       BufferPool bufferPool,
       OzoneClientConfig config,
-      Token<? extends TokenIdentifier> token
+      Token<? extends TokenIdentifier> token,
+      ContainerClientMetrics clientMetrics
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
     this.blockID = new AtomicReference<>(blockID);
+    replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
-    this.containerBlockData =
-        BlockData.newBuilder().setBlockID(blockID.getDatanodeBlockIDProtobuf())
-            .addMetadata(keyValue);
+
+    ContainerProtos.DatanodeBlockID.Builder blkIDBuilder =
+        ContainerProtos.DatanodeBlockID.newBuilder()
+            .setContainerID(blockID.getContainerID())
+            .setLocalID(blockID.getLocalID())
+            .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
+    if (replicationIndex > 0) {
+      blkIDBuilder.setReplicaIndex(replicationIndex);
+    }
+    this.containerBlockData = BlockData.newBuilder().setBlockID(
+        blkIDBuilder.build()).addMetadata(keyValue);
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
     this.bufferPool = bufferPool;
     this.token = token;
-
-    replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
 
     //number of buffers used before doing a flush
     refreshCurrentBuffer();
@@ -170,6 +181,8 @@ public class BlockOutputStream extends OutputStream {
     ioException = new AtomicReference<>(null);
     checksum = new Checksum(config.getChecksumType(),
         config.getBytesPerChecksum());
+    this.clientMetrics = clientMetrics;
+    this.pipeline = pipeline;
   }
 
   void refreshCurrentBuffer() {
@@ -268,9 +281,13 @@ public class BlockOutputStream extends OutputStream {
       writeChunkIfNeeded();
       off += writeLen;
       len -= writeLen;
-      writtenDataLength += writeLen;
+      updateWrittenDataLength(writeLen);
       doFlushOrWatchIfNeeded();
     }
+  }
+
+  public void updateWrittenDataLength(int writeLen) {
+    writtenDataLength += writeLen;
   }
 
   private void doFlushOrWatchIfNeeded() throws IOException {
@@ -611,6 +628,7 @@ public class BlockOutputStream extends OutputStream {
     if (ioe == null) {
       IOException exception =  new IOException(EXCEPTION_MSG + e.toString(), e);
       ioException.compareAndSet(null, exception);
+      LOG.debug("Exception: for block ID: " + blockID,  e);
     } else {
       LOG.debug("Previous request had already failed with {} " +
               "so subsequent request also encounters " +
@@ -682,7 +700,6 @@ public class BlockOutputStream extends OutputStream {
       LOG.debug("Writing chunk {} length {} at offset {}",
           chunkInfo.getChunkName(), effectiveChunkSize, offset);
     }
-
     try {
       XceiverClientReply asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
           blockID.get(), data, token, replicationIndex);
@@ -705,6 +722,7 @@ public class BlockOutputStream extends OutputStream {
             throw ce;
           });
       containerBlockData.addChunks(chunkInfo);
+      clientMetrics.recordWriteChunk(pipeline, chunkInfo.getLen());
       return validateFuture;
     } catch (IOException | ExecutionException e) {
       throw new IOException(EXCEPTION_MSG + e.toString(), e);
@@ -748,5 +766,13 @@ public class BlockOutputStream extends OutputStream {
     setIoException(ex);
     adjustBuffersOnException();
     throw getIoException();
+  }
+
+  /**
+   * Get the Replication Index.
+   * @return replicationIndex
+   */
+  public int getReplicationIndex() {
+    return replicationIndex;
   }
 }

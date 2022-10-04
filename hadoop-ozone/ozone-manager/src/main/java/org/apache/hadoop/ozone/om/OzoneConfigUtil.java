@@ -21,13 +21,74 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.security.UserGroupInformation;
+
+import java.io.IOException;
+import java.util.Collection;
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS;
 
 /**
  * Utility class for ozone configurations.
  */
 public final class OzoneConfigUtil {
   private OzoneConfigUtil() {
+  }
+
+  /**
+   * Return list of OzoneAdministrators from config.
+   */
+  static Collection<String> getOzoneAdminsFromConfig(OzoneConfiguration conf)
+          throws IOException {
+    Collection<String> ozAdmins =
+            conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
+    String omSPN = UserGroupInformation.getCurrentUser().getShortUserName();
+    if (!ozAdmins.contains(omSPN)) {
+      ozAdmins.add(omSPN);
+    }
+    return ozAdmins;
+  }
+
+  /**
+   * Return list of s3 administrators prop from config.
+   *
+   * If ozone.s3.administrators value is empty string or unset,
+   * defaults to ozone.administrators value.
+   */
+  static Collection<String> getS3AdminsFromConfig(OzoneConfiguration conf)
+          throws IOException {
+    Collection<String> ozAdmins =
+            conf.getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS);
+    if (ozAdmins == null || ozAdmins.isEmpty()) {
+      ozAdmins = conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
+    }
+    String omSPN = UserGroupInformation.getCurrentUser().getShortUserName();
+    if (!ozAdmins.contains(omSPN)) {
+      ozAdmins.add(omSPN);
+    }
+    return ozAdmins;
+  }
+
+  static Collection<String> getOzoneAdminsGroupsFromConfig(
+      OzoneConfiguration conf) {
+    return conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS);
+  }
+
+  static Collection<String> getS3AdminsGroupsFromConfig(
+      OzoneConfiguration conf) {
+    Collection<String> s3AdminsGroup =
+            conf.getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS_GROUPS);
+    if (s3AdminsGroup.isEmpty() && conf
+        .getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS).isEmpty()) {
+      s3AdminsGroup = conf
+              .getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS);
+    }
+    return s3AdminsGroup;
   }
 
   public static ReplicationConfig resolveReplicationConfigPreference(

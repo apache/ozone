@@ -20,6 +20,7 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -120,7 +121,7 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
       default:
         throw new ServiceException("Unknown command type: " + cmdType);
       }
-    } catch (IOException e) {
+    } catch (IOException | TimeoutException e) {
       throw new ServiceException(e);
     }
   }

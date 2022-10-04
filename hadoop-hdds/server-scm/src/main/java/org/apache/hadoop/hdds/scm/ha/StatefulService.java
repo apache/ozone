@@ -19,10 +19,11 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.protobuf.ByteString;
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.Message;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.util.concurrent.TimeoutException;
 
 /**
  * A StatefulService is an SCMService that persists configuration to RocksDB.
@@ -41,14 +42,14 @@ public abstract class StatefulService implements SCMService {
   }
 
   /**
-   * Persists the specified {@link GeneratedMessage} configurationMessage
+   * Persists the specified {@link Message} configurationMessage
    * to RocksDB with this service's {@link SCMService#getServiceName()} as the
    * key.
-   * @param configurationMessage configuration GeneratedMessage to persist
+   * @param configurationMessage configuration Message to persist
    * @throws IOException on failure to persist configuration
    */
-  protected final void saveConfiguration(GeneratedMessage configurationMessage)
-      throws IOException {
+  protected final void saveConfiguration(Message configurationMessage)
+      throws IOException, TimeoutException {
     stateManager.saveConfiguration(getServiceName(),
         configurationMessage.toByteString());
   }
@@ -63,7 +64,7 @@ public abstract class StatefulService implements SCMService {
    * @throws IOException on failure to fetch the message from DB or when
    *                     parsing it. ensure the specified configType is correct
    */
-  protected final <T extends GeneratedMessage> T readConfiguration(
+  protected final <T extends Message> T readConfiguration(
       Class<T> configType) throws IOException {
     ByteString byteString = stateManager.readConfiguration(getServiceName());
     if (byteString == null) {
@@ -76,7 +77,7 @@ public abstract class StatefulService implements SCMService {
     } catch (NoSuchMethodException | IllegalAccessException
         | InvocationTargetException e) {
       e.printStackTrace();
-      throw new IOException("GeneratedMessage cannot be parsed. Ensure that "
+      throw new IOException("Message cannot be parsed. Ensure that "
           + configType + " is the correct expected message type for " +
           this.getServiceName(), e);
     }
