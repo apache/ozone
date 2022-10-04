@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.metadata;
 
 import org.apache.commons.text.WordUtils;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -32,6 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.metrics2.lib.Interns.info;
 
@@ -55,9 +55,15 @@ public final class SCMMetadataStoreMetrics implements MetricsSource {
 
   private SCMMetadataStoreImpl scmMetadataStore;
 
+  private Map<String, MetricsInfo> columnFamilyMetrics;
+
   public SCMMetadataStoreMetrics(SCMMetadataStoreImpl scmMetadataStoreImpl) {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
     this.scmMetadataStore = scmMetadataStoreImpl;
+
+    columnFamilyMetrics = scmMetadataStore.getTableMap().entrySet()
+        .stream().collect(
+        Collectors.toMap(Map.Entry::getKey, e -> getMetricsInfo(e.getKey())));
   }
 
   public static SCMMetadataStoreMetrics create(SCMMetadataStoreImpl
@@ -72,19 +78,17 @@ public final class SCMMetadataStoreMetrics implements MetricsSource {
     MetricsRecordBuilder builder = collector.addRecord(METRICS_SOURCE_NAME)
         .tag(ESTIMATED_KEY_COUNT, scmMetadataStore.getEstimatedKeyCountStr());
 
-    for (Map.Entry<String, Table<?, ?>> entry: scmMetadataStore.getTableMap()
-        .entrySet()) {
+    for (Map.Entry<String, MetricsInfo> entry: columnFamilyMetrics.entrySet()) {
       long count = 0L;
       try {
-        count = entry.getValue().getEstimatedKeyCount();
+        count = scmMetadataStore.getTableMap().get(entry.getKey())
+            .getEstimatedKeyCount();
       } catch (IOException e) {
         LOG.error("Can not get estimated key count for table {}",
             entry.getKey(), e);
       }
-      builder.addGauge(getMetricsInfo(entry.getKey()), count);
+      builder.addGauge(entry.getValue(), count);
     }
-
-
   }
 
   public void unRegister() {
