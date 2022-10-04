@@ -59,8 +59,8 @@ public class TestSCMMetadataStoreImpl {
       // Ignore
     }
 
-    Assertions.assertFalse(((SCMMetadataStoreImpl) scmMetadataStore)
-        .getEstimatedKeyCountStr().contains("sequenceId : 0"));
+    Assertions.assertTrue(((SCMMetadataStoreImpl) scmMetadataStore)
+        .getEstimatedKeyCountStr().contains("sequenceId : 1"));
     Assertions.assertEquals(1, getGauge("SequenceIdEstimatedKeyCount"));
   }
 

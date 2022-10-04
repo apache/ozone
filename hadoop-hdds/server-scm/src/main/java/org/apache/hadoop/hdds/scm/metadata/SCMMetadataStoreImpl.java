@@ -21,10 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -43,7 +40,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -74,23 +70,6 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class SCMMetadataStoreImpl implements SCMMetadataStore {
-
-  public static final Set<DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES =
-      new HashSet<>(Arrays.asList(
-          DELETED_BLOCKS,
-          VALID_CERTS,
-          VALID_SCM_CERTS,
-          REVOKED_CERTS,
-          REVOKED_CERTS_V2,
-          CONTAINERS,
-          PIPELINES,
-          TRANSACTIONINFO,
-          CRLS,
-          SEQUENCE_ID,
-          MOVE,
-          META,
-          STATEFUL_SERVICE_CONFIG
-      ));
 
   private Table<Long, DeletedBlocksTransaction> deletedBlocksTable;
 
@@ -360,7 +339,8 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
       try {
         return e.getKey() + " : " + e.getValue().getEstimatedKeyCount();
       } catch (IOException ex) {
-        ex.printStackTrace();
+        LOG.error("Can not get estimated key count for table {}",
+            e.getKey(), ex);
       }
       return "N/A";
     }).collect(Collectors.toList()));

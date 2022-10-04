@@ -18,21 +18,22 @@
 package org.apache.hadoop.hdds.scm.metadata;
 
 import org.apache.commons.text.WordUtils;
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Map;
+
+import static org.apache.hadoop.metrics2.lib.Interns.info;
 
 /**
  * Class contains metrics related to SCM Metadata Store.
@@ -40,23 +41,15 @@ import java.util.Map;
 @Metrics(about = "SCM Metadata Store Metrics", context = OzoneConsts.OZONE)
 public final class SCMMetadataStoreMetrics implements MetricsSource {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(SCMMetadataStoreMetrics.class);
+
   public static final String METRICS_SOURCE_NAME =
       SCMMetadataStoreMetrics.class.getSimpleName();
 
-  private static final MetricsInfo ESTIMATED_KEY_COUNT = Interns.info(
+  private static final MetricsInfo ESTIMATED_KEY_COUNT = info(
       "EstimatedKeyCount",
       "Tracked estimated key count of all column families");
-
-  private static final Map<String, MetricsInfo> ESTIMATED_KEY_COUNT_METRICS
-      = Collections.unmodifiableMap(new LinkedHashMap<String, MetricsInfo>() {{
-          for (DBColumnFamilyDefinition<?, ?> table:
-              SCMMetadataStoreImpl.COLUMN_FAMILIES) {
-            String name = WordUtils.capitalize(table.getName());
-            String metric = name + "EstimatedKeyCount";
-            String description = "Estimated key count in table of " + name;
-            put(table.getName(), Interns.info(metric, description));
-          }
-        }});
 
   private MetricsRegistry registry;
 
@@ -79,16 +72,16 @@ public final class SCMMetadataStoreMetrics implements MetricsSource {
     MetricsRecordBuilder builder = collector.addRecord(METRICS_SOURCE_NAME)
         .tag(ESTIMATED_KEY_COUNT, scmMetadataStore.getEstimatedKeyCountStr());
 
-    for (Map.Entry<String, MetricsInfo> e :
-        ESTIMATED_KEY_COUNT_METRICS.entrySet()) {
+    for (Map.Entry<String, Table<?, ?>> entry: scmMetadataStore.getTableMap()
+        .entrySet()) {
       long count = 0L;
       try {
-        count = scmMetadataStore.getTableMap().get(e.getKey())
-            .getEstimatedKeyCount();
-      } catch (IOException exception) {
-        // Ignore exception here.
+        count = entry.getValue().getEstimatedKeyCount();
+      } catch (IOException e) {
+        LOG.error("Can not get estimated key count for table {}",
+            entry.getKey(), e);
       }
-      builder.addGauge(e.getValue(), count);
+      builder.addGauge(getMetricsInfo(entry.getKey()), count);
     }
 
 
@@ -98,4 +91,10 @@ public final class SCMMetadataStoreMetrics implements MetricsSource {
     DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
   }
 
+  private MetricsInfo getMetricsInfo(String tableName) {
+    String name = WordUtils.capitalize(tableName);
+    String metric = name + "EstimatedKeyCount";
+    String description = "Estimated key count in table of " + name;
+    return info(metric, description);
+  }
 }
