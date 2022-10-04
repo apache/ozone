@@ -39,4 +39,9 @@ public interface OzoneManagerServiceProvider {
    * @return OM metadata manager instance.
    */
   OMMetadataManager getOMMetadataManagerInstance();
+
+  /**
+   * Trigger a sync between Recon and OM.
+   */
+  boolean triggerSyncDataFromOMImmediately();
 }
