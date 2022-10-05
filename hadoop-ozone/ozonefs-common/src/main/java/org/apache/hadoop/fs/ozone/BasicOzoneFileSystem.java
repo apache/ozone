@@ -1026,7 +1026,8 @@ public class BasicOzoneFileSystem extends FileSystem {
     return true;
   }
 
-  protected FileStatus constructFileStatus(FileStatusAdapter fileStatusAdapter) {
+  protected FileStatus constructFileStatus(
+          FileStatusAdapter fileStatusAdapter) {
     return new FileStatus(fileStatusAdapter.getLength(),
             fileStatusAdapter.isDir(),
             fileStatusAdapter.getBlockReplication(),
