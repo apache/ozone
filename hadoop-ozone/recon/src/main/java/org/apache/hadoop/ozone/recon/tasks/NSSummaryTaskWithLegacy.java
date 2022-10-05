@@ -223,7 +223,6 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
           // Get bucket info from bucket table
           OmBucketInfo omBucketInfo = omMetadataManager
               .getBucketTable().getSkipCache(bucketDBKey);
-
           // True if FileSystemPaths enabled
           boolean enableFileSystemPaths =
               ozoneConfiguration.get(OMConfigKeys

@@ -98,6 +98,11 @@ public class DirectoryEntityHandler extends EntityHandler {
       Path subdirPath = Paths.get(subdirNSSummary.getDirName());
       Path subdirFileName = subdirPath.getFileName();
       String subdirName;
+      // Checking for null to get rid of a findbugs error and
+      // then throwing the NPException to avoid swallowing it.
+      // Error: Possible null pointer dereference in
+      // ...DirectoryEntityHandler.getDuResponse(boolean, boolean) due to
+      // return value of called method Dereferenced at DirectoryEntityHandler
       if (subdirFileName != null) {
         subdirName = subdirFileName.toString();
       } else {

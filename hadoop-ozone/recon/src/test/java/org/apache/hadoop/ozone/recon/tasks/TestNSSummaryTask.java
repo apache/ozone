@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
@@ -47,7 +46,6 @@ import org.junit.runner.RunWith;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -57,7 +55,10 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOz
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 
 /**
- * Test for NSSummaryTaskWithLegacy.
+ * Test for NSSummaryTask. Create one bucket of each layout
+ * and test process and reprocess. Currently, there is no
+ * support for OBS buckets. Check that the NSSummary
+ * for the OBS bucket is null.
  */
 @RunWith(Enclosed.class)
 public final class TestNSSummaryTask {
@@ -75,11 +76,14 @@ public final class TestNSSummaryTask {
   private static final String VOL = "vol";
   private static final String BUCKET_ONE = "bucket1";
   private static final String BUCKET_TWO = "bucket2";
+  private static final String BUCKET_THREE = "bucket3";
   private static final String KEY_ONE = "file1";
   private static final String KEY_TWO = "file2";
+  private static final String KEY_THREE = "file3";
   private static final String KEY_FIVE = "file5";
   private static final String FILE_ONE = "file1";
   private static final String FILE_TWO = "file2";
+  private static final String FILE_THREE = "file3";
   private static final String FILE_FIVE = "file5";
 
   private static final String TEST_USER = "TestUser";
@@ -88,15 +92,17 @@ public final class TestNSSummaryTask {
   private static final long VOL_OBJECT_ID = 0L;
   private static final long BUCKET_ONE_OBJECT_ID = 1L;
   private static final long BUCKET_TWO_OBJECT_ID = 2L;
+  private static final long BUCKET_THREE_OBJECT_ID = 4L;
   private static final long KEY_ONE_OBJECT_ID = 3L;
   private static final long KEY_TWO_OBJECT_ID = 5L;
+  private static final long KEY_THREE_OBJECT_ID = 8L;
   private static final long KEY_FIVE_OBJECT_ID = 9L;
 
   private static final long KEY_ONE_SIZE = 500L;
   private static final long KEY_TWO_SIZE = 1025L;
+  private static final long KEY_THREE_SIZE =
+      ReconConstants.MAX_FILE_SIZE_UPPER_BOUND - 100L;
   private static final long KEY_FIVE_SIZE = 100L;
-
-  private static Set<Long> bucketOneAns = new HashSet<>();
 
   private TestNSSummaryTask() {
   }
@@ -136,6 +142,7 @@ public final class TestNSSummaryTask {
 
     private static NSSummary nsSummaryForBucket1;
     private static NSSummary nsSummaryForBucket2;
+    private static NSSummary nsSummaryForBucket3;
 
     @BeforeClass
     public static void setUp() throws IOException {
@@ -157,8 +164,11 @@ public final class TestNSSummaryTask {
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
       nsSummaryForBucket2 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_TWO_OBJECT_ID);
+      nsSummaryForBucket3 =
+      reconNamespaceSummaryManager.getNSSummary(BUCKET_THREE_OBJECT_ID);
       Assert.assertNotNull(nsSummaryForBucket1);
       Assert.assertNotNull(nsSummaryForBucket2);
+      Assert.assertNull(nsSummaryForBucket3);
     }
 
     @Test
@@ -204,6 +214,7 @@ public final class TestNSSummaryTask {
 
     private static NSSummary nsSummaryForBucket1;
     private static NSSummary nsSummaryForBucket2;
+    private static NSSummary nsSummaryForBucket3;
 
     private static OMDBUpdateEvent keyEvent1;
     private static OMDBUpdateEvent keyEvent2;
@@ -219,6 +230,9 @@ public final class TestNSSummaryTask {
       nsSummaryForBucket2 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_TWO_OBJECT_ID);
       Assert.assertNotNull(nsSummaryForBucket2);
+      nsSummaryForBucket3 =
+          reconNamespaceSummaryManager.getNSSummary(BUCKET_THREE_OBJECT_ID);
+      Assert.assertNull(nsSummaryForBucket3);
     }
 
     private static OMUpdateEventBatch processEventBatch() throws IOException {
@@ -269,8 +283,6 @@ public final class TestNSSummaryTask {
 
       Set<Long> childDirBucket1 = nsSummaryForBucket1.getChildDir();
       Assert.assertEquals(0, childDirBucket1.size());
-      bucketOneAns.clear();
-      Assert.assertEquals(bucketOneAns, childDirBucket1);
     }
 
     @Test
@@ -355,23 +367,13 @@ public final class TestNSSummaryTask {
         .build();
   }
 
-  private static OmDirectoryInfo buildOmDirInfo(String dirName,
-                                                long objectId,
-                                                long parentObjectId) {
-    return new OmDirectoryInfo.Builder()
-        .setName(dirName)
-        .setObjectID(objectId)
-        .setParentObjectID(parentObjectId)
-        .build();
-  }
-
   /**
    * Populate OMDB with the following configs.
-   * vol
-   * /     \
-   * bucket1   bucket2
-   * /          /
-   * file1    file2
+   *        vol
+   *      /     \         \
+   * bucket1   bucket2    bucket3
+   * /          /           \
+   * file1    file2       file3
    *
    * @throws IOException
    */
@@ -401,6 +403,19 @@ public final class TestNSSummaryTask {
         VOL_OBJECT_ID,
           KEY_TWO_SIZE,
         getLegacyBucketLayout());
+
+    // Bucket3 OBS layout
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_THREE,
+        BUCKET_THREE,
+        VOL,
+        FILE_THREE,
+        KEY_THREE_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        BUCKET_THREE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        KEY_THREE_SIZE,
+        getOBSBucketLayout());
   }
 
   /**
@@ -443,13 +458,23 @@ public final class TestNSSummaryTask {
         .setBucketLayout(getLegacyBucketLayout())
         .build();
 
+    OmBucketInfo bucketInfo3 = OmBucketInfo.newBuilder()
+        .setVolumeName(VOL)
+        .setBucketName(BUCKET_THREE)
+        .setObjectID(BUCKET_THREE_OBJECT_ID)
+        .setBucketLayout(getOBSBucketLayout())
+        .build();
+
     String bucketKey = omMetadataManager.getBucketKey(
         bucketInfo1.getVolumeName(), bucketInfo1.getBucketName());
     String bucketKey2 = omMetadataManager.getBucketKey(
         bucketInfo2.getVolumeName(), bucketInfo2.getBucketName());
+    String bucketKey3 = omMetadataManager.getBucketKey(
+        bucketInfo3.getVolumeName(), bucketInfo3.getBucketName());
 
     omMetadataManager.getBucketTable().put(bucketKey, bucketInfo1);
     omMetadataManager.getBucketTable().put(bucketKey2, bucketInfo2);
+    omMetadataManager.getBucketTable().put(bucketKey3, bucketInfo3);
   }
 
   private static BucketLayout getFSOBucketLayout() {
@@ -458,5 +483,9 @@ public final class TestNSSummaryTask {
 
   private static BucketLayout getLegacyBucketLayout() {
     return BucketLayout.LEGACY;
+  }
+
+  private static BucketLayout getOBSBucketLayout() {
+    return BucketLayout.OBJECT_STORE;
   }
 }
