@@ -377,14 +377,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         updateBCSID(container, dispatcherContext, cmdType);
         audit(action, eventType, params, AuditEventStatus.SUCCESS, null);
       } else {
-        //Other places could use on-demand scanning, this seemed like the
-        //easiest place to add a collective on-demand scanning.
-        //It would be also possible to add it to all the error cases
-        //inside KeyValueHandler
-        //It's possible to arrive here with an open container throwing a read
-        //error. We need to figure out if those containers can be closed
-        //to perform scanning.
-        scanContainerIfNeeded(container);
+        //TODO HDDS-7096:
+        // This is a too general place for on demand scanning.
+        // Create a specific exception that signals for on demand scanning
+        // and move this general scan to where it is more appropriate.
+        OnDemandContainerScanner.INSTANCE.scanContainer(container);
         audit(action, eventType, params, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
       }
@@ -576,7 +573,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private void scanContainerIfNeeded(Container<?> container) {
     if (container.getContainerState() == State.CLOSED ||
         container.getContainerState() == State.QUASI_CLOSED) {
-      OnDemandContainerScanner.getInstance().scanContainer(container);
+      OnDemandContainerScanner.INSTANCE.scanContainer(container);
     }
   }
 
