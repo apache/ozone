@@ -20,17 +20,38 @@ package org.apache.hadoop.ozone.om;
 
 import javax.servlet.ServletException;
 
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.compressors.CompressorException;
+import org.apache.commons.compress.compressors.CompressorOutputStream;
+import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
@@ -50,6 +71,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
+  private static final int MAX_SECONDS_TO_WAIT = 10;
 
   @Override
   public void init() throws ServletException {
@@ -82,4 +104,120 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         allowedGroups,
         om.isSpnegoEnabled());
   }
+
+  private void getFilesFromCheckpoint(DBCheckpoint checkpoint,
+                                      Map<Object, Path> noCopyFiles)
+      throws IOException {
+    Path dir = checkpoint.getCheckpointLocation();
+
+    try (Stream<Path> files = Files.list(dir)) {
+      for(Path file : files.collect(Collectors.toList())) {
+        // get the inode
+        Object key = Files.readAttributes(
+            file, BasicFileAttributes.class).fileKey();
+        noCopyFiles.put(key, file);
+      }
+    }
+  }
+  private List<Path> getSnapshotDirs(DBCheckpoint checkpoint)
+      throws IOException {
+    ArrayList<Path> list = new ArrayList<>();
+
+    // get snapshotInfo entries
+    OzoneConfiguration conf = ((OzoneManager) getServletContext()
+        .getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
+        .getConfiguration();
+
+    OmMetadataManagerImpl checkpointMetadataManager =
+        OmMetadataManagerImpl.createSnapshotMetadataManager(
+            conf, checkpoint.getCheckpointLocation().toString());
+    try(TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+        iterator = checkpointMetadataManager
+        .getSnapshotInfoTable().iterator()) {
+
+      // add each entries directory to the list
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, SnapshotInfo> entry = iterator.next();
+        Path path = Paths.get(entry.getValue().getCheckpointDirName());
+        list.add(path);
+      }
+    }
+    return list;
+  }
+
+  private void waitForDirToExist(Path dir)
+      throws IOException, InterruptedException {
+    int count = 0;
+    while (!dir.toFile().exists() && count < MAX_SECONDS_TO_WAIT) {
+      Thread.sleep(1000);
+      count++;
+    }
+    if (count == MAX_SECONDS_TO_WAIT) {
+      throw new IOException("snapshot dir doesn't exist: " + dir);
+    }
+  }
+  private void processDir(Path dir, Map<Object,Path> noCopyFiles,
+                          Map<Object, Path> copyFiles,
+                          Map<Path, Path> hardLinkFiles)
+      throws IOException, InterruptedException {
+    waitForDirToExist(dir);
+    try (Stream<Path> files = Files.list(dir)) {
+      for(Path file : files.collect(Collectors.toList())) {
+        // get the inode
+        Object key = Files.readAttributes(
+            file, BasicFileAttributes.class).fileKey();
+        if (noCopyFiles.containsKey(key)) {
+          hardLinkFiles.put(file, noCopyFiles.get(key));
+        } else if (copyFiles.containsKey(key)) {
+          hardLinkFiles.put(file, copyFiles.get(key));
+        } else {
+          copyFiles.put(key, file);
+        }
+      }
+    }
+
+  }
+  public void createTarBall(DBCheckpoint checkpoint, OutputStream destination)
+      throws IOException, InterruptedException, CompressorException {
+    HashMap<Object, Path> noCopyFiles = new HashMap<>();
+    HashMap<Object, Path> copyFiles = new HashMap<>();
+    HashMap<Path, Path> hardLinkFiles = new HashMap<>();
+    getFilesFromCheckpoint(checkpoint, noCopyFiles);
+    for (Path dir : getSnapshotDirs(checkpoint)) {
+      processDir(dir, noCopyFiles, copyFiles, hardLinkFiles);
+    }
+    try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
+        .createCompressorOutputStream(CompressorStreamFactory.GZIP,
+            destination)) {
+
+      try (ArchiveOutputStream archiveOutputStream =
+          new TarArchiveOutputStream(gzippedOut)) {
+
+        Path checkpointPath = checkpoint.getCheckpointLocation();
+        try (Stream<Path> files = Files.list(checkpointPath)) {
+          for (Path path : files.collect(Collectors.toList())) {
+            if (path != null) {
+              Path fileName = path.getFileName();
+              if (fileName != null) {
+                includeFile(path.toFile(), fileName.toString(),
+                    archiveOutputStream);
+              }
+            }
+          }
+        }
+        for (Path file : copyFiles.values()) {
+          includeFile(file.toFile(), file.getFileName().toString(),
+              archiveOutputStream);
+        }
+        Path hardLinkList = createHardLinkList(checkpointPath, hardLinkFiles);
+        includeFile(hardLinkList.toFile(), hardLinkList.getFileName().toString(),
+            archiveOutputStream);
+      }
+    } catch (CompressorException e) {
+      throw new IOException(
+          "Can't compress the checkpoint: " +
+              checkpoint.getCheckpointLocation(), e);
+    }
+  }
+
 }

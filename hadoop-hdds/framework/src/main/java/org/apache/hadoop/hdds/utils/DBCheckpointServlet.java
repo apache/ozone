@@ -238,7 +238,7 @@ public class DBCheckpointServlet extends HttpServlet {
     }
   }
 
-  private static void includeFile(File file, String entryName,
+  protected static void includeFile(File file, String entryName,
       ArchiveOutputStream archiveOutputStream)
       throws IOException {
     ArchiveEntry archiveEntry =
