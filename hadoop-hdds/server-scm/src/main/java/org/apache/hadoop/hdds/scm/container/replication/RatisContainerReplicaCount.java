@@ -248,7 +248,26 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   }
 
   /**
-   * Return true is the container is over replicated. Decommission and
+   * Return true if the container is sufficiently replicated. Decommissioning
+   * and Decommissioned containers are ignored in this check, assuming they will
+   * eventually be removed from the cluster.
+   * This check ignores inflight additions, if includePendingAdd is false,
+   * otherwise it will assume they complete ok.
+   *
+   * @return True if the container is sufficiently replicated and False
+   *         otherwise.
+   */
+  public boolean isSufficientlyReplicated(boolean includePendingAdd) {
+    // Positive for under-rep, negative for over-rep
+    int delta = missingReplicas();
+    if (includePendingAdd) {
+      delta -= inFlightAdd;
+    }
+    return delta <= 0;
+  }
+
+  /**
+   * Return true if the container is over replicated. Decommission and
    * maintenance containers are ignored for this check.
    * The check ignores inflight additions, as they may fail, but it does
    * consider inflight deletes, as they would reduce the over replication when
@@ -258,14 +277,37 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    */
   @Override
   public boolean isOverReplicated() {
-    return missingReplicas() + inFlightDel < 0;
+    return isOverReplicated(true);
+  }
+
+  /**
+   * Return true if the container is over replicated. Decommission and
+   * maintenance containers are ignored for this check.
+   * The check ignores inflight additions, as they may fail, but it does
+   * consider inflight deletes if includePendingDelete is true.
+   *
+   * @return True if the container is over replicated, false otherwise.
+   */
+  public boolean isOverReplicated(boolean includePendingDelete) {
+    int delta = missingReplicas();
+    if (includePendingDelete) {
+      delta += inFlightDel;
+    }
+    return delta < 0;
   }
 
   /**
    * @return Return Excess Redundancy replica nums.
    */
-  public int getExcessRedundancy() {
-    int excessRedundancy = missingReplicas() + inFlightDel;
+  public int getExcessRedundancy(boolean includePendingDelete) {
+    int excessRedundancy = missingReplicas();
+    if (excessRedundancy >= 0) {
+      // either perfectly replicated or under replicated
+      return 0;
+    }
+    if (includePendingDelete) {
+      excessRedundancy += inFlightDel;
+    }
     return -excessRedundancy;
   }
 
@@ -278,18 +320,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    * @return Count of remaining redundant replicas.
    */
   public int getRemainingRedundancy() {
-    return repFactor - missingReplicas() - inFlightDel - 1;
-  }
-
-  /**
-   * Considering the pending replicas, which have been scheduled for copy or
-   * reconstruction, will the container still be under-replicated when they
-   * complete.
-   * @return True if the under-replication is corrected by the pending
-   *         replicas. False otherwise.
-   */
-  public boolean isSufficientlyReplicatedAfterPending() {
-    return getHealthyCount() + inFlightAdd >= repFactor;
+    return Math.max(0, healthyCount + decommissionCount + maintenanceCount - 1);
   }
 
   /**

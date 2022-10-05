@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.junit.Assert;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
@@ -430,6 +431,49 @@ class TestRatisContainerReplicaCount {
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     assertTrue(rcnt.isUnrecoverable());
     assertFalse(rcnt.isSufficientlyReplicated());
+  }
+
+  @Test
+  void testOverReplicatedWithAndWithoutPending() {
+    Set<ContainerReplica> replica = registerNodes(IN_SERVICE, IN_SERVICE,
+        IN_SERVICE, IN_SERVICE, IN_SERVICE);
+    ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 2, 3, 2);
+    assertTrue(rcnt.isOverReplicated(false));
+    assertFalse(rcnt.isOverReplicated(true));
+    assertEquals(2, rcnt.getExcessRedundancy(false));
+    assertEquals(0, rcnt.getExcessRedundancy(true));
+  }
+
+  @Test
+  void testRemainingRedundancy() {
+    Set<ContainerReplica> replica = registerNodes(IN_SERVICE, IN_SERVICE,
+        IN_SERVICE, IN_SERVICE);
+    ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 1, 3, 2);
+    Assert.assertEquals(3, rcnt.getRemainingRedundancy());
+    replica = registerNodes(IN_SERVICE);
+    rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
+    Assert.assertEquals(0, rcnt.getRemainingRedundancy());
+    rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 1, 3, 2);
+    Assert.assertEquals(0, rcnt.getRemainingRedundancy());
+  }
+
+  @Test
+  void testSufficientlyReplicatedWithAndWithoutPending() {
+    Set<ContainerReplica> replica = registerNodes(IN_SERVICE, IN_SERVICE);
+    ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
+    assertFalse(rcnt.isSufficientlyReplicated(true));
+    rcnt =
+        new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
+    assertTrue(rcnt.isSufficientlyReplicated(true));
+    assertFalse(rcnt.isSufficientlyReplicated(false));
   }
 
   private void validate(RatisContainerReplicaCount rcnt,
