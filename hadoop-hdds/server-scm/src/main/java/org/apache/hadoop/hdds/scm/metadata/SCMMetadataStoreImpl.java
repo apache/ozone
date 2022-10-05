@@ -23,9 +23,7 @@ import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
-import com.google.gson.Gson;
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -331,19 +329,6 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
       throw new IOException(String.format(errMsg, name));
     }
     tableMap.put(name, table);
-  }
-
-  public String getEstimatedKeyCountStr() {
-    Gson gson = new Gson();
-    return gson.toJson(tableMap.entrySet().stream().map(e -> {
-      try {
-        return e.getKey() + " : " + e.getValue().getEstimatedKeyCount();
-      } catch (IOException ex) {
-        LOG.error("Can not get estimated key count for table {}",
-            e.getKey(), ex);
-      }
-      return "N/A";
-    }).collect(Collectors.toList()));
   }
 
   Map<String, Table<?, ?>> getTableMap() {
