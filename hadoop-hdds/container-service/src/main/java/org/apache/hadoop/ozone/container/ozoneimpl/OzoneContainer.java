@@ -307,30 +307,27 @@ public class OzoneContainer {
   private void startContainerScrub() {
     ContainerScannerConfiguration c = config.getObject(
         ContainerScannerConfiguration.class);
-    boolean enabled = c.isEnabled();
-
-    if (!enabled) {
+    if (!c.isEnabled()) {
       LOG.info("Background container scanner has been disabled.");
-    } else {
-      if (this.metadataScanner == null) {
-        this.metadataScanner = new ContainerMetadataScanner(c, controller);
-      }
-      this.metadataScanner.start();
+      return;
+    }
+    OnDemandContainerScanner.init(c, controller);
+    if (this.metadataScanner == null) {
+      this.metadataScanner = new ContainerMetadataScanner(c, controller);
+    }
+    this.metadataScanner.start();
 
-      if (c.getBandwidthPerVolume() == 0L) {
-        LOG.warn(VOLUME_BYTES_PER_SECOND_KEY + " is set to 0, " +
-            "so background container data scanner will not start.");
-        return;
-      }
-
-      dataScanners = new ArrayList<>();
-      for (StorageVolume v : volumeSet.getVolumesList()) {
-        ContainerDataScanner s = new ContainerDataScanner(c, controller,
-            (HddsVolume) v);
-        s.start();
-        dataScanners.add(s);
-      }
-      OnDemandContainerScanner.init(c, controller);
+    if (c.getBandwidthPerVolume() == 0L) {
+      LOG.warn(VOLUME_BYTES_PER_SECOND_KEY + " is set to 0, " +
+          "so background container data scanner will not start.");
+      return;
+    }
+    dataScanners = new ArrayList<>();
+    for (StorageVolume v : volumeSet.getVolumesList()) {
+      ContainerDataScanner s = new ContainerDataScanner(c, controller,
+          (HddsVolume) v);
+      s.start();
+      dataScanners.add(s);
     }
   }
 
@@ -350,7 +347,7 @@ public class OzoneContainer {
     for (ContainerDataScanner s : dataScanners) {
       s.shutdown();
     }
-    OnDemandContainerScanner.getInstance().shutdown();
+    OnDemandContainerScanner.INSTANCE.shutdown();
   }
 
   /**
