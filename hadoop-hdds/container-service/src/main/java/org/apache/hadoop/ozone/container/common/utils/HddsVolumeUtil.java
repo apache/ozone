@@ -136,7 +136,7 @@ public final class HddsVolumeUtil {
    * @param pathStr path to match
    */
   public static HddsVolume matchHddsVolume(List<HddsVolume> volumes,
-      String pathStr) {
+      String pathStr) throws IOException {
     assert pathStr != null;
     List<HddsVolume> resList = new ArrayList<>();
     for (HddsVolume hddsVolume: volumes) {
@@ -147,9 +147,9 @@ public final class HddsVolumeUtil {
     if (resList.size() == 1) {
       return resList.get(0);
     } else if (resList.size() > 1) {
-      LOG.warn("Get multi volumes {} matching path {}",
+      throw new IOException("Get multi volumes " +
           resList.stream().map(StorageVolume::getVolumeRootDir).collect(
-              Collectors.joining(",")), pathStr);
+              Collectors.joining(",")) + " matching path " + pathStr);
     }
     return null;
   }

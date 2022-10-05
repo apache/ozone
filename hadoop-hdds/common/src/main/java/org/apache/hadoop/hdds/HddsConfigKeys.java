@@ -281,7 +281,4 @@ public final class HddsConfigKeys {
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_DNAUDIT =
       "ozone.audit.log.debug.cmd.list.dnaudit";
 
-  // The path where datanode diskBalancer's conf is to be written to.
-  public static final String HDDS_DATANODE_DISK_BALANCER_INFO_DIR =
-      "hdds.datanode.disk.balancer.info.dir";
 }

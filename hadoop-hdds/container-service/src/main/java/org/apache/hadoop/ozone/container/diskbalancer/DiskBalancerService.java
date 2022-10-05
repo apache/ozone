@@ -21,7 +21,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -62,6 +61,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+
+import static org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration.HDDS_DATANODE_DISK_BALANCER_INFO_DIR;
 
 
 /**
@@ -189,7 +190,7 @@ public class DiskBalancerService extends BackgroundService {
 
   private String getDiskBalancerInfoPath() {
     String diskBalancerInfoDir =
-        conf.getTrimmed(HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_INFO_DIR);
+        conf.getTrimmed(HDDS_DATANODE_DISK_BALANCER_INFO_DIR);
     if (Strings.isNullOrEmpty(diskBalancerInfoDir)) {
       File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
       if (metaDirPath == null) {

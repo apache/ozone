@@ -302,10 +302,9 @@ public class DatanodeConfiguration {
       type = ConfigType.BOOLEAN,
       tags = { DATANODE, ConfigTag.DISKBALANCER},
       description =
-          "Refresh Time interval of the Datanode DiskBalancer service. " +
-              "The Datanode will check the service periodically and update " +
-              "the config and running status for DiskBalancer service. " +
-              "Unit could be defined with postfix (ns,ms,s,m,h,d). "
+          "If DiskBalancer fails to get information from diskbalancer.info, " +
+              "it will choose this value to decide if this service should be " +
+              "running."
   )
   private boolean diskBalancerShouldRun = false;
 

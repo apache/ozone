@@ -175,13 +175,6 @@
     </description>
   </property>
   <property>
-    <name>hdds.datanode.disk.balancer.info.dir</name>
-    <value/>
-    <tag>STORAGE, DISK_BALANCER</tag>
-    <description>The file to persist latest DiskBalancer information.
-    </description>
-  </property>
-  <property>
     <name>hdds.datanode.volume.choosing.policy</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
