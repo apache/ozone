@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.shell.snapshot;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.shell.Handler;
-import org.apache.hadoop.ozone.shell.ListOptions;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.bucket.BucketUri;
 import picocli.CommandLine;
@@ -39,9 +38,6 @@ public class ListSnapshotHandler extends Handler {
   @CommandLine.Mixin
   private BucketUri snapshotPath;
 
-  @CommandLine.Mixin
-  private ListOptions listOptions;
-
   @Override
   protected OzoneAddress getAddress() {
     return snapshotPath.getValue();
@@ -54,10 +50,9 @@ public class ListSnapshotHandler extends Handler {
     String bucketName = snapshotPath.getValue().getBucketName();
 
     List<? extends OzoneSnapshot> snapshotInfos = client.getObjectStore()
-        .listSnapshot(volumeName, bucketName, listOptions.getStartItem(),
-            listOptions.getPrefix());
+        .listSnapshot(volumeName, bucketName);
     int counter = printAsJsonArray(snapshotInfos.iterator(),
-        listOptions.getLimit());
+        snapshotInfos.size());
     if (isVerbose()) {
       out().printf("Found : %d snapshots for o3://%s/ %s ", counter,
           volumeName, bucketName);

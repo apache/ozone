@@ -1118,19 +1118,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public List<SnapshotInfo> listSnapshot(String volumeName, String bucketName,
-        String startKey, String prefix) throws IOException {
+  public List<SnapshotInfo> listSnapshot(String volumeName, String bucketName)
+      throws IOException {
     final OzoneManagerProtocolProtos.ListSnapshotRequest.Builder
         requestBuilder =
         OzoneManagerProtocolProtos.ListSnapshotRequest.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName);
-    if (startKey != null) {
-      requestBuilder.setStartKey(startKey);
-    }
-    if (prefix != null) {
-      requestBuilder.setPrefix(prefix);
-    }
 
     final OMRequest omRequest = createOMRequest(Type.ListSnapshot)
         .setListSnapshotRequest(requestBuilder)

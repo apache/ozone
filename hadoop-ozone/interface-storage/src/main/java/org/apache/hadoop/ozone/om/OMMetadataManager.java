@@ -223,14 +223,12 @@ public interface OMMetadataManager extends DBStoreHAManager {
       String startKeyName, String keyPrefix, int maxKeys) throws IOException;
 
   /**
+   * List snapshots in a volume/bucket.
    * @param volumeName volume name
    * @param bucketName bucket name
-   * @param startKey   the start snapshot name
-   * @param prefix     snapshot name prefix
    * @return list of snapshot
    */
-  List<SnapshotInfo> listSnapshot(String volumeName, String bucketName,
-                                  String startKey, String prefix)
+  List<SnapshotInfo> listSnapshot(String volumeName, String bucketName)
       throws IOException;
 
   /**

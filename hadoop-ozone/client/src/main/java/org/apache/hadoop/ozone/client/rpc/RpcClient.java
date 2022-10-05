@@ -930,23 +930,21 @@ public class RpcClient implements ClientProtocol {
   }
 
   /**
-   * List snapshots in a volume/bucket, filtered by a name prefix.
+   * List snapshots in a volume/bucket.
    * @param volumeName volume name
    * @param bucketName bucket name
-   * @param startKey   the start snapshot name
-   * @param prefix     snapshot name prefix
    * @return list of snapshot name
    * @throws IOException
    */
   @Override
-  public List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName,
-      String startKey, String prefix) throws IOException {
+  public List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName)
+      throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(volumeName),
         "volume can't be null or empty.");
     Preconditions.checkArgument(Strings.isNotBlank(bucketName),
         "bucket can't be null or empty.");
-    return ozoneManagerClient.listSnapshot(volumeName, bucketName, startKey,
-        prefix).stream().map(snapshotInfo -> new OzoneSnapshot(
+    return ozoneManagerClient.listSnapshot(volumeName, bucketName).stream()
+        .map(snapshotInfo -> new OzoneSnapshot(
         snapshotInfo.getVolumeName(),
         snapshotInfo.getBucketName(),
         snapshotInfo.getName(),

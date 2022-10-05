@@ -579,8 +579,7 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName,
-                                          String startKey, String prefix)
+  public List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName)
       throws IOException {
     return null;
   }

@@ -657,8 +657,7 @@ public interface OzoneManagerProtocol
   }
 
   /**
-   * Create snapshot.
-   *
+   * List snapshots in a volume/bucket.
    * @param volumeName volume name
    * @param bucketName bucket name
    * @param startKey   the start snapshot name
@@ -666,8 +665,7 @@ public interface OzoneManagerProtocol
    * @return list of snapshot name
    * @throws IOException
    */
-  default List<SnapshotInfo> listSnapshot(String volumeName, String bucketName,
-                                          String startKey, String prefix)
+  default List<SnapshotInfo> listSnapshot(String volumeName, String bucketName)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");

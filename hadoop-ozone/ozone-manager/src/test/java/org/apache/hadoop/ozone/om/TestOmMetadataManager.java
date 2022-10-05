@@ -676,58 +676,33 @@ public class TestOmMetadataManager {
 
     OMRequestTestUtils.addVolumeToDB(vol1, omMetadataManager);
     addBucketsToCache(vol1, bucket1);
-    String prefixSnapshotA = "key-a";
-    String prefixSnapshotB = "key-b";
-    TreeSet<String> snapshotsASet = new TreeSet<>();
-    TreeSet<String> snapshotsSet = new TreeSet<>();
+    String snapshotName = "snapshot";
 
-    for (int i = 1; i <= 100; i++) {
+    for (int i = 1; i <= 10; i++) {
       if (i % 2 == 0) {
-        snapshotsASet.add(prefixSnapshotA + i);
-        snapshotsSet.add(prefixSnapshotA + i);
         OMRequestTestUtils.addSnapshotToTable(vol1, bucket1,
-            prefixSnapshotA + i, omMetadataManager);
+            snapshotName + i, omMetadataManager);
       } else {
-        snapshotsSet.add(prefixSnapshotB + i);
         OMRequestTestUtils.addSnapshotToTableCache(vol1, bucket1,
-            prefixSnapshotB + i, omMetadataManager);
+            snapshotName + i, omMetadataManager);
       }
     }
 
     //Test listing snapshots with no volume name.
     Assert.assertThrows(OMException.class, () -> omMetadataManager.listSnapshot(
-        null, null, null, null));
+        null, null));
 
     //Test listing snapshots with no bucket name.
     Assert.assertThrows(OMException.class, () -> omMetadataManager.listSnapshot(
-        vol1, null, null, null));
+        vol1, null));
 
-    //Test listing all snapshots which have prefix "key-a".
+    //Test listing all snapshots.
     List<SnapshotInfo> snapshotInfos = omMetadataManager.listSnapshot(vol1,
-        bucket1, null, prefixSnapshotA);
-    Assert.assertEquals(snapshotInfos.size(), 50);
+        bucket1);
+    Assert.assertEquals(10, snapshotInfos.size());
     for (SnapshotInfo snapshotInfo : snapshotInfos) {
-      Assert.assertTrue(snapshotInfo.getName().startsWith(prefixSnapshotA));
+      Assert.assertTrue(snapshotInfo.getName().startsWith(snapshotName));
     }
 
-    //Test listing snapshots which have prefix "key-a" and start with "key-a10".
-    String startKey = prefixSnapshotA + "10";
-    snapshotInfos = omMetadataManager.listSnapshot(
-        vol1, bucket1, startKey, prefixSnapshotA);
-    Assert.assertEquals(snapshotsASet.tailSet(startKey).size() - 1,
-        snapshotInfos.size());
-    for (SnapshotInfo snapshotInfo : snapshotInfos) {
-      Assert.assertFalse(snapshotInfo.getName().equals(startKey));
-      Assert.assertTrue(snapshotInfo.getName().startsWith(prefixSnapshotA));
-    }
-
-    TreeSet<String> expectedKey = new TreeSet<>();
-    //Test listing add snapshot with empty prefix.
-    snapshotInfos = omMetadataManager.listSnapshot(vol1, bucket1, null, null);
-    Assert.assertEquals(snapshotInfos.size(), 100);
-    for (SnapshotInfo snapshotInfo : snapshotInfos) {
-      expectedKey.add(snapshotInfo.getName());
-    }
-    Assert.assertEquals(snapshotsSet, expectedKey);
   }
 }

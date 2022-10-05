@@ -1621,8 +1621,6 @@ message CreateSnapshotRequest {
 message ListSnapshotRequest {
   required string volumeName = 1;
   required string bucketName = 2;
-  optional string startKey = 3;
-  optional string prefix = 4;
 }
 
 message DeleteTenantRequest {

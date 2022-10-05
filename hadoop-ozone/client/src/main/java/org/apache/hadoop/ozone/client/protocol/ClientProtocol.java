@@ -971,15 +971,12 @@ public interface ClientProtocol {
       String bucketName, String snapshotName) throws IOException;
 
   /**
-   * List snapshots in a volume/bucket, filtered by a name prefix.
+   * List snapshots in a volume/bucket.
    * @param volumeName volume name
    * @param bucketName bucket name
-   * @param startKey   the start snapshot name
-   * @param prefix     snapshot name prefix
    * @return list of snapshot name
    * @throws IOException
    */
-  List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName,
-                                   String startKey, String prefix)
+  List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName)
       throws IOException;
 }
