@@ -70,8 +70,17 @@ public enum BucketLayout {
     return this.equals(LEGACY);
   }
 
-  public boolean isObjectStore() {
-    return this.equals(OBJECT_STORE);
+  public boolean isObjectStore(boolean enableFileSystemPaths) {
+    if (this.equals(OBJECT_STORE)) {
+      return true;
+    } else {
+      // If bucket layout is Legacy and FileSystemPaths
+      // are disabled, then the bucket operates as OBS.
+      if (this.equals(LEGACY) && !enableFileSystemPaths) {
+        return true;
+      }
+      return false;
+    }
   }
 
   public boolean shouldNormalizePaths(boolean enableFileSystemPaths) {

@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -68,6 +69,7 @@ public final class TestNSSummaryTaskWithLegacy {
   private static OMMetadataManager omMetadataManager;
   private static ReconOMMetadataManager reconOMMetadataManager;
   private static NSSummaryTaskWithLegacy nSSummaryTaskWithLegacy;
+  private static OzoneConfiguration omConfiguration;
 
   // Object names
   private static final String VOL = "vol";
@@ -147,7 +149,8 @@ public final class TestNSSummaryTaskWithLegacy {
     populateOMDB();
 
     nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager,
+        reconOMMetadataManager, omConfiguration);
   }
 
   /**
@@ -690,9 +693,11 @@ public final class TestNSSummaryTaskWithLegacy {
   private static void initializeNewOmMetadataManager(
       File omDbDir)
       throws IOException {
-    OzoneConfiguration omConfiguration = new OzoneConfiguration();
+    omConfiguration = new OzoneConfiguration();
     omConfiguration.set(OZONE_OM_DB_DIRS,
         omDbDir.getAbsolutePath());
+    omConfiguration.set(OMConfigKeys
+        .OZONE_OM_ENABLE_FILESYSTEM_PATHS, "true");
     omMetadataManager = new OmMetadataManagerImpl(
         omConfiguration);
 

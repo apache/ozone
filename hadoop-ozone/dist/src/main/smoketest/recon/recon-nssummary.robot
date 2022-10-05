@@ -14,7 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Smoke test for Recon Namespace Summary Endpoint for FSO and Legacy buckets.
+Documentation       Smoke test for Recon Namespace Summary Endpoint for ${BUCKET_LAYOUT} buckets.
 Library             OperatingSystem
 Library             String
 Library             BuiltIn

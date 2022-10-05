@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -108,6 +109,7 @@ public class TestNSSummaryEndpointWithLegacy {
 
   private ReconOMMetadataManager reconOMMetadataManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
+  private OzoneConfiguration conf;
 
   private static final String TEST_PATH_UTILITY =
       "/vol1/buck1/a/b/c/d/e/file1.txt";
@@ -155,6 +157,7 @@ public class TestNSSummaryEndpointWithLegacy {
   private static final String DIR_FOUR = "dir4";
   private static final String DIR_FIVE = "dir5";
   // objects IDs
+  private static final long PARENT_OBJECT_ID_ZERO = 0L;
   private static final long VOL_OBJECT_ID = 0L;
   private static final long BUCKET_ONE_OBJECT_ID = 1L;
   private static final long BUCKET_TWO_OBJECT_ID = 2L;
@@ -342,8 +345,9 @@ public class TestNSSummaryEndpointWithLegacy {
 
   @Before
   public void setUp() throws Exception {
+    conf = new OzoneConfiguration();
     OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
-        temporaryFolder.newFolder());
+        temporaryFolder.newFolder(), conf);
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         getMockOzoneManagerServiceProvider();
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager, 
@@ -369,7 +373,7 @@ public class TestNSSummaryEndpointWithLegacy {
     populateOMDB();
     NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy = 
         new NSSummaryTaskWithLegacy(reconNamespaceSummaryManager, 
-                                    reconOMMetadataManager);
+                                    reconOMMetadataManager, conf);
     nsSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
   }
 
@@ -480,6 +484,7 @@ public class TestNSSummaryEndpointWithLegacy {
     Assert.assertEquals(VOL_DATA_SIZE, duVol1.getSize());
     Assert.assertEquals(VOL_TWO_DATA_SIZE, duVol2.getSize());
   }
+
   @Test
   public void testDiskUsageVolume() throws Exception {
     // volume level DU
@@ -497,8 +502,8 @@ public class TestNSSummaryEndpointWithLegacy {
     Assert.assertEquals(BUCKET_TWO_PATH, duBucket2.getSubpath());
     Assert.assertEquals(BUCKET_ONE_DATA_SIZE, duBucket1.getSize());
     Assert.assertEquals(BUCKET_TWO_DATA_SIZE, duBucket2.getSize());
-
   }
+
   @Test
   public void testDiskUsageBucket() throws Exception {
     // bucket level DU
@@ -509,8 +514,8 @@ public class TestNSSummaryEndpointWithLegacy {
     DUResponse.DiskUsage duDir1 = duBucketResponse.getDuData().get(0);
     Assert.assertEquals(DIR_ONE_PATH, duDir1.getSubpath());
     Assert.assertEquals(DIR_ONE_DATA_SIZE, duDir1.getSize());
-
   }
+
   @Test
   public void testDiskUsageDir() throws Exception {
     // dir level DU
@@ -532,8 +537,8 @@ public class TestNSSummaryEndpointWithLegacy {
 
     Assert.assertEquals(DIR_FOUR_PATH, duDir4.getSubpath());
     Assert.assertEquals(KEY_SIX_SIZE, duDir4.getSize());
-
   }
+
   @Test
   public void testDiskUsageKey() throws Exception {
     // key level DU
@@ -542,8 +547,8 @@ public class TestNSSummaryEndpointWithLegacy {
     DUResponse keyObj = (DUResponse) keyResponse.getEntity();
     Assert.assertEquals(0, keyObj.getCount());
     Assert.assertEquals(KEY_FOUR_SIZE, keyObj.getSize());
-
   }
+
   @Test
   public void testDiskUsageUnknown() throws Exception {
     // invalid path check
@@ -721,7 +726,7 @@ public class TestNSSummaryEndpointWithLegacy {
           VOL,
           DIR_ONE,
           DIR_ONE_OBJECT_ID,
-          BUCKET_ONE_OBJECT_ID,
+          PARENT_OBJECT_ID_ZERO,
           BUCKET_ONE_OBJECT_ID,
           VOL_OBJECT_ID,
           getBucketLayout());
@@ -731,7 +736,7 @@ public class TestNSSummaryEndpointWithLegacy {
           VOL,
           DIR_TWO,
           DIR_TWO_OBJECT_ID,
-          DIR_ONE_OBJECT_ID,
+          PARENT_OBJECT_ID_ZERO,
           BUCKET_ONE_OBJECT_ID,
           VOL_OBJECT_ID,
           getBucketLayout());
@@ -741,7 +746,7 @@ public class TestNSSummaryEndpointWithLegacy {
           VOL,
           DIR_THREE,
           DIR_THREE_OBJECT_ID,
-          DIR_ONE_OBJECT_ID,
+          PARENT_OBJECT_ID_ZERO,
           BUCKET_ONE_OBJECT_ID,
           VOL_OBJECT_ID,
           getBucketLayout());
@@ -751,7 +756,7 @@ public class TestNSSummaryEndpointWithLegacy {
           VOL,
           DIR_FOUR,
           DIR_FOUR_OBJECT_ID,
-          DIR_ONE_OBJECT_ID,
+          PARENT_OBJECT_ID_ZERO,
           BUCKET_ONE_OBJECT_ID,
           VOL_OBJECT_ID,
           getBucketLayout());
@@ -761,7 +766,7 @@ public class TestNSSummaryEndpointWithLegacy {
           VOL_TWO,
           DIR_FIVE,
           DIR_FIVE_OBJECT_ID,
-          BUCKET_THREE_OBJECT_ID,
+          PARENT_OBJECT_ID_ZERO,
           BUCKET_THREE_OBJECT_ID,
           VOL_TWO_OBJECT_ID,
           getBucketLayout());
@@ -773,7 +778,7 @@ public class TestNSSummaryEndpointWithLegacy {
           VOL,
           FILE_ONE,
           KEY_ONE_OBJECT_ID,
-          BUCKET_ONE_OBJECT_ID,
+          PARENT_OBJECT_ID_ZERO,
           BUCKET_ONE_OBJECT_ID,
           VOL_OBJECT_ID,
           KEY_ONE_SIZE,
@@ -784,7 +789,7 @@ public class TestNSSummaryEndpointWithLegacy {
           VOL,
           FILE_TWO,
           KEY_TWO_OBJECT_ID,
-          DIR_TWO_OBJECT_ID,
+          PARENT_OBJECT_ID_ZERO,
           BUCKET_ONE_OBJECT_ID,
           VOL_OBJECT_ID,
           KEY_TWO_SIZE,
@@ -795,7 +800,7 @@ public class TestNSSummaryEndpointWithLegacy {
           VOL,
           FILE_THREE,
           KEY_THREE_OBJECT_ID,
-          DIR_THREE_OBJECT_ID,
+          PARENT_OBJECT_ID_ZERO,
           BUCKET_ONE_OBJECT_ID,
           VOL_OBJECT_ID,
           KEY_THREE_SIZE,
@@ -806,7 +811,7 @@ public class TestNSSummaryEndpointWithLegacy {
           VOL,
           FILE_FOUR,
           KEY_FOUR_OBJECT_ID,
-          BUCKET_TWO_OBJECT_ID,
+          PARENT_OBJECT_ID_ZERO,
           BUCKET_TWO_OBJECT_ID,
           VOL_OBJECT_ID,
           KEY_FOUR_SIZE,
@@ -817,7 +822,7 @@ public class TestNSSummaryEndpointWithLegacy {
           VOL,
           FILE_FIVE,
           KEY_FIVE_OBJECT_ID,
-          BUCKET_TWO_OBJECT_ID,
+          PARENT_OBJECT_ID_ZERO,
           BUCKET_TWO_OBJECT_ID,
           VOL_OBJECT_ID,
           KEY_FIVE_SIZE,
@@ -828,7 +833,7 @@ public class TestNSSummaryEndpointWithLegacy {
           VOL,
           FILE_SIX,
           KEY_SIX_OBJECT_ID,
-          DIR_FOUR_OBJECT_ID,
+          PARENT_OBJECT_ID_ZERO,
           BUCKET_ONE_OBJECT_ID,
           VOL_OBJECT_ID,
           KEY_SIX_SIZE,
@@ -839,7 +844,7 @@ public class TestNSSummaryEndpointWithLegacy {
           VOL_TWO,
           FILE_EIGHT,
           KEY_EIGHT_OBJECT_ID,
-          BUCKET_THREE_OBJECT_ID,
+          PARENT_OBJECT_ID_ZERO,
           BUCKET_THREE_OBJECT_ID,
           VOL_TWO_OBJECT_ID,
           KEY_EIGHT_SIZE,
@@ -850,7 +855,7 @@ public class TestNSSummaryEndpointWithLegacy {
           VOL_TWO,
           FILE_NINE,
           KEY_NINE_OBJECT_ID,
-          DIR_FIVE_OBJECT_ID,
+          PARENT_OBJECT_ID_ZERO,
           BUCKET_THREE_OBJECT_ID,
           VOL_TWO_OBJECT_ID,
           KEY_NINE_SIZE,
@@ -861,7 +866,7 @@ public class TestNSSummaryEndpointWithLegacy {
           VOL_TWO,
           FILE_TEN,
           KEY_TEN_OBJECT_ID,
-          DIR_FIVE_OBJECT_ID,
+          PARENT_OBJECT_ID_ZERO,
           BUCKET_THREE_OBJECT_ID,
           VOL_TWO_OBJECT_ID,
           KEY_TEN_SIZE,
@@ -872,7 +877,7 @@ public class TestNSSummaryEndpointWithLegacy {
           VOL_TWO,
           FILE_ELEVEN,
           KEY_ELEVEN_OBJECT_ID,
-          BUCKET_FOUR_OBJECT_ID,
+          PARENT_OBJECT_ID_ZERO,
           BUCKET_FOUR_OBJECT_ID,
           VOL_TWO_OBJECT_ID,
           KEY_ELEVEN_SIZE,
@@ -885,11 +890,12 @@ public class TestNSSummaryEndpointWithLegacy {
    * @throws IOException ioEx
    */
   private static OMMetadataManager initializeNewOmMetadataManager(
-      File omDbDir)
+      File omDbDir, OzoneConfiguration omConfiguration)
       throws IOException {
-    OzoneConfiguration omConfiguration = new OzoneConfiguration();
     omConfiguration.set(OZONE_OM_DB_DIRS,
         omDbDir.getAbsolutePath());
+    omConfiguration.set(OMConfigKeys
+        .OZONE_OM_ENABLE_FILESYSTEM_PATHS, "true");
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
         omConfiguration);
 
@@ -976,7 +982,7 @@ public class TestNSSummaryEndpointWithLegacy {
         VOL,
         MULTI_BLOCK_FILE,
         MULTI_BLOCK_KEY_OBJECT_ID,
-        DIR_ONE_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup),
@@ -1069,7 +1075,7 @@ public class TestNSSummaryEndpointWithLegacy {
         VOL,
         FILE_ONE,
         KEY_ONE_OBJECT_ID,
-        BUCKET_ONE_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
@@ -1082,7 +1088,7 @@ public class TestNSSummaryEndpointWithLegacy {
         VOL,
         FILE_TWO,
         KEY_TWO_OBJECT_ID,
-        DIR_TWO_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
@@ -1095,7 +1101,7 @@ public class TestNSSummaryEndpointWithLegacy {
         VOL,
         FILE_THREE,
         KEY_THREE_OBJECT_ID,
-        DIR_THREE_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
@@ -1108,7 +1114,7 @@ public class TestNSSummaryEndpointWithLegacy {
         VOL,
         FILE_FOUR,
         KEY_FOUR_OBJECT_ID,
-        BUCKET_TWO_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
         BUCKET_TWO_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
@@ -1121,7 +1127,7 @@ public class TestNSSummaryEndpointWithLegacy {
         VOL,
         FILE_FIVE,
         KEY_FIVE_OBJECT_ID,
-        BUCKET_TWO_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
         BUCKET_TWO_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
@@ -1134,7 +1140,7 @@ public class TestNSSummaryEndpointWithLegacy {
         VOL,
         FILE_SIX,
         KEY_SIX_OBJECT_ID,
-        DIR_FOUR_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
@@ -1147,7 +1153,7 @@ public class TestNSSummaryEndpointWithLegacy {
         VOL,
         FILE_SEVEN,
         KEY_SEVEN_OBJECT_ID,
-        DIR_ONE_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
@@ -1160,7 +1166,7 @@ public class TestNSSummaryEndpointWithLegacy {
         VOL_TWO,
         FILE_EIGHT,
         KEY_EIGHT_OBJECT_ID,
-        BUCKET_THREE_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
         BUCKET_THREE_OBJECT_ID,
         VOL_TWO_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
@@ -1173,7 +1179,7 @@ public class TestNSSummaryEndpointWithLegacy {
         VOL_TWO,
         FILE_NINE,
         KEY_NINE_OBJECT_ID,
-        DIR_FIVE_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
         BUCKET_THREE_OBJECT_ID,
         VOL_TWO_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
@@ -1186,7 +1192,7 @@ public class TestNSSummaryEndpointWithLegacy {
         VOL_TWO,
         FILE_TEN,
         KEY_TEN_OBJECT_ID,
-        DIR_FIVE_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
         BUCKET_THREE_OBJECT_ID,
         VOL_TWO_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
@@ -1199,7 +1205,7 @@ public class TestNSSummaryEndpointWithLegacy {
         VOL_TWO,
         FILE_ELEVEN,
         KEY_ELEVEN_OBJECT_ID,
-        BUCKET_FOUR_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
         BUCKET_FOUR_OBJECT_ID,
         VOL_TWO_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),

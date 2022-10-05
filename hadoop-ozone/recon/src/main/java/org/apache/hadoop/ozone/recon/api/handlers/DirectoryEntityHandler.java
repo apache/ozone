@@ -101,7 +101,7 @@ public class DirectoryEntityHandler extends EntityHandler {
       if (subdirFileName != null) {
         subdirName = subdirFileName.toString();
       } else {
-        throw new IOException("Subdirectory file name is null.");
+        throw new NullPointerException("Subdirectory file name is null.");
       }
       // build the path for subdirectory
       String subpath = BucketHandler

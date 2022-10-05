@@ -17,8 +17,10 @@
  */
 
 package org.apache.hadoop.ozone.recon.tasks;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -50,11 +52,16 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskWithLegacy.class);
 
+  private OzoneConfiguration ozoneConfiguration;
+
   public NSSummaryTaskWithLegacy(ReconNamespaceSummaryManager
                                  reconNamespaceSummaryManager,
                                  ReconOMMetadataManager
-                                 reconOMMetadataManager) {
+                                 reconOMMetadataManager,
+                                 OzoneConfiguration
+                                     ozoneConfiguration) {
     super(reconNamespaceSummaryManager, reconOMMetadataManager);
+    this.ozoneConfiguration = ozoneConfiguration;
   }
 
   public boolean processWithLegacy(OMUpdateEventBatch events) {
@@ -80,6 +87,27 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
             (OMDBUpdateEvent<String, OmKeyInfo>) omdbUpdateEvent;
         OmKeyInfo updatedKeyInfo = keyTableUpdateEvent.getValue();
         OmKeyInfo oldKeyInfo = keyTableUpdateEvent.getOldValue();
+
+        // KeyTable entries belong to both Legacy and OBS buckets.
+        // Check bucket layout and if it's OBS
+        // continue to the next iteration.
+        // Check just for the current KeyInfo.
+        String volumeName = updatedKeyInfo.getVolumeName();
+        String bucketName = updatedKeyInfo.getBucketName();
+        String bucketDBKey = getReconOMMetadataManager()
+            .getBucketKey(volumeName, bucketName);
+        // Get bucket info from bucket table
+        OmBucketInfo omBucketInfo = getReconOMMetadataManager()
+            .getBucketTable().getSkipCache(bucketDBKey);
+        // True if FileSystemPaths enabled
+        boolean enableFileSystemPaths =
+            ozoneConfiguration.get(OMConfigKeys
+                .OZONE_OM_ENABLE_FILESYSTEM_PATHS).equals("true");
+
+        if (omBucketInfo.getBucketLayout()
+            .isObjectStore(enableFileSystemPaths)) {
+          continue;
+        }
 
         setKeyParentID(updatedKeyInfo);
 
@@ -196,7 +224,13 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
           OmBucketInfo omBucketInfo = omMetadataManager
               .getBucketTable().getSkipCache(bucketDBKey);
 
-          if (omBucketInfo.getBucketLayout().isObjectStore()) {
+          // True if FileSystemPaths enabled
+          boolean enableFileSystemPaths =
+              ozoneConfiguration.get(OMConfigKeys
+                  .OZONE_OM_ENABLE_FILESYSTEM_PATHS).equals("true");
+
+          if (omBucketInfo.getBucketLayout()
+              .isObjectStore(enableFileSystemPaths)) {
             continue;
           }
 
@@ -251,7 +285,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
               keyInfo.getBucketName(), parentKeyName);
       OmKeyInfo parentKeyInfo = getReconOMMetadataManager()
           .getKeyTable(BUCKET_LAYOUT)
-          .get(fullParentKeyName);
+          .getSkipCache(fullParentKeyName);
 
       if (parentKeyInfo != null) {
         keyInfo.setParentObjectID(parentKeyInfo.getObjectID());
@@ -263,7 +297,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
       String bucketKey = getReconOMMetadataManager()
           .getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
       OmBucketInfo parentBucketInfo =
-          getReconOMMetadataManager().getBucketTable().get(bucketKey);
+          getReconOMMetadataManager().getBucketTable().getSkipCache(bucketKey);
 
       if (parentBucketInfo != null) {
         keyInfo.setParentObjectID(parentBucketInfo.getObjectID());
