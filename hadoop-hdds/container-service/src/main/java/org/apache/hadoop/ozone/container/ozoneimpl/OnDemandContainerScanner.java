@@ -44,7 +44,6 @@ public final class OnDemandContainerScanner {
   public static final OnDemandContainerScanner INSTANCE =
       new OnDemandContainerScanner();
 
-  private boolean enabled = false;
   private boolean initialized = false;
   private ContainerController controller;
   private DataTransferThrottler throttler;
@@ -67,7 +66,6 @@ public final class OnDemandContainerScanner {
       return;
     }
     INSTANCE.setInitialized(true);
-    INSTANCE.setEnabled(conf.isEnabled());
     INSTANCE.setController(controller);
     INSTANCE.setThrottler(new DataTransferThrottler(
         conf.getOnDemandBandwidthPerVolume()));
@@ -78,7 +76,7 @@ public final class OnDemandContainerScanner {
   }
 
   public void scanContainer(Container<?> container) {
-    if (!enabled || !initialized) {
+    if (!initialized) {
       return;
     }
     if (container.shouldScanData() && toBeScannedContainers.add(container)) {
@@ -133,7 +131,6 @@ public final class OnDemandContainerScanner {
   }
 
   public synchronized void shutdown() {
-    enabled = false;
     initialized = false;
     metrics.unregister();
     if (!scanExecutor.isShutdown()) {
@@ -155,10 +152,6 @@ public final class OnDemandContainerScanner {
 
   private void setController(ContainerController controller) {
     this.controller = controller;
-  }
-
-  private void setEnabled(boolean enabled) {
-    this.enabled = enabled;
   }
 
   private void setInitialized(boolean initialized) {
