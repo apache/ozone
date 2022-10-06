@@ -148,7 +148,7 @@ public class TestOMKeyRequest {
     scmBlockLocationProtocol = Mockito.mock(ScmBlockLocationProtocol.class);
     metrics = Mockito.mock(OMPerformanceMetrics.class);
     keyManager = new KeyManagerImpl(ozoneManager, scmClient, ozoneConfiguration,
-        "", metrics);
+        metrics);
     when(ozoneManager.getScmClient()).thenReturn(scmClient);
     when(ozoneManager.getBlockTokenSecretManager())
         .thenReturn(ozoneBlockTokenSecretManager);
