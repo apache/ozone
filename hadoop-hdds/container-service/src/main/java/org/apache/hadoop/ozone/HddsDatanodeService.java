@@ -18,9 +18,6 @@
 package org.apache.hadoop.ozone;
 
 import javax.management.ObjectName;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.sun.jmx.mbeanserver.Introspector;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -33,6 +30,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.DatanodeVersion;
@@ -70,18 +68,22 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.ServicePlugin;
 import org.apache.hadoop.util.Time;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import picocli.CommandLine.Command;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.sun.jmx.mbeanserver.Introspector;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
-import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
+import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.util.ExitUtil.terminate;
+
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import picocli.CommandLine.Command;
 
 /**
  * Datanode service plugin to start the HDDS container services.
