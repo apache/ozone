@@ -102,7 +102,7 @@ public final class SCMMetadataStoreMetrics implements MetricsSource {
     builder.tag(ESTIMATED_KEY_COUNT, gson.toJson(keyCountMap));
   }
 
-  public static void unRegister() {
+  public static synchronized void unRegister() {
     instance = null;
     DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
   }
