@@ -79,18 +79,18 @@ public class ContainerBalancer extends StatefulService {
    */
   @Override
   public void notifyStatusChanged() {
-    boolean shouldStop = false;
-    lock.lock();
-    try {
-      if (!scmContext.isLeader() || scmContext.isInSafeMode()) {
+    if (!scmContext.isLeader() || scmContext.isInSafeMode()) {
+      boolean shouldStop;
+      lock.lock();
+      try {
         shouldStop = canBalancerStop();
+      } finally {
+        lock.unlock();
       }
-    } finally {
-      lock.unlock();
-    }
-    if (shouldStop) {
-      LOG.info("Stopping ContainerBalancer in this scm on status change");
-      stop();
+      if (shouldStop) {
+        LOG.info("Stopping ContainerBalancer in this scm on status change");
+        stop();
+      }
       return;
     }
 
