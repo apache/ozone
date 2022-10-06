@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -26,20 +28,16 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMUpdateEventBuilder;
+import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
+import org.jooq.DSLContext;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
-import org.jooq.DSLContext;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
-import java.util.ArrayList;
-
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
@@ -83,7 +81,7 @@ public class TestTableCountTask extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testReprocess() {
+  public void testReprocess() throws Exception {
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
     // Mock 5 rows in each table and test the count
     for (String tableName: tableCountTask.getTaskTables()) {
