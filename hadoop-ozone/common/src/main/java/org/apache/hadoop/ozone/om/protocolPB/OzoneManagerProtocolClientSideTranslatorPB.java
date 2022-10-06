@@ -780,16 +780,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
     LookupKeyRequest.Builder req = LookupKeyRequest.newBuilder();
-    KeyArgs keyArgs = KeyArgs.newBuilder()
-        .setVolumeName(args.getVolumeName())
-        .setBucketName(args.getBucketName())
-        .setKeyName(args.getKeyName())
-        .setDataSize(args.getDataSize())
-        .setSortDatanodes(args.getSortDatanodes())
-        .setLatestVersionLocation(args.getLatestVersionLocation())
-        .setHeadOp(args.isHeadOp())
-        .build();
-    req.setKeyArgs(keyArgs);
+    req.setKeyArgs(args.toProtobuf());
 
     OMRequest omRequest = createOMRequest(Type.LookupKey)
         .setLookupKeyRequest(req)
@@ -806,18 +797,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                              boolean assumeS3Context)
       throws IOException {
     GetKeyInfoRequest.Builder req = GetKeyInfoRequest.newBuilder();
-    KeyArgs keyArgs = KeyArgs.newBuilder()
-        .setVolumeName(args.getVolumeName())
-        .setBucketName(args.getBucketName())
-        .setKeyName(args.getKeyName())
-        .setDataSize(args.getDataSize())
-        .setSortDatanodes(args.getSortDatanodes())
-        .setLatestVersionLocation(args.getLatestVersionLocation())
-        .setHeadOp(args.isHeadOp())
-        .setForceUpdateContainerCacheFromSCM(
-            args.isForceUpdateContainerCacheFromSCM())
-        .build();
-    req.setKeyArgs(keyArgs);
+    req.setKeyArgs(args.toProtobuf());
     req.setAssumeS3Context(assumeS3Context);
 
     OMRequest omRequest = createOMRequest(Type.GetKeyInfo)

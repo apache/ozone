@@ -21,6 +21,8 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,7 +45,6 @@ public final class OmKeyArgs implements Auditable {
   private final String multipartUploadID;
   private final int multipartUploadPartNumber;
   private Map<String, String> metadata;
-  private boolean refreshPipeline;
   private boolean sortDatanodesInPipeline;
   private List<OzoneAcl> acls;
   private boolean latestVersionLocation;
@@ -56,7 +57,7 @@ public final class OmKeyArgs implements Auditable {
       long dataSize, ReplicationConfig replicationConfig,
       List<OmKeyLocationInfo> locationInfoList, boolean isMultipart,
       String uploadID, int partNumber,
-      Map<String, String> metadataMap, boolean refreshPipeline,
+      Map<String, String> metadataMap,
       List<OzoneAcl> acls, boolean sortDatanode,
       boolean latestVersionLocation, boolean recursive, boolean headOp,
       boolean forceUpdateContainerCacheFromSCM) {
@@ -194,6 +195,21 @@ public final class OmKeyArgs implements Auditable {
         .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM);
   }
 
+  @NotNull
+  public KeyArgs toProtobuf() {
+    return KeyArgs.newBuilder()
+        .setVolumeName(getVolumeName())
+        .setBucketName(getBucketName())
+        .setKeyName(getKeyName())
+        .setDataSize(getDataSize())
+        .setSortDatanodes(getSortDatanodes())
+        .setLatestVersionLocation(getLatestVersionLocation())
+        .setHeadOp(isHeadOp())
+        .setForceUpdateContainerCacheFromSCM(
+            isForceUpdateContainerCacheFromSCM())
+        .build();
+  }
+
   /**
    * Builder class of OmKeyArgs.
    */
@@ -208,7 +224,6 @@ public final class OmKeyArgs implements Auditable {
     private String multipartUploadID;
     private int multipartUploadPartNumber;
     private Map<String, String> metadata = new HashMap<>();
-    private boolean refreshPipeline;
     private boolean sortDatanodesInPipeline;
     private boolean latestVersionLocation;
     private List<OzoneAcl> acls;
@@ -276,11 +291,6 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
-    public Builder setRefreshPipeline(boolean refresh) {
-      this.refreshPipeline = refresh;
-      return this;
-    }
-
     public Builder setSortDatanodesInPipeline(boolean sort) {
       this.sortDatanodesInPipeline = sort;
       return this;
@@ -310,7 +320,7 @@ public final class OmKeyArgs implements Auditable {
       return new OmKeyArgs(volumeName, bucketName, keyName, dataSize,
           replicationConfig, locationInfoList, isMultipartKey,
           multipartUploadID,
-          multipartUploadPartNumber, metadata, refreshPipeline, acls,
+          multipartUploadPartNumber, metadata, acls,
           sortDatanodesInPipeline, latestVersionLocation, recursive, headOp,
           forceUpdateContainerCacheFromSCM);
     }

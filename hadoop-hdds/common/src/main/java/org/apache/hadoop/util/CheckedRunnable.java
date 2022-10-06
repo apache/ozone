@@ -15,39 +15,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.helpers;
-
-import org.apache.hadoop.metrics2.lib.MutableRate;
-import org.apache.hadoop.util.Time;
+package org.apache.hadoop.util;
 
 import java.io.IOException;
 
 /**
- * Encloses helpers to deal with metrics.
+ * This presents a block of code with a possibility of throwing an IOException.
  */
-public final class MetricUtil {
-  private MetricUtil() {
-  }
-
-  public static <T, E extends IOException> T captureLatencyNs(
-      MutableRate metric,
-      CheckedSupplier<T, E> block) throws E {
-    long start = Time.monotonicNowNanos();
-    try {
-      return block.get();
-    } finally {
-      metric.add(Time.monotonicNowNanos() - start);
-    }
-  }
-
-  public static <E extends IOException> void captureLatencyNs(
-      MutableRate metric,
-      CheckedRunnable<E> block) throws IOException {
-    long start = Time.monotonicNowNanos();
-    try {
-      block.run();
-    } finally {
-      metric.add(Time.monotonicNowNanos() - start);
-    }
-  }
+@FunctionalInterface
+public interface CheckedRunnable<E extends IOException> {
+  void run() throws E;
 }

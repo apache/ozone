@@ -15,14 +15,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.helpers;
+package org.apache.hadoop.util;
 
 import java.io.IOException;
 
 /**
- * This presents a block of code with a possibility of throwing an IOException.
+ * Similar to {@link java.util.function.Supplier}, this class presents a block
+ * of code generating a value with a possibility of throwing an IOException.
  */
 @FunctionalInterface
-public interface CheckedRunnable<E extends IOException> {
-  void run() throws E;
+public interface CheckedSupplier<T, E extends IOException> {
+  T get() throws E;
 }
