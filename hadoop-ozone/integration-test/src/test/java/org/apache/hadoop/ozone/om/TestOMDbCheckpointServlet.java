@@ -39,10 +39,12 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.UUID;
 
+import com.google.common.io.Files;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.io.IOUtils;
@@ -94,8 +96,6 @@ public class TestOMDbCheckpointServlet {
   private HttpServletRequest requestMock = null;
   private HttpServletResponse responseMock = null;
   private OMDBCheckpointServlet omDbCheckpointServletMock = null;
-  private OzoneManagerProtocol writeClient;
-  private DBCheckpoint dbCheckpoint;
 
   @Rule
   public Timeout timeout = Timeout.seconds(240);
@@ -151,9 +151,6 @@ public class TestOMDbCheckpointServlet {
         .setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();
-    writeClient = cluster.getRpcClient().getObjectStore()
-        .getClientProxy().getOzoneManagerClient();
-
     omMetrics = cluster.getOzoneManager().getMetrics();
 
     omDbCheckpointServletMock =
@@ -178,20 +175,6 @@ public class TestOMDbCheckpointServlet {
 
     doCallRealMethod().when(omDbCheckpointServletMock).doGet(requestMock,
         responseMock);
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
-    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
-        "content");
-    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
-        "content");
-    Thread.sleep(2000);
-    writeClient.createSnapshot(bucket.getVolumeName(), bucket.getName(),
-        UUID.randomUUID().toString());
-    Thread.sleep(2000);
-    dbCheckpoint = cluster.getOzoneManager()
-        .getMetadataManager().getStore()
-        .getCheckpoint(true);
-    doCallRealMethod().when(omDbCheckpointServletMock)
-        .writeArchiveToStream(any(), any());
   }
 
   @Test
@@ -324,6 +307,24 @@ public class TestOMDbCheckpointServlet {
   public void testWriteArchiveToStream()
       throws Exception {
     setupCluster();
+    OzoneManagerProtocol writeClient = cluster.getRpcClient().getObjectStore()
+        .getClientProxy().getOzoneManagerClient();
+
+
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
+        "content");
+    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
+        "content");
+    Thread.sleep(2000);
+    writeClient.createSnapshot(bucket.getVolumeName(), bucket.getName(),
+        UUID.randomUUID().toString());
+    Thread.sleep(2000);
+    DBCheckpoint dbCheckpoint = cluster.getOzoneManager()
+        .getMetadataManager().getStore()
+        .getCheckpoint(true);
+    doCallRealMethod().when(omDbCheckpointServletMock)
+        .writeArchiveToStream(any(), any());
     tempFile = File.createTempFile("testWriteArchiveToStream_" + System
         .currentTimeMillis(), ".tar.gz");
 
@@ -331,20 +332,9 @@ public class TestOMDbCheckpointServlet {
     omDbCheckpointServletMock.writeArchiveToStream(dbCheckpoint,
         fileOutputStream);
     fileOutputStream.close();
-
-
-    TarArchiveInputStream tarInput = new TarArchiveInputStream(new GzipCompressorInputStream(new FileInputStream(tempFile)));
-    TarArchiveEntry currentEntry = tarInput.getNextTarEntry();
-    BufferedReader br = null;
-    while (currentEntry != null) {
-      br = new BufferedReader(new InputStreamReader(tarInput)); // Read directly from tarInput
-      System.out.println("For File = " + currentEntry.getName());
-      String line;
-      while ((line = br.readLine()) != null) {
-        System.out.println("line="+line);
-      }
-      currentEntry = tarInput.getNextTarEntry(); // You forgot to iterate to the next file
-    }
+    String testDirName = folder.newFolder().getAbsolutePath();
+    FileUtil.unTar(tempFile, new File(testDirName));
+    Thread.sleep(1000);
 
   }
 }
