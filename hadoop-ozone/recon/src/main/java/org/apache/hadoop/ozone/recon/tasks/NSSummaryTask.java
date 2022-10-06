@@ -28,11 +28,22 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
+
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_THREAD_COUNT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_THREAD_COUNT_KEY;
 
 /**
  * Task to query data from OMDB and write into Recon RocksDB.
- * Reprocess() will take a snapshots on OMDB, and iterate the keyTable and
- * dirTable to write all information to RocksDB.
+ * Reprocess() will take a snapshots on OMDB, and iterate the keyTable,
+ * the fileTable and the dirTable to write all information to RocksDB.
  *
  * For FSO-enabled keyTable (fileTable), we need to fetch the parent object
  * (bucket or directory), increment its numOfKeys by 1, increase its sizeOfKeys
@@ -40,6 +51,11 @@ import java.io.IOException;
  *
  * For dirTable, we need to fetch the parent object (bucket or directory),
  * add the current directory's objectID to the parent object's childDir field.
+ *
+ * For keyTable, the parent object is not available. Get the parent object,
+ * add it to the current object and reuse the existing methods for FSO.
+ * Only processing entries that belong to Legacy buckets. If the entry
+ * refers to a directory then build directory info object from it.
  *
  * Process() will write all OMDB updates to RocksDB.
  * Write logic is the same as above. For update action, we will treat it as
@@ -49,10 +65,11 @@ public class NSSummaryTask implements ReconOmTask {
   private static final Logger LOG =
           LoggerFactory.getLogger(NSSummaryTask.class);
 
-  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
-  private ReconOMMetadataManager reconOMMetadataManager;
-  private NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
-  private NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy;
+  private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private final ReconOMMetadataManager reconOMMetadataManager;
+  private final NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
+  private final NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy;
+  private final OzoneConfiguration ozoneConfiguration;
 
   @Inject
   public NSSummaryTask(ReconNamespaceSummaryManager
@@ -63,6 +80,7 @@ public class NSSummaryTask implements ReconOmTask {
                              ozoneConfiguration) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
+    this.ozoneConfiguration = ozoneConfiguration;
     this.nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager, reconOMMetadataManager);
     this.nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
@@ -87,7 +105,12 @@ public class NSSummaryTask implements ReconOmTask {
 
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
-    boolean success;
+    int threadCount = ozoneConfiguration
+        .getInt(OZONE_RECON_TASK_THREAD_COUNT_KEY,
+        OZONE_RECON_TASK_THREAD_COUNT_DEFAULT);
+    ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
+    Collection<Callable<Boolean>> tasks = new ArrayList<>();
+
     try {
       // reinit Recon RocksDB's namespace CF.
       reconNamespaceSummaryManager.clearNSSummaryTable();
@@ -96,12 +119,32 @@ public class NSSummaryTask implements ReconOmTask {
           ioEx);
       return new ImmutablePair<>(getTaskName(), false);
     }
-    success = nsSummaryTaskWithFSO.reprocessWithFSO(omMetadataManager);
-    if (success) {
-      success = nsSummaryTaskWithLegacy
-          .reprocessWithLegacy(reconOMMetadataManager);
+
+    tasks.add(() -> nsSummaryTaskWithFSO
+        .reprocessWithFSO(omMetadataManager));
+    tasks.add(() -> nsSummaryTaskWithLegacy
+        .reprocessWithLegacy(reconOMMetadataManager));
+
+    List<Future<Boolean>> results;
+
+    try {
+      results = executorService.invokeAll(tasks);
+      for (int i = 0; i < results.size(); i++) {
+        if (results.get(i).get().equals(false)) {
+          return new ImmutablePair<>(getTaskName(), false);
+        }
+      }
+    } catch (InterruptedException ex) {
+      LOG.error("Error while reprocessing NSSummary " +
+          "table in Recon DB. ", ex);
+      return new ImmutablePair<>(getTaskName(), false);
+    } catch (ExecutionException ex2) {
+      LOG.error("Error while reprocessing NSSummary " +
+          "table in Recon DB. ", ex2);
+      return new ImmutablePair<>(getTaskName(), false);
     }
-    return new ImmutablePair<>(getTaskName(), success);
+    executorService.shutdown();
+    return new ImmutablePair<>(getTaskName(), true);
   }
 }
 
