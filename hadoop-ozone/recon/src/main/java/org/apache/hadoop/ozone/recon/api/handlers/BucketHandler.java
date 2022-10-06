@@ -38,6 +38,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlashIfNeeded;
 
@@ -183,19 +185,21 @@ public abstract class BucketHandler {
                 OzoneStorageContainerManager reconSCM,
                 OmBucketInfo bucketInfo) throws IOException {
 
-    if (bucketInfo.getBucketLayout()
-            .equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-      return new FSOBucketHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, bucketInfo);
-    } else if (bucketInfo.getBucketLayout()
-        .equals(BucketLayout.LEGACY)) {
-      return new LegacyBucketHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, bucketInfo);
-    } else if (bucketInfo.getBucketLayout()
-        .equals(BucketLayout.OBJECT_STORE)) {
-      throw new RuntimeException("Unsupported bucket layout.");
-    } else {
+    // If bucketInfo is null then entity type is UNKNOWN
+    if (Objects.isNull(bucketInfo)) {
       return null;
+    } else {
+      if (bucketInfo.getBucketLayout()
+          .equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+        return new FSOBucketHandler(reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM, bucketInfo);
+      } else if (bucketInfo.getBucketLayout()
+          .equals(BucketLayout.LEGACY)) {
+        return new LegacyBucketHandler(reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM, bucketInfo);
+      } else {
+        throw new RuntimeException("Unsupported bucket layout.");
+      }
     }
   }
 
