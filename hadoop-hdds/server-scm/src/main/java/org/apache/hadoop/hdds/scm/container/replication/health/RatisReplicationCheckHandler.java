@@ -29,6 +29,8 @@ import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCou
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -80,10 +82,16 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
         report.incrementAndSample(ReplicationManagerReport.HealthState.MISSING,
             container.containerID());
       }
+      if (underHealth.isMisReplicated()) {
+        report.incrementAndSample(
+            ReplicationManagerReport.HealthState.MIS_REPLICATED,
+            container.containerID());
+      }
       // TODO - if it is unrecoverable, should we return false to other
       //        handlers can be tried?
-      if (!underHealth.isSufficientlyReplicatedAfterPending() &&
-          !underHealth.isUnrecoverable()) {
+      if (!underHealth.isUnrecoverable() &&
+          (underHealth.isMisReplicatedAfterPending() ||
+              !underHealth.isSufficientlyReplicatedAfterPending())) {
         request.getReplicationQueue().enqueue(underHealth);
       }
       return true;
@@ -128,19 +136,29 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
             pendingDelete, requiredNodes, minReplicasForMaintenance);
 
     ContainerPlacementStatus placementStatus =
-        getPlacementStatus(replicas, requiredNodes);
+        getPlacementStatus(replicas, requiredNodes, Collections.EMPTY_LIST);
 
+    ContainerPlacementStatus placementStatusWithPending = placementStatus;
+    if (replicaPendingOps.size() > 0) {
+      placementStatusWithPending =
+          getPlacementStatus(replicas, requiredNodes, replicaPendingOps);
+    }
     boolean sufficientlyReplicated
         = replicaCount.isSufficientlyReplicated(false);
     boolean isPolicySatisfied = placementStatus.isPolicySatisfied();
     if (!sufficientlyReplicated || !isPolicySatisfied) {
-      //TODO: HDDS-6892 return a Mis-Replicated health result
-      // if due to placementStatus.
-      return new ContainerHealthResult.UnderReplicatedHealthResult(
-        container, replicaCount.getRemainingRedundancy(),
-        isPolicySatisfied && replicas.size() >= requiredNodes,
-        replicaCount.isSufficientlyReplicated(true),
-        replicaCount.isUnrecoverable());
+      ContainerHealthResult.UnderReplicatedHealthResult result =
+          new ContainerHealthResult.UnderReplicatedHealthResult(
+          container, replicaCount.getRemainingRedundancy(),
+          isPolicySatisfied && replicas.size() >= requiredNodes,
+          replicaCount.isSufficientlyReplicated(true),
+          replicaCount.isUnrecoverable());
+      result.setMisReplicated(!isPolicySatisfied)
+          .setMisReplicatedAfterPending(
+              !placementStatusWithPending.isPolicySatisfied())
+          .setDueToMisReplication(
+              !isPolicySatisfied && replicaCount.isSufficientlyReplicated());
+      return result;
     }
 
     boolean isOverReplicated = replicaCount.isOverReplicated(false);
@@ -161,11 +179,20 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
    * @return ContainerPlacementStatus indicating if the policy is met or not
    */
   private ContainerPlacementStatus getPlacementStatus(
-      Set<ContainerReplica> replicas, int replicationFactor) {
-    List<DatanodeDetails> replicaDns = replicas.stream()
+      Set<ContainerReplica> replicas, int replicationFactor,
+      List<ContainerReplicaOp> pendingOps) {
+
+    Set<DatanodeDetails> replicaDns = replicas.stream()
         .map(ContainerReplica::getDatanodeDetails)
-        .collect(Collectors.toList());
+        .collect(Collectors.toSet());
+    for (ContainerReplicaOp op : pendingOps) {
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+        replicaDns.add(op.getTarget());
+      } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+        replicaDns.remove(op.getTarget());
+      }
+    }
     return ratisContainerPlacement.validateContainerPlacement(
-        replicaDns, replicationFactor);
+        new ArrayList<>(replicaDns), replicationFactor);
   }
 }

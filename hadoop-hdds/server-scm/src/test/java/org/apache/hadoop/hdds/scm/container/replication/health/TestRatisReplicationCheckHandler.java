@@ -20,6 +20,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -87,7 +88,7 @@ public class TestRatisReplicationCheckHandler {
   }
 
   @Test
-  public void testReturnFalseForNonEC() {
+  public void testReturnFalseForNonRatis() {
     ContainerInfo container =
         createContainerInfo(new ECReplicationConfig(3, 2));
     Set<ContainerReplica> replicas =
@@ -372,4 +373,163 @@ public class TestRatisReplicationCheckHandler {
     Assert.assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
+
+  @Test
+  public void testUnderReplicatedWithMisReplication() {
+    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+        Mockito.any(),
+        Mockito.anyInt()
+    )).thenAnswer(invocation ->
+        new ContainerPlacementStatusDefault(1, 2, 3));
+
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), 0, 0);
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container);
+    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
+        healthCheck.checkHealth(requestBuilder.build());
+    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    Assert.assertEquals(1, result.getRemainingRedundancy());
+    Assert.assertFalse(result.isSufficientlyReplicatedAfterPending());
+    Assert.assertFalse(result.underReplicatedDueToDecommission());
+    Assert.assertTrue(result.isMisReplicated());
+    Assert.assertTrue(result.isMisReplicatedAfterPending());
+    Assert.assertFalse(result.isDueToMisReplication());
+
+    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.MIS_REPLICATED));
+  }
+
+  @Test
+  public void testUnderReplicatedWithMisReplicationFixedByPending() {
+    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+        Mockito.any(),
+        Mockito.anyInt()
+    )).thenAnswer(invocation -> {
+      List<DatanodeDetails> dns = invocation.getArgument(0);
+      // If the number of DNs is 3 or less make it be mis-replicated
+      if (dns.size() <= 3) {
+        return new ContainerPlacementStatusDefault(1, 2, 3);
+      } else {
+        return new ContainerPlacementStatusDefault(2, 2, 3);
+      }
+    });
+
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), 0, 0);
+
+    List<ContainerReplicaOp> pending = new ArrayList<>();
+    pending.add(ContainerReplicaOp.create(
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0));
+    pending.add(ContainerReplicaOp.create(
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0));
+
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container)
+        .setPendingOps(pending);
+    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
+        healthCheck.checkHealth(requestBuilder.build());
+    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    Assert.assertEquals(1, result.getRemainingRedundancy());
+    Assert.assertTrue(result.isSufficientlyReplicatedAfterPending());
+    Assert.assertFalse(result.underReplicatedDueToDecommission());
+    Assert.assertTrue(result.isMisReplicated());
+    Assert.assertFalse(result.isMisReplicatedAfterPending());
+    Assert.assertFalse(result.isDueToMisReplication());
+
+    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.MIS_REPLICATED));
+  }
+
+  @Test
+  public void testUnderReplicatedOnlyDueToMisReplication() {
+    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+        Mockito.any(),
+        Mockito.anyInt()
+    )).thenAnswer(invocation ->
+        new ContainerPlacementStatusDefault(1, 2, 3));
+
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), 0, 0, 0);
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container);
+    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
+        healthCheck.checkHealth(requestBuilder.build());
+    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    Assert.assertEquals(2, result.getRemainingRedundancy());
+    Assert.assertTrue(result.isSufficientlyReplicatedAfterPending());
+    Assert.assertFalse(result.underReplicatedDueToDecommission());
+    Assert.assertTrue(result.isMisReplicated());
+    Assert.assertTrue(result.isMisReplicatedAfterPending());
+    Assert.assertTrue(result.isDueToMisReplication());
+
+    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.MIS_REPLICATED));
+  }
+
+  @Test
+  public void testUnderReplicatedOnlyDueToMisReplicationFixByPending() {
+    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+        Mockito.any(),
+        Mockito.anyInt()
+    )).thenAnswer(invocation -> {
+      List<DatanodeDetails> dns = invocation.getArgument(0);
+      // If the number of DNs is 3 or less make it be mis-replicated
+      if (dns.size() <= 3) {
+        return new ContainerPlacementStatusDefault(1, 2, 3);
+      } else {
+        return new ContainerPlacementStatusDefault(2, 2, 3);
+      }
+    });
+
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), 0, 0, 0);
+
+    List<ContainerReplicaOp> pending = new ArrayList<>();
+    pending.add(ContainerReplicaOp.create(
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0));
+    pending.add(ContainerReplicaOp.create(
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0));
+
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container)
+        .setPendingOps(pending);
+    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
+        healthCheck.checkHealth(requestBuilder.build());
+    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    Assert.assertEquals(2, result.getRemainingRedundancy());
+    Assert.assertTrue(result.isSufficientlyReplicatedAfterPending());
+    Assert.assertFalse(result.underReplicatedDueToDecommission());
+    Assert.assertTrue(result.isMisReplicated());
+    Assert.assertFalse(result.isMisReplicatedAfterPending());
+    Assert.assertTrue(result.isDueToMisReplication());
+
+    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.MIS_REPLICATED));
+  }
+
 }
