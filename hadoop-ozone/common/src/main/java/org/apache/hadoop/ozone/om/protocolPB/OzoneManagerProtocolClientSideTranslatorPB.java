@@ -1114,9 +1114,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return snapshotInfo.getName();
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public List<SnapshotInfo> listSnapshot(String volumeName, String bucketName)
       throws IOException {

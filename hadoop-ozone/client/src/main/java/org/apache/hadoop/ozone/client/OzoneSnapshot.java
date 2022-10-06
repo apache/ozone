@@ -24,41 +24,24 @@ import org.apache.hadoop.ozone.om.helpers.WithMetadata;
  */
 public class OzoneSnapshot extends WithMetadata {
 
-  /**
-   * Name of the Volume the snapshot belongs to.
-   */
   private final String volumeName;
-  /**
-   * Name of the Bucket the snapshot belongs to.
-   */
   private final String bucketName;
-  /**
-   * Name of the snapshot.
-   */
   private final String name;
-  /**
-   * Creation time of the snapshot.
-   */
   private final long creationTime;
-
-
-
-
-  /**
-   * Status of the snapshot.
-   */
   private final SnapshotInfo.SnapshotStatus snapshotStatus;
-
-  /**
-   * ID of the snapshot.
-   */
   private final String snapshotID;  // UUID
-
-  /**
-   * Path of the snapshot.
-   */
   private final String snapshotPath; // snapshot mask
 
+  /**
+   * Constructs OzoneSnapshot from SnapshotInfo.
+   * @param volumeName Name of the Volume the snapshot belongs to.
+   * @param bucketName Name of the Bucket the snapshot belongs to.
+   * @param name Name of the snapshot.
+   * @param creationTime Creation time of the snapshot.
+   * @param snapshotStatus Status of the snapshot.
+   * @param snapshotID ID of the snapshot.
+   * @param snapshotPath Path of the snapshot.
+   */
   public OzoneSnapshot(String volumeName, String bucketName,
                        String name, long creationTime,
                        SnapshotInfo.SnapshotStatus snapshotStatus,

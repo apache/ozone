@@ -660,8 +660,6 @@ public interface OzoneManagerProtocol
    * List snapshots in a volume/bucket.
    * @param volumeName volume name
    * @param bucketName bucket name
-   * @param startKey   the start snapshot name
-   * @param prefix     snapshot name prefix
    * @return list of snapshot name
    * @throws IOException
    */

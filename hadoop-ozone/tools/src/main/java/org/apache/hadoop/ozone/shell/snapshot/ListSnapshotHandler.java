@@ -28,7 +28,7 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * list ozone snapshot.
+ * a handler for Ozone shell CLI command 'list snapshot'.
  */
 @CommandLine.Command(name = "list",
     aliases = "ls",
