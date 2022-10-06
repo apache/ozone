@@ -61,8 +61,9 @@ import java.util.Map;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_O3TRASH_NO_HOST;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_O3TRASH_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.addTrailingSlashIfNeeded;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.pathToKey;
 
@@ -128,11 +129,11 @@ public class TrashOzoneFileSystem extends FileSystem {
   public URI getUri() {
     URI uri = null;
     try {
-      uri = new URIBuilder().setScheme(OZONE_URI_SCHEME)
-              .setHost("ofs.trash")
+      uri = new URIBuilder().setScheme(OZONE_O3TRASH_URI_SCHEME)
+              .setHost(OZONE_O3TRASH_NO_HOST)
               .build();
     } catch (URISyntaxException e) {
-      LOG.error("Invalid syntax while building URI");
+      LOG.error("Invalid syntax while building URI", e);
     }
     return uri;
   }
