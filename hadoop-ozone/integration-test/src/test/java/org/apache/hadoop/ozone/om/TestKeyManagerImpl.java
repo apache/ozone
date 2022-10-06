@@ -1336,7 +1336,7 @@ public class TestKeyManagerImpl {
     omKeyInfo.appendNewBlocks(omKeyLocationInfoList, false);
 
     KeyManagerImpl keyManagerImpl =
-        new KeyManagerImpl(ozoneManager, scmClientMock, conf, "om1", metrics);
+        new KeyManagerImpl(ozoneManager, scmClientMock, conf, metrics);
 
     keyManagerImpl.refresh(omKeyInfo);
 
@@ -1377,7 +1377,7 @@ public class TestKeyManagerImpl {
     omKeyInfo.appendNewBlocks(omKeyLocationInfoList, false);
 
     KeyManagerImpl keyManagerImpl =
-        new KeyManagerImpl(ozoneManager, scmClientMock, conf, "om1", metrics);
+        new KeyManagerImpl(ozoneManager, scmClientMock, conf, metrics);
 
     try {
       keyManagerImpl.refresh(omKeyInfo);
