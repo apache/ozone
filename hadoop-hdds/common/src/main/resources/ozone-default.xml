@@ -3338,4 +3338,22 @@
       will create intermediate directories.
     </description>
   </property>
+
+  <property>
+    <name>ozone.client.fs.default.listing.page.size</name>
+    <value>1024</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      Default listing page size value used for listing items on fs related sub-commands.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.fs.max.listing.page.size</name>
+    <value>5000</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      Default listing page size value used for listing items on fs related sub-commands.
+    </description>
+  </property>
 </configuration>

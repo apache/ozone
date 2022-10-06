@@ -66,7 +66,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -75,6 +74,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_CLIENT_FS_LISTING_PAGE_SIZE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_CLIENT_FS_LISTING_PAGE_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_EMPTY;
 
@@ -91,6 +94,8 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 public class BasicRootedOzoneFileSystem extends FileSystem {
   static final Logger LOG =
       LoggerFactory.getLogger(BasicRootedOzoneFileSystem.class);
+
+  private static int listingPageSize = 1024;
 
   /**
    * The Ozone client for connecting to Ozone server.
@@ -111,6 +116,16 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
     super.initialize(name, conf);
+    int maxListingPageSize = conf.getInt(
+        OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE,
+        OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE_DEFAULT);
+    listingPageSize = conf.getInt(
+        OZONE_CLIENT_FS_LISTING_PAGE_SIZE,
+        OZONE_CLIENT_FS_LISTING_PAGE_SIZE_DEFAULT);
+    Preconditions.checkArgument(this.listingPageSize <= maxListingPageSize,
+        OZONE_CLIENT_FS_LISTING_PAGE_SIZE +
+            " value should not be greater than the value of " +
+            OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE);
     setConf(conf);
     Preconditions.checkNotNull(name.getScheme(),
         "No scheme provided in %s", name);
@@ -735,7 +750,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("listStatus() path:{}", f);
-    int numEntries = LISTING_PAGE_SIZE;
     LinkedList<FileStatus> statuses = new LinkedList<>();
     List<FileStatus> tmpStatusList;
     String startPath = "";
@@ -743,7 +757,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     do {
       tmpStatusList =
           adapter.listStatus(pathToKey(f), false, startPath,
-              numEntries, uri, workingDir, getUsername())
+              listingPageSize, uri, workingDir, getUsername())
               .stream()
               .map(this::convertFileStatus)
               .collect(Collectors.toList());
@@ -759,7 +773,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       // listStatus returns entries numEntries in size if available.
       // Any lesser number of entries indicate that the required entries have
       // exhausted.
-    } while (tmpStatusList.size() == numEntries);
+    } while (tmpStatusList.size() == listingPageSize);
 
     return statuses.toArray(new FileStatus[0]);
   }
@@ -1032,8 +1046,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         return false;
       }
       if (i >= thisListing.size()) {
-        if (startPath != null && (thisListing.size() == LISTING_PAGE_SIZE ||
-            thisListing.size() == LISTING_PAGE_SIZE - 1)) {
+        if (startPath != null && (thisListing.size() == listingPageSize ||
+            thisListing.size() == listingPageSize - 1)) {
           // current listing is exhausted & fetch a new listing
           thisListing = listFileStatus(p, startPath);
           if (thisListing != null && !thisListing.isEmpty()) {
@@ -1081,7 +1095,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     List<FileStatus> statusList;
     statusList =
         adapter.listStatus(pathToKey(f), false, startPath,
-            LISTING_PAGE_SIZE, uri, workingDir, getUsername())
+            listingPageSize, uri, workingDir, getUsername())
             .stream()
             .map(this::convertFileStatus)
             .collect(Collectors.toList());
