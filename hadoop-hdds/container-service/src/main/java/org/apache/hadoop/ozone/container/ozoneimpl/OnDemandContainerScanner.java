@@ -58,7 +58,7 @@ public final class OnDemandContainerScanner {
   private OnDemandContainerScanner() {
   }
 
-  public static synchronized void init(
+  public synchronized void init(
       ContainerScannerConfiguration conf, ContainerController controller) {
     if (INSTANCE.initialized) {
       LOG.warn("Trying to initialize on demand scanner" +

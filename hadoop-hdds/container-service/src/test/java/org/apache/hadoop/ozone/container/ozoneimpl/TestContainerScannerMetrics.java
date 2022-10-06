@@ -17,21 +17,25 @@
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import org.apache.commons.compress.utils.Lists;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdds.conf.OzoneConfiguration.newInstanceOf;
@@ -70,7 +74,13 @@ public class TestContainerScannerMetrics {
     conf = newInstanceOf(ContainerScannerConfiguration.class);
     conf.setMetadataScanInterval(0);
     conf.setDataScanInterval(0);
+    conf.setEnabled(true);
     controller = mockContainerController();
+  }
+
+  @After
+  public void tearDown() {
+    OnDemandContainerScanner.INSTANCE.shutdown();
   }
 
   @Test
@@ -124,6 +134,48 @@ public class TestContainerScannerMetrics {
     subject.run();
 
     assertNull(DefaultMetricsSystem.instance().getSource(name));
+  }
+
+  @Test
+  public void testOnDemandScannerMetrics() {
+    OnDemandContainerScanner.INSTANCE.init(conf, controller);
+    OnDemandContainerScanner scanner = OnDemandContainerScanner.INSTANCE;
+    ArrayList<Future<?>> resultFutureList = Lists.newArrayList();
+    scanner.scanContainer(corruptData);
+    resultFutureList.add(scanner.getLastScanFuture());
+    scanner.scanContainer(corruptMetadata);
+    resultFutureList.add(scanner.getLastScanFuture());
+    scanner.scanContainer(healthy);
+    resultFutureList.add(scanner.getLastScanFuture());
+    waitOnScannerToFinish(resultFutureList);
+    OnDemandScannerMetrics metrics = OnDemandContainerScanner.INSTANCE
+        .getMetrics();
+    //Containers with shouldScanData = false shouldn't increase
+    // the number of scanned containers
+    assertEquals(1, metrics.getNumUnHealthyContainers());
+    assertEquals(2, metrics.getNumContainersScanned());
+  }
+
+  private void waitOnScannerToFinish(ArrayList<Future<?>> resultFutureList) {
+    for (Future<?> future : resultFutureList) {
+      try {
+        future.get();
+      } catch (Exception e) {
+        throw new RuntimeException("Error while waiting on " +
+            "on-demand scanner to finish");
+      }
+    }
+  }
+
+  @Test
+  public void testOnDemandScannerMetricsUnregisters() {
+    OnDemandContainerScanner.INSTANCE.init(conf, controller);
+    OnDemandContainerScanner scanner = OnDemandContainerScanner.INSTANCE;
+    String metricsName = scanner.getMetrics().getName();
+    assertNotNull(DefaultMetricsSystem.instance().getSource(metricsName));
+    scanner.shutdown();
+    scanner.scanContainer(healthy);
+    assertNull(DefaultMetricsSystem.instance().getSource(metricsName));
   }
 
   private ContainerController mockContainerController() {
