@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import com.google.protobuf.BlockingService;
 import javax.management.ObjectName;
 import java.io.BufferedWriter;
 import java.io.File;
