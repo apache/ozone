@@ -324,18 +324,17 @@ public class TestOMDbCheckpointServlet {
         .getMetadataManager().getStore()
         .getCheckpoint(true);
     doCallRealMethod().when(omDbCheckpointServletMock)
-        .writeArchiveToStream(any(), any());
+        .returnDBCheckpointToStream(any(), any());
     tempFile = File.createTempFile("testWriteArchiveToStream_" + System
         .currentTimeMillis(), ".tar.gz");
 
     FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
-    omDbCheckpointServletMock.writeArchiveToStream(dbCheckpoint,
+    omDbCheckpointServletMock.returnDBCheckpointToStream(dbCheckpoint,
         fileOutputStream);
     fileOutputStream.close();
     String testDirName = folder.newFolder().getAbsolutePath();
     FileUtil.unTar(tempFile, new File(testDirName));
-    Thread.sleep(1000);
-
+    System.out.println("gbjtestdir is: " + testDirName);
   }
 }
 
