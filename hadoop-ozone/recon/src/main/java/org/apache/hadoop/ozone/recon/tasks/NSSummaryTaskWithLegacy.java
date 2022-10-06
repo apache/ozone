@@ -67,6 +67,10 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
   public boolean processWithLegacy(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
+    // true if FileSystemPaths enabled
+    boolean enableFileSystemPaths =
+        ozoneConfiguration.get(OMConfigKeys
+            .OZONE_OM_ENABLE_FILESYSTEM_PATHS).equals("true");
 
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, ? extends
@@ -99,10 +103,6 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         // Get bucket info from bucket table
         OmBucketInfo omBucketInfo = getReconOMMetadataManager()
             .getBucketTable().getSkipCache(bucketDBKey);
-        // True if FileSystemPaths enabled
-        boolean enableFileSystemPaths =
-            ozoneConfiguration.get(OMConfigKeys
-                .OZONE_OM_ENABLE_FILESYSTEM_PATHS).equals("true");
 
         if (omBucketInfo.getBucketLayout()
             .isObjectStore(enableFileSystemPaths)) {
@@ -201,6 +201,10 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
   public boolean reprocessWithLegacy(OMMetadataManager omMetadataManager) {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
+    // true if FileSystemPaths enabled
+    boolean enableFileSystemPaths =
+        ozoneConfiguration.get(OMConfigKeys
+            .OZONE_OM_ENABLE_FILESYSTEM_PATHS).equals("true");
 
     try {
       Table<String, OmKeyInfo> keyTable =
@@ -223,10 +227,6 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
           // Get bucket info from bucket table
           OmBucketInfo omBucketInfo = omMetadataManager
               .getBucketTable().getSkipCache(bucketDBKey);
-          // True if FileSystemPaths enabled
-          boolean enableFileSystemPaths =
-              ozoneConfiguration.get(OMConfigKeys
-                  .OZONE_OM_ENABLE_FILESYSTEM_PATHS).equals("true");
 
           if (omBucketInfo.getBucketLayout()
               .isObjectStore(enableFileSystemPaths)) {

@@ -369,11 +369,11 @@ public final class TestNSSummaryTask {
 
   /**
    * Populate OMDB with the following configs.
-   *        vol
-   *      /     \         \
+   *             vol
+   *      /       \       \
    * bucket1   bucket2    bucket3
-   * /          /           \
-   * file1    file2       file3
+   *    /        /        /
+   * file1    file2     file3
    *
    * @throws IOException
    */
@@ -420,7 +420,8 @@ public final class TestNSSummaryTask {
 
   /**
    * Create a new OM Metadata manager instance with one user, one vol, and two
-   * buckets. Bucket1 will have FSO layout and bucket2 will have Legacy layout.
+   * buckets. Bucket1 will have FSO layout, bucket2 will have Legacy layout
+   * and bucket3 will have OBS layout.
    * @throws IOException ioEx
    */
   private static void initializeNewOmMetadataManager(
