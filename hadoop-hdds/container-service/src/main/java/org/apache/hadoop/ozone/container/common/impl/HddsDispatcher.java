@@ -382,7 +382,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // Create a specific exception that signals for on demand scanning
         // and move this general scan to where it is more appropriate.
         // Add integration tests to test the full functionality.
-        OnDemandContainerScanner.INSTANCE.scanContainer(container);
+        OnDemandContainerScanner.scanContainer(container);
         audit(action, eventType, params, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
       }
@@ -574,7 +574,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private void scanContainerIfNeeded(Container<?> container) {
     if (container.getContainerState() == State.CLOSED ||
         container.getContainerState() == State.QUASI_CLOSED) {
-      OnDemandContainerScanner.INSTANCE.scanContainer(container);
+      OnDemandContainerScanner.scanContainer(container);
     }
   }
 

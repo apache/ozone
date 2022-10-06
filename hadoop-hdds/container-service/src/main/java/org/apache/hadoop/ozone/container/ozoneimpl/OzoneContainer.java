@@ -311,7 +311,7 @@ public class OzoneContainer {
       LOG.info("Background container scanner has been disabled.");
       return;
     }
-    OnDemandContainerScanner.INSTANCE.init(c, controller);
+    OnDemandContainerScanner.init(c, controller);
     if (this.metadataScanner == null) {
       this.metadataScanner = new ContainerMetadataScanner(c, controller);
     }
@@ -347,7 +347,7 @@ public class OzoneContainer {
     for (ContainerDataScanner s : dataScanners) {
       s.shutdown();
     }
-    OnDemandContainerScanner.INSTANCE.shutdown();
+    OnDemandContainerScanner.shutdown();
   }
 
   /**

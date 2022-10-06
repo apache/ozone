@@ -41,47 +41,47 @@ public final class OnDemandContainerScanner {
   public static final Logger LOG =
       LoggerFactory.getLogger(OnDemandContainerScanner.class);
 
-  public static final OnDemandContainerScanner INSTANCE =
-      new OnDemandContainerScanner();
+  private static volatile OnDemandContainerScanner instance;
 
-  private volatile boolean initialized = false;
-  private volatile ExecutorService scanExecutor;
-  private ContainerController containerController;
-  private DataTransferThrottler throttler;
-  private Canceler canceler;
-  private ConcurrentHashMap
+  private final ExecutorService scanExecutor;
+  private final ContainerController containerController;
+  private final DataTransferThrottler throttler;
+  private final Canceler canceler;
+  private final ConcurrentHashMap
       .KeySetView<Container<?>, Boolean> toBeScannedContainers;
-  private OnDemandScannerMetrics metrics;
+  private final OnDemandScannerMetrics metrics;
   @VisibleForTesting
-  private Future<?> lastScanFuture;
+  private static Future<?> lastScanFuture;
 
-  private OnDemandContainerScanner() {
+  private OnDemandContainerScanner(
+      ContainerScannerConfiguration conf, ContainerController controller) {
+    containerController = controller;
+    throttler = new DataTransferThrottler(
+        conf.getOnDemandBandwidthPerVolume());
+    canceler = new Canceler();
+    metrics = OnDemandScannerMetrics.create();
+    scanExecutor = Executors.newSingleThreadExecutor();
+    toBeScannedContainers = ConcurrentHashMap.newKeySet();
   }
 
-  public synchronized void init(
+  public static synchronized void init(
       ContainerScannerConfiguration conf, ContainerController controller) {
-    if (INSTANCE.initialized) {
+    if (instance != null) {
       LOG.warn("Trying to initialize on demand scanner" +
           " a second time on a datanode.");
       return;
     }
-    INSTANCE.initialized = true;
-    INSTANCE.containerController = controller;
-    INSTANCE.throttler = new DataTransferThrottler(
-        conf.getOnDemandBandwidthPerVolume());
-    INSTANCE.canceler = new Canceler();
-    INSTANCE.metrics = OnDemandScannerMetrics.create();
-    INSTANCE.scanExecutor = Executors.newSingleThreadExecutor();
-    INSTANCE.toBeScannedContainers = ConcurrentHashMap.newKeySet();
+    instance = new OnDemandContainerScanner(conf, controller);
   }
 
-  public void scanContainer(Container<?> container) {
-    if (!initialized) {
+  public static void scanContainer(Container<?> container) {
+    if (instance == null) {
       return;
     }
-    if (container.shouldScanData() && toBeScannedContainers.add(container)) {
-      lastScanFuture = scanExecutor.submit(() -> {
-        toBeScannedContainers.remove(container);
+    if (container.shouldScanData() &&
+        instance.toBeScannedContainers.add(container)) {
+      lastScanFuture = instance.scanExecutor.submit(() -> {
+        instance.toBeScannedContainers.remove(container);
         if (container.shouldScanData()) {
           performOnDemandScan(container);
         }
@@ -89,20 +89,20 @@ public final class OnDemandContainerScanner {
     }
   }
 
-  private void performOnDemandScan(Container<?> container) {
+  private static void performOnDemandScan(Container<?> container) {
     long containerId = container.getContainerData().getContainerID();
     try {
       ContainerData containerData = container.getContainerData();
       logScanStart(containerData);
-      if (container.scanData(throttler, canceler)) {
+      if (container.scanData(instance.throttler, instance.canceler)) {
         Instant now = Instant.now();
         logScanCompleted(containerData, now);
-        containerController.updateDataScanTimestamp(containerId, now);
+        instance.containerController.updateDataScanTimestamp(containerId, now);
       } else {
-        containerController.markContainerUnhealthy(containerId);
-        metrics.incNumUnHealthyContainers();
+        instance.containerController.markContainerUnhealthy(containerId);
+        instance.metrics.incNumUnHealthyContainers();
       }
-      metrics.incNumContainersScanned();
+      instance.metrics.incNumContainersScanned();
     } catch (IOException e) {
       LOG.warn("Unexpected exception while scanning container "
           + containerId, e);
@@ -126,12 +126,19 @@ public final class OnDemandContainerScanner {
     }
   }
 
-  public OnDemandScannerMetrics getMetrics() {
-    return metrics;
+  public static OnDemandScannerMetrics getMetrics() {
+    return instance.metrics;
   }
 
-  public synchronized void shutdown() {
-    initialized = false;
+  public static synchronized void shutdown() {
+    if (instance == null) {
+      return;
+    }
+    instance.shutdownScanner();
+  }
+
+  private synchronized void shutdownScanner() {
+    instance = null;
     metrics.unregister();
     if (!scanExecutor.isShutdown()) {
       scanExecutor.shutdown();
@@ -151,7 +158,7 @@ public final class OnDemandContainerScanner {
   }
 
   @VisibleForTesting
-  public Future<?> getLastScanFuture() {
+  public static Future<?> getLastScanFuture() {
     return lastScanFuture;
   }
 }

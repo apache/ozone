@@ -73,16 +73,16 @@ public class TestOnDemandContainerScanner {
 
   @After
   public void tearDown() {
-    OnDemandContainerScanner.INSTANCE.shutdown();
+    OnDemandContainerScanner.shutdown();
   }
 
   @Test
   public void testOnDemandContainerScanner() throws Exception {
     //Without initialization,
     // there shouldn't be interaction with containerController
-    OnDemandContainerScanner.INSTANCE.scanContainer(corruptData);
+    OnDemandContainerScanner.scanContainer(corruptData);
     Mockito.verifyZeroInteractions(controller);
-    OnDemandContainerScanner.INSTANCE.init(conf, controller);
+    OnDemandContainerScanner.init(conf, controller);
     testContainerMarkedUnhealthy(healthy, never());
     testContainerMarkedUnhealthy(corruptData, atLeastOnce());
     testContainerMarkedUnhealthy(openContainer, never());
@@ -90,10 +90,10 @@ public class TestOnDemandContainerScanner {
 
   @Test
   public void testContainerScannerMultipleInitsAndShutdowns() throws Exception {
-    OnDemandContainerScanner.INSTANCE.init(conf, controller);
-    OnDemandContainerScanner.INSTANCE.init(conf, controller);
-    OnDemandContainerScanner.INSTANCE.shutdown();
-    OnDemandContainerScanner.INSTANCE.shutdown();
+    OnDemandContainerScanner.init(conf, controller);
+    OnDemandContainerScanner.init(conf, controller);
+    OnDemandContainerScanner.shutdown();
+    OnDemandContainerScanner.shutdown();
     //There shouldn't be an interaction after shutdown:
     testContainerMarkedUnhealthy(corruptData, never());
   }
@@ -101,7 +101,7 @@ public class TestOnDemandContainerScanner {
   private void testContainerMarkedUnhealthy(
       Container<?> container, VerificationMode invocationTimes)
       throws IOException {
-    OnDemandContainerScanner.INSTANCE.scanContainer(container);
+    OnDemandContainerScanner.scanContainer(container);
     waitForScanToFinish();
     Mockito.verify(controller, invocationTimes).markContainerUnhealthy(
         container.getContainerData().getContainerID());
@@ -109,8 +109,7 @@ public class TestOnDemandContainerScanner {
 
   private void waitForScanToFinish() {
     try {
-      Future<?> futureScan = OnDemandContainerScanner.INSTANCE
-          .getLastScanFuture();
+      Future<?> futureScan = OnDemandContainerScanner.getLastScanFuture();
       if (futureScan == null) {
         return;
       }

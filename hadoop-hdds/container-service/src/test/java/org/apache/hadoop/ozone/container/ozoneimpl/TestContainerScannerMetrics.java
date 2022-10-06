@@ -80,7 +80,7 @@ public class TestContainerScannerMetrics {
 
   @After
   public void tearDown() {
-    OnDemandContainerScanner.INSTANCE.shutdown();
+    OnDemandContainerScanner.shutdown();
   }
 
   @Test
@@ -138,18 +138,16 @@ public class TestContainerScannerMetrics {
 
   @Test
   public void testOnDemandScannerMetrics() {
-    OnDemandContainerScanner.INSTANCE.init(conf, controller);
-    OnDemandContainerScanner scanner = OnDemandContainerScanner.INSTANCE;
+    OnDemandContainerScanner.init(conf, controller);
     ArrayList<Future<?>> resultFutureList = Lists.newArrayList();
-    scanner.scanContainer(corruptData);
-    resultFutureList.add(scanner.getLastScanFuture());
-    scanner.scanContainer(corruptMetadata);
-    resultFutureList.add(scanner.getLastScanFuture());
-    scanner.scanContainer(healthy);
-    resultFutureList.add(scanner.getLastScanFuture());
+    OnDemandContainerScanner.scanContainer(corruptData);
+    resultFutureList.add(OnDemandContainerScanner.getLastScanFuture());
+    OnDemandContainerScanner.scanContainer(corruptMetadata);
+    resultFutureList.add(OnDemandContainerScanner.getLastScanFuture());
+    OnDemandContainerScanner.scanContainer(healthy);
+    resultFutureList.add(OnDemandContainerScanner.getLastScanFuture());
     waitOnScannerToFinish(resultFutureList);
-    OnDemandScannerMetrics metrics = OnDemandContainerScanner.INSTANCE
-        .getMetrics();
+    OnDemandScannerMetrics metrics = OnDemandContainerScanner.getMetrics();
     //Containers with shouldScanData = false shouldn't increase
     // the number of scanned containers
     assertEquals(1, metrics.getNumUnHealthyContainers());
@@ -169,12 +167,11 @@ public class TestContainerScannerMetrics {
 
   @Test
   public void testOnDemandScannerMetricsUnregisters() {
-    OnDemandContainerScanner.INSTANCE.init(conf, controller);
-    OnDemandContainerScanner scanner = OnDemandContainerScanner.INSTANCE;
-    String metricsName = scanner.getMetrics().getName();
+    OnDemandContainerScanner.init(conf, controller);
+    String metricsName = OnDemandContainerScanner.getMetrics().getName();
     assertNotNull(DefaultMetricsSystem.instance().getSource(metricsName));
-    scanner.shutdown();
-    scanner.scanContainer(healthy);
+    OnDemandContainerScanner.shutdown();
+    OnDemandContainerScanner.scanContainer(healthy);
     assertNull(DefaultMetricsSystem.instance().getSource(metricsName));
   }
 
