@@ -37,9 +37,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_THREAD_COUNT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_THREAD_COUNT_KEY;
-
 /**
  * Task to query data from OMDB and write into Recon RocksDB.
  * Reprocess() will take a snapshots on OMDB, and iterate the keyTable,
@@ -105,10 +102,6 @@ public class NSSummaryTask implements ReconOmTask {
 
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
-    int threadCount = ozoneConfiguration
-        .getInt(OZONE_RECON_TASK_THREAD_COUNT_KEY,
-        OZONE_RECON_TASK_THREAD_COUNT_DEFAULT);
-    ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
     Collection<Callable<Boolean>> tasks = new ArrayList<>();
 
     try {
@@ -126,7 +119,8 @@ public class NSSummaryTask implements ReconOmTask {
         .reprocessWithLegacy(reconOMMetadataManager));
 
     List<Future<Boolean>> results;
-
+    ExecutorService executorService = Executors
+        .newFixedThreadPool(2);
     try {
       results = executorService.invokeAll(tasks);
       for (int i = 0; i < results.size(); i++) {
@@ -142,8 +136,9 @@ public class NSSummaryTask implements ReconOmTask {
       LOG.error("Error while reprocessing NSSummary " +
           "table in Recon DB. ", ex2);
       return new ImmutablePair<>(getTaskName(), false);
+    } finally {
+      executorService.shutdown();
     }
-    executorService.shutdown();
     return new ImmutablePair<>(getTaskName(), true);
   }
 }
