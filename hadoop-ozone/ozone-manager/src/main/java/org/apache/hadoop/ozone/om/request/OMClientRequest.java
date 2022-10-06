@@ -66,7 +66,7 @@ public abstract class OMClientRequest implements RequestAuditor {
       LoggerFactory.getLogger(OMClientRequest.class);
 
   private OMRequest omRequest;
-
+  private static BucketLayout layout;
   private UserGroupInformation userGroupInformation;
   private InetAddress inetAddress;
 
@@ -505,6 +505,7 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   public static String validateAndNormalizeKey(boolean enableFileSystemPaths,
       String keyPath, BucketLayout bucketLayout) throws OMException {
+    layout = bucketLayout;
     LOG.debug("Bucket Layout: {}", bucketLayout);
     if (bucketLayout.shouldNormalizePaths(enableFileSystemPaths)) {
       keyPath = validateAndNormalizeKey(true, keyPath);
@@ -520,7 +521,12 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   public static String validateAndNormalizeKey(String keyName)
       throws OMException {
-    String normalizedKeyName = OmUtils.normalizeKey(keyName, false);
+    String normalizedKeyName;
+    if (layout.equals(BucketLayout.LEGACY)) {
+      normalizedKeyName = OmUtils.normalizeKey(keyName, true);
+    } else {
+      normalizedKeyName = OmUtils.normalizeKey(keyName, false);
+    }
     return isValidKeyPath(normalizedKeyName);
   }
 
