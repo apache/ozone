@@ -19,10 +19,12 @@ package org.apache.hadoop.hdds.scm.metadata;
 
 import com.google.gson.Gson;
 import org.apache.commons.text.WordUtils;
+import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineMetrics;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
@@ -54,6 +56,7 @@ public final class SCMMetadataStoreMetrics implements MetricsSource {
       "Tracked estimated key count of all column families");
 
   private MetricsRegistry registry;
+  private static SCMMetadataStoreMetrics instance;
 
   private SCMMetadataStoreImpl scmMetadataStore;
 
@@ -63,16 +66,20 @@ public final class SCMMetadataStoreMetrics implements MetricsSource {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
     this.scmMetadataStore = scmMetadataStoreImpl;
 
-    columnFamilyMetrics = scmMetadataStore.getTableMap().entrySet()
+    columnFamilyMetrics = scmMetadataStoreImpl.getTableMap().entrySet()
         .stream().collect(
         Collectors.toMap(Map.Entry::getKey, e -> getMetricsInfo(e.getKey())));
   }
 
-  public static SCMMetadataStoreMetrics create(SCMMetadataStoreImpl
+  public static synchronized SCMMetadataStoreMetrics create(SCMMetadataStoreImpl
       scmMetadataStore) {
-    return DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
-        "SCM Metadata store  related metrics",
+    if (instance != null) {
+      return instance;
+    }
+    instance = DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
+        "SCM Metadata store related metrics",
         new SCMMetadataStoreMetrics(scmMetadataStore));
+    return instance;
   }
 
   @Override
@@ -98,6 +105,7 @@ public final class SCMMetadataStoreMetrics implements MetricsSource {
   }
 
   public void unRegister() {
+    instance = null;
     DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
   }
 
