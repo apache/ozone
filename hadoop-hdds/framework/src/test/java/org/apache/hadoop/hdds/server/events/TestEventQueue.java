@@ -17,11 +17,12 @@
  */
 package org.apache.hadoop.hdds.server.events;
 
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 
 import java.util.ArrayList;
 import java.util.List;
