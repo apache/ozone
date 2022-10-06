@@ -19,12 +19,10 @@ package org.apache.hadoop.hdds.scm.metadata;
 
 import com.google.gson.Gson;
 import org.apache.commons.text.WordUtils;
-import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineMetrics;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
@@ -104,7 +102,7 @@ public final class SCMMetadataStoreMetrics implements MetricsSource {
     builder.tag(ESTIMATED_KEY_COUNT, gson.toJson(keyCountMap));
   }
 
-  public void unRegister() {
+  public static void unRegister() {
     instance = null;
     DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
   }
