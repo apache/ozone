@@ -44,11 +44,11 @@ public final class OnDemandContainerScanner {
   public static final OnDemandContainerScanner INSTANCE =
       new OnDemandContainerScanner();
 
-  private boolean initialized = false;
-  private ContainerController controller;
+  private volatile boolean initialized = false;
+  private volatile ExecutorService scanExecutor;
+  private ContainerController containerController;
   private DataTransferThrottler throttler;
   private Canceler canceler;
-  private ExecutorService scanExecutor;
   private ConcurrentHashMap
       .KeySetView<Container<?>, Boolean> toBeScannedContainers;
   private OnDemandScannerMetrics metrics;
@@ -65,14 +65,14 @@ public final class OnDemandContainerScanner {
           " a second time on a datanode.");
       return;
     }
-    INSTANCE.setInitialized(true);
-    INSTANCE.setController(controller);
-    INSTANCE.setThrottler(new DataTransferThrottler(
-        conf.getOnDemandBandwidthPerVolume()));
-    INSTANCE.setCanceler(new Canceler());
-    INSTANCE.setMetrics(OnDemandScannerMetrics.create());
-    INSTANCE.setScanExecutor(Executors.newSingleThreadExecutor());
-    INSTANCE.setToBeScannedContainers(ConcurrentHashMap.newKeySet());
+    INSTANCE.initialized = true;
+    INSTANCE.containerController = controller;
+    INSTANCE.throttler = new DataTransferThrottler(
+        conf.getOnDemandBandwidthPerVolume());
+    INSTANCE.canceler = new Canceler();
+    INSTANCE.metrics = OnDemandScannerMetrics.create();
+    INSTANCE.scanExecutor = Executors.newSingleThreadExecutor();
+    INSTANCE.toBeScannedContainers = ConcurrentHashMap.newKeySet();
   }
 
   public void scanContainer(Container<?> container) {
@@ -97,9 +97,9 @@ public final class OnDemandContainerScanner {
       if (container.scanData(throttler, canceler)) {
         Instant now = Instant.now();
         logScanCompleted(containerData, now);
-        controller.updateDataScanTimestamp(containerId, now);
+        containerController.updateDataScanTimestamp(containerId, now);
       } else {
-        controller.markContainerUnhealthy(containerId);
+        containerController.markContainerUnhealthy(containerId);
         metrics.incNumUnHealthyContainers();
       }
       metrics.incNumContainersScanned();
@@ -148,34 +148,6 @@ public final class OnDemandContainerScanner {
       scanExecutor.shutdownNow();
       throw new RuntimeException(e);
     }
-  }
-
-  private void setController(ContainerController controller) {
-    this.controller = controller;
-  }
-
-  private void setInitialized(boolean initialized) {
-    this.initialized = initialized;
-  }
-
-  private void setThrottler(DataTransferThrottler throttler) {
-    this.throttler = throttler;
-  }
-
-  private void setCanceler(Canceler canceler) {
-    this.canceler = canceler;
-  }
-
-  private void setScanExecutor(ExecutorService scanExecutor) {
-    this.scanExecutor = scanExecutor;
-  }
-
-  private void setToBeScannedContainers(ConcurrentHashMap.KeySetView<Container<?>, Boolean> toBeScannedContainers) {
-    this.toBeScannedContainers = toBeScannedContainers;
-  }
-
-  private void setMetrics(OnDemandScannerMetrics metrics) {
-    this.metrics = metrics;
   }
 
   @VisibleForTesting
