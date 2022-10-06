@@ -23,10 +23,12 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -35,12 +37,20 @@ import java.security.Principal;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.UUID;
 
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.compressors.CompressorException;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import org.apache.commons.io.FileUtils;
@@ -64,6 +74,7 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.mockito.Matchers;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
@@ -83,6 +94,8 @@ public class TestOMDbCheckpointServlet {
   private HttpServletRequest requestMock = null;
   private HttpServletResponse responseMock = null;
   private OMDBCheckpointServlet omDbCheckpointServletMock = null;
+  private OzoneManagerProtocol writeClient;
+  private DBCheckpoint dbCheckpoint;
 
   @Rule
   public Timeout timeout = Timeout.seconds(240);
@@ -138,6 +151,9 @@ public class TestOMDbCheckpointServlet {
         .setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();
+    writeClient = cluster.getRpcClient().getObjectStore()
+        .getClientProxy().getOzoneManagerClient();
+
     omMetrics = cluster.getOzoneManager().getMetrics();
 
     omDbCheckpointServletMock =
@@ -162,6 +178,20 @@ public class TestOMDbCheckpointServlet {
 
     doCallRealMethod().when(omDbCheckpointServletMock).doGet(requestMock,
         responseMock);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
+        "content");
+    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
+        "content");
+    Thread.sleep(2000);
+    writeClient.createSnapshot(bucket.getVolumeName(), bucket.getName(),
+        UUID.randomUUID().toString());
+    Thread.sleep(2000);
+    dbCheckpoint = cluster.getOzoneManager()
+        .getMetadataManager().getStore()
+        .getCheckpoint(true);
+    doCallRealMethod().when(omDbCheckpointServletMock)
+        .writeArchiveToStream(any(), any());
   }
 
   @Test
@@ -289,6 +319,33 @@ public class TestOMDbCheckpointServlet {
       IOUtils.closeStream(fis);
       IOUtils.closeStream(fos);
     }
+  }
+  @Test
+  public void testWriteArchiveToStream()
+      throws Exception {
+    setupCluster();
+    tempFile = File.createTempFile("testWriteArchiveToStream_" + System
+        .currentTimeMillis(), ".tar.gz");
+
+    FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
+    omDbCheckpointServletMock.writeArchiveToStream(dbCheckpoint,
+        fileOutputStream);
+    fileOutputStream.close();
+
+
+    TarArchiveInputStream tarInput = new TarArchiveInputStream(new GzipCompressorInputStream(new FileInputStream(tempFile)));
+    TarArchiveEntry currentEntry = tarInput.getNextTarEntry();
+    BufferedReader br = null;
+    while (currentEntry != null) {
+      br = new BufferedReader(new InputStreamReader(tarInput)); // Read directly from tarInput
+      System.out.println("For File = " + currentEntry.getName());
+      String line;
+      while ((line = br.readLine()) != null) {
+        System.out.println("line="+line);
+      }
+      currentEntry = tarInput.getNextTarEntry(); // You forgot to iterate to the next file
+    }
+
   }
 }
 

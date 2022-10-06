@@ -176,7 +176,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   }
 
-  public void createTarBall(DBCheckpoint checkpoint, OutputStream destination)
+  public void writeArchiveToStream(DBCheckpoint checkpoint, OutputStream destination)
       throws IOException, InterruptedException, CompressorException {
     HashMap<Object, Path> copyFiles = new HashMap<>();
     HashMap<Path, Path> hardLinkFiles = new HashMap<>();
