@@ -54,6 +54,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+
 /**
  * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
  *
@@ -130,8 +134,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         .getConfiguration();
 
     OmMetadataManagerImpl checkpointMetadataManager =
-        OmMetadataManagerImpl.createSnapshotMetadataManager(
-            conf, checkpoint.getCheckpointLocation().toString());
+        OmMetadataManagerImpl.createCheckpointMetadataManager(
+            conf, checkpoint);
     try(TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
         iterator = checkpointMetadataManager
         .getSnapshotInfoTable().iterator()) {
@@ -139,7 +143,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       // add each entries directory to the list
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> entry = iterator.next();
-        Path path = Paths.get(entry.getValue().getCheckpointDirName());
+        Path path = Paths.get(OMStorage.getOmDbDir(conf) +
+            OM_KEY_PREFIX + OM_SNAPSHOT_DIR + OM_KEY_PREFIX +
+            OM_DB_NAME + entry.getValue().getCheckpointDirName());
         list.add(path);
       }
     }
@@ -192,7 +198,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
       try (ArchiveOutputStream archiveOutputStream =
           new TarArchiveOutputStream(gzippedOut)) {
-
+        ((TarArchiveOutputStream)archiveOutputStream)
+            .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
         Path checkpointPath = checkpoint.getCheckpointLocation();
 
         for (Path file : copyFiles.values()) {

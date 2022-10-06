@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
@@ -298,15 +300,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     this.omEpoch = 0;
   }
 
-  // metadata constructor for snapshots
-  private OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName)
+  // metadata constructor for checkpoints
+  private OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name)
       throws IOException {
     lock = new OmReadOnlyLock();
     omEpoch = 0;
-    String snapshotDir = OMStorage.getOmDbDir(conf) +
-        OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
-    setStore(loadDB(conf, new File(snapshotDir),
-        OM_DB_NAME + snapshotDirName, true));
+    setStore(loadDB(conf, dir, name, true));
     initializeOmTables();
   }
 
@@ -320,9 +319,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    */
   public static OmMetadataManagerImpl createSnapshotMetadataManager(
       OzoneConfiguration conf, String snapshotDirName) throws IOException {
+    File snapshotDir = new File(OMStorage.getOmDbDir(conf) +
+        OM_KEY_PREFIX + OM_SNAPSHOT_DIR);
     OmMetadataManagerImpl smm = new OmMetadataManagerImpl(conf,
-        snapshotDirName);
+        snapshotDir, OM_DB_NAME + snapshotDirName);
     return smm;
+  }
+
+  public static OmMetadataManagerImpl createCheckpointMetadataManager(
+      OzoneConfiguration conf, DBCheckpoint checkpoint) throws IOException {
+    Path path = checkpoint.getCheckpointLocation();
+    File dir = path.getParent().toFile();
+    String name = path.getFileName().toString();
+    return new OmMetadataManagerImpl(conf, dir, name);
   }
 
   @Override
