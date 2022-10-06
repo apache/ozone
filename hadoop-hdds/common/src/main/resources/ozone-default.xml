@@ -3340,6 +3340,25 @@
   </property>
 
   <property>
+    <name>ozone.om.container.location.cache.size</name>
+    <value>100000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      The size of the container locations cache in Ozone Manager. This cache allows Ozone Manager to populate
+      block locations in key-read responses without calling SCM, thus increases Ozone Manager read performance.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.container.location.cache.ttl</name>
+    <value>360m</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      The time to live for container location cache in Ozone.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.client.fs.default.listing.page.size</name>
     <value>1024</value>
     <tag>OZONE, CLIENT</tag>
@@ -3356,4 +3375,5 @@
       Default listing page size value used for listing items on fs related sub-commands.
     </description>
   </property>
+
 </configuration>
