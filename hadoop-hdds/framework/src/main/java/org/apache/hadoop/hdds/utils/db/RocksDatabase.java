@@ -344,7 +344,6 @@ public final class RocksDatabase {
       final int maxLoop = 5000;
       for (int i = 0; i < maxLoop; ++i) {
         if (counter.get() == 0) {
-          close(columnFamilies, db, descriptors, writeOptions, dbOptions);
           break;
         }
         try {
@@ -352,9 +351,12 @@ public final class RocksDatabase {
         } catch (InterruptedException e) {
           close(columnFamilies, db, descriptors, writeOptions, dbOptions);
           Thread.currentThread().interrupt();
-          break;
+          return;
         }
       }
+      
+      // After counter is 0 or max re-try, do force close
+      close(columnFamilies, db, descriptors, writeOptions, dbOptions);
     }
   }
 
