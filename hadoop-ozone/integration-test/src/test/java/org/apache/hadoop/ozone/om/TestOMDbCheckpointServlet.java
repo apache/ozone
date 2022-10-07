@@ -333,15 +333,99 @@ public class TestOMDbCheckpointServlet {
       }
     }
 
-    String hlString = Paths.get(shortCheckpointLocation,
+    String hlPath = Paths.get(shortCheckpointLocation,
         "hardLinkFile").toString();
-    Assert.assertTrue(finalCheckpointSet.contains(hlString));
+    Assert.assertTrue(finalCheckpointSet.contains(hlPath));
 
-    finalCheckpointSet.remove(hlString);
+    finalCheckpointSet.remove(hlPath);
 
 
     Assert.assertEquals(initialCheckpointSet, finalCheckpointSet);
 
+    String shortSnapshotLocation =
+        fixFile(metaDirLength, Paths.get(snapshotDirName));
+    String shortSnapshotLocation2 =
+        fixFile(metaDirLength, Paths.get(snapshotDirName2));
+
+    Path finalSnapshotLocation =
+        Paths.get(testDirName, shortSnapshotLocation);
+
+    Assert.assertTrue(Paths
+        .get(finalSnapshotLocation.toString(),
+            "CURRENT").toFile().exists());
+
+    Set<String> initialSnapshotSet = new HashSet<>();
+    try (Stream<Path> files = Files.list(Paths.get(snapshotDirName))) {
+      for (Path file : files.collect(Collectors.toList())) {
+        if (!file.getFileName().toString().equals("dummyFile")) {
+          initialSnapshotSet.add(fixFile(metaDirLength, file));
+        }
+      }
+    }
+    Set<String> finalSnapshotSet = new HashSet<>();
+    boolean foundManifest = false;
+    try (Stream<Path> files = Files.list(finalSnapshotLocation)) {
+      for (Path file : files.collect(Collectors.toList())) {
+        if (file.toString().contains("MANIFEST")) {
+          foundManifest = true;
+        }
+        finalSnapshotSet.add(fixFile(testDirLength, file));
+      }
+    }
+    Assert.assertTrue("snapshot manifest found", foundManifest);
+
+    Stream<String> lines = Files.lines(Paths.get(testDirName, hlPath));
+    boolean linesFound = false;
+    boolean dummyLinkFound = false;
+    for (String line: lines.collect(Collectors.toList())) {
+      linesFound = true;
+      if (line.contains("dummyFile")) {
+        dummyLinkFound = true;
+        Assert.assertTrue(checkDummyFile(shortSnapshotLocation,shortSnapshotLocation2, line));
+      } else {
+        Assert.assertTrue(checkLine(shortSnapshotLocation, shortSnapshotLocation2, shortCheckpointLocation, line));
+        if (line.startsWith(shortSnapshotLocation)) {
+          finalSnapshotSet.add(line.split("\t")[0]);
+        }
+      }
+    }
+    Assert.assertTrue("hard link file not empty", linesFound);
+    Assert.assertTrue("dummy link found", dummyLinkFound);
+    Assert.assertEquals(initialSnapshotSet, finalSnapshotSet);
+
+  }
+  private boolean checkDummyFile(String dir0, String dir1, String line) {
+    String[] files = line.split("\t");
+    if (!files[0].startsWith(dir0) && !files[1].startsWith(dir0)) {
+      return false;
+    }
+    if (!files[0].startsWith(dir1) && !files[1].startsWith(dir1)) {
+      return false;
+    }
+    Path path0 = Paths.get(files[0]);
+    Path path1 = Paths.get(files[1]);
+    if (path0.getParent().equals(path1.getParent())) {
+      return false;
+    }
+    return path0.getFileName().equals(path1.getFileName());
+  }
+  private boolean checkLine(String shortSnapshotLocation,
+                            String shortSnapshotLocation2,
+                            String shortCheckpointLocation, String line) {
+    String[] files = line.split("\t");
+    if (!files[0].startsWith(shortSnapshotLocation) &&
+        !files[0].startsWith(shortSnapshotLocation2)) {
+      return false;
+    }
+    if (!files[1].startsWith(shortCheckpointLocation)) {
+      return false;
+    }
+    String file0 = files[0].substring(shortSnapshotLocation.length());
+    String file1 = files[1].substring(shortCheckpointLocation.length());
+    if (Paths.get(file0).getNameCount() > 1) {
+      return false;
+    }
+    return file0.equals(file1);
   }
   private String createSnapshot(String vname, String bname)
       throws IOException, InterruptedException, TimeoutException {
