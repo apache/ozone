@@ -23,35 +23,24 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.Principal;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
-import com.google.common.io.Files;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -61,14 +50,17 @@ import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
-import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.writeDBCheckpointToStream;
 
+
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 
-import static org.junit.Assert.assertNotNull;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -278,32 +270,49 @@ public class TestOMDbCheckpointServlet {
   public void testWriteArchiveToStream()
       throws Exception {
     setupCluster();
-    OzoneManagerProtocol writeClient = cluster.getRpcClient().getObjectStore()
-        .getClientProxy().getOzoneManagerClient();
-
 
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
     TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
         "content");
     TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
         "content");
+
+    // this sleep can be removed after this is fixed:
+    //  https://issues.apache.org/jira/browse/HDDS-7279
     Thread.sleep(2000);
-    writeClient.createSnapshot(bucket.getVolumeName(), bucket.getName(),
-        UUID.randomUUID().toString());
-    Thread.sleep(2000);
+    String snapshotDirName =
+        createSnapshot(bucket.getVolumeName(), bucket.getName());
     DBCheckpoint dbCheckpoint = cluster.getOzoneManager()
         .getMetadataManager().getStore()
         .getCheckpoint(true);
-    tempFile = File.createTempFile("testWriteArchiveToStream_" + System
-        .currentTimeMillis(), ".tar.gz");
 
     FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
     omDbCheckpointServletMock.returnDBCheckpointToStream(dbCheckpoint,
         fileOutputStream);
-    fileOutputStream.close();
+
     String testDirName = folder.newFolder().getAbsolutePath();
     FileUtil.unTar(tempFile, new File(testDirName));
     System.out.println("gbjtestdir is: " + testDirName);
   }
-}
 
+  private String createSnapshot(String vname, String bname)
+      throws IOException, InterruptedException, TimeoutException {
+    final OzoneManager om = cluster.getOzoneManager();
+    File metaDir = OMStorage.getOmDbDir(conf);
+    String snapshotName = UUID.randomUUID().toString();
+    OzoneManagerProtocol writeClient = cluster.getRpcClient().getObjectStore()
+        .getClientProxy().getOzoneManagerClient();
+
+    writeClient.createSnapshot(vname, bname, snapshotName);
+    SnapshotInfo snapshotInfo = om
+        .getMetadataManager().getSnapshotInfoTable()
+        .get(SnapshotInfo.getTableKey(vname, bname, snapshotName));
+    String snapshotDirName = metaDir + OM_KEY_PREFIX +
+        OM_SNAPSHOT_DIR + OM_KEY_PREFIX + OM_DB_NAME +
+        snapshotInfo.getCheckpointDirName() + OM_KEY_PREFIX;
+    GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
+        100, 2000);
+    return snapshotDirName;
+  }
+
+}
