@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.InvalidContainerReplicaException;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.SimpleMockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -164,7 +165,8 @@ public class TestDatanodeAdminMonitor {
 
   @Test
   public void testDecommissionNodeWaitsForContainersToReplicate()
-      throws NodeNotFoundException, ContainerNotFoundException {
+          throws NodeNotFoundException, ContainerNotFoundException,
+          InvalidContainerReplicaException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
         new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
@@ -212,7 +214,8 @@ public class TestDatanodeAdminMonitor {
 
   @Test
   public void testDecommissionAbortedWhenNodeInUnexpectedState()
-      throws NodeNotFoundException, ContainerNotFoundException {
+          throws NodeNotFoundException, ContainerNotFoundException,
+          InvalidContainerReplicaException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
         new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
@@ -247,7 +250,8 @@ public class TestDatanodeAdminMonitor {
 
   @Test
   public void testDecommissionAbortedWhenNodeGoesDead()
-      throws NodeNotFoundException, ContainerNotFoundException {
+          throws NodeNotFoundException, ContainerNotFoundException,
+          InvalidContainerReplicaException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
         new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
@@ -337,7 +341,8 @@ public class TestDatanodeAdminMonitor {
 
   @Test
   public void testMaintenanceEndsWhileReplicatingContainers()
-      throws ContainerNotFoundException, NodeNotFoundException {
+          throws ContainerNotFoundException, NodeNotFoundException,
+          InvalidContainerReplicaException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
         new NodeStatus(ENTERING_MAINTENANCE,
@@ -501,7 +506,7 @@ public class TestDatanodeAdminMonitor {
   private void mockGetContainerReplicaCount(
       HddsProtos.LifeCycleState containerState,
       HddsProtos.NodeOperationalState...replicaStates)
-      throws ContainerNotFoundException {
+          throws ContainerNotFoundException, InvalidContainerReplicaException {
     reset(repManager);
     Mockito.when(repManager.getContainerReplicaCount(
         Mockito.any(ContainerID.class)))

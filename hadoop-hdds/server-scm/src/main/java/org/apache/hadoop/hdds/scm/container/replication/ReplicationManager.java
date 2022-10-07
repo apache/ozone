@@ -311,6 +311,8 @@ public class ReplicationManager implements SCMService {
         // TODO - send any commands contained in the health result
       } catch (ContainerNotFoundException e) {
         LOG.error("Container {} not found", c.getContainerID(), e);
+      } catch (InvalidContainerReplicaException e) {
+        LOG.error("Invalid Container Replica {}", c.getContainerID(), e);
       }
     }
     report.setComplete();
@@ -425,7 +427,7 @@ public class ReplicationManager implements SCMService {
 
   protected void processContainer(ContainerInfo containerInfo,
       ReplicationQueue repQueue, ReplicationManagerReport report)
-      throws ContainerNotFoundException {
+          throws ContainerNotFoundException, InvalidContainerReplicaException {
 
     ContainerID containerID = containerInfo.containerID();
     Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
@@ -524,7 +526,7 @@ public class ReplicationManager implements SCMService {
    * @throws ContainerNotFoundException
    */
   public ContainerReplicaCount getContainerReplicaCount(ContainerID containerID)
-      throws ContainerNotFoundException {
+          throws ContainerNotFoundException, InvalidContainerReplicaException {
     ContainerInfo container = containerManager.getContainer(containerID);
     if (container.getReplicationType() == EC) {
       return getECContainerReplicaCount(container);
@@ -800,7 +802,8 @@ public class ReplicationManager implements SCMService {
   }
 
   private ECContainerReplicaCount getECContainerReplicaCount(
-      ContainerInfo containerInfo) throws ContainerNotFoundException {
+      ContainerInfo containerInfo) throws ContainerNotFoundException,
+          InvalidContainerReplicaException {
     Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
         containerInfo.containerID());
     List<ContainerReplicaOp> pendingOps =

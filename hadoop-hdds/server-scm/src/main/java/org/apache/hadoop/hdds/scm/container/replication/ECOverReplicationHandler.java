@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -74,7 +75,8 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
   @Override
   public Map<DatanodeDetails, SCMCommand<?>> processAndCreateCommands(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
-      ContainerHealthResult result, int remainingMaintenanceRedundancy) {
+      ContainerHealthResult result, int remainingMaintenanceRedundancy)
+          throws IOException {
     ContainerInfo container = result.getContainerInfo();
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()

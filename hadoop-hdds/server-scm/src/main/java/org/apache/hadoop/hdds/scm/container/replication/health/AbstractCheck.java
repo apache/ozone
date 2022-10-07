@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
+import org.apache.hadoop.hdds.scm.container.replication.InvalidContainerReplicaException;
 
 /**
  * Abstract base class for Container Health Checks to extend.
@@ -34,7 +35,8 @@ public abstract class AbstractCheck implements HealthCheck {
    * @return True if the request was handled or false if it was not and should
    *         be handled by the next handler in the chain.
    */
-  public boolean handleChain(ContainerCheckRequest request) {
+  public boolean handleChain(ContainerCheckRequest request)
+          throws InvalidContainerReplicaException {
     boolean result = handle(request);
     if (!result && successor != null) {
       return successor.handleChain(request);
@@ -66,6 +68,7 @@ public abstract class AbstractCheck implements HealthCheck {
    *         be handled by the next handler in the chain.
    */
   @Override
-  public abstract boolean handle(ContainerCheckRequest request);
+  public abstract boolean handle(ContainerCheckRequest request)
+          throws InvalidContainerReplicaException;
 
 }
