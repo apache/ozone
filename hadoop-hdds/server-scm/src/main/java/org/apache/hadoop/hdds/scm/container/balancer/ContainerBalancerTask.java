@@ -166,7 +166,9 @@ public class ContainerBalancerTask implements Runnable {
     } catch (Throwable e) {
       LOG.error("Container Balancer is stopped abnormally, ", e);
     }
-    taskStatus = Status.STOPPED;
+    synchronized (this) {
+      taskStatus = Status.STOPPED;
+    }
   }
 
   /**
@@ -174,7 +176,11 @@ public class ContainerBalancerTask implements Runnable {
    * {@link ContainerBalancerTask#stop()}.
    */
   public void stop() {
-    taskStatus = Status.STOPPING;
+    synchronized (this) {
+      if (taskStatus == Status.RUNNING) {
+        taskStatus = Status.STOPPING;
+      }
+    }
   }
 
   private void balancer() {
