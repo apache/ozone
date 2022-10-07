@@ -69,16 +69,15 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FS_LISTING_PAGE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FS_LISTING_PAGE_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_CLIENT_FS_LISTING_PAGE_SIZE;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_CLIENT_FS_LISTING_PAGE_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE_DEFAULT;
 
 /**
  * The minimal Ozone Filesystem implementation.
@@ -120,13 +119,11 @@ public class BasicOzoneFileSystem extends FileSystem {
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
     super.initialize(name, conf);
-    int maxListingPageSize = conf.getInt(
-        OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE,
-        OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE_DEFAULT);
     listingPageSize = conf.getInt(
         OZONE_CLIENT_FS_LISTING_PAGE_SIZE,
         OZONE_CLIENT_FS_LISTING_PAGE_SIZE_DEFAULT);
-    Preconditions.checkArgument(this.listingPageSize <= maxListingPageSize,
+    Preconditions.checkArgument(this.listingPageSize <=
+            OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE,
         OZONE_CLIENT_FS_LISTING_PAGE_SIZE +
             " value should not be greater than the value of " +
             OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE);

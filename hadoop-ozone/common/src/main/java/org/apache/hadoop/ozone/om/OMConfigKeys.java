@@ -406,16 +406,4 @@ public final class OMConfigKeys {
   public static final TimeDuration OZONE_OM_CONTAINER_LOCATION_CACHE_TTL_DEFAULT
       = TimeDuration.valueOf(360, TimeUnit.MINUTES);
 
-  // Items listing page size for fs client sub-commands output
-  public static final String OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE =
-      "ozone.client.fs.max.listing.page.size";
-
-  public static final String
-      OZONE_CLIENT_FS_LISTING_PAGE_SIZE =
-      "ozone.client.fs.default.listing.page.size";
-  public static final int
-      OZONE_CLIENT_FS_LISTING_PAGE_SIZE_DEFAULT = 1024;
-
-  public static final int
-      OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE_DEFAULT = 5000;
 }
