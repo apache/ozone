@@ -1347,7 +1347,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         for (File ratisGroupDir : ratisDirFiles) {
           if (ratisGroupDir.isDirectory()) {
             if (!ratisGroupDir.getName().equals(groupIDfromServiceID)) {
-              throw new IOException("Ratis group Dir on disk "
+              LOG.warn("Ratis group Dir on disk "
                   + ratisGroupDir.getName() + " does not match with RaftGroupID"
                   + groupIDfromServiceID + " generated from service id "
                   + getOMServiceId() + ". Looks like there is a change to " +
