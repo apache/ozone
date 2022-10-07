@@ -312,7 +312,6 @@ public class ContainerBalancer extends StatefulService {
    */
   @Override
   public void stop() {
-    Thread balancingThread;
     lock.lock();
     try {
       if (!canBalancerStop()) {
@@ -321,7 +320,6 @@ public class ContainerBalancer extends StatefulService {
         return;
       }
       task.stop();
-      balancingThread = currentBalancingThread;
     } finally {
       lock.unlock();
     }
@@ -329,14 +327,11 @@ public class ContainerBalancer extends StatefulService {
     // NOTE: join should be called outside the lock in hierarchy
     // to avoid locking others waiting
     // wait for balancingThread to die with interrupt
-    if (balancingThread != null &&
-        balancingThread.getId() != Thread.currentThread().getId()) {
-      balancingThread.interrupt();
-      try {
-        balancingThread.join();
-      } catch (InterruptedException exception) {
-        Thread.currentThread().interrupt();
-      }
+    currentBalancingThread.interrupt();
+    try {
+      currentBalancingThread.join();
+    } catch (InterruptedException exception) {
+      Thread.currentThread().interrupt();
     }
     LOG.info("Container Balancer stopped successfully.");
   }
