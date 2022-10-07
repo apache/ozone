@@ -200,8 +200,8 @@ public class DBCheckpointServlet extends HttpServlet {
     }
   }
 
-  protected void returnDBCheckpointToStream(DBCheckpoint checkpoint,
-      OutputStream destination)
+  public void returnDBCheckpointToStream(DBCheckpoint checkpoint,
+                                         OutputStream destination)
       throws IOException, InterruptedException, CompressorException {
     writeDBCheckpointToStream(checkpoint, destination);    
   }
