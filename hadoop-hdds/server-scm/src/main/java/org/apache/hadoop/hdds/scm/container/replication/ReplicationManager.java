@@ -36,9 +36,11 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithMismatchedReplicasHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.ClosingContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.HealthCheck;
 import org.apache.hadoop.hdds.scm.container.replication.health.OpenContainerHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.QuasiClosedContainerHandler;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
@@ -58,12 +60,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
-import java.util.Comparator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
-import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -146,10 +144,7 @@ public class ReplicationManager implements SCMService {
   private final ECReplicationCheckHandler ecReplicationCheckHandler;
   private final EventPublisher eventPublisher;
   private final ReentrantLock lock = new ReentrantLock();
-  private Queue<ContainerHealthResult.UnderReplicatedHealthResult>
-      underRepQueue;
-  private Queue<ContainerHealthResult.OverReplicatedHealthResult>
-      overRepQueue;
+  private ReplicationQueue replicationQueue;
   private final ECUnderReplicationHandler ecUnderReplicationHandler;
   private final ECOverReplicationHandler ecOverReplicationHandler;
   private final int maintenanceRedundancy;
@@ -194,8 +189,7 @@ public class ReplicationManager implements SCMService {
     this.legacyReplicationManager = legacyReplicationManager;
     this.ecReplicationCheckHandler = new ECReplicationCheckHandler();
     this.nodeManager = nodeManager;
-    this.underRepQueue = createUnderReplicatedQueue();
-    this.overRepQueue = new LinkedList<>();
+    this.replicationQueue = new ReplicationQueue();
     this.maintenanceRedundancy = rmConf.maintenanceRemainingRedundancy;
     ecUnderReplicationHandler = new ECUnderReplicationHandler(
         ecReplicationCheckHandler, containerPlacement, conf, nodeManager);
@@ -212,7 +206,10 @@ public class ReplicationManager implements SCMService {
     // Chain together the series of checks that are needed to validate the
     // containers when they are checked by RM.
     containerCheckChain = new OpenContainerHandler(this);
-    containerCheckChain.addNext(new ClosedWithMismatchedReplicasHandler(this))
+    containerCheckChain
+        .addNext(new ClosingContainerHandler(this))
+        .addNext(new QuasiClosedContainerHandler(this))
+        .addNext(new ClosedWithMismatchedReplicasHandler(this))
         .addNext(ecReplicationCheckHandler);
     start();
   }
@@ -299,11 +296,7 @@ public class ReplicationManager implements SCMService {
     final List<ContainerInfo> containers =
         containerManager.getContainers();
     ReplicationManagerReport report = new ReplicationManagerReport();
-    Queue<ContainerHealthResult.UnderReplicatedHealthResult>
-        underReplicated = createUnderReplicatedQueue();
-    Queue<ContainerHealthResult.OverReplicatedHealthResult> overReplicated =
-        new LinkedList<>();
-
+    ReplicationQueue newRepQueue = new ReplicationQueue();
     for (ContainerInfo c : containers) {
       if (!shouldRun()) {
         break;
@@ -314,7 +307,7 @@ public class ReplicationManager implements SCMService {
         continue;
       }
       try {
-        processContainer(c, underReplicated, overReplicated, report);
+        processContainer(c, newRepQueue, report);
         // TODO - send any commands contained in the health result
       } catch (ContainerNotFoundException e) {
         LOG.error("Container {} not found", c.getContainerID(), e);
@@ -323,8 +316,7 @@ public class ReplicationManager implements SCMService {
     report.setComplete();
     lock.lock();
     try {
-      underRepQueue = underReplicated;
-      overRepQueue = overReplicated;
+      replicationQueue = newRepQueue;
     } finally {
       lock.unlock();
     }
@@ -344,7 +336,7 @@ public class ReplicationManager implements SCMService {
       dequeueUnderReplicatedContainer() {
     lock.lock();
     try {
-      return underRepQueue.poll();
+      return replicationQueue.dequeueUnderReplicatedContainer();
     } finally {
       lock.unlock();
     }
@@ -360,7 +352,7 @@ public class ReplicationManager implements SCMService {
       dequeueOverReplicatedContainer() {
     lock.lock();
     try {
-      return overRepQueue.poll();
+      return replicationQueue.dequeueOverReplicatedContainer();
     } finally {
       lock.unlock();
     }
@@ -389,7 +381,7 @@ public class ReplicationManager implements SCMService {
     underReplicatedHealthResult.incrementRequeueCount();
     lock.lock();
     try {
-      underRepQueue.add(underReplicatedHealthResult);
+      replicationQueue.enqueue(underReplicatedHealthResult);
     } finally {
       lock.unlock();
     }
@@ -399,7 +391,7 @@ public class ReplicationManager implements SCMService {
       .OverReplicatedHealthResult overReplicatedHealthResult) {
     lock.lock();
     try {
-      overRepQueue.add(overReplicatedHealthResult);
+      replicationQueue.enqueue(overReplicatedHealthResult);
     } finally {
       lock.unlock();
     }
@@ -432,9 +424,8 @@ public class ReplicationManager implements SCMService {
   }
 
   protected void processContainer(ContainerInfo containerInfo,
-      Queue<ContainerHealthResult.UnderReplicatedHealthResult> underRep,
-      Queue<ContainerHealthResult.OverReplicatedHealthResult> overRep,
-      ReplicationManagerReport report) throws ContainerNotFoundException {
+      ReplicationQueue repQueue, ReplicationManagerReport report)
+      throws ContainerNotFoundException {
 
     ContainerID containerID = containerInfo.containerID();
     Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
@@ -448,8 +439,7 @@ public class ReplicationManager implements SCMService {
         .setMaintenanceRedundancy(maintenanceRedundancy)
         .setReport(report)
         .setPendingOps(pendingOps)
-        .setUnderRepQueue(underRep)
-        .setOverRepQueue(overRep)
+        .setReplicationQueue(repQueue)
         .build();
     // This will call the chain of container health handlers in turn which
     // will issue commands as needed, update the report and perhaps add
@@ -498,21 +488,6 @@ public class ReplicationManager implements SCMService {
       return scm.getContainerTokenGenerator().generateEncodedToken(containerID);
     }
     return ""; // unit test
-  }
-
-  /**
-   * Creates a priority queue of UnderReplicatedHealthResult, where the elements
-   * are ordered by the weighted redundancy of the container. This means that
-   * containers with the least remaining redundancy are at the front of the
-   * queue, and will be processed first.
-   * @return An empty instance of a PriorityQueue.
-   */
-  protected PriorityQueue<ContainerHealthResult.UnderReplicatedHealthResult>
-      createUnderReplicatedQueue() {
-    return new PriorityQueue<>(Comparator.comparing(ContainerHealthResult
-            .UnderReplicatedHealthResult::getWeightedRedundancy)
-        .thenComparing(ContainerHealthResult
-            .UnderReplicatedHealthResult::getRequeueCount));
   }
 
   public ReplicationManagerReport getContainerReport() {

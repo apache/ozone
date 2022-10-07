@@ -279,6 +279,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
@@ -410,6 +411,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static boolean testSecureOmFlag = false;
 
   private final OzoneLockProvider ozoneLockProvider;
+  private OMPerformanceMetrics perfMetrics;
 
   /**
    * OM Startup mode.
@@ -528,7 +530,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     scmContainerClient = getScmContainerClient(configuration);
     // verifies that the SCM info in the OM Version file is correct.
     scmBlockClient = getScmBlockClient(configuration);
-    this.scmClient = new ScmClient(scmBlockClient, scmContainerClient);
+    this.scmClient = new ScmClient(scmBlockClient, scmContainerClient,
+        configuration);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
         getEnableFileSystemPaths());
 
@@ -719,8 +722,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     prefixManager = new PrefixManagerImpl(metadataManager, isRatisEnabled);
+    perfMetrics = OMPerformanceMetrics.register();
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
-        omStorage.getOmId());
+            perfMetrics);
 
     if (withNewSnapshot) {
       Integer layoutVersionInDB = getLayoutVersionInDB();
@@ -2077,6 +2081,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omSnapshotProvider != null) {
         omSnapshotProvider.stop();
       }
+      OMPerformanceMetrics.unregister();
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
     }
@@ -2709,12 +2714,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.USERNAME, null);
     try {
       metrics.incNumVolumeLists();
-      if (!allowListAllVolumes) {
-        // Only admin can list all volumes when disallowed in config
-        if (isAclEnabled) {
-          checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST,
-              OzoneConsts.OZONE_ROOT, null, null);
-        }
+      if (isAclEnabled) {
+        checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST,
+            OzoneConsts.OZONE_ROOT, null, null);
       }
       return volumeManager.listVolumes(null, prefix, prevKey, maxKeys);
     } catch (Exception ex) {
@@ -2812,11 +2814,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
+    long start = Time.monotonicNowNanos();
     ResolvedBucket bucket = resolveBucketLink(args);
+    perfMetrics.addLookupResolveBucketLatencyNs(
+        Time.monotonicNowNanos() - start);
 
     if (isAclEnabled) {
+      long startAcl = Time.monotonicNowNanos();
       checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
           bucket.realVolume(), bucket.realBucket(), args.getKeyName());
+      perfMetrics.addLookupAclCheckLatency(Time.monotonicNowNanos() - startAcl);
     }
 
     boolean auditSuccess = true;
@@ -2838,6 +2845,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.READ_KEY,
             auditMap));
       }
+
+      perfMetrics.addLookupLatency(Time.monotonicNowNanos() - start);
     }
   }
 
@@ -2978,6 +2987,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
+  public String getRatisRoles() {
+    List<ServiceInfo> serviceList = null;
+    int port = omNodeDetails.getRatisPort();
+    RaftPeer leaderId;
+    if (isRatisEnabled) {
+      try {
+        leaderId = omRatisServer.getLeader();
+        serviceList = getServiceList();
+      } catch (IOException e) {
+        LOG.error("IO-Exception Occurred", e);
+        return "Exception: " + e.toString();
+      }
+      return OmUtils.format(serviceList, port, leaderId.getId().toString());
+    } else {
+      return "Ratis-Disabled";
+    }
+  }
+
   public String getRatisLogDirectory() {
     return  OzoneManagerRatisUtils.getOMRatisDirectory(configuration);
   }
@@ -3322,6 +3349,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public S3VolumeContext getS3VolumeContext() throws IOException {
+    long start = Time.monotonicNowNanos();
     // Unless the OM request contains S3 authentication info with an access
     // ID that corresponds to a tenant volume, the request will be directed
     // to the default S3 volume.
@@ -3404,7 +3432,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     final S3VolumeContext.Builder s3VolumeContext = S3VolumeContext.newBuilder()
         .setOmVolumeArgs(getVolumeInfo(s3Volume))
         .setUserPrincipal(userPrincipal);
-
+    perfMetrics.addS3VolumeContextLatencyNs(Time.monotonicNowNanos() - start);
     return s3VolumeContext.build();
   }
 
@@ -4138,7 +4166,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public ResolvedBucket resolveBucketLink(Pair<String, String> requested)
       throws IOException {
-
     Pair<String, String> resolved;
     if (isAclEnabled) {
       UserGroupInformation ugi = getRemoteUser();
