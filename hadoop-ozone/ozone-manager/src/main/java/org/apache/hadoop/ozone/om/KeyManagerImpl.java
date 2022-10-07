@@ -44,11 +44,9 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -1336,26 +1334,26 @@ public class KeyManagerImpl implements KeyManager {
             FILE_NOT_FOUND);
   }
 
-  private OmKeyInfo createDirectoryKey(String volumeName, String bucketName,
-      String keyName, List<OzoneAcl> acls) throws IOException {
+  private OmKeyInfo createDirectoryKey(OmKeyInfo keyInfo, String keyName)
+          throws IOException {
     // verify bucket exists
-    OmBucketInfo bucketInfo = getBucketInfo(volumeName, bucketName);
+    OmBucketInfo bucketInfo = getBucketInfo(keyInfo.getVolumeName(),
+            keyInfo.getBucketName());
 
     String dir = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
     FileEncryptionInfo encInfo = getFileEncryptionInfo(bucketInfo);
     return new OmKeyInfo.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
+        .setVolumeName(keyInfo.getVolumeName())
+        .setBucketName(keyInfo.getBucketName())
         .setKeyName(dir)
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
-        .setReplicationConfig(RatisReplicationConfig
-            .getInstance(ReplicationFactor.ONE))
+        .setReplicationConfig(keyInfo.getReplicationConfig())
         .setFileEncryptionInfo(encInfo)
-        .setAcls(acls)
+        .setAcls(keyInfo.getAcls())
         .build();
   }
   /**
@@ -1641,8 +1639,7 @@ public class KeyManagerImpl implements KeyManager {
               if (!isKeyDeleted(entryInDb, keyTable)) {
                 if (!entryKeyName.equals(immediateChild)) {
                   OmKeyInfo fakeDirEntry = createDirectoryKey(
-                      omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
-                      immediateChild, omKeyInfo.getAcls());
+                      omKeyInfo, immediateChild);
                   cacheKeyMap.put(entryInDb,
                       new OzoneFileStatus(fakeDirEntry,
                           scmBlockSize, true));

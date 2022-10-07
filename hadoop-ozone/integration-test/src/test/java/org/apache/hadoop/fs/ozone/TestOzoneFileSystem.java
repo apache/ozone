@@ -18,19 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.Set;
-import java.util.TreeSet;
-
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -68,8 +56,32 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.Assert;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import org.apache.commons.io.IOUtils;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.Set;
+import java.util.TreeSet;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
@@ -87,20 +99,6 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-
-import org.apache.ozone.test.LambdaTestUtils;
-import org.apache.ozone.test.TestClock;
-import org.apache.ozone.test.tag.Flaky;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Ozone file system tests that are not covered by contract tests.
@@ -125,7 +123,7 @@ public class TestOzoneFileSystem {
     // TestOzoneFileSystem#init() function will be invoked only at the
     // beginning of every new set of Parameterized.Parameters.
     if (enabledFileSystemPaths != setDefaultFs ||
-            omRatisEnabled != enableOMRatis) {
+            omRatisEnabled != enableOMRatis || cluster == null) {
       enabledFileSystemPaths = setDefaultFs;
       omRatisEnabled = enableOMRatis;
       try {
@@ -614,6 +612,45 @@ public class TestOzoneFileSystem {
 
     // the number of immediate children of root is 1
     Assert.assertEquals(1, fileStatuses.length);
+    writeClient.deleteKey(keyArgs);
+  }
+
+  @Test
+  public void testListStatusWithIntermediateDirWithECEnabled()
+          throws Exception {
+    String keyName = "object-dir/object-name1";
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setAcls(Collections.emptyList())
+            .setReplicationConfig(new ECReplicationConfig(3, 2))
+            .setLocationInfoList(new ArrayList<>())
+            .build();
+    OpenKeySession session = writeClient.openKey(keyArgs);
+    writeClient.commitKey(keyArgs, session.getId());
+    Path parent = new Path("/");
+    // Wait until the filestatus is updated
+    if (!enabledFileSystemPaths) {
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return fs.listStatus(parent).length != 0;
+        } catch (IOException e) {
+          LOG.error("listStatus() Failed", e);
+          Assert.fail("listStatus() Failed");
+          return false;
+        }
+      }, 1000, 120000);
+    }
+    FileStatus[] fileStatuses = fs.listStatus(parent);
+    // the number of immediate children of root is 1
+    Assert.assertEquals(1, fileStatuses.length);
+    Assert.assertEquals(fileStatuses[0].isErasureCoded(),
+            !bucketLayout.isFileSystemOptimized());
+    fileStatuses = fs.listStatus(new Path(
+            fileStatuses[0].getPath().toString() + "/object-name1"));
+    Assert.assertEquals(1, fileStatuses.length);
+    Assert.assertTrue(fileStatuses[0].isErasureCoded());
     writeClient.deleteKey(keyArgs);
   }
 
