@@ -175,6 +175,9 @@ public class TestOMDbCheckpointServlet {
 
     doCallRealMethod().when(omDbCheckpointServletMock).doGet(requestMock,
         responseMock);
+
+    doCallRealMethod().when(omDbCheckpointServletMock)
+        .returnDBCheckpointToStream(any(), any());
   }
 
   @Test
@@ -272,38 +275,6 @@ public class TestOMDbCheckpointServlet {
   }
 
   @Test
-  public void testWriteCheckpointToOutputStream() throws Exception {
-
-    FileInputStream fis = null;
-    FileOutputStream fos = null;
-
-    try {
-      String testDirName = folder.newFolder().getAbsolutePath();
-      File file = new File(testDirName + "/temp1.txt");
-      OutputStreamWriter writer = new OutputStreamWriter(
-          new FileOutputStream(file), StandardCharsets.UTF_8);
-      writer.write("Test data 1");
-      writer.close();
-
-      file = new File(testDirName + "/temp2.txt");
-      writer = new OutputStreamWriter(
-          new FileOutputStream(file), StandardCharsets.UTF_8);
-      writer.write("Test data 2");
-      writer.close();
-
-      File outputFile =
-          new File(Paths.get(testDirName, "output_file.tgz").toString());
-      TestDBCheckpoint dbCheckpoint = new TestDBCheckpoint(
-          Paths.get(testDirName));
-      writeDBCheckpointToStream(dbCheckpoint,
-          new FileOutputStream(outputFile));
-      assertNotNull(outputFile);
-    } finally {
-      IOUtils.closeStream(fis);
-      IOUtils.closeStream(fos);
-    }
-  }
-  @Test
   public void testWriteArchiveToStream()
       throws Exception {
     setupCluster();
@@ -323,8 +294,6 @@ public class TestOMDbCheckpointServlet {
     DBCheckpoint dbCheckpoint = cluster.getOzoneManager()
         .getMetadataManager().getStore()
         .getCheckpoint(true);
-    doCallRealMethod().when(omDbCheckpointServletMock)
-        .returnDBCheckpointToStream(any(), any());
     tempFile = File.createTempFile("testWriteArchiveToStream_" + System
         .currentTimeMillis(), ".tar.gz");
 
@@ -338,36 +307,3 @@ public class TestOMDbCheckpointServlet {
   }
 }
 
-class TestDBCheckpoint implements DBCheckpoint {
-
-  private final Path checkpointFile;
-
-  TestDBCheckpoint(Path checkpointFile) {
-    this.checkpointFile = checkpointFile;
-  }
-
-  @Override
-  public Path getCheckpointLocation() {
-    return checkpointFile;
-  }
-
-  @Override
-  public long getCheckpointTimestamp() {
-    return 0;
-  }
-
-  @Override
-  public long getLatestSequenceNumber() {
-    return 0;
-  }
-
-  @Override
-  public long checkpointCreationTimeTaken() {
-    return 0;
-  }
-
-  @Override
-  public void cleanupCheckpoint() throws IOException {
-    FileUtils.deleteDirectory(checkpointFile.toFile());
-  }
-}
