@@ -115,7 +115,6 @@ public class TestOMDbCheckpointServlet {
   public void init() throws Exception {
     conf = new OzoneConfiguration();
 
-
     tempFile = File.createTempFile("testDoGet_" + System
         .currentTimeMillis(), ".tar.gz");
 
@@ -155,7 +154,6 @@ public class TestOMDbCheckpointServlet {
         .build();
     cluster.waitForClusterToBeReady();
     omMetrics = cluster.getOzoneManager().getMetrics();
-    metaDir = OMStorage.getOmDbDir(conf);
 
     omDbCheckpointServletMock =
         mock(OMDBCheckpointServlet.class);
@@ -282,6 +280,7 @@ public class TestOMDbCheckpointServlet {
   public void testWriteArchiveToStream()
       throws Exception {
     setupCluster();
+    metaDir = OMStorage.getOmDbDir(conf);
 
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
     TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
@@ -297,6 +296,10 @@ public class TestOMDbCheckpointServlet {
     String snapshotDirName2 =
         createSnapshot(bucket.getVolumeName(), bucket.getName());
 
+
+    // create dummy link from one snapshot dir to the other
+    //  to confirm that links are recognized even if
+    //  they are not in the checkpoint directory
     Path dummyFile = Paths.get(snapshotDirName, "dummyFile");
     Path dummyLink = Paths.get(snapshotDirName2, "dummyFile");
     Files.write(dummyFile, "dummyData".getBytes(StandardCharsets.UTF_8));
@@ -310,9 +313,12 @@ public class TestOMDbCheckpointServlet {
     omDbCheckpointServletMock.returnDBCheckpointToStream(dbCheckpoint,
         fileOutputStream);
 
+    // Untar the file into a temp folder to be examined
     String testDirName = folder.newFolder().getAbsolutePath();
     int testDirLength = testDirName.length();
     FileUtil.unTar(tempFile, new File(testDirName));
+
+
     Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
     int metaDirLength = metaDir.toString().length();
     String shortCheckpointLocation =
@@ -320,6 +326,7 @@ public class TestOMDbCheckpointServlet {
     Path finalCheckpointLocation =
         Paths.get(testDirName, shortCheckpointLocation);
 
+    // Confirm the checkpoint directories match
     Set<String> initialCheckpointSet = new HashSet<>();
     try (Stream<Path> files = Files.list(checkpointLocation)) {
       for (Path file : files.collect(Collectors.toList())) {
@@ -333,6 +340,7 @@ public class TestOMDbCheckpointServlet {
       }
     }
 
+    // Confirm hardLinkFile exists in checkpoint dir
     String hlPath = Paths.get(shortCheckpointLocation,
         "hardLinkFile").toString();
     Assert.assertTrue(finalCheckpointSet.contains(hlPath));
@@ -350,10 +358,12 @@ public class TestOMDbCheckpointServlet {
     Path finalSnapshotLocation =
         Paths.get(testDirName, shortSnapshotLocation);
 
+    // Confirm snapshot current file exists and is not a hard link
     Assert.assertTrue(Paths
         .get(finalSnapshotLocation.toString(),
             "CURRENT").toFile().exists());
 
+    // get initial snapshot files
     Set<String> initialSnapshotSet = new HashSet<>();
     try (Stream<Path> files = Files.list(Paths.get(snapshotDirName))) {
       for (Path file : files.collect(Collectors.toList())) {
@@ -362,6 +372,8 @@ public class TestOMDbCheckpointServlet {
         }
       }
     }
+
+    // get final snapshot files
     Set<String> finalSnapshotSet = new HashSet<>();
     boolean foundManifest = false;
     try (Stream<Path> files = Files.list(finalSnapshotLocation)) {
@@ -374,6 +386,7 @@ public class TestOMDbCheckpointServlet {
     }
     Assert.assertTrue("snapshot manifest found", foundManifest);
 
+    // check each line in the hard link file
     Stream<String> lines = Files.lines(Paths.get(testDirName, hlPath));
     boolean linesFound = false;
     boolean dummyLinkFound = false;
@@ -391,7 +404,8 @@ public class TestOMDbCheckpointServlet {
     }
     Assert.assertTrue("hard link file not empty", linesFound);
     Assert.assertTrue("dummy link found", dummyLinkFound);
-    Assert.assertEquals(initialSnapshotSet, finalSnapshotSet);
+    Assert.assertEquals("found expected snapshot files",
+        initialSnapshotSet, finalSnapshotSet);
 
   }
   private boolean checkDummyFile(String dir0, String dir1, String line) {
