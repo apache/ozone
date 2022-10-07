@@ -152,9 +152,11 @@ public class ECReconstructionCoordinator implements Closeable {
       }
 
       // 2. Reconstruct and transfer to targets
-      for (BlockLocationInfo blockLocationInfo : blockLocationInfoMap
-          .values()) {
-        reconstructECBlockGroup(blockLocationInfo, repConfig, targetNodeMap);
+      for (Long key: blockLocationInfoMap.keySet()) {
+        BlockLocationInfo blockLocationInfo = blockLocationInfoMap.get(key);
+        BlockData[] blockData = blockDataMap.get(key);
+        reconstructECBlockGroup(blockLocationInfo, repConfig,
+            targetNodeMap, blockData);
       }
 
       // 3. Close containers
@@ -191,7 +193,7 @@ public class ECReconstructionCoordinator implements Closeable {
 
   void reconstructECBlockGroup(BlockLocationInfo blockLocationInfo,
       ECReplicationConfig repConfig,
-      SortedMap<Integer, DatanodeDetails> targetMap)
+      SortedMap<Integer, DatanodeDetails> targetMap, BlockData[] blockDataGroup)
       throws IOException {
     long safeBlockGroupLength = blockLocationInfo.getLength();
     List<Integer> missingContainerIndexes = new ArrayList<>(targetMap.keySet());
@@ -244,8 +246,9 @@ public class ECReconstructionCoordinator implements Closeable {
         targetBlockStreams[i] =
             new ECBlockOutputStream(blockLocationInfo.getBlockID(),
                 this.containerOperationClient.getXceiverClientManager(),
-                this.containerOperationClient
-                    .singleNodePipeline(datanodeDetails, repConfig), bufferPool,
+                this.containerOperationClient.
+                    singleNodePipeline(datanodeDetails, repConfig,
+                    toReconstructIndexes.get(i)), bufferPool,
                 configuration, blockLocationInfo.getToken(), clientMetrics);
         bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
         // Make sure it's clean. Don't want to reuse the erroneously returned
@@ -268,10 +271,20 @@ public class ECReconstructionCoordinator implements Closeable {
         length -= readLen;
       }
 
+      int totalNodes = repConfig.getRequiredNodes();
+      int parity = repConfig.getParity();
+
       try {
         for (ECBlockOutputStream targetStream : targetBlockStreams) {
-          targetStream
-              .executePutBlock(true, true, blockLocationInfo.getLength());
+          long replicaIndex = targetStream.getReplicationIndex();
+          //Write checksum only to parity and 1st Replica.
+          if (replicaIndex > 1 && replicaIndex <= (totalNodes - parity)) {
+            targetStream.executePutBlock(true, true,
+                blockLocationInfo.getLength());
+          } else {
+            targetStream.executePutBlock(true, true,
+                blockLocationInfo.getLength(), blockDataGroup);
+          }
           checkFailures(targetStream,
               targetStream.getCurrentPutBlkResponseFuture());
         }

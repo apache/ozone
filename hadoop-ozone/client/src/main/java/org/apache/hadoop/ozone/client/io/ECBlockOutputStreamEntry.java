@@ -275,15 +275,15 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     int totalNodes = repConfig.getRequiredNodes();
     int parity = repConfig.getParity();
 
-    for (int i = 0; i < blockOutputStreams.length; i++) {
-      ECBlockOutputStream stream = blockOutputStreams[i];
+    for (int idx = 0; idx < blockOutputStreams.length; idx++) {
+      ECBlockOutputStream stream = blockOutputStreams[idx];
       if (stream == null) {
         continue;
       }
       try {
         // Set checksum only for 1st node and parity nodes
-        if (i > 0 && i < totalNodes - parity) {
-          stream.executePutBlock(isClose, true, blockGroupLength, null);
+        if (idx > 0 && idx < totalNodes - parity) {
+          stream.executePutBlock(isClose, true, blockGroupLength);
         } else {
           stream.executePutBlock(isClose, true, blockGroupLength, checksum);
         }
@@ -417,22 +417,16 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
       }
     }
 
-    byte[] checksumBytes;
     ByteArrayOutputStream out = new ByteArrayOutputStream();
-    try {
-      for (ContainerProtos.ChunkInfo info : chunkInfos) {
-        List<ByteString> byteStrings = new ArrayList<>(info.getChecksumData()
-            .getChecksumsList());
-        for (ByteString byteString : byteStrings) {
-          out.write(byteString.toByteArray());
-        }
+    for (ContainerProtos.ChunkInfo info : chunkInfos) {
+      List<ByteString> byteStrings = new ArrayList<>(info.getChecksumData()
+          .getChecksumsList());
+      for (ByteString byteString : byteStrings) {
+        out.write(byteString.toByteArray());
       }
-      checksumBytes = out.toByteArray();
-    } finally {
-      out.close();
     }
-    
-    return new String(checksumBytes, StandardCharsets.ISO_8859_1);
+
+    return new String(out.toByteArray(), StandardCharsets.ISO_8859_1);
   }
 
   /**

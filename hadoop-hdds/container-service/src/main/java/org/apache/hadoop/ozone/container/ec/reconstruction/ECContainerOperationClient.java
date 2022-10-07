@@ -38,7 +38,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -163,6 +165,17 @@ public class ECContainerOperationClient implements Closeable {
     } finally {
       this.xceiverClientManager.releaseClient(xceiverClient, false);
     }
+  }
+
+  Pipeline singleNodePipeline(DatanodeDetails dn,
+      ECReplicationConfig repConfig, int replicaIndex) {
+
+    Map<DatanodeDetails, Integer> dnIndexMap = new HashMap<>();
+    dnIndexMap.put(dn, replicaIndex);
+    return Pipeline.newBuilder().setId(PipelineID.valueOf(dn.getUuid()))
+        .setReplicationConfig(repConfig).setNodes(ImmutableList.of(dn))
+        .setReplicaIndexes(dnIndexMap)
+        .setState(Pipeline.PipelineState.CLOSED).build();
   }
 
   Pipeline singleNodePipeline(DatanodeDetails dn,

@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 
@@ -89,6 +90,48 @@ public class ECBlockOutputStream extends BlockOutputStream {
   public CompletableFuture<ContainerProtos.ContainerCommandResponseProto> write(
       ByteBuffer buff) throws IOException {
     return writeChunkToContainer(ChunkBuffer.wrap(buff));
+  }
+
+  public CompletableFuture<ContainerProtos.
+      ContainerCommandResponseProto> executePutBlock(boolean close,
+      boolean force, long blockGroupLength, BlockData[] blockData)
+      throws IOException {
+
+    BlockData checksumBlockData = null;
+    //Reverse Traversal as all parity will have checksumBytes
+    for (int i = blockData.length - 1; i >= 0; i--) {
+      BlockData bd = blockData[i];
+      if (bd == null) {
+        continue;
+      }
+      List<ChunkInfo> chunks = bd.getChunks();
+      if (chunks != null && chunks.get(0).getMetadataCount() > 0) {
+        checksumBlockData = bd;
+        break;
+      }
+    }
+
+    Preconditions.checkNotNull(checksumBlockData);
+
+    List<ChunkInfo> currentChunks = getContainerBlockData().getChunksList();
+    List<ChunkInfo> checksumBlockDataChunks = checksumBlockData.getChunks();
+
+    Preconditions.checkArgument(
+        currentChunks.size() == checksumBlockDataChunks.size());
+    List<ChunkInfo> newChunkList = new ArrayList<>();
+
+    for (int i = 0; i < currentChunks.size(); i++) {
+      ChunkInfo chunkInfo = currentChunks.get(i);
+      ChunkInfo checksumChunk = checksumBlockDataChunks.get(i);
+
+      ChunkInfo newInfo = ChunkInfo.newBuilder(chunkInfo)
+          .addAllMetadata(checksumChunk.getMetadataList()).build();
+      newChunkList.add(newInfo);
+    }
+
+    getContainerBlockData().clearChunks();
+    getContainerBlockData().addAllChunks(newChunkList);
+    return executePutBlock(close, force, blockGroupLength);
   }
 
   public CompletableFuture<ContainerProtos.

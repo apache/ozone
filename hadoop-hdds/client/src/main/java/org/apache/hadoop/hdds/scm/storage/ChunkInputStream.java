@@ -385,6 +385,7 @@ public class ChunkInputStream extends InputStream
     final ChunkInfo adjustedChunkInfo = ChunkInfo.newBuilder(chunkInfo)
         .setOffset(chunkInfo.getOffset() + adjustedBuffersOffset)
         .setLen(adjustedBuffersLen)
+        .clearMetadata()
         .build();
 
     readChunkDataIntoBuffers(adjustedChunkInfo);

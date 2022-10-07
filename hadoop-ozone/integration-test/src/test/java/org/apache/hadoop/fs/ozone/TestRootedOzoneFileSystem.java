@@ -1753,6 +1753,9 @@ public class TestRootedOzoneFileSystem {
 
   }
 
+  /**
+   *  Test EC checksum with Replicated checksum.
+   */
   @Test
   public void testFileChecksum() throws IOException {
     int dataLen = 1024 * 1024 * 5;

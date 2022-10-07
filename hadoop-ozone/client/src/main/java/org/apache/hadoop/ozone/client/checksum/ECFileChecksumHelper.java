@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -117,8 +118,14 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
       ByteBuffer blockChecksumByteBuffer) throws IOException {
     String blockChecksumForDebug = null;
     switch (getCombineMode()) {
+    case MD5MD5CRC:
+      final MD5Hash md5 = new MD5Hash(blockChecksumByteBuffer.array());
+      md5.write(getBlockChecksumBuf());
+      if (LOG.isDebugEnabled()) {
+        blockChecksumForDebug = md5.toString();
+      }
+      break;
     case COMPOSITE_CRC:
-
       byte[] crcBytes = blockChecksumByteBuffer.array();
       if (LOG.isDebugEnabled()) {
         blockChecksumForDebug = CrcUtil.toSingleCrcString(crcBytes);
