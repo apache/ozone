@@ -26,12 +26,20 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.Principal;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -68,6 +76,7 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.mockito.Matchers;
 
+import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.fixFile;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
@@ -88,6 +97,7 @@ public class TestOMDbCheckpointServlet {
   private HttpServletRequest requestMock = null;
   private HttpServletResponse responseMock = null;
   private OMDBCheckpointServlet omDbCheckpointServletMock = null;
+  private File metaDir;
 
   @Rule
   public Timeout timeout = Timeout.seconds(240);
@@ -104,6 +114,7 @@ public class TestOMDbCheckpointServlet {
   @Before
   public void init() throws Exception {
     conf = new OzoneConfiguration();
+
 
     tempFile = File.createTempFile("testDoGet_" + System
         .currentTimeMillis(), ".tar.gz");
@@ -144,6 +155,7 @@ public class TestOMDbCheckpointServlet {
         .build();
     cluster.waitForClusterToBeReady();
     omMetrics = cluster.getOzoneManager().getMetrics();
+    metaDir = OMStorage.getOmDbDir(conf);
 
     omDbCheckpointServletMock =
         mock(OMDBCheckpointServlet.class);
@@ -282,6 +294,14 @@ public class TestOMDbCheckpointServlet {
     Thread.sleep(2000);
     String snapshotDirName =
         createSnapshot(bucket.getVolumeName(), bucket.getName());
+    String snapshotDirName2 =
+        createSnapshot(bucket.getVolumeName(), bucket.getName());
+
+    Path dummyFile = Paths.get(snapshotDirName, "dummyFile");
+    Path dummyLink = Paths.get(snapshotDirName2, "dummyFile");
+    Files.write(dummyFile, "dummyData".getBytes(StandardCharsets.UTF_8));
+    Files.createLink(dummyLink, dummyFile);
+
     DBCheckpoint dbCheckpoint = cluster.getOzoneManager()
         .getMetadataManager().getStore()
         .getCheckpoint(true);
@@ -291,14 +311,41 @@ public class TestOMDbCheckpointServlet {
         fileOutputStream);
 
     String testDirName = folder.newFolder().getAbsolutePath();
+    int testDirLength = testDirName.length();
     FileUtil.unTar(tempFile, new File(testDirName));
-    System.out.println("gbjtestdir is: " + testDirName);
-  }
+    Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
+    int metaDirLength = metaDir.toString().length();
+    String shortCheckpointLocation =
+        fixFile(metaDirLength, checkpointLocation);
+    Path finalCheckpointLocation =
+        Paths.get(testDirName, shortCheckpointLocation);
 
+    Set<String> initialCheckpointSet = new HashSet<>();
+    try (Stream<Path> files = Files.list(checkpointLocation)) {
+      for (Path file : files.collect(Collectors.toList())) {
+        initialCheckpointSet.add(fixFile(metaDirLength, file));
+      }
+    }
+    Set<String> finalCheckpointSet = new HashSet<>();
+    try (Stream<Path> files = Files.list(finalCheckpointLocation)) {
+      for (Path file : files.collect(Collectors.toList())) {
+        finalCheckpointSet.add(fixFile(testDirLength, file));
+      }
+    }
+
+    String hlString = Paths.get(shortCheckpointLocation,
+        "hardLinkFile").toString();
+    Assert.assertTrue(finalCheckpointSet.contains(hlString));
+
+    finalCheckpointSet.remove(hlString);
+
+
+    Assert.assertEquals(initialCheckpointSet, finalCheckpointSet);
+
+  }
   private String createSnapshot(String vname, String bname)
       throws IOException, InterruptedException, TimeoutException {
     final OzoneManager om = cluster.getOzoneManager();
-    File metaDir = OMStorage.getOmDbDir(conf);
     String snapshotName = UUID.randomUUID().toString();
     OzoneManagerProtocol writeClient = cluster.getRpcClient().getObjectStore()
         .getClientProxy().getOzoneManagerClient();

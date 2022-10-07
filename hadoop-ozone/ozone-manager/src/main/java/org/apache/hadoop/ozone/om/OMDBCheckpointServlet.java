@@ -247,7 +247,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     Files.write(data, sb.toString().getBytes(StandardCharsets.UTF_8));
     return data;
   }
-  private String fixFile(int truncateLength, Path file) {
+
+  static String fixFile(int truncateLength, Path file) {
     return file.toString().substring(truncateLength);
   }
 
