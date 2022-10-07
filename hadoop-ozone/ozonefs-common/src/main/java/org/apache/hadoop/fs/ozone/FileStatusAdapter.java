@@ -77,6 +77,10 @@ public final class FileStatusAdapter {
     return isdir;
   }
 
+  public boolean isFile() {
+    return !isdir;
+  }
+
   public short getBlockReplication() {
     return blockReplication;
   }
@@ -119,6 +123,29 @@ public final class FileStatusAdapter {
   @SuppressFBWarnings("EI_EXPOSE_REP")
   public BlockLocation[] getBlockLocations() {
     return blockLocations;
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getClass().getSimpleName())
+        .append("{")
+        .append("path=" + path)
+        .append("; isDirectory=" + isdir);
+    if(isFile()){
+      sb.append("; length=" + length)
+              .append("; diskConsumed= " + getDiskConsumed())
+          .append("; blockReplication=" + blockReplication)
+          .append("; blocksize=" + blocksize);
+    }
+    sb.append("; accessTime=" + accessTime)
+        .append("; owner=" + owner)
+        .append("; group=" + group)
+        .append("; permission=" + permission)
+        .append("; isSymlink=" + getSymlink())
+        .append("}");
+    
+    return sb.toString();
   }
 
 }
