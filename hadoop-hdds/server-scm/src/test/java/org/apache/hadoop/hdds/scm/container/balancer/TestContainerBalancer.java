@@ -235,14 +235,16 @@ public class TestContainerBalancer {
     startBalancer(balancerConfiguration);
     try {
       containerBalancer.startBalancer(balancerConfiguration);
-      Assertions.assertTrue(false);
+      Assertions.assertTrue(false,
+          "Exception should be thrown when startBalancer again");
     } catch (IllegalContainerBalancerStateException e) {
       // start failed again, valid case
     }
 
     try {
       containerBalancer.start();
-      Assertions.assertTrue(false);
+      Assertions.assertTrue(false,
+          "Exception should be thrown when start again");
     } catch (IllegalContainerBalancerStateException e) {
       // start failed again, valid case
     }
@@ -256,7 +258,8 @@ public class TestContainerBalancer {
 
     try {
       containerBalancer.stopBalancer();
-      Assertions.assertTrue(false);
+      Assertions.assertTrue(false,
+          "Exception should be thrown when stop again");
     } catch (Exception e) {
       // stop failed as already stopped, valid case
     }
@@ -282,9 +285,10 @@ public class TestContainerBalancer {
     containerBalancer.notifyStatusChanged();
     try {
       containerBalancer.start();
+      Assertions.assertTrue(false,
+          "Exception should be thrown when start again");
     } catch (IllegalContainerBalancerStateException e) {
-      // start failed
-      Assertions.assertTrue(true);
+      // start failed when triggered again, valid case
     }
 
     Assertions.assertTrue(containerBalancer.getBalancerStatus()
