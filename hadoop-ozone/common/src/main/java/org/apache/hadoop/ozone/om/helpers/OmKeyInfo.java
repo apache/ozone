@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -229,9 +230,9 @@ public final class OmKeyInfo extends WithParentObjectId {
     // Only check ContainerBlockID here to avoid the mismatch of the pipeline
     // field and BcsId in the OmKeyLocationInfo, as the OmKeyInfoCodec ignores
     // the pipeline field by default and bcsId would be updated in Ratis mode.
-    List<ContainerBlockID> updatedBlockIDs = updatedBlockLocations.stream().
+    Set<ContainerBlockID> updatedBlockIDs = updatedBlockLocations.stream().
         map(BlockLocationInfo::getBlockID).map(BlockID::getContainerBlockID).
-        collect(Collectors.toList());
+        collect(Collectors.toSet());
     uncommittedBlocks.removeIf(block -> updatedBlockIDs.
         contains(block.getBlockID().getContainerBlockID()));
 
