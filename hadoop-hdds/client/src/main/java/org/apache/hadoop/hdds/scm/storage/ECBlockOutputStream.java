@@ -111,26 +111,30 @@ public class ECBlockOutputStream extends BlockOutputStream {
       }
     }
 
-    Preconditions.checkNotNull(checksumBlockData);
+    if (checksumBlockData != null) {
+      List<ChunkInfo> currentChunks = getContainerBlockData().getChunksList();
+      List<ChunkInfo> checksumBlockDataChunks = checksumBlockData.getChunks();
 
-    List<ChunkInfo> currentChunks = getContainerBlockData().getChunksList();
-    List<ChunkInfo> checksumBlockDataChunks = checksumBlockData.getChunks();
+      Preconditions.checkArgument(
+          currentChunks.size() == checksumBlockDataChunks.size());
+      List<ChunkInfo> newChunkList = new ArrayList<>();
 
-    Preconditions.checkArgument(
-        currentChunks.size() == checksumBlockDataChunks.size());
-    List<ChunkInfo> newChunkList = new ArrayList<>();
+      for (int i = 0; i < currentChunks.size(); i++) {
+        ChunkInfo chunkInfo = currentChunks.get(i);
+        ChunkInfo checksumChunk = checksumBlockDataChunks.get(i);
 
-    for (int i = 0; i < currentChunks.size(); i++) {
-      ChunkInfo chunkInfo = currentChunks.get(i);
-      ChunkInfo checksumChunk = checksumBlockDataChunks.get(i);
+        ChunkInfo newInfo = ChunkInfo.newBuilder(chunkInfo)
+            .addAllMetadata(checksumChunk.getMetadataList()).build();
+        newChunkList.add(newInfo);
+      }
 
-      ChunkInfo newInfo = ChunkInfo.newBuilder(chunkInfo)
-          .addAllMetadata(checksumChunk.getMetadataList()).build();
-      newChunkList.add(newInfo);
+      getContainerBlockData().clearChunks();
+      getContainerBlockData().addAllChunks(newChunkList);
+    } else {
+      throw new IOException("None of the block data have checksum " +
+          "which means parity+1 blocks are not present");
     }
 
-    getContainerBlockData().clearChunks();
-    getContainerBlockData().addAllChunks(newChunkList);
     return executePutBlock(close, force, blockGroupLength);
   }
 

@@ -152,11 +152,12 @@ public class ECReconstructionCoordinator implements Closeable {
       }
 
       // 2. Reconstruct and transfer to targets
-      for (Long key: blockLocationInfoMap.keySet()) {
-        BlockLocationInfo blockLocationInfo = blockLocationInfoMap.get(key);
-        BlockData[] blockData = blockDataMap.get(key);
+      for (Map.Entry<Long, BlockLocationInfo> blockLocationInfoEntry
+          : blockLocationInfoMap.entrySet()) {
+        Long key = blockLocationInfoEntry.getKey();
+        BlockLocationInfo blockLocationInfo = blockLocationInfoEntry.getValue();
         reconstructECBlockGroup(blockLocationInfo, repConfig,
-            targetNodeMap, blockData);
+            targetNodeMap, blockDataMap.get(key));
       }
 
       // 3. Close containers
