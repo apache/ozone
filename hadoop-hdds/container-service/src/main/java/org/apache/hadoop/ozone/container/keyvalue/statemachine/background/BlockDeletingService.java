@@ -556,16 +556,31 @@ public class BlockDeletingService extends BackgroundService {
             LOG.warn("Missing delete block(Container = " +
                 container.getContainerData().getContainerID() + ", Block = " +
                 blkLong);
+            blocksDeleted++;
             continue;
           }
+
+          boolean deleted = false;
           try {
             handler.deleteBlock(container, blkInfo);
             blocksDeleted++;
-            bytesReleased += KeyValueContainerUtil.getBlockLength(blkInfo);
-          } catch (InvalidProtocolBufferException e) {
-            LOG.error("Failed to parse block info for block {}", blkLong, e);
+            deleted = true;
           } catch (IOException e) {
+            // TODO: if deletion of certain block retries exceed the certain
+            //  number of times, service should skip deleting it,
+            //  otherwise invalid numPendingDeletionBlocks could accumulate
+            //  beyond the limit and the following deletion will stop.
             LOG.error("Failed to delete files for block {}", blkLong, e);
+          }
+
+          if (deleted) {
+            try {
+              bytesReleased += KeyValueContainerUtil.getBlockLength(blkInfo);
+            } catch (IOException e) {
+              // TODO: handle the bytesReleased correctly for the unexpected
+              //  exception.
+              LOG.error("Failed to get block length for block {}", blkLong, e);
+            }
           }
         }
       }
