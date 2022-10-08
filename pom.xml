@@ -136,8 +136,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jersey2.version>2.34</jersey2.version>
 
     <!-- jackson versions -->
-    <jackson2.version>2.13.2</jackson2.version>
-    <jackson2.databind.version>2.13.2.2</jackson2.databind.version>
+    <jackson2.version>2.13.4</jackson2.version>
+    <jackson2.databind.version>2.13.4</jackson2.databind.version>
 
     <!-- jaegertracing veresion -->
     <jaeger.version>1.6.0</jaeger.version>
