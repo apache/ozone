@@ -840,6 +840,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public boolean scanData(DataTransferThrottler throttler, Canceler canceler) {
+    boolean result;
     if (!shouldScanData()) {
       throw new IllegalStateException("The checksum verification can not be" +
           " done for container in state "
@@ -851,7 +852,15 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         new KeyValueContainerCheck(containerData.getMetadataPath(), config,
             containerId, containerData.getVolume());
 
-    return checker.fullCheck(throttler, canceler);
+    // Lock here avoids concurrent RW the block-data table by ongoing
+    // block deletion and the checker.
+    readLock();
+    try {
+      result = checker.fullCheck(throttler, canceler);
+    } finally {
+      readUnlock();
+    }
+    return result;
   }
 
   private enum ContainerCheckLevel {
