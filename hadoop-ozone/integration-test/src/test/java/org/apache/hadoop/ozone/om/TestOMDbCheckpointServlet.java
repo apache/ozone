@@ -321,28 +321,28 @@ public class TestOMDbCheckpointServlet {
 
     Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
     int metaDirLength = metaDir.toString().length();
-    String shortCheckpointLocation =
-        fixFile(metaDirLength, checkpointLocation);
     Path finalCheckpointLocation =
-        Paths.get(testDirName, shortCheckpointLocation);
+        Paths.get(testDirName);
 
     // Confirm the checkpoint directories match
     Set<String> initialCheckpointSet = new HashSet<>();
     try (Stream<Path> files = Files.list(checkpointLocation)) {
       for (Path file : files.collect(Collectors.toList())) {
-        initialCheckpointSet.add(fixFile(metaDirLength, file));
+        initialCheckpointSet.add(fixFile(checkpointLocation.toString().length(), file));
       }
     }
     Set<String> finalCheckpointSet = new HashSet<>();
     try (Stream<Path> files = Files.list(finalCheckpointLocation)) {
       for (Path file : files.collect(Collectors.toList())) {
+        if (file.getFileName().toString().equals("db.snapshots")) {
+          continue;
+        }
         finalCheckpointSet.add(fixFile(testDirLength, file));
       }
     }
 
     // Confirm hardLinkFile exists in checkpoint dir
-    String hlPath = Paths.get(shortCheckpointLocation,
-        "hardLinkFile").toString();
+    String hlPath = "/hardLinkFile";
     Assert.assertTrue(finalCheckpointSet.contains(hlPath));
 
     finalCheckpointSet.remove(hlPath);
@@ -396,7 +396,7 @@ public class TestOMDbCheckpointServlet {
         dummyLinkFound = true;
         Assert.assertTrue(checkDummyFile(shortSnapshotLocation,shortSnapshotLocation2, line));
       } else {
-        Assert.assertTrue(checkLine(shortSnapshotLocation, shortSnapshotLocation2, shortCheckpointLocation, line));
+        Assert.assertTrue(checkLine(shortSnapshotLocation, shortSnapshotLocation2, line));
         if (line.startsWith(shortSnapshotLocation)) {
           finalSnapshotSet.add(line.split("\t")[0]);
         }
@@ -425,21 +425,19 @@ public class TestOMDbCheckpointServlet {
   }
   private boolean checkLine(String shortSnapshotLocation,
                             String shortSnapshotLocation2,
-                            String shortCheckpointLocation, String line) {
+                            String line) {
     String[] files = line.split("\t");
     if (!files[0].startsWith(shortSnapshotLocation) &&
         !files[0].startsWith(shortSnapshotLocation2)) {
       return false;
     }
-    if (!files[1].startsWith(shortCheckpointLocation)) {
-      return false;
-    }
+
     String file0 = files[0].substring(shortSnapshotLocation.length());
-    String file1 = files[1].substring(shortCheckpointLocation.length());
+    String file1 = files[1];
     if (Paths.get(file0).getNameCount() > 1) {
       return false;
     }
-    return file0.equals(file1);
+    return file0.equals("/" + file1);
   }
   private String createSnapshot(String vname, String bname)
       throws IOException, InterruptedException, TimeoutException {

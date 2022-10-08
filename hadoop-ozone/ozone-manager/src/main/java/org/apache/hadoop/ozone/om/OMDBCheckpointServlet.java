@@ -53,7 +53,6 @@ import java.util.LinkedHashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -197,8 +196,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
     int truncateLength = metaDirPath.toString().length();
-    String fixedDir = fixFile(truncateLength,
-        checkpoint.getCheckpointLocation());
 
     getFilesFromCheckpoint(checkpoint, copyFiles);
     for (Path dir : getSnapshotDirs(checkpoint)) {
@@ -213,17 +210,20 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           new TarArchiveOutputStream(gzippedOut)) {
         ((TarArchiveOutputStream)archiveOutputStream)
             .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
-        Path checkpointPath = checkpoint.getCheckpointLocation();
 
         for (Path file : copyFiles.values()) {
           String fixedFile = fixFile(truncateLength, file);
+          if (fixedFile.startsWith("/db.checkpoints")) {
+            fixedFile = Paths.get(fixedFile).getFileName().toString();
+          }
           includeFile(file.toFile(), fixedFile,
               archiveOutputStream);
         }
-        Path hardLinkFile = createHardLinkList(truncateLength, hardLinkFiles);
-        includeFile(hardLinkFile.toFile(),
-            Paths.get(fixedDir, "hardLinkFile").toString(),
-            archiveOutputStream);
+        if (!hardLinkFiles.isEmpty()) {
+          Path hardLinkFile = createHardLinkList(truncateLength, hardLinkFiles);
+          includeFile(hardLinkFile.toFile(), "hardLinkFile",
+              archiveOutputStream);
+        }
       }
     } catch (CompressorException e) {
       throw new IOException(
@@ -239,9 +239,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     Path data = Files.createTempFile("hardLinkData", "txt");
     StringBuilder sb = new StringBuilder();
     for (Map.Entry<Path, Path> entry : hardLinkFiles.entrySet()) {
+      String fixedFile = fixFile(truncateLength, entry.getValue());
+      if (fixedFile.startsWith("/db.checkpoints")) {
+        fixedFile = Paths.get(fixedFile).getFileName().toString();
+      }
       sb.append(fixFile(truncateLength, entry.getKey()))
           .append("\t")
-          .append(fixFile(truncateLength, entry.getValue()))
+          .append(fixedFile)
           .append("\n");
     }
     Files.write(data, sb.toString().getBytes(StandardCharsets.UTF_8));
