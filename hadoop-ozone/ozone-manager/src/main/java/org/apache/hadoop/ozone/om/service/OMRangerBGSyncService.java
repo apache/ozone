@@ -386,7 +386,8 @@ public class OMRangerBGSyncService extends BackgroundService {
         .build();
   }
 
-  public void setOMDBRangerServiceVersion(long version) throws ServiceException {
+  public void setOMDBRangerServiceVersion(long version)
+          throws ServiceException {
     // OM DB update goes through Ratis
     SetRangerServiceVersionRequest.Builder versionSyncRequest =
         SetRangerServiceVersionRequest.newBuilder()

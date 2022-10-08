@@ -60,7 +60,8 @@ public class RangerUserRequest {
   private int connectionTimeout = 5000;
   private int connectionRequestTimeout = 5000;
 
-  public RangerUserRequest(String rangerHttpsAddress, String userName, String passwd) {
+  public RangerUserRequest(String rangerHttpsAddress, String userName,
+                           String passwd) {
 
     // Trim trailing slash
     if (rangerHttpsAddress.endsWith("/")) {
