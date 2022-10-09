@@ -220,7 +220,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     this.updatePieChart('/', DEFAULT_DISPLAY_LIMIT);
   }
 
-  clickPieSection(e, curPath: string): void { 
+  clickPieSection(e, curPath: string): void {
     const subPath: string = e.points[0].label;
     if (subPath === OTHER_PATH_NAME) {
       return;
