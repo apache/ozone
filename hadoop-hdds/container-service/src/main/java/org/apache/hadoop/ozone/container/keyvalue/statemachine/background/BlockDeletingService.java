@@ -490,7 +490,7 @@ public class BlockDeletingService extends BackgroundService {
 
         DeleteTransactionStats deleteBlocksResult =
             deleteTransactions(delBlocks, handler, blockDataTable, container);
-        int deletedBlocksProceeded = deleteBlocksResult.getBlocksProcessed();
+        int deletedBlocksProcessed = deleteBlocksResult.getBlocksProcessed();
         int deletedBlocksCount = deleteBlocksResult.getBlocksDeleted();
         long releasedBytes = deleteBlocksResult.getBytesReleased();
 
@@ -516,7 +516,7 @@ public class BlockDeletingService extends BackgroundService {
 
           // update count of pending deletion blocks, block count and used
           // bytes in in-memory container status and used space in volume.
-          containerData.decrPendingDeletionBlocks(deletedBlocksProceeded);
+          containerData.decrPendingDeletionBlocks(deletedBlocksProcessed);
           containerData.decrBlockCount(deletedBlocksCount);
           containerData.decrBytesUsed(releasedBytes);
           containerData.getVolume().decrementUsedSpace(releasedBytes);
