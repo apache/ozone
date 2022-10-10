@@ -157,7 +157,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       if (duResponse.subPathCount === 0 || subpaths === 0) {
         pieces = duResponse && duResponse.path.split('/');
         subpathName = pieces[pieces.length - 1];
-        pathLabels = [((duResponse.path).isKey || subpathName === OTHER_PATH_NAME) ? subpathName : subpathName];
+        pathLabels = [subpathName];
         values = [0.1];
         percentage = [100.00];
         sizeStr = [this.byteToSize(duResponse.size, 1)];
@@ -172,13 +172,13 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           return (subpath.isKey || subpathName === OTHER_PATH_NAME) ? subpathName : subpathName + '/';
         });
 
-        values = subpaths.map(subpath => {
-          return subpath.size / dataSize;
-        });
+      values = subpaths.map(subpath => {
+        return subpath.size / dataSize;
+      });
 
-        percentage = values.map(value => {
-          return (value * 100).toFixed(2);
-        });
+      percentage = values.map(value => {
+        return (value * 100).toFixed(2);
+      });
 
         sizeStr = subpaths.map(subpath => {
           return this.byteToSize(subpath.size, 1);
@@ -419,8 +419,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                 </Col>
               </Row>
               <Row>
-                {(duResponse.size > 0) ?
-                  ((duResponse.size > 0 && duResponse.subPathCount === 0) ?
+                {(duResponse.size > 0)?
                     <div style={{height: 800}}>
                     <div  className='metadatainformation'>
                       <br/> {' '}
@@ -439,24 +438,10 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                         showlegend: true,
                         title: 'Disk Usage for ' + returnPath + ' (Total Size: ' + this.byteToSize(duResponse.size, 1) + ')'
                       }
-                    }/>
+                    }
+                    onClick={(duResponse.subPathCount === 0) ? undefined : e => this.clickPieSection(e, returnPath)}/>
                   </div>
                     :
-                    <Plot
-                      data={plotData}
-                      layout={
-                        {
-                          width: 800,
-                          height: 750,
-                          font: {
-                            family: 'Roboto, sans-serif',
-                            size: 15
-                          },
-                          showlegend: true,
-                          title: 'Disk Usage for ' + returnPath + ' (Total Size: ' + this.byteToSize(duResponse.size, 1) + ')'
-                        }
-                      }
-                      onClick={e => this.clickPieSection(e, returnPath)}/>) :
                   <div style={{height: 800}} className='metadatainformation'><br/>
                     This object is empty. Add files to it to see a visualization on disk usage.{' '}<br/>
                       You can also view its metadata details by clicking the top right button.
