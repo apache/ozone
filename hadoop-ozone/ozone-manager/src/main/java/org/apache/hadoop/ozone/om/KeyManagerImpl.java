@@ -1249,10 +1249,8 @@ public class KeyManagerImpl implements KeyManager {
             if (fullPath.startsWith(subPath)) {
               // create fake directory
               fakeDirKeyInfo = createDirectoryKey(
-                  omKeyInfo.getVolumeName(),
-                  omKeyInfo.getBucketName(),
-                  dirKey,
-                  omKeyInfo.getAcls());
+                  omKeyInfo,
+                  dirKey);
             }
           }
         }
