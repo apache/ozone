@@ -43,11 +43,11 @@ import static org.apache.hadoop.ozone.HddsDatanodeService.getLogger;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test class for {@link HddsDatanodeService}.
@@ -69,7 +69,7 @@ public class TestHddsSecureDatanodeInit {
 
   private CertificateClient client;
 
-  @BeforeClass
+  @BeforeAll
   public static void setUp() throws Exception {
     testDir = GenericTestUtils.getRandomizedTestDir();
     conf = new OzoneConfiguration();
@@ -108,12 +108,12 @@ public class TestHddsSecureDatanodeInit {
 
   }
 
-  @AfterClass
+  @AfterAll
   public static void tearDown() {
     FileUtil.fullyDelete(testDir);
   }
 
-  @Before
+  @BeforeEach
   public void setUpDNCertClient() {
 
     FileUtils.deleteQuietly(Paths.get(
@@ -139,10 +139,11 @@ public class TestHddsSecureDatanodeInit {
     LambdaTestUtils.intercept(Exception.class, "",
         () -> service.initializeCertificateClient(conf));
 
-    Assert.assertNotNull(client.getPrivateKey());
-    Assert.assertNotNull(client.getPublicKey());
-    Assert.assertNull(client.getCertificate());
-    Assert.assertTrue(dnLogs.getOutput().contains("Init response: GETCERT"));
+    Assertions.assertNotNull(client.getPrivateKey());
+    Assertions.assertNotNull(client.getPublicKey());
+    Assertions.assertNull(client.getCertificate());
+    Assertions.assertTrue(dnLogs.getOutput()
+        .contains("Init response: GETCERT"));
   }
 
   @Test
@@ -153,10 +154,11 @@ public class TestHddsSecureDatanodeInit {
     LambdaTestUtils.intercept(RuntimeException.class, "DN security" +
             " initialization failed",
         () -> service.initializeCertificateClient(conf));
-    Assert.assertNull(client.getPrivateKey());
-    Assert.assertNull(client.getPublicKey());
-    Assert.assertNotNull(client.getCertificate());
-    Assert.assertTrue(dnLogs.getOutput().contains("Init response: FAILURE"));
+    Assertions.assertNull(client.getPrivateKey());
+    Assertions.assertNull(client.getPublicKey());
+    Assertions.assertNotNull(client.getCertificate());
+    Assertions.assertTrue(dnLogs.getOutput()
+        .contains("Init response: FAILURE"));
   }
 
   @Test
@@ -166,10 +168,11 @@ public class TestHddsSecureDatanodeInit {
     LambdaTestUtils.intercept(RuntimeException.class, "DN security" +
             " initialization failed",
         () -> service.initializeCertificateClient(conf));
-    Assert.assertNull(client.getPrivateKey());
-    Assert.assertNotNull(client.getPublicKey());
-    Assert.assertNull(client.getCertificate());
-    Assert.assertTrue(dnLogs.getOutput().contains("Init response: FAILURE"));
+    Assertions.assertNull(client.getPrivateKey());
+    Assertions.assertNotNull(client.getPublicKey());
+    Assertions.assertNull(client.getCertificate());
+    Assertions.assertTrue(dnLogs.getOutput()
+        .contains("Init response: FAILURE"));
   }
 
   @Test
@@ -180,10 +183,11 @@ public class TestHddsSecureDatanodeInit {
     LambdaTestUtils.intercept(RuntimeException.class, "DN security" +
             " initialization failed",
         () -> service.initializeCertificateClient(conf));
-    Assert.assertNull(client.getPrivateKey());
-    Assert.assertNotNull(client.getPublicKey());
-    Assert.assertNotNull(client.getCertificate());
-    Assert.assertTrue(dnLogs.getOutput().contains("Init response: FAILURE"));
+    Assertions.assertNull(client.getPrivateKey());
+    Assertions.assertNotNull(client.getPublicKey());
+    Assertions.assertNotNull(client.getCertificate());
+    Assertions.assertTrue(dnLogs.getOutput()
+        .contains("Init response: FAILURE"));
   }
 
   @Test
@@ -193,10 +197,11 @@ public class TestHddsSecureDatanodeInit {
     LambdaTestUtils.intercept(RuntimeException.class, " DN security" +
             " initialization failed",
         () -> service.initializeCertificateClient(conf));
-    Assert.assertNotNull(client.getPrivateKey());
-    Assert.assertNull(client.getPublicKey());
-    Assert.assertNull(client.getCertificate());
-    Assert.assertTrue(dnLogs.getOutput().contains("Init response: FAILURE"));
+    Assertions.assertNotNull(client.getPrivateKey());
+    Assertions.assertNull(client.getPublicKey());
+    Assertions.assertNull(client.getCertificate());
+    Assertions.assertTrue(dnLogs.getOutput()
+        .contains("Init response: FAILURE"));
     dnLogs.clearOutput();
   }
 
@@ -206,10 +211,11 @@ public class TestHddsSecureDatanodeInit {
     certCodec.writeCertificate(certHolder);
     keyCodec.writePrivateKey(privateKey);
     service.initializeCertificateClient(conf);
-    Assert.assertNotNull(client.getPrivateKey());
-    Assert.assertNotNull(client.getPublicKey());
-    Assert.assertNotNull(client.getCertificate());
-    Assert.assertTrue(dnLogs.getOutput().contains("Init response: SUCCESS"));
+    Assertions.assertNotNull(client.getPrivateKey());
+    Assertions.assertNotNull(client.getPublicKey());
+    Assertions.assertNotNull(client.getCertificate());
+    Assertions.assertTrue(dnLogs.getOutput()
+        .contains("Init response: SUCCESS"));
   }
 
   @Test
@@ -219,10 +225,11 @@ public class TestHddsSecureDatanodeInit {
     keyCodec.writePrivateKey(privateKey);
     LambdaTestUtils.intercept(Exception.class, "",
         () -> service.initializeCertificateClient(conf));
-    Assert.assertNotNull(client.getPrivateKey());
-    Assert.assertNotNull(client.getPublicKey());
-    Assert.assertNull(client.getCertificate());
-    Assert.assertTrue(dnLogs.getOutput().contains("Init response: GETCERT"));
+    Assertions.assertNotNull(client.getPrivateKey());
+    Assertions.assertNotNull(client.getPublicKey());
+    Assertions.assertNull(client.getCertificate());
+    Assertions.assertTrue(dnLogs.getOutput()
+        .contains("Init response: GETCERT"));
   }
 
   @Test
@@ -233,10 +240,11 @@ public class TestHddsSecureDatanodeInit {
     certCodec.writeCertificate(certHolder);
 
     service.initializeCertificateClient(conf);
-    Assert.assertNotNull(client.getPrivateKey());
-    Assert.assertNotNull(client.getPublicKey());
-    Assert.assertNotNull(client.getCertificate());
-    Assert.assertTrue(dnLogs.getOutput().contains("Init response: SUCCESS"));
+    Assertions.assertNotNull(client.getPrivateKey());
+    Assertions.assertNotNull(client.getPublicKey());
+    Assertions.assertNotNull(client.getCertificate());
+    Assertions.assertTrue(dnLogs.getOutput()
+        .contains("Init response: SUCCESS"));
   }
 
   /**
@@ -259,16 +267,16 @@ public class TestHddsSecureDatanodeInit {
     service.setCertificateClient(client);
     PKCS10CertificationRequest csr =
         service.getCSR(conf);
-    Assert.assertNotNull(csr);
+    Assertions.assertNotNull(csr);
 
     csr = service.getCSR(conf);
-    Assert.assertNotNull(csr);
+    Assertions.assertNotNull(csr);
 
     csr = service.getCSR(conf);
-    Assert.assertNotNull(csr);
+    Assertions.assertNotNull(csr);
 
     csr = service.getCSR(conf);
-    Assert.assertNotNull(csr);
+    Assertions.assertNotNull(csr);
   }
 
 }
