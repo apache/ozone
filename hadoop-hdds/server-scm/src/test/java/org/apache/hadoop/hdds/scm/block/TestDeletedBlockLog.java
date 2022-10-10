@@ -397,6 +397,14 @@ public class TestDeletedBlockLog {
     for (DeletedBlocksTransaction block : blocks) {
       Assertions.assertEquals(0, block.getCount());
     }
+
+    // Increment for the reset transactions.
+    incrementCount(txIDs);
+    blocks = getAllTransactions();
+    for (DeletedBlocksTransaction block : blocks) {
+      Assertions.assertEquals(1, block.getCount());
+    }
+
     Assertions.assertEquals(30 * THREE, blocks.size());
   }
 
