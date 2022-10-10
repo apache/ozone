@@ -558,6 +558,12 @@ public class TestBlockDeletingService {
     GenericTestUtils.waitFor(() -> ctr2.getNumPendingDeletionBlocks() == 0,
         200, 2000);
 
+    // To make sure the container stat calculation is right
+    Assert.assertEquals(0, ctr1.getBlockCount());
+    Assert.assertEquals(0, ctr1.getBytesUsed());
+    Assert.assertEquals(0, ctr2.getBlockCount());
+    Assert.assertEquals(0, ctr2.getBytesUsed());
+
     svc.shutdown();
   }
 
