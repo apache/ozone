@@ -159,10 +159,6 @@ public class ContainerBalancerTask implements Runnable {
   public void run() {
     try {
       balancer();
-
-      // mark balancer completion, if ha and stopped as not a leader, it will
-      // be handled inside for not saving configuration with leader check
-      saveConfiguration(config, false, 0);
     } catch (Throwable e) {
       LOG.error("Container Balancer is stopped abnormally, ", e);
     }
@@ -196,11 +192,6 @@ public class ContainerBalancerTask implements Runnable {
     for (; i < iterations && isBalancerRunning(); i++) {
       // reset some variables and metrics for this iteration
       resetState();
-
-      if (!isBalancerRunning()) {
-        return;
-      }
-
       if (config.getTriggerDuEnable()) {
         // before starting a new iteration, we trigger all the datanode
         // to run `du`. this is an aggressive action, with which we can
@@ -237,8 +228,8 @@ public class ContainerBalancerTask implements Runnable {
           return;
         }
         // otherwise, try to stop balancer
-        LOG.info("Stopping ContainerBalancer. Reason for stopping: Could not " +
-            "initialize ContainerBalancer's iteration number " + i);
+        tryStopWithSaveConfiguration("Could not initialize " +
+            "ContainerBalancer's iteration number " + i);
         return;
       }
 
@@ -249,7 +240,7 @@ public class ContainerBalancerTask implements Runnable {
       // if no new move option is generated, it means the cluster cannot be
       // balanced anymore; so just stop balancer
       if (iR == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
-        LOG.info("Stopping ContainerBalancer. Reason for stopping: {}", iR);
+        tryStopWithSaveConfiguration(iR.toString());
         return;
       }
 
@@ -281,15 +272,41 @@ public class ContainerBalancerTask implements Runnable {
         }
       }
     }
+    
+    tryStopWithSaveConfiguration("Completed all iterations.");
+  }
+
+  /**
+   * Tries to stop ContainerBalancer. Logs the reason for stopping. Calls
+   * {@link ContainerBalancer#stopBalancer()}.
+   * @param stopReason a string specifying the reason for stopping
+   *                   ContainerBalancer.
+   */
+  private void tryStopWithSaveConfiguration(String stopReason) {
+    synchronized (this) {
+      try {
+        LOG.info("Save Configuration for stopping. Reason: {}", stopReason);
+        saveConfiguration(config, false, 0);
+        stop();
+      } catch (IOException | TimeoutException e) {
+        LOG.warn("Save configuration failed. Reason for " +
+            "stopping: {}", stopReason, e);
+      }
+    }
   }
 
   private void saveConfiguration(ContainerBalancerConfiguration configuration,
                                  boolean shouldRun, int index)
       throws IOException, TimeoutException {
     if (!isValidSCMState()) {
+      LOG.warn("Save configuration is not allowed as not in valid State.");
       return;
     }
-    containerBalancer.saveConfiguration(configuration, shouldRun, index);
+    synchronized (this) {
+      if (isBalancerRunning()) {
+        containerBalancer.saveConfiguration(configuration, shouldRun, index);
+      }
+    }
   }
 
   /**

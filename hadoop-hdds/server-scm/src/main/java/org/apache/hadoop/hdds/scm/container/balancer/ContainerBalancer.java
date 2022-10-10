@@ -98,6 +98,10 @@ public class ContainerBalancer extends StatefulService {
     try {
       // else check for start
       boolean shouldRun = shouldRun();
+      if (shouldRun && !canBalancerStart()) {
+        LOG.warn("Could not start ContainerBalancer on notify," +
+            " might be stopped");
+      }
       if (shouldRun && canBalancerStart()) {
         LOG.info("Starting ContainerBalancer in this scm on status change");
         try {
@@ -174,8 +178,7 @@ public class ContainerBalancer extends StatefulService {
    * @return true if balancer can be stopped, otherwise false
    */
   private boolean canBalancerStop() {
-    return null != task
-        && task.getBalancerStatus() == ContainerBalancerTask.Status.RUNNING;
+    return isBalancerRunning();
   }
 
   /**
@@ -326,6 +329,10 @@ public class ContainerBalancer extends StatefulService {
       lock.unlock();
     }
 
+    blockTillTaskStop(balancingThread);
+  }
+
+  private static void blockTillTaskStop(Thread balancingThread) {
     // NOTE: join should be called outside the lock in hierarchy
     // to avoid locking others waiting
     // wait for balancingThread to die with interrupt
@@ -346,13 +353,17 @@ public class ContainerBalancer extends StatefulService {
   public void stopBalancer()
       throws IOException, IllegalContainerBalancerStateException,
       TimeoutException {
+    Thread balancingThread;
     lock.lock();
     try {
       validateState(true);
+      saveConfiguration(config, false, 0);
+      task.stop();
+      balancingThread = currentBalancingThread;
     } finally {
       lock.unlock();
     }
-    stop();
+    blockTillTaskStop(balancingThread);
   }
 
   public void saveConfiguration(ContainerBalancerConfiguration configuration,
