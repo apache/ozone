@@ -607,7 +607,7 @@ public class BlockDeletingService extends BackgroundService {
   /**
    * The wrapper class of the result of deleting transactions.
    */
-  private class DeleteTransactionStats {
+  private static class DeleteTransactionStats {
 
     private final int blocksProcessed;
     private final int blocksDeleted;
