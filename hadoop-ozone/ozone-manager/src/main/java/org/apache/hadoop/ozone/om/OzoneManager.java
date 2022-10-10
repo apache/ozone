@@ -1351,10 +1351,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         for (File ratisGroupDir : ratisDirFiles) {
           if (ratisGroupDir.isDirectory()) {
             if (!ratisGroupDir.getName().equals(groupIDfromServiceID)) {
-              LOG.warn("Another ratis dir is detected "
-                  + "(possible SCM collocation)."
-                  + " It's better not to share ratis log dir "
-                  + "in the production environment.");
+              LOG.warn("Ratis group Dir on disk "
+                  + ratisGroupDir.getName() + " does not match with RaftGroupID"
+                  + groupIDfromServiceID + " generated from service id "
+                  + getOMServiceId() + ". Looks like there is a change to " +
+                  OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY + " value after the " +
+                  "cluster is setup. Currently change to this value is not " +
+                  "supported.");
             }
           } else {
             LOG.warn("Unknown file {} exists in ratis storage dir {}",
