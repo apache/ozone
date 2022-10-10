@@ -160,10 +160,8 @@ public final class ContainerStateManagerImpl
     this.lastUsedMap = new ConcurrentHashMap<>();
     this.containerStateChangeActions = getContainerStateChangeActions();
     this.transactionBuffer = buffer;
-    boolean fair = conf.getBoolean(OZONE_MANAGER_FAIR_LOCK,
-        OZONE_MANAGER_FAIR_LOCK_DEFAULT);
     this.lockManager =
-        new LockManager<>(confSrc, fair);
+        new LockManager<>(confSrc, true);
     initialize();
   }
 
