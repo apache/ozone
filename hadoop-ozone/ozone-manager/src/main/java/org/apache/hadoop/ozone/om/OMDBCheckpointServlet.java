@@ -112,9 +112,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         om.isSpnegoEnabled());
   }
 
-  private void getFilesFromCheckpoint(DBCheckpoint checkpoint,
-                                      Map<Object, Path> copyFiles)
-      throws IOException {
+  private void getFilesForArchive(DBCheckpoint checkpoint,
+                                  Map<Object, Path> copyFiles,
+                                  Map<Path, Path> hardLinkFiles)
+      throws IOException, InterruptedException {
     Path dir = checkpoint.getCheckpointLocation();
 
     try (Stream<Path> files = Files.list(dir)) {
@@ -125,7 +126,11 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         copyFiles.put(key, file);
       }
     }
+    for (Path snapshotDir : getSnapshotDirs(checkpoint)) {
+      processDir(snapshotDir, copyFiles, hardLinkFiles);
+    }
   }
+
   private List<Path> getSnapshotDirs(DBCheckpoint checkpoint)
       throws IOException {
     ArrayList<Path> list = new ArrayList<>();
@@ -174,6 +179,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         // get the inode
         Object key = Files.readAttributes(
             file, BasicFileAttributes.class).fileKey();
+        // If we already have the inode, store as hard link
         if (copyFiles.containsKey(key)) {
           hardLinkFiles.put(file, copyFiles.get(key));
         } else {
@@ -185,10 +191,37 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   @Override
-  public void returnDBCheckpointToStream(DBCheckpoint checkpoint, OutputStream destination)
+  public void writeDbDataToStream(DBCheckpoint checkpoint, OutputStream destination)
       throws IOException, InterruptedException, CompressorException {
+    // Map of inodes to path
     HashMap<Object, Path> copyFiles = new HashMap<>();
+    // Map of link to path
     HashMap<Path, Path> hardLinkFiles = new HashMap<>();
+
+    getFilesForArchive(checkpoint, copyFiles, hardLinkFiles);
+
+    try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
+        .createCompressorOutputStream(CompressorStreamFactory.GZIP,
+            destination)) {
+
+      try (TarArchiveOutputStream archiveOutputStream =
+          new TarArchiveOutputStream(gzippedOut)) {
+        archiveOutputStream
+            .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
+
+        writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream);
+      }
+    } catch (CompressorException e) {
+      throw new IOException(
+          "Can't compress the checkpoint: " +
+              checkpoint.getCheckpointLocation(), e);
+    }
+  }
+
+  private void writeFilesToArchive(HashMap<Object, Path> copyFiles,
+                         HashMap<Path, Path> hardLinkFiles,
+                         ArchiveOutputStream archiveOutputStream)
+      throws IOException {
 
     OzoneConfiguration conf = ((OzoneManager) getServletContext()
         .getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
@@ -197,38 +230,18 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
     int truncateLength = metaDirPath.toString().length();
 
-    getFilesFromCheckpoint(checkpoint, copyFiles);
-    for (Path dir : getSnapshotDirs(checkpoint)) {
-      processDir(dir, copyFiles, hardLinkFiles);
-    }
-
-    try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
-        .createCompressorOutputStream(CompressorStreamFactory.GZIP,
-            destination)) {
-
-      try (ArchiveOutputStream archiveOutputStream =
-          new TarArchiveOutputStream(gzippedOut)) {
-        ((TarArchiveOutputStream)archiveOutputStream)
-            .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
-
-        for (Path file : copyFiles.values()) {
-          String fixedFile = fixFile(truncateLength, file);
-          if (fixedFile.startsWith("/db.checkpoints")) {
-            fixedFile = Paths.get(fixedFile).getFileName().toString();
-          }
-          includeFile(file.toFile(), fixedFile,
-              archiveOutputStream);
-        }
-        if (!hardLinkFiles.isEmpty()) {
-          Path hardLinkFile = createHardLinkList(truncateLength, hardLinkFiles);
-          includeFile(hardLinkFile.toFile(), "hardLinkFile",
-              archiveOutputStream);
-        }
+    for (Path file : copyFiles.values()) {
+      String fixedFile = fixFileName(truncateLength, file);
+      if (fixedFile.startsWith("/db.checkpoints")) {
+        fixedFile = Paths.get(fixedFile).getFileName().toString();
       }
-    } catch (CompressorException e) {
-      throw new IOException(
-          "Can't compress the checkpoint: " +
-              checkpoint.getCheckpointLocation(), e);
+      includeFile(file.toFile(), fixedFile,
+          archiveOutputStream);
+    }
+    if (!hardLinkFiles.isEmpty()) {
+      Path hardLinkFile = createHardLinkList(truncateLength, hardLinkFiles);
+      includeFile(hardLinkFile.toFile(), "hardLinkFile",
+          archiveOutputStream);
     }
   }
 
@@ -239,11 +252,11 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     Path data = Files.createTempFile("hardLinkData", "txt");
     StringBuilder sb = new StringBuilder();
     for (Map.Entry<Path, Path> entry : hardLinkFiles.entrySet()) {
-      String fixedFile = fixFile(truncateLength, entry.getValue());
+      String fixedFile = fixFileName(truncateLength, entry.getValue());
       if (fixedFile.startsWith("/db.checkpoints")) {
         fixedFile = Paths.get(fixedFile).getFileName().toString();
       }
-      sb.append(fixFile(truncateLength, entry.getKey()))
+      sb.append(fixFileName(truncateLength, entry.getKey()))
           .append("\t")
           .append(fixedFile)
           .append("\n");
@@ -252,7 +265,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return data;
   }
 
-  static String fixFile(int truncateLength, Path file) {
+  static String fixFileName(int truncateLength, Path file) {
     return file.toString().substring(truncateLength);
   }
 

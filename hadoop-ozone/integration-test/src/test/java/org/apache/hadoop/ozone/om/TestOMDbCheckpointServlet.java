@@ -76,7 +76,7 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.mockito.Matchers;
 
-import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.fixFile;
+import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.fixFileName;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
@@ -179,7 +179,7 @@ public class TestOMDbCheckpointServlet {
         responseMock);
 
     doCallRealMethod().when(omDbCheckpointServletMock)
-        .returnDBCheckpointToStream(any(), any());
+        .writeDbDataToStream(any(), any());
   }
 
   @Test
@@ -310,7 +310,7 @@ public class TestOMDbCheckpointServlet {
         .getCheckpoint(true);
 
     FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
-    omDbCheckpointServletMock.returnDBCheckpointToStream(dbCheckpoint,
+    omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint,
         fileOutputStream);
 
     // Untar the file into a temp folder to be examined
@@ -328,7 +328,8 @@ public class TestOMDbCheckpointServlet {
     Set<String> initialCheckpointSet = new HashSet<>();
     try (Stream<Path> files = Files.list(checkpointLocation)) {
       for (Path file : files.collect(Collectors.toList())) {
-        initialCheckpointSet.add(fixFile(checkpointLocation.toString().length(), file));
+        initialCheckpointSet.add(
+            fixFileName(checkpointLocation.toString().length(), file));
       }
     }
     Set<String> finalCheckpointSet = new HashSet<>();
@@ -337,7 +338,7 @@ public class TestOMDbCheckpointServlet {
         if (file.getFileName().toString().equals("db.snapshots")) {
           continue;
         }
-        finalCheckpointSet.add(fixFile(testDirLength, file));
+        finalCheckpointSet.add(fixFileName(testDirLength, file));
       }
     }
 
@@ -351,9 +352,9 @@ public class TestOMDbCheckpointServlet {
     Assert.assertEquals(initialCheckpointSet, finalCheckpointSet);
 
     String shortSnapshotLocation =
-        fixFile(metaDirLength, Paths.get(snapshotDirName));
+        fixFileName(metaDirLength, Paths.get(snapshotDirName));
     String shortSnapshotLocation2 =
-        fixFile(metaDirLength, Paths.get(snapshotDirName2));
+        fixFileName(metaDirLength, Paths.get(snapshotDirName2));
 
     Path finalSnapshotLocation =
         Paths.get(testDirName, shortSnapshotLocation);
@@ -368,7 +369,7 @@ public class TestOMDbCheckpointServlet {
     try (Stream<Path> files = Files.list(Paths.get(snapshotDirName))) {
       for (Path file : files.collect(Collectors.toList())) {
         if (!file.getFileName().toString().equals("dummyFile")) {
-          initialSnapshotSet.add(fixFile(metaDirLength, file));
+          initialSnapshotSet.add(fixFileName(metaDirLength, file));
         }
       }
     }
@@ -381,7 +382,9 @@ public class TestOMDbCheckpointServlet {
         if (file.toString().contains("MANIFEST")) {
           foundManifest = true;
         }
-        finalSnapshotSet.add(fixFile(testDirLength, file));
+        if (!file.getFileName().toString().equals("dummyFile")) {
+          finalSnapshotSet.add(fixFileName(testDirLength, file));
+        }
       }
     }
     Assert.assertTrue("snapshot manifest found", foundManifest);
