@@ -545,7 +545,7 @@ public class BlockDeletingService extends BackgroundService {
         List<DeletedBlocksTransaction> delBlocks, Handler handler,
         Table<String, BlockData> blockDataTable, Container container)
         throws IOException {
-      int blocksMissed = 0;
+      int blocksProcessed = 0;
       int blocksDeleted = 0;
       long bytesReleased = 0;
       for (DeletedBlocksTransaction entry : delBlocks) {
@@ -557,7 +557,7 @@ public class BlockDeletingService extends BackgroundService {
             LOG.warn("Missing delete block(Container = " +
                 container.getContainerData().getContainerID() + ", Block = " +
                 blkLong);
-            blocksMissed++;
+            blocksProcessed++;
             continue;
           }
 
@@ -565,6 +565,7 @@ public class BlockDeletingService extends BackgroundService {
           try {
             handler.deleteBlock(container, blkInfo);
             blocksDeleted++;
+            blocksProcessed++;
             deleted = true;
           } catch (IOException e) {
             // TODO: if deletion of certain block retries exceed the certain
@@ -585,7 +586,7 @@ public class BlockDeletingService extends BackgroundService {
           }
         }
       }
-      return new DeleteTransactionStats(blocksMissed + blocksDeleted,
+      return new DeleteTransactionStats(blocksProcessed,
           blocksDeleted, bytesReleased);
     }
 
