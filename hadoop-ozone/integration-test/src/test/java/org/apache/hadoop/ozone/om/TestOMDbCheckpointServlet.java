@@ -76,6 +76,7 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.mockito.Matchers;
 
+import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.fixFileName;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -315,12 +316,12 @@ public class TestOMDbCheckpointServlet {
 
     // Untar the file into a temp folder to be examined
     String testDirName = folder.newFolder().getAbsolutePath();
-    int testDirLength = testDirName.length();
+    int testDirLength = testDirName.length() + 1;
     FileUtil.unTar(tempFile, new File(testDirName));
 
 
     Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
-    int metaDirLength = metaDir.toString().length();
+    int metaDirLength = metaDir.toString().length() + 1;
     Path finalCheckpointLocation =
         Paths.get(testDirName);
 
@@ -329,13 +330,13 @@ public class TestOMDbCheckpointServlet {
     try (Stream<Path> files = Files.list(checkpointLocation)) {
       for (Path file : files.collect(Collectors.toList())) {
         initialCheckpointSet.add(
-            fixFileName(checkpointLocation.toString().length(), file));
+            fixFileName(checkpointLocation.toString().length() + 1, file));
       }
     }
     Set<String> finalCheckpointSet = new HashSet<>();
     try (Stream<Path> files = Files.list(finalCheckpointLocation)) {
       for (Path file : files.collect(Collectors.toList())) {
-        if (file.getFileName().toString().equals("db.snapshots")) {
+        if (file.getFileName().toString().equals(OM_SNAPSHOT_DIR)) {
           continue;
         }
         finalCheckpointSet.add(fixFileName(testDirLength, file));
@@ -343,7 +344,7 @@ public class TestOMDbCheckpointServlet {
     }
 
     // Confirm hardLinkFile exists in checkpoint dir
-    String hlPath = "/hardLinkFile";
+    String hlPath = OM_HARDLINK_FILE;
     Assert.assertTrue(finalCheckpointSet.contains(hlPath));
 
     finalCheckpointSet.remove(hlPath);

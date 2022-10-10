@@ -56,6 +56,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
@@ -79,6 +80,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       LoggerFactory.getLogger(OMDBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
   private static final int MAX_SECONDS_TO_WAIT = 10;
+
+  public static final String OM_HARDLINK_FILE = "hardLinkFile";
 
   @Override
   public void init() throws ServletException {
@@ -228,11 +231,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         .getConfiguration();
 
     File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
-    int truncateLength = metaDirPath.toString().length();
+    int truncateLength = metaDirPath.toString().length() + 1;
 
     for (Path file : copyFiles.values()) {
       String fixedFile = fixFileName(truncateLength, file);
-      if (fixedFile.startsWith("/db.checkpoints")) {
+      if (fixedFile.startsWith(OM_CHECKPOINT_DIR)) {
+        // checkpoint files go to root of tarball
         fixedFile = Paths.get(fixedFile).getFileName().toString();
       }
       includeFile(file.toFile(), fixedFile,
@@ -240,7 +244,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
     if (!hardLinkFiles.isEmpty()) {
       Path hardLinkFile = createHardLinkList(truncateLength, hardLinkFiles);
-      includeFile(hardLinkFile.toFile(), "hardLinkFile",
+      includeFile(hardLinkFile.toFile(), OM_HARDLINK_FILE,
           archiveOutputStream);
     }
   }
@@ -253,7 +257,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     StringBuilder sb = new StringBuilder();
     for (Map.Entry<Path, Path> entry : hardLinkFiles.entrySet()) {
       String fixedFile = fixFileName(truncateLength, entry.getValue());
-      if (fixedFile.startsWith("/db.checkpoints")) {
+      if (fixedFile.startsWith(OM_CHECKPOINT_DIR)) {
         fixedFile = Paths.get(fixedFile).getFileName().toString();
       }
       sb.append(fixFileName(truncateLength, entry.getKey()))
