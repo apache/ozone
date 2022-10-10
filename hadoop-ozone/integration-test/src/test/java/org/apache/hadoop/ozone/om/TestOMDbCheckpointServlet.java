@@ -66,6 +66,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 
 
 import org.apache.ozone.test.GenericTestUtils;
+import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Assert;
 
@@ -99,6 +100,9 @@ public class TestOMDbCheckpointServlet {
   private HttpServletResponse responseMock = null;
   private OMDBCheckpointServlet omDbCheckpointServletMock = null;
   private File metaDir;
+  private String snapshotDirName;
+  private String snapshotDirName2;
+  private DBCheckpoint dbCheckpoint;
 
   @Rule
   public Timeout timeout = Timeout.seconds(240);
@@ -280,35 +284,7 @@ public class TestOMDbCheckpointServlet {
   @Test
   public void testWriteArchiveToStream()
       throws Exception {
-    setupCluster();
-    metaDir = OMStorage.getOmDbDir(conf);
-
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
-    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
-        "content");
-    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
-        "content");
-
-    // this sleep can be removed after this is fixed:
-    //  https://issues.apache.org/jira/browse/HDDS-7279
-    Thread.sleep(2000);
-    String snapshotDirName =
-        createSnapshot(bucket.getVolumeName(), bucket.getName());
-    String snapshotDirName2 =
-        createSnapshot(bucket.getVolumeName(), bucket.getName());
-
-
-    // create dummy link from one snapshot dir to the other
-    //  to confirm that links are recognized even if
-    //  they are not in the checkpoint directory
-    Path dummyFile = Paths.get(snapshotDirName, "dummyFile");
-    Path dummyLink = Paths.get(snapshotDirName2, "dummyFile");
-    Files.write(dummyFile, "dummyData".getBytes(StandardCharsets.UTF_8));
-    Files.createLink(dummyLink, dummyFile);
-
-    DBCheckpoint dbCheckpoint = cluster.getOzoneManager()
-        .getMetadataManager().getStore()
-        .getCheckpoint(true);
+    prepArchiveData();
 
     FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
     omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint,
@@ -325,31 +301,16 @@ public class TestOMDbCheckpointServlet {
     Path finalCheckpointLocation =
         Paths.get(testDirName);
 
-    // Confirm the checkpoint directories match
-    Set<String> initialCheckpointSet = new HashSet<>();
-    try (Stream<Path> files = Files.list(checkpointLocation)) {
-      for (Path file : files.collect(Collectors.toList())) {
-        initialCheckpointSet.add(
-            fixFileName(checkpointLocation.toString().length() + 1, file));
-      }
-    }
-    Set<String> finalCheckpointSet = new HashSet<>();
-    try (Stream<Path> files = Files.list(finalCheckpointLocation)) {
-      for (Path file : files.collect(Collectors.toList())) {
-        if (file.getFileName().toString().equals(OM_SNAPSHOT_DIR)) {
-          continue;
-        }
-        finalCheckpointSet.add(fixFileName(testDirLength, file));
-      }
-    }
+    // Confirm the checkpoint directories match, (after remove extras)
+    Set<String> initialCheckpointSet = getFiles(checkpointLocation,
+        checkpointLocation.toString().length() + 1);
+    Set<String> finalCheckpointSet = getFiles(finalCheckpointLocation,
+        testDirLength);
+    finalCheckpointSet.remove(OM_SNAPSHOT_DIR);
 
     // Confirm hardLinkFile exists in checkpoint dir
-    String hlPath = OM_HARDLINK_FILE;
-    Assert.assertTrue(finalCheckpointSet.contains(hlPath));
-
-    finalCheckpointSet.remove(hlPath);
-
-
+    Assert.assertTrue(finalCheckpointSet.contains(OM_HARDLINK_FILE));
+    finalCheckpointSet.remove(OM_HARDLINK_FILE);
     Assert.assertEquals(initialCheckpointSet, finalCheckpointSet);
 
     String shortSnapshotLocation =
@@ -391,7 +352,7 @@ public class TestOMDbCheckpointServlet {
     Assert.assertTrue("snapshot manifest found", foundManifest);
 
     // check each line in the hard link file
-    Stream<String> lines = Files.lines(Paths.get(testDirName, hlPath));
+    Stream<String> lines = Files.lines(Paths.get(testDirName, OM_HARDLINK_FILE));
     boolean linesFound = false;
     boolean dummyLinkFound = false;
     for (String line: lines.collect(Collectors.toList())) {
@@ -412,6 +373,20 @@ public class TestOMDbCheckpointServlet {
         initialSnapshotSet, finalSnapshotSet);
 
   }
+
+  @NotNull
+  private Set<String> getFiles(Path path, int truncateLength)
+      throws IOException {
+    Set<String> fileSet = new HashSet<>();
+    try (Stream<Path> files = Files.list(path)) {
+      for (Path file : files.collect(Collectors.toList())) {
+        fileSet.add(
+            fixFileName(truncateLength, file));
+      }
+    }
+    return fileSet;
+  }
+
   private boolean checkDummyFile(String dir0, String dir1, String line) {
     String[] files = line.split("\t");
     if (!files[0].startsWith(dir0) && !files[1].startsWith(dir0)) {
@@ -462,4 +437,38 @@ public class TestOMDbCheckpointServlet {
     return snapshotDirName;
   }
 
+  private void prepArchiveData() {
+
+    setupCluster();
+    metaDir = OMStorage.getOmDbDir(conf);
+
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
+        "content");
+    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
+        "content");
+
+    // this sleep can be removed after this is fixed:
+    //  https://issues.apache.org/jira/browse/HDDS-7279
+    Thread.sleep(2000);
+    snapshotDirName =
+        createSnapshot(bucket.getVolumeName(), bucket.getName());
+    snapshotDirName2 =
+        createSnapshot(bucket.getVolumeName(), bucket.getName());
+
+
+    // create dummy link from one snapshot dir to the other
+    //  to confirm that links are recognized even if
+    //  they are not in the checkpoint directory
+    Path dummyFile = Paths.get(snapshotDirName, "dummyFile");
+    Path dummyLink = Paths.get(snapshotDirName2, "dummyFile");
+    Files.write(dummyFile, "dummyData".getBytes(StandardCharsets.UTF_8));
+    Files.createLink(dummyLink, dummyFile);
+
+    dbCheckpoint = cluster.getOzoneManager()
+        .getMetadataManager().getStore()
+        .getCheckpoint(true);
+
+
+  }
 }
