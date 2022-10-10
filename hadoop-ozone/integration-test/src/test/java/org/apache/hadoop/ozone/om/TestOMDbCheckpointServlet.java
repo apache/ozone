@@ -308,8 +308,8 @@ public class TestOMDbCheckpointServlet {
         testDirLength);
     finalCheckpointSet.remove(OM_SNAPSHOT_DIR);
 
-    // Confirm hardLinkFile exists in checkpoint dir
-    Assert.assertTrue(finalCheckpointSet.contains(OM_HARDLINK_FILE));
+    Assert.assertTrue("hardlink file exists in checkpoint dir",
+        finalCheckpointSet.contains(OM_HARDLINK_FILE));
     finalCheckpointSet.remove(OM_HARDLINK_FILE);
     Assert.assertEquals(initialCheckpointSet, finalCheckpointSet);
 
@@ -317,46 +317,26 @@ public class TestOMDbCheckpointServlet {
         fixFileName(metaDirLength, Paths.get(snapshotDirName));
     String shortSnapshotLocation2 =
         fixFileName(metaDirLength, Paths.get(snapshotDirName2));
-
     Path finalSnapshotLocation =
         Paths.get(testDirName, shortSnapshotLocation);
 
-    // Confirm snapshot current file exists and is not a hard link
-    Assert.assertTrue(Paths
-        .get(finalSnapshotLocation.toString(),
-            "CURRENT").toFile().exists());
+    Assert.assertTrue("CURRENT file exists",
+        Paths.get(finalSnapshotLocation.toString(),
+        "CURRENT").toFile().exists());
 
-    // get initial snapshot files
-    Set<String> initialSnapshotSet = new HashSet<>();
-    try (Stream<Path> files = Files.list(Paths.get(snapshotDirName))) {
-      for (Path file : files.collect(Collectors.toList())) {
-        if (!file.getFileName().toString().equals("dummyFile")) {
-          initialSnapshotSet.add(fixFileName(metaDirLength, file));
-        }
-      }
-    }
-
-    // get final snapshot files
-    Set<String> finalSnapshotSet = new HashSet<>();
-    boolean foundManifest = false;
-    try (Stream<Path> files = Files.list(finalSnapshotLocation)) {
-      for (Path file : files.collect(Collectors.toList())) {
-        if (file.toString().contains("MANIFEST")) {
-          foundManifest = true;
-        }
-        if (!file.getFileName().toString().equals("dummyFile")) {
-          finalSnapshotSet.add(fixFileName(testDirLength, file));
-        }
-      }
-    }
-    Assert.assertTrue("snapshot manifest found", foundManifest);
+    Set<String> initialSnapshotSet =
+        getFiles(Paths.get(snapshotDirName), metaDirLength);
+    Set<String> finalSnapshotSet =
+        getFiles(finalSnapshotLocation, testDirLength);
+    Assert.assertTrue("snapshot manifest found",
+        finalSnapshotSet.stream().anyMatch(s->s.contains("MANIFEST")));
 
     // check each line in the hard link file
     Stream<String> lines = Files.lines(Paths.get(testDirName, OM_HARDLINK_FILE));
-    boolean linesFound = false;
     boolean dummyLinkFound = false;
     for (String line: lines.collect(Collectors.toList())) {
-      linesFound = true;
+      Assert.assertFalse("CURRENT file is not a hard link",
+          line.contains("CURRENT"));
       if (line.contains("dummyFile")) {
         dummyLinkFound = true;
         Assert.assertTrue(checkDummyFile(shortSnapshotLocation,shortSnapshotLocation2, line));
@@ -367,11 +347,9 @@ public class TestOMDbCheckpointServlet {
         }
       }
     }
-    Assert.assertTrue("hard link file not empty", linesFound);
     Assert.assertTrue("dummy link found", dummyLinkFound);
     Assert.assertEquals("found expected snapshot files",
         initialSnapshotSet, finalSnapshotSet);
-
   }
 
   @NotNull
@@ -380,8 +358,9 @@ public class TestOMDbCheckpointServlet {
     Set<String> fileSet = new HashSet<>();
     try (Stream<Path> files = Files.list(path)) {
       for (Path file : files.collect(Collectors.toList())) {
-        fileSet.add(
-            fixFileName(truncateLength, file));
+        if (!file.getFileName().toString().equals("dummyFile")) {
+            fileSet.add(fixFileName(truncateLength, file));
+        }
       }
     }
     return fileSet;
@@ -437,7 +416,7 @@ public class TestOMDbCheckpointServlet {
     return snapshotDirName;
   }
 
-  private void prepArchiveData() {
+  private void prepArchiveData() throws Exception {
 
     setupCluster();
     metaDir = OMStorage.getOmDbDir(conf);
