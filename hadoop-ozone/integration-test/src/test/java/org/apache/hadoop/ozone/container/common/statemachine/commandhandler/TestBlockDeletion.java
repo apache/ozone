@@ -201,7 +201,6 @@ public class TestBlockDeletion {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
         .setReplicationConfig(repConfig)
-        .setRefreshPipeline(true)
         .build();
     List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
         om.lookupKey(keyArgs).getKeyLocationVersions();
@@ -312,7 +311,6 @@ public class TestBlockDeletion {
         .setReplicationConfig(
             RatisReplicationConfig
                 .getInstance(HddsProtos.ReplicationFactor.THREE))
-        .setRefreshPipeline(true)
         .build();
     List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
         om.lookupKey(keyArgs).getKeyLocationVersions();
@@ -508,7 +506,6 @@ public class TestBlockDeletion {
           .setReplicationConfig(
               RatisReplicationConfig
                   .getInstance(HddsProtos.ReplicationFactor.THREE))
-          .setRefreshPipeline(true)
           .build();
       writeClient.deleteKey(keyArgs);
     }

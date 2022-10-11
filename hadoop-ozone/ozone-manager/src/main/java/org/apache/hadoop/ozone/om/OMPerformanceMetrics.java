@@ -58,6 +58,25 @@ public class OMPerformanceMetrics {
   @Metric(about = "resolveBucketLink latency nanoseconds")
   private MutableRate lookupResolveBucketLatencyNs;
 
+
+  @Metric(about = "Overall getKeyInfo in nanoseconds")
+  private MutableRate getKeyInfoLatencyNs;
+
+  @Metric(about = "Read key info from db in getKeyInfo")
+  private MutableRate getKeyInfoReadKeyInfoLatencyNs;
+
+  @Metric(about = "Block token generation latency in getKeyInfo")
+  private MutableRate getKeyInfoGenerateBlockTokenLatencyNs;
+
+  @Metric(about = "Refresh location latency in getKeyInfo")
+  private MutableRate getKeyInfoRefreshLocationLatencyNs;
+
+  @Metric(about = "ACLs check in getKeyInfo")
+  private MutableRate getKeyInfoAclCheckLatencyNs;
+
+  @Metric(about = "resolveBucketLink latency in getKeyInfo")
+  private MutableRate getKeyInfoResolveBucketLatencyNs;
+
   @Metric(about = "s3VolumeInfo latency nanoseconds")
   private MutableRate s3VolumeContextLatencyNs;
 
@@ -66,27 +85,52 @@ public class OMPerformanceMetrics {
     lookupLatencyNs.add(latencyInNs);
   }
 
-  public void addLookupGenerateBlockTokenLatency(long latencyInNs) {
-    lookupGenerateBlockTokenLatencyNs.add(latencyInNs);
+  public MutableRate getLookupRefreshLocationLatencyNs() {
+    return lookupRefreshLocationLatencyNs;
   }
 
-  public void addLookupRefreshLocationLatency(long latencyInNs) {
-    lookupRefreshLocationLatencyNs.add(latencyInNs);
+
+  public MutableRate getLookupGenerateBlockTokenLatencyNs() {
+    return lookupGenerateBlockTokenLatencyNs;
   }
 
-  public void addLookupAclCheckLatency(long latencyInNs) {
-    lookupAclCheckLatencyNs.add(latencyInNs);
+  public MutableRate getLookupReadKeyInfoLatencyNs() {
+    return lookupReadKeyInfoLatencyNs;
   }
 
-  public void addLookupReadKeyInfoLatency(long latencyInNs) {
-    lookupReadKeyInfoLatencyNs.add(latencyInNs);
+  public MutableRate getLookupAclCheckLatencyNs() {
+    return lookupAclCheckLatencyNs;
   }
 
   public void addS3VolumeContextLatencyNs(long latencyInNs) {
     s3VolumeContextLatencyNs.add(latencyInNs);
   }
 
-  public void addLookupResolveBucketLatencyNs(long latencyInNs) {
-    lookupResolveBucketLatencyNs.add(latencyInNs);
+  public MutableRate getLookupResolveBucketLatencyNs() {
+    return lookupResolveBucketLatencyNs;
+  }
+
+  public void addGetKeyInfoLatencyNs(long value) {
+    getKeyInfoLatencyNs.add(value);
+  }
+
+  public MutableRate getGetKeyInfoAclCheckLatencyNs() {
+    return getKeyInfoAclCheckLatencyNs;
+  }
+
+  public MutableRate getGetKeyInfoGenerateBlockTokenLatencyNs() {
+    return getKeyInfoGenerateBlockTokenLatencyNs;
+  }
+
+  public MutableRate getGetKeyInfoReadKeyInfoLatencyNs() {
+    return getKeyInfoReadKeyInfoLatencyNs;
+  }
+
+  public MutableRate getGetKeyInfoRefreshLocationLatencyNs() {
+    return getKeyInfoRefreshLocationLatencyNs;
+  }
+
+  public MutableRate getGetKeyInfoResolveBucketLatencyNs() {
+    return getKeyInfoResolveBucketLatencyNs;
   }
 }
