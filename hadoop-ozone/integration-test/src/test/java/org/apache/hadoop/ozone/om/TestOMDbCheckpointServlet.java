@@ -282,7 +282,7 @@ public class TestOMDbCheckpointServlet {
   }
 
   @Test
-  public void testWriteArchiveToStream()
+  public void testWriteDbDataToStream()
       throws Exception {
     prepArchiveData();
 
@@ -339,9 +339,9 @@ public class TestOMDbCheckpointServlet {
           line.contains("CURRENT"));
       if (line.contains("dummyFile")) {
         dummyLinkFound = true;
-        Assert.assertTrue(checkDummyFile(shortSnapshotLocation,shortSnapshotLocation2, line));
+        checkDummyFile(shortSnapshotLocation,shortSnapshotLocation2, line);
       } else {
-        Assert.assertTrue(checkLine(shortSnapshotLocation, shortSnapshotLocation2, line));
+        checkLine(shortSnapshotLocation, shortSnapshotLocation2, line);
         if (line.startsWith(shortSnapshotLocation)) {
           finalSnapshotSet.add(line.split("\t")[0]);
         }
@@ -366,37 +366,38 @@ public class TestOMDbCheckpointServlet {
     return fileSet;
   }
 
-  private boolean checkDummyFile(String dir0, String dir1, String line) {
+  // tests to see that dummy entry in hardlink file looks something like:
+  //  "dir1/dummyFile  dir2/dummyFile"
+  private void checkDummyFile(String dir0, String dir1, String line) {
     String[] files = line.split("\t");
-    if (!files[0].startsWith(dir0) && !files[1].startsWith(dir0)) {
-      return false;
-    }
-    if (!files[0].startsWith(dir1) && !files[1].startsWith(dir1)) {
-      return false;
-    }
+    Assert.assertTrue("dummy entry contains first directory",
+        files[0].startsWith(dir0) || files[1].startsWith(dir0));
+    Assert.assertTrue("dummy entry contains second directory",
+        files[0].startsWith(dir1) || files[1].startsWith(dir1));
     Path path0 = Paths.get(files[0]);
     Path path1 = Paths.get(files[1]);
-    if (path0.getParent().equals(path1.getParent())) {
-      return false;
-    }
-    return path0.getFileName().equals(path1.getFileName());
+    Assert.assertNotEquals("dummy entry parent directories differ",
+        path0.getParent(), path1.getParent());
+    Assert.assertTrue("dummy entries contains dummyFile name",
+        path0.getFileName().toString().equals("dummyFile") &&
+        path1.getFileName().toString().equals("dummyFile"));
   }
-  private boolean checkLine(String shortSnapshotLocation,
+
+  // tests line in hard link file looks something like:
+  //  "dir1/x.sst x.sst"
+  private void checkLine(String shortSnapshotLocation,
                             String shortSnapshotLocation2,
                             String line) {
     String[] files = line.split("\t");
-    if (!files[0].startsWith(shortSnapshotLocation) &&
-        !files[0].startsWith(shortSnapshotLocation2)) {
-      return false;
-    }
+    Assert.assertTrue("hl entry starts with valid snapshot dir",
+        files[0].startsWith(shortSnapshotLocation) ||
+        files[0].startsWith(shortSnapshotLocation2));
 
-    String file0 = files[0].substring(shortSnapshotLocation.length());
+    String file0 = files[0].substring(shortSnapshotLocation.length() + 1);
     String file1 = files[1];
-    if (Paths.get(file0).getNameCount() > 1) {
-      return false;
-    }
-    return file0.equals("/" + file1);
+    Assert.assertEquals("hl filenames are the same", file0, file1);
   }
+
   private String createSnapshot(String vname, String bname)
       throws IOException, InterruptedException, TimeoutException {
     final OzoneManager om = cluster.getOzoneManager();
@@ -447,7 +448,5 @@ public class TestOMDbCheckpointServlet {
     dbCheckpoint = cluster.getOzoneManager()
         .getMetadataManager().getStore()
         .getCheckpoint(true);
-
-
   }
 }
