@@ -18,10 +18,8 @@ package org.apache.hadoop.hdds.scm.block;
 
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
-import org.apache.hadoop.hdfs.protocol.datatransfer.Op;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.LinkedList;
 import java.util.Map;
