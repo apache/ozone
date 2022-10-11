@@ -277,6 +277,7 @@ public final class OmUtils {
       // write to OM DB. And therefore it doesn't need a OMClientRequest.
       // Although indirectly the Ranger sync service task could invoke write
       // operation SetRangerServiceVersion.
+    case GetKeyInfo:
       return true;
     case CreateVolume:
     case SetVolumeProperty:

@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -65,8 +66,8 @@ public class ReconContainerManager extends ContainerManagerImpl {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconContainerManager.class);
-  private StorageContainerServiceProvider scmClient;
-  private PipelineManager pipelineManager;
+  private final StorageContainerServiceProvider scmClient;
+  private final PipelineManager pipelineManager;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
   private final ReconContainerMetadataManager cdbServiceProvider;
   private final Table<UUID, DatanodeDetails> nodeDB;
@@ -75,16 +76,6 @@ public class ReconContainerManager extends ContainerManagerImpl {
   // Pipeline -> # of open containers
   private final Map<PipelineID, Integer> pipelineToOpenContainer;
 
-  /**
-   * Constructs a mapping class that creates mapping between container names
-   * and pipelines.
-   * <p>
-   * passed to LevelDB and this memory is allocated in Native code space.
-   * CacheSize is specified
-   * in MB.
-   *
-   * @throws IOException on Failure.
-   */
   @SuppressWarnings("parameternumber")
   public ReconContainerManager(
       Configuration conf,
@@ -104,7 +95,6 @@ public class ReconContainerManager extends ContainerManagerImpl {
     this.pipelineManager = pipelineManager;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.cdbServiceProvider = reconContainerMetadataManager;
-    // batchHandler = scmDBStore
     this.nodeDB = ReconSCMDBDefinition.NODES.getTable(store);
     this.replicaHistoryMap = new ConcurrentHashMap<>();
     this.pipelineToOpenContainer = new ConcurrentHashMap<>();
@@ -120,7 +110,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
   public void checkAndAddNewContainer(ContainerID containerID,
       ContainerReplicaProto.State replicaState,
       DatanodeDetails datanodeDetails)
-      throws Exception {
+      throws IOException, TimeoutException, InvalidStateTransitionException {
     if (!containerExist(containerID)) {
       LOG.info("New container {} got from {}.", containerID,
           datanodeDetails.getHostName());
@@ -198,12 +188,12 @@ public class ReconContainerManager extends ContainerManagerImpl {
    *
    * @param containerID containerID to check
    * @param state  state to be compared
-   * @throws IOException
    */
 
   private void checkContainerStateAndUpdate(ContainerID containerID,
                                             ContainerReplicaProto.State state)
-      throws Exception {
+          throws IOException, InvalidStateTransitionException,
+          TimeoutException {
     ContainerInfo containerInfo = getContainer(containerID);
     if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)
         && !state.equals(ContainerReplicaProto.State.OPEN)
@@ -252,9 +242,8 @@ public class ReconContainerManager extends ContainerManagerImpl {
         } else {
           // Get open container for a pipeline that Recon does not know
           // about yet. Cannot update internal state until pipeline is synced.
-          LOG.warn(String.format(
-              "Pipeline %s not found. Cannot add container %s",
-              pipelineID, containerInfo.containerID()));
+          LOG.warn("Pipeline {} not found. Cannot add container {}",
+                  pipelineID, containerInfo.containerID());
         }
       } else {
         getContainerStateManager().addContainer(containerInfo.getProtobuf());

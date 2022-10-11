@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 
@@ -42,7 +42,7 @@ public class TestContainerScannerConfiguration {
 
   private OzoneConfiguration conf;
 
-  @Before
+  @BeforeEach
   public void setup() {
     this.conf = new OzoneConfiguration();
   }

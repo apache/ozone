@@ -196,7 +196,6 @@ public class TestFailureHandlingByClient {
         .setBucketName(bucketName)
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
 
@@ -339,7 +338,6 @@ public class TestFailureHandlingByClient {
         .setBucketName(bucketName)
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
 
@@ -401,7 +399,6 @@ public class TestFailureHandlingByClient {
         .setBucketName(bucketName)
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
 
@@ -466,7 +463,6 @@ public class TestFailureHandlingByClient {
         .setBucketName(bucketName)
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
 
@@ -530,7 +526,6 @@ public class TestFailureHandlingByClient {
         .setBucketName(bucketName)
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
 
