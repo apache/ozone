@@ -40,8 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
@@ -120,7 +119,7 @@ public final class OmSnapshotManager {
         = notification -> {
           try {
             // close snapshot's rocksdb on eviction
-            notification.getValue().close();
+            Objects.requireNonNull(notification.getValue()).close();
           } catch (IOException e) {
             LOG.error("Failed to close snapshot: {} {}",
                 notification.getKey(), e);

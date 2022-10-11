@@ -54,12 +54,11 @@ public class TestOMSnapshotCreateResponse {
   
   private OMMetadataManager omMetadataManager;
   private BatchOperation batchOperation;
-  private String fsPath;
   private OzoneConfiguration ozoneConfiguration;
   @Before
   public void setup() throws Exception {
     ozoneConfiguration = new OzoneConfiguration();
-    fsPath = folder.newFolder().getAbsolutePath();
+    String fsPath = folder.newFolder().getAbsolutePath();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         fsPath);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
