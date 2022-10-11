@@ -1242,7 +1242,6 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .setLatestVersionLocation(getLatestVersionLocation)
         .build();
@@ -1266,7 +1265,6 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .build();
 
@@ -1412,7 +1410,6 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .setLatestVersionLocation(getLatestVersionLocation)
         .build();
@@ -1644,7 +1641,6 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .setLatestVersionLocation(getLatestVersionLocation)
         .build();
@@ -1702,7 +1698,6 @@ public class RpcClient implements ClientProtocol {
             .setVolumeName(omKeyInfo.getVolumeName())
             .setBucketName(omKeyInfo.getBucketName())
             .setKeyName(omKeyInfo.getKeyName())
-            .setRefreshPipeline(true)
             .setSortDatanodesInPipeline(topologyAwareReadEnabled)
             .setLatestVersionLocation(getLatestVersionLocation)
             .build();
@@ -1747,7 +1742,6 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .setLatestVersionLocation(getLatestVersionLocation)
         .build();
