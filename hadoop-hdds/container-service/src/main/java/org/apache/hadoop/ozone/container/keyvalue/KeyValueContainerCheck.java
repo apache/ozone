@@ -247,7 +247,7 @@ public class KeyValueContainerCheck {
         // make sure reading the latest record. If the record is just removed,
         // the block should be skipped to scan.
         try {
-          scanBlock(db, block, throttler, canceler);
+          scanBlock(block, throttler, canceler);
         } catch (IOException ex) {
           if (getBlockDataFromDBWithLock(db, block) == null) {
             if (LOG.isDebugEnabled()) {
@@ -299,8 +299,8 @@ public class KeyValueContainerCheck {
     }
   }
 
-  private void scanBlock(DBHandle db, BlockData block,
-      DataTransferThrottler throttler, Canceler canceler) throws IOException {
+  private void scanBlock(BlockData block, DataTransferThrottler throttler,
+      Canceler canceler) throws IOException {
     ContainerLayoutVersion layout = onDiskContainerData.getLayoutVersion();
 
     for (ContainerProtos.ChunkInfo chunk : block.getChunks()) {
@@ -308,12 +308,10 @@ public class KeyValueContainerCheck {
           block.getBlockID(), ChunkInfo.getFromProtoBuf(chunk));
 
       if (!chunkFile.exists()) {
-        // concurrent mutation in Block DB? lookup the block again.
-        BlockData bdata = getBlockDataFromDB(db, block);
         // In EC, client may write empty putBlock in padding block nodes.
         // So, we need to make sure, chunk length > 0, before declaring
         // the missing chunk file.
-        if (bdata != null && bdata.getChunks().size() > 0 && bdata
+        if (block.getChunks().size() > 0 && block
             .getChunks().get(0).getLen() > 0) {
           throw new IOException(
               "Missing chunk file " + chunkFile.getAbsolutePath());
