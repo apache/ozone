@@ -426,7 +426,7 @@ public class TestOMDbCheckpointServlet {
         + OM_KEY_PREFIX;
     GenericTestUtils.waitFor(() -> new File(snapshotPath).exists(),
         100, 2000);
-    return snapshotDirName;
+    return snapshotPath;
   }
 
   private void prepArchiveData() throws Exception {
