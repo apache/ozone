@@ -58,7 +58,7 @@ Ozone Manager 和 Storage Container Manager 都支持 HA。在这种模式下，
  ```
 <property>
    <name>ozone.om.service.ids</name>
-   <value>cluster1,cluster2</value>
+   <value>cluster1</value>
 </property>
 ```
 
