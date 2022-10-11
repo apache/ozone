@@ -41,7 +41,8 @@ import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.FILE_DIR_SEPARATOR;
 
 @CommandLine.Command(name = "ockrw",
         aliases = "ozone-client-key-read-write-ops",
-        description = "Read and write keys with the help of the ozone clients.",
+        description = "Generate keys with a fixed name and ranges that can" 
+        + " be written and read as sub-ranges from multiple clients.",
         versionProvider = HddsVersionProvider.class,
         mixinStandardHelpOptions = true,
         showDefaultValues = true)
@@ -51,51 +52,54 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   @CommandLine.Option(names = {"-v", "--volume"},
           description = "Name of the volume which contains the test data. " +
                   "Will be created if missing.",
-          defaultValue = "vol1")
+          defaultValue = "ockrwvolume")
   private String volumeName;
 
   @CommandLine.Option(names = {"-b", "--bucket"},
           description = "Name of the bucket which contains the test data.",
-          defaultValue = "bucket1")
+          defaultValue = "ockrwbucket")
   private String bucketName;
 
   @CommandLine.Option(names = {"-m", "--read-metadata-only"},
-          description = "If only read key's metadata. " +
-                  "Supported values are Y, F.",
+          description = "If only read key's metadata.",
           defaultValue = "false")
   private boolean readMetadataOnly;
+
   @CommandLine.Option(names = {"-s", "--start-index"},
-          description = "Start index of keys of read/write operation.",
+          description = "Start index of keys of read/write operation." + 
+          "This can allow adding keys incrementally or parallel from multiple"
+          + " clients. Example: Write keys 0-1000000 followed by "
+          + "keys 1000001-2000000.",
           defaultValue = "0")
   private int startIndex;
 
   @CommandLine.Option(names = {"-r", "--range"},
-          description = "index range of read/write operations.",
-          defaultValue = "0")
+          description = "Range of read/write operations. This in co-ordination"
+          + " with --start-index can specify the range to read. "
+          + "Example: Read from --start-index 1000 and read --range 1000 keys.",
+          defaultValue = "1")
   private int range;
+
   @CommandLine.Option(names = {"--size"},
           description = "Object size (in bytes) " +
-                  "to be generated.",
+                  "to read/write. If user sets a read size which is larger"
+                  + " than the key size, it only reads bytes up to key size.",
           defaultValue = "1")
   private int objectSizeInBytes;
 
-  @CommandLine.Option(names = {"--keySorted"},
-          description = "Generated sorted key or not. The key name " +
-                  "will be generated via md5 hash if choose " +
-                  "to use unsorted key.",
+  @CommandLine.Option(names = {"--contiguous"},
+          description = "By default, the keys are randomized lexically" 
+          + " by calculating the md5 of the key name. If this option is set," 
+          + " the keys are written lexically contiguously.",
           defaultValue = "false")
   private boolean keySorted;
 
   @CommandLine.Option(names = {"--percentage-read"},
-          description = "Percentage of read tasks in mix workload.",
+          description = "Percentage of read tasks in mix workload."
+          + " The remainder of the percentage will writes to keys."
+          + " Example --percentage-read 90 will result in 10% writes.",
           defaultValue = "100")
   private int percentageRead;
-
-  @CommandLine.Option(names = {"--clients"},
-          description =
-                  "Number of clients, defaults 1.",
-          defaultValue = "1")
-  private int clientsCount = 1;
 
   @CommandLine.Option(
           names = "--om-service-id",
@@ -126,13 +130,13 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   public Void call() throws Exception {
     init();
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-    OzoneClient[] ozoneClients = new OzoneClient[clientsCount];
+    OzoneClient[] ozoneClients = new OzoneClient[threadNo];
     for (int i = 0; i < clientsCount; i++) {
       ozoneClients[i] = createOzoneClient(omServiceID, ozoneConfiguration);
     }
 
     ensureVolumeAndBucketExist(ozoneClients[0], volumeName, bucketName);
-    ozoneBuckets = new OzoneBucket[clientsCount];
+    ozoneBuckets = new OzoneBucket[threadNo];
     for (int i = 0; i < clientsCount; i++) {
       ozoneBuckets[i] = ozoneClients[i].getObjectStore().getVolume(volumeName)
               .getBucket(bucketName);
@@ -184,6 +188,7 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     });
   }
 
+  @SuppressWarnings({"unused"})
   public void processReadTasks(String keyName, OzoneBucket ozoneBucket)
           throws RuntimeException, IOException {
     if (readMetadataOnly) {
@@ -222,19 +227,22 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   }
 
   public String getKeyName(int clientIndex) {
-    int start, end;
+    // int start, end;
     // separate tasks evenly to each client
-    if (range < clientsCount) {
-      start = startIndex + clientIndex;
-      end = start;
-    } else {
-      start = startIndex + clientIndex * (range / clientsCount);
-      end = start + (range / clientsCount) - 1;
-    }
+    // if (range < clientsCount) {
+    //   start = startIndex + clientIndex;
+    //   end = start;
+    // } else {
+    //   start = startIndex + clientIndex * (range / clientsCount);
+    //   end = start + (range / clientsCount) - 1;
+    // }
 
     StringBuilder keyNameSb = new StringBuilder();
+    // int randomIdxWithinRange = ThreadLocalRandom.current().
+    //         nextInt(end + 1 - start) + start;
     int randomIdxWithinRange = ThreadLocalRandom.current().
-            nextInt(end + 1 - start) + start;
+            nextInt(startIndex, startIndex + range);
+
     if (keySorted) {
       keyNameSb.append(getPrefix()).append(FILE_DIR_SEPARATOR).
               append(randomIdxWithinRange);

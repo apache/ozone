@@ -37,6 +37,11 @@ import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.PURE_INDEX;
 import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.MD5;
 import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.FILE_DIR_SEPARATOR;
 
+// import com.fasterxml.jackson.databind.ObjectMapper;
+// import java.util.HashMap;
+// import java.util.Map;
+// import java.io.File;
+
 /**
  * Ozone range keys generator for performance test.
  */
@@ -54,12 +59,12 @@ public class RangeKeysGenerator extends BaseFreonGenerator
   @CommandLine.Option(names = {"-v", "--volume"},
           description = "Name of the volume which contains the test data. " +
                   "Will be created if missing.",
-          defaultValue = "vol1")
+          defaultValue = "ockrwvolume")
   private String volumeName;
 
   @CommandLine.Option(names = {"-b", "--bucket"},
           description = "Name of the bucket which contains the test data.",
-          defaultValue = "bucket1")
+          defaultValue = "ockrwbucket")
   private String bucketName;
 
   @CommandLine.Option(names = {"-r", "--range-each-client-write"},
@@ -164,13 +169,19 @@ public class RangeKeysGenerator extends BaseFreonGenerator
     OzoneBucket ozbk = client.getObjectStore().getVolume(volumeName)
             .getBucket(bucketName);
 
+// ObjectMapper mapper = new ObjectMapper();
+// Map<String, String> testMap = new HashMap<String, String>(); 
+
     String keyName;
     for (int i = start; i < end + 1; i++) {
       keyName = getPrefix() + FILE_DIR_SEPARATOR + f.apply(i);
+      testMap.put(String.valueOf(i), keyName);
       try (OzoneOutputStream out = ozbk.createKey(keyName, writeSizeInBytes)) {
         out.write(keyContent);
         out.flush();
       }
     }
+
+//     mapper.writeValue(new File("test.json"), testMap);
   }
 }

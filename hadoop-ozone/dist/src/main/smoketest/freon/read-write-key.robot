@@ -21,19 +21,45 @@ Test Timeout        5 minutes
 *** Variables ***
 ${PREFIX}    ${EMPTY}
 
+
 *** Test Cases ***
 Pre-generate 100 keys of size 1 byte each to Ozone
-    ${result} =        Execute          ozone freon ork -n 1 -t 10 -v voltest -b buckettest -p performanceTest
+    ${result} =        Execute          ozone freon ork -n 1 -t 10 -r 100 --size 1 -v voltest -b buckettest -p performanceTest
+
+
+
 
 Read 10 keys from pre-generated keys
-    ${result} =        Execute          ozone freon ockrw -n 10 -t 10 -r 100 -v voltest -b buckettest -p performanceTest
+    ${keysCount} =     10
+    ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 10 -r 100 -v voltest -b buckettest -p performanceTest
+                       Should contain   ${result}   Successful executions: ${keysCount}
+
+
+
 
 Read 10 keys' metadata from pre-generated keys
-    ${result} =        Execute          ozone freon ockrw -n 10 -t 10 -m -r 100 -v voltest -b buckettest -p performanceTest
+    ${keysCount} =     10
+    ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 10 -m -r 100 -v voltest -b buckettest -p performanceTest
+                       Should contain   ${result}   Successful executions: ${keysCount}
+
+
+
 
 Write 10 keys of size 1 byte each from key index 0 to 99
-    ${result} =        Execute          ozone freon ockrw -n 10 -t 10 --percentage-read -r 100 -v voltest -b buckettest -p performanceTest
+    ${keysCount} =     10
+    ${size}      =     1
+    ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 10 --percentage-read 0 --size ${size} -r 100 -v voltest -b buckettest -p performanceTest2
+                       Should contain   ${result}   Successful executions: ${keysCount}
+    ${keyName} =       c4ca423
+    ${result} =        Execute          ozone sh key info /voltest/buckettest/performanceTest2/${keyName}
+                       Should contain   "dataSize" : 1
 
-Run 90 % of read-key tasks and 10 % of write-key tasks from pre-generated keys
-    ${result} =        Execute          ozone freon ockrw -n 10 -t 10 --percentage-read 90 -r 100 -v voltest -b buckettest -p performanceTest
+
+
+
+
+Run 90 % of read-key tasks and 10 % of write-key tasks for 10 keys from pre-generated keys
+    ${keysCount} =     10
+    ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 10 --percentage-read 90 -r 100 -v voltest -b buckettest -p performanceTest
+                       Should contain   ${result}   Successful executions: ${keysCount}
 
