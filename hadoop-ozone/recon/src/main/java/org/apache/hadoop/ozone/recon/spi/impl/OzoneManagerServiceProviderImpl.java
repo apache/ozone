@@ -253,7 +253,7 @@ public class OzoneManagerServiceProviderImpl
     LOG.info("Before the new scheduleWithFixedDelay");
     scheduler.scheduleWithFixedDelay(() -> {
       try {
-        if(!isSyncDataFromOMRunning) {
+        if (!isSyncDataFromOMRunning) {
           syncDataFromOM();
         }
       } catch (Throwable t) {

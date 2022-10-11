@@ -19,14 +19,16 @@ public class OMSyncEndpoint {
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;
 
   @Inject
-  public OMSyncEndpoint(OzoneManagerServiceProvider ozoneManagerServiceProvider) {
+  public OMSyncEndpoint(
+      OzoneManagerServiceProvider ozoneManagerServiceProvider) {
     this.ozoneManagerServiceProvider = ozoneManagerServiceProvider;
   }
 
   @GET
   @Path("trigger")
   public Response triggerOMSync() {
-    boolean isSuccess = ozoneManagerServiceProvider.triggerSyncDataFromOMImmediately();
+    boolean isSuccess
+        = ozoneManagerServiceProvider.triggerSyncDataFromOMImmediately();
     return Response.ok(isSuccess).build();
   }
 }
