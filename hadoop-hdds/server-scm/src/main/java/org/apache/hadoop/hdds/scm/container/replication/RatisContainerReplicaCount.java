@@ -325,7 +325,8 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
 
   /**
    * How many more replicas can be lost before the container is
-   * unreadable. For containers which are under-replicated due to decommission
+   * unreadable, assuming any infligh deletes will complete. For containers
+   * which are under-replicated due to decommission
    * or maintenance only, the remaining redundancy will include those
    * decommissioning or maintenance replicas, as they are technically still
    * available until the datanode processes are stopped.
