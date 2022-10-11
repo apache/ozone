@@ -139,13 +139,38 @@ public class TestRatisReplicationCheckHandler {
   }
 
   @Test
+  public void testUnderReplicatedContainerDueToPendingDelete() {
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), 0, 0, 0);
+    List<ContainerReplicaOp> pending = new ArrayList<>();
+    pending.add(ContainerReplicaOp.create(
+        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 0));
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container)
+        .setPendingOps(pending);
+    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
+        healthCheck.checkHealth(requestBuilder.build());
+    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    Assert.assertEquals(1, result.getRemainingRedundancy());
+    Assert.assertFalse(result.isSufficientlyReplicatedAfterPending());
+    Assert.assertFalse(result.underReplicatedDueToDecommission());
+
+    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+  }
+
+  @Test
   public void testUnderReplicatedContainerFixedWithPending() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), 0, 0);
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(ContainerReplicaOp.create(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 3));
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0));
     requestBuilder.setContainerReplicas(replicas)
         .setPendingOps(pending)
         .setContainerInfo(container);
@@ -196,7 +221,7 @@ public class TestRatisReplicationCheckHandler {
         Pair.of(DECOMMISSIONED, 0));
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(ContainerReplicaOp.create(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 1));
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0));
 
     requestBuilder.setContainerReplicas(replicas)
         .setPendingOps(pending)

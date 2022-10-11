@@ -470,10 +470,23 @@ class TestRatisContainerReplicaCount {
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     assertFalse(rcnt.isSufficientlyReplicated(true));
+    assertFalse(rcnt.isSufficientlyReplicated(false));
+
     rcnt =
         new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
     assertTrue(rcnt.isSufficientlyReplicated(true));
     assertFalse(rcnt.isSufficientlyReplicated(false));
+
+    replica = registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE);
+    rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 1, 3, 2);
+    assertFalse(rcnt.isSufficientlyReplicated(false));
+    assertFalse(rcnt.isSufficientlyReplicated(true));
+    rcnt =
+        new RatisContainerReplicaCount(container, replica, 1, 1, 3, 2);
+    assertFalse(rcnt.isSufficientlyReplicated(false));
+    assertTrue(rcnt.isSufficientlyReplicated(true));
+
   }
 
   private void validate(RatisContainerReplicaCount rcnt,

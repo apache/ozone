@@ -96,6 +96,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
       }
       return true;
     }
+
     if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
       report.incrementAndSample(
@@ -136,7 +137,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
             pendingDelete, requiredNodes, minReplicasForMaintenance);
 
     ContainerPlacementStatus placementStatus =
-        getPlacementStatus(replicas, requiredNodes, Collections.EMPTY_LIST);
+        getPlacementStatus(replicas, requiredNodes, Collections.emptyList());
 
     ContainerPlacementStatus placementStatusWithPending = placementStatus;
     if (replicaPendingOps.size() > 0) {
@@ -150,7 +151,8 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
       ContainerHealthResult.UnderReplicatedHealthResult result =
           new ContainerHealthResult.UnderReplicatedHealthResult(
           container, replicaCount.getRemainingRedundancy(),
-          isPolicySatisfied && replicas.size() >= requiredNodes,
+          isPolicySatisfied
+              && replicas.size() - pendingDelete >= requiredNodes,
           replicaCount.isSufficientlyReplicated(true),
           replicaCount.isUnrecoverable());
       result.setMisReplicated(!isPolicySatisfied)
@@ -188,7 +190,8 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
     for (ContainerReplicaOp op : pendingOps) {
       if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
         replicaDns.add(op.getTarget());
-      } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+      }
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
         replicaDns.remove(op.getTarget());
       }
     }
