@@ -47,6 +47,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -79,7 +80,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
-  private static final int MAX_SECONDS_TO_WAIT = 10;
+  private static final String DURATION_TO_WAIT_FOR_DIRECTORY = "PT10S";
 
   public static final String OM_HARDLINK_FILE = "hardLinkFile";
 
@@ -164,15 +165,19 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   private void waitForDirToExist(Path dir)
       throws IOException, InterruptedException {
-    int count = 0;
-    while (!dir.toFile().exists() && count < MAX_SECONDS_TO_WAIT) {
-      Thread.sleep(1000);
-      count++;
+    long endTime = System.currentTimeMillis() +
+        Duration.parse(DURATION_TO_WAIT_FOR_DIRECTORY).toMillis();
+    while (!dir.toFile().exists()) {
+      Thread.sleep(100);
+      if (System.currentTimeMillis() > endTime) {
+        break;
+      }
     }
-    if (count == MAX_SECONDS_TO_WAIT) {
+    if (System.currentTimeMillis() > endTime) {
       throw new IOException("snapshot dir doesn't exist: " + dir);
     }
   }
+
   private void processDir(Path dir, Map<Object,Path> copyFiles,
                           Map<Path, Path> hardLinkFiles)
       throws IOException, InterruptedException {
@@ -253,7 +258,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private Path createHardLinkList(int truncateLength,
                                   Map<Path, Path> hardLinkFiles)
       throws IOException {
-    Path data = Files.createTempFile("hardLinkData", "txt");
+    Path data = Files.createTempFile("data", "txt");
     StringBuilder sb = new StringBuilder();
     for (Map.Entry<Path, Path> entry : hardLinkFiles.entrySet()) {
       String fixedFile = fixFileName(truncateLength, entry.getValue());
