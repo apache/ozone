@@ -93,7 +93,7 @@ public class BasicOzoneFileSystem extends FileSystem {
   static final Logger LOG =
       LoggerFactory.getLogger(BasicOzoneFileSystem.class);
 
-  private static int listingPageSize =
+  private int listingPageSize =
       OZONE_CLIENT_FS_LISTING_PAGE_SIZE_DEFAULT;
 
   /**
