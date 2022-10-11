@@ -61,9 +61,7 @@ import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
@@ -85,7 +83,7 @@ public class TestOmSnapshot {
   private static BucketLayout bucketLayout = BucketLayout.LEGACY;
   private static boolean enabledFileSystemPaths;
   private static ObjectStore store;
-  private static File metaDir;
+  private static OzoneConfiguration conf;
   private static OzoneManager ozoneManager;
 
   @Rule
@@ -126,7 +124,7 @@ public class TestOmSnapshot {
    *
    */
   private void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
     String clusterId = UUID.randomUUID().toString();
     String scmId = UUID.randomUUID().toString();
     String omId = UUID.randomUUID().toString();
@@ -152,7 +150,6 @@ public class TestOmSnapshot {
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-    metaDir = OMStorage.getOmDbDir(conf);
 
   }
 
@@ -440,9 +437,7 @@ public class TestOmSnapshot {
     SnapshotInfo snapshotInfo = ozoneManager
         .getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(vname, bname, snapshotName));
-    String snapshotDirName = metaDir + OM_KEY_PREFIX +
-        OM_SNAPSHOT_DIR + OM_KEY_PREFIX + OM_DB_NAME +
-        snapshotInfo.getCheckpointDirName() + OM_KEY_PREFIX + "CURRENT";
+    String snapshotDirName = getSnapshotPath(conf, snapshotInfo);
     GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
         1000, 120000);
 

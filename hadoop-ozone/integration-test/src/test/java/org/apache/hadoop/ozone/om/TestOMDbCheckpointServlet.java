@@ -79,6 +79,7 @@ import org.mockito.Matchers;
 
 import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.fixFileName;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
@@ -409,9 +410,8 @@ public class TestOMDbCheckpointServlet {
     SnapshotInfo snapshotInfo = om
         .getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(vname, bname, snapshotName));
-    String snapshotDirName = metaDir + OM_KEY_PREFIX +
-        OM_SNAPSHOT_DIR + OM_KEY_PREFIX + OM_DB_NAME +
-        snapshotInfo.getCheckpointDirName() + OM_KEY_PREFIX;
+    String snapshotDirName = getSnapshotPath(conf, snapshotInfo)
+        + OM_KEY_PREFIX;
     GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
         100, 2000);
     return snapshotDirName;

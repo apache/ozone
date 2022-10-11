@@ -61,6 +61,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 
 /**
  * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
@@ -154,9 +155,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       // add each entries directory to the list
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> entry = iterator.next();
-        Path path = Paths.get(OMStorage.getOmDbDir(conf) +
-            OM_KEY_PREFIX + OM_SNAPSHOT_DIR + OM_KEY_PREFIX +
-            OM_DB_NAME + entry.getValue().getCheckpointDirName());
+        Path path = Paths.get(getSnapshotPath(conf, entry.getValue()));
         list.add(path);
       }
     }
