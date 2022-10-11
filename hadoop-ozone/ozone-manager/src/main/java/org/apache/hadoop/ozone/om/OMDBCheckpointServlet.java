@@ -58,9 +58,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 
 /**
@@ -124,7 +121,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     Path dir = checkpoint.getCheckpointLocation();
 
     try (Stream<Path> files = Files.list(dir)) {
-      for(Path file : files.collect(Collectors.toList())) {
+      for (Path file : files.collect(Collectors.toList())) {
         // get the inode
         Object key = Files.readAttributes(
             file, BasicFileAttributes.class).fileKey();
@@ -148,7 +145,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     OmMetadataManagerImpl checkpointMetadataManager =
         OmMetadataManagerImpl.createCheckpointMetadataManager(
             conf, checkpoint);
-    try(TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
         iterator = checkpointMetadataManager
         .getSnapshotInfoTable().iterator()) {
 
@@ -177,12 +174,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
   }
 
-  private void processDir(Path dir, Map<Object,Path> copyFiles,
+  private void processDir(Path dir, Map<Object, Path> copyFiles,
                           Map<Path, Path> hardLinkFiles)
       throws IOException, InterruptedException {
     waitForDirToExist(dir);
     try (Stream<Path> files = Files.list(dir)) {
-      for(Path file : files.collect(Collectors.toList())) {
+      for (Path file : files.collect(Collectors.toList())) {
         // get the inode
         Object key = Files.readAttributes(
             file, BasicFileAttributes.class).fileKey();
@@ -198,7 +195,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   @Override
-  public void writeDbDataToStream(DBCheckpoint checkpoint, OutputStream destination)
+  public void writeDbDataToStream(DBCheckpoint checkpoint,
+    OutputStream destination)
       throws IOException, InterruptedException, CompressorException {
     // Map of inodes to path
     HashMap<Object, Path> copyFiles = new HashMap<>();

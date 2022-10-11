@@ -94,7 +94,7 @@ public class TestOmSnapshotFileSystem {
   private static OzoneManagerProtocol writeClient;
   private static BucketLayout bucketLayout;
   private static boolean enabledFileSystemPaths;
-    private static OzoneManager ozoneManager;
+  private static OzoneManager ozoneManager;
   private static String keyPrefix;
 
   private static final Logger LOG =

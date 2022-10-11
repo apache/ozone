@@ -65,7 +65,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 
 
 import org.apache.ozone.test.GenericTestUtils;
-import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Assert;
 
@@ -286,9 +285,10 @@ public class TestOMDbCheckpointServlet {
       throws Exception {
     prepArchiveData();
 
-    FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
-    omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint,
-        fileOutputStream);
+    try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
+        omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint,
+            fileOutputStream);
+    }
 
     // Untar the file into a temp folder to be examined
     String testDirName = folder.newFolder().getAbsolutePath();
@@ -329,17 +329,18 @@ public class TestOMDbCheckpointServlet {
     Set<String> finalSnapshotSet =
         getFiles(finalSnapshotLocation, testDirLength);
     Assert.assertTrue("snapshot manifest found",
-        finalSnapshotSet.stream().anyMatch(s->s.contains("MANIFEST")));
+        finalSnapshotSet.stream().anyMatch(s -> s.contains("MANIFEST")));
 
     // check each line in the hard link file
-    Stream<String> lines = Files.lines(Paths.get(testDirName, OM_HARDLINK_FILE));
+    Stream<String> lines = Files.lines(Paths.get(testDirName,
+        OM_HARDLINK_FILE));
     boolean dummyLinkFound = false;
     for (String line: lines.collect(Collectors.toList())) {
       Assert.assertFalse("CURRENT file is not a hard link",
           line.contains("CURRENT"));
       if (line.contains("dummyFile")) {
         dummyLinkFound = true;
-        checkDummyFile(shortSnapshotLocation,shortSnapshotLocation2, line,
+        checkDummyFile(shortSnapshotLocation, shortSnapshotLocation2, line,
             testDirName);
       } else {
         checkLine(shortSnapshotLocation, shortSnapshotLocation2, line);
@@ -353,14 +354,15 @@ public class TestOMDbCheckpointServlet {
         initialSnapshotSet, finalSnapshotSet);
   }
 
-  @NotNull
   private Set<String> getFiles(Path path, int truncateLength)
       throws IOException {
     Set<String> fileSet = new HashSet<>();
     try (Stream<Path> files = Files.list(path)) {
       for (Path file : files.collect(Collectors.toList())) {
-        if (!file.getFileName().toString().equals("dummyFile")) {
+        if (file != null) {
+          if (!file.getFileName().toString().equals("dummyFile")) {
             fileSet.add(fixFileName(truncateLength, file));
+          }
         }
       }
     }
@@ -420,9 +422,9 @@ public class TestOMDbCheckpointServlet {
     SnapshotInfo snapshotInfo = om
         .getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(vname, bname, snapshotName));
-    String snapshotDirName = getSnapshotPath(conf, snapshotInfo)
+    String snapshotPath = getSnapshotPath(conf, snapshotInfo)
         + OM_KEY_PREFIX;
-    GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
+    GenericTestUtils.waitFor(() -> new File(snapshotPath).exists(),
         100, 2000);
     return snapshotDirName;
   }
