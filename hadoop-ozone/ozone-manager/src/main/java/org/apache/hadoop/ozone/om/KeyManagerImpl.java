@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -128,6 +129,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.util.Time.monotonicNow;
@@ -321,10 +323,36 @@ public class KeyManagerImpl implements KeyManager {
   public OmKeyInfo lookupKey(OmKeyArgs args, String clientAddress)
       throws IOException {
     Preconditions.checkNotNull(args);
+
+    OmKeyInfo value = captureLatencyNs(metrics.getLookupReadKeyInfoLatencyNs(),
+        () -> readKeyInfo(args));
+
+    // If operation is head, do not perform any additional steps based on flags.
+    // As head operation does not need any of those details.
+    if (!args.isHeadOp()) {
+
+      // add block token for read.
+      captureLatencyNs(metrics.getLookupGenerateBlockTokenLatencyNs(),
+          () -> addBlockToken4Read(value));
+
+      // Refresh container pipeline info from SCM
+      // based on OmKeyArgs.refreshPipeline flag
+      // value won't be null as the check is done inside try/catch block.
+      captureLatencyNs(metrics.getLookupRefreshLocationLatencyNs(),
+          () -> refresh(value));
+
+      if (args.getSortDatanodes()) {
+        sortDatanodes(clientAddress, value);
+      }
+    }
+
+    return value;
+  }
+
+  private OmKeyInfo readKeyInfo(OmKeyArgs args) throws IOException {
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
-    long start = Time.monotonicNowNanos();
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
 
@@ -355,44 +383,17 @@ public class KeyManagerImpl implements KeyManager {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
-    metrics.addLookupReadKeyInfoLatency(Time.monotonicNowNanos() - start);
 
     if (value == null) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("volume:{} bucket:{} Key:{} not found", volumeName,
-                bucketName, keyName);
+            bucketName, keyName);
       }
       throw new OMException("Key:" + keyName + " not found", KEY_NOT_FOUND);
     }
-
-
     if (args.getLatestVersionLocation()) {
       slimLocationVersion(value);
     }
-
-    // If operation is head, do not perform any additional steps based on flags.
-    // As head operation does not need any of those details.
-    if (!args.isHeadOp()) {
-
-      // add block token for read.
-      start = Time.monotonicNowNanos();
-      addBlockToken4Read(value);
-      metrics.addLookupGenerateBlockTokenLatency(
-          Time.monotonicNowNanos() - start);
-
-      // Refresh container pipeline info from SCM
-      // based on OmKeyArgs.refreshPipeline flag
-      // value won't be null as the check is done inside try/catch block.
-      start = Time.monotonicNowNanos();
-      refresh(value);
-      metrics.addLookupRefreshLocationLatency(Time.monotonicNowNanos() - start);
-
-      if (args.getSortDatanodes()) {
-        sortDatanodes(clientAddress, value);
-      }
-
-    }
-
     return value;
   }
 
@@ -1931,5 +1932,60 @@ public class KeyManagerImpl implements KeyManager {
       return buckInfo.getBucketLayout().isFileSystemOptimized();
     }
     return false;
+  }
+
+  @Override
+  public OmKeyInfo getKeyInfo(OmKeyArgs args, String clientAddress)
+      throws IOException {
+    Preconditions.checkNotNull(args);
+
+    OmKeyInfo value = captureLatencyNs(
+        metrics.getGetKeyInfoReadKeyInfoLatencyNs(),
+        () -> readKeyInfo(args));
+
+    // If operation is head, do not perform any additional steps based on flags.
+    // As head operation does not need any of those details.
+    if (!args.isHeadOp()) {
+
+      // add block token for read.
+      captureLatencyNs(metrics.getGetKeyInfoGenerateBlockTokenLatencyNs(),
+          () -> addBlockToken4Read(value));
+
+      // get container pipeline info from cache.
+      captureLatencyNs(metrics.getGetKeyInfoRefreshLocationLatencyNs(),
+          () -> refreshPipelineFromCache(value,
+              args.isForceUpdateContainerCacheFromSCM()));
+
+      if (args.getSortDatanodes()) {
+        sortDatanodes(clientAddress, value);
+      }
+    }
+    return value;
+  }
+
+  protected void refreshPipelineFromCache(OmKeyInfo keyInfo,
+                                          boolean forceRefresh)
+      throws IOException {
+    Set<Long> containerIds = keyInfo.getKeyLocationVersions().stream()
+        .flatMap(v -> v.getLocationList().stream())
+        .map(BlockLocationInfo::getContainerID)
+        .collect(Collectors.toSet());
+
+    Map<Long, Pipeline> containerLocations =
+        scmClient.getContainerLocations(containerIds, forceRefresh);
+
+    for (OmKeyLocationInfoGroup key : keyInfo.getKeyLocationVersions()) {
+      for (List<OmKeyLocationInfo> omKeyLocationInfoList :
+          key.getLocationLists()) {
+        for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoList) {
+          Pipeline pipeline = containerLocations.get(
+              omKeyLocationInfo.getContainerID());
+          if (pipeline != null &&
+              !pipeline.equals(omKeyLocationInfo.getPipeline())) {
+            omKeyLocationInfo.setPipeline(pipeline);
+          }
+        }
+      }
+    }
   }
 }
