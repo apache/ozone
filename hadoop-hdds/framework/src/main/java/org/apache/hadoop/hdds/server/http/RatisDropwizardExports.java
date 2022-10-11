@@ -54,13 +54,6 @@ public class RatisDropwizardExports extends DropwizardExports {
         r2 -> deregisterDropwizard(r2, ratisMetricsMap));
   }
 
-  public static void clear(Map<String, RatisDropwizardExports>
-                               ratisMetricsMap) {
-    MetricRegistries.global().clear();
-    CollectorRegistry.defaultRegistry.clear();
-    ratisMetricsMap.clear();
-  }
-
   private static void registerDropwizard(RatisMetricRegistry registry,
       Map<String, RatisDropwizardExports> ratisMetricsMap) {
     RatisDropwizardExports rde = new RatisDropwizardExports(
