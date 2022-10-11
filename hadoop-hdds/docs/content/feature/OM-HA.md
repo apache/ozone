@@ -56,7 +56,7 @@ This logical name is called `serviceId` and can be configured in the `ozone-site
  ```
 <property>
    <name>ozone.om.service.ids</name>
-   <value>cluster1,cluster2</value>
+   <value>cluster1</value>
 </property>
 ```
 
