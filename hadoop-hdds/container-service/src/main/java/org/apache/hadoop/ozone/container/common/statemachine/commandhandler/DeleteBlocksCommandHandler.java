@@ -112,11 +112,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           SCMCommandProto.Type.deleteBlocksCommand, command.getType());
       return;
     }
-    if (shouldRequeue(command, context, container)) {
-      context.requeueCommand(command);
-      return;
-    }
-
     try {
       DeleteCmdInfo cmd = new DeleteCmdInfo((DeleteBlocksCommand) command,
           container, context, connectionManager);
@@ -286,6 +281,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       List<Future> futures = new ArrayList<>();
       for (int i = 0; i < containerBlocks.size(); i++) {
         DeletedBlocksTransaction tx = containerBlocks.get(i);
+        // Container is being balanced, ignore this transaction
+        if (shouldAbandon(tx.getContainerID(), cmd.getContainer())) {
+          continue;
+        }
         Future future = executor.submit(
             new ProcessTransactionTask(tx, resultBuilder));
         futures.add(future);
@@ -550,18 +549,11 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         throws IOException;
   }
 
-  private boolean shouldRequeue(SCMCommand cmd, StateContext stateContext,
+  private boolean shouldAbandon(long containerId,
       OzoneContainer ozoneContainer) {
-    // If exceeds retry limit, no need to retry then.
-    if (cmd.getRetryCount() >= stateContext.getRequeueRetryLimit()) {
-      return false;
-    }
-    for (DeletedBlocksTransaction tx:
-        ((DeleteBlocksCommand) cmd).blocksTobeDeleted()) {
-      if (ozoneContainer.getDiskBalancerService()
-          .isBalancingContainer(tx.getContainerID())) {
-        return true;
-      }
+    if (ozoneContainer.getDiskBalancerService()
+        .isBalancingContainer(containerId)) {
+      return true;
     }
     return false;
   }

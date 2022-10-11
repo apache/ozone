@@ -42,6 +42,13 @@ public final class DiskBalancerConfiguration {
   public static final String HDDS_DATANODE_DISK_BALANCER_INFO_DIR =
       "hdds.datanode.disk.balancer.info.dir";
 
+  public static final String HDDS_DATANODE_DISK_BALANCER_VOLUME_CHOOSING_POLICY
+      = "hdds.datanode.disk.balancer.volume.choosing.policy";
+
+  public static final String
+      HDDS_DATANODE_DISK_BALANCER_CONTAINER_CHOOSING_POLICY =
+      "hdds.datanode.disk.balancer.container.choosing.policy";
+
   @Config(key = "volume.density.threshold", type = ConfigType.DOUBLE,
       defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
       description = "Threshold is a percentage in the range of 0 to 100. A " +

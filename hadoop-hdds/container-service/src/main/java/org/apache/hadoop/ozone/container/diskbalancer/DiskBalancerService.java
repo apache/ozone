@@ -54,7 +54,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -62,7 +61,9 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration.HDDS_DATANODE_DISK_BALANCER_CONTAINER_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration.HDDS_DATANODE_DISK_BALANCER_INFO_DIR;
+import static org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration.HDDS_DATANODE_DISK_BALANCER_VOLUME_CHOOSING_POLICY;
 
 
 /**
@@ -93,6 +94,8 @@ public class DiskBalancerService extends BackgroundService {
   private Map<HddsVolume, Long> deltaSizes;
   private MutableVolumeSet volumeSet;
 
+  private DiskBalancerVolumeChoosingPolicy volumeChoosingPolicy;
+  private DiskBalancerContainerChoosingPolicy containerChoosingPolicy;
   private final File diskBalancerInfoFile;
 
   private DiskBalancerServiceMetrics metrics;
@@ -114,6 +117,18 @@ public class DiskBalancerService extends BackgroundService {
     deltaSizes = new ConcurrentHashMap<>();
     volumeSet = ozoneContainer.getVolumeSet();
 
+    try {
+      volumeChoosingPolicy = conf.getClass(
+          HDDS_DATANODE_DISK_BALANCER_VOLUME_CHOOSING_POLICY,
+          SimpleDiskBalancerVolumeChoosingPolicy.class,
+          DiskBalancerVolumeChoosingPolicy.class).newInstance();
+      containerChoosingPolicy = conf.getClass(
+          HDDS_DATANODE_DISK_BALANCER_CONTAINER_CHOOSING_POLICY,
+          SimpleDiskBalancerContainerChoosingPolicy.class,
+          DiskBalancerContainerChoosingPolicy.class).newInstance();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
     metrics = DiskBalancerServiceMetrics.create();
 
     loadDiskBalancerInfo();
@@ -308,27 +323,22 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     for (int i = 0; i < availableTaskCount; i++) {
-      Pair<HddsVolume, HddsVolume> pair =
-          DiskBalancerUtils.getVolumePair(volumeSet, threshold, deltaSizes);
+      Pair<HddsVolume, HddsVolume> pair = volumeChoosingPolicy
+          .chooseVolume(volumeSet, threshold, deltaSizes);
       if (pair == null) {
         continue;
       }
       HddsVolume sourceVolume = pair.getLeft(), destVolume = pair.getRight();
-      Iterator<Container<?>> itr = ozoneContainer.getController()
-          .getContainers(sourceVolume);
-      while (itr.hasNext()) {
-        ContainerData containerData = itr.next().getContainerData();
-        if (!inProgressContainers.contains(
-            containerData.getContainerID()) && containerData.isClosed()) {
-          queue.add(new DiskBalancerTask(containerData, sourceVolume,
-              destVolume));
-          inProgressContainers.add(containerData.getContainerID());
-          deltaSizes.put(sourceVolume, deltaSizes.getOrDefault(sourceVolume, 0L)
-              - containerData.getBytesUsed());
-          deltaSizes.put(destVolume, deltaSizes.getOrDefault(destVolume, 0L)
-              + containerData.getBytesUsed());
-          break;
-        }
+      ContainerData toBalanceContainer = containerChoosingPolicy
+          .chooseContainer(ozoneContainer, sourceVolume, inProgressContainers);
+      if (toBalanceContainer != null) {
+        queue.add(new DiskBalancerTask(toBalanceContainer, sourceVolume,
+            destVolume));
+        inProgressContainers.add(toBalanceContainer.getContainerID());
+        deltaSizes.put(sourceVolume, deltaSizes.getOrDefault(sourceVolume, 0L)
+            - toBalanceContainer.getBytesUsed());
+        deltaSizes.put(destVolume, deltaSizes.getOrDefault(destVolume, 0L)
+            + toBalanceContainer.getBytesUsed());
       }
     }
     if (queue.isEmpty()) {

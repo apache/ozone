@@ -352,22 +352,6 @@ public class DatanodeConfiguration {
     this.diskBalancerTimeout = duration.toMillis();
   }
 
-  @Config(key = "command.requeue.retry.limit",
-      defaultValue = "100",
-      type = ConfigType.LONG,
-      tags = { DATANODE},
-      description = "The retrying limit for requeue commands."
-  )
-  private long commandRequeueRetryLimit = 100;
-
-  public long getCommandRequeueRetryLimit() {
-    return commandRequeueRetryLimit;
-  }
-
-  public void setCommandRequeueRetryLimit(long limit) {
-    this.commandRequeueRetryLimit = limit;
-  }
-
   @PostConstruct
   public void validate() {
     if (containerDeleteThreads < 1) {

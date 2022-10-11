@@ -136,8 +136,6 @@ public class StateContext {
   // ReportType -> Report.
   private final Map<String, AtomicReference<Message>> type2Reports;
 
-  private final long requeueRetryLimit;
-
   /**
    * term of latest leader SCM, extract from SCMCommand.
    *
@@ -190,8 +188,6 @@ public class StateContext {
     fullReportTypeList = new ArrayList<>();
     type2Reports = new HashMap<>();
     initReportTypeCollection();
-    requeueRetryLimit = conf.getObject(DatanodeConfiguration.class)
-        .getCommandRequeueRetryLimit();
   }
 
   /**
@@ -937,22 +933,4 @@ public class StateContext {
     return reconHeartbeatFrequency.get();
   }
 
-  /**
-   * Re-add a command to the State Machine queue.
-   *
-   * @param command - SCMCommand.
-   */
-  public void requeueCommand(SCMCommand command) {
-    lock.lock();
-    try {
-      command.incRetryCount();
-      commandQueue.add(command);
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  public long getRequeueRetryLimit() {
-    return requeueRetryLimit;
-  }
 }
