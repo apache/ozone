@@ -58,7 +58,6 @@ import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
@@ -340,7 +339,8 @@ public class TestOMDbCheckpointServlet {
           line.contains("CURRENT"));
       if (line.contains("dummyFile")) {
         dummyLinkFound = true;
-        checkDummyFile(shortSnapshotLocation,shortSnapshotLocation2, line);
+        checkDummyFile(shortSnapshotLocation,shortSnapshotLocation2, line,
+            testDirName);
       } else {
         checkLine(shortSnapshotLocation, shortSnapshotLocation2, line);
         if (line.startsWith(shortSnapshotLocation)) {
@@ -369,7 +369,8 @@ public class TestOMDbCheckpointServlet {
 
   // tests to see that dummy entry in hardlink file looks something like:
   //  "dir1/dummyFile  dir2/dummyFile"
-  private void checkDummyFile(String dir0, String dir1, String line) {
+  private void checkDummyFile(String dir0, String dir1, String line,
+                              String testDirName) {
     String[] files = line.split("\t");
     Assert.assertTrue("dummy entry contains first directory",
         files[0].startsWith(dir0) || files[1].startsWith(dir0));
@@ -382,6 +383,15 @@ public class TestOMDbCheckpointServlet {
     Assert.assertTrue("dummy entries contains dummyFile name",
         path0.getFileName().toString().equals("dummyFile") &&
         path1.getFileName().toString().equals("dummyFile"));
+    int dummyFileCount = 0;
+    if (Paths.get(testDirName, dir0, "dummyFile").toFile().exists()) {
+      dummyFileCount++;
+    }
+    if (Paths.get(testDirName, dir1, "dummyFile").toFile().exists()) {
+      dummyFileCount++;
+    }
+    Assert.assertEquals("exactly one dummy file exists in the output dir",
+        dummyFileCount, 1);
   }
 
   // tests line in hard link file looks something like:
