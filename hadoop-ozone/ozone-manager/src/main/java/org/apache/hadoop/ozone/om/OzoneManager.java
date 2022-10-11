@@ -1352,7 +1352,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           if (ratisGroupDir.isDirectory()) {
             if (!ratisGroupDir.getName().equals(groupIDfromServiceID)) {
               LOG.warn("Another ratis dir is detected "
-                  + "(possible SCM collocation)."
+                  + "(possible SCM collocation)." + ratisGroupDir.getName()
                   + " It's better not to share ratis log dir "
                   + "in the production environment.");
             }
