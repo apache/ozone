@@ -123,7 +123,7 @@ enum Type {
   SetRangerServiceVersion = 107;
   RangerBGSync = 109;
   CreateSnapshot = 110;
-  ListSnapshot = 112;
+  ListSnapshot = 111;
 }
 
 message OMRequest {
@@ -229,7 +229,7 @@ message OMRequest {
   optional SetRangerServiceVersionRequest   SetRangerServiceVersionRequest = 107;
   optional RangerBGSyncRequest              RangerBGSyncRequest            = 109;
   optional CreateSnapshotRequest            CreateSnapshotRequest          = 110;
-  optional ListSnapshotRequest              ListSnapshotRequest            = 112;
+  optional ListSnapshotRequest              ListSnapshotRequest            = 111;
 }
 
 message OMResponse {
@@ -328,7 +328,7 @@ message OMResponse {
   optional SetRangerServiceVersionResponse   SetRangerServiceVersionResponse = 107;
   optional RangerBGSyncResponse              RangerBGSyncResponse          = 109;
   optional CreateSnapshotResponse            CreateSnapshotResponse        = 110;
-  optional ListSnapshotResponse              ListSnapshotResponse         = 112;
+  optional ListSnapshotResponse              ListSnapshotResponse         = 111;
 }
 
 enum Status {

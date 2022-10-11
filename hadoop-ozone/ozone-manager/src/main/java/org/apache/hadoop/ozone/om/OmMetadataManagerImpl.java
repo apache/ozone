@@ -1141,8 +1141,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     List<SnapshotInfo> snapshotInfos = new ArrayList<>();
     TreeMap<String, SnapshotInfo> snapshotInfoMap = new TreeMap<>();
 
-    snapshotInfoMap.putAll(getSnapshotFromCache());
-    snapshotInfoMap.putAll(getSnapshotFromDB());
+    appendSnapshotFromCacheToMap(snapshotInfoMap);
+    appendSnapshotFromDBToMap(snapshotInfoMap);
 
     for (Map.Entry<String, SnapshotInfo> cacheKey : snapshotInfoMap
         .entrySet()) {
@@ -1152,8 +1152,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return snapshotInfos;
   }
 
-  private TreeMap<String, SnapshotInfo> getSnapshotFromCache() {
-    TreeMap<String, SnapshotInfo> result = new TreeMap<>();
+  private void appendSnapshotFromCacheToMap(TreeMap snapshotInfoMap) {
     Iterator<Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>>> iterator =
         snapshotInfoTable.cacheIterator();
     while (iterator.hasNext()) {
@@ -1162,14 +1161,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       String snapshotKey = entry.getKey().getCacheKey();
       SnapshotInfo snapshotInfo = entry.getValue().getCacheValue();
       if (snapshotInfo != null) {
-        result.put(snapshotKey, snapshotInfo);
+        snapshotInfoMap.put(snapshotKey, snapshotInfo);
       }
     }
-    return result;
   }
 
-  private TreeMap<String, SnapshotInfo> getSnapshotFromDB() throws IOException {
-    TreeMap<String, SnapshotInfo> result = new TreeMap<>();
+  private void appendSnapshotFromDBToMap(TreeMap snapshotInfoMap)
+      throws IOException {
     try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>>
              snapshotIter = snapshotInfoTable.iterator()) {
       KeyValue< String, SnapshotInfo> snapshotinfo;
@@ -1179,13 +1177,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
           CacheValue<SnapshotInfo> cacheValue =
               snapshotInfoTable.getCacheValue(
                   new CacheKey<>(snapshotinfo.getKey()));
+          // There is always the latest data in the cache, so don't need to add
+          // earlier data from DB. We only add data from DB if there is no data
+          // in cache.
           if (cacheValue == null) {
-            result.put(snapshotinfo.getKey(), snapshotinfo.getValue());
+            snapshotInfoMap.put(snapshotinfo.getKey(), snapshotinfo.getValue());
           }
         }
       }
     }
-    return result;
   }
 
   @Override
