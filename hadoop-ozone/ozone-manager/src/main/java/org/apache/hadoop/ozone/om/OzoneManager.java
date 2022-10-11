@@ -2084,7 +2084,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omSnapshotProvider.stop();
       }
       OMPerformanceMetrics.unregister();
-      RatisDropwizardExports.clear(ratisMetricsMap);
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
     }

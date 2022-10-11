@@ -98,8 +98,8 @@ public class TestReportPublisher {
     ScheduledExecutorService dummyExecutorService = Mockito.mock(
         ScheduledExecutorService.class);
     publisher.init(dummyContext, dummyExecutorService);
-    verify(dummyExecutorService, times(1)).scheduleAtFixedRate(publisher,
-        0, 0, TimeUnit.MILLISECONDS);
+    verify(dummyExecutorService, times(1)).schedule(publisher,
+        0, TimeUnit.MILLISECONDS);
   }
 
   @Test
