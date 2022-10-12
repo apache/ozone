@@ -27,18 +27,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.getChkptCompactionLogFilename;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.getCurrentCompactionLogFilename;
-
 /**
  * This class is used to manage/create OM snapshots.
  */
 public final class SnapshotManager {
 
-  
   /**
    * Creates snapshot checkpoint that corresponds with SnapshotInfo.
-   * @param OMMetadataManager the metadata manager
+   * @param omMetadataManager the metadata manager
    * @param snapshotInfo The metadata of snapshot to be created
    * @return instance of DBCheckpoint
    */
@@ -49,34 +45,9 @@ public final class SnapshotManager {
     RDBStore store = (RDBStore) omMetadataManager.getStore();
 
     final DBCheckpoint dbCheckpoint;
-    try {
-      // The call blocks waiting for all ongoing background work to finish,
-      // and pauses any future compactions.
-//      store.getDb().pauseBackgroundWork();
 
-      final String compactionLogPathStr = getCurrentCompactionLogFilename();
-      final String destFilename =
-          getChkptCompactionLogFilename(snapshotInfo.getCheckpointDirName());
-
-      if (new File(compactionLogPathStr).exists()) {
-        // TODO: Alternatively, if file does not exist (no compaction happened),
-        //  create empty file instead.
-        Files.move(Paths.get(compactionLogPathStr),
-            Paths.get(store.getSnapshotsParentDir(), destFilename));
-      }
-
-      // Create DB checkpoint
-      dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
-
-      // Rename compaction log to correspond to the checkpoint dir name
-      // The compaction log contains all the compaction history since last
-      // checkpoint, which is used to track all the SST file diffs.
-
-      // TODO: Double check failure recovery paths
-
-    } finally {
-//      store.getDb().continueBackgroundWork();
-    }
+    // Create DB checkpoint
+    dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
 
     return dbCheckpoint;
   }

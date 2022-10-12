@@ -59,6 +59,13 @@ public class TestRocksDBCheckpointDiffer {
 
 
   public static void main(String[] args) throws Exception {
+
+    // Delete the compaction log dir if it already exists
+    File dir = new File("./compaction-log");
+    if (dir.exists()) {
+      deleteDirectory(dir);
+    }
+
     TestRocksDBCheckpointDiffer tester= new TestRocksDBCheckpointDiffer();
     RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer(
         "./rocksdb-data",
@@ -92,10 +99,10 @@ public class TestRocksDBCheckpointDiffer {
       String fname = "fwdGraph_" + gtype.toString() +  ".png";
       String rname = "reverseGraph_"+ gtype.toString() + ".png";
 
-      //differ.pngPrintMutableGrapth(differ.getCompactionFwdDAG(),
-      //  fname, gtype);
-      //differ.pngPrintMutableGrapth(differ.getCompactionReverseDAG(), rname,
-      //    gtype);
+//      differ.pngPrintMutableGrapth(differ.getCompactionFwdDAG(),
+//          fname, gtype);
+//      differ.pngPrintMutableGrapth(differ.getCompactionReverseDAG(), rname,
+//          gtype);
     }
     rocksDB.close();
   }
@@ -113,7 +120,7 @@ public class TestRocksDBCheckpointDiffer {
         .toString();
   }
 
-  //  Test Code to create sample RocksDB instance.
+  // Test Code to create sample RocksDB instance.
   public RocksDB createRocksDBInstance(String dbPathArg,
                                        RocksDBCheckpointDiffer differ)
       throws RocksDBException, InterruptedException {
@@ -128,6 +135,9 @@ public class TestRocksDBCheckpointDiffer {
 
     RocksDB rocksDB;
     rocksDB = differ.getRocksDBInstanceWithCompactionTracking(dbPathArg);
+
+    differ.setCompactionLogParentDir(".");
+    differ.setCompactionLogFilenameBySeqNum(rocksDB.getLatestSequenceNumber());
 
     Random random = new Random();
     // key-value

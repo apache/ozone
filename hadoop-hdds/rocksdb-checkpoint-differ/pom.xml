@@ -72,6 +72,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>spotbugs-annotations</artifactId>
       <scope>compile</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+    </dependency>
 
   </dependencies>
 

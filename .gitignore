@@ -20,9 +20,10 @@ build
 dependency-reduced-pom.xml
 make-build-debug
 
-# TODO: Remove later
+# TODO: Remove before merging
 rocksdb-data*
 SavedCompacted_Files
+compaction-log
 
 # Filesystem contract test options and credentials
 auth-keys.xml

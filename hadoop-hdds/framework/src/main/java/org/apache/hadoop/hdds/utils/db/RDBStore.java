@@ -135,6 +135,12 @@ public class RDBStore implements DBStore {
         }
       }
 
+      // Finish the initialization of compaction DAG tracker by setting the
+      // sequence number as current compaction log filename.
+      rocksDBCheckpointDiffer.setCompactionLogParentDir(snapshotsParentDir);
+      rocksDBCheckpointDiffer.setCompactionLogFilenameBySeqNum(
+          db.getLatestSequenceNumber());
+
       //Initialize checkpoint manager
       checkPointManager = new RDBCheckpointManager(db, dbLocation.getName());
       rdbMetrics = RDBMetrics.create();
@@ -161,7 +167,6 @@ public class RDBStore implements DBStore {
     return snapshotsParentDir;
   }
 
-  @VisibleForTesting
   public RocksDBCheckpointDiffer getRocksDBCheckpointDiffer() {
     return rocksDBCheckpointDiffer;
   }
@@ -288,7 +293,6 @@ public class RDBStore implements DBStore {
 
   public DBCheckpoint getSnapshot(String name) throws IOException {
     this.flushLog(true);
-//    this.getDb().pauseBackgroundWork();
     return checkPointManager.createCheckpoint(snapshotsParentDir, name);
   }
 
