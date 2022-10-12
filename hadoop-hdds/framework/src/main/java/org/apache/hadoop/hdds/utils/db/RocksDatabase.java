@@ -367,37 +367,6 @@ public final class RocksDatabase {
     }
   }
 
-  /**
-   * Pause background work. For example, compaction.
-   * <p>
-   * This function will wait until all currently running background processes
-   * finish. After it returns, no background process will be run until
-   * continueBackgroundWork() is called.
-   */
-  public void pauseBackgroundWork() throws IOException {
-    try {
-      db.get().pauseBackgroundWork();
-    } catch (RocksDBException e) {
-      closeOnError(e);
-      throw toIOException(this, "pauseBackgroundWork", e);
-    }
-  }
-
-  /**
-   * Continue background work. For example, compaction.
-   * <p>
-   * Resumes background work which was suspended by previously calling
-   * pauseBackgroundWork().
-   */
-  public void continueBackgroundWork() throws IOException {
-    try {
-      db.get().continueBackgroundWork();
-    } catch (RocksDBException e) {
-      closeOnError(e);
-      throw toIOException(this, "continueBackgroundWork", e);
-    }
-  }
-
   public void compactRange() throws IOException {
     try {
       db.get().compactRange();
