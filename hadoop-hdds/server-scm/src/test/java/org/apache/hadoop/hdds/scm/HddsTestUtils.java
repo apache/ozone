@@ -659,6 +659,7 @@ public final class HddsTestUtils {
         .setOwner("TEST");
   }
 
+
   public static ContainerInfo getContainer(
       final HddsProtos.LifeCycleState state) {
     return getDefaultContainerInfoBuilder(state)
@@ -709,7 +710,8 @@ public final class HddsTestUtils {
       final UUID originNodeId,
       final DatanodeDetails datanodeDetails) {
     return getReplicas(containerId, state, CONTAINER_USED_BYTES_DEFAULT,
-        CONTAINER_NUM_KEYS_DEFAULT, sequenceId, originNodeId, datanodeDetails);
+        CONTAINER_NUM_KEYS_DEFAULT, sequenceId, originNodeId,
+        false, 0, datanodeDetails);
   }
 
   public static ContainerReplica getReplicas(
@@ -719,17 +721,42 @@ public final class HddsTestUtils {
       final long keyCount,
       final long sequenceId,
       final UUID originNodeId,
+      final boolean hasReplicaIndex,
+      final int replicaIndex,
       final DatanodeDetails datanodeDetails) {
-    return ContainerReplica.newBuilder()
+    ContainerReplica.ContainerReplicaBuilder builder = ContainerReplica.newBuilder()
         .setContainerID(containerId)
         .setContainerState(state)
         .setDatanodeDetails(datanodeDetails)
         .setOriginNodeId(originNodeId)
         .setSequenceId(sequenceId)
         .setBytesUsed(usedBytes)
-        .setKeyCount(keyCount)
-        .build();
+        .setKeyCount(keyCount);
+    if (hasReplicaIndex) {
+      builder.setReplicaIndex(replicaIndex);
+    }
+    return builder.build();
   }
+
+  public static Set<ContainerReplica> getReplicasWithReplicaIndex(
+          final ContainerID containerId,
+          final ContainerReplicaProto.State state,
+          final long usedBytes,
+          final long keyCount,
+          final long sequenceId,
+          final DatanodeDetails... datanodeDetails) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    int replicaIndex = 1;
+    for (DatanodeDetails datanode : datanodeDetails) {
+      replicas.add(getReplicas(containerId, state,
+              usedBytes, keyCount, sequenceId, datanode.getUuid(),
+              true, replicaIndex, datanode));
+      replicaIndex+=1;
+    }
+    return replicas;
+  }
+
+
 
   public static Pipeline getRandomPipeline() {
     List<DatanodeDetails> nodes = new ArrayList<>();
