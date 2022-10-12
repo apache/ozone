@@ -80,7 +80,6 @@ share/ozone/lib/hk2-api.jar
 share/ozone/lib/hk2-locator.jar
 share/ozone/lib/hk2-utils.jar
 share/ozone/lib/hppc.jar
-share/ozone/lib/htrace-core4-incubating.jar
 share/ozone/lib/httpasyncclient.jar
 share/ozone/lib/httpclient.jar
 share/ozone/lib/httpcore.jar
