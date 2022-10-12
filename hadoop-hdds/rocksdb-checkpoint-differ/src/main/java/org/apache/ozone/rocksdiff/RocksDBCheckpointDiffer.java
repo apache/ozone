@@ -340,76 +340,7 @@ public class RocksDBCheckpointDiffer {
    */
   public void setRocksDBForCompactionTracking(
       DBOptions rocksOptions, List<AbstractEventListener> list) {
-    final AbstractEventListener onCompactionCompletedListener =
-        new AbstractEventListener() {
-          @Override
-          @SuppressFBWarnings({
-              "AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION",
-              "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
-          public void onCompactionCompleted(
-              final RocksDB db, final CompactionJobInfo compactionJobInfo) {
-            synchronized (db) {
-
-              LOG.warn(compactionJobInfo.compactionReason().toString());
-              LOG.warn("List of input files:");
-
-              if (compactionJobInfo.inputFiles().size() == 0) {
-                LOG.error("Compaction input files list is empty?");
-                return;
-              }
-
-              final StringBuilder sb = new StringBuilder();
-
-              // kLevelL0FilesNum / kLevelMaxLevelSize. TODO: REMOVE
-              sb.append("# ").append(compactionJobInfo.compactionReason()).append('\n');
-
-              // Trim DB path, only keep the SST file name
-              final int filenameBegin =
-                  compactionJobInfo.inputFiles().get(0).lastIndexOf("/");
-
-              for (String file : compactionJobInfo.inputFiles()) {
-                final String fn = file.substring(filenameBegin + 1);
-                sb.append(fn).append('\t');  // TODO: Trim last delimiter
-
-                // Create hardlink backups for the SST files that are going
-                // to be deleted after this RDB compaction.
-                LOG.warn(file);
-                String saveLinkFileName =
-                    saveCompactedFilePath + new File(file).getName();
-                Path link = Paths.get(saveLinkFileName);
-                Path srcFile = Paths.get(file);
-                try {
-                  Files.createLink(link, srcFile);
-                } catch (IOException e) {
-                  LOG.warn("Exception in creating hardlink");
-                  e.printStackTrace();
-                }
-              }
-              sb.append('\n');
-
-              LOG.warn("List of output files:");
-              for (String file : compactionJobInfo.outputFiles()) {
-                final String fn = file.substring(filenameBegin + 1);
-                sb.append(fn).append('\t');
-                LOG.warn(file + ",");
-              }
-              sb.append('\n');
-
-              // Persist infile/outfile to file
-              appendToCurrentCompactionLog(sb.toString());
-
-              // Let us also build the graph
-//              populateCompactionDAG(compactionJobInfo.inputFiles(),
-//                  compactionJobInfo.outputFiles());
-
-//              if (debugEnabled(DEBUG_DAG_BUILD_UP)) {
-//                printMutableGraph(null, null, compactionDAGFwd);
-//              }
-            }
-          }
-        };
-
-    list.add(onCompactionCompletedListener);
+    list.add(newCompactionCompletedListener());
     rocksOptions.setListeners(list);
   }
 
@@ -438,87 +369,90 @@ public class RocksDBCheckpointDiffer {
     setRocksDBForCompactionTracking(rocksOptions, new ArrayList<>());
   }
 
+  private AbstractEventListener newCompactionCompletedListener() {
+    return new AbstractEventListener() {
+      @Override
+      @SuppressFBWarnings({
+          "AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION",
+          "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
+      public void onCompactionCompleted(
+          final RocksDB db, final CompactionJobInfo compactionJobInfo) {
+        synchronized (db) {
+
+          LOG.warn(compactionJobInfo.compactionReason().toString());
+          LOG.warn("List of input files:");
+
+          if (compactionJobInfo.inputFiles().size() == 0) {
+            LOG.error("Compaction input files list is empty?");
+            return;
+          }
+
+          final StringBuilder sb = new StringBuilder();
+
+          // kLevelL0FilesNum / kLevelMaxLevelSize. TODO: Can remove
+          sb.append("# ").append(compactionJobInfo.compactionReason()).append('\n');
+
+          // Trim DB path, only keep the SST file name
+          final int filenameBegin =
+              compactionJobInfo.inputFiles().get(0).lastIndexOf("/");
+
+          for (String file : compactionJobInfo.inputFiles()) {
+            final String fn = file.substring(filenameBegin + 1);
+            sb.append(fn).append('\t');  // TODO: nit: Trim last delimiter
+
+            // Create hardlink backups for the SST files that are going
+            // to be deleted after this RDB compaction.
+            LOG.warn(file);
+            String saveLinkFileName =
+                saveCompactedFilePath + new File(file).getName();
+            Path link = Paths.get(saveLinkFileName);
+            Path srcFile = Paths.get(file);
+            try {
+              Files.createLink(link, srcFile);
+            } catch (IOException e) {
+              LOG.warn("Exception in creating hardlink");
+              e.printStackTrace();
+            }
+          }
+          sb.append('\n');
+
+          LOG.warn("List of output files:");
+          for (String file : compactionJobInfo.outputFiles()) {
+            final String fn = file.substring(filenameBegin + 1);
+            sb.append(fn).append('\t');
+            LOG.warn(file + ", ");
+          }
+          sb.append('\n');
+
+          // Persist infile/outfile to file
+          appendToCurrentCompactionLog(sb.toString());
+
+          // Populate the DAG
+          populateCompactionDAG(
+              compactionJobInfo.inputFiles().toArray(new String[0]),
+              compactionJobInfo.outputFiles().toArray(new String[0]));
+
+//          if (debugEnabled(DEBUG_DAG_BUILD_UP)) {
+//            printMutableGraph(null, null, compactionDAGFwd);
+//          }
+        }
+      }
+    };
+  }
+
   /**
    * This takes Options.
    */
   public void setRocksDBForCompactionTracking(
       Options rocksOptions, List<AbstractEventListener> list) {
-    final AbstractEventListener onCompactionCompletedListener =
-        new AbstractEventListener() {
-          @Override
-          @SuppressFBWarnings({
-              "AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION",
-              "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
-          public void onCompactionCompleted(
-              final RocksDB db, final CompactionJobInfo compactionJobInfo) {
-            synchronized (db) {
-
-              LOG.warn(compactionJobInfo.compactionReason().toString());
-              LOG.warn("List of input files:");
-
-              if (compactionJobInfo.inputFiles().size() == 0) {
-                LOG.error("Compaction input files list is empty?");
-                return;
-              }
-
-              final StringBuilder sb = new StringBuilder();
-
-              // kLevelL0FilesNum / kLevelMaxLevelSize. TODO: Can remove
-              sb.append("# ").append(compactionJobInfo.compactionReason()).append('\n');
-
-              // Trim DB path, only keep the SST file name
-              final int filenameBegin =
-                  compactionJobInfo.inputFiles().get(0).lastIndexOf("/");
-
-              for (String file : compactionJobInfo.inputFiles()) {
-                final String fn = file.substring(filenameBegin + 1);
-                sb.append(fn).append('\t');  // TODO: nit: Trim last delimiter
-
-                LOG.warn(file);
-                String saveLinkFileName =
-                    saveCompactedFilePath + new File(file).getName();
-                Path link = Paths.get(saveLinkFileName);
-                Path srcFile = Paths.get(file);
-                try {
-                  Files.createLink(link, srcFile);
-                } catch (IOException e) {
-                  LOG.warn("Exception in creating hardlink");
-                  e.printStackTrace();
-                }
-              }
-              sb.append('\n');
-
-              LOG.warn("List of output files:");
-              for (String file : compactionJobInfo.outputFiles()) {
-                final String fn = file.substring(filenameBegin + 1);
-                sb.append(fn).append('\t');
-                LOG.warn(file);
-              }
-              sb.append('\n');
-
-              // Persist infile/outfile to file
-              appendToCurrentCompactionLog(sb.toString());
-
-              // Let us also build the graph
-//              populateCompactionDAG(compactionJobInfo.inputFiles(),
-//                  compactionJobInfo.outputFiles());
-
-//              if (debugEnabled(DEBUG_DAG_BUILD_UP)) {
-//                printMutableGraph(null, null,
-//                    compactionDAGFwd);
-//              }
-            }
-          }
-        };
-
-    list.add(onCompactionCompletedListener);
+    list.add(newCompactionCompletedListener());
     rocksOptions.setListeners(list);
   }
 
   public RocksDB getRocksDBInstanceWithCompactionTracking(String dbPath)
       throws RocksDBException {
     final Options opt = new Options().setCreateIfMissing(true);
-//    opt.setWriteBufferSize(1L);  // Default is 64 MB. Unit in bytes.
+//    opt.setWriteBufferSize(1L);  // Unit in bytes. Default is 64 MB.
 //    opt.setMaxWriteBufferNumber(1);  // Default is 2
 //    opt.setCompressionType(CompressionType.NO_COMPRESSION);
 //    opt.setMaxBytesForLevelMultiplier(2);
@@ -1058,7 +992,7 @@ public class RocksDBCheckpointDiffer {
       // fist go through fwdGraph to find nodes that don't have succesors.
       // These nodes will be the top level nodes in reverse graph
       Set<CompactionNode> successors = fwdMutableGraph.successors(infileNode);
-      if (successors == null || successors.size() == 0) {
+      if (successors.size() == 0) {
         LOG.warn("traverseGraph : No successors. cumulative " +
             "keys : " + infileNode.cumulativeKeysReverseTraversal + "::total " +
             "keys ::" + infileNode.totalNumberOfKeys);
@@ -1087,7 +1021,7 @@ public class RocksDBCheckpointDiffer {
           LOG.warn("traverseGraph : expanding node " + current.fileName);
           Set<CompactionNode> successors =
               reverseMutableGraph.successors(current);
-          if (successors == null || successors.size() == 0) {
+          if (successors.size() == 0) {
             LOG.warn("traverseGraph : No successors. cumulative " +
                 "keys : " + current.cumulativeKeysReverseTraversal);
           } else {
@@ -1103,8 +1037,7 @@ public class RocksDBCheckpointDiffer {
             }
           }
         }
-        currentLevel = new HashSet<>();
-        currentLevel.addAll(nextLevel);
+        currentLevel = new HashSet<>(nextLevel);
         nextLevel = new HashSet<>();
         LOG.warn("");
       }
