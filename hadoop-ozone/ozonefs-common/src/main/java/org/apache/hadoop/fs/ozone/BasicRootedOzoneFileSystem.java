@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -450,7 +451,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         throws IOException {
       super(f);
       this.recursive = recursive;
-      if (getStatus().isDirectory()
+      if (getStatus().isDir()
           && !this.recursive
           && listStatus(f).length != 0) {
         throw new PathIsNotEmptyDirectoryException(f.toString());
@@ -732,20 +733,20 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   @Override
   public FileStatus[] listStatus(Path f) throws IOException {
-    return convertFileStatusArr( listStatusAdapter(f));
+    return convertFileStatusArr(listStatusAdapter(f));
   }
 
-  private FileStatus[] convertFileStatusArr(FileStatusAdapter[] adapterArr){
+  private FileStatus[] convertFileStatusArr(FileStatusAdapter[] adapterArr) {
     FileStatus[] result = new FileStatus[adapterArr.length];
     int index = 0;
-    for (FileStatusAdapter ff : adapterArr){
+    for (FileStatusAdapter ff : adapterArr) {
       result[index++] = convertFileStatus(ff);      
     }
     return result;
   }
 
   
-  public FileStatusAdapter[] listStatus(Path f) throws IOException {
+  public FileStatusAdapter[] listStatusAdapter(Path f) throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("listStatus() path:{}", f);
@@ -759,7 +760,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           adapter.listStatus(pathToKey(f), false, startPath,
               numEntries, uri, workingDir, getUsername())
               .stream()
-              // .map(this::convertFileStatus)
               .collect(Collectors.toList());
 
       if (!tmpStatusList.isEmpty()) {
@@ -871,7 +871,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return convertFileStatus(getFileStatusAdapter(f));
   }
 
-  public FileStatusAdapter getFileStatus(Path f) throws IOException {
+  public FileStatusAdapter getFileStatusAdapter(Path f) throws IOException {
     incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("getFileStatus() path:{}", f);
@@ -883,7 +883,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
     FileStatusAdapter fileStatus = null;
     try {
-      fileStatus = adapter.getFileStatus(key, uri, qualifiedPath, getUsername());
+      fileStatus = 
+        adapter.getFileStatus(key, uri, qualifiedPath, getUsername());
     } catch (IOException e) {
       if (e instanceof OMException) {
         OMException ex = (OMException) e;
@@ -1182,7 +1183,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     OzoneListingIterator(Path path, boolean isFSO)
         throws IOException {
       this.path = path;
-      this.status = getFileStatusAdapter((path);
+      this.status = getFileStatusAdapter(path);
       this.pathKey = pathToKey(path);
       this.isFSO = isFSO;
       if (!isFSO) {
@@ -1235,7 +1236,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         if (isFSO) {
           FileStatusAdapter[] fileStatuses;
           fileStatuses = listStatusAdapter(path);
-          for (FileStatus fileStatus : fileStatuses) {
+          for (FileStatusAdapter fileStatus : fileStatuses) {
             String keyName =
                 new OFSPath(fileStatus.getPath().toString()).getKeyName();
             keyPathList.add(ofsPathPrefix + keyName);
@@ -1339,7 +1340,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return new LocatedFileStatus(fileStatus, blockLocations);
   }
 
-   @Override
+  @Override
   public ContentSummary getContentSummary(Path f) throws IOException {
     FileStatusAdapter status = getFileStatusAdapter(f);
 
@@ -1354,7 +1355,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     // f is a directory
     long[] summary = {0, 0, 0, 1};
     int i = 0;
-    for(FileStatusAdapter s : listStatusAdapter(f)) {
+    for (FileStatusAdapter s : listStatusAdapter(f)) {
       long length = s.getLength();
       long spaceConsumed = s.getDiskConsumed();
       ContentSummary c = s.isDir() ? getContentSummary(s.getPath()) :

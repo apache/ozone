@@ -521,12 +521,9 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     OmKeyInfo keyInfo = status.getKeyInfo();
     short replication = (short) keyInfo.getReplicationConfig()
         .getRequiredNodes();
-    //calculate the number of bytes required to store the dataSize with replication
-    long diskConsumed = keyInfo.getReplicatedSize();
-
     return new FileStatusAdapter(
         keyInfo.getDataSize(),
-        diskConsumed,
+        keyInfo.getReplicatedSize(),
         new Path(OZONE_URI_DELIMITER + keyInfo.getKeyName())
             .makeQualified(defaultUri, workingDir),
         status.isDirectory(),

@@ -49,9 +49,9 @@ public final class FileStatusAdapter {
   private final BlockLocation[] blockLocations;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public FileStatusAdapter(long length, long diskConsumed, Path path, boolean isdir,
-      short blockReplication, long blocksize, long modificationTime,
-      long accessTime, short permission, String owner,
+  public FileStatusAdapter(long length, long diskConsumed, Path path, 
+      boolean isdir, short blockReplication, long blocksize, 
+      long modificationTime, long accessTime, short permission, String owner,
       String group, Path symlink, BlockLocation[] locations) {
     this.length = length;
     this.diskConsumed = diskConsumed;
@@ -132,7 +132,7 @@ public final class FileStatusAdapter {
         .append("{")
         .append("path=" + path)
         .append("; isDirectory=" + isdir);
-    if(isFile()){
+    if (isFile()) {
       sb.append("; length=" + length)
               .append("; diskConsumed= " + getDiskConsumed())
           .append("; blockReplication=" + blockReplication)
