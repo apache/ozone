@@ -41,7 +41,7 @@ public final class ManagedRocksObjectUtils {
     }
   }
 
-  static void assertClosed(ManagedObject<?>object) {
+  static void assertClosed(ManagedObject<?> object) {
     RocksObject rocksObject = object.get();
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
     if (rocksObject.isOwningHandle()) {
@@ -49,7 +49,8 @@ public final class ManagedRocksObjectUtils {
       LOG.warn("{} is not closed properly",
           rocksObject.getClass().getSimpleName());
       if (LOG.isDebugEnabled()) {
-        LOG.debug("StackTrace for unclosed instance: {}", object.getStackTrace());
+        LOG.debug("StackTrace for unclosed instance: {}",
+            object.getStackTrace());
       }
     }
   }

@@ -613,7 +613,8 @@ public class ReconContainerMetadataManagerImpl
 
   private void initializeKeyContainerTable() throws IOException {
     Instant start = Instant.now();
-    try(TableIterator<ContainerKeyPrefix, ? extends KeyValue<ContainerKeyPrefix,
+    try (TableIterator<ContainerKeyPrefix, ?
+        extends KeyValue<ContainerKeyPrefix,
         Integer>> iterator = containerKeyTable.iterator()) {
       KeyValue<ContainerKeyPrefix, Integer> keyValue;
       long count = 0;

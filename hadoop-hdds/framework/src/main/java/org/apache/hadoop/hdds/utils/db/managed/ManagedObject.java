@@ -27,7 +27,7 @@ import org.rocksdb.RocksObject;
 class ManagedObject<T extends RocksObject> implements AutoCloseable {
   private final T original;
 
-  private final StackTraceElement [] elements;
+  private final StackTraceElement[] elements;
 
   ManagedObject(T original) {
     this.original = original;
@@ -49,13 +49,13 @@ class ManagedObject<T extends RocksObject> implements AutoCloseable {
     super.finalize();
   }
 
-  public String getStackTrace(){
+  public String getStackTrace() {
     if (elements != null && elements.length > 0) {
       // 15 lines should be good enough to know the caller of
       // the unclosed instance?
       int maxStackTraceLines = 15;
       StringBuilder sb = new StringBuilder();
-      for (int line =1; line<=maxStackTraceLines; line++){
+      for (int line = 1; line <= maxStackTraceLines; line++) {
         sb.append(elements[line]);
         sb.append("\n");
       }
