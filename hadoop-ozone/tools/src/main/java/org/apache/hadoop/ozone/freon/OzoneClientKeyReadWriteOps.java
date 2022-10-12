@@ -140,7 +140,7 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
 
     ensureVolumeAndBucketExist(ozoneClients[0], volumeName, bucketName);
     ozoneBuckets = new OzoneBucket[clientCount];
-    for (int i = 0; i < clientsCount; i++) {
+    for (int i = 0; i < clientCount; i++) {
       ozoneBuckets[i] = ozoneClients[i].getObjectStore().getVolume(volumeName)
               .getBucket(bucketName);
     }
