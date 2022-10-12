@@ -1971,6 +1971,7 @@ public class KeyManagerImpl implements KeyManager {
         .map(BlockLocationInfo::getContainerID)
         .collect(Collectors.toSet());
 
+    metrics.setForceContainerCacheRefresh(forceRefresh);
     Map<Long, Pipeline> containerLocations =
         scmClient.getContainerLocations(containerIds, forceRefresh);
 

@@ -47,6 +47,7 @@ public class ScmClient {
   private final ScmBlockLocationProtocol blockClient;
   private final StorageContainerLocationProtocol containerClient;
   private final LoadingCache<Long, Pipeline> containerLocationCache;
+  private final OmCacheMetrics containerCacheMetrics;
   private SCMUpdateServiceGrpcClient updateServiceGrpcClient;
 
   ScmClient(ScmBlockLocationProtocol blockClient,
@@ -56,6 +57,8 @@ public class ScmClient {
     this.blockClient = blockClient;
     this.containerLocationCache =
         createContainerLocationCache(configuration, containerClient);
+    this.containerCacheMetrics = OmCacheMetrics.create(containerLocationCache,
+        "ContainerInfo");
   }
 
   static LoadingCache<Long, Pipeline> createContainerLocationCache(
@@ -70,6 +73,7 @@ public class ScmClient {
     return CacheBuilder.newBuilder()
         .maximumSize(maxSize)
         .expireAfterWrite(ttl, unit)
+        .recordStats()
         .build(new CacheLoader<Long, Pipeline>() {
           @NotNull
           @Override
@@ -130,5 +134,8 @@ public class ScmClient {
         "container location", e.getCause());
   }
 
+  public void close() {
+    containerCacheMetrics.unregister();
+  }
 
 }
