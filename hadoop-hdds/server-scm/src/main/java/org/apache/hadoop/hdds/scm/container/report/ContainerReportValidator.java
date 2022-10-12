@@ -9,9 +9,20 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import java.util.Map;
 import java.util.Optional;
 
-public class ContainerReportValidator {
+/**
+ * Class for Validating Container Report.
+ */
+public final class ContainerReportValidator {
+
+  private Map<ReplicationType, ReplicaValidator> replicaValidators;
+  private static final ContainerReportValidator CONTAINER_REPORT_VALIDATOR;
+  private ContainerReportValidator() {
+    this.replicaValidators = ImmutableMap.of(ReplicationType.EC,
+            new ECReplicaValidator());
+  }
+
   private interface ReplicaValidator {
-    public boolean validate(ReplicationConfig replicationConfig,
+    boolean validate(ReplicationConfig replicationConfig,
                             ContainerReplicaProto replicaProto);
   }
 
@@ -22,19 +33,19 @@ public class ContainerReportValidator {
                             ContainerReplicaProto replicaProto) {
 
       return replicationConfig.getReplicationType() == ReplicationType.EC
-      && replicaProto.hasReplicaIndex() && replicaProto.getReplicaIndex()>0
-      && replicaProto.getReplicaIndex() <= replicationConfig.getRequiredNodes();
+        && replicaProto.hasReplicaIndex() && replicaProto.getReplicaIndex() > 0
+        && replicaProto.getReplicaIndex() <=
+              replicationConfig.getRequiredNodes();
     }
   }
 
-  private static final Map<ReplicationType, ReplicaValidator> replicaValidators;
   static {
-    replicaValidators = ImmutableMap.of(ReplicationType.EC, new ECReplicaValidator());
+    CONTAINER_REPORT_VALIDATOR = new ContainerReportValidator();
   }
   private static boolean validateReplica(ReplicationConfig replicationConfig,
                                          ContainerReplicaProto replicaProto) {
     return Optional.ofNullable(replicationConfig.getReplicationType())
-            .map(replicaValidators::get)
+            .map(CONTAINER_REPORT_VALIDATOR.replicaValidators::get)
             .map(replicaValidator ->
                     replicaValidator.validate(replicationConfig, replicaProto))
             .orElse(true);

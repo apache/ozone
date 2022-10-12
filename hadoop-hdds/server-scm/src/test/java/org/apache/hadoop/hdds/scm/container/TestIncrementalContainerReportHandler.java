@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
@@ -65,7 +64,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -76,7 +78,9 @@ import java.util.stream.IntStream;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
-import static org.apache.hadoop.hdds.scm.HddsTestUtils.*;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.apache.hadoop.hdds.scm.container.TestContainerReportHandler.getContainerReportsProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 
@@ -357,8 +361,8 @@ public class TestIncrementalContainerReportHandler {
         new IncrementalContainerReportFromDatanode(
             datanode, containerReport);
 
-    final ContainerReportsProto fullReport = getContainerReportsProto(containerTwo.containerID(), CLOSED,
-            datanode.getUuidString());
+    final ContainerReportsProto fullReport = getContainerReportsProto(
+            containerTwo.containerID(), CLOSED, datanode.getUuidString());
     final ContainerReportFromDatanode fcr = new ContainerReportFromDatanode(
         datanode, fullReport);
 
@@ -406,19 +410,19 @@ public class TestIncrementalContainerReportHandler {
   }
 
   private static IncrementalContainerReportProto
-    getIncrementalContainerReportProto(ContainerReplicaProto replicaProto) {
+      getIncrementalContainerReportProto(ContainerReplicaProto replicaProto) {
     final IncrementalContainerReportProto.Builder crBuilder =
             IncrementalContainerReportProto.newBuilder();
     return crBuilder.addReport(replicaProto).build();
   }
 
   private static IncrementalContainerReportProto
-  getIncrementalContainerReportProto(
-          final ContainerID containerId,
-          final ContainerReplicaProto.State state,
-          final String originNodeId,
-          final boolean hasReplicaIndex,
-          final int replicaIndex) {
+      getIncrementalContainerReportProto(
+            final ContainerID containerId,
+            final ContainerReplicaProto.State state,
+            final String originNodeId,
+            final boolean hasReplicaIndex,
+            final int replicaIndex) {
     final ContainerReplicaProto.Builder replicaProto =
             ContainerReplicaProto.newBuilder()
                     .setContainerID(containerId.getId())
@@ -450,8 +454,8 @@ public class TestIncrementalContainerReportHandler {
   }
 
   private void testReplicaIndexUpdate(ContainerInfo container,
-                                      DatanodeDetails dn, int replicaIndex,
-                                      Map<DatanodeDetails, Integer> expectedReplicaMap) {
+         DatanodeDetails dn, int replicaIndex,
+         Map<DatanodeDetails, Integer> expectedReplicaMap) {
     final IncrementalContainerReportProto containerReport =
             getIncrementalContainerReportProto(container.containerID(),
                     ContainerReplicaProto.State.CLOSED, dn.getUuidString(),
@@ -472,11 +476,9 @@ public class TestIncrementalContainerReportHandler {
   @Test
   public void testECReplicaIndexValidation() throws NodeNotFoundException,
           IOException, TimeoutException {
-    final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
-            NodeStatus.inServiceHealthy()).iterator();
     List<DatanodeDetails> dns = IntStream.range(0, 5)
-            .mapToObj(i->randomDatanodeDetails()).collect(Collectors.toList());
-    dns.stream().forEach(dn->nodeManager.register(dn, null, null));
+        .mapToObj(i -> randomDatanodeDetails()).collect(Collectors.toList());
+    dns.stream().forEach(dn -> nodeManager.register(dn, null, null));
     ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
     final ContainerInfo container = getECContainer(LifeCycleState.CLOSED,
             PipelineID.randomId(), replicationConfig);

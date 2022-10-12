@@ -2056,7 +2056,7 @@ public class TestLegacyReplicationManager {
         UUID.nameUUIDFromBytes(Longs.toByteArray(container.getContainerID()));
     final ContainerReplica replica = getReplicas(container.containerID(),
         replicaState, container.getUsedBytes(), container.getNumberOfKeys(),
-        1000L, originNodeId,false, 0, dn);
+        1000L, originNodeId, dn);
     containerStateManager
         .updateContainerReplica(container.containerID(), replica);
     return replica;
@@ -2071,7 +2071,7 @@ public class TestLegacyReplicationManager {
     final UUID originNodeId =
         UUID.nameUUIDFromBytes(Longs.toByteArray(container.getContainerID()));
     final ContainerReplica replica = getReplicas(container.containerID(),
-        replicaState, usedBytes, numOfKeys, 1000L, originNodeId, false, 0, dn);
+        replicaState, usedBytes, numOfKeys, 1000L, originNodeId, dn);
     containerStateManager
         .updateContainerReplica(container.containerID(), replica);
     return replica;
