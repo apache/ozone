@@ -22,11 +22,11 @@ import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorS
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction.Action.CLOSE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -63,8 +63,8 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import com.google.protobuf.Message;
 
@@ -502,7 +502,7 @@ public class TestStateContext {
     }
     executorService.submit((Callable<String>) futureTwo::get);
 
-    Assert.assertFalse(stateContext.isThreadPoolAvailable(executorService));
+    Assertions.assertFalse(stateContext.isThreadPoolAvailable(executorService));
 
     futureOne.complete("futureOne");
     LambdaTestUtils.await(1000, 100, () ->
@@ -644,11 +644,11 @@ public class TestStateContext {
     ctx.addCommand(new CloseContainerCommand(1, PipelineID.randomId()));
 
     Map<SCMCommandProto.Type, Integer> summary = ctx.getCommandQueueSummary();
-    Assert.assertEquals(3,
+    Assertions.assertEquals(3,
         summary.get(SCMCommandProto.Type.replicateContainerCommand).intValue());
-    Assert.assertEquals(2,
+    Assertions.assertEquals(2,
         summary.get(SCMCommandProto.Type.closePipelineCommand).intValue());
-    Assert.assertEquals(1,
+    Assertions.assertEquals(1,
         summary.get(SCMCommandProto.Type.closeContainerCommand).intValue());
   }
 

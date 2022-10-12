@@ -132,7 +132,6 @@ public class TestBCSID {
             RatisReplicationConfig
                 .getInstance(HddsProtos.ReplicationFactor.ONE))
         .setKeyName("ratis")
-        .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     List<OmKeyLocationInfo> keyLocationInfos =
