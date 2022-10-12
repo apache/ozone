@@ -340,9 +340,8 @@ public final class RocksDatabase {
       if (columnFamilies != null) {
         columnFamilies.values().stream().forEach(f -> f.markClosed());
       }
-      // each loop 1 milli sec, 5000 loop mak 5 sec wait
-      final int maxLoop = 5000;
-      for (int i = 0; i < maxLoop; ++i) {
+      // wait till all access to rocks db is process to avoid crash while close
+      while (true) {
         if (counter.get() == 0) {
           break;
         }
@@ -355,7 +354,7 @@ public final class RocksDatabase {
         }
       }
       
-      // After counter is 0 or max re-try, do force close
+      // close when counter is 0, no more operation
       close(columnFamilies, db, descriptors, writeOptions, dbOptions);
     }
   }
