@@ -57,6 +57,14 @@ public class TestRocksDBCheckpointDiffer {
   private static int lastSnapshotCounter = 0;
   private static String lastSnapshotPrefix = "snap_id_";
 
+  /**
+   * Graph type.
+   */
+  enum GType {
+    FNAME,
+    KEYSIZE,
+    CUMUTATIVE_SIZE
+  }
 
   public static void main(String[] args) throws Exception {
 
@@ -94,8 +102,7 @@ public class TestRocksDBCheckpointDiffer {
 
     differ.diffAllSnapshots();
     differ.dumpCompactioNodeTable();
-    for (RocksDBCheckpointDiffer.GType gtype :
-        RocksDBCheckpointDiffer.GType.values()) {
+    for (GType gtype : GType.values()) {
       String fname = "fwdGraph_" + gtype.toString() +  ".png";
       String rname = "reverseGraph_"+ gtype.toString() + ".png";
 
