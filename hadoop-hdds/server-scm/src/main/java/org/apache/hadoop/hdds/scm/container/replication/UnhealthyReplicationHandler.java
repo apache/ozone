@@ -50,5 +50,5 @@ public interface UnhealthyReplicationHandler {
   Map<DatanodeDetails, SCMCommand<?>> processAndCreateCommands(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult result, int remainingMaintenanceRedundancy)
-          throws IOException;
+      throws IOException;
 }

@@ -42,7 +42,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -87,7 +86,7 @@ public class TestECOverReplicationHandler {
   }
 
   @Test
-  public void testNoOverReplication() throws IOException {
+  public void testNoOverReplication() {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
@@ -96,7 +95,7 @@ public class TestECOverReplicationHandler {
   }
 
   @Test
-  public void testOverReplicationWithOneSameIndexes() throws IOException {
+  public void testOverReplicationWithOneSameIndexes() {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 1),
@@ -109,7 +108,7 @@ public class TestECOverReplicationHandler {
   }
 
   @Test
-  public void testOverReplicationWithMultiSameIndexes() throws IOException {
+  public void testOverReplicationWithMultiSameIndexes() {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 1),
@@ -128,7 +127,7 @@ public class TestECOverReplicationHandler {
 
   private void testOverReplicationWithIndexes(
       Set<ContainerReplica> availableReplicas,
-      Map<Integer, Integer> index2excessNum) throws IOException {
+      Map<Integer, Integer> index2excessNum) {
     ECOverReplicationHandler ecORH =
         new ECOverReplicationHandler(replicationCheck, policy, nodeManager);
     ContainerHealthResult.OverReplicatedHealthResult result =

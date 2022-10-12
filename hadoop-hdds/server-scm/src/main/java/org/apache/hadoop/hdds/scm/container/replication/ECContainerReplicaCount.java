@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -76,8 +75,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   public ECContainerReplicaCount(ContainerInfo containerInfo,
       Set<ContainerReplica> replicas,
       List<ContainerReplicaOp> replicaPendingOps,
-      int remainingMaintenanceRedundancy)
-      throws InvalidContainerReplicaException {
+      int remainingMaintenanceRedundancy) {
     this.containerInfo = containerInfo;
     this.replicas = replicas;
     this.repConfig = (ECReplicationConfig)containerInfo.getReplicationConfig();
@@ -88,12 +86,8 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
 
     for (ContainerReplicaOp op : replicaPendingOps) {
       if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
-        ensureIndexWithinBounds(op.getReplicaIndex(), op.getTarget(),
-                "pendingAdd");
         pendingAdd.add(op.getReplicaIndex());
       } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
-        ensureIndexWithinBounds(op.getReplicaIndex(), op.getTarget(),
-                "pendingDelete");
         pendingDelete.add(op.getReplicaIndex());
       }
     }
@@ -102,8 +96,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
       HddsProtos.NodeOperationalState state =
           replica.getDatanodeDetails().getPersistedOpState();
       int index = replica.getReplicaIndex();
-      ensureIndexWithinBounds(index, replica.getDatanodeDetails(),
-              "replicaSet");
+      ensureIndexWithinBounds(index, "replicaSet");
       if (state == DECOMMISSIONED || state == DECOMMISSIONING) {
         int val = decommissionIndexes.getOrDefault(index, 0);
         decommissionIndexes.put(index, val + 1);
@@ -119,6 +112,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     // will eventually be removed and reduce the count for this replica. If the
     // count goes to zero, remove it from the map.
     for (Integer i : pendingDelete) {
+      ensureIndexWithinBounds(i, "pendingDelete");
       Integer count = healthyIndexes.get(i);
       if (count != null) {
         count = count - 1;
@@ -128,6 +122,10 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
           healthyIndexes.put(i, count);
         }
       }
+    }
+    // Ensure any pending adds are within bounds
+    for (Integer i : pendingAdd) {
+      ensureIndexWithinBounds(i, "pendingAdd");
     }
   }
 
@@ -431,14 +429,11 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
    * @param index The replica index to check.
    * @Throws IllegalArgumentException if the index is out of bounds.
    */
-  private void ensureIndexWithinBounds(Integer index, DatanodeDetails details,
-                                       String setName)
-          throws InvalidContainerReplicaException {
+  private void ensureIndexWithinBounds(Integer index, String setName) {
     if (index < 1 || index > repConfig.getRequiredNodes()) {
-      throw new InvalidContainerReplicaException("Replica Index in " + setName
+      throw new IllegalArgumentException("Replica Index in " + setName
           + " for containerID " + containerInfo.getContainerID()
-          + " in datanode " + details.toString()
-          + " must be between 1 and " + repConfig.getRequiredNodes()
+          + "must be between 1 and " + repConfig.getRequiredNodes()
           + ". But the given index is: " + index);
     }
   }

@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -56,8 +55,7 @@ public abstract class AbstractOverReplicationHandler
    */
   public abstract Map<DatanodeDetails, SCMCommand<?>> processAndCreateCommands(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
-      ContainerHealthResult result, int remainingMaintenanceRedundancy)
-          throws IOException;
+      ContainerHealthResult result, int remainingMaintenanceRedundancy);
 
   /**
    * Identify whether the placement status is actually equal for a

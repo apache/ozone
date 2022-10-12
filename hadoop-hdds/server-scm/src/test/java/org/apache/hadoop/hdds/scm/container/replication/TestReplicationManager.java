@@ -130,8 +130,7 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void testOpenContainerSkipped() throws ContainerNotFoundException,
-          InvalidContainerReplicaException {
+  public void testOpenContainerSkipped() throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.OPEN);
     // It is under replicated, but as its still open it is seen as healthy.
@@ -144,7 +143,7 @@ public class TestReplicationManager {
 
   @Test
   public void testUnhealthyOpenContainerClosed()
-          throws ContainerNotFoundException, InvalidContainerReplicaException {
+      throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.OPEN);
     // Container is open but replicas are closed, so it is open but unhealthy.
@@ -160,8 +159,7 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void testHealthyContainer() throws ContainerNotFoundException,
-          InvalidContainerReplicaException {
+  public void testHealthyContainer() throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
@@ -173,8 +171,7 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void testUnderReplicatedContainer() throws ContainerNotFoundException,
-          InvalidContainerReplicaException {
+  public void testUnderReplicatedContainer() throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
@@ -189,7 +186,7 @@ public class TestReplicationManager {
 
   @Test
   public void testUnderReplicatedContainerFixedByPending()
-          throws ContainerNotFoundException, InvalidContainerReplicaException {
+      throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
@@ -211,7 +208,7 @@ public class TestReplicationManager {
 
   @Test
   public void testUnderReplicatedAndUnrecoverable()
-          throws ContainerNotFoundException, InvalidContainerReplicaException {
+      throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2);
@@ -230,7 +227,7 @@ public class TestReplicationManager {
 
   @Test
   public void testUnderAndOverReplicated()
-          throws ContainerNotFoundException, InvalidContainerReplicaException {
+      throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 5, 5);
@@ -249,8 +246,7 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void testOverReplicated() throws ContainerNotFoundException,
-          InvalidContainerReplicaException {
+  public void testOverReplicated() throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED,
@@ -265,7 +261,7 @@ public class TestReplicationManager {
 
   @Test
   public void testOverReplicatedFixByPending()
-          throws ContainerNotFoundException, InvalidContainerReplicaException {
+      throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED,

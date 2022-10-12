@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ECContainerReplicaCount;
-import org.apache.hadoop.hdds.scm.container.replication.InvalidContainerReplicaException;
 
 import java.util.List;
 import java.util.Set;
@@ -43,8 +42,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
   }
 
   @Override
-  public boolean handle(ContainerCheckRequest request)
-          throws InvalidContainerReplicaException {
+  public boolean handle(ContainerCheckRequest request) {
     if (request.getContainerInfo().getReplicationType() != EC) {
       // This handler is only for EC containers.
       return false;
@@ -94,8 +92,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
     return false;
   }
 
-  public ContainerHealthResult checkHealth(ContainerCheckRequest request)
-          throws InvalidContainerReplicaException {
+  public ContainerHealthResult checkHealth(ContainerCheckRequest request) {
     ContainerInfo container = request.getContainerInfo();
     Set<ContainerReplica> replicas = request.getContainerReplicas();
     List<ContainerReplicaOp> replicaPendingOps = request.getPendingOps();

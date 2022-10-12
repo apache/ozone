@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.Un
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.HealthState;
 
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
-import org.apache.hadoop.hdds.scm.container.replication.InvalidContainerReplicaException;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.junit.Assert;
 import org.junit.Before;
@@ -76,8 +75,7 @@ public class TestECReplicationCheckHandler {
   }
 
   @Test
-  public void testHealthyContainerIsHealthy()
-          throws InvalidContainerReplicaException {
+  public void testHealthyContainerIsHealthy() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), 1, 2, 3, 4, 5);
@@ -95,8 +93,7 @@ public class TestECReplicationCheckHandler {
   }
 
   @Test
-  public void testUnderReplicatedContainerIsUnderReplicated()
-          throws InvalidContainerReplicaException {
+  public void testUnderReplicatedContainerIsUnderReplicated() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), 1, 2, 4, 5);
@@ -119,8 +116,7 @@ public class TestECReplicationCheckHandler {
   }
 
   @Test
-  public void testUnderReplicatedContainerFixedWithPending()
-          throws InvalidContainerReplicaException {
+  public void testUnderReplicatedContainerFixedWithPending() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), 1, 2, 4, 5);
@@ -149,8 +145,7 @@ public class TestECReplicationCheckHandler {
   }
 
   @Test
-  public void testUnderReplicatedDueToDecommission()
-          throws InvalidContainerReplicaException {
+  public void testUnderReplicatedDueToDecommission() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
@@ -177,8 +172,7 @@ public class TestECReplicationCheckHandler {
   }
 
   @Test
-  public void testUnderReplicatedDueToDecommissionFixedWithPending()
-          throws InvalidContainerReplicaException {
+  public void testUnderReplicatedDueToDecommissionFixedWithPending() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
@@ -210,8 +204,7 @@ public class TestECReplicationCheckHandler {
   }
 
   @Test
-  public void testUnderReplicatedDueToDecommissionAndMissingReplica()
-          throws InvalidContainerReplicaException {
+  public void testUnderReplicatedDueToDecommissionAndMissingReplica() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
@@ -240,8 +233,7 @@ public class TestECReplicationCheckHandler {
   }
 
   @Test
-  public void testUnderReplicatedAndUnrecoverable()
-          throws InvalidContainerReplicaException {
+  public void testUnderReplicatedAndUnrecoverable() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2));
@@ -269,8 +261,7 @@ public class TestECReplicationCheckHandler {
   }
 
   @Test
-  public void testOverReplicatedContainer()
-          throws InvalidContainerReplicaException {
+  public void testOverReplicatedContainer() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
@@ -297,8 +288,7 @@ public class TestECReplicationCheckHandler {
   }
 
   @Test
-  public void testOverReplicatedContainerFixedByPending()
-          throws InvalidContainerReplicaException {
+  public void testOverReplicatedContainerFixedByPending() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
@@ -331,8 +321,7 @@ public class TestECReplicationCheckHandler {
   }
 
   @Test
-  public void testOverReplicatedContainerDueToMaintenance()
-          throws InvalidContainerReplicaException {
+  public void testOverReplicatedContainerDueToMaintenance() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
@@ -356,8 +345,7 @@ public class TestECReplicationCheckHandler {
   }
 
   @Test
-  public void testOverAndUnderReplicated()
-          throws InvalidContainerReplicaException {
+  public void testOverAndUnderReplicated() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),

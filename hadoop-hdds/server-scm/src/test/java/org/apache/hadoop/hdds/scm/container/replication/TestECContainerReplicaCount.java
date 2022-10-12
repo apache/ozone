@@ -58,8 +58,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testPerfectlyReplicatedContainer()
-          throws InvalidContainerReplicaException {
+  public void testPerfectlyReplicatedContainer() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
@@ -72,8 +71,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testContainerMissingReplica()
-          throws InvalidContainerReplicaException {
+  public void testContainerMissingReplica() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
@@ -87,8 +85,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testContainerMissingReplicaDueToPendingDelete()
-          throws InvalidContainerReplicaException {
+  public void testContainerMissingReplicaDueToPendingDelete() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
@@ -105,8 +102,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testContainerExcessReplicasAndPendingDelete()
-          throws InvalidContainerReplicaException {
+  public void testContainerExcessReplicasAndPendingDelete() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
@@ -122,8 +118,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testUnderRepContainerWithExcessReplicasAndPendingDelete()
-          throws InvalidContainerReplicaException {
+  public void testUnderRepContainerWithExcessReplicasAndPendingDelete() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
@@ -141,8 +136,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testContainerWithMaintenanceReplicasSufficientlyReplicated()
-          throws InvalidContainerReplicaException {
+  public void testContainerWithMaintenanceReplicasSufficientlyReplicated() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_MAINTENANCE, 4),
@@ -161,8 +155,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testOverReplicatedContainer()
-          throws InvalidContainerReplicaException {
+  public void testOverReplicatedContainer() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
@@ -184,8 +177,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testOverReplicatedContainerFixedWithPendingDelete()
-          throws InvalidContainerReplicaException {
+  public void testOverReplicatedContainerFixedWithPendingDelete() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
@@ -208,8 +200,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testOverReplicatedAndUnderReplicatedContainer()
-          throws InvalidContainerReplicaException {
+  public void testOverReplicatedAndUnderReplicatedContainer() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
@@ -227,8 +218,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testAdditionalMaintenanceCopiesAllMaintenance()
-          throws InvalidContainerReplicaException {
+  public void testAdditionalMaintenanceCopiesAllMaintenance() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_MAINTENANCE, 1),
             Pair.of(ENTERING_MAINTENANCE, 2), Pair.of(IN_MAINTENANCE, 3),
@@ -255,8 +245,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testAdditionalMaintenanceCopiesAlreadyReplicated()
-          throws InvalidContainerReplicaException {
+  public void testAdditionalMaintenanceCopiesAlreadyReplicated() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
@@ -285,8 +274,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testAdditionalMaintenanceCopiesAlreadyReplicatedWithDelete()
-          throws InvalidContainerReplicaException {
+  public void testAdditionalMaintenanceCopiesAlreadyReplicatedWithDelete() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
@@ -308,8 +296,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testAdditionalMaintenanceCopiesDuplicatesInMaintenance()
-          throws InvalidContainerReplicaException {
+  public void testAdditionalMaintenanceCopiesDuplicatesInMaintenance() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
@@ -339,8 +326,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testMaintenanceRedundancyGreaterThanParity()
-          throws InvalidContainerReplicaException {
+  public void testMaintenanceRedundancyGreaterThanParity() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_MAINTENANCE, 4),
@@ -365,8 +351,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testUnderReplicatedNoMaintenance()
-          throws InvalidContainerReplicaException {
+  public void testUnderReplicatedNoMaintenance() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3));
@@ -387,8 +372,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testMaintenanceRedundancyIsMetWithPendingAdd()
-          throws InvalidContainerReplicaException {
+  public void testMaintenanceRedundancyIsMetWithPendingAdd() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_MAINTENANCE, 1),
             Pair.of(ENTERING_MAINTENANCE, 2), Pair.of(IN_MAINTENANCE, 3),
@@ -411,8 +395,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testUnderReplicatedFixedWithPending()
-          throws InvalidContainerReplicaException {
+  public void testUnderReplicatedFixedWithPending() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3));
@@ -436,8 +419,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testMissingNonMaintenanceReplicas()
-          throws InvalidContainerReplicaException {
+  public void testMissingNonMaintenanceReplicas() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_MAINTENANCE, 4));
@@ -456,8 +438,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testMissingNonMaintenanceReplicasAllMaintenance()
-          throws InvalidContainerReplicaException {
+  public void testMissingNonMaintenanceReplicasAllMaintenance() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_MAINTENANCE, 1), Pair.of(IN_MAINTENANCE, 2),
             Pair.of(IN_MAINTENANCE, 3), Pair.of(IN_MAINTENANCE, 4),
@@ -481,8 +462,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testMissingNonMaintenanceReplicasPendingAdd()
-          throws InvalidContainerReplicaException {
+  public void testMissingNonMaintenanceReplicasPendingAdd() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
@@ -518,7 +498,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testMissing() throws InvalidContainerReplicaException {
+  public void testMissing() {
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, new HashSet<>(),
             Collections.emptyList(), 1);
@@ -545,8 +525,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testDecommissioningOnlyIndexes()
-          throws InvalidContainerReplicaException {
+  public void testDecommissioningOnlyIndexes() {
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
