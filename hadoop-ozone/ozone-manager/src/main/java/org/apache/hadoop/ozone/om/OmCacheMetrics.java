@@ -27,19 +27,21 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 
 /**
- * Reusable component that emit cache metrics.
+ * Reusable component that emits cache metrics for a particular cache.
  */
 public final class OmCacheMetrics implements MetricsSource {
   enum CacheMetricsInfo implements MetricsInfo {
     CacheName("Cache Metrics."),
     Size("Size of the cache."),
-    HitCount("Number of threads in the pool."),
-    HitRate("Number of threads in the pool."),
-    MissCount("Number of threads in the pool."),
-    MissRate("Number of threads in the pool."),
-    LoadSuccessCount("Number of threads in the pool."),
-    LoadExceptionCount("Number of threads in the pool."),
-    EvictionCount("Number of threads in the pool.");
+    HitCount("Number of time the lookup methods return a cached value."),
+    HitRate("Ratio of cache requests which were hit."),
+    MissCount("Number of times the requested value is not in the cache."),
+    MissRate("Ratio of cache requests which were missed."),
+    LoadSuccessCount("Number of times the cache successfully " +
+        "load new values"),
+    LoadExceptionCount("Number of times the cache encounters exception " +
+        "loading new values."),
+    EvictionCount("Number of values which were evicted.");
 
     private final String desc;
 
