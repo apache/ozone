@@ -92,12 +92,10 @@ import java.util.stream.Stream;
 //      thise case.
 //      - Getting the DB sync. This case needs to handle getting the
 //      compaction-DAG information as well.
-//
 
 /**
  *  RocksDBCheckpointDiffer class.
  */
-@SuppressWarnings({"NM_METHOD_NAMING_CONVENTION"})
 public class RocksDBCheckpointDiffer {
   private final String rocksDbPath;
   private String cpPath;
@@ -438,10 +436,8 @@ public class RocksDBCheckpointDiffer {
     }
   }
 
-  public void setRocksDBForCompactionTracking(Options rocksOptions)
-      throws RocksDBException {
-    setRocksDBForCompactionTracking(rocksOptions,
-        new ArrayList<AbstractEventListener>());
+  public void setRocksDBForCompactionTracking(Options rocksOptions) {
+    setRocksDBForCompactionTracking(rocksOptions, new ArrayList<>());
   }
 
   /**
@@ -469,7 +465,7 @@ public class RocksDBCheckpointDiffer {
 
               final StringBuilder sb = new StringBuilder();
 
-              // kLevelL0FilesNum / kLevelMaxLevelSize
+              // kLevelL0FilesNum / kLevelMaxLevelSize. TODO: Can remove
               sb.append("# ").append(compactionJobInfo.compactionReason()).append('\n');
 
               // Trim DB path, only keep the SST file name
@@ -478,7 +474,7 @@ public class RocksDBCheckpointDiffer {
 
               for (String file : compactionJobInfo.inputFiles()) {
                 final String fn = file.substring(filenameBegin + 1);
-                sb.append(fn).append('\t');  // TODO: Trim last delimiter
+                sb.append(fn).append('\t');  // TODO: nit: Trim last delimiter
 
                 LOG.warn(file);
                 String saveLinkFileName =
@@ -580,16 +576,6 @@ public class RocksDBCheckpointDiffer {
     return liveFiles;
   }
 
-  private int getSnapshotIdx(Snapshot src) {
-    // Jump an O(n) search (for the UT)
-    for (int i = 0; i < allSnapshots.length; i++) {
-      if (allSnapshots[i].snapshotID.equals(src.snapshotID)) {
-        return i;
-      }
-    }
-    return -1;
-  }
-
   /**
    * Process each line of compaction log text file input and populate the DAG.
    * TODO: Drop synchronized? and make this thread safe?
@@ -658,7 +644,6 @@ public class RocksDBCheckpointDiffer {
     HashSet<String> loadSet = new HashSet<>(sstSet);
 
     // Check if all the nodes in the provided SST set is already loaded in DAG
-//    compactionDAGFwd.nodes().containsAll(sstSet);
     for (String sstFile : sstSet) {
       if (compactionNodeTable.containsKey(sstFile)) {
         loadSet.remove(sstFile);
@@ -666,7 +651,8 @@ public class RocksDBCheckpointDiffer {
     }
 
     if (loadSet.size() == 0) {
-      // All expected nodes in the sstSet are already loaded, no need to read any compaction log.
+      // All expected nodes in the sstSet are already there,
+      //  no need to read any compaction log
       return true;
     }
 
@@ -714,7 +700,7 @@ public class RocksDBCheckpointDiffer {
   /**
    * Given the src and destination Snapshots, it prints a Diff list.
    *
-   * Expected input: src checkpoint is taken AFTER dest checkpoint.
+   * Expected input: src is a checkpoint taken AFTER dest checkpoint.
    *
    * @param src
    * @param dest

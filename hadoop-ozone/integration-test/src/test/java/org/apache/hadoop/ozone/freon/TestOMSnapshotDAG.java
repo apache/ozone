@@ -86,14 +86,6 @@ public class TestOMSnapshotDAG {
 
     store = cluster.getClient().getObjectStore();
 
-    // Hack to get freon working
-//    path = GenericTestUtils
-//        .getTempPath(TestHadoopDirTreeGenerator.class.getSimpleName());
-//    FileOutputStream out = FileUtils.openOutputStream(new File(path, "conf"));
-//    cluster.getConf().writeXml(out);
-//    out.getFD().sync();
-//    out.close();
-
     GenericTestUtils.setLogLevel(RaftLog.LOG, Level.INFO);
     GenericTestUtils.setLogLevel(RaftServer.LOG, Level.INFO);
   }
