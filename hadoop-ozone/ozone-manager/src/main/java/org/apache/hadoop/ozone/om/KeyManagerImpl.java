@@ -1255,8 +1255,6 @@ public class KeyManagerImpl implements KeyManager {
           }
         }
       }
-    } catch (Exception e) {
-      LOG.error("Failed to get info of key {}", keyName, e);
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
               bucketName);
