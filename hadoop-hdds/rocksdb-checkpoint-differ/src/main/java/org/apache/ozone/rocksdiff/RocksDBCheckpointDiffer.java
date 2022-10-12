@@ -1004,14 +1004,13 @@ public class RocksDBCheckpointDiffer {
   /**
    * Populate the compaction DAG with input and outout SST files lists.
    */
+  @SuppressFBWarnings({"AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION"})
   private void populateCompactionDAG(String[] inputFiles,
       String[] outputFiles) {
 
     LOG.info("Populating compaction DAG with lists of input and output files");
 
-    for (String outFilePath : outputFiles) {
-      // TODO: Drop getFileName() call later
-      String outfile = Paths.get(outFilePath).getFileName().toString();
+    for (String outfile : outputFiles) {
       CompactionNode outfileNode = compactionNodeTable.get(outfile);
       if (outfileNode == null) {
         long numKeys = 0;
@@ -1028,9 +1027,7 @@ public class RocksDBCheckpointDiffer {
         compactionNodeTable.put(outfile, outfileNode);
       }
 
-      for (String inFilePath : inputFiles) {
-        // TODO: Drop getFileName() call later
-        String infile = Paths.get(inFilePath).getFileName().toString();
+      for (String infile : inputFiles) {
         CompactionNode infileNode = compactionNodeTable.get(infile);
         if (infileNode == null) {
           long numKeys = 0;
