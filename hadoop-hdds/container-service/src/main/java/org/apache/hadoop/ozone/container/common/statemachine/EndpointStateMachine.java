@@ -161,7 +161,6 @@ public class EndpointStateMachine
     if (endPoint != null) {
       endPoint.close();
     }
-    executorService.shutdown();
   }
 
   /**

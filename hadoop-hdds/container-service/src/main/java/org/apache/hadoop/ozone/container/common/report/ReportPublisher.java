@@ -54,8 +54,8 @@ public abstract class ReportPublisher<T extends Message>
                    ScheduledExecutorService executorService) {
     this.context = stateContext;
     this.executor = executorService;
-    this.executor.scheduleAtFixedRate(this,
-        getReportFrequency(), getReportFrequency(), TimeUnit.MILLISECONDS);
+    this.executor.schedule(this,
+        getReportFrequency(), TimeUnit.MILLISECONDS);
   }
 
   public void setConf(ConfigurationSource conf) {
@@ -71,6 +71,8 @@ public abstract class ReportPublisher<T extends Message>
     if (!executor.isShutdown() &&
         (context.getState() != DatanodeStates.SHUTDOWN)) {
       publishReport();
+      executor.schedule(this,
+          getReportFrequency(), TimeUnit.MILLISECONDS);
     }
   }
 
