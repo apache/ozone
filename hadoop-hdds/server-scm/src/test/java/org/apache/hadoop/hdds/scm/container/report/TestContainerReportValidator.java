@@ -39,8 +39,8 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 public class TestContainerReportValidator {
 
-  private ContainerReplicaProto getContainerReplica
-          (ContainerID containerID, int replicaIndex, DatanodeDetails dn) {
+  private ContainerReplicaProto getContainerReplica(
+          ContainerID containerID, int replicaIndex, DatanodeDetails dn) {
     return HddsTestUtils.createContainerReplica(containerID,
             State.CLOSED, dn.getUuidString(), 10000L, 2L,
             replicaIndex);
