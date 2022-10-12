@@ -2788,7 +2788,7 @@
   </property>
   <property>
     <name>ozone.recon.scm.snapshot.enabled</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, RECON, SCM</tag>
     <description>
       If enabled, SCM DB Snapshot is taken by Recon.

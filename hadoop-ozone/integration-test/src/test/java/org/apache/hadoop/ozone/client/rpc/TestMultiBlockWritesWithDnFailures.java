@@ -181,7 +181,6 @@ public class TestMultiBlockWritesWithDnFailures {
             RatisReplicationConfig
                 .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     Assert.assertEquals(2 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
@@ -234,7 +233,6 @@ public class TestMultiBlockWritesWithDnFailures {
             RatisReplicationConfig
                 .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     Assert.assertEquals(4 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
