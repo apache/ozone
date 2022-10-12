@@ -111,6 +111,8 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
 
   private OzoneBucket[] ozoneBuckets;
 
+  private int clientCount;
+
   private byte[] keyContent;
 
   private static final Logger LOG =
@@ -130,13 +132,14 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   public Void call() throws Exception {
     init();
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-    OzoneClient[] ozoneClients = new OzoneClient[threadNo];
-    for (int i = 0; i < clientsCount; i++) {
+    clientCount =  getThreadNo();
+    OzoneClient[] ozoneClients = new OzoneClient[clientCount];
+    for (int i = 0; i < clientCount; i++) {
       ozoneClients[i] = createOzoneClient(omServiceID, ozoneConfiguration);
     }
 
     ensureVolumeAndBucketExist(ozoneClients[0], volumeName, bucketName);
-    ozoneBuckets = new OzoneBucket[threadNo];
+    ozoneBuckets = new OzoneBucket[clientCount];
     for (int i = 0; i < clientsCount; i++) {
       ozoneBuckets[i] = ozoneClients[i].getObjectStore().getVolume(volumeName)
               .getBucket(bucketName);
@@ -151,7 +154,7 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     }
     runTests(this::readWriteKeys);
 
-    for (int i = 0; i < clientsCount; i++) {
+    for (int i = 0; i < clientCount; i++) {
       if (ozoneClients[i] != null) {
         ozoneClients[i].close();
       }
@@ -160,7 +163,7 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   }
 
   public void readWriteKeys(long counter) throws Exception {
-    int clientIndex = (int)((counter) % clientsCount);
+    int clientIndex = (int)((counter) % clientCount);
     OzoneBucket ozoneBucket = ozoneBuckets[clientIndex];
     TaskType taskType = decideReadOrWriteTask();
     String keyName = getKeyName(clientIndex);

@@ -175,7 +175,7 @@ public class RangeKeysGenerator extends BaseFreonGenerator
     String keyName;
     for (int i = start; i < end + 1; i++) {
       keyName = getPrefix() + FILE_DIR_SEPARATOR + f.apply(i);
-      testMap.put(String.valueOf(i), keyName);
+//       testMap.put(String.valueOf(i), keyName);
       try (OzoneOutputStream out = ozbk.createKey(keyName, writeSizeInBytes)) {
         out.write(keyContent);
         out.flush();
