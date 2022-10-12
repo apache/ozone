@@ -93,7 +93,7 @@ public class IncrementalContainerReportHandler extends
               nodeManager.addContainer(dd, id);
             }
           }
-          if (ContainerReportValidator.validate(container, replicaProto)) {
+          if (ContainerReportValidator.validate(container, dd, replicaProto)) {
             processContainerReplica(dd, container, replicaProto, publisher);
           }
         } catch (ContainerNotFoundException e) {

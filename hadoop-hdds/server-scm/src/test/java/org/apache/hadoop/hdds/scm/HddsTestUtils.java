@@ -825,4 +825,27 @@ public final class HddsTestUtils {
     }
     return containerInfoList;
   }
+
+  public static ContainerReplicaProto createContainerReplica(
+          ContainerID containerId, ContainerReplicaProto.State state,
+          String originNodeId, long usedBytes, long keyCount,
+          int replicaIndex) {
+
+    return ContainerReplicaProto.newBuilder()
+                    .setContainerID(containerId.getId())
+                    .setState(state)
+                    .setOriginNodeId(originNodeId)
+                    .setFinalhash("e16cc9d6024365750ed8dbd194ea46d2")
+                    .setSize(5368709120L)
+                    .setUsed(usedBytes)
+                    .setKeyCount(keyCount)
+                    .setReadCount(100000000L)
+                    .setWriteCount(100000000L)
+                    .setReadBytes(2000000000L)
+                    .setWriteBytes(2000000000L)
+                    .setBlockCommitSequenceId(10000L)
+                    .setDeleteTransactionId(0)
+                    .setReplicaIndex(replicaIndex)
+                    .build();
+  }
 }

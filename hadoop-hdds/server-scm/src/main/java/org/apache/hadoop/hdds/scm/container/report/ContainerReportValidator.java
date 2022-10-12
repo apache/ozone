@@ -20,9 +20,13 @@ package org.apache.hadoop.hdds.scm.container.report;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.Optional;
@@ -41,19 +45,39 @@ public final class ContainerReportValidator {
 
   private interface ReplicaValidator {
     boolean validate(ReplicationConfig replicationConfig,
-                            ContainerReplicaProto replicaProto);
+                     DatanodeDetails datanodeDetails,
+                     ContainerReplicaProto replicaProto);
   }
 
   private static class ECReplicaValidator implements ReplicaValidator {
 
+    private static final Logger LOG =
+            LoggerFactory.getLogger(ECReplicaValidator.class);
     @Override
     public boolean validate(ReplicationConfig replicationConfig,
+                            DatanodeDetails datanodeDetails,
                             ContainerReplicaProto replicaProto) {
+      if (replicationConfig.getReplicationType() != ReplicationType.EC) {
+        LOG.error("Provided Replication Config: {} is not " +
+                        "EC replication config",
+                replicationConfig.getReplicationType());
+        return false;
+      }
+      boolean validReplicaIndex = replicaProto.hasReplicaIndex()
+              && replicaProto.getReplicaIndex() > 0 &&
+              replicaProto.getReplicaIndex() <=
+                      replicationConfig.getRequiredNodes();
 
-      return replicationConfig.getReplicationType() == ReplicationType.EC
-        && replicaProto.hasReplicaIndex() && replicaProto.getReplicaIndex() > 0
-        && replicaProto.getReplicaIndex() <=
-              replicationConfig.getRequiredNodes();
+      if (!validReplicaIndex) {
+        LOG.error("ContainerReplicaReport for ContainerID: {} " +
+                        "in Datanode: {} failed. " +
+                        "Replica Index should be between 1 and {}. " +
+                        "Given Replica Index: {}",
+                replicaProto.getContainerID(), datanodeDetails,
+                replicationConfig.getRequiredNodes(),
+                replicaProto.getReplicaIndex());
+      }
+      return validReplicaIndex;
     }
   }
 
@@ -61,16 +85,20 @@ public final class ContainerReportValidator {
     CONTAINER_REPORT_VALIDATOR = new ContainerReportValidator();
   }
   private static boolean validateReplica(ReplicationConfig replicationConfig,
+                                         DatanodeDetails datanodeDetails,
                                          ContainerReplicaProto replicaProto) {
     return Optional.ofNullable(replicationConfig.getReplicationType())
             .map(CONTAINER_REPORT_VALIDATOR.replicaValidators::get)
             .map(replicaValidator ->
-                    replicaValidator.validate(replicationConfig, replicaProto))
+                    replicaValidator.validate(replicationConfig,
+                            datanodeDetails, replicaProto))
             .orElse(true);
   }
   public static boolean validate(ContainerInfo containerInfo,
+                                 DatanodeDetails datanodeDetails,
                                  ContainerReplicaProto replicaProto) {
-    return validateReplica(containerInfo.getReplicationConfig(), replicaProto);
+    return validateReplica(containerInfo.getReplicationConfig(),
+            datanodeDetails, replicaProto);
   }
 
 

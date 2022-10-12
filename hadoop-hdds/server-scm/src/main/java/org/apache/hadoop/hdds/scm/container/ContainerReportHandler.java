@@ -189,7 +189,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
             nodeManager.addContainer(datanodeDetails, cid);
           }
           if (container == null || ContainerReportValidator
-                  .validate(container, replica)) {
+                  .validate(container, datanodeDetails, replica)) {
             processSingleReplica(datanodeDetails, container,
                     replica, publisher);
           }
