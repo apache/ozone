@@ -41,6 +41,19 @@ public final class ManagedRocksObjectUtils {
     }
   }
 
+  static void assertClosed(ManagedObject<?>object) {
+    RocksObject rocksObject = object.get();
+    ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
+    if (rocksObject.isOwningHandle()) {
+      ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
+      LOG.warn("{} is not closed properly",
+          rocksObject.getClass().getSimpleName());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("StackTrace for unclosed instance: {}", object.getStackTrace());
+      }
+    }
+  }
+
   static void assertClosed(RocksObject rocksObject, Throwable stack) {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
     if (rocksObject.isOwningHandle()) {
