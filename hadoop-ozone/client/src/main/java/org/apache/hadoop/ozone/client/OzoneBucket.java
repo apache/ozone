@@ -650,11 +650,12 @@ public class OzoneBucket extends WithMetadata {
    * keys if key prefix is null.
    *
    * @param keyPrefix Bucket prefix to match
+   * @param delimiter A delimiter to group matched keys
    * @return {@code Iterator<OzoneKey>}
    */
-  public Iterator<? extends OzoneKey> listKeys(String keyPrefix)
-      throws IOException {
-    return listKeys(keyPrefix, null);
+  public Iterator<? extends OzoneKey> listKeys(String keyPrefix,
+      String delimiter) throws IOException {
+    return listKeys(keyPrefix, delimiter, null);
   }
 
   /**
@@ -664,14 +665,15 @@ public class OzoneBucket extends WithMetadata {
    * keys if key prefix is null.
    *
    * @param keyPrefix Bucket prefix to match
+   * @param delimiter A delimiter to group matched keys
    * @param prevKey Keys will be listed after this key name
    * @return {@code Iterator<OzoneKey>}
    */
-  public Iterator<? extends OzoneKey> listKeys(String keyPrefix, String prevKey)
-      throws IOException {
+  public Iterator<? extends OzoneKey> listKeys(String keyPrefix,
+           String delimiter, String prevKey) throws IOException {
 
     return new KeyIteratorFactory()
-        .getKeyIterator(keyPrefix, prevKey, bucketLayout);
+        .getKeyIterator(keyPrefix, delimiter, prevKey, bucketLayout);
   }
 
   /**
@@ -987,15 +989,23 @@ public class OzoneBucket extends WithMetadata {
   private class KeyIterator implements Iterator<OzoneKey> {
 
     private String keyPrefix = null;
+    private String delimiter = null;
     private Iterator<OzoneKey> currentIterator;
     private OzoneKey currentValue;
 
     String getKeyPrefix() {
       return keyPrefix;
     }
+    String getDelimiter() {
+      return delimiter;
+    }
 
     void setKeyPrefix(String keyPrefixPath) {
       keyPrefix = keyPrefixPath;
+    }
+
+    void setDelimiter(String delimiter) {
+      this.delimiter = delimiter;
     }
 
     /**
@@ -1008,6 +1018,12 @@ public class OzoneBucket extends WithMetadata {
       setKeyPrefix(keyPrefix);
       this.currentValue = null;
       this.currentIterator = getNextListOfKeys(prevKey).iterator();
+    }
+
+    KeyIterator(String keyPrefix, String delimiter, String prevKey)
+        throws IOException {
+      this(keyPrefix, prevKey);
+      this.delimiter = delimiter;
     }
 
     @Override
@@ -1087,8 +1103,9 @@ public class OzoneBucket extends WithMetadata {
      * @param keyPrefix
      * @param prevKey
      */
-    KeyIteratorWithFSO(String keyPrefix, String prevKey) throws IOException {
-      super(keyPrefix, prevKey);
+    KeyIteratorWithFSO(String keyPrefix, String delimiter, String prevKey)
+        throws IOException {
+      super(keyPrefix, delimiter, prevKey);
     }
 
     /**
@@ -1315,9 +1332,14 @@ public class OzoneBucket extends WithMetadata {
           // Adding in-progress keyPath back to the stack to make sure
           // all the siblings will be fetched.
           stack.push(new ImmutablePair<>(keyPrefix, keyInfo.getKeyName()));
-          // Adding current directory to the stack, so that this dir will be
-          // the top element. Moving seek pointer to fetch sub-paths
-          stack.push(new ImmutablePair<>(keyInfo.getKeyName(), ""));
+          // If a slash ('/') delimiter is defined, children can be considered
+          // as CommonPrefix. So we do not need fetch recursively.
+          if (StringUtils.isBlank(getDelimiter()) ||
+              !OZONE_URI_DELIMITER.equals(getDelimiter())) {
+            // Adding current directory to the stack, so that this dir will be
+            // the top element. Moving seek pointer to fetch sub-paths
+            stack.push(new ImmutablePair<>(keyInfo.getKeyName(), ""));
+          }
           // Return it so that the next iteration will be
           // started using the stacked items.
           return true;
@@ -1413,12 +1435,12 @@ public class OzoneBucket extends WithMetadata {
   }
 
   private class KeyIteratorFactory {
-    KeyIterator getKeyIterator(String keyPrefix, String prevKey,
-        BucketLayout bType) throws IOException {
+    KeyIterator getKeyIterator(String keyPrefix, String delimiter,
+         String prevKey, BucketLayout bType) throws IOException {
       if (bType.isFileSystemOptimized()) {
-        return new KeyIteratorWithFSO(keyPrefix, prevKey);
+        return new KeyIteratorWithFSO(keyPrefix, delimiter, prevKey);
       } else {
-        return new KeyIterator(keyPrefix, prevKey);
+        return new KeyIterator(keyPrefix, delimiter, prevKey);
       }
     }
   }
