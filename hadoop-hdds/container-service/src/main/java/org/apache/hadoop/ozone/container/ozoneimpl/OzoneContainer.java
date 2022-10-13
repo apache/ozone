@@ -84,6 +84,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.VOLUME_BYTES_PER_SECOND_KEY;
 
 /**
@@ -311,12 +312,12 @@ public class OzoneContainer {
       LOG.info("Background container scanner has been disabled.");
       return;
     }
-    OnDemandContainerScanner.init(c, controller);
-    if (this.metadataScanner == null) {
-      this.metadataScanner = new ContainerMetadataScanner(c, controller);
-    }
-    this.metadataScanner.start();
+    initOnDemandContainerScanner(c);
+    initMetadataScanner(c);
+    initContainerScanner(c);
+  }
 
+  private void initContainerScanner(ContainerScannerConfiguration c) {
     if (c.getBandwidthPerVolume() == 0L) {
       LOG.warn(VOLUME_BYTES_PER_SECOND_KEY + " is set to 0, " +
           "so background container data scanner will not start.");
@@ -329,6 +330,22 @@ public class OzoneContainer {
       s.start();
       dataScanners.add(s);
     }
+  }
+
+  private void initMetadataScanner(ContainerScannerConfiguration c) {
+    if (this.metadataScanner == null) {
+      this.metadataScanner = new ContainerMetadataScanner(c, controller);
+    }
+    this.metadataScanner.start();
+  }
+
+  private void initOnDemandContainerScanner(ContainerScannerConfiguration c) {
+    if (c.getOnDemandBandwidthPerVolume() == 0L) {
+      LOG.warn(ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY + " is set to 0, " +
+          "so on-demand container data scanner will not start.");
+      return;
+    }
+    OnDemandContainerScanner.init(c, controller);
   }
 
   /**

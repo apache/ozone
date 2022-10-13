@@ -18,9 +18,8 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import org.apache.commons.compress.utils.Lists;
-import org.apache.hadoop.hdfs.util.Canceler;
-import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -37,6 +36,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -44,7 +44,6 @@ import static org.apache.hadoop.hdds.conf.OzoneConfiguration.newInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -142,13 +141,11 @@ public class TestContainerScannerMetrics {
   @Test
   public void testOnDemandScannerMetrics() {
     OnDemandContainerScanner.init(conf, controller);
-    ArrayList<Future<?>> resultFutureList = Lists.newArrayList();
-    OnDemandContainerScanner.scanContainer(corruptData);
-    resultFutureList.add(OnDemandContainerScanner.getLastScanFuture());
-    OnDemandContainerScanner.scanContainer(corruptMetadata);
-    resultFutureList.add(OnDemandContainerScanner.getLastScanFuture());
-    OnDemandContainerScanner.scanContainer(healthy);
-    resultFutureList.add(OnDemandContainerScanner.getLastScanFuture());
+    ArrayList<Optional<Future<?>>> resultFutureList = Lists.newArrayList();
+    resultFutureList.add(OnDemandContainerScanner.scanContainer(corruptData));
+    resultFutureList.add(
+        OnDemandContainerScanner.scanContainer(corruptMetadata));
+    resultFutureList.add(OnDemandContainerScanner.scanContainer(healthy));
     waitOnScannerToFinish(resultFutureList);
     OnDemandScannerMetrics metrics = OnDemandContainerScanner.getMetrics();
     //Containers with shouldScanData = false shouldn't increase
@@ -157,14 +154,10 @@ public class TestContainerScannerMetrics {
     assertEquals(2, metrics.getNumContainersScanned());
   }
 
-  private void waitOnScannerToFinish(ArrayList<Future<?>> resultFutureList) {
-    for (Future<?> future : resultFutureList) {
-      try {
-        future.get();
-      } catch (Exception e) {
-        throw new RuntimeException("Error while waiting on " +
-            "on-demand scanner to finish");
-      }
+  private void waitOnScannerToFinish(
+      ArrayList<Optional<Future<?>>> resultFutureList) {
+    for (Optional<Future<?>> future : resultFutureList) {
+      future.ifPresent(ContainerTestUtils::waitForScanToFinish);
     }
   }
 
@@ -180,13 +173,16 @@ public class TestContainerScannerMetrics {
 
   private ContainerController mockContainerController() {
     // healthy container
-    setupMockContainer(healthy, true, true, true);
+    ContainerTestUtils.setupMockContainer(healthy,
+        true, true, true, containerIdSeq);
 
     // unhealthy container (corrupt data)
-    setupMockContainer(corruptData, true, true, false);
+    ContainerTestUtils.setupMockContainer(corruptData,
+        true, true, false, containerIdSeq);
 
     // unhealthy container (corrupt metadata)
-    setupMockContainer(corruptMetadata, false, false, false);
+    ContainerTestUtils.setupMockContainer(corruptMetadata,
+        false, false, false, containerIdSeq);
 
     Collection<Container<?>> containers = Arrays.asList(
         healthy, corruptData, corruptMetadata);
@@ -196,17 +192,4 @@ public class TestContainerScannerMetrics {
 
     return mock;
   }
-
-  private void setupMockContainer(
-      Container<ContainerData> c, boolean shouldScanData,
-      boolean scanMetaDataSuccess, boolean scanDataSuccess) {
-    ContainerData data = mock(ContainerData.class);
-    when(data.getContainerID()).thenReturn(containerIdSeq.getAndIncrement());
-    when(c.getContainerData()).thenReturn(data);
-    when(c.shouldScanData()).thenReturn(shouldScanData);
-    when(c.scanMetaData()).thenReturn(scanMetaDataSuccess);
-    when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
-        .thenReturn(scanDataSuccess);
-  }
-
 }

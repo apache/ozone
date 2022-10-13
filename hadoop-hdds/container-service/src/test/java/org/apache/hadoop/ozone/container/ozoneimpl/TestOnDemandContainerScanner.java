@@ -19,11 +19,11 @@
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import org.apache.hadoop.hdfs.util.Canceler;
-import org.apache.hadoop.hdfs.util.DataTransferThrottler;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -33,15 +33,14 @@ import org.mockito.junit.MockitoJUnitRunner;
 import org.mockito.verification.VerificationMode;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdds.conf.OzoneConfiguration.newInstanceOf;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for the on-demand container scanner.
@@ -98,50 +97,52 @@ public class TestOnDemandContainerScanner {
     testContainerMarkedUnhealthy(corruptData, never());
   }
 
+  @Test
+  public void testSameContainerQueuedMultipleTimes() {
+    OnDemandContainerScanner.init(conf, controller);
+    //We need a scan to be in progress to test scheduling a container
+    // multiple times, because the first scheduled scan is immediately removed
+    // from the list of to be scanned containers.
+    //Given a container that is scheduled when another scan is already running
+    Optional<Future<?>> onGoingScan = OnDemandContainerScanner
+        .scanContainer(healthy);
+    Optional<Future<?>> firstScan = OnDemandContainerScanner
+        .scanContainer(corruptData);
+    Assert.assertTrue(onGoingScan.isPresent());
+    if (!onGoingScan.get().isDone()) {
+      //When scheduling the same container again, while the other container's
+      // scan is still not finished
+      Optional<Future<?>> secondScanResult = OnDemandContainerScanner
+          .scanContainer(corruptData);
+      //Then the first schedule will run and the second one is dismissed
+      Assert.assertTrue(firstScan.isPresent());
+      Assert.assertFalse(secondScanResult.isPresent());
+    }
+  }
+
   private void testContainerMarkedUnhealthy(
       Container<?> container, VerificationMode invocationTimes)
       throws IOException {
-    OnDemandContainerScanner.scanContainer(container);
-    waitForScanToFinish();
+    Optional<Future<?>> result =
+        OnDemandContainerScanner.scanContainer(container);
+    result.ifPresent(ContainerTestUtils::waitForScanToFinish);
     Mockito.verify(controller, invocationTimes).markContainerUnhealthy(
         container.getContainerData().getContainerID());
   }
 
-  private void waitForScanToFinish() {
-    try {
-      Future<?> futureScan = OnDemandContainerScanner.getLastScanFuture();
-      if (futureScan == null) {
-        return;
-      }
-      futureScan.get();
-    } catch (Exception e) {
-      throw new RuntimeException("Error while waiting" +
-          " for on-demand scan to finish");
-    }
-  }
-
   private ContainerController mockContainerController() {
     // healthy container
-    setupMockContainer(healthy, true, true);
+    ContainerTestUtils.setupMockContainer(healthy,
+        true, true, containerIdSeq);
 
     // unhealthy container (corrupt data)
-    setupMockContainer(corruptData, true, false);
+    ContainerTestUtils.setupMockContainer(corruptData,
+        true, false, containerIdSeq);
 
     // unhealthy container (corrupt metadata)
-    setupMockContainer(openContainer, false,
-        false);
+    ContainerTestUtils.setupMockContainer(openContainer,
+        false, false, containerIdSeq);
 
     return mock(ContainerController.class);
-  }
-
-  private void setupMockContainer(
-      Container<ContainerData> c, boolean shouldScanData,
-      boolean scanDataSuccess) {
-    ContainerData data = mock(ContainerData.class);
-    when(data.getContainerID()).thenReturn(containerIdSeq.getAndIncrement());
-    when(c.getContainerData()).thenReturn(data);
-    when(c.shouldScanData()).thenReturn(shouldScanData);
-    when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
-        .thenReturn(scanDataSuccess);
   }
 }

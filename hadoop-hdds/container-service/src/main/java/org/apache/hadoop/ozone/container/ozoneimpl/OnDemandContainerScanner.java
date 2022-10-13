@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -48,10 +47,8 @@ public final class OnDemandContainerScanner {
   private final DataTransferThrottler throttler;
   private final Canceler canceler;
   private final ConcurrentHashMap
-      .KeySetView<Container<?>, Boolean> toBeScannedContainers;
+      .KeySetView<Long, Boolean> containerRescheduleCheckSet;
   private final OnDemandScannerMetrics metrics;
-  @VisibleForTesting
-  private static Future<?> lastScanFuture;
 
   private OnDemandContainerScanner(
       ContainerScannerConfiguration conf, ContainerController controller) {
@@ -61,7 +58,7 @@ public final class OnDemandContainerScanner {
     canceler = new Canceler();
     metrics = OnDemandScannerMetrics.create();
     scanExecutor = Executors.newSingleThreadExecutor();
-    toBeScannedContainers = ConcurrentHashMap.newKeySet();
+    containerRescheduleCheckSet = ConcurrentHashMap.newKeySet();
   }
 
   public static synchronized void init(
@@ -74,19 +71,30 @@ public final class OnDemandContainerScanner {
     instance = new OnDemandContainerScanner(conf, controller);
   }
 
-  public static void scanContainer(Container<?> container) {
-    if (instance == null) {
-      return;
+  public static Optional<Future<?>> scanContainer(Container<?> container) {
+    if (instance == null || !container.shouldScanData()) {
+      return Optional.empty();
     }
-    if (container.shouldScanData() &&
-        instance.toBeScannedContainers.add(container)) {
-      lastScanFuture = instance.scanExecutor.submit(() -> {
-        instance.toBeScannedContainers.remove(container);
+    Future<?> resultFuture = null;
+    long containerId = container.getContainerData().getContainerID();
+    if (addContainerToScheduledContainers(containerId)) {
+      resultFuture = instance.scanExecutor.submit(() -> {
+        removeContainerFromScheduledContainers(containerId);
         if (container.shouldScanData()) {
           performOnDemandScan(container);
         }
       });
     }
+    return Optional.ofNullable(resultFuture);
+  }
+
+  private static boolean addContainerToScheduledContainers(long containerId) {
+    return instance.containerRescheduleCheckSet.add(containerId);
+  }
+
+  private static void removeContainerFromScheduledContainers(
+      long containerId) {
+    instance.containerRescheduleCheckSet.remove(containerId);
   }
 
   private static void performOnDemandScan(Container<?> container) {
@@ -120,10 +128,8 @@ public final class OnDemandContainerScanner {
 
   private static void logScanCompleted(
       ContainerData containerData, Instant timestamp) {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Completed scan of container {} at {}",
-          containerData.getContainerID(), timestamp);
-    }
+    LOG.debug("Completed scan of container {} at {}",
+        containerData.getContainerID(), timestamp);
   }
 
   public static OnDemandScannerMetrics getMetrics() {
@@ -155,10 +161,5 @@ public final class OnDemandContainerScanner {
       scanExecutor.shutdownNow();
       throw new RuntimeException(e);
     }
-  }
-
-  @VisibleForTesting
-  public static Future<?> getLastScanFuture() {
-    return lastScanFuture;
   }
 }

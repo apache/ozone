@@ -571,13 +571,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         .orElse(Boolean.FALSE);
   }
 
-  private void scanContainerIfNeeded(Container<?> container) {
-    if (container.getContainerState() == State.CLOSED ||
-        container.getContainerState() == State.QUASI_CLOSED) {
-      OnDemandContainerScanner.scanContainer(container);
-    }
-  }
-
   @Override
   public Handler getHandler(ContainerProtos.ContainerType containerType) {
     return handlers.get(containerType);

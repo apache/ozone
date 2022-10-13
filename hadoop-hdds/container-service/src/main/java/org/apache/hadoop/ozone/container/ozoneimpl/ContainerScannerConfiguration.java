@@ -52,9 +52,11 @@ public class ContainerScannerConfiguration {
       Duration.ofHours(3).toMillis();
   public static final long DATA_SCAN_INTERVAL_DEFAULT =
       Duration.ofDays(7).toMillis();
-  public static final long BANDWIDTH_PER_VOLUME_DEFAULT = 1048576;   // 1MB
-  // 1MB
-  public static final long ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT = 1048576;
+
+  private static final long BYTES_IN_MEGABYTES = 1048576L;
+  public static final long BANDWIDTH_PER_VOLUME_DEFAULT = BYTES_IN_MEGABYTES;
+  public static final long ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT =
+      BYTES_IN_MEGABYTES * 5L;
 
   @Config(key = "enabled",
       type = ConfigType.BOOLEAN,
