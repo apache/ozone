@@ -168,7 +168,7 @@ public class TestPermissionCheck {
   public void testListKey() throws IOException {
     Mockito.when(objectStore.getVolume(anyString())).thenReturn(volume);
     Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).listKeys(anyString());
+    doThrow(exception).when(bucket).listKeys(anyString(), null);
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
 

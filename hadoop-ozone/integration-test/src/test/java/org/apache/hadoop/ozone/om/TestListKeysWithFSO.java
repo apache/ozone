@@ -475,7 +475,7 @@ public class TestListKeysWithFSO {
   private static List<String> getExpectedKeyList(String keyPrefix,
       String startKey, OzoneBucket legacyBucket) throws Exception {
     Iterator<? extends OzoneKey> ozoneKeyIterator =
-        legacyBucket.listKeys(keyPrefix, startKey);
+        legacyBucket.listKeys(keyPrefix, null, startKey);
 
     List<String> keys = new LinkedList<>();
     while (ozoneKeyIterator.hasNext()) {
@@ -489,7 +489,7 @@ public class TestListKeysWithFSO {
       List<String> keys, OzoneBucket fsoBucket) throws Exception {
 
     Iterator<? extends OzoneKey> ozoneKeyIterator =
-        fsoBucket.listKeys(keyPrefix, startKey);
+        fsoBucket.listKeys(keyPrefix, null, startKey);
 
     List <String> keyLists = new ArrayList<>();
     while (ozoneKeyIterator.hasNext()) {

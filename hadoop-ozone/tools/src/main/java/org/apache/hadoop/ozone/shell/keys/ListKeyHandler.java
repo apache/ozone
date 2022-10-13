@@ -54,7 +54,7 @@ public class ListKeyHandler extends BucketHandler {
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);
     Iterator<? extends OzoneKey> keyIterator = bucket.listKeys(
-        listOptions.getPrefix(), listOptions.getStartItem());
+        listOptions.getPrefix(), null, listOptions.getStartItem());
 
     int maxKeyLimit = listOptions.getLimit();
     int counter = printAsJsonArray(keyIterator, maxKeyLimit);

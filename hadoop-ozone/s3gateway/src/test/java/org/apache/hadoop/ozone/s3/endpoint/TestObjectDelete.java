@@ -55,6 +55,6 @@ public class TestObjectDelete {
 
     //THEN
     Assert.assertFalse("Bucket Should not contain any key after delete",
-        bucket.listKeys("").hasNext());
+        bucket.listKeys("", null).hasNext());
   }
 }

@@ -693,7 +693,7 @@ public class BasicRootedOzoneClientAdapterImpl
       // return an empty list on error
       return new IteratorAdapter(Collections.emptyIterator());
     }
-    return new IteratorAdapter(bucket.listKeys(key));
+    return new IteratorAdapter(bucket.listKeys(key, null));
   }
 
   /**

@@ -435,18 +435,18 @@ public class TestObjectStoreWithFSO {
 
     // Root level listing keys
     Iterator<? extends OzoneKey> ozoneKeyIterator =
-        ozoneBucket.listKeys(null, null);
+        ozoneBucket.listKeys(null, null, null);
     verifyFullTreeStructure(ozoneKeyIterator);
 
     ozoneKeyIterator =
-        ozoneBucket.listKeys("a/", null);
+        ozoneBucket.listKeys("a/", null, null);
     verifyFullTreeStructure(ozoneKeyIterator);
 
     LinkedList<String> expectedKeys;
 
     // Intermediate level keyPrefix - 2nd level
     ozoneKeyIterator =
-        ozoneBucket.listKeys("a///b2///", null);
+        ozoneBucket.listKeys("a///b2///", null, null);
     expectedKeys = new LinkedList<>();
     expectedKeys.add("a/b2/");
     expectedKeys.add("a/b2/d1/");
@@ -460,7 +460,7 @@ public class TestObjectStoreWithFSO {
 
     // Intermediate level keyPrefix - 3rd level
     ozoneKeyIterator =
-        ozoneBucket.listKeys("a/b2/d1", null);
+        ozoneBucket.listKeys("a/b2/d1", null, null);
     expectedKeys = new LinkedList<>();
     expectedKeys.add("a/b2/d1/");
     expectedKeys.add("a/b2/d1/d11.tx");
@@ -468,14 +468,14 @@ public class TestObjectStoreWithFSO {
 
     // Boundary of a level
     ozoneKeyIterator =
-        ozoneBucket.listKeys("a/b2/d2", "a/b2/d2/d21.tx");
+        ozoneBucket.listKeys("a/b2/d2", null, "a/b2/d2/d21.tx");
     expectedKeys = new LinkedList<>();
     expectedKeys.add("a/b2/d2/d22.tx");
     checkKeyList(ozoneKeyIterator, expectedKeys);
 
     // Boundary case - last node in the depth-first-traversal
     ozoneKeyIterator =
-        ozoneBucket.listKeys("a/b3/e3", "a/b3/e3/e31.tx");
+        ozoneBucket.listKeys("a/b3/e3", null, "a/b3/e3/e31.tx");
     expectedKeys = new LinkedList<>();
     checkKeyList(ozoneKeyIterator, expectedKeys);
   }
@@ -538,18 +538,18 @@ public class TestObjectStoreWithFSO {
     // Iterator with key name as prefix.
 
     Iterator<? extends OzoneKey> ozoneKeyIterator =
-            ozoneBucket.listKeys("/dir1//", null);
+            ozoneBucket.listKeys("/dir1//", null, null);
 
     checkKeyList(ozoneKeyIterator, keys);
 
     // Iterator with with normalized key prefix.
     ozoneKeyIterator =
-            ozoneBucket.listKeys("dir1/");
+            ozoneBucket.listKeys("dir1/", null, null);
 
     checkKeyList(ozoneKeyIterator, keys);
 
     // Iterator with key name as previous key.
-    ozoneKeyIterator = ozoneBucket.listKeys(null,
+    ozoneKeyIterator = ozoneBucket.listKeys(null, null,
             "/dir1///dir2/file1/");
 
     // Remove keys before //dir1/dir2/file1
@@ -560,7 +560,7 @@ public class TestObjectStoreWithFSO {
     checkKeyList(ozoneKeyIterator, keys);
 
     // Iterator with  normalized key as previous key.
-    ozoneKeyIterator = ozoneBucket.listKeys(null,
+    ozoneKeyIterator = ozoneBucket.listKeys(null, null,
             OmUtils.normalizeKey(key1, false));
 
     checkKeyList(ozoneKeyIterator, keys);

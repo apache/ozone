@@ -377,7 +377,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public Iterator<BasicKeyInfo> listKeys(String pathKey) throws IOException {
     incrementCounter(Statistic.OBJECTS_LIST, 1);
-    return new IteratorAdapter(bucket.listKeys(pathKey));
+    return new IteratorAdapter(bucket.listKeys(pathKey, null));
   }
 
   @Override

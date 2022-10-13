@@ -61,7 +61,8 @@ public class TestObjectMultiDelete {
     MultiDeleteResponse response = rest.multiDelete("b1", "", mdr);
 
     //THEN
-    Set<String> keysAtTheEnd = Sets.newHashSet(bucket.listKeys("")).stream()
+    Set<String> keysAtTheEnd = Sets.newHashSet(
+        bucket.listKeys("", null)).stream()
         .map(OzoneKey::getName)
         .collect(Collectors.toSet());
 
@@ -93,7 +94,8 @@ public class TestObjectMultiDelete {
     MultiDeleteResponse response = rest.multiDelete("b1", "", mdr);
 
     //THEN
-    Set<String> keysAtTheEnd = Sets.newHashSet(bucket.listKeys("")).stream()
+    Set<String> keysAtTheEnd = Sets.newHashSet(
+        bucket.listKeys("", null)).stream()
         .map(OzoneKey::getName)
         .collect(Collectors.toSet());
 
