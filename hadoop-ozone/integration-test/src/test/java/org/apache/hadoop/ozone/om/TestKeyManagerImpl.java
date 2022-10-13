@@ -800,19 +800,20 @@ public class TestKeyManagerImpl {
     List<OmKeyLocationInfo> locationList =
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList();
     Assert.assertEquals(1, locationList.size());
+    long containerID = locationList.get(0).getContainerID();
     locationInfoList.add(
         new OmKeyLocationInfo.Builder().setPipeline(pipeline)
-            .setBlockID(new BlockID(locationList.get(0).getContainerID(),
+            .setBlockID(new BlockID(containerID,
                 locationList.get(0).getLocalID())).build());
     keyArgs.setLocationInfoList(locationInfoList);
 
     writeClient.commitKey(keyArgs, keySession.getId());
-    ContainerInfo containerInfo = new ContainerInfo.Builder().setContainerID(1L)
-        .setPipelineID(pipeline.getId()).build();
+    ContainerInfo containerInfo = new ContainerInfo.Builder()
+        .setContainerID(containerID).setPipelineID(pipeline.getId()).build();
     List<ContainerWithPipeline> containerWithPipelines = Arrays.asList(
         new ContainerWithPipeline(containerInfo, pipeline));
     when(mockScmContainerClient.getContainerWithPipelineBatch(
-        Arrays.asList(1L))).thenReturn(containerWithPipelines);
+        Arrays.asList(containerID))).thenReturn(containerWithPipelines);
 
     OmKeyInfo key = keyManager.lookupKey(keyArgs, null);
     Assert.assertEquals(key.getKeyName(), keyName);
