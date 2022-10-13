@@ -255,7 +255,7 @@ public class KeyValueContainerCheck {
                   block, containerID);
             }
           } else {
-            throw new IOException(ex);
+            throw ex;
           }
         }
       }
