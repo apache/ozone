@@ -21,6 +21,7 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -159,7 +160,7 @@ public class TestOzoneNativeAuthorizer {
     writeClient = omTestManagers.getWriteClient();
     nativeAuthorizer = new OzoneNativeAuthorizer(volumeManager, bucketManager,
         keyManager, prefixManager,
-        Collections.singletonList("om"));
+        new OzoneAdmins(Collections.singletonList("om")));
     adminUgi = UserGroupInformation.createUserForTesting("om",
         new String[]{"ozone"});
     testUgi = UserGroupInformation.createUserForTesting("testuser",
@@ -400,7 +401,8 @@ public class TestOzoneNativeAuthorizer {
       String msg = "Acl to check:" + a1 + " accessType:" +
           accessType + " path:" + obj.getPath();
       if (a1.equals(CREATE) && obj.getResourceType().equals(VOLUME)) {
-        assertEquals(msg, nativeAuthorizer.getOzoneAdmins().contains(user),
+        assertEquals(msg, nativeAuthorizer.getOzoneAdmins()
+                         .getAdminUsernames().contains(user),
             nativeAuthorizer.checkAccess(obj,
                 builder.setAclRights(a1).build()));
       } else {
@@ -521,7 +523,7 @@ public class TestOzoneNativeAuthorizer {
     allAcls.remove(NONE);
     RequestContext ctx = builder.build();
     boolean expectedResult = expectedAclResult;
-    if (nativeAuthorizer.getOzoneAdmins().contains(
+    if (nativeAuthorizer.getOzoneAdmins().getAdminUsernames().contains(
         ctx.getClientUgi().getUserName())) {
       expectedResult = true;
     }

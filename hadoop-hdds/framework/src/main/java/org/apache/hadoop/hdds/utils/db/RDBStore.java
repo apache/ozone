@@ -63,23 +63,27 @@ public class RDBStore implements DBStore {
   private final String snapshotsParentDir;
   private final RDBMetrics rdbMetrics;
   private final RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
+  private final String dbJmxBeanName;
 
   @VisibleForTesting
   public RDBStore(File dbFile, ManagedDBOptions options,
                   Set<TableConfig> families) throws IOException {
     this(dbFile, options, new ManagedWriteOptions(), families,
-        new CodecRegistry(), false, 1000);
+        new CodecRegistry(), false, 1000, null);
   }
 
+  @SuppressWarnings("parameternumber")
   public RDBStore(File dbFile, ManagedDBOptions dbOptions,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
-                  CodecRegistry registry, boolean readOnly, int maxFSSnapshots)
-      throws IOException {
+                  CodecRegistry registry, boolean readOnly, int maxFSSnapshots,
+                  String dbJmxBeanNameName) throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
     Preconditions.checkArgument(!families.isEmpty());
     codecRegistry = registry;
     dbLocation = dbFile;
+    dbJmxBeanName = dbJmxBeanNameName == null ? dbFile.getName() :
+        dbJmxBeanNameName;
 
     try {
       rocksDBCheckpointDiffer =
@@ -95,14 +99,16 @@ public class RDBStore implements DBStore {
 
       if (dbOptions.statistics() != null) {
         Map<String, String> jmxProperties = new HashMap<>();
-        jmxProperties.put("dbName", dbFile.getName());
+        jmxProperties.put("dbName", dbJmxBeanName);
         statMBeanName = HddsUtils.registerWithJmxProperties(
             "Ozone", "RocksDbStore", jmxProperties,
-            RocksDBStoreMBean.create(dbOptions.statistics(),
-                dbFile.getName()));
+            RocksDBStoreMBean.create(dbOptions.statistics(), dbJmxBeanName));
         if (statMBeanName == null) {
           LOG.warn("jmx registration failed during RocksDB init, db path :{}",
-              dbFile.getAbsolutePath());
+              dbJmxBeanName);
+        } else {
+          LOG.debug("jmx registration succeed during RocksDB init, db path :{}",
+              dbJmxBeanName);
         }
       }
 
@@ -165,13 +171,14 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     if (statMBeanName != null) {
       MBeans.unregister(statMBeanName);
       statMBeanName = null;
     }
 
     RDBMetrics.unRegister();
+    checkPointManager.close();
     db.close();
   }
 
@@ -301,7 +308,7 @@ public class RDBStore implements DBStore {
   }
 
   public Collection<ColumnFamily> getColumnFamilies() {
-    return db.getColumnFamilies();
+    return db.getExtraColumnFamilies();
   }
 
   @Override

@@ -398,4 +398,15 @@ public final class OMConfigKeys {
   public static final TimeDuration
       OZONE_OM_MULTITENANCY_RANGER_SYNC_TIMEOUT_DEFAULT
       = TimeDuration.valueOf(10, TimeUnit.SECONDS);
+
+  public static final String OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE
+      = "ozone.om.container.location.cache.size";
+  public static final int OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE_DEFAULT
+      = 100_000;
+
+  public static final String OZONE_OM_CONTAINER_LOCATION_CACHE_TTL
+      = "ozone.om.container.location.cache.ttl";
+
+  public static final TimeDuration OZONE_OM_CONTAINER_LOCATION_CACHE_TTL_DEFAULT
+      = TimeDuration.valueOf(360, TimeUnit.MINUTES);
 }

@@ -388,17 +388,14 @@ public class TestOzoneShellHA {
 
   @Test
   public void testRATISTypeECReplication() {
-    for (ReplicationType type : new ReplicationType[]{
-        ReplicationType.RATIS, ReplicationType.STAND_ALONE}) {
-      String[] args = new String[]{"bucket", "create", "/vol/bucket",
-          "--type=" + type, "--replication=rs-3-2-1024k"};
-      Throwable t = assertThrows(ExecutionException.class,
-          () -> execute(ozoneShell, args));
-      Throwable c = t.getCause();
-      assertTrue(c instanceof IllegalArgumentException);
-      assertEquals("rs-3-2-1024k is not supported for " +
-              type + " replication type", c.getMessage());
-    }
+    String[] args = new String[]{"bucket", "create", "/vol/bucket",
+        "--type=" + ReplicationType.RATIS, "--replication=rs-3-2-1024k"};
+    Throwable t = assertThrows(ExecutionException.class,
+        () -> execute(ozoneShell, args));
+    Throwable c = t.getCause();
+    assertTrue(c instanceof IllegalArgumentException);
+    assertEquals("rs-3-2-1024k is not supported for " +
+            ReplicationType.RATIS + " replication type", c.getMessage());
   }
 
   /**
@@ -1009,7 +1006,7 @@ public class TestOzoneShellHA {
     }
 
     args = new String[] {"bucket", "set-replication-config", bucketPath, "-t",
-        "STAND_ALONE", "-r", "ONE"};
+        "RATIS", "-r", "THREE"};
     execute(ozoneShell, args);
     bucket = volume.getBucket("bucket0");
     try (OzoneOutputStream out = bucket.createKey("newNonECKey", 1024)) {

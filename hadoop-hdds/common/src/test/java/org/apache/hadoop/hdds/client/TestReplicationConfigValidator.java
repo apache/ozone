@@ -29,10 +29,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /**
  * Test ReplicationConfig validator.
  */
-public class TestReplicationConfigValidator {
+class TestReplicationConfigValidator {
 
   @Test
-  public void testValidation() {
+  void testValidation() {
     MutableConfigurationSource config = new InMemoryConfiguration();
 
     final ReplicationConfigValidator validator =
@@ -51,14 +51,16 @@ public class TestReplicationConfigValidator {
     try {
       validator.validate(new ECReplicationConfig(invalidEcConfig1));
     } catch (IllegalArgumentException ex) {
-      GenericTestUtils.assertExceptionContains("Invalid replication " +
-          "config for type EC and replication xor-6-4-{CHUNK_SIZE}", ex);
+      GenericTestUtils.assertExceptionContains(
+              "Invalid data-parity replication " +
+          "config for type EC and replication xor-6-4-{CHUNK_SIZE}. " +
+                      "Supported data-parity are 3-2,6-3,10-4", ex);
     }
 
   }
 
   @Test
-  public void testWithoutValidation() {
+  void testWithoutValidation() {
     MutableConfigurationSource config = new InMemoryConfiguration();
     config.set("ozone.replication.allowed-configs", "");
 
@@ -71,7 +73,7 @@ public class TestReplicationConfigValidator {
   }
 
   @Test
-  public void testCustomValidation() {
+  void testCustomValidation() {
     MutableConfigurationSource config = new InMemoryConfiguration();
     config.set("ozone.replication.allowed-configs", "RATIS/THREE");
 

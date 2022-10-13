@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import java.io.IOException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -104,7 +105,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         authorizer.setBucketManager(bucketManager);
         authorizer.setKeyManager(keyManager);
         authorizer.setPrefixManager(prefixManager);
-        authorizer.setOzoneAdmins(ozoneManager.getOmAdminUsernames());
+        authorizer.setOzoneAdmins(
+            new OzoneAdmins(ozoneManager.getOmAdminUsernames()));
         authorizer.setAllowListAllVolumes(allowListAllVolumes);
       } else {
         isNativeAuthorizerEnabled = false;

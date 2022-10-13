@@ -38,10 +38,10 @@ public class RDBSstFileWriter implements DumpFileWriter, Closeable {
   private File sstFile;
   private AtomicLong keyCounter;
   private ManagedOptions emptyOption = new ManagedOptions();
+  private final ManagedEnvOptions emptyEnvOptions = new ManagedEnvOptions();
 
   public RDBSstFileWriter() {
-    ManagedEnvOptions envOptions = new ManagedEnvOptions();
-    this.sstFileWriter = new ManagedSstFileWriter(envOptions, emptyOption);
+    this.sstFileWriter = new ManagedSstFileWriter(emptyEnvOptions, emptyOption);
     this.keyCounter = new AtomicLong(0);
   }
 
@@ -82,19 +82,23 @@ public class RDBSstFileWriter implements DumpFileWriter, Closeable {
         throw toIOException("Failed to finish dumping into file "
             + sstFile.getAbsolutePath(), e);
       } finally {
-        sstFileWriter.close();
-        sstFileWriter = null;
-        emptyOption.close();
+        closeResources();
       }
 
       keyCounter.set(0);
     }
   }
 
+  private void closeResources() {
+    sstFileWriter.close();
+    sstFileWriter = null;
+    emptyOption.close();
+    emptyEnvOptions.close();
+  }
+
   private void closeOnFailure() {
     if (sstFileWriter != null) {
-      sstFileWriter.close();
-      sstFileWriter = null;
+      closeResources();
     }
   }
 }

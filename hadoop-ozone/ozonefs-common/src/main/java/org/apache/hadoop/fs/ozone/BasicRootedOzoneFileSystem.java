@@ -54,6 +54,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -194,8 +195,11 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     statistics.incrementReadOps(1);
     LOG.trace("open() path: {}", path);
     final String key = pathToKey(path);
-    return new FSDataInputStream(
-        new OzoneFSInputStream(adapter.readFile(key), statistics));
+    return new FSDataInputStream(createFSInputStream(adapter.readFile(key)));
+  }
+
+  protected InputStream createFSInputStream(InputStream inputStream) {
+    return new OzoneFSInputStream(inputStream, statistics);
   }
 
   protected void incrementCounter(Statistic statistic) {
@@ -573,10 +577,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       return false;
     }
 
-    if (status == null) {
-      return false;
-    }
-
     String key = pathToKey(f);
     boolean result;
 
@@ -867,12 +867,17 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     try {
       fileStatus = convertFileStatus(
           adapter.getFileStatus(key, uri, qualifiedPath, getUsername()));
-    } catch (OMException ex) {
-      if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND) ||
-          ex.getResult().equals(OMException.ResultCodes.BUCKET_NOT_FOUND) ||
-          ex.getResult().equals(OMException.ResultCodes.VOLUME_NOT_FOUND)) {
-        throw new FileNotFoundException("File not found. path:" + f);
+    } catch (IOException e) {
+      if (e instanceof OMException) {
+        OMException ex = (OMException) e;
+        if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND) ||
+            ex.getResult().equals(OMException.ResultCodes.BUCKET_NOT_FOUND) ||
+            ex.getResult().equals(OMException.ResultCodes.VOLUME_NOT_FOUND)) {
+          throw new FileNotFoundException("File not found. path:" + f);
+        }
       }
+      LOG.warn("GetFileStatus failed for path {}", f, e);
+      throw e;
     }
     return fileStatus;
   }
@@ -959,6 +964,133 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_LOCATED_STATUS);
     return super.listLocatedStatus(f);
+  }
+
+  @Override
+  public RemoteIterator<FileStatus> listStatusIterator(Path f)
+      throws IOException {
+    return new OzoneFileStatusIterator<>(f);
+  }
+
+  /**
+   * A private class implementation for iterating list of file status.
+   *
+   * @param <T> the type of the file status.
+   */
+  private final class OzoneFileStatusIterator<T extends FileStatus>
+      implements RemoteIterator<T> {
+    private List<FileStatus> thisListing;
+    private int i;
+    private Path p;
+    private T curStat = null;
+    private String startPath = "";
+
+    /**
+     * Constructor to initialize OzoneFileStatusIterator.
+     * Get the first batch of entry for iteration.
+     *
+     * @param p path to file/directory.
+     * @throws IOException
+     */
+    private OzoneFileStatusIterator(Path p) throws IOException {
+      this.p = p;
+      // fetch the first batch of entries in the directory
+      thisListing = listFileStatus(p, startPath);
+      if (thisListing != null && !thisListing.isEmpty()) {
+        startPath = pathToKey(
+            thisListing.get(thisListing.size() - 1).getPath());
+        LOG.debug("Got {} file status, next start path {}",
+            thisListing.size(), startPath);
+      }
+      i = 0;
+    }
+
+    /**
+     * @return true if next entry exists false otherwise.
+     * @throws IOException
+     */
+    @Override
+    public boolean hasNext() throws IOException {
+      while (curStat == null && hasNextNoFilter()) {
+        T next;
+        FileStatus fileStat = thisListing.get(i++);
+        next = (T) (fileStat);
+        curStat = next;
+      }
+      return curStat != null;
+    }
+
+    /**
+     * Checks the next available entry from partial listing if not exhausted
+     * or fetches new batch for listing.
+     *
+     * @return true if next entry exists false otherwise.
+     * @throws IOException
+     */
+    private boolean hasNextNoFilter() throws IOException {
+      if (thisListing == null) {
+        return false;
+      }
+      if (i >= thisListing.size()) {
+        if (startPath != null && (thisListing.size() == LISTING_PAGE_SIZE ||
+            thisListing.size() == LISTING_PAGE_SIZE - 1)) {
+          // current listing is exhausted & fetch a new listing
+          thisListing = listFileStatus(p, startPath);
+          if (thisListing != null && !thisListing.isEmpty()) {
+            startPath = pathToKey(
+                thisListing.get(thisListing.size() - 1).getPath());
+            LOG.debug("Got {} file status, next start path {}",
+                thisListing.size(), startPath);
+          } else {
+            return false;
+          }
+          i = 0;
+        }
+      }
+      return (i < thisListing.size());
+    }
+
+    /**
+     * @return next entry.
+     * @throws IOException
+     */
+    @Override
+    public T next() throws IOException {
+      if (hasNext()) {
+        T tmp = curStat;
+        curStat = null;
+        return tmp;
+      }
+      throw new java.util.NoSuchElementException("No more entry in " + p);
+    }
+  }
+
+  /**
+   * Get all the file status for input path and startPath.
+   *
+   * @param f
+   * @param startPath
+   * @return list of file status.
+   * @throws IOException
+   */
+  private List<FileStatus> listFileStatus(Path f, String startPath)
+      throws IOException {
+    incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
+    statistics.incrementReadOps(1);
+    LOG.trace("listFileStatus() path:{}", f);
+    List<FileStatus> statusList;
+    statusList =
+        adapter.listStatus(pathToKey(f), false, startPath,
+            LISTING_PAGE_SIZE, uri, workingDir, getUsername())
+            .stream()
+            .map(this::convertFileStatus)
+            .collect(Collectors.toList());
+
+    if (!statusList.isEmpty() && !startPath.isEmpty()) {
+      // Excluding the 1st file status element from list.
+      statusList.remove(0);
+    }
+    return statusList;
   }
 
   /**

@@ -25,6 +25,7 @@ import java.util.HashMap;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaOneDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaTwoDBDefinition;
@@ -75,7 +76,7 @@ public final class DBDefinitionFactory {
           "Path is required to identify the used db scheme");
     }
     String dbName = fileName.toString();
-    if (dbName.endsWith("container.db")) {
+    if (dbName.endsWith(OzoneConsts.CONTAINER_DB_SUFFIX)) {
       switch (dnDBSchemaVersion) {
       case "V1":
         return new DatanodeSchemaOneDBDefinition(

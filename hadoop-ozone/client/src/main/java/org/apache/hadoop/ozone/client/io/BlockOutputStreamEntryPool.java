@@ -26,6 +26,7 @@ import java.util.ListIterator;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -79,6 +80,7 @@ public class BlockOutputStreamEntryPool {
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
   private final ExcludeList excludeList;
+  private final ContainerClientMetrics clientMetrics;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockOutputStreamEntryPool(
@@ -88,7 +90,8 @@ public class BlockOutputStreamEntryPool {
       String uploadID, int partNumber,
       boolean isMultipart, OmKeyInfo info,
       boolean unsafeByteBufferConversion,
-      XceiverClientFactory xceiverClientFactory, long openID
+      XceiverClientFactory xceiverClientFactory, long openID,
+      ContainerClientMetrics clientMetrics
   ) {
     this.config = config;
     this.xceiverClientFactory = xceiverClientFactory;
@@ -110,19 +113,14 @@ public class BlockOutputStreamEntryPool {
                 .getStreamBufferSize()),
             ByteStringConversion
                 .createByteBufferConversion(unsafeByteBufferConversion));
+    this.clientMetrics = clientMetrics;
   }
 
   ExcludeList createExcludeList() {
     return new ExcludeList();
   }
 
-  /**
-   * A constructor for testing purpose only.
-   *
-   * @see KeyOutputStream#KeyOutputStream()
-   */
-  @VisibleForTesting
-  BlockOutputStreamEntryPool() {
+  BlockOutputStreamEntryPool(ContainerClientMetrics clientMetrics) {
     streamEntries = new ArrayList<>();
     omClient = null;
     keyArgs = null;
@@ -140,6 +138,7 @@ public class BlockOutputStreamEntryPool {
     currentStreamIndex = 0;
     openID = -1;
     excludeList = new ExcludeList();
+    this.clientMetrics = clientMetrics;
   }
 
   /**
@@ -185,6 +184,7 @@ public class BlockOutputStreamEntryPool {
             .setLength(subKeyInfo.getLength())
             .setBufferPool(bufferPool)
             .setToken(subKeyInfo.getToken())
+            .setClientMetrics(clientMetrics)
             .build();
   }
 
@@ -245,6 +245,10 @@ public class BlockOutputStreamEntryPool {
 
   OzoneClientConfig getConfig() {
     return config;
+  }
+
+  ContainerClientMetrics getClientMetrics() {
+    return clientMetrics;
   }
 
   /**

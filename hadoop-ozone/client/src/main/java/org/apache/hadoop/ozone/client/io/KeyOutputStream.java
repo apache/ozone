@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -89,11 +90,7 @@ public class KeyOutputStream extends OutputStream {
 
   private long clientID;
 
-  /**
-   * A constructor for testing purpose only.
-   */
-  @VisibleForTesting
-  public KeyOutputStream() {
+  public KeyOutputStream(ContainerClientMetrics clientMetrics) {
     closed = false;
     this.retryPolicyMap = HddsClientUtils.getExceptionList()
         .stream()
@@ -101,7 +98,7 @@ public class KeyOutputStream extends OutputStream {
             e -> RetryPolicies.TRY_ONCE_THEN_FAIL));
     retryCount = 0;
     offset = 0;
-    blockOutputStreamEntryPool = new BlockOutputStreamEntryPool();
+    blockOutputStreamEntryPool = new BlockOutputStreamEntryPool(clientMetrics);
   }
 
   @VisibleForTesting
@@ -137,7 +134,8 @@ public class KeyOutputStream extends OutputStream {
       OzoneManagerProtocol omClient, int chunkSize,
       String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
-      boolean unsafeByteBufferConversion
+      boolean unsafeByteBufferConversion,
+      ContainerClientMetrics clientMetrics
   ) {
     this.config = config;
     blockOutputStreamEntryPool =
@@ -149,7 +147,8 @@ public class KeyOutputStream extends OutputStream {
             isMultipart, handler.getKeyInfo(),
             unsafeByteBufferConversion,
             xceiverClientManager,
-            handler.getId());
+            handler.getId(),
+            clientMetrics);
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval());
     this.retryCount = 0;
@@ -552,6 +551,7 @@ public class KeyOutputStream extends OutputStream {
     private boolean unsafeByteBufferConversion;
     private OzoneClientConfig clientConfig;
     private ReplicationConfig replicationConfig;
+    private ContainerClientMetrics clientMetrics;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -652,6 +652,15 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+    public Builder setClientMetrics(ContainerClientMetrics clientMetrics) {
+      this.clientMetrics = clientMetrics;
+      return this;
+    }
+
+    public ContainerClientMetrics getClientMetrics() {
+      return clientMetrics;
+    }
+
     public KeyOutputStream build() {
       return new KeyOutputStream(
           clientConfig,
@@ -664,7 +673,8 @@ public class KeyOutputStream extends OutputStream {
           multipartUploadID,
           multipartNumber,
           isMultipartKey,
-          unsafeByteBufferConversion);
+          unsafeByteBufferConversion,
+          clientMetrics);
     }
 
   }
