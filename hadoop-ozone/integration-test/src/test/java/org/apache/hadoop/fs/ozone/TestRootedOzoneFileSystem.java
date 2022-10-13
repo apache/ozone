@@ -21,12 +21,15 @@ package org.apache.hadoop.fs.ozone;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
@@ -383,6 +386,223 @@ public class TestRootedOzoneFileSystem {
 
     // Cleanup
     fs.delete(parent, true);
+  }
+
+  /**
+   * Tests listStatusIterator operation on a directory.
+   */
+  @Test
+  public void testListStatusIteratorWithDir() throws Exception {
+    Path parent = new Path(bucketPath, "testListStatus");
+    Path file1 = new Path(parent, "key1");
+    Path file2 = new Path(parent, "key2");
+    try {
+      // Iterator should have no items when dir is empty
+      RemoteIterator<FileStatus> it = ofs.listStatusIterator(bucketPath);
+      Assert.assertFalse(it.hasNext());
+      ContractTestUtils.touch(fs, file1);
+      ContractTestUtils.touch(fs, file2);
+      // Iterator should have an item when dir is not empty
+      it = ofs.listStatusIterator(bucketPath);
+      while (it.hasNext()) {
+        FileStatus fileStatus = it.next();
+        Assert.assertNotNull(fileStatus);
+        Assert.assertEquals("Parent path doesn't match",
+            fileStatus.getPath().toUri().getPath(), parent.toString());
+      }
+      // Iterator on a directory should return all subdirs along with
+      // files.
+      it = ofs.listStatusIterator(parent);
+      int iCount = 0;
+      while (it.hasNext()) {
+        iCount++;
+        FileStatus fileStatus = it.next();
+        Assert.assertNotNull(fileStatus);
+      }
+      Assert.assertEquals(
+          "Iterator did not return all the file status",
+          2, iCount);
+      // Iterator should return file status for only the
+      // immediate children of a directory.
+      Path file3 = new Path(parent, "dir1/key3");
+      Path file4 = new Path(parent, "dir1/key4");
+      ContractTestUtils.touch(fs, file3);
+      ContractTestUtils.touch(fs, file4);
+      it = ofs.listStatusIterator(parent);
+      iCount = 0;
+      while (it.hasNext()) {
+        iCount++;
+        FileStatus fileStatus = it.next();
+        Assert.assertNotNull(fileStatus);
+      }
+      Assert.assertEquals("Iterator did not return file status " +
+          "of all the children of the directory", 3, iCount);
+    } finally {
+      // Cleanup
+      fs.delete(parent, true);
+    }
+  }
+
+  /**
+   * Test listStatusIterator operation in a bucket.
+   */
+  @Test
+  public void testListStatusIteratorInBucket() throws Exception {
+    Path root = new Path("/" + volumeName + "/" + bucketName);
+    Path dir1 = new Path(root, "dir1");
+    Path dir12 = new Path(dir1, "dir12");
+    Path dir2 = new Path(root, "dir2");
+    try {
+      fs.mkdirs(dir12);
+      fs.mkdirs(dir2);
+
+      // ListStatus on root should return dir1 (even though /dir1 key does not
+      // exist) and dir2 only. dir12 is not an immediate child of root and
+      // hence should not be listed.
+      RemoteIterator<FileStatus> it = ofs.listStatusIterator(root);
+      // Verify that dir12 is not included in the result of the listStatus on
+      // root
+      int iCount = 0;
+      while (it.hasNext()) {
+        iCount++;
+        FileStatus fileStatus = it.next();
+        Assert.assertNotNull(fileStatus);
+        Assert.assertNotEquals(fileStatus, dir12.toString());
+      }
+      Assert.assertEquals(
+              "FileStatus should return only the immediate children",
+              2, iCount);
+
+    } finally {
+      // cleanup
+      fs.delete(dir1, true);
+      fs.delete(dir2, true);
+    }
+  }
+
+  @Test
+  public void testListStatusIteratorWithPathNotFound() throws Exception {
+    Path root = new Path("/test");
+    try {
+      ofs.listStatusIterator(root);
+      Assert.fail("Should have thrown OMException");
+    } catch (OMException omEx) {
+      Assert.assertEquals("Volume test is not found",
+          OMException.ResultCodes.VOLUME_NOT_FOUND, omEx.getResult());
+    }
+  }
+
+  /**
+   * Tests listStatusIterator operation on root directory with different
+   * numbers of numDir.
+   */
+  @Test
+  public void testListStatusIteratorOnPageSize() throws Exception {
+    int[] pageSize = {
+        1, LISTING_PAGE_SIZE, LISTING_PAGE_SIZE + 1,
+        LISTING_PAGE_SIZE - 1, LISTING_PAGE_SIZE + LISTING_PAGE_SIZE / 2,
+        LISTING_PAGE_SIZE + LISTING_PAGE_SIZE
+    };
+    for (int numDir : pageSize) {
+      int range = numDir / LISTING_PAGE_SIZE;
+      switch (range) {
+      case 0:
+        listStatusIterator(numDir);
+        break;
+      case 1:
+        listStatusIterator(numDir);
+        break;
+      case 2:
+        listStatusIterator(numDir);
+        break;
+      default:
+        listStatusIterator(numDir);
+      }
+    }
+  }
+
+  private void listStatusIterator(int numDirs) throws IOException {
+    Path root = new Path("/" + volumeName + "/" + bucketName);
+    Set<String> paths = new TreeSet<>();
+    try {
+      for (int i = 0; i < numDirs; i++) {
+        Path p = new Path(root, String.valueOf(i));
+        fs.mkdirs(p);
+        paths.add(p.getName());
+      }
+
+      RemoteIterator<FileStatus> iterator = ofs.listStatusIterator(root);
+      int iCount = 0;
+      if (iterator != null) {
+        while (iterator.hasNext()) {
+          FileStatus fileStatus = iterator.next();
+          iCount++;
+          Assert.assertTrue(paths.contains(fileStatus.getPath().getName()));
+        }
+      }
+      Assert.assertEquals(
+          "Total directories listed do not match the existing directories",
+          numDirs, iCount);
+
+    } finally {
+      // Cleanup
+      for (int i = 0; i < numDirs; i++) {
+        Path p = new Path(root, String.valueOf(i));
+        fs.delete(p, true);
+      }
+    }
+  }
+
+  /**
+   * Tests listStatusIterator on a path with subdirs.
+   */
+  @Test
+  public void testListStatusIteratorOnSubDirs() throws Exception {
+    // Create the following key structure
+    //      /dir1/dir11/dir111
+    //      /dir1/dir12
+    //      /dir1/dir12/file121
+    //      /dir2
+    // listStatusIterator on /dir1 should return all its immediated subdirs only
+    // which are /dir1/dir11 and /dir1/dir12. Super child files/dirs
+    // (/dir1/dir12/file121 and /dir1/dir11/dir111) should not be returned by
+    // listStatusIterator.
+    Path dir1 = new Path(bucketPath, "dir1");
+    Path dir11 = new Path(dir1, "dir11");
+    Path dir111 = new Path(dir11, "dir111");
+    Path dir12 = new Path(dir1, "dir12");
+    Path file121 = new Path(dir12, "file121");
+    Path dir2 = new Path(bucketPath, "dir2");
+    try {
+      fs.mkdirs(dir111);
+      fs.mkdirs(dir12);
+      ContractTestUtils.touch(fs, file121);
+      fs.mkdirs(dir2);
+
+      RemoteIterator<FileStatus> it = ofs.listStatusIterator(dir1);
+      int iCount = 0;
+      while (it.hasNext()) {
+        iCount++;
+        FileStatus fileStatus = it.next();
+        Assert.assertNotNull(fileStatus);
+        Assert.assertNotEquals(fileStatus, dir12.toString());
+        // Verify that the two children of /dir1
+        // returned by listStatusIterator operation
+        // are /dir1/dir11 and /dir1/dir12.
+        Assert.assertTrue(
+            fileStatus.getPath().toUri().getPath().
+                equals(dir11.toString()) ||
+                fileStatus.getPath().toUri().getPath().
+                    equals(dir12.toString()));
+      }
+      Assert.assertEquals(
+          "Iterator should return only the immediate children",
+          2, iCount);
+    } finally {
+      // Cleanup
+      fs.delete(dir2, true);
+      fs.delete(dir1, true);
+    }
   }
 
   /**
@@ -1719,6 +1939,33 @@ public class TestRootedOzoneFileSystem {
     final OzoneKeyDetails key = bucket.getKey(ofsPath.getKeyName());
     Assert.assertEquals(ReplicationType.EC.name(),
         key.getReplicationConfig().getReplicationType().name());
+  }
+
+  @Test
+  public void testGetFileStatus() throws Exception {
+    String volumeNameLocal = getRandomNonExistVolumeName();
+    String bucketNameLocal = RandomStringUtils.randomNumeric(5);
+    Path volume = new Path("/" + volumeNameLocal);
+    ofs.mkdirs(volume);
+    LambdaTestUtils.intercept(OMException.class,
+        () -> ofs.getFileStatus(new Path(volume, bucketNameLocal)));
+    // Cleanup
+    ofs.delete(volume, true);
+  }
+
+  @Test
+  public void testUnbuffer() throws IOException {
+    String testKeyName = "testKey2";
+    Path path = new Path(bucketPath, testKeyName);
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.write(1);
+    }
+
+    try (FSDataInputStream stream = fs.open(path)) {
+      assertTrue(stream.hasCapability(StreamCapabilities.UNBUFFER));
+      stream.unbuffer();
+    }
+
   }
 
   public void testNonPrivilegedUserMkdirCreateBucket() throws IOException {

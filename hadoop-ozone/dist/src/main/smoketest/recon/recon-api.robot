@@ -26,6 +26,7 @@ Test Timeout        5 minutes
 ${ENDPOINT_URL}       http://recon:9888
 ${API_ENDPOINT_URL}   ${ENDPOINT_URL}/api/v1
 ${ADMIN_API_ENDPOINT_URL}   ${API_ENDPOINT_URL}/containers
+${UNHEALTHY_ENDPOINT_URL}   ${API_ENDPOINT_URL}/containers/unhealthy
 ${NON_ADMIN_API_ENDPOINT_URL}   ${API_ENDPOINT_URL}/clusterState
 
 *** Keywords ***
@@ -109,6 +110,19 @@ Check admin only api access
 
     kinit as recon admin
     Check http return code      ${ADMIN_API_ENDPOINT_URL}       200
+
+Check unhealthy, (admin) api access
+    Execute    kdestroy
+    Check http return code      ${UNHEALTHY_ENDPOINT_URL}       401
+
+    kinit as non admin
+    Check http return code      ${UNHEALTHY_ENDPOINT_URL}       403
+
+    kinit as ozone admin
+    Check http return code      ${UNHEALTHY_ENDPOINT_URL}       200
+
+    kinit as recon admin
+    Check http return code      ${UNHEALTHY_ENDPOINT_URL}       200
 
 Check normal api access
     Execute    kdestroy

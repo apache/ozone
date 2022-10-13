@@ -197,12 +197,19 @@ public final class OMMetadataManagerTestUtils {
                                     long parentObjectId,
                                     long bucketObjectId,
                                     long volumeObjectId,
-                                    long dataSize)
+                                    long dataSize,
+                                    BucketLayout bucketLayout)
           throws IOException {
-    // DB key in FileTable => "parentId/filename"
-    String omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
-            bucketObjectId, parentObjectId, fileName);
-    omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).put(omKey,
+    // DB key in FileTable => "volumeId/bucketId/parentId/fileName"
+    // DB key in KeyTable => "/volume/bucket/key"
+    String omKey;
+    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
+             bucketObjectId, parentObjectId, fileName);
+    } else {
+      omKey = omMetadataManager.getOzoneKey(volume, bucket, key);
+    }
+    omMetadataManager.getKeyTable(bucketLayout).put(omKey,
             new OmKeyInfo.Builder()
                     .setBucketName(bucket)
                     .setVolumeName(volume)
@@ -217,19 +224,26 @@ public final class OMMetadataManagerTestUtils {
 
   @SuppressWarnings("checkstyle:parameternumber")
   public static void writeKeyToOm(OMMetadataManager omMetadataManager,
-                                  long volumeObjectId,
-                                  long bucketObjectId,
-                                  long parentObjectId,
-                                  long objectId,
-                                  String volName,
-                                  String bucketName,
                                   String keyName,
+                                  String bucketName,
+                                  String volName,
                                   String fileName,
-                                  List<OmKeyLocationInfoGroup> locationVersions)
+                                  long objectId,
+                                  long parentObjectId,
+                                  long bucketObjectId,
+                                  long volumeObjectId,
+                                  List<OmKeyLocationInfoGroup> locationVersions,
+                                  BucketLayout bucketLayout)
           throws IOException {
-    String omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
-            bucketObjectId, parentObjectId, fileName);
-    omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).put(omKey,
+
+    String omKey;
+    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
+              bucketObjectId, parentObjectId, fileName);
+    } else {
+      omKey = omMetadataManager.getOzoneKey(volName, bucketName, keyName);
+    }
+    omMetadataManager.getKeyTable(bucketLayout).put(omKey,
             new OmKeyInfo.Builder()
                     .setBucketName(bucketName)
                     .setVolumeName(volName)

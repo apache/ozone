@@ -58,11 +58,12 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -92,12 +93,9 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       ConfigurationSource conf, int threadPoolSize, int queueLimit) {
     this.containerSet = cset;
     this.conf = conf;
-    this.executor = new ThreadPoolExecutor(
-        0, threadPoolSize, 60, TimeUnit.SECONDS,
-        new LinkedBlockingQueue<>(),
-        new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("DeleteBlocksCommandHandlerThread-%d")
-            .build());
+    this.executor = Executors.newFixedThreadPool(
+        threadPoolSize, new ThreadFactoryBuilder()
+            .setNameFormat("DeleteBlocksCommandHandlerThread-%d").build());
     this.deleteCommandQueues = new LinkedBlockingQueue<>(queueLimit);
     handlerThread = new Daemon(new DeleteCmdWorker());
     handlerThread.start();
@@ -193,18 +191,16 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   /**
    * Process one delete transaction.
    */
-  public final class ProcessTransactionTask implements Runnable {
+  public final class ProcessTransactionTask implements
+      Callable<DeleteBlockTransactionResult> {
     private DeletedBlocksTransaction tx;
-    private ContainerBlocksDeletionACKProto.Builder result;
 
-    public ProcessTransactionTask(DeletedBlocksTransaction transaction,
-        ContainerBlocksDeletionACKProto.Builder resultBuilder) {
-      this.result = resultBuilder;
+    public ProcessTransactionTask(DeletedBlocksTransaction transaction) {
       this.tx = transaction;
     }
 
     @Override
-    public void run() {
+    public DeleteBlockTransactionResult call() {
       DeleteBlockTransactionResult.Builder txResultBuilder =
           DeleteBlockTransactionResult.newBuilder();
       txResultBuilder.setTxID(tx.getTxID());
@@ -253,7 +249,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         txResultBuilder.setContainerID(containerId)
             .setSuccess(false);
       }
-      result.addResults(txResultBuilder.build());
+      return txResultBuilder.build();
     }
   }
 
@@ -279,18 +275,18 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
       ContainerBlocksDeletionACKProto.Builder resultBuilder =
           ContainerBlocksDeletionACKProto.newBuilder();
-      List<Future> futures = new ArrayList<>();
+      List<Future<DeleteBlockTransactionResult>> futures = new ArrayList<>();
       for (int i = 0; i < containerBlocks.size(); i++) {
         DeletedBlocksTransaction tx = containerBlocks.get(i);
-        Future future = executor.submit(
-            new ProcessTransactionTask(tx, resultBuilder));
+        Future<DeleteBlockTransactionResult> future =
+            executor.submit(new ProcessTransactionTask(tx));
         futures.add(future);
       }
 
       // Wait for tasks to finish
       futures.forEach(f -> {
         try {
-          f.get();
+          resultBuilder.addResults(f.get());
         } catch (InterruptedException | ExecutionException e) {
           LOG.error("task failed.", e);
           Thread.currentThread().interrupt();

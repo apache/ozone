@@ -84,7 +84,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration.VOLUME_BYTES_PER_SECOND_KEY;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.VOLUME_BYTES_PER_SECOND_KEY;
 
 /**
  * Ozone main class sets up the network servers and initializes the container
@@ -148,7 +148,8 @@ public class OzoneContainer {
         new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
             context, VolumeType.DB_VOLUME, volumeChecker);
     if (SchemaV3.isFinalizedAndEnabled(config)) {
-      HddsVolumeUtil.loadAllHddsVolumeDbStore(volumeSet, dbVolumeSet, LOG);
+      HddsVolumeUtil.loadAllHddsVolumeDbStore(
+          volumeSet, dbVolumeSet, false, LOG);
     }
 
     long recoveringContainerTimeout = config.getTimeDuration(
@@ -304,8 +305,8 @@ public class OzoneContainer {
    * Start background daemon thread for performing container integrity checks.
    */
   private void startContainerScrub() {
-    ContainerScrubberConfiguration c = config.getObject(
-        ContainerScrubberConfiguration.class);
+    ContainerScannerConfiguration c = config.getObject(
+        ContainerScannerConfiguration.class);
     boolean enabled = c.isEnabled();
 
     if (!enabled) {

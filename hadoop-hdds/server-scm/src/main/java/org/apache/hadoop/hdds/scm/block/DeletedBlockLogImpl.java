@@ -82,9 +82,9 @@ public class DeletedBlockLogImpl
   private final ContainerManager containerManager;
   private final Lock lock;
   // Maps txId to set of DNs which are successful in committing the transaction
-  private Map<Long, Set<UUID>> transactionToDNsCommitMap;
+  private final Map<Long, Set<UUID>> transactionToDNsCommitMap;
   // Maps txId to its retry counts;
-  private Map<Long, Integer> transactionToRetryCountMap;
+  private final Map<Long, Integer> transactionToRetryCountMap;
   // The access to DeletedBlocksTXTable is protected by
   // DeletedBlockLogStateManager.
   private final DeletedBlockLogStateManager deletedBlockLogStateManager;
@@ -418,16 +418,18 @@ public class DeletedBlockLogImpl
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
-        int numBlocksAdded = 0;
         ArrayList<Long> txIDs = new ArrayList<>();
-        while (iter.hasNext() && numBlocksAdded < blockDeletionLimit) {
+        // Here takes block replica count as the threshold to avoid the case
+        // that part of replicas committed the TXN and recorded in the
+        // transactionToDNsCommitMap, while they are counted in the threshold.
+        while (iter.hasNext() &&
+            transactions.getBlocksDeleted() < blockDeletionLimit) {
           Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
           final ContainerID id = ContainerID.valueOf(txn.getContainerID());
           try {
             if (txn.getCount() > -1 && txn.getCount() <= maxRetry
                 && !containerManager.getContainer(id).isOpen()) {
-              numBlocksAdded += txn.getLocalIDCount();
               getTransaction(txn, transactions);
               transactionToDNsCommitMap
                   .putIfAbsent(txn.getTxID(), new LinkedHashSet<>());

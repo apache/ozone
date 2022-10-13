@@ -175,6 +175,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantRevokeUserAccessIdRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -2052,6 +2054,24 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setCancelPrepareRequest(cancelPrepareRequest).build();
 
     return handleError(submitRequest(omRequest)).getCancelPrepareResponse();
+  }
+
+  @Override
+  public EchoRPCResponse echoRPCReq(byte[] payloadReq,
+                                    int payloadSizeResp)
+          throws IOException {
+    EchoRPCRequest echoRPCRequest =
+            EchoRPCRequest.newBuilder()
+                    .setPayloadReq(ByteString.copyFrom(payloadReq))
+                    .setPayloadSizeResp(payloadSizeResp)
+                    .build();
+
+    OMRequest omRequest = createOMRequest(Type.EchoRPC)
+            .setEchoRPCRequest(echoRPCRequest).build();
+
+    EchoRPCResponse echoRPCResponse =
+            handleError(submitRequest(omRequest)).getEchoRPCResponse();
+    return echoRPCResponse;
   }
 
   @VisibleForTesting

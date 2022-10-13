@@ -179,7 +179,9 @@ public class TestContainerPlacementFactory {
   public static class DummyImpl implements PlacementPolicy {
     @Override
     public List<DatanodeDetails> chooseDatanodes(
-        List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
+        List<DatanodeDetails> usedNodes,
+        List<DatanodeDetails> excludedNodes,
+        List<DatanodeDetails> favoredNodes,
         int nodesRequired, long metadataSizeRequired, long dataSizeRequired) {
       return null;
     }

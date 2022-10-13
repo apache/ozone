@@ -52,6 +52,7 @@ import picocli.CommandLine.Option;
         HadoopFsValidator.class,
         SameKeyReader.class,
         S3KeyGenerator.class,
+        S3BucketGenerator.class,
         DatanodeChunkGenerator.class,
         DatanodeChunkValidator.class,
         DatanodeBlockPutter.class,
@@ -65,7 +66,9 @@ import picocli.CommandLine.Option;
         StreamingGenerator.class,
         SCMThroughputBenchmark.class,
         OmBucketReadWriteFileOps.class,
-        OmBucketReadWriteKeyOps.class},
+        OmBucketReadWriteKeyOps.class,
+        OmRPCLoadGenerator.class,
+    },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class Freon extends GenericCli {

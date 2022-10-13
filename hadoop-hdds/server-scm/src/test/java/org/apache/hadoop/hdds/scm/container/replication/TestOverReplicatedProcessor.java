@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
@@ -59,13 +60,17 @@ public class TestOverReplicatedProcessor {
   @Before
   public void setup() {
     conf = new OzoneConfiguration();
+    ReplicationManagerConfiguration rmConf =
+        conf.getObject(ReplicationManagerConfiguration.class);
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     pendingOps = new ContainerReplicaPendingOps(conf, clock);
     replicationManager = Mockito.mock(ReplicationManager.class);
     eventPublisher = Mockito.mock(EventPublisher.class);
     repConfig = new ECReplicationConfig(3, 2);
     overReplicatedProcessor = new OverReplicatedProcessor(
-        replicationManager, pendingOps, eventPublisher);
+        replicationManager, pendingOps, eventPublisher,
+        rmConf.getOverReplicatedInterval());
+    Mockito.when(replicationManager.shouldRun()).thenReturn(true);
   }
 
   @Test

@@ -305,4 +305,11 @@ public abstract class EndpointBase implements Auditor {
     AUDIT.logReadFailure(
         buildAuditMessageForFailure(action, getAuditParameters(), ex));
   }
+
+  protected boolean isAccessDenied(OMException ex) {
+    ResultCodes result = ex.getResult();
+    return result == ResultCodes.PERMISSION_DENIED
+        || result == ResultCodes.INVALID_TOKEN;
+  }
+
 }

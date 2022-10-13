@@ -36,7 +36,9 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
+import org.rocksdb.InfoLogLevel;
 import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -112,8 +114,8 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       }
 
       String rocksDbStat = config.getTrimmed(
-              OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
-              OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
+          OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
+          OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
 
       if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
         ManagedStatistics statistics = new ManagedStatistics();
@@ -121,11 +123,34 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
         options.setStatistics(statistics);
       }
 
-      this.store = DBStoreBuilder.newBuilder(config, dbDef)
-              .setDBOptions(options)
-              .setDefaultCFOptions(cfOptions)
-              .setOpenReadOnly(openReadOnly)
-              .build();
+      if (this.dbDef instanceof DatanodeSchemaThreeDBDefinition) {
+        DatanodeConfiguration dc =
+            config.getObject(DatanodeConfiguration.class);
+        // Config user log files
+        InfoLogLevel level = InfoLogLevel.valueOf(
+            dc.getRocksdbLogLevel() + "_LEVEL");
+        options.setInfoLogLevel(level);
+        options.setMaxLogFileSize(dc.getRocksdbMaxFileSize());
+        options.setKeepLogFileNum(dc.getRocksdbMaxFileNum());
+        options.setDeleteObsoleteFilesPeriodMicros(
+            dc.getRocksdbDeleteObsoleteFilesPeriod());
+
+        // For V3, all Rocksdb dir has the same "container.db" name. So use
+        // parentDirName(storage UUID)-dbDirName as db metrics name
+        this.store = DBStoreBuilder.newBuilder(config, dbDef)
+            .setDBOptions(options)
+            .setDefaultCFOptions(cfOptions)
+            .setOpenReadOnly(openReadOnly)
+            .setDBJmxBeanNameName(dbDef.getDBLocation(config).getName() + "-" +
+                dbDef.getName())
+            .build();
+      } else {
+        this.store = DBStoreBuilder.newBuilder(config, dbDef)
+            .setDBOptions(options)
+            .setDefaultCFOptions(cfOptions)
+            .setOpenReadOnly(openReadOnly)
+            .build();
+      }
 
       // Use the DatanodeTable wrapper to disable the table iterator on
       // existing Table implementations retrieved from the DBDefinition.
@@ -208,6 +233,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   @Override
   public void close() throws IOException {
     this.store.close();
+    this.cfOptions.close();
   }
 
   @Override

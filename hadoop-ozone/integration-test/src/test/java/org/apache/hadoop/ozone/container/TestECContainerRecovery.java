@@ -23,15 +23,17 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -43,9 +45,9 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -54,6 +56,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
@@ -78,7 +81,7 @@ public class TestECContainerRecovery {
   /**
    * Create a MiniDFSCluster for testing.
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     chunkSize = 1024;
     flushSize = 2 * chunkSize;
@@ -125,7 +128,7 @@ public class TestECContainerRecovery {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -180,30 +183,30 @@ public class TestECContainerRecovery {
     List<ContainerInfo> containers =
         cluster.getStorageContainerManager().getContainerManager()
             .getContainers();
-    long containerID = 0;
+    ContainerInfo container = null;
     for (ContainerInfo info : containers) {
       if (info.getPipelineID().getId().equals(pipeline.getId().getId())) {
-        containerID = info.containerID().getProtobuf().getId();
+        container = info;
       }
     }
     StorageContainerManager scm = cluster.getStorageContainerManager();
-    StorageContainerLocationProtocol scmContainerClient =
-        HAUtils.getScmContainerClient(cluster.getConf());
-    scmContainerClient.closeContainer(containerID);
-    // Make sure replica closed.
-    waitForDNContainerState(ContainerProtos.ContainerDataProto.State.CLOSED,
-        pipeline, containerID);
+
+    // Shutting sown DN triggers close pipeline and close container.
+    cluster.shutdownHddsDatanode(pipeline.getFirstNode());
+
+    // Make sure container closed.
+    waitForSCMContainerState(StorageContainerDatanodeProtocolProtos
+        .ContainerReplicaProto.State.CLOSED, container.containerID());
     //Temporarily stop the RM process.
     scm.getReplicationManager().stop();
 
-    // Stop the DN and wait for the lower replication.
-    cluster.shutdownHddsDatanode(pipeline.getFirstNode());
-    waitForContainerCount(4, containerID, scm);
+    // Wait for the lower replication.
+    waitForContainerCount(4, container.containerID(), scm);
 
     // Start the RM to resume the replication process and wait for the
     // reconstruction.
     scm.getReplicationManager().start();
-    waitForContainerCount(5, containerID, scm);
+    waitForContainerCount(5, container.containerID(), scm);
 
     // Let's verify for Over replications now.
     //Temporarily stop the RM process.
@@ -213,35 +216,56 @@ public class TestECContainerRecovery {
     // increased.
     cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
     // Check container is over replicated.
-    waitForContainerCount(6, containerID, scm);
+    waitForContainerCount(6, container.containerID(), scm);
+    // Wait for all the replicas to be closed.
+    container = scm.getContainerInfo(container.getContainerID());
+    waitForDNContainerState(container, scm);
 
     // Resume RM and wait the over replicated replica deleted.
     scm.getReplicationManager().start();
-    waitForContainerCount(5, containerID, scm);
+    waitForContainerCount(5, container.containerID(), scm);
   }
 
-  private void waitForDNContainerState(
-      ContainerProtos.ContainerDataProto.State state, Pipeline pipeline,
-      long containerID) throws TimeoutException, InterruptedException {
-    //Wait until container closed at DN
+  private void waitForDNContainerState(ContainerInfo container,
+      StorageContainerManager scm) throws InterruptedException,
+      TimeoutException {
     GenericTestUtils.waitFor(() -> {
       try {
-        return cluster.getHddsDatanode(pipeline.getFirstNode())
-            .getDatanodeStateMachine().getContainer().getContainerSet()
-            .getContainer(containerID).getContainerState() == state;
+        List<ContainerReplica> unhealthyReplicas = scm.getContainerManager()
+            .getContainerReplicas(container.containerID()).stream()
+            .filter(r -> !ReplicationManager
+                .compareState(container.getState(), r.getState()))
+            .collect(Collectors.toList());
+        return unhealthyReplicas.size() == 0;
+      } catch (ContainerNotFoundException e) {
+        return false;
+      }
+    }, 100, 100000);
+  }
+
+  private void waitForSCMContainerState(
+      StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State state,
+      ContainerID containerID) throws TimeoutException, InterruptedException {
+    //Wait until container closed at SCM
+    GenericTestUtils.waitFor(() -> {
+      try {
+        HddsProtos.LifeCycleState containerState = cluster
+            .getStorageContainerManager().getContainerManager()
+            .getContainer(containerID).getState();
+        return ReplicationManager.compareState(containerState, state);
       } catch (IOException e) {
         return false;
       }
     }, 100, 100000);
   }
 
-  private void waitForContainerCount(int count, long containerID,
+  private void waitForContainerCount(int count, ContainerID containerID,
       StorageContainerManager scm)
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> {
       try {
         return scm.getContainerManager()
-            .getContainerReplicas(ContainerID.valueOf(containerID))
+            .getContainerReplicas(containerID)
             .size() == count;
       } catch (ContainerNotFoundException e) {
         return false;
