@@ -1299,7 +1299,7 @@ public class TestKeyManagerImpl {
 
     // create a key "dir1/key1"
     OmKeyArgs keyArgs = createBuilder().setKeyName(fullKeyName).build();
-    OpenKeySession keySession = writeClient.openKey(keyArgs, true, true);
+    OpenKeySession keySession = writeClient.openKey(keyArgs);
     keyArgs.setLocationInfoList(
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
     writeClient.commitKey(keyArgs, keySession.getId());
