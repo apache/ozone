@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
+import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -271,6 +272,18 @@ public interface OzoneManagerProtocol
    * @throws IOException
    */
   OmKeyInfo lookupKey(OmKeyArgs args) throws IOException;
+
+  /**
+   * Lookup for the container of an existing key.
+   *
+   * @param args the args of the key.
+   * @param assumeS3Context if true OM will automatically lookup the S3
+   *                        volume context and includes in the response.
+   * @return KeyInfoWithVolumeContext includes info that client uses to talk
+   *         to containers and S3 volume context info if assumeS3Context is set.
+   */
+  KeyInfoWithVolumeContext getKeyInfo(OmKeyArgs args, boolean assumeS3Context)
+      throws IOException;
 
   /**
    * Rename an existing key within a bucket.

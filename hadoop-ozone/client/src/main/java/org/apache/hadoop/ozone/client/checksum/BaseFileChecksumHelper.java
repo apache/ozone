@@ -162,7 +162,7 @@ public abstract class BaseFileChecksumHelper {
       OmKeyArgs keyArgs =
           new OmKeyArgs.Builder().setVolumeName(volume.getName())
               .setBucketName(bucket.getName()).setKeyName(keyName)
-              .setRefreshPipeline(true).setSortDatanodesInPipeline(true)
+              .setSortDatanodesInPipeline(true)
               .setLatestVersionLocation(true).build();
       keyInfo = ozoneManagerClient.lookupKey(keyArgs);
     }

@@ -547,6 +547,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     for (int i : internalBuffers) {
       if (decoderInputBuffers[i] != null) {
         decoderInputBuffers[i].clear();
+        decoderInputBuffers[i].limit(getRepConfig().getEcChunkSize());
       }
     }
   }

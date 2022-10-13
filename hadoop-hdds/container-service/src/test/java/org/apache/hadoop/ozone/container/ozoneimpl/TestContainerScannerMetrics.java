@@ -23,11 +23,13 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -35,9 +37,9 @@ import java.util.Collection;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdds.conf.OzoneConfiguration.newInstanceOf;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -45,7 +47,8 @@ import static org.mockito.Mockito.when;
 /**
  * This test verifies the container scanner metrics functionality.
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 public class TestContainerScannerMetrics {
 
   private final AtomicLong containerIdSeq = new AtomicLong(100);
@@ -65,7 +68,7 @@ public class TestContainerScannerMetrics {
   private ContainerScannerConfiguration conf;
   private ContainerController controller;
 
-  @Before
+  @BeforeEach
   public void setup() {
     conf = newInstanceOf(ContainerScannerConfiguration.class);
     conf.setMetadataScanInterval(0);
