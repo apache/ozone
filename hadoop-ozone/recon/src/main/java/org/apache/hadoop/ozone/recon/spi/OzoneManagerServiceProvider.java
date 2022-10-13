@@ -42,6 +42,7 @@ public interface OzoneManagerServiceProvider {
 
   /**
    * Trigger a sync between Recon and OM.
+   * @return whether the trigger happened or not
    */
   boolean triggerSyncDataFromOMImmediately();
 }

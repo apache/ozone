@@ -243,18 +243,18 @@ public class OzoneManagerServiceProviderImpl
   }
 
   private void startSyncDataFromOM(long initialDelay) {
-
     long interval = configuration.getTimeDuration(
         OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY,
         configuration.get(
             ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY,
             OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT),
         TimeUnit.MILLISECONDS);
-    LOG.info("Before the new scheduleWithFixedDelay");
+    LOG.debug("Started the OM DB sync scheduler.");
     scheduler.scheduleWithFixedDelay(() -> {
       try {
-        if (!isSyncDataFromOMRunning) {
-          syncDataFromOM();
+        boolean isSuccess = syncDataFromOM();
+        if (!isSuccess) {
+          LOG.debug("OM DB sync is already running.");
         }
       } catch (Throwable t) {
         LOG.error("Unexpected exception while syncing data from OM.", t);
@@ -263,26 +263,19 @@ public class OzoneManagerServiceProviderImpl
         initialDelay,
         interval,
         TimeUnit.MILLISECONDS);
-    LOG.info("After the new scheduleWithFixedDelay");
-
   }
 
   private void stopSyncDataFromOMThread() {
-    LOG.info("Before the shutdownNow()");
     scheduler.shutdownNow();
-    LOG.info("After the shutdownNow()");
+    LOG.debug("Shutdown the OM DB sync scheduler.");
   }
 
   @Override
   public boolean triggerSyncDataFromOMImmediately() {
     if (!isSyncDataFromOMRunning) {
-      LOG.info("Before the stopSyncDataFromOMThread");
       stopSyncDataFromOMThread();
-      LOG.info("After the stopSyncDataFromOMThread");
       scheduler = Executors.newScheduledThreadPool(1);
-      LOG.info("Before the startSyncDataFromOM");
       startSyncDataFromOM(0L);
-      LOG.info("After the startSyncDataFromOM");
       return true;
     }
     return false;
@@ -475,7 +468,11 @@ public class OzoneManagerServiceProviderImpl
    * full snapshot from Ozone Manager.
    */
   @VisibleForTesting
-  public void syncDataFromOM() {
+  public boolean syncDataFromOM() {
+    if (isSyncDataFromOMRunning) {
+      LOG.debug("syncDataFromOM() is already running");
+      return false;
+    }
     isSyncDataFromOMRunning = true;
 
     try {
@@ -539,6 +536,7 @@ public class OzoneManagerServiceProviderImpl
     } finally {
       isSyncDataFromOMRunning = false;
     }
+    return true;
   }
 
   /**

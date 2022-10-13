@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImp
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
@@ -65,20 +64,21 @@ import static org.mockito.Mockito.when;
 /**
  * Test class for OMSyncEndpoint.
  */
-public class TestOMSyncEndpoint {
+public class TestTriggerDBSyncEndpoint {
 
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-  private OMSyncEndpoint omSyncEndpoint;
+  private TriggerDBSyncEndpoint triggerDBSyncEndpoint;
   private OzoneManagerServiceProviderImpl ozoneManagerServiceProvider;
   private OzoneConfiguration configuration;
   private OzoneManagerProtocol ozoneManagerProtocol;
   private OMMetadataManager omMetadataManager;
   private ReconOMMetadataManager reconOMMetadataManager;
 
-  @Before
-  public void setUp() throws IOException, AuthenticationException {
+  @Test
+  public void testTriggerDBSyncEndpointWithOM() throws IOException,
+      AuthenticationException {
     configuration = new OzoneConfiguration();
     configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR,
         temporaryFolder.newFolder().getAbsolutePath());
@@ -99,9 +99,10 @@ public class TestOMSyncEndpoint {
     DBCheckpoint checkpoint = omMetadataManager.getStore()
         .getCheckpoint(true);
     File tarFile = createTarFile(checkpoint.getCheckpointLocation());
-    InputStream inputStream = new FileInputStream(tarFile);
     HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
-    when(httpURLConnectionMock.getInputStream()).thenReturn(inputStream);
+    try (InputStream inputStream = new FileInputStream(tarFile)) {
+      when(httpURLConnectionMock.getInputStream()).thenReturn(inputStream);
+    }
     when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
         .thenReturn(httpURLConnectionMock);
 
@@ -133,12 +134,9 @@ public class TestOMSyncEndpoint {
                 mock(StorageContainerLocationProtocol.class))
             .build();
 
-    omSyncEndpoint = reconTestInjector.getInstance(OMSyncEndpoint.class);
-  }
-
-  @Test
-  public void testOMSyncEndpoint() {
-    Response response = omSyncEndpoint.triggerOMSync();
+    triggerDBSyncEndpoint
+        = reconTestInjector.getInstance(TriggerDBSyncEndpoint.class);
+    Response response = triggerDBSyncEndpoint.triggerOMDBSync();
     Assertions.assertEquals(200, response.getStatus());
     Assertions.assertEquals(true, response.getEntity());
   }

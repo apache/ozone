@@ -30,23 +30,23 @@ import javax.ws.rs.core.Response;
 /**
  * Endpoint to trigger the OM DB sync between Recon and OM.
  */
-@Path("/omsync")
+@Path("/triggerdbsync")
 @Produces(MediaType.APPLICATION_JSON)
-public class OMSyncEndpoint {
+public class TriggerDBSyncEndpoint {
 
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;
 
   @Inject
-  public OMSyncEndpoint(
+  public TriggerDBSyncEndpoint(
       OzoneManagerServiceProvider ozoneManagerServiceProvider) {
     this.ozoneManagerServiceProvider = ozoneManagerServiceProvider;
   }
 
   @GET
-  @Path("trigger")
-  public Response triggerOMSync() {
-    boolean isSuccess
-        = ozoneManagerServiceProvider.triggerSyncDataFromOMImmediately();
+  @Path("om")
+  public Response triggerOMDBSync() {
+    boolean isSuccess =
+        ozoneManagerServiceProvider.triggerSyncDataFromOMImmediately();
     return Response.ok(isSuccess).build();
   }
 }
