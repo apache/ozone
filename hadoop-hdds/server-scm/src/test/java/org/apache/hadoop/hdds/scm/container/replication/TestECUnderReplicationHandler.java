@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.assertj.core.util.Lists;
+import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -211,6 +212,17 @@ public class TestECUnderReplicationHandler {
             .thenReturn(false);
     Mockito.when(mockedPolicy.validateContainerPlacement(Mockito.anyList(),
             Mockito.anyInt())).thenReturn(mockedContainerPlacementStatus);
+    Mockito.when(mockedPolicy.validateContainerPlacement(Mockito.anyList(),
+            Mockito.anyInt())).thenAnswer(invocationOnMock -> {
+              Set<DatanodeDetails> dns =
+                      new HashSet<>(invocationOnMock.getArgument(0));
+              Assert.assertTrue(
+                      availableReplicas.stream()
+                      .map(ContainerReplica::getDatanodeDetails)
+                      .filter(dn -> dn.getPersistedOpState() == IN_SERVICE)
+                      .allMatch(dns::contains));
+              return mockedContainerPlacementStatus;
+            });
     testUnderReplicationWithMissingIndexes(Collections.emptyList(),
             availableReplicas, 0, 0, mockedPolicy);
   }
