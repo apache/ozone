@@ -340,7 +340,7 @@ public final class OMConfigKeys {
       "ozone.om.transport.class";
   public static final String OZONE_OM_TRANSPORT_CLASS_DEFAULT =
       "org.apache.hadoop.ozone.om.protocolPB"
-          + ".GrpcOmTransportFactory";
+          + ".Hadoop3OmTransportFactory";
   public static final String OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT =
       "ozone.om.unflushed.transaction.max.count";
   public static final int OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT_DEFAULT

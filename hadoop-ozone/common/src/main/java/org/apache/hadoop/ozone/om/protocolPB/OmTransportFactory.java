@@ -46,7 +46,7 @@ public interface OmTransportFactory {
       throws IOException {
     try {
       // if configured transport class is different than the default
-      // OmTransportFactory (GrpcOmTransportFactory), then
+      // OmTransportFactory (Hadoop3OmTransportFactory), then
       // check service loader for transport class and instantiate it
       if (conf
           .get(OZONE_OM_TRANSPORT_CLASS,
