@@ -53,7 +53,7 @@ One Ozone configuration (`ozone-site.xml`) can support multiple Ozone HA cluster
 
 This logical name is called `serviceId` and can be configured in the `ozone-site.xml`
  
- ```
+```XML
 <property>
    <name>ozone.om.service.ids</name>
    <value>cluster1</value>
