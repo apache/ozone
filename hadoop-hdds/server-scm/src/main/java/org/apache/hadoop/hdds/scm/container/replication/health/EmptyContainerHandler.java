@@ -63,7 +63,7 @@ public class EmptyContainerHandler extends AbstractCheck {
     ContainerInfo containerInfo = request.getContainerInfo();
     Set<ContainerReplica> replicas = request.getContainerReplicas();
 
-    if (isContainerEmpty(containerInfo, replicas)) {
+    if (isContainerEmptyAndClosed(containerInfo, replicas)) {
       request.getReport()
           .incrementAndSample(ReplicationManagerReport.HealthState.EMPTY,
               containerInfo.containerID());
@@ -97,7 +97,7 @@ public class EmptyContainerHandler extends AbstractCheck {
    * @param replicas Set of ContainerReplica
    * @return true if the container is considered empty, false otherwise
    */
-  private boolean isContainerEmpty(final ContainerInfo container,
+  private boolean isContainerEmptyAndClosed(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
     return container.getState() == HddsProtos.LifeCycleState.CLOSED &&
         container.getNumberOfKeys() == 0 && replicas.stream()
