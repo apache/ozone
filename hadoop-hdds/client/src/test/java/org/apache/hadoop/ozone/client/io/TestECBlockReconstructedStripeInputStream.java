@@ -86,12 +86,32 @@ public class TestECBlockReconstructedStripeInputStream {
 
   @BeforeEach
   public void setup() {
+    polluteByteBufferPool();
     repConfig = new ECReplicationConfig(3, 2,
         ECReplicationConfig.EcCodec.RS, ONEMB);
     streamFactory = new ECStreamTestUtil.TestBlockInputStreamFactory();
 
     randomSeed = random.nextLong();
     dataGen = new SplittableRandom(randomSeed);
+  }
+
+  /**
+   * All the tests here use a chunk size of 1MB, but in a mixed workload
+   * cluster, it is possible to have multiple EC chunk sizes. This will result
+   * in the byte buffer pool having buffers of varying size and when a buffer is
+   * requested it can receive a buffer larger than the request size. That caused
+   * problems in HDDS-7304, so this method ensures the buffer pool has some
+   * larger buffers to return.
+   */
+  private void polluteByteBufferPool() {
+    List<ByteBuffer> bufs = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      ByteBuffer b = bufferPool.getBuffer(false, ONEMB * 3);
+      bufs.add(b);
+    }
+    for (ByteBuffer b : bufs) {
+      bufferPool.putBuffer(b);
+    }
   }
 
   @AfterEach

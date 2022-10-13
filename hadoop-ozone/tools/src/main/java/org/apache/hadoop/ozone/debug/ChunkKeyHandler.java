@@ -97,7 +97,6 @@ public class ChunkKeyHandler extends KeyHandler implements
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setKeyName(keyName)
-            .setRefreshPipeline(true)
             .build();
     OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);
     // querying  the keyLocations.The OM is queried to get containerID and

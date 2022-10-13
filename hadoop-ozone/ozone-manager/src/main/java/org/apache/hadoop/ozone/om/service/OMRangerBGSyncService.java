@@ -15,7 +15,7 @@
  * the License.
  */
 
-package org.apache.hadoop.ozone.om.multitenant;
+package org.apache.hadoop.ozone.om.service;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -50,6 +50,9 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
+import org.apache.hadoop.ozone.om.multitenant.AuthorizerLock;
+import org.apache.hadoop.ozone.om.multitenant.InMemoryMultiTenantAccessController;
+import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Policy;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Role;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -383,7 +386,8 @@ public class OMRangerBGSyncService extends BackgroundService {
         .build();
   }
 
-  void setOMDBRangerServiceVersion(long version) throws ServiceException {
+  public void setOMDBRangerServiceVersion(long version)
+          throws ServiceException {
     // OM DB update goes through Ratis
     SetRangerServiceVersionRequest.Builder versionSyncRequest =
         SetRangerServiceVersionRequest.newBuilder()

@@ -89,7 +89,6 @@ public class TestStorageContainerManagerHelper {
           .setVolumeName(bucket.getVolumeName())
           .setBucketName(bucket.getName())
           .setKeyName(key)
-          .setRefreshPipeline(true)
           .build();
       OmKeyInfo location = cluster.getOzoneManager()
           .lookupKey(arg);

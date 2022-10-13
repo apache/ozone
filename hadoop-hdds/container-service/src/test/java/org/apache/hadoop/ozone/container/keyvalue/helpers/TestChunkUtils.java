@@ -44,11 +44,11 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
 
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.Assert;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,7 +86,7 @@ public class TestChunkUtils {
             ChunkUtils.readData(file, readBuffers, offset, len, null);
 
             // There should be only one element in readBuffers
-            Assert.assertEquals(1, readBuffers.length);
+            Assertions.assertEquals(1, readBuffers.length);
             ByteBuffer readBuffer = readBuffers[0];
 
             LOG.info("Read data ({}): {}", threadNumber,
@@ -173,7 +173,7 @@ public class TestChunkUtils {
       ChunkUtils.readData(file, readBuffers, offset, len, null);
 
       // There should be only one element in readBuffers
-      Assert.assertEquals(1, readBuffers.length);
+      Assertions.assertEquals(1, readBuffers.length);
       ByteBuffer readBuffer = readBuffers[0];
 
       assertArrayEquals(array, readBuffer.array());
@@ -191,11 +191,11 @@ public class TestChunkUtils {
     Path tempFile = Files.createTempFile(PREFIX, "overwrite");
     FileUtils.write(tempFile.toFile(), "test", UTF_8);
 
-    Assert.assertTrue(
+    Assertions.assertTrue(
         ChunkUtils.validateChunkForOverwrite(tempFile.toFile(),
             new ChunkInfo("chunk", 3, 5)));
 
-    Assert.assertFalse(
+    Assertions.assertFalse(
         ChunkUtils.validateChunkForOverwrite(tempFile.toFile(),
             new ChunkInfo("chunk", 5, 5)));
   }
@@ -214,7 +214,7 @@ public class TestChunkUtils {
         () -> ChunkUtils.readData(nonExistentFile, bufs, offset, len, null));
 
     // then
-    Assert.assertEquals(UNABLE_TO_FIND_CHUNK, e.getResult());
+    Assertions.assertEquals(UNABLE_TO_FIND_CHUNK, e.getResult());
   }
 
 }
