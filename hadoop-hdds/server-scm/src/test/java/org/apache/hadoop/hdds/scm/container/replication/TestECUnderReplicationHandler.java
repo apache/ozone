@@ -248,15 +248,15 @@ public class TestECUnderReplicationHandler {
             Mockito.anyInt())).thenReturn(mockedContainerPlacementStatus);
     Mockito.when(mockedPolicy.validateContainerPlacement(Mockito.anyList(),
             Mockito.anyInt())).thenAnswer(invocationOnMock -> {
-      Set<DatanodeDetails> dns =
-              new HashSet<>(invocationOnMock.getArgument(0));
-      Assert.assertTrue(
-              availableReplicas.stream()
+              Set<DatanodeDetails> dns =
+                  new HashSet<>(invocationOnMock.getArgument(0));
+              Assert.assertTrue(
+                      availableReplicas.stream()
                       .map(ContainerReplica::getDatanodeDetails)
                       .filter(dn -> dn.getPersistedOpState() == IN_SERVICE)
                       .allMatch(dns::contains));
-      return mockedContainerPlacementStatus;
-    });
+              return mockedContainerPlacementStatus;
+            });
     ECReplicationCheckHandler checkHandler =
             new ECReplicationCheckHandler(mockedPolicy);
 
