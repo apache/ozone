@@ -18,7 +18,7 @@
 
 import React from 'react';
 import axios from 'axios';
-import {Icon, Table, Tooltip} from 'antd';
+import {Icon, Table, Tooltip, Tabs} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
 import filesize from 'filesize';
 import moment from 'moment';
@@ -26,6 +26,7 @@ import {showDataFetchError, timeFormat} from 'utils/common';
 import './missingContainers.less';
 
 const size = filesize.partial({standard: 'iec'});
+const {TabPane} = Tabs;
 
 interface IMissingContainerResponse {
   containerID: number;
@@ -35,6 +36,19 @@ interface IMissingContainerResponse {
   pipelineID: string;
 }
 
+interface IAllContainerResponse {
+  containerID: number;
+  containerState: string;
+  unhealthySince: string;
+  expectedReplicaCount: number;
+  actualReplicaCount: number;
+  replicaDeltaCount: number;
+  reason: string;
+  keys: number;
+  pipelineID: string;
+  replicas: IContainerReplicaAll[];
+}
+
 export interface IContainerReplica {
   containerId: number;
   datanodeHost: string;
@@ -42,9 +56,26 @@ export interface IContainerReplica {
   lastReportTimestamp: number;
 }
 
+export interface IContainerReplicaAll {
+  containerId: number;
+  datanodeUuid: string;
+  datanodeHost: string;
+  firstSeenTime: number;
+  lastSeenTime: number;
+  lastBcsId: number;
+}
+
 export interface IMissingContainersResponse {
   totalCount: number;
   containers: IMissingContainerResponse[];
+}
+
+interface IAllReplicatedContainersResponse {
+  missingCount: number;
+  underReplicatedCount: number;
+  overReplicatedCount: number;
+  misReplicatedCount: number;
+  containers: IAllContainerResponse[];
 }
 
 interface IKeyResponse {
@@ -82,7 +113,7 @@ const COLUMNS = [
     key: 'replicas',
     render: (replicas: IContainerReplica[]) => (
       <div>
-        {replicas.map(replica => {
+        {replicas && replicas.map(replica => {
           const tooltip = (
             <div>
               <div>First Report Time: {timeFormat(replica.firstReportTimestamp)}</div>
@@ -158,6 +189,294 @@ const KEY_TABLE_COLUMNS = [
   }
 ];
 
+const UCOLUMNS = [
+  {
+    title: 'Container ID',
+    dataIndex: 'containerID',
+    key: 'containerID',
+    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.containerID - b.containerID
+  },
+  {
+    title: 'No. of Keys',
+    dataIndex: 'keys',
+    key: 'keys',
+    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.keys - b.keys
+  },
+  {
+    title: 'Active/Expected Replica(s)',
+    dataIndex: 'expectedReplicaCount',
+    key: 'expectedReplicaCount',
+    render: (expectedReplicaCount: number, record: IAllContainerResponse) => {
+      const actualReplicaCount = record.actualReplicaCount;
+      return (
+        <span>
+          {actualReplicaCount} / {expectedReplicaCount}
+        </span>
+      );
+    }
+  },
+  {
+    title: 'Datanodes',
+    dataIndex: 'replicas',
+    key: 'replicas',
+    render: (replicas: IContainerReplicaAll[]) => (
+      <div>
+        {replicas && replicas.map(replica => {
+          const tooltip = (
+            <div>
+              <div>First Report Time: {timeFormat(replica.firstSeenTime)}</div>
+              <div>Last Report Time: {timeFormat(replica.lastSeenTime)}</div>
+            </div>
+          );
+          return (
+            <div key={replica.datanodeHost}>
+              <Tooltip
+                placement='left'
+                title={tooltip}
+              >
+                <Icon type='info-circle' className='icon-small'/>
+              </Tooltip>
+              <span className='pl-5'>
+                {replica.datanodeHost}
+              </span>
+            </div>
+          );
+        }
+        )}
+      </div>
+    )
+  },
+  {
+    title: 'Pipeline ID',
+    dataIndex: 'pipelineID',
+    key: 'pipelineID',
+    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.pipelineID.localeCompare(b.pipelineID)
+  },
+  {
+    title: 'Unhealthy Since',
+    dataIndex: 'unhealthySince',
+    key: 'unhealthySince',
+    render: (unhealthySince: number) => timeFormat(unhealthySince),
+    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.unhealthySince - b.unhealthySince
+  }
+];
+
+const OCOLUMNS = [
+  {
+    title: 'Container ID',
+    dataIndex: 'containerID',
+    key: 'containerID',
+    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.containerID - b.containerID
+  },
+  {
+    title: 'No. of Keys',
+    dataIndex: 'keys',
+    key: 'keys',
+    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.keys - b.keys
+  },
+  {
+    title: 'Active/Expected Replica(s)',
+    dataIndex: 'expectedReplicaCount',
+    key: 'expectedReplicaCount',
+    render: (expectedReplicaCount: number, record: IAllContainerResponse) => {
+      const actualReplicaCount = record.actualReplicaCount;
+      return (
+        <span>
+          {actualReplicaCount} / {expectedReplicaCount}
+        </span>
+      );
+    }
+  },
+  {
+    title: 'Datanodes',
+    dataIndex: 'replicas',
+    key: 'replicas',
+    render: (replicas: IContainerReplicaAll[]) => (
+      <div>
+        {replicas && replicas.map(replica => {
+          const tooltip = (
+            <div>
+              <div>First Report Time: {timeFormat(replica.firstSeenTime)}</div>
+              <div>Last Report Time: {timeFormat(replica.lastSeenTime)}</div>
+            </div>
+          );
+          return (
+            <div key={replica.datanodeHost}>
+              <Tooltip
+                placement='left'
+                title={tooltip}
+              >
+                <Icon type='info-circle' className='icon-small'/>
+              </Tooltip>
+              <span className='pl-5'>
+                {replica.datanodeHost}
+              </span>
+            </div>
+          );
+        }
+        )}
+      </div>
+    )
+  },
+  {
+    title: 'Pipeline ID',
+    dataIndex: 'pipelineID',
+    key: 'pipelineID',
+    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.pipelineID.localeCompare(b.pipelineID)
+  },
+  {
+    title: 'Unhealthy Since',
+    dataIndex: 'unhealthySince',
+    key: 'unhealthySince',
+    render: (unhealthySince: number) => timeFormat(unhealthySince),
+    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.unhealthySince - b.unhealthySince
+  }
+];
+
+const MCOLUMNS = [
+  {
+    title: 'Container ID',
+    dataIndex: 'containerID',
+    key: 'containerID',
+    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.containerID - b.containerID
+  },
+  {
+    title: 'No. of Keys',
+    dataIndex: 'keys',
+    key: 'keys',
+    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.keys - b.keys
+  },
+  {
+    title: 'Active/Expected Replica(s)',
+    dataIndex: 'expectedReplicaCount',
+    key: 'expectedReplicaCount',
+    render: (expectedReplicaCount: number, record: IAllContainerResponse) => {
+      const actualReplicaCount = record.actualReplicaCount;
+      return (
+        <span>
+          {actualReplicaCount} / {expectedReplicaCount}
+        </span>
+      );
+    }
+  },
+  {
+    title: 'Datanodes',
+    dataIndex: 'replicas',
+    key: 'replicas',
+    render: (replicas: IContainerReplicaAll[]) => (
+      <div>
+        {replicas && replicas.map(replica => {
+          const tooltip = (
+            <div>
+              <div>First Report Time: {timeFormat(replica.firstSeenTime)}</div>
+              <div>Last Report Time: {timeFormat(replica.lastSeenTime)}</div>
+            </div>
+          );
+          return (
+            <div key={replica.datanodeHost}>
+              <Tooltip
+                placement='left'
+                title={tooltip}
+              >
+                <Icon type='info-circle' className='icon-small'/>
+              </Tooltip>
+              <span className='pl-5'>
+                {replica.datanodeHost}
+              </span>
+            </div>
+          );
+        }
+        )}
+      </div>
+    )
+  },
+  {
+    title: 'Pipeline ID',
+    dataIndex: 'pipelineID',
+    key: 'pipelineID',
+    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.pipelineID.localeCompare(b.pipelineID)
+  },
+  {
+    title: 'Unhealthy Since',
+    dataIndex: 'unhealthySince',
+    key: 'unhealthySince',
+    render: (unhealthySince: number) => timeFormat(unhealthySince),
+    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.unhealthySince - b.unhealthySince
+  }
+];
+
+const ACOLUMNS = [
+  {
+    title: 'Container ID',
+    dataIndex: 'containerID',
+    key: 'containerID',
+    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.containerID - b.containerID
+  },
+  {
+    title: 'No. of Keys',
+    dataIndex: 'keys',
+    key: 'keys',
+    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.keys - b.keys
+  },
+  {
+    title: 'Active/Expected Replica(s)',
+    dataIndex: 'expectedReplicaCount',
+    key: 'expectedReplicaCount',
+    render: (expectedReplicaCount: number, record: IAllContainerResponse) => {
+      const actualReplicaCount = record.actualReplicaCount;
+      return (
+        <span>
+          {actualReplicaCount} / {expectedReplicaCount}
+        </span>
+      );
+    }
+  },
+  {
+    title: 'Datanodes',
+    dataIndex: 'replicas',
+    key: 'replicas',
+    render: (replicas: IContainerReplicaAll[]) => (
+      <div>
+        {replicas && replicas.map(replica => {
+          const tooltip = (
+            <div>
+              <div>First Report Time: {timeFormat(replica.firstSeenTime)}</div>
+              <div>Last Report Time: {timeFormat(replica.lastSeenTime)}</div>
+            </div>
+          );
+          return (
+            <div key={replica.datanodeHost}>
+              <Tooltip
+                placement='left'
+                title={tooltip}
+              >
+                <Icon type='info-circle' className='icon-small'/>
+              </Tooltip>
+              <span className='pl-5'>
+                {replica.datanodeHost}
+              </span>
+            </div>
+          );
+        }
+        )}
+      </div>
+    )
+  },
+  {
+    title: 'Pipeline ID',
+    dataIndex: 'pipelineID',
+    key: 'pipelineID',
+    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.pipelineID.localeCompare(b.pipelineID)
+  },
+  {
+    title: 'Unhealthy Since',
+    dataIndex: 'unhealthySince',
+    key: 'unhealthySince',
+    render: (unhealthySince: number) => timeFormat(unhealthySince),
+    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.unhealthySince - b.unhealthySince
+  }
+];
+
 interface IExpandedRow {
   [key: number]: IExpandedRowState;
 }
@@ -172,6 +491,10 @@ interface IExpandedRowState {
 interface IMissingContainersState {
   loading: boolean;
   dataSource: IMissingContainerResponse[];
+  udataSource: IAllContainerResponse[];
+  odataSource: IAllContainerResponse[];
+  mdataSource: IAllContainerResponse[];
+  adataSource: IAllContainerResponse[];
   totalCount: number;
   expandedRowData: IExpandedRow;
 }
@@ -182,6 +505,10 @@ export class MissingContainers extends React.Component<Record<string, object>, I
     this.state = {
       loading: false,
       dataSource: [],
+      udataSource: [],
+      odataSource: [],
+      mdataSource: [],
+      adataSource: [],
       totalCount: 0,
       expandedRowData: {}
     };
@@ -192,16 +519,41 @@ export class MissingContainers extends React.Component<Record<string, object>, I
     this.setState({
       loading: true
     });
-    axios.get('/api/v1/containers/missing').then(response => {
-      const missingContainersResponse: IMissingContainersResponse = response.data;
-      const totalCount = missingContainersResponse.totalCount;
-      const missingContainers: IMissingContainerResponse[] = missingContainersResponse.containers;
+
+    axios.all([
+      axios.get('/api/v1/containers/missing'),
+      axios.get('/api/v1/containers/unhealthy/UNDER_REPLICATED'),
+      axios.get('/api/v1/containers/unhealthy/OVER_REPLICATED'),
+      axios.get('/api/v1/containers/unhealthy/MIS_REPLICATED'),
+      axios.get('/api/v1/containers/unhealthy/ALL_REPLICAS_UNHEALTHY'),
+    ]).then(axios.spread((missingContainersResponse, underReplicatedResponse, overReplicatedResponse, misReplicatedResponse, allReplicatedResponse) => {
+      
+      const missingContainersResponse1: IMissingContainersResponse = missingContainersResponse.data;
+      const totalCount = missingContainersResponse1.totalCount;
+      const missingContainers: IMissingContainerResponse[] = missingContainersResponse1.containers;
+
+      const underReplicatedResponse1: IAllReplicatedContainersResponse = underReplicatedResponse.data;
+      const uContainers: IAllContainerResponse[] = underReplicatedResponse1.containers;
+      
+      const overReplicatedResponse1: IAllReplicatedContainersResponse = overReplicatedResponse.data;
+      const oContainers: IAllContainerResponse[] = overReplicatedResponse1.containers;
+      
+      const misReplicatedResponse1: IAllReplicatedContainersResponse = misReplicatedResponse.data;
+      const mContainers: IAllContainerResponse[] = misReplicatedResponse1.containers;
+
+      const allReplicatedResponse1: IAllReplicatedContainersResponse = allReplicatedResponse.data;
+      const aContainers: IAllContainerResponse[] = allReplicatedResponse1.containers;
+      
       this.setState({
         loading: false,
         dataSource: missingContainers,
+        udataSource: uContainers,
+        odataSource: oContainers,
+        mdataSource: mContainers,
+        adataSource: aContainers,
         totalCount
       });
-    }).catch(error => {
+    })).catch(error => {
       this.setState({
         loading: false
       });
@@ -211,6 +563,13 @@ export class MissingContainers extends React.Component<Record<string, object>, I
 
   onShowSizeChange = (current: number, pageSize: number) => {
     console.log(current, pageSize);
+  };
+
+  onTabChange = (activeKey: string) => {
+    // Fetch inactive pipelines if tab is switched to "Inactive"
+    if (activeKey === '2') {
+      // Fetch inactive pipelines in the future
+    }
   };
 
   onRowExpandClick = (expanded: boolean, record: IMissingContainerResponse) => {
@@ -270,7 +629,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
   };
 
   render() {
-    const {dataSource, loading, totalCount} = this.state;
+    const {dataSource, loading, udataSource, odataSource, mdataSource ,adataSource} = this.state;
     const paginationConfig: PaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} missing containers`,
       showSizeChanger: true,
@@ -279,14 +638,46 @@ export class MissingContainers extends React.Component<Record<string, object>, I
     return (
       <div className='missing-containers-container'>
         <div className='page-header'>
-          Missing Containers ({totalCount})
+          Containers
         </div>
         <div className='content-div'>
-          <Table
-            expandRowByClick dataSource={dataSource} columns={COLUMNS}
-            loading={loading}
-            pagination={paginationConfig} rowKey='containerID'
-            expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+          <Tabs defaultActiveKey='1' onChange={this.onTabChange}>
+            <TabPane key='1' tab="Missing">
+              <Table
+                expandRowByClick dataSource={dataSource} columns={COLUMNS}
+                loading={loading}
+                pagination={paginationConfig} rowKey='containerID'
+                expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+            </TabPane>
+            <TabPane key='2' tab='Under-Replicated'>
+              <Table
+                expandRowByClick dataSource={udataSource} columns={UCOLUMNS}
+                loading={loading}
+                pagination={paginationConfig} rowKey='containerID'
+                expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+            </TabPane>
+            <TabPane key='3' tab='Over-Replicated'>
+              <Table
+                expandRowByClick dataSource={odataSource} columns={OCOLUMNS}
+                loading={loading}
+                pagination={paginationConfig} rowKey='containerID'
+                expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+            </TabPane>
+            <TabPane key='4' tab='Mis-Replicated'>
+              <Table
+                expandRowByClick dataSource={mdataSource} columns={MCOLUMNS}
+                loading={loading}
+                pagination={paginationConfig} rowKey='containerID'
+                expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+            </TabPane>
+            <TabPane key='5' tab='All-Replicated'>
+              <Table
+                expandRowByClick dataSource={adataSource} columns={MCOLUMNS}
+                loading={loading}
+                pagination={paginationConfig} rowKey='containerID'
+                expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+            </TabPane>
+          </Tabs>
         </div>
       </div>
     );

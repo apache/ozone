@@ -23,5 +23,9 @@
   "/namespace/du?path=/clunky&files=true": "/clunky",
   "/namespace/summary?path=*": "/metadata",
   "/namespace/quota?path=*": "/quota",
-  "/task/status": "/taskStatus"
+  "/task/status": "/taskStatus",
+  "/containers/unhealthy/UNDER_REPLICATED": "/UNDER_REPLICATED",
+  "/containers/unhealthy/OVER_REPLICATED": "/OVER_REPLICATED",
+  "/containers/unhealthy/MIS_REPLICATED": "/MIS_REPLICATED",
+  "/containers/unhealthy/ALL_REPLICAS_UNHEALTHY": "/ALL_REPLICAS_UNHEALTHY"
 }
