@@ -32,8 +32,8 @@ import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfig
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.VOLUME_BYTES_PER_SECOND_KEY;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Test for {@link ContainerScannerConfiguration}.
@@ -51,11 +51,12 @@ public class TestContainerScannerConfiguration {
   public void acceptsValidValues() {
     long validInterval = Duration.ofHours(1).toMillis();
     long validBandwidth = (long) StorageUnit.MB.toBytes(1);
+    long validOnDemandBandwidth = (long) StorageUnit.MB.toBytes(2);
 
     conf.setLong(METADATA_SCAN_INTERVAL_KEY, validInterval);
     conf.setLong(DATA_SCAN_INTERVAL_KEY, validInterval);
     conf.setLong(VOLUME_BYTES_PER_SECOND_KEY, validBandwidth);
-    conf.setLong(ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY, validBandwidth);
+    conf.setLong(ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY, validOnDemandBandwidth);
 
     ContainerScannerConfiguration csConf =
         conf.getObject(ContainerScannerConfiguration.class);
@@ -63,7 +64,8 @@ public class TestContainerScannerConfiguration {
     assertEquals(validInterval, csConf.getMetadataScanInterval());
     assertEquals(validInterval, csConf.getDataScanInterval());
     assertEquals(validBandwidth, csConf.getBandwidthPerVolume());
-    assertEquals(validBandwidth, csConf.getOnDemandBandwidthPerVolume());
+    assertEquals(validOnDemandBandwidth,
+        csConf.getOnDemandBandwidthPerVolume());
   }
 
   @Test

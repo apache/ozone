@@ -94,7 +94,7 @@ public class ContainerScannerConfiguration {
 
   @Config(key = "on.demand.volume.bytes.per.second",
       type = ConfigType.LONG,
-      defaultValue = "1048576",
+      defaultValue = "5242880",
       tags = {ConfigTag.STORAGE},
       description = "Config parameter to throttle I/O bandwidth used"
           + " by on demand scanner per volume.")
