@@ -260,13 +260,24 @@ public class OMBucketCreateRequest extends OMClientRequest {
       LOG.info("created bucket: {} of layout {} in volume: {}", bucketName,
           omBucketInfo.getBucketLayout(), volumeName);
       omMetrics.incNumBuckets();
+      if (isECBucket(bucketInfo)) {
+        omMetrics.incNumEcBuckets();
+      }
       return omClientResponse;
     } else {
       omMetrics.incNumBucketCreateFails();
+      if (isECBucket(bucketInfo)) {
+        omMetrics.incNumEcBucketCreateFails();
+      }
       LOG.error("Bucket creation failed for bucket:{} in volume:{}",
           bucketName, volumeName, exception);
       return omClientResponse;
     }
+  }
+
+  private boolean isECBucket(BucketInfo bucketInfo) {
+    return bucketInfo.hasDefaultReplicationConfig() && bucketInfo
+        .getDefaultReplicationConfig().hasEcReplicationConfig();
   }
 
   private BucketLayout getDefaultBucketLayout(OzoneManager ozoneManager,

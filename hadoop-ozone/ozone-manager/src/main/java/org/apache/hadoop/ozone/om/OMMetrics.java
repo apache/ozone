@@ -195,6 +195,12 @@ public class OMMetrics {
   private @Metric MutableCounterLong numDirs;
   private @Metric MutableCounterLong numFiles;
 
+  //EC Metrics
+  private @Metric MutableCounterLong numECKeyCreates;
+  private @Metric MutableCounterLong numECKeyCreateFails;
+  private @Metric MutableCounterLong numECBucketCreates;
+  private @Metric MutableCounterLong numECBucketCreateFails;
+
   private final DBCheckpointMetrics dbCheckpointMetrics;
 
   public OMMetrics() {
@@ -1159,6 +1165,22 @@ public class OMMetrics {
 
   public void incNumTrashAtomicDirDeletes() {
     numTrashAtomicDirDeletes.incr();
+  }
+
+  public void incNumEcKeys() {
+    numECKeyCreates.incr();
+  }
+
+  public void incNumEcBuckets() {
+    numECBucketCreates.incr();
+  }
+
+  public void incNumEcKeyCreateFails() {
+    numECKeyCreateFails.incr();
+  }
+
+  public void incNumEcBucketCreateFails() {
+    numECBucketCreateFails.incr();
   }
 
   public void unRegister() {

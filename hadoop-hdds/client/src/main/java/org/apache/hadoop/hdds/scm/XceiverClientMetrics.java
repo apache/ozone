@@ -39,6 +39,8 @@ public class XceiverClientMetrics {
 
   private @Metric MutableCounterLong pendingOps;
   private @Metric MutableCounterLong totalOps;
+  private @Metric MutableCounterLong numECReconstruction;
+  private @Metric MutableCounterLong numECReconstructionFails;
   private MutableCounterLong[] pendingOpsArray;
   private MutableCounterLong[] opsArray;
   private MutableRate[] containerOpsLatency;
@@ -98,6 +100,14 @@ public class XceiverClientMetrics {
 
   public long getPendingContainerOpCountMetrics(ContainerProtos.Type type) {
     return pendingOpsArray[type.ordinal()].value();
+  }
+
+  public void incNumECReconstruction() {
+    numECReconstruction.incr();
+  }
+
+  public void incNumECReconstructionFails() {
+    numECReconstructionFails.incr();
   }
 
   @VisibleForTesting

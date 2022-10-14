@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
@@ -157,11 +158,17 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
         lastPosition = blockReader.getPos();
         totalRead += blockReader.read(buf);
       }
+      if (reconstructionReader) {
+        XceiverClientManager.getXceiverClientMetrics()
+            .incNumECReconstruction();
+      }
     } catch (IOException e) {
       if (reconstructionReader) {
         // If we get an error from the reconstruction reader, there
         // is nothing left to try. It will re-try until it has insufficient
         // locations internally, so if an error comes here, just re-throw it.
+        XceiverClientManager.getXceiverClientMetrics()
+            .incNumECReconstructionFails();
         throw e;
       }
       if (e instanceof BadDataLocationException) {
