@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -38,8 +39,10 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -82,6 +85,44 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private long unhealthyContainers = 0;
   private long underReplicatedContainers = 0;
 
+  @SuppressFBWarnings(value = "SIC_INNER_SHOULD_BE_STATIC")
+  private final class ContainerStateInWorkflow {
+    private long sufficientlyReplicated = 0;
+    private long unhealthyContainers = 0;
+    private long underReplicatedContainers = 0;
+    private String host = "";
+
+    private ContainerStateInWorkflow(String host,
+                                     long sufficientlyReplicated,
+                                    long underReplicatedContainers,
+                                    long unhealthyContainers) {
+      this.host = host;
+      this.sufficientlyReplicated = sufficientlyReplicated;
+      this.unhealthyContainers = unhealthyContainers;
+      this.underReplicatedContainers = underReplicatedContainers;
+    }
+
+    public void setAll(long sufficiently,
+                    long under,
+                    long unhealthy) {
+      sufficientlyReplicated = sufficiently;
+      underReplicatedContainers = under;
+      unhealthyContainers = unhealthy;
+    }
+    public void reset() {
+      sufficientlyReplicated = 0L;
+      underReplicatedContainers = 0L;
+      unhealthyContainers = 0L;
+    }
+
+    public String getHost() {
+      return host;
+    }
+  }
+
+  private Map<String, ContainerStateInWorkflow> containerStateByHost;
+  private Map<String, Long> pipelinesWaitingToCloseByHost;
+
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeAdminMonitorImpl.class);
   // The number of containers for each of under replicated and unhealthy
@@ -97,6 +138,9 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     this.eventQueue = eventQueue;
     this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
+
+    containerStateByHost = new HashMap<>();
+    pipelinesWaitingToCloseByHost = new HashMap<>();
   }
 
   /**
@@ -183,15 +227,27 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   }
 
   synchronized void setMetricsToGauge() {
-    metrics.setTotalTrackedContainersUnhealthy(unhealthyContainers);
-    metrics.setTotalTrackedRecommissionNodes(trackedRecommission);
-    metrics.setTotalTrackedDecommissioningMaintenanceNodes(
+    metrics.setTrackedContainersUnhealthyTotal(unhealthyContainers);
+    metrics.setTrackedRecommissionNodesTotal(trackedRecommission);
+    metrics.setTrackedDecommissioningMaintenanceNodesTotal(
             trackedDecomMaintenance);
-    metrics.setTotalTrackedContainersUnderReplicated(
+    metrics.setTrackedContainersUnderReplicatedTotal(
             underReplicatedContainers);
-    metrics.setTotalTrackedContainersSufficientlyReplicated(
+    metrics.setTrackedContainersSufficientlyReplicatedTotal(
             sufficientlyReplicatedContainers);
-    metrics.setTotalTrackedPipelinesWaitingToClose(pipelinesWaitingToClose);
+    metrics.setTrackedPipelinesWaitingToCloseTotal(pipelinesWaitingToClose);
+    for (Map.Entry<String, Long> e :
+            pipelinesWaitingToCloseByHost.entrySet()) {
+      metrics.metricRecordPipelineWaitingToCloseByHost(e.getKey(),
+              e.getValue());
+    }
+    for (Map.Entry<String, ContainerStateInWorkflow> e :
+            containerStateByHost.entrySet()) {
+      metrics.metricRecordOfReplicationByHost(e.getKey(),
+              e.getValue().sufficientlyReplicated,
+              e.getValue().underReplicatedContainers,
+              e.getValue().unhealthyContainers);
+    }
   }
 
   void resetContainerMetrics() {
@@ -199,6 +255,12 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     sufficientlyReplicatedContainers = 0;
     unhealthyContainers = 0;
     underReplicatedContainers = 0;
+
+    for (Map.Entry<String, ContainerStateInWorkflow> e :
+            containerStateByHost.entrySet()) {
+      e.getValue().reset();
+    }
+    pipelinesWaitingToCloseByHost.replaceAll((k, v) -> 0L);
   }
 
   private void processCancelledNodes() {
@@ -313,6 +375,8 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     } else {
       LOG.info("Waiting for pipelines to close for {}. There are {} " +
           "pipelines", dn, pipelines.size());
+      pipelinesWaitingToCloseByHost.put(dn.getHostName(),
+              (long) pipelines.size());
       pipelinesWaitingToClose += pipelines.size();
       return false;
     }
@@ -363,6 +427,14 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     LOG.info("{} has {} sufficientlyReplicated, {} underReplicated and {} " +
         "unhealthy containers",
         dn, sufficientlyReplicated, underReplicated, unhealthy);
+    containerStateByHost.computeIfAbsent(dn.getHostName(),
+            hostID -> new ContainerStateInWorkflow(hostID,
+                    0L,
+                    0L,
+                    0L)
+    ).setAll(sufficientlyReplicated,
+            underReplicated,
+            unhealthy);
     sufficientlyReplicatedContainers += sufficientlyReplicated;
     underReplicatedContainers += underReplicated;
     unhealthyContainers += unhealthy;

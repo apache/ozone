@@ -17,15 +17,20 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Class contains metrics related to the NodeDecommissionManager.
@@ -37,28 +42,40 @@ public final class NodeDecommissionMetrics implements MetricsSource {
                 .class.getSimpleName();
 
   @Metric("Number of nodes tracked for decommissioning and maintenance.")
-  private MutableGaugeLong totalTrackedDecommissioningMaintenanceNodes;
+  private MutableGaugeLong trackedDecommissioningMaintenanceNodesTotal;
 
   @Metric("Number of nodes tracked for recommissioning.")
-  private MutableGaugeLong totalTrackedRecommissionNodes;
+  private MutableGaugeLong trackedRecommissionNodesTotal;
 
   @Metric("Number of nodes tracked with pipelines waiting to close.")
-  private MutableGaugeLong totalTrackedPipelinesWaitingToClose;
+  private MutableGaugeLong trackedPipelinesWaitingToCloseTotal;
 
   @Metric("Number of containers under replicated in tracked nodes.")
-  private MutableGaugeLong totalTrackedContainersUnderReplicated;
+  private MutableGaugeLong trackedContainersUnderReplicatedTotal;
 
   @Metric("Number of containers unhealthy in tracked nodes.")
-  private MutableGaugeLong totalTrackedContainersUnhealthy;
+  private MutableGaugeLong trackedContainersUnhealthyTotal;
 
   @Metric("Number of containers sufficiently replicated in tracked nodes.")
-  private MutableGaugeLong totalTrackedContainersSufficientlyReplicated;
+  private MutableGaugeLong trackedContainersSufficientlyReplicatedTotal;
 
   private MetricsRegistry registry;
+
+  private Map<String, MutableGaugeLong> trackedSufficientlyReplicatedByHost;
+
+  private Map<String, MutableGaugeLong> trackedUnderReplicatedByHost;
+
+  private Map<String, MutableGaugeLong> trackedUnhealthyContainersByHost;
+
+  private Map<String, MutableGaugeLong> trackedPipelinesWaitingToCloseByHost;
 
   /** Private constructor. */
   private NodeDecommissionMetrics() {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
+    trackedSufficientlyReplicatedByHost = new HashMap<>();
+    trackedUnderReplicatedByHost = new HashMap<>();
+    trackedUnhealthyContainersByHost = new HashMap();
+    trackedPipelinesWaitingToCloseByHost = new HashMap();
   }
 
   /**
@@ -82,12 +99,7 @@ public final class NodeDecommissionMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector
         .addRecord(METRICS_SOURCE_NAME);
-    totalTrackedDecommissioningMaintenanceNodes.snapshot(builder, all);
-    totalTrackedRecommissionNodes.snapshot(builder, all);
-    totalTrackedPipelinesWaitingToClose.snapshot(builder, all);
-    totalTrackedContainersUnderReplicated.snapshot(builder, all);
-    totalTrackedContainersUnhealthy.snapshot(builder, all);
-    totalTrackedContainersSufficientlyReplicated.snapshot(builder, all);
+    registry.snapshot(builder, all);
   }
 
   /**
@@ -97,62 +109,138 @@ public final class NodeDecommissionMetrics implements MetricsSource {
     DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
   }
 
-  public void setTotalTrackedDecommissioningMaintenanceNodes(
+  public void setTrackedDecommissioningMaintenanceNodesTotal(
             long numNodesTracked) {
-    totalTrackedDecommissioningMaintenanceNodes
+    trackedDecommissioningMaintenanceNodesTotal
             .set(numNodesTracked);
   }
 
-  public void setTotalTrackedRecommissionNodes(
+  public void setTrackedRecommissionNodesTotal(
           long numNodesTrackedRecommissioned) {
-    totalTrackedRecommissionNodes.set(numNodesTrackedRecommissioned);
+    trackedRecommissionNodesTotal.set(numNodesTrackedRecommissioned);
   }
 
-  public void setTotalTrackedPipelinesWaitingToClose(
+  public void setTrackedPipelinesWaitingToCloseTotal(
           long numTrackedPipelinesWaitToClose) {
-    totalTrackedPipelinesWaitingToClose
+    trackedPipelinesWaitingToCloseTotal
             .set(numTrackedPipelinesWaitToClose);
   }
 
-  public void setTotalTrackedContainersUnderReplicated(
+  public void setTrackedContainersUnderReplicatedTotal(
           long numTrackedUnderReplicated) {
-    totalTrackedContainersUnderReplicated
+    trackedContainersUnderReplicatedTotal
             .set(numTrackedUnderReplicated);
   }
 
-  public void setTotalTrackedContainersUnhealthy(
+  public void setTrackedContainersUnhealthyTotal(
           long numTrackedUnhealthy) {
-    totalTrackedContainersUnhealthy
+    trackedContainersUnhealthyTotal
             .set(numTrackedUnhealthy);
   }
 
-  public void setTotalTrackedContainersSufficientlyReplicated(
+  public void setTrackedContainersSufficientlyReplicatedTotal(
           long numTrackedSufficientlyReplicated) {
-    totalTrackedContainersSufficientlyReplicated
+    trackedContainersSufficientlyReplicatedTotal
             .set(numTrackedSufficientlyReplicated);
   }
 
-  public long getTotalTrackedDecommissioningMaintenanceNodes() {
-    return totalTrackedDecommissioningMaintenanceNodes.value();
+  public long getTrackedDecommissioningMaintenanceNodesTotal() {
+    return trackedDecommissioningMaintenanceNodesTotal.value();
   }
 
-  public long getTotalTrackedRecommissionNodes() {
-    return totalTrackedRecommissionNodes.value();
+  public long getTrackedRecommissionNodesTotal() {
+    return trackedRecommissionNodesTotal.value();
   }
 
-  public long getTotalTrackedPipelinesWaitingToClose() {
-    return totalTrackedPipelinesWaitingToClose.value();
+  public long getTrackedPipelinesWaitingToCloseTotal() {
+    return trackedPipelinesWaitingToCloseTotal.value();
   }
 
-  public long getTotalTrackedContainersUnderReplicated() {
-    return totalTrackedContainersUnderReplicated.value();
+  public long getTrackedContainersUnderReplicatedTotal() {
+    return trackedContainersUnderReplicatedTotal.value();
   }
 
-  public long getTotalTrackedContainersUnhealthy() {
-    return totalTrackedContainersUnhealthy.value();
+  public long getTrackedContainersUnhealthyTotal() {
+    return trackedContainersUnhealthyTotal.value();
   }
 
-  public long getTotalTrackedContainersSufficientlyReplicated() {
-    return totalTrackedContainersSufficientlyReplicated.value();
+  public long getTrackedContainersSufficientlyReplicatedTotal() {
+    return trackedContainersSufficientlyReplicatedTotal.value();
+  }
+
+  public void metricRecordPipelineWaitingToCloseByHost(String host,
+                                                       long num) {
+    trackedPipelinesWaitingToCloseByHost.computeIfAbsent(host,
+            hostID -> registry.newGauge(
+                    Interns.info("trackedPipelinesWaitingToClose-" + hostID,
+                            "Number of pipelines waiting to close for "
+                                    + "host in decommissioning and "
+                                    + "maintenance mode"),
+                    0L)
+    ).set(num);
+  }
+
+  public void metricRecordOfReplicationByHost(String host,
+                               long sufficientlyReplicated,
+                               long underReplicated,
+                               long unhealthy) {
+    trackedSufficientlyReplicatedByHost.computeIfAbsent(host,
+            hostID -> registry.newGauge(
+                    Interns.info("trackedSufficientlyReplicated-" + hostID,
+                            "Number of sufficiently replicated containers "
+                                    + "for host in decommissioning and "
+                                    + "maintenance mode"),
+                    0L)
+    ).set(sufficientlyReplicated);
+
+    trackedUnderReplicatedByHost.computeIfAbsent(host,
+            hostID -> registry.newGauge(
+                    Interns.info("trackedUnderReplicated-" + hostID,
+                            "Number of under-replicated containers "
+                                    + "for host in decommissioning and "
+                                    + "maintenance mode"),
+                    0L)
+    ).set(underReplicated);
+
+    trackedUnhealthyContainersByHost.computeIfAbsent(host,
+            hostID -> registry.newGauge(
+                    Interns.info("trackedUnhealthyContainers-" + hostID,
+                            "Number of unhealthy containers "
+                                    + "for host in decommissioning and "
+                                    + "maintenance mode"),
+                    0L)
+    ).set(unhealthy);
+  }
+
+  @VisibleForTesting
+  public Long getTrackedPipelinesWaitingToCloseByHost(String host) {
+    if (!trackedPipelinesWaitingToCloseByHost.containsKey(host)) {
+      return null;
+    }
+    return trackedPipelinesWaitingToCloseByHost.get(host).value();
+  }
+
+  @VisibleForTesting
+  public Long getTrackedSufficientlyReplicatedByHost(String host) {
+    if (!trackedSufficientlyReplicatedByHost.containsKey(host)) {
+      return null;
+    }
+    return trackedSufficientlyReplicatedByHost.get(host).value();
+  }
+
+  @VisibleForTesting
+  public Long getTrackedUnderReplicatedByHost(String host) {
+    if (!trackedUnderReplicatedByHost.containsKey(host)) {
+      return null;
+    }
+    return trackedUnderReplicatedByHost.get(host).value();
+  }
+
+  @VisibleForTesting
+  public Long getTrackedUnhealthyContainersByHost(String host) {
+    if (!trackedUnhealthyContainersByHost.containsKey(host)) {
+      return null;
+    }
+    return trackedUnhealthyContainersByHost.get(host).value();
   }
 }

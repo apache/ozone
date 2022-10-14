@@ -90,7 +90,7 @@ public class TestNodeDecommissionMetrics {
     monitor.startMonitoring(dn1);
     monitor.run();
     Assertions.assertEquals(1,
-            metrics.getTotalTrackedDecommissioningMaintenanceNodes());
+            metrics.getTrackedDecommissioningMaintenanceNodesTotal());
   }
 
   /**
@@ -110,9 +110,9 @@ public class TestNodeDecommissionMetrics {
     monitor.stopMonitoring(dn1);
     monitor.run();
     Assertions.assertEquals(0,
-            metrics.getTotalTrackedDecommissioningMaintenanceNodes());
+            metrics.getTrackedDecommissioningMaintenanceNodesTotal());
     Assertions.assertEquals(1,
-            metrics.getTotalTrackedRecommissionNodes());
+            metrics.getTrackedRecommissionNodesTotal());
   }
 
   /**
@@ -121,7 +121,9 @@ public class TestNodeDecommissionMetrics {
    */
   @Test
   public void testDecommMonitorCollectPipelinesWaitingClosed() {
-    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn1 = MockDatanodeDetails.createDatanodeDetails(
+            "datanode_host1",
+            "/r1/ng1");
     nodeManager.register(dn1,
             new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
                     HddsProtos.NodeState.HEALTHY));
@@ -133,7 +135,21 @@ public class TestNodeDecommissionMetrics {
     // Ensure a StartAdmin event was fired
     eventQueue.processAll(20000);
     Assertions.assertEquals(2,
-            metrics.getTotalTrackedPipelinesWaitingToClose());
+            metrics.getTrackedPipelinesWaitingToCloseTotal());
+
+    // should have host specific metric collected
+    // for datanode_host1
+    Assertions.assertEquals(2,
+            metrics.getTrackedPipelinesWaitingToCloseByHost(
+                    "datanode_host1"));
+    // Clear the pipelines and the metric collected for
+    // datanode_host1 should clear
+    nodeManager.setPipelines(dn1, 0);
+    monitor.run();
+    eventQueue.processAll(20000);
+    Assertions.assertEquals(0,
+            metrics.getTrackedPipelinesWaitingToCloseByHost(
+                    "datanode_host1"));
   }
 
   /**
@@ -143,7 +159,9 @@ public class TestNodeDecommissionMetrics {
   @Test
   public void testDecommMonitorCollectUnderReplicated()
           throws ContainerNotFoundException, NodeNotFoundException {
-    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn1 = MockDatanodeDetails.createDatanodeDetails(
+            "datanode_host1",
+            "/r1/ng1");
     nodeManager.register(dn1,
             new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
                     HddsProtos.NodeState.HEALTHY));
@@ -168,7 +186,13 @@ public class TestNodeDecommissionMetrics {
     monitor.startMonitoring(dn1);
     monitor.run();
     Assertions.assertEquals(1,
-            metrics.getTotalTrackedContainersUnderReplicated());
+            metrics.getTrackedContainersUnderReplicatedTotal());
+
+    // should have host specific metric collected
+    // for datanode_host1
+    Assertions.assertEquals(1,
+            metrics.getTrackedUnderReplicatedByHost(
+                    "datanode_host1"));
   }
 
   /**
@@ -178,7 +202,9 @@ public class TestNodeDecommissionMetrics {
   @Test
   public void testDecommMonitorCollectSufficientlyReplicated()
           throws ContainerNotFoundException, NodeNotFoundException {
-    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn1 = MockDatanodeDetails.createDatanodeDetails(
+            "datanode_host1",
+            "/r1/ng1");
     nodeManager.register(dn1,
             new NodeStatus(DECOMMISSIONING,
                     HddsProtos.NodeState.HEALTHY));
@@ -201,8 +227,13 @@ public class TestNodeDecommissionMetrics {
     // expect dn in decommissioning workflow with container
     // sufficiently replicated
     Assertions.assertEquals(1,
-            metrics.getTotalTrackedContainersSufficientlyReplicated());
+            metrics.getTrackedContainersSufficientlyReplicatedTotal());
 
+    // should have host specific metric collected
+    // for datanode_host1
+    Assertions.assertEquals(1,
+            metrics.getTrackedSufficientlyReplicatedByHost(
+                    "datanode_host1"));
   }
 
   /**
@@ -212,7 +243,9 @@ public class TestNodeDecommissionMetrics {
   @Test
   public void testDecommMonitorCollectUnhealthyContainers()
           throws ContainerNotFoundException, NodeNotFoundException {
-    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn1 = MockDatanodeDetails.createDatanodeDetails(
+            "datanode_host1",
+            "/r1/ng1");
     nodeManager.register(dn1,
             new NodeStatus(DECOMMISSIONING,
                     HddsProtos.NodeState.HEALTHY));
@@ -231,8 +264,13 @@ public class TestNodeDecommissionMetrics {
 
     monitor.run();
     Assertions.assertEquals(1,
-            metrics.getTotalTrackedContainersUnhealthy());
+            metrics.getTrackedContainersUnhealthyTotal());
 
+    // should have host specific metric collected
+    // for datanode_host1
+    Assertions.assertEquals(1,
+            metrics.getTrackedUnhealthyContainersByHost(
+                    "datanode_host1"));
   }
 
   /**
@@ -277,7 +315,7 @@ public class TestNodeDecommissionMetrics {
 
     monitor.run();
     Assertions.assertEquals(3,
-            metrics.getTotalTrackedContainersUnderReplicated());
+            metrics.getTrackedContainersUnderReplicatedTotal());
 
   }
 
@@ -307,6 +345,6 @@ public class TestNodeDecommissionMetrics {
 
     monitor.run();
     Assertions.assertEquals(3,
-            metrics.getTotalTrackedPipelinesWaitingToClose());
+            metrics.getTrackedPipelinesWaitingToCloseTotal());
   }
 }
