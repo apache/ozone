@@ -17,6 +17,9 @@
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -28,6 +31,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ECContainerReplicaCount;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 
@@ -38,7 +42,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.E
  */
 public class ECReplicationCheckHandler extends AbstractCheck {
 
-  public ECReplicationCheckHandler() {
+  private PlacementPolicy placementPolicy;
+  public ECReplicationCheckHandler(PlacementPolicy placementPolicy) {
+    this.placementPolicy = placementPolicy;
   }
 
   @Override
@@ -95,6 +101,10 @@ public class ECReplicationCheckHandler extends AbstractCheck {
   public ContainerHealthResult checkHealth(ContainerCheckRequest request) {
     ContainerInfo container = request.getContainerInfo();
     Set<ContainerReplica> replicas = request.getContainerReplicas();
+    List<DatanodeDetails> dns = replicas.stream()
+        .map(ContainerReplica::getDatanodeDetails).collect(Collectors.toList());
+    int totalNumberOfNodesRequired = container.getReplicationConfig()
+            .getRequiredNodes();
     List<ContainerReplicaOp> replicaPendingOps = request.getPendingOps();
     ECContainerReplicaCount replicaCount =
         new ECContainerReplicaCount(container, replicas, replicaPendingOps,
@@ -102,9 +112,12 @@ public class ECReplicationCheckHandler extends AbstractCheck {
 
     ECReplicationConfig repConfig =
         (ECReplicationConfig) container.getReplicationConfig();
-
-    if (!replicaCount.isSufficientlyReplicated(false)) {
-      List<Integer> missingIndexes = replicaCount.unavailableIndexes(false);
+    ContainerPlacementStatus placementStatus = placementPolicy
+            .validateContainerPlacement(dns, totalNumberOfNodesRequired);
+    if (!replicaCount.isSufficientlyReplicated(false) ||
+            !placementStatus.isPolicySatisfied()) {
+      List<Integer> missingIndexes = replicaCount
+              .unavailableIndexes(false);
       int remainingRedundancy = repConfig.getParity();
       boolean dueToDecommission = true;
       if (missingIndexes.size() > 0) {
@@ -119,7 +132,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       return new ContainerHealthResult.UnderReplicatedHealthResult(
           container, remainingRedundancy, dueToDecommission,
           replicaCount.isSufficientlyReplicated(true),
-          replicaCount.isUnrecoverable());
+          replicaCount.isUnrecoverable(), placementStatus);
     }
 
     if (replicaCount.isOverReplicated(false)) {

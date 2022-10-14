@@ -82,7 +82,7 @@ public class TestECOverReplicationHandler {
     NodeSchema[] schemas =
         new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
-    replicationCheck = new ECReplicationCheckHandler();
+    replicationCheck = new ECReplicationCheckHandler(policy);
   }
 
   @Test

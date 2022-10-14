@@ -196,9 +196,10 @@ public class ReplicationManager implements SCMService {
         TimeUnit.MILLISECONDS);
     this.containerReplicaPendingOps = replicaPendingOps;
     this.legacyReplicationManager = legacyReplicationManager;
-    this.ecReplicationCheckHandler = new ECReplicationCheckHandler();
+    this.ecReplicationCheckHandler = new ECReplicationCheckHandler(
+        containerPlacement);
     this.ratisReplicationCheckHandler =
-        new RatisReplicationCheckHandler(containerPlacement);
+            new RatisReplicationCheckHandler(containerPlacement);
     this.nodeManager = nodeManager;
     this.replicationQueue = new ReplicationQueue();
     this.maintenanceRedundancy = rmConf.maintenanceRemainingRedundancy;

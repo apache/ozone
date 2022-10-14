@@ -19,20 +19,24 @@ package org.apache.hadoop.hdds.scm.container.replication.health;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
-import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
+import org.apache.hadoop.hdds.scm.container.replication.*;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.OverReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.HealthState;
 
-import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mock;
+import org.mockito.Mockito;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -59,11 +63,16 @@ public class TestECReplicationCheckHandler {
   private int maintenanceRedundancy = 2;
   private ContainerCheckRequest.Builder requestBuilder;
   private ReplicationManagerReport report;
+  private PlacementPolicy placementPolicy;
 
 
-  @Before
+  @BeforeEach
   public void setup() {
-    healthCheck = new ECReplicationCheckHandler();
+    placementPolicy = Mockito.mock(PlacementPolicy.class);
+    Mockito.when(placementPolicy.validateContainerPlacement(
+            Mockito.anyList(), Mockito.anyInt()))
+            .thenReturn(new ContainerPlacementStatusDefault(1, 1, 1));
+    healthCheck = new ECReplicationCheckHandler(placementPolicy);
     repConfig = new ECReplicationConfig(3, 2);
     repQueue = new ReplicationQueue();
     report = new ReplicationManagerReport();
@@ -359,6 +368,9 @@ public class TestECReplicationCheckHandler {
     Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
     Assert.assertEquals(1,
         ((UnderReplicatedHealthResult)result).getRemainingRedundancy());
+    Assert.assertEquals(0,
+            ((UnderReplicatedHealthResult)result).getPlacementStatus()
+                    .misReplicationCount());
 
     // Under-replicated takes precedence and the over-replication is ignored
     // for now.
@@ -369,6 +381,48 @@ public class TestECReplicationCheckHandler {
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2, 3, 4, 5, 6})
+  public void testCheckUnHealthyPlacementStatus(int misreplicationCnt) {
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
+            Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2));
+    ContainerCheckRequest request = requestBuilder
+            .setContainerReplicas(replicas)
+            .setContainerInfo(container)
+            .build();
+    PlacementPolicy mockedPolicy = Mockito.spy(PlacementPolicy.class);
+    ContainerPlacementStatus mockedContainerPlacementStatus =
+            Mockito.mock(ContainerPlacementStatus.class);
+    Mockito.when(mockedContainerPlacementStatus.isPolicySatisfied())
+            .thenReturn(false);
+    Mockito.when(mockedContainerPlacementStatus.misReplicationCount())
+            .thenReturn(misreplicationCnt);
+    Mockito.when(mockedPolicy.validateContainerPlacement(Mockito.anyList(),
+            Mockito.anyInt())).thenReturn(mockedContainerPlacementStatus);
+    ECReplicationCheckHandler checkHandler =
+            new ECReplicationCheckHandler(mockedPolicy);
+    ContainerHealthResult result = checkHandler.checkHealth(request);
+    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    Assert.assertEquals(1,
+            ((UnderReplicatedHealthResult)result).getRemainingRedundancy());
+    Assert.assertEquals(misreplicationCnt,
+            ((UnderReplicatedHealthResult)result).getPlacementStatus()
+            .misReplicationCount());
+
+    // Under-replicated takes precedence and the over-replication is ignored
+    // for now.
+    Assert.assertTrue(checkHandler.handle(request));
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, report.getStat(
+            ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(0, report.getStat(
+            ReplicationManagerReport.HealthState.OVER_REPLICATED));
   }
 
 }

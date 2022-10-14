@@ -23,7 +23,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -79,9 +81,14 @@ public class TestUnderReplicatedProcessor {
   public void testEcReconstructionCommand() throws IOException {
     ContainerInfo container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
+    ContainerPlacementStatus placementStatus =
+            Mockito.mock(ContainerPlacementStatus.class);
+    Mockito.when(placementStatus.isPolicySatisfied()).thenReturn(true);
+
     Mockito.when(replicationManager.dequeueUnderReplicatedContainer())
         .thenReturn(new ContainerHealthResult
-                .UnderReplicatedHealthResult(container, 3, false, false, false),
+                .UnderReplicatedHealthResult(container, 3, false, false, false,
+                        placementStatus),
             (ContainerHealthResult.UnderReplicatedHealthResult) null);
     List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
         sourceNodes = new ArrayList<>();
@@ -125,9 +132,13 @@ public class TestUnderReplicatedProcessor {
   public void testEcReplicationCommand() throws IOException {
     ContainerInfo container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
+    ContainerPlacementStatus placementStatus =
+            Mockito.mock(ContainerPlacementStatus.class);
+    Mockito.when(placementStatus.isPolicySatisfied()).thenReturn(true);
     Mockito.when(replicationManager.dequeueUnderReplicatedContainer())
         .thenReturn(new ContainerHealthResult
-                .UnderReplicatedHealthResult(container, 3, true, false, false),
+                .UnderReplicatedHealthResult(container, 3, true, false, false,
+                        placementStatus),
             (ContainerHealthResult.UnderReplicatedHealthResult) null);
     List<DatanodeDetails> sourceDns = new ArrayList<>();
     sourceDns.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -161,9 +172,13 @@ public class TestUnderReplicatedProcessor {
   public void testMessageRequeuedOnException() throws IOException {
     ContainerInfo container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
+    ContainerPlacementStatus placementStatus =
+            Mockito.mock(ContainerPlacementStatus.class);
+    Mockito.when(placementStatus.isPolicySatisfied()).thenReturn(true);
     Mockito.when(replicationManager.dequeueUnderReplicatedContainer())
         .thenReturn(new ContainerHealthResult
-                .UnderReplicatedHealthResult(container, 3, false, false, false),
+                .UnderReplicatedHealthResult(container, 3, false, false, false,
+                        placementStatus),
             (ContainerHealthResult.UnderReplicatedHealthResult) null);
 
     Mockito.when(replicationManager

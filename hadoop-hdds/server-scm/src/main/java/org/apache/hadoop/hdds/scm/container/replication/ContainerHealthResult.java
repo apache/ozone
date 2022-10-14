@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
@@ -34,7 +35,8 @@ public class ContainerHealthResult {
     HEALTHY,
     UNHEALTHY,
     UNDER_REPLICATED,
-    OVER_REPLICATED
+    OVER_REPLICATED,
+    UNHEALTHY_PLACEMENT
   }
 
   private final ContainerInfo containerInfo;
@@ -112,14 +114,18 @@ public class ContainerHealthResult {
     private final boolean unrecoverable;
     private int requeueCount = 0;
 
+    private final ContainerPlacementStatus placementStatus;
+
     public UnderReplicatedHealthResult(ContainerInfo containerInfo,
         int remainingRedundancy, boolean dueToDecommission,
-        boolean replicatedOkWithPending, boolean unrecoverable) {
+        boolean replicatedOkWithPending, boolean unrecoverable,
+        ContainerPlacementStatus placementStatus) {
       super(containerInfo, HealthState.UNDER_REPLICATED);
       this.remainingRedundancy = remainingRedundancy;
       this.dueToDecommission = dueToDecommission;
       this.sufficientlyReplicatedAfterPending = replicatedOkWithPending;
       this.unrecoverable = unrecoverable;
+      this.placementStatus = placementStatus;
     }
 
     /**
@@ -266,6 +272,9 @@ public class ContainerHealthResult {
     public boolean isUnrecoverable() {
       return unrecoverable;
     }
+    public ContainerPlacementStatus getPlacementStatus() {
+      return placementStatus;
+    }
   }
 
   /**
@@ -307,5 +316,7 @@ public class ContainerHealthResult {
     public boolean isSufficientlyReplicatedAfterPending() {
       return sufficientlyReplicatedAfterPending;
     }
+
+
   }
 }

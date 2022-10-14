@@ -44,6 +44,8 @@ import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -92,7 +94,7 @@ public class TestECUnderReplicationHandler {
     NodeSchema[] schemas =
         new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
-    replicationCheck = new ECReplicationCheckHandler();
+    replicationCheck = new ECReplicationCheckHandler(policy);
   }
 
   @Test
@@ -227,6 +229,45 @@ public class TestECUnderReplicationHandler {
             availableReplicas, 0, 0, mockedPolicy);
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2, 3, 4, 5, 6})
+  public void testUnderReplicationUnhealthyPlacementCheck(int misreplicationCnt)
+          throws IOException {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+            .createReplicas(Pair.of(IN_SERVICE, 1),
+                    Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
+                    Pair.of(IN_SERVICE, 4));
+    PlacementPolicy mockedPolicy = Mockito.spy(policy);
+    ContainerPlacementStatus mockedContainerPlacementStatus =
+            Mockito.mock(ContainerPlacementStatus.class);
+    Mockito.when(mockedContainerPlacementStatus.isPolicySatisfied())
+            .thenReturn(false);
+    Mockito.when(mockedContainerPlacementStatus.misReplicationCount())
+            .thenReturn(misreplicationCnt);
+    Mockito.when(mockedPolicy.validateContainerPlacement(Mockito.anyList(),
+            Mockito.anyInt())).thenReturn(mockedContainerPlacementStatus);
+    Mockito.when(mockedPolicy.validateContainerPlacement(Mockito.anyList(),
+            Mockito.anyInt())).thenAnswer(invocationOnMock -> {
+      Set<DatanodeDetails> dns =
+              new HashSet<>(invocationOnMock.getArgument(0));
+      Assert.assertTrue(
+              availableReplicas.stream()
+                      .map(ContainerReplica::getDatanodeDetails)
+                      .filter(dn -> dn.getPersistedOpState() == IN_SERVICE)
+                      .allMatch(dns::contains));
+      return mockedContainerPlacementStatus;
+    });
+    ECReplicationCheckHandler checkHandler =
+            new ECReplicationCheckHandler(mockedPolicy);
+
+    ECUnderReplicationHandler ecURH =
+            new ECUnderReplicationHandler(checkHandler,
+                    mockedPolicy, conf, nodeManager);
+    testUnderReplicationWithMissingIndexes(Collections.emptyList(),
+            availableReplicas, 0, 0,
+            Math.min(4, misreplicationCnt), ecURH);
+  }
+
   @Test
   public void testExceptionIfNoNodesFound() {
     PlacementPolicy noNodesPolicy = ReplicationTestUtil
@@ -291,12 +332,20 @@ public class TestECUnderReplicationHandler {
 
   public Map<DatanodeDetails, SCMCommand<?>>
       testUnderReplicationWithMissingIndexes(
+          List<Integer> missingIndexes, Set<ContainerReplica> availableReplicas,
+          int decomIndexes, int maintenanceIndexes,
+          PlacementPolicy placementPolicy) throws IOException {
+    return testUnderReplicationWithMissingIndexes(
+            missingIndexes, availableReplicas, decomIndexes, maintenanceIndexes,
+            0, new ECUnderReplicationHandler(replicationCheck,
+                    placementPolicy, conf, nodeManager));
+  }
+
+  public Map<DatanodeDetails, SCMCommand<?>>
+      testUnderReplicationWithMissingIndexes(
       List<Integer> missingIndexes, Set<ContainerReplica> availableReplicas,
-      int decomIndexes, int maintenanceIndexes,
-      PlacementPolicy placementPolicy) throws IOException {
-    ECUnderReplicationHandler ecURH =
-        new ECUnderReplicationHandler(replicationCheck,
-            placementPolicy, conf, nodeManager);
+      int decomIndexes, int maintenanceIndexes, int placementReplicateCommand,
+      ECUnderReplicationHandler ecURH) throws IOException {
     ContainerHealthResult.UnderReplicatedHealthResult result =
         Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
     Mockito.when(result.isUnrecoverable()).thenReturn(false);
@@ -333,8 +382,8 @@ public class TestECUnderReplicationHandler {
     int maxMaintenance = PARITY - remainingMaintenanceRedundancy;
     int expectedMaintenanceCommands = Math.max(0,
         maintenanceIndexes - maxMaintenance);
-    Assertions.assertEquals(decomIndexes + expectedMaintenanceCommands,
-        replicateCommand);
+    Assertions.assertEquals(placementReplicateCommand +
+        decomIndexes + expectedMaintenanceCommands, replicateCommand);
     Assertions.assertEquals(shouldReconstructCommandExist ? 1 : 0,
         reconstructCommand);
     return datanodeDetailsSCMCommandMap;
