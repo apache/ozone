@@ -888,6 +888,11 @@
                 "id": 4,
                 "name": "count",
                 "type": "uint32"
+              },
+              {
+                "id": 5,
+                "name": "hostname",
+                "type": "string"
               }
             ]
           },

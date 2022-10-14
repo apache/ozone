@@ -46,10 +46,15 @@ public class ListInfoSubcommand extends ScmSubcommand {
       defaultValue = "")
   private String ipaddress;
 
-  @CommandLine.Option(names = {"--id"},
+  @CommandLine.Option(names = {"--uuid"},
       description = "Show info by datanode UUID.",
       defaultValue = "")
   private String uuid;
+
+  @CommandLine.Option(names = {"--hostname"},
+      description = "Show info by datanode hostname.",
+      defaultValue = "")
+  private String hostname;
 
   @CommandLine.Option(names = {"--operational-state"},
       description = "Show info by datanode NodeOperationalState(" +
@@ -75,6 +80,10 @@ public class ListInfoSubcommand extends ScmSubcommand {
     if (!Strings.isNullOrEmpty(ipaddress)) {
       allNodes = allNodes.filter(p -> p.getDatanodeDetails().getIpAddress()
           .compareToIgnoreCase(ipaddress) == 0);
+    }
+    if (!Strings.isNullOrEmpty(hostname)) {
+      allNodes = allNodes.filter(p -> p.getDatanodeDetails().getHostName()
+          .compareToIgnoreCase(hostname) == 0);
     }
     if (!Strings.isNullOrEmpty(uuid)) {
       allNodes = allNodes.filter(p ->

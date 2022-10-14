@@ -1126,10 +1126,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           request, int clientVersion) throws IOException {
     List<HddsProtos.DatanodeUsageInfoProto> infoList;
 
-    // get info by ip or uuid
-    if (request.hasUuid() || request.hasIpaddress()) {
+    // get info by ip or uuid or hostname
+    if (request.hasUuid() ||
+        request.hasIpaddress() ||
+        request.hasHostname()) {
       infoList = impl.getDatanodeUsageInfo(request.getIpaddress(),
-          request.getUuid(), clientVersion);
+          request.getUuid(), request.getHostname(), clientVersion);
     } else {  // get most or least used nodes
       infoList = impl.getDatanodeUsageInfo(request.getMostUsed(),
           request.getCount(), clientVersion);

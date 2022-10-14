@@ -1001,15 +1001,17 @@ public class SCMClientProtocolServer implements
    * Get Datanode usage info such as capacity, SCMUsed, and remaining by ip
    * or uuid.
    *
-   * @param ipaddress Datanode Address String
+   * @param ipaddress Datanode Address IP String
    * @param uuid Datanode UUID String
+   * @param hostname Datanode Address hostname String
    * @return List of DatanodeUsageInfoProto. Each element contains usage info
    * such as capacity, SCMUsed, and remaining space.
    * @throws IOException if admin authentication fails
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid, int clientVersion) throws IOException {
+      String ipaddress, String uuid,
+      String hostname, int clientVersion) throws IOException {
 
     // check admin authorisation
     try {
@@ -1019,12 +1021,14 @@ public class SCMClientProtocolServer implements
       throw e;
     }
 
-    // get datanodes by ip or uuid
+    // get datanodes by ip or uuid or hostname
     List<DatanodeDetails> nodes = new ArrayList<>();
     if (!Strings.isNullOrEmpty(uuid)) {
       nodes.add(scm.getScmNodeManager().getNodeByUuid(uuid));
     } else if (!Strings.isNullOrEmpty(ipaddress)) {
-      nodes = scm.getScmNodeManager().getNodesByAddress(ipaddress);
+      nodes = scm.getScmNodeManager().getNodesByIpAddress(ipaddress);
+    } else if (!Strings.isNullOrEmpty(hostname)) {
+      nodes = scm.getScmNodeManager().getNodesByHostName(hostname);
     } else {
       throw new IOException(
           "Could not get datanode with the specified parameters."

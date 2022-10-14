@@ -368,16 +368,18 @@ public interface ScmClient extends Closeable {
   int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException;
 
   /**
-   * Get usage information of datanode by ipaddress or uuid.
+   * Get usage information of datanode by ipaddress or uuid or hostname.
    *
    * @param ipaddress datanode ipaddress String
    * @param uuid datanode uuid String
+   * @param hostname datanode hostname String
    * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMused, and remaining space.
    * @throws IOException
    */
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(String ipaddress,
-                                                               String uuid)
+                                                               String uuid,
+                                                               String hostname)
       throws IOException;
 
   /**

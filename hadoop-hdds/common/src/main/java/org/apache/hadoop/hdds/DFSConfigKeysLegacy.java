@@ -39,10 +39,9 @@ public final class DFSConfigKeysLegacy {
   public static final String DFS_DATANODE_DATA_DIR_KEY =
       "dfs.datanode.data.dir";
 
+  @Deprecated
   public static final String DFS_DATANODE_USE_DN_HOSTNAME =
       "dfs.datanode.use.datanode.hostname";
-
-  public static final boolean DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT = false;
 
   public static final String DFS_XFRAME_OPTION_ENABLED = "dfs.xframe.enabled";
 

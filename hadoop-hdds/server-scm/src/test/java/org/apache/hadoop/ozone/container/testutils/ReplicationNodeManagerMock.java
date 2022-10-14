@@ -481,7 +481,12 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   @Override
-  public List<DatanodeDetails> getNodesByAddress(String address) {
+  public List<DatanodeDetails> getNodesByIpAddress(String address) {
+    return new LinkedList<>();
+  }
+
+  @Override
+  public List<DatanodeDetails> getNodesByHostName(String hostName) {
     return new LinkedList<>();
   }
 

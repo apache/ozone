@@ -328,7 +328,7 @@ public class SCMBlockProtocolServer implements
       NodeManager nodeManager = scm.getScmNodeManager();
       Node client = null;
       List<DatanodeDetails> possibleClients =
-          nodeManager.getNodesByAddress(clientMachine);
+          nodeManager.getNodesByIpAddress(clientMachine);
       if (possibleClients.size() > 0) {
         client = possibleClients.get(0);
       }

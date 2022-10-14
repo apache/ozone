@@ -319,6 +319,7 @@ message DatanodeUsageInfoRequestProto {
   optional string uuid = 2;
   optional bool mostUsed = 3;
   optional uint32 count = 4;
+  optional string hostname = 5;
 }
 
 message DatanodeUsageInfoResponseProto {

@@ -27,7 +27,7 @@ List datanodes
 
 Filter list by UUID
     ${uuid} =           Execute      ozone admin datanode list | grep '^Datanode:' | head -1 | awk '{ print \$2 }'
-    ${output} =         Execute      ozone admin datanode list --id "${uuid}"
+    ${output} =         Execute      ozone admin datanode list --uuid "${uuid}"
     Should contain      ${output}    Datanode: ${uuid}
     ${datanodes} =      Get Lines Containing String    ${output}    Datanode:
     @{lines} =          Split To Lines   ${datanodes}

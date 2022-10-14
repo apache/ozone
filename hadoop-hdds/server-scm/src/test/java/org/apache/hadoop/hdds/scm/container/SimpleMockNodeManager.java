@@ -333,7 +333,12 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public List<DatanodeDetails> getNodesByAddress(String address) {
+  public List<DatanodeDetails> getNodesByIpAddress(String address) {
+    return null;
+  }
+
+  @Override
+  public List<DatanodeDetails> getNodesByHostName(String hostName) {
     return null;
   }
 

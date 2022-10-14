@@ -469,11 +469,21 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.resetDeletedBlockRetryCount(txIDs);
   }
 
+  /**
+   * Get Datanode Usage information by ipaddress or uuid or hostname.
+   *
+   * @param ipaddress datanode ipaddress String
+   * @param uuid datanode uuid String
+   * @param hostname datanode hostname String
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
+   * capacity, SCMused, and remaining space.
+   * @throws IOException
+   */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid) throws IOException {
+      String ipaddress, String uuid, String hostname) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(ipaddress,
-        uuid, ClientVersion.CURRENT_VERSION);
+        uuid, hostname, ClientVersion.CURRENT_VERSION);
   }
 
   @Override

@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +56,6 @@ public class NodeDecommissionManager {
   private EventPublisher eventQueue;
   private ReplicationManager replicationManager;
   private OzoneConfiguration conf;
-  private boolean useHostnames;
   private long monitorInterval;
 
   private static final Logger LOG =
@@ -115,13 +113,9 @@ public class NodeDecommissionManager {
         throw new InvalidHostStringException("Unable to resolve host "
             + host.getRawHostname(), e);
       }
-      String dnsName;
-      if (useHostnames) {
-        dnsName = addr.getHostName();
-      } else {
-        dnsName = addr.getHostAddress();
-      }
-      List<DatanodeDetails> found = nodeManager.getNodesByAddress(dnsName);
+      String dnsName = addr.getHostAddress();
+
+      List<DatanodeDetails> found = nodeManager.getNodesByIpAddress(dnsName);
       if (found.size() == 0) {
         throw new InvalidHostStringException("Host " + host.getRawHostname()
             + " (" + dnsName + ") is not running any datanodes registered"
@@ -185,10 +179,6 @@ public class NodeDecommissionManager {
     executor = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setNameFormat("DatanodeAdminManager-%d")
             .setDaemon(true).build());
-
-    useHostnames = conf.getBoolean(
-        DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
 
     monitorInterval = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,

@@ -45,7 +45,7 @@ import java.util.stream.Collectors;
     name = "usageinfo",
     description = "List usage information " +
         "(such as Capacity, SCMUsed, Remaining) of a datanode by IP address " +
-        "or UUID",
+        "or UUID or Host name",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class UsageInfoSubcommand extends ScmSubcommand {
@@ -68,6 +68,10 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     @CommandLine.Option(names = {"--uuid"}, paramLabel = "UUID", description =
         "Show info by datanode UUID.", defaultValue = "")
     private String uuid;
+
+    @CommandLine.Option(names = {"--hostname"}, paramLabel = "HOSTNAME",
+        description = "Show info by datanode hostname.", defaultValue = "")
+    private String hostname;
 
     @CommandLine.Option(names = {"-m", "--most-used"},
         description = "Show the most used datanodes.",
@@ -98,11 +102,12 @@ public class UsageInfoSubcommand extends ScmSubcommand {
       throw new IOException("Count must be an integer greater than 0.");
     }
 
-    // fetch info by ip or uuid
+    // fetch info by ip or uuid or hostname
     if (!Strings.isNullOrEmpty(exclusiveArguments.ipaddress) ||
-        !Strings.isNullOrEmpty(exclusiveArguments.uuid)) {
+        !Strings.isNullOrEmpty(exclusiveArguments.uuid) ||
+        !Strings.isNullOrEmpty(exclusiveArguments.hostname)) {
       infoList = scmClient.getDatanodeUsageInfo(exclusiveArguments.ipaddress,
-          exclusiveArguments.uuid);
+          exclusiveArguments.uuid, exclusiveArguments.hostname);
     } else { // get info of most used or least used nodes
       infoList = scmClient.getDatanodeUsageInfo(exclusiveArguments.mostUsed,
           count);
@@ -129,8 +134,9 @@ public class UsageInfoSubcommand extends ScmSubcommand {
   private void printInfo(DatanodeUsage info) {
     System.out.printf("%-13s: %s %n", "UUID",
         info.getDatanodeDetails().getUuid());
-    System.out.printf("%-13s: %s (%s) %n", "IP Address",
-        info.getDatanodeDetails().getIpAddress(),
+    System.out.printf("%-13s: %s %n", "IP Address",
+        info.getDatanodeDetails().getIpAddress());
+    System.out.printf("%-13s: %s %n", "Hostname",
         info.getDatanodeDetails().getHostName());
     // print capacity in a readable format
     System.out.printf("%-13s: %s (%s) %n", "Capacity", info.getCapacity()

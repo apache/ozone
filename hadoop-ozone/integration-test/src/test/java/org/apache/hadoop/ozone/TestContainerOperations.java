@@ -117,7 +117,7 @@ public class TestContainerOperations {
 
     List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
         storageClient.getDatanodeUsageInfo(
-            dn.getIpAddress(), dn.getUuidString());
+            dn.getIpAddress(), dn.getUuidString(), dn.getHostName());
 
     for (HddsProtos.DatanodeUsageInfoProto info : usageInfoList) {
       assertTrue(info.getNode().getPortsList().stream()
