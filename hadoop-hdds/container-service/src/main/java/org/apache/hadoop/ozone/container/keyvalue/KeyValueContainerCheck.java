@@ -248,6 +248,8 @@ public class KeyValueContainerCheck {
         // the block should be skipped to scan.
         try {
           scanBlock(block, throttler, canceler);
+        } catch (OzoneChecksumException ex) {
+          throw ex;
         } catch (IOException ex) {
           if (getBlockDataFromDBWithLock(db, block) == null) {
             if (LOG.isDebugEnabled()) {
