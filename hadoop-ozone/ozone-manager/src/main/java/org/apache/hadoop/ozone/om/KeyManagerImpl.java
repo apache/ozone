@@ -1233,26 +1233,9 @@ public class KeyManagerImpl implements KeyManager {
         String dirKeyBytes = metadataManager.getOzoneKey(
                 volumeName, bucketName, dirKey);
         dirKeyInfo = metadataManager.getKeyTable(layout).get(dirKeyBytes);
-
-        // Check if the key is a prefix.
-        // Some keys may contain '/' Ozone will treat '/' as directory separator
-        // such as : key name is 'a/b/c', 'a' and 'b' may not really exist,
-        // but Ozone treats 'a' and 'b' as a directory.
-        // we need create a fake directory 'a' or 'a/b'
         if (dirKeyInfo == null) {
-          Table.KeyValue<String, OmKeyInfo> keyValue =
-              metadataManager.getKeyTable(layout).iterator().seek(fileKeyBytes);
-          if (keyValue != null) {
-            Path fullPath = Paths.get(keyValue.getValue().getKeyName());
-            Path subPath = Paths.get(dirKey);
-            OmKeyInfo omKeyInfo = keyValue.getValue();
-            if (fullPath.startsWith(subPath)) {
-              // create fake directory
-              fakeDirKeyInfo = createDirectoryKey(
-                  omKeyInfo,
-                  dirKey);
-            }
-          }
+          fakeDirKeyInfo =
+              createFakeDirIfShould(volumeName, bucketName, keyName, layout);
         }
       }
     } finally {
@@ -1299,6 +1282,37 @@ public class KeyManagerImpl implements KeyManager {
     throw new OMException("Unable to get file status: volume: " +
             volumeName + " bucket: " + bucketName + " key: " + keyName,
             FILE_NOT_FOUND);
+  }
+
+  /**
+   * Create a fake directory if the key is a path prefix,
+   * otherwise returns null.
+   * Some keys may contain '/' Ozone will treat '/' as directory separator
+   * such as : key name is 'a/b/c', 'a' and 'b' may not really exist,
+   * but Ozone treats 'a' and 'b' as a directory.
+   * we need create a fake directory 'a' or 'a/b'
+   *
+   * @return OmKeyInfo if the key is a path prefix, otherwise returns null.
+   */
+  private OmKeyInfo createFakeDirIfShould(String volume, String bucket,
+      String keyName, BucketLayout layout) throws IOException {
+    OmKeyInfo fakeDirKeyInfo = null;
+    String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+    String fileKeyBytes = metadataManager.getOzoneKey(volume, bucket, keyName);
+    Table.KeyValue<String, OmKeyInfo> keyValue =
+            metadataManager.getKeyTable(layout).iterator().seek(fileKeyBytes);
+
+    if (keyValue != null) {
+      Path fullPath = Paths.get(keyValue.getValue().getKeyName());
+      Path subPath = Paths.get(dirKey);
+      OmKeyInfo omKeyInfo = keyValue.getValue();
+      if (fullPath.startsWith(subPath)) {
+        // create fake directory
+        fakeDirKeyInfo = createDirectoryKey(omKeyInfo, dirKey);
+      }
+    }
+
+    return fakeDirKeyInfo;
   }
 
 
