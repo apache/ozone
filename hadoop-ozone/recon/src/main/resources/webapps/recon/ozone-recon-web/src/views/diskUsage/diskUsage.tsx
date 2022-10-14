@@ -173,12 +173,12 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         });
 
        values = subpaths.map(subpath => {
-         return subpath.size / dataSize;
+        return subpath.size / dataSize;
        });
 
-        percentage = values.map(value => {
-         return (value * 100).toFixed(2);
-        });
+       percentage = values.map(value => {
+        return (value * 100).toFixed(2);
+       });
 
         sizeStr = subpaths.map(subpath => {
           return this.byteToSize(subpath.size, 1);
