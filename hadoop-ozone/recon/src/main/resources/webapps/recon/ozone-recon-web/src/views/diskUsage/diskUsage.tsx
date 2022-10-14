@@ -172,13 +172,13 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           return (subpath.isKey || subpathName === OTHER_PATH_NAME) ? subpathName : subpathName + '/';
         });
 
-      values = subpaths.map(subpath => {
-        return subpath.size / dataSize;
-      });
+        values = subpaths.map(subpath => {
+          return subpath.size / dataSize;
+        });
 
-      percentage = values.map(value => {
-        return (value * 100).toFixed(2);
-      });
+        percentage = values.map(value => {
+          return (value * 100).toFixed(2);
+        });
 
         sizeStr = subpaths.map(subpath => {
           return this.byteToSize(subpath.size, 1);
@@ -421,7 +421,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
               <Row>
                 {(duResponse.size > 0)?
                     <div style={{height: 800}}>
-                    <div  className='metadatainformation'>
+                    <div className='metadatainformation'>
                       <br/> {' '}
                         You can also view its metadata details by clicking the top right button.
                     </div>
