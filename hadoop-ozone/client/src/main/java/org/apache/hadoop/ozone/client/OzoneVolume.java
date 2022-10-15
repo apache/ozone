@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.client;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +33,6 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -46,53 +44,18 @@ import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
  */
 public class OzoneVolume extends WithMetadata {
 
-  /**
-   * The proxy used for connecting to the cluster and perform
-   * client operations.
-   */
   private final ClientProtocol proxy;
-
-  /**
-   * Name of the Volume.
-   */
   private final String name;
-
-  /**
-   * Admin Name of the Volume.
-   */
-  private String admin;
-  /**
-   * Owner of the Volume.
-   */
+  private final String admin;
   private String owner;
-  /**
-   * Quota of bytes allocated for the Volume.
-   */
   private long quotaInBytes;
-  /**
-   * Quota of bucket count allocated for the Volume.
-   */
   private long quotaInNamespace;
-  /**
-   * Bucket namespace quota usage.
-   */
-  private long usedNamespace;
-  /**
-   * Creation time of the volume.
-   */
-  private Instant creationTime;
-  /**
-   * Modification time of the volume.
-   */
+  private final long usedNamespace;
+  private final Instant creationTime;
   private Instant modificationTime;
-  /**
-   * Volume ACLs.
-   */
-  private List<OzoneAcl> acls;
-
-  private int listCacheSize;
-
-  private OzoneObj ozoneObj;
+  private final List<OzoneAcl> acls;
+  private final int listCacheSize;
+  private final OzoneObj ozoneObj;
   /**
    * Reference count on this Ozone volume.
    *
@@ -105,25 +68,32 @@ public class OzoneVolume extends WithMetadata {
    * Volumes created using CLI, ObjectStore API or upgraded from older OM DB
    * will have reference count set to zero by default.
    */
-  private long refCount;
+  private final long refCount;
 
   /**
    * Constructs OzoneVolume instance.
    * @param conf Configuration object.
-   * @param proxy ClientProtocol proxy.
+   * @param proxy ClientProtocol proxy used for connecting to the cluster and
+   *              perform client operations.
    * @param name Name of the volume.
-   * @param admin Volume admin.
-   * @param owner Volume owner.
-   * @param quotaInBytes Volume quota in bytes.
-   * @param creationTime creation time of the volume
+   * @param admin Admin Name of the Volume.
+   * @param owner Owner of the Volume.
+   * @param quotaInBytes Quota of bytes allocated for the Volume.
+   * @param quotaInNamespace Quota of bucket count allocated for the Volume.
+   * @param creationTime Creation time of the volume
+   * @param modificationTime Modification time of the volume.
    * @param acls ACLs associated with the volume.
    * @param metadata custom key value metadata.
+   * @param refCount Reference count on this Ozone volume.
+   * @param usedNamespace Bucket namespace quota usage.
    */
   @SuppressWarnings("parameternumber")
   public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
-      String name, String admin, String owner, long quotaInBytes,
-      long quotaInNamespace, long creationTime, List<OzoneAcl> acls,
-      Map<String, String> metadata) {
+                     String name, String admin, String owner,
+                     long quotaInBytes, long quotaInNamespace,
+                     long creationTime, long modificationTime,
+                     List<OzoneAcl> acls, Map<String, String> metadata,
+                     long refCount, long usedNamespace) {
     Preconditions.checkNotNull(proxy, "Client proxy is not set.");
     this.proxy = proxy;
     this.name = name;
@@ -135,166 +105,70 @@ public class OzoneVolume extends WithMetadata {
     this.acls = acls;
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
     this.metadata = metadata;
-    modificationTime = Instant.now();
-    if (modificationTime.isBefore(this.creationTime)) {
-      modificationTime = Instant.ofEpochSecond(
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
+    if (this.modificationTime.isBefore(this.creationTime)) {
+      this.modificationTime = Instant.ofEpochSecond(
           this.creationTime.getEpochSecond(), this.creationTime.getNano());
     }
     this.ozoneObj = OzoneObjInfo.Builder.newBuilder()
         .setVolumeName(name)
         .setResType(OzoneObj.ResourceType.VOLUME)
         .setStoreType(OzoneObj.StoreType.OZONE).build();
-  }
-
-  /**
-   * @param refCount volume reference count.
-   */
-  @SuppressWarnings("parameternumber")
-  public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
-      String name, String admin, String owner, long quotaInBytes,
-      long quotaInNamespace, long usedNamespace, long creationTime,
-      long modificationTime, List<OzoneAcl> acls,
-      Map<String, String> metadata, long refCount) {
-    this(conf, proxy, name, admin, owner, quotaInBytes, quotaInNamespace,
-        usedNamespace, creationTime, modificationTime, acls, metadata);
     this.refCount = refCount;
-  }
-
-  /**
-   * @param modificationTime modification time of the volume.
-   */
-  @SuppressWarnings("parameternumber")
-  public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
-      String name, String admin, String owner, long quotaInBytes,
-      long quotaInNamespace, long usedNamespace, long creationTime,
-      long modificationTime, List<OzoneAcl> acls,
-      Map<String, String> metadata) {
-    this(conf, proxy, name, admin, owner, quotaInBytes, quotaInNamespace,
-        creationTime, acls, metadata);
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.usedNamespace = usedNamespace;
   }
 
-  @SuppressWarnings("parameternumber")
-  public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
-      String name, String admin, String owner, long quotaInBytes,
-      long quotaInNamespace, long creationTime, List<OzoneAcl> acls) {
-    this(conf, proxy, name, admin, owner, quotaInBytes, quotaInNamespace,
-        creationTime, acls, new HashMap<>());
-    modificationTime = Instant.now();
-    if (modificationTime.isBefore(this.creationTime)) {
-      modificationTime = Instant.ofEpochSecond(
-          this.creationTime.getEpochSecond(), this.creationTime.getNano());
-    }
-  }
-
-  @SuppressWarnings("parameternumber")
-  public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
-      String name, String admin, String owner, long quotaInBytes,
-      long quotaInNamespace, long usedNamespace, long creationTime,
-      long modificationTime, List<OzoneAcl> acls) {
-    this(conf, proxy, name, admin, owner, quotaInBytes, quotaInNamespace,
-        creationTime, acls);
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
-    this.usedNamespace = usedNamespace;
-  }
-
-  @VisibleForTesting
-  protected OzoneVolume(String name, String admin, String owner,
-      long quotaInBytes, long quotaInNamespace, long creationTime,
-      List<OzoneAcl> acls) {
-    this.proxy = null;
-    this.name = name;
-    this.admin = admin;
-    this.owner = owner;
-    this.quotaInBytes = quotaInBytes;
-    this.quotaInNamespace = quotaInNamespace;
-    this.creationTime = Instant.ofEpochMilli(creationTime);
-    this.acls = acls;
-    this.metadata = new HashMap<>();
-    modificationTime = Instant.now();
-    if (modificationTime.isBefore(this.creationTime)) {
-      modificationTime = Instant.ofEpochSecond(
-          this.creationTime.getEpochSecond(), this.creationTime.getNano());
-    }
-  }
-
-  @SuppressWarnings("parameternumber")
-  @VisibleForTesting
-  protected OzoneVolume(String name, String admin, String owner,
-      long quotaInBytes, long quotaInNamespace, long creationTime,
-      long modificationTime, List<OzoneAcl> acls) {
-    this(name, admin, owner, quotaInBytes, quotaInNamespace, creationTime,
-        acls);
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
-  }
-
   /**
-   * Returns Volume name.
-   *
-   * @return volumeName
+   * @return Volume name
    */
   public String getName() {
     return name;
   }
 
   /**
-   * Returns Volume's admin name.
-   *
-   * @return adminName
+   * @return Volume's admin name.
    */
   public String getAdmin() {
     return admin;
   }
 
   /**
-   * Returns Volume's owner name.
-   *
-   * @return ownerName
+   * @return Volume's owner name.
    */
   public String getOwner() {
     return owner;
   }
 
   /**
-   * Returns Quota allocated for the Volume in bytes.
-   *
-   * @return quotaInBytes
+   * @return Quota allocated for the Volume in bytes.
    */
   public long getQuotaInBytes() {
     return quotaInBytes;
   }
 
   /**
-   * Returns quota of bucket counts allocated for the Volume.
-   *
-   * @return quotaInNamespace
+   * @return quota of bucket counts allocated for the Volume.
    */
   public long getQuotaInNamespace() {
     return quotaInNamespace;
   }
+
   /**
-   * Returns creation time of the volume.
-   *
-   * @return creation time.
+   * @return creation time of the volume.
    */
   public Instant getCreationTime() {
     return creationTime;
   }
 
   /**
-   * Returns modification time of the volume.
-   *
-   * @return modification time.
+   * @return modification time of the volume.
    */
   public Instant getModificationTime() {
     return modificationTime;
   }
 
   /**
-   * Returns OzoneAcl list associated with the Volume.
-   *
-   * @return aclMap
+   * @return OzoneAcl list associated with the Volume.
    */
   public List<OzoneAcl> getAcls() {
     return ListUtils.unmodifiableList(acls);
@@ -305,7 +179,6 @@ public class OzoneVolume extends WithMetadata {
    * @param addAcl ACL to be added
    * @return true - if acl is successfully added, false if acl already exists
    * for the bucket.
-   * @throws IOException
    */
   public boolean addAcl(OzoneAcl addAcl) throws IOException {
     boolean added = proxy.addAcl(ozoneObj, addAcl);
@@ -319,8 +192,6 @@ public class OzoneVolume extends WithMetadata {
    * Remove acl for Ozone object. Return true if acl is removed successfully
    * else false.
    * @param acl Ozone acl to be removed.
-   *
-   * @throws IOException if there is error.
    * */
   public boolean removeAcl(OzoneAcl acl) throws IOException {
     boolean removed = proxy.removeAcl(ozoneObj, acl);
@@ -334,8 +205,6 @@ public class OzoneVolume extends WithMetadata {
    * Acls to be set for given Ozone object. This operations reset ACL for
    * given object to list of ACLs provided in argument.
    * @param aclList List of acls.
-   *
-   * @throws IOException if there is error.
    * */
   public boolean setAcl(List<OzoneAcl> aclList) throws IOException {
     boolean reset = proxy.setAcl(ozoneObj, aclList);
@@ -357,7 +226,6 @@ public class OzoneVolume extends WithMetadata {
   /**
    * Sets/Changes the owner of this Volume.
    * @param userName new owner
-   * @throws IOException
    */
   public boolean setOwner(String userName) throws IOException {
     boolean result = proxy.setVolumeOwner(name, userName);
@@ -367,8 +235,6 @@ public class OzoneVolume extends WithMetadata {
 
   /**
    * Clean the space quota of the volume.
-   *
-   * @throws IOException
    */
   public void clearSpaceQuota() throws IOException {
     OzoneVolume ozoneVolume = proxy.getVolumeDetails(name);
@@ -379,8 +245,6 @@ public class OzoneVolume extends WithMetadata {
 
   /**
    * Clean the namespace quota of the volume.
-   *
-   * @throws IOException
    */
   public void clearNamespaceQuota() throws IOException {
     OzoneVolume ozoneVolume = proxy.getVolumeDetails(name);
@@ -393,7 +257,6 @@ public class OzoneVolume extends WithMetadata {
    * Sets/Changes the quota of this Volume.
    *
    * @param quota OzoneQuota Object that can be applied to storage volume.
-   * @throws IOException
    */
   public void setQuota(OzoneQuota quota) throws IOException {
     proxy.setVolumeQuota(name, quota.getQuotaInNamespace(),
@@ -405,7 +268,6 @@ public class OzoneVolume extends WithMetadata {
   /**
    * Creates a new Bucket in this Volume, with default values.
    * @param bucketName Name of the Bucket
-   * @throws IOException
    */
   public void createBucket(String bucketName)
       throws IOException {
@@ -416,7 +278,6 @@ public class OzoneVolume extends WithMetadata {
    * Creates a new Bucket in this Volume, with properties set in bucketArgs.
    * @param bucketName Name of the Bucket
    * @param bucketArgs Properties to be set
-   * @throws IOException
    */
   public void createBucket(String bucketName, BucketArgs bucketArgs)
       throws IOException {
@@ -427,11 +288,9 @@ public class OzoneVolume extends WithMetadata {
    * Get the Bucket from this Volume.
    * @param bucketName Name of the Bucket
    * @return OzoneBucket
-   * @throws IOException
    */
   public OzoneBucket getBucket(String bucketName) throws IOException {
-    OzoneBucket bucket = proxy.getBucketDetails(name, bucketName);
-    return bucket;
+    return proxy.getBucketDetails(name, bucketName);
   }
 
   /**

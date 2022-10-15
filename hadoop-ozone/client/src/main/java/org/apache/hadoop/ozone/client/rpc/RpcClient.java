@@ -522,12 +522,12 @@ public class RpcClient implements ClientProtocol {
         volume.getOwnerName(),
         volume.getQuotaInBytes(),
         volume.getQuotaInNamespace(),
-        volume.getUsedNamespace(),
         volume.getCreationTime(),
         volume.getModificationTime(),
         volume.getAcls(),
         volume.getMetadata(),
-        volume.getRefCount());
+        volume.getRefCount(),
+        volume.getUsedNamespace());
   }
 
   @Override
@@ -557,10 +557,12 @@ public class RpcClient implements ClientProtocol {
         volume.getOwnerName(),
         volume.getQuotaInBytes(),
         volume.getQuotaInNamespace(),
-        volume.getUsedNamespace(),
         volume.getCreationTime(),
         volume.getModificationTime(),
-        volume.getAcls()))
+        volume.getAcls(),
+        volume.getMetadata(),
+        volume.getRefCount(),
+        volume.getUsedNamespace()))
         .collect(Collectors.toList());
   }
 
@@ -579,11 +581,12 @@ public class RpcClient implements ClientProtocol {
         volume.getOwnerName(),
         volume.getQuotaInBytes(),
         volume.getQuotaInNamespace(),
-        volume.getUsedNamespace(),
         volume.getCreationTime(),
         volume.getModificationTime(),
         volume.getAcls(),
-        volume.getMetadata()))
+        volume.getMetadata(),
+        volume.getRefCount(),
+        volume.getUsedNamespace()))
         .collect(Collectors.toList());
   }
 

@@ -68,7 +68,11 @@ public class ObjectStoreStub extends ObjectStore {
             volumeArgs.getQuotaInBytes(),
             volumeArgs.getQuotaInNamespace(),
             Time.now(),
-            volumeArgs.getAcls());
+            Time.now(),
+            volumeArgs.getAcls(),
+            volumeArgs.getMetadata(),
+            0,
+            0);
     volumes.put(volumeName, volume);
   }
 

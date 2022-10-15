@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -41,11 +42,14 @@ public class OzoneVolumeStub extends OzoneVolume {
 
   private ArrayList<OzoneAcl> aclList = new ArrayList<>();
 
+  @SuppressWarnings("parameternumber")
   public OzoneVolumeStub(String name, String admin, String owner,
       long quotaInBytes, long quotaInNamespace, long creationTime,
-      List<OzoneAcl> acls) {
-    super(name, admin, owner, quotaInBytes, quotaInNamespace, creationTime,
-        acls);
+      long modificationTime, List<OzoneAcl> acls,
+      Map<String, String> metadata, long refCount, long usedNamespace) {
+    super(new OzoneConfiguration(), null, name, admin, owner, quotaInBytes,
+            quotaInNamespace, creationTime, modificationTime, acls, metadata,
+            refCount, usedNamespace);
   }
 
   @Override
