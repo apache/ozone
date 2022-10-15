@@ -19,6 +19,8 @@
 package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.rocksdb.RocksObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * General template for a managed RocksObject.
@@ -29,9 +31,15 @@ class ManagedObject<T extends RocksObject> implements AutoCloseable {
 
   private final StackTraceElement[] elements;
 
+  public static final Logger LOG = LoggerFactory.getLogger(ManagedObject.class);
+
   ManagedObject(T original) {
     this.original = original;
-    this.elements = Thread.currentThread().getStackTrace();
+    if (LOG.isDebugEnabled()) {
+      this.elements = Thread.currentThread().getStackTrace();
+    } else {
+      this.elements = null;
+    }
   }
 
   public T get() {
