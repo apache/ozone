@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om;
+package org.apache.hadoop.util;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheStats;
@@ -29,7 +29,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 /**
  * Reusable component that emits cache metrics for a particular cache.
  */
-public final class OmCacheMetrics implements MetricsSource {
+public final class CacheMetrics implements MetricsSource {
   enum CacheMetricsInfo implements MetricsInfo {
     CacheName("Cache Metrics."),
     Size("Size of the cache."),
@@ -56,22 +56,22 @@ public final class OmCacheMetrics implements MetricsSource {
   }
 
   public static final String SOURCE_NAME =
-      OmCacheMetrics.class.getSimpleName();
+      CacheMetrics.class.getSimpleName();
 
-  public static final String NAME = OmCacheMetrics.class.getSimpleName();
+  public static final String NAME = CacheMetrics.class.getSimpleName();
 
   private final Cache<?, ?> cache;
   private final String name;
 
-  private OmCacheMetrics(Cache<?, ?> cache, String name) {
+  private CacheMetrics(Cache<?, ?> cache, String name) {
     this.cache = cache;
     this.name = name;
   }
 
-  public static OmCacheMetrics create(Cache<?, ?> cache, String name) {
+  public static CacheMetrics create(Cache<?, ?> cache, String name) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     return ms.register(NAME, "Cache Metrics",
-        new OmCacheMetrics(cache, name));
+        new CacheMetrics(cache, name));
   }
 
   @Override
