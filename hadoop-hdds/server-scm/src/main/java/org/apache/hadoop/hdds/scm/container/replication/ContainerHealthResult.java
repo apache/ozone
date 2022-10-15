@@ -35,8 +35,7 @@ public class ContainerHealthResult {
     HEALTHY,
     UNHEALTHY,
     UNDER_REPLICATED,
-    OVER_REPLICATED,
-    UNHEALTHY_PLACEMENT
+    OVER_REPLICATED
   }
 
   private final ContainerInfo containerInfo;

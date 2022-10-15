@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -101,7 +102,12 @@ public class TestReplicationManager {
 
     Mockito.when(containerManager.getContainers()).thenAnswer(
         invocation -> new ArrayList<>(containerInfoSet));
-
+    ContainerPlacementStatus containerPlacementStatus =
+            Mockito.mock(ContainerPlacementStatus.class);
+    Mockito.when(containerPlacementStatus.isPolicySatisfied())
+            .thenReturn(true);
+    Mockito.when(placementPolicy.validateContainerPlacement(Mockito.anyList(),
+            Mockito.anyInt())).thenReturn(containerPlacementStatus);
     replicationManager = new ReplicationManager(
         configuration,
         containerManager,
