@@ -30,8 +30,11 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.util.Time;
+
+import static org.mockito.Mockito.mock;
 
 /**
  * Ozone volume with in-memory state for testing.
@@ -47,9 +50,9 @@ public class OzoneVolumeStub extends OzoneVolume {
       long quotaInBytes, long quotaInNamespace, long creationTime,
       long modificationTime, List<OzoneAcl> acls,
       Map<String, String> metadata, long refCount, long usedNamespace) {
-    super(new OzoneConfiguration(), null, name, admin, owner, quotaInBytes,
-            quotaInNamespace, creationTime, modificationTime, acls, metadata,
-            refCount, usedNamespace);
+    super(new OzoneConfiguration(), mock(ClientProtocol.class), name, admin,
+            owner, quotaInBytes, quotaInNamespace, creationTime,
+            modificationTime, acls, metadata, refCount, usedNamespace);
   }
 
   @Override
