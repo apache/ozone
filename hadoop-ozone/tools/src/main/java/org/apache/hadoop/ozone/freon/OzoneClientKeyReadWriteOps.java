@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.slf4j.Logger;
@@ -32,6 +33,7 @@ import picocli.CommandLine;
 import java.io.IOException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.HashMap;
 
 import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.FILE_DIR_SEPARATOR;
 
@@ -109,7 +111,7 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
 
   private Timer timer;
 
-  private OzoneBucket[] ozoneBuckets;
+  private OzoneClient[] ozoneClients;
 
   private int clientCount;
 
@@ -133,17 +135,12 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     init();
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
     clientCount =  getThreadNo();
-    OzoneClient[] ozoneClients = new OzoneClient[clientCount];
+    ozoneClients = new OzoneClient[clientCount];
     for (int i = 0; i < clientCount; i++) {
       ozoneClients[i] = createOzoneClient(omServiceID, ozoneConfiguration);
     }
 
     ensureVolumeAndBucketExist(ozoneClients[0], volumeName, bucketName);
-    ozoneBuckets = new OzoneBucket[clientCount];
-    for (int i = 0; i < clientCount; i++) {
-      ozoneBuckets[i] = ozoneClients[i].getObjectStore().getVolume(volumeName)
-              .getBucket(bucketName);
-    }
 
     timer = getMetrics().timer("key-read-write");
     if (objectSizeInBytes >= 0) {
@@ -162,20 +159,19 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     return null;
   }
 
-  public void readWriteKeys(long counter) throws Exception {
+  public void readWriteKeys(long counter) throws RuntimeException, IOException {
     int clientIndex = (int)((counter) % clientCount);
-    OzoneBucket ozoneBucket = ozoneBuckets[clientIndex];
     TaskType taskType = decideReadOrWriteTask();
-    String keyName = getKeyName(clientIndex);
+    String keyName = getKeyName();
 
     timer.time(() -> {
       try {
         switch (taskType) {
         case READ_TASK:
-          processReadTasks(keyName, ozoneBucket);
+          processReadTasks(keyName, ozoneClients[clientIndex]);
           break;
         case WRITE_TASK:
-          processWriteTasks(keyName, ozoneBucket);
+          processWriteTasks(keyName, ozoneClients[clientIndex]);
           break;
         default:
           break;
@@ -191,58 +187,46 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     });
   }
 
-  @SuppressWarnings({"unused"})
-  public void processReadTasks(String keyName, OzoneBucket ozoneBucket)
+  public void processReadTasks(String keyName, OzoneClient client)
           throws RuntimeException, IOException {
-    if (readMetadataOnly) {
-      ozoneBucket.getKey(keyName);
-    } else {
+    OzoneKeyDetails keyDetails = client.getProxy().getKeyDetails(volumeName, bucketName, keyName);            
+    if (!readMetadataOnly) {
       byte[] data = new byte[objectSizeInBytes];
-      try (OzoneInputStream inputStream = ozoneBucket.readKey(keyName)) {
-        inputStream.read(data);
+      try (OzoneInputStream introStream = keyDetails.getContent()) {
+         introStream.read(data);
+      } catch (Exception ex) {
+        throw ex;
       }
     }
   }
-  public void processWriteTasks(String keyName, OzoneBucket ozoneBucket)
+
+  public void processWriteTasks(String keyName, OzoneClient ozoneClient)
           throws RuntimeException, IOException {
     try (OzoneOutputStream out =
-                 ozoneBucket.createKey(keyName, objectSizeInBytes)) {
+                 ozoneClient.getProxy().createKey(volumeName, bucketName, keyName, objectSizeInBytes, null, new HashMap())) {
       out.write(keyContent);
     } catch (Exception ex) {
       throw ex;
     }
   }
+
   public TaskType decideReadOrWriteTask() {
-    if (!isMixWorkload()) {
-      if (percentageRead == 100) {
-        return TaskType.READ_TASK;
-      } else {
-        return TaskType.WRITE_TASK;
-      }
+    if (percentageRead == 100) {
+      return TaskType.READ_TASK;
+    } else if (percentageRead == 0) {
+      return TaskType.WRITE_TASK;
     }
     //mix workload
-    int tmp = ThreadLocalRandom.current().nextInt(100) + 1; // 1 ~ 100
-    if (tmp < percentageRead) {
+    int tmp = ThreadLocalRandom.current().nextInt(1,101);
+    if (tmp  <= percentageRead) {
       return TaskType.READ_TASK;
     } else {
       return TaskType.WRITE_TASK;
     }
   }
 
-  public String getKeyName(int clientIndex) {
-    // int start, end;
-    // separate tasks evenly to each client
-    // if (range < clientsCount) {
-    //   start = startIndex + clientIndex;
-    //   end = start;
-    // } else {
-    //   start = startIndex + clientIndex * (range / clientsCount);
-    //   end = start + (range / clientsCount) - 1;
-    // }
-
+  public String getKeyName() {
     StringBuilder keyNameSb = new StringBuilder();
-    // int randomIdxWithinRange = ThreadLocalRandom.current().
-    //         nextInt(end + 1 - start) + start;
     int randomIdxWithinRange = ThreadLocalRandom.current().
             nextInt(startIndex, startIndex + range);
 
@@ -254,10 +238,6 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
               append(kg.generateMd5KeyName(randomIdxWithinRange));
     }
     return keyNameSb.toString();
-  }
-
-  public boolean isMixWorkload() {
-    return !(percentageRead == 0 || percentageRead == 100);
   }
 
 }

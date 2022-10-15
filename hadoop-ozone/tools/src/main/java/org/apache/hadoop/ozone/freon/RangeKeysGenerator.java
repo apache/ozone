@@ -32,6 +32,7 @@ import picocli.CommandLine;
 
 import java.util.concurrent.Callable;
 import java.util.function.Function;
+import java.util.HashMap;
 
 import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.PURE_INDEX;
 import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.MD5;
@@ -88,13 +89,9 @@ public class RangeKeysGenerator extends BaseFreonGenerator
           description = "Generated object size (in bytes) " +
                   "to be written.",
           defaultValue = "1")
-  private int writeSizeInBytes;
+  private int objectSizeInBytes;
 
-  @CommandLine.Option(names = {"--clients"},
-          description =
-                  "Number of clients, defaults 1.",
-          defaultValue = "1")
-  private int clientsCount = 1;
+  private int clientCount;
 
   @CommandLine.Option(
           names = "--debug",
@@ -110,7 +107,7 @@ public class RangeKeysGenerator extends BaseFreonGenerator
   )
   private String omServiceID = null;
   private KeyGeneratorUtil kg;
-  private OzoneClient[] rpcClients;
+  private OzoneClient[] ozoneClients;
   private byte[] keyContent;
   private Timer timer;
 
@@ -119,22 +116,23 @@ public class RangeKeysGenerator extends BaseFreonGenerator
   public Void call() throws Exception {
     init();
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-    rpcClients = new OzoneClient[clientsCount];
-    for (int i = 0; i < clientsCount; i++) {
-      rpcClients[i] = createOzoneClient(omServiceID, ozoneConfiguration);
+    clientCount =  getThreadNo();
+    ozoneClients = new OzoneClient[clientCount];
+    for (int i = 0; i < clientCount; i++) {
+      ozoneClients[i] = createOzoneClient(omServiceID, ozoneConfiguration);
     }
 
-    ensureVolumeAndBucketExist(rpcClients[0], volumeName, bucketName);
-    if (writeSizeInBytes >= 0) {
-      keyContent = RandomUtils.nextBytes(writeSizeInBytes);
+    ensureVolumeAndBucketExist(ozoneClients[0], volumeName, bucketName);
+    if (objectSizeInBytes >= 0) {
+      keyContent = RandomUtils.nextBytes(objectSizeInBytes);
     }
     timer = getMetrics().timer("key-read-write");
 
     kg = new KeyGeneratorUtil();
     runTests(this::generateRangeKeys);
-    for (int i = 0; i < clientsCount; i++) {
-      if (rpcClients[i] != null) {
-        rpcClients[i].close();
+    for (int i = 0; i < clientCount; i++) {
+      if (ozoneClients[i] != null) {
+        ozoneClients[i].close();
       }
     }
 
@@ -142,8 +140,8 @@ public class RangeKeysGenerator extends BaseFreonGenerator
   }
 
   public void generateRangeKeys(long count) throws Exception {
-    int clientIndex = (int)(count % clientsCount);
-    OzoneClient client = rpcClients[clientIndex];
+    int clientIndex = (int)(count % clientCount);
+    OzoneClient client = ozoneClients[clientIndex];
     int start = startIndex + (int)count * range;
     int end = start + range;
 
@@ -164,24 +162,15 @@ public class RangeKeysGenerator extends BaseFreonGenerator
   }
 
 
-  public void loopRunner(Function<Integer, String> f, OzoneClient client,
+  public void loopRunner(Function<Integer, String> fn, OzoneClient client,
                          int start, int end) throws Exception {
-    OzoneBucket ozbk = client.getObjectStore().getVolume(volumeName)
-            .getBucket(bucketName);
-
-// ObjectMapper mapper = new ObjectMapper();
-// Map<String, String> testMap = new HashMap<String, String>(); 
-
     String keyName;
     for (int i = start; i < end + 1; i++) {
-      keyName = getPrefix() + FILE_DIR_SEPARATOR + f.apply(i);
-//       testMap.put(String.valueOf(i), keyName);
-      try (OzoneOutputStream out = ozbk.createKey(keyName, writeSizeInBytes)) {
+      keyName = getPrefix() + FILE_DIR_SEPARATOR + fn.apply(i);
+      try (OzoneOutputStream out = client.getProxy().
+                        createKey(volumeName, bucketName, keyName, objectSizeInBytes, null, new HashMap())) {
         out.write(keyContent);
-        out.flush();
       }
     }
-
-//     mapper.writeValue(new File("test.json"), testMap);
   }
 }
