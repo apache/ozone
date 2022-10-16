@@ -19,14 +19,24 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
+import javax.ws.rs.core.MultivaluedMap;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Context;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.Iterator;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Collections;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -35,6 +45,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -44,12 +55,16 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
 import com.google.common.annotations.VisibleForTesting;
+
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 
 /**
  * Basic helpers for all the REST endpoints.
@@ -63,6 +78,8 @@ public abstract class EndpointBase implements Auditor {
   @Context
   private ContainerRequestContext context;
 
+  private Set<String> excludeMetadataFields =
+          new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG));
   private static final Logger LOG =
       LoggerFactory.getLogger(EndpointBase.class);
 
@@ -237,6 +254,57 @@ public abstract class EndpointBase implements Auditor {
       } else {
         throw e;
       }
+    }
+  }
+
+  protected Map<String, String> getCustomMetadataFromHeaders(
+      MultivaluedMap<String, String> requestHeaders) throws OS3Exception {
+    Map<String, String> customMetadata = new HashMap<>();
+    if (requestHeaders == null || requestHeaders.isEmpty()) {
+      return customMetadata;
+    }
+
+    Set<String> customMetadataKeys = requestHeaders.keySet().stream()
+            .filter(k -> {
+              if (k.startsWith(CUSTOM_METADATA_HEADER_PREFIX) &&
+                      !excludeMetadataFields.contains(
+                        k.substring(
+                          CUSTOM_METADATA_HEADER_PREFIX.length()))) {
+                return true;
+              }
+              return false;
+            })
+            .collect(Collectors.toSet());
+
+    long sizeInBytes = 0;
+    if (!customMetadataKeys.isEmpty()) {
+      for (String key : customMetadataKeys) {
+        String mapKey =
+            key.substring(CUSTOM_METADATA_HEADER_PREFIX.length());
+        List<String> values = requestHeaders.get(key);
+        String value = StringUtils.join(values, ",");
+        sizeInBytes += mapKey.getBytes(UTF_8).length;
+        sizeInBytes += value.getBytes(UTF_8).length;
+
+        if (sizeInBytes >
+                OzoneConsts.S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB * KB) {
+          throw new IllegalArgumentException("Illegal user defined metadata." +
+              " Combined size cannot exceed 2KB.");
+        }
+        customMetadata.put(mapKey, value);
+      }
+    }
+    return customMetadata;
+  }
+
+  protected void addCustomMetadataHeaders(
+      Response.ResponseBuilder responseBuilder, OzoneKey key) {
+
+    Map<String, String> metadata = key.getMetadata();
+    for (Map.Entry<String, String> entry : metadata.entrySet()) {
+      responseBuilder
+          .header(CUSTOM_METADATA_HEADER_PREFIX + entry.getKey(),
+              entry.getValue());
     }
   }
 

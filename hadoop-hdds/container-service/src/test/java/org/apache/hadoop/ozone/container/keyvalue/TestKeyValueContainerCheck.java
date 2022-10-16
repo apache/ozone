@@ -71,7 +71,7 @@ public class TestKeyValueContainerCheck
 
     KeyValueContainerCheck kvCheck =
         new KeyValueContainerCheck(containerData.getMetadataPath(), conf,
-            containerID, containerData.getVolume());
+            containerID, containerData.getVolume(), container);
 
     // first run checks on a Open Container
     boolean valid = kvCheck.fastCheck();
@@ -106,7 +106,7 @@ public class TestKeyValueContainerCheck
 
     KeyValueContainerCheck kvCheck =
         new KeyValueContainerCheck(containerData.getMetadataPath(), conf,
-            containerID, containerData.getVolume());
+            containerID, containerData.getVolume(), container);
 
     File dbFile = KeyValueContainerLocationUtil
         .getContainerDBFile(containerData);

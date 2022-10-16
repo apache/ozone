@@ -258,7 +258,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     // return response.
     if (exception == null) {
       LOG.info("created bucket: {} of layout {} in volume: {}", bucketName,
-          bucketInfo.getBucketLayout(), volumeName);
+          omBucketInfo.getBucketLayout(), volumeName);
       omMetrics.incNumBuckets();
       return omClientResponse;
     } else {

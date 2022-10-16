@@ -52,8 +52,8 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -101,7 +101,7 @@ public class TestHeartbeatEndpointTask {
     task.call();
 
     // THEN
-    Assert.assertEquals(1, context.getCommandQueueSummary()
+    Assertions.assertEquals(1, context.getCommandQueueSummary()
         .get(reconstructECContainersCommand).intValue());
   }
 
@@ -123,11 +123,11 @@ public class TestHeartbeatEndpointTask {
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(scm);
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assert.assertTrue(heartbeat.hasDatanodeDetails());
-    Assert.assertFalse(heartbeat.hasNodeReport());
-    Assert.assertFalse(heartbeat.hasContainerReport());
-    Assert.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
-    Assert.assertFalse(heartbeat.hasContainerActions());
+    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
+    Assertions.assertFalse(heartbeat.hasNodeReport());
+    Assertions.assertFalse(heartbeat.hasContainerReport());
+    Assertions.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
+    Assertions.assertFalse(heartbeat.hasContainerActions());
   }
 
   @Test
@@ -155,11 +155,11 @@ public class TestHeartbeatEndpointTask {
     context.refreshFullReport(NodeReportProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assert.assertTrue(heartbeat.hasDatanodeDetails());
-    Assert.assertTrue(heartbeat.hasNodeReport());
-    Assert.assertFalse(heartbeat.hasContainerReport());
-    Assert.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
-    Assert.assertFalse(heartbeat.hasContainerActions());
+    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
+    Assertions.assertTrue(heartbeat.hasNodeReport());
+    Assertions.assertFalse(heartbeat.hasContainerReport());
+    Assertions.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
+    Assertions.assertFalse(heartbeat.hasContainerActions());
   }
 
   @Test
@@ -187,11 +187,11 @@ public class TestHeartbeatEndpointTask {
     context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assert.assertTrue(heartbeat.hasDatanodeDetails());
-    Assert.assertFalse(heartbeat.hasNodeReport());
-    Assert.assertTrue(heartbeat.hasContainerReport());
-    Assert.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
-    Assert.assertFalse(heartbeat.hasContainerActions());
+    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
+    Assertions.assertFalse(heartbeat.hasNodeReport());
+    Assertions.assertTrue(heartbeat.hasContainerReport());
+    Assertions.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
+    Assertions.assertFalse(heartbeat.hasContainerActions());
   }
 
   @Test
@@ -220,11 +220,11 @@ public class TestHeartbeatEndpointTask {
         CommandStatusReportsProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assert.assertTrue(heartbeat.hasDatanodeDetails());
-    Assert.assertFalse(heartbeat.hasNodeReport());
-    Assert.assertFalse(heartbeat.hasContainerReport());
-    Assert.assertTrue(heartbeat.getCommandStatusReportsCount() != 0);
-    Assert.assertFalse(heartbeat.hasContainerActions());
+    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
+    Assertions.assertFalse(heartbeat.hasNodeReport());
+    Assertions.assertFalse(heartbeat.hasContainerReport());
+    Assertions.assertTrue(heartbeat.getCommandStatusReportsCount() != 0);
+    Assertions.assertFalse(heartbeat.hasContainerActions());
   }
 
   @Test
@@ -252,11 +252,11 @@ public class TestHeartbeatEndpointTask {
     context.addContainerAction(getContainerAction());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assert.assertTrue(heartbeat.hasDatanodeDetails());
-    Assert.assertFalse(heartbeat.hasNodeReport());
-    Assert.assertFalse(heartbeat.hasContainerReport());
-    Assert.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
-    Assert.assertTrue(heartbeat.hasContainerActions());
+    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
+    Assertions.assertFalse(heartbeat.hasNodeReport());
+    Assertions.assertFalse(heartbeat.hasContainerReport());
+    Assertions.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
+    Assertions.assertTrue(heartbeat.hasContainerActions());
   }
 
   @Test
@@ -299,17 +299,17 @@ public class TestHeartbeatEndpointTask {
     context.addContainerAction(getContainerAction());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assert.assertTrue(heartbeat.hasDatanodeDetails());
-    Assert.assertTrue(heartbeat.hasNodeReport());
-    Assert.assertTrue(heartbeat.hasContainerReport());
-    Assert.assertTrue(heartbeat.getCommandStatusReportsCount() != 0);
-    Assert.assertTrue(heartbeat.hasContainerActions());
-    Assert.assertTrue(heartbeat.hasCommandQueueReport());
+    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
+    Assertions.assertTrue(heartbeat.hasNodeReport());
+    Assertions.assertTrue(heartbeat.hasContainerReport());
+    Assertions.assertTrue(heartbeat.getCommandStatusReportsCount() != 0);
+    Assertions.assertTrue(heartbeat.hasContainerActions());
+    Assertions.assertTrue(heartbeat.hasCommandQueueReport());
     CommandQueueReportProto queueCount = heartbeat.getCommandQueueReport();
-    Assert.assertEquals(queueCount.getCommandCount(), commands.size());
-    Assert.assertEquals(queueCount.getCountCount(), commands.size());
+    Assertions.assertEquals(queueCount.getCommandCount(), commands.size());
+    Assertions.assertEquals(queueCount.getCountCount(), commands.size());
     for (int i = 0; i < commands.size(); i++) {
-      Assert.assertEquals(commands.get(queueCount.getCommand(i)).intValue(),
+      Assertions.assertEquals(commands.get(queueCount.getCommand(i)).intValue(),
           queueCount.getCount(i));
     }
   }

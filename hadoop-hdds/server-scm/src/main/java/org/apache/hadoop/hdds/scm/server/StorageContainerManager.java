@@ -1664,18 +1664,20 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
 
+    if (ms != null) {
+      ms.stop();
+    }
+
+    scmSafeModeManager.stop();
+    serviceManager.stop();
+    RatisDropwizardExports.clear(ratisMetricsMap);
+
     try {
       LOG.info("Stopping SCM MetadataStore.");
       scmMetadataStore.stop();
     } catch (Exception ex) {
       LOG.error("SCM Metadata store stop failed", ex);
     }
-
-    if (ms != null) {
-      ms.stop();
-    }
-
-    scmSafeModeManager.stop();
   }
 
   @Override
