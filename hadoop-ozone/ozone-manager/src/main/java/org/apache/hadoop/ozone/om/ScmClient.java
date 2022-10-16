@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.update.client.SCMUpdateServiceGrpcClient;
+import org.apache.hadoop.util.CacheMetrics;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
@@ -47,6 +48,7 @@ public class ScmClient {
   private final ScmBlockLocationProtocol blockClient;
   private final StorageContainerLocationProtocol containerClient;
   private final LoadingCache<Long, Pipeline> containerLocationCache;
+  private final CacheMetrics containerCacheMetrics;
   private SCMUpdateServiceGrpcClient updateServiceGrpcClient;
 
   ScmClient(ScmBlockLocationProtocol blockClient,
@@ -56,6 +58,8 @@ public class ScmClient {
     this.blockClient = blockClient;
     this.containerLocationCache =
         createContainerLocationCache(configuration, containerClient);
+    this.containerCacheMetrics = CacheMetrics.create(containerLocationCache,
+        "ContainerInfo");
   }
 
   static LoadingCache<Long, Pipeline> createContainerLocationCache(
@@ -70,6 +74,7 @@ public class ScmClient {
     return CacheBuilder.newBuilder()
         .maximumSize(maxSize)
         .expireAfterWrite(ttl, unit)
+        .recordStats()
         .build(new CacheLoader<Long, Pipeline>() {
           @NotNull
           @Override
@@ -130,5 +135,8 @@ public class ScmClient {
         "container location", e.getCause());
   }
 
+  public void close() {
+    containerCacheMetrics.unregister();
+  }
 
 }
