@@ -145,7 +145,6 @@ public class TestCloseContainerHandlingByClient {
         .setBucketName(bucketName)
         .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
 
     waitForContainerClose(key);
@@ -179,7 +178,6 @@ public class TestCloseContainerHandlingByClient {
         .setBucketName(bucketName)
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
 
     waitForContainerClose(key);
@@ -214,7 +212,6 @@ public class TestCloseContainerHandlingByClient {
         .setBucketName(bucketName)
         .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
 
     waitForContainerClose(key);
@@ -275,7 +272,6 @@ public class TestCloseContainerHandlingByClient {
         .setBucketName(bucketName)
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
 
     waitForContainerClose(key);
@@ -320,7 +316,6 @@ public class TestCloseContainerHandlingByClient {
         .setBucketName(bucketName)
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
 
     waitForContainerClose(key);
@@ -383,7 +378,6 @@ public class TestCloseContainerHandlingByClient {
         setBucketName(bucketName)
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
 
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
@@ -418,7 +412,6 @@ public class TestCloseContainerHandlingByClient {
         .setBucketName(bucketName)
         .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
 
     waitForContainerClose(key);

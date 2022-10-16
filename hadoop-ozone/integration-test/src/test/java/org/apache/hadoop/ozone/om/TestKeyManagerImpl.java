@@ -253,14 +253,15 @@ public class TestKeyManagerImpl {
 
   private static void mockContainerClient() {
     ScmClient scmClient = new ScmClient(scm.getBlockProtocolServer(),
-        mockScmContainerClient);
+        mockScmContainerClient, conf);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
         "scmClient", scmClient);
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmClient", scmClient);
   }
   private static void mockBlockClient() {
-    ScmClient scmClient = new ScmClient(mockScmBlockLocationProtocol, null);
+    ScmClient scmClient = new ScmClient(mockScmBlockLocationProtocol, null,
+        conf);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
         "scmClient", scmClient);
     HddsWhiteboxTestUtils.setInternalState(om,
@@ -1335,7 +1336,7 @@ public class TestKeyManagerImpl {
     omKeyInfo.appendNewBlocks(omKeyLocationInfoList, false);
 
     KeyManagerImpl keyManagerImpl =
-        new KeyManagerImpl(ozoneManager, scmClientMock, conf, "om1", metrics);
+        new KeyManagerImpl(ozoneManager, scmClientMock, conf, metrics);
 
     keyManagerImpl.refresh(omKeyInfo);
 
@@ -1376,7 +1377,7 @@ public class TestKeyManagerImpl {
     omKeyInfo.appendNewBlocks(omKeyLocationInfoList, false);
 
     KeyManagerImpl keyManagerImpl =
-        new KeyManagerImpl(ozoneManager, scmClientMock, conf, "om1", metrics);
+        new KeyManagerImpl(ozoneManager, scmClientMock, conf, metrics);
 
     try {
       keyManagerImpl.refresh(omKeyInfo);

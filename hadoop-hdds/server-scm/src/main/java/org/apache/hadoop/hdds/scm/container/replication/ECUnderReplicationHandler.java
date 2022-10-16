@@ -174,7 +174,6 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                       .filter(datanodeDetails ->
                               datanodeDetails.getPersistedOpState() ==
                               HddsProtos.NodeOperationalState.IN_SERVICE)
-                      .filter(DatanodeDetails::isDecomissioned)
                       .collect(Collectors.toList());
       // We got the missing indexes, this is excluded any decommissioning
       // indexes. Find the good source nodes.

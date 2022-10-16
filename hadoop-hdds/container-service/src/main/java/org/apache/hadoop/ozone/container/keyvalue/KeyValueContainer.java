@@ -828,7 +828,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     long containerId = containerData.getContainerID();
     KeyValueContainerCheck checker =
         new KeyValueContainerCheck(containerData.getMetadataPath(), config,
-            containerId, containerData.getVolume());
+            containerId, containerData.getVolume(), this);
     return checker.fastCheck();
   }
 
@@ -849,7 +849,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     long containerId = containerData.getContainerID();
     KeyValueContainerCheck checker =
         new KeyValueContainerCheck(containerData.getMetadataPath(), config,
-            containerId, containerData.getVolume());
+            containerId, containerData.getVolume(), this);
 
     return checker.fullCheck(throttler, canceler);
   }

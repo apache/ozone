@@ -320,7 +320,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public List<ContainerWithPipeline> getContainerWithPipelineBatch(
-      List<Long> containerIDs) throws IOException {
+      Iterable<? extends Long> containerIDs) throws IOException {
     getScm().checkAdminAccess(null);
 
     List<ContainerWithPipeline> cpList = new ArrayList<>();
