@@ -92,7 +92,7 @@ import com.google.inject.Inject;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREFIX;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportBase;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 
@@ -222,7 +222,7 @@ public class ReconStorageContainerManagerFacade
     // Use the same executor for both ICR and FCR.
     // The Executor maps the event to a thread for DN.
     // Dispatcher should always dispatch FCR first followed by ICR
-    List<BlockingQueue<ContainerReportBase>> queues
+    List<BlockingQueue<ContainerReport>> queues
         = initContainerReportQueue();
     List<ThreadPoolExecutor> executors
         = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(queues);
@@ -272,7 +272,7 @@ public class ReconStorageContainerManagerFacade
   }
 
   @NotNull
-  private List<BlockingQueue<ContainerReportBase>> initContainerReportQueue() {
+  private List<BlockingQueue<ContainerReport>> initContainerReportQueue() {
     int threadPoolSize = ozoneConfiguration.getInt(OZONE_SCM_EVENT_PREFIX +
             StringUtils.camelize(SCMEvents.CONTAINER_REPORT.getName()
                 + "_OR_"
@@ -285,10 +285,9 @@ public class ReconStorageContainerManagerFacade
                 + SCMEvents.INCREMENTAL_CONTAINER_REPORT.getName())
             + ".queue.size",
         OZONE_SCM_EVENT_CONTAINER_REPORT_QUEUE_SIZE_DEFAULT);
-    List<BlockingQueue<ContainerReportBase>>
-        queues = new ArrayList<>();
+    List<BlockingQueue<ContainerReport>> queues = new ArrayList<>();
     for (int i = 0; i < threadPoolSize; ++i) {
-      queues.add(new ContainerReportQueue<>(queueSize));
+      queues.add(new ContainerReportQueue(queueSize));
     }
     return queues;
   }

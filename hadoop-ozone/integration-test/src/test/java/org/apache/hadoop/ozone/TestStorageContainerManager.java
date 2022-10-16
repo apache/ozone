@@ -846,10 +846,10 @@ public class TestStorageContainerManager {
   @Test
   public void testContainerReportQueueWithDrop() throws Exception {
     EventQueue eventQueue = new EventQueue();
-    List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReportBase>>
+    List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReport>>
         queues = new ArrayList<>();
     for (int i = 0; i < 1; ++i) {
-      queues.add(new ContainerReportQueue<>());
+      queues.add(new ContainerReportQueue());
     }
     ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
     DatanodeDetails dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
@@ -888,10 +888,10 @@ public class TestStorageContainerManager {
   @Test
   public void testIncrementalContainerReportQueue() throws Exception {
     EventQueue eventQueue = new EventQueue();
-    List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReportBase>>
+    List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReport>>
         queues = new ArrayList<>();
     for (int i = 0; i < 1; ++i) {
-      queues.add(new ContainerReportQueue<>());
+      queues.add(new ContainerReportQueue());
     }
     DatanodeDetails dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
         .build();

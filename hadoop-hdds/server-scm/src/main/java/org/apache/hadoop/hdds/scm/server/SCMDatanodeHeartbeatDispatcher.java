@@ -268,7 +268,25 @@ public final class SCMDatanodeHeartbeatDispatcher {
   /**
    * Container report payload base reference.
    */
-  public interface ContainerReportBase {
+  public interface ContainerReport {
+    DatanodeDetails getDatanodeDetails();
+    ContainerReportType getType();
+  }
+
+  /**
+   * Container Report Type.
+   */
+  public enum ContainerReportType {
+    /**
+     * Incremental container report type
+     * {@liks IncrementalContainerReportFromDatanode}.
+     */
+    ICR,
+    /**
+     * Full container report type
+     * {@liks ContainerReportFromDatanode}.
+     */
+    FCR
   }
 
   /**
@@ -276,7 +294,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
    */
   public static class ContainerReportFromDatanode
       extends ReportFromDatanode<ContainerReportsProto>
-      implements ContainerReportBase {
+      implements ContainerReport {
 
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
         ContainerReportsProto report) {
@@ -292,6 +310,10 @@ public final class SCMDatanodeHeartbeatDispatcher {
     public int hashCode() {
       return this.getDatanodeDetails().getUuid().hashCode();
     }
+    
+    public ContainerReportType getType() {
+      return ContainerReportType.FCR;
+    }
   }
 
   /**
@@ -299,7 +321,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
    */
   public static class IncrementalContainerReportFromDatanode
       extends ReportFromDatanode<IncrementalContainerReportProto>
-      implements ContainerReportBase {
+      implements ContainerReport {
 
     public IncrementalContainerReportFromDatanode(
         DatanodeDetails datanodeDetails,
@@ -315,6 +337,10 @@ public final class SCMDatanodeHeartbeatDispatcher {
     @Override
     public int hashCode() {
       return this.getDatanodeDetails().getUuid().hashCode();
+    }
+
+    public ContainerReportType getType() {
+      return ContainerReportType.ICR;
     }
   }
 

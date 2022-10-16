@@ -17,32 +17,30 @@
  */
 package org.apache.hadoop.hdds.scm.server;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportBase;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
-import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor.IQueueMetrics;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
+import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor.IQueueMetrics;
+import org.apache.hadoop.util.Time;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Customized queue to handle FCR and ICR from datanode optimally,
  * avoiding duplicate FCR reports.
  */
-public class ContainerReportQueue<VALUE extends ContainerReportBase>
-    implements BlockingQueue<VALUE>, IQueueMetrics {
+public class ContainerReportQueue
+    implements BlockingQueue<ContainerReport>, IQueueMetrics {
 
   private final Integer maxCapacity;
 
@@ -52,7 +50,7 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
    */
   private LinkedBlockingQueue<String> orderingQueue
       = new LinkedBlockingQueue<>();
-  private Map<String, List<VALUE>> dataMap = new HashMap<>();
+  private Map<String, List<ContainerReport>> dataMap = new HashMap<>();
 
   private int capacity = 0;
 
@@ -63,34 +61,28 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
   }
   
   public ContainerReportQueue(int maxCapacity) {
-    super();
     this.maxCapacity = maxCapacity;
   }
 
-  private boolean addContainerReport(VALUE val) {
-    ContainerReportFromDatanode report
-        = (ContainerReportFromDatanode) val;
+  private boolean addContainerReport(ContainerReport val) {
+    String uuidString = val.getDatanodeDetails().getUuidString();
     synchronized (this) {
       // 1. check if no previous report available, else add the report
-      DatanodeDetails dn = report.getDatanodeDetails();
-      if (!dataMap.containsKey(dn.getUuidString())) {
-        ArrayList<VALUE> dataList = new ArrayList<>();
-        dataList.add(val);
-        ++capacity;
-        dataMap.put(dn.getUuidString(), dataList);
-        orderingQueue.add(dn.getUuidString());
+      if (!dataMap.containsKey(uuidString)) {
+        addReport(val, uuidString);
         return true;
       }
 
       // 2. FCR report available
-      List<VALUE> dataList = dataMap.get(dn.getUuidString());
+      List<ContainerReport> dataList = dataMap.get(uuidString);
       boolean isReportRemoved = false;
       if (!dataList.isEmpty()) {
         // remove FCR if present
         for (int i = dataList.size() - 1; i >= 0; --i) {
-          ContainerReportBase reportInfo = dataList.get(i);
+          ContainerReport reportInfo = dataList.get(i);
           // if FCR, its last FCR report, remove directly
-          if (isFCRReport(reportInfo)) {
+          if (SCMDatanodeHeartbeatDispatcher.ContainerReportType.FCR
+              == reportInfo.getType()) {
             dataList.remove(i);
             --capacity;
             droppedCount.incrementAndGet();
@@ -103,51 +95,45 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
       dataList.add(val);
       ++capacity;
       if (!isReportRemoved) {
-        orderingQueue.add(dn.getUuidString());
+        orderingQueue.add(uuidString);
       }
     }
     return true;
   }
 
-  private boolean addIncrementalReport(VALUE val) {
-    IncrementalContainerReportFromDatanode report
-        = (IncrementalContainerReportFromDatanode) val;
+  private boolean addIncrementalReport(ContainerReport val) {
+    String uuidString = val.getDatanodeDetails().getUuidString();
     synchronized (this) {
       // 1. check if no previous report available, else add the report
-      DatanodeDetails dn = report.getDatanodeDetails();
-      if (!dataMap.containsKey(dn.getUuidString())) {
-        ArrayList<VALUE> dataList = new ArrayList<>();
-        dataList.add(val);
-        ++capacity;
-        dataMap.put(dn.getUuidString(), dataList);
-        orderingQueue.add(dn.getUuidString());
+      if (!dataMap.containsKey(uuidString)) {
+        addReport(val, uuidString);
         return true;
       }
 
       // 2. Add ICR report or merge to previous ICR
-      List<VALUE> dataList = dataMap.get(dn.getUuidString());
+      List<ContainerReport> dataList = dataMap.get(uuidString);
       dataList.add(val);
       ++capacity;
-      orderingQueue.add(dn.getUuidString());
+      orderingQueue.add(uuidString);
     }
     return true;
   }
 
-  private boolean isFCRReport(Object report) {
-    return report instanceof ContainerReportFromDatanode;
+  private void addReport(ContainerReport val, String uuidString) {
+    ArrayList<ContainerReport> dataList = new ArrayList<>();
+    dataList.add(val);
+    ++capacity;
+    dataMap.put(uuidString, dataList);
+    orderingQueue.add(uuidString);
   }
 
-  private boolean isICRReport(Object report) {
-    return report instanceof IncrementalContainerReportFromDatanode;
-  }
-
-  private VALUE removeAndGet(String uuid) {
+  private ContainerReport removeAndGet(String uuid) {
     if (uuid == null) {
       return null;
     }
 
-    List<VALUE> dataList = dataMap.get(uuid);
-    VALUE report = null;
+    List<ContainerReport> dataList = dataMap.get(uuid);
+    ContainerReport report = null;
     if (dataList != null && !dataList.isEmpty()) {
       report = dataList.remove(0);
       --capacity;
@@ -158,33 +144,29 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
     return report;
   }
 
-  private VALUE getReport(String uuid) {
+  private ContainerReport getReport(String uuid) {
     if (uuid == null) {
       return null;
     }
 
-    List<VALUE> dataList = dataMap.get(uuid);
+    List<ContainerReport> dataList = dataMap.get(uuid);
     if (dataList != null && !dataList.isEmpty()) {
       return dataList.get(0);
     }
     return null;
   }
 
-  private static void checkNotNull(Object v) {
-    if (v == null) {
-      throw new NullPointerException();
-    }
-  }
-
-  public boolean addValue(@NotNull VALUE value) {
+  public boolean addValue(@NotNull ContainerReport value) {
     synchronized (this) {
       if (remainingCapacity() == 0) {
         return false;
       }
 
-      if (isFCRReport(value)) {
+      if (SCMDatanodeHeartbeatDispatcher.ContainerReportType.FCR
+          == value.getType()) {
         return addContainerReport(value);
-      } else if (isICRReport(value)) {
+      } else if (SCMDatanodeHeartbeatDispatcher.ContainerReportType.ICR
+          == value.getType()) {
         return addIncrementalReport(value);
       }
       return false;
@@ -192,8 +174,8 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
   }
 
   @Override
-  public boolean add(@NotNull VALUE value) {
-    checkNotNull(value);
+  public boolean add(@NotNull ContainerReport value) {
+    Objects.requireNonNull(value);
     synchronized (this) {
       if (remainingCapacity() == 0) {
         throw new IllegalStateException("capacity not available");
@@ -204,26 +186,23 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
   }
 
   @Override
-  public boolean offer(@NotNull VALUE value) {
-    checkNotNull(value);
+  public boolean offer(@NotNull ContainerReport value) {
+    Objects.requireNonNull(value);
     synchronized (this) {
       return addValue(value);
     }
   }
 
   @Override
-  public VALUE remove() {
+  public ContainerReport remove() {
     synchronized (this) {
       String uuid = orderingQueue.remove();
-      if (null == uuid) {
-        throw new NoSuchElementException();
-      }
       return removeAndGet(uuid);
     }
   }
 
   @Override
-  public VALUE poll() {
+  public ContainerReport poll() {
     synchronized (this) {
       String uuid = orderingQueue.poll();
       return removeAndGet(uuid);
@@ -231,18 +210,15 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
   }
 
   @Override
-  public VALUE element() {
+  public ContainerReport element() {
     synchronized (this) {
       String uuid = orderingQueue.element();
-      if (null == uuid) {
-        throw new NoSuchElementException();
-      }
       return getReport(uuid);
     }
   }
 
   @Override
-  public VALUE peek() {
+  public ContainerReport peek() {
     synchronized (this) {
       String uuid = orderingQueue.peek();
       return getReport(uuid);
@@ -250,31 +226,33 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
   }
 
   @Override
-  public void put(@NotNull VALUE value) throws InterruptedException {
-    checkNotNull(value);
+  public void put(@NotNull ContainerReport value) throws InterruptedException {
+    Objects.requireNonNull(value);
     while (!addValue(value)) {
       Thread.currentThread().sleep(10);
     }
   }
 
   @Override
-  public boolean offer(VALUE value, long timeout, @NotNull TimeUnit unit)
-      throws InterruptedException {
-    checkNotNull(value);
+  public boolean offer(ContainerReport value, long timeout,
+                       @NotNull TimeUnit unit) throws InterruptedException {
+    Objects.requireNonNull(value);
     long timeoutMillis = unit.toMillis(timeout);
     while (timeoutMillis > 0) {
       if (addValue(value)) {
         return true;
       }
+      long startTime = Time.monotonicNow();
       Thread.currentThread().sleep(10);
-      timeoutMillis -= 10;
+      long timeDiff = Time.monotonicNow() - startTime;
+      timeoutMillis -= timeDiff;
     }
     return false;
   }
 
   @NotNull
   @Override
-  public VALUE take() throws InterruptedException {
+  public ContainerReport take() throws InterruptedException {
     String uuid = orderingQueue.take();
     synchronized (this) {
       return removeAndGet(uuid);
@@ -283,7 +261,7 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
 
   @Nullable
   @Override
-  public VALUE poll(long timeout, @NotNull TimeUnit unit)
+  public ContainerReport poll(long timeout, @NotNull TimeUnit unit)
       throws InterruptedException {
     String uuid = orderingQueue.poll(timeout, unit);
     synchronized (this) {
@@ -311,7 +289,7 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
   }
 
   @Override
-  public boolean addAll(@NotNull Collection<? extends VALUE> c) {
+  public boolean addAll(@NotNull Collection<? extends ContainerReport> c) {
     // no need support this
     throw new UnsupportedOperationException("not supported");
   }
@@ -357,7 +335,7 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
 
   @NotNull
   @Override
-  public Iterator<VALUE> iterator() {
+  public Iterator<ContainerReport> iterator() {
     // no need support this
     throw new UnsupportedOperationException("not supported");
   }
@@ -377,13 +355,14 @@ public class ContainerReportQueue<VALUE extends ContainerReportBase>
   }
 
   @Override
-  public int drainTo(@NotNull Collection<? super VALUE> c) {
+  public int drainTo(@NotNull Collection<? super ContainerReport> c) {
     // no need support this
     throw new UnsupportedOperationException("not supported");
   }
 
   @Override
-  public int drainTo(@NotNull Collection<? super VALUE> c, int maxElements) {
+  public int drainTo(@NotNull Collection<? super ContainerReport> c,
+                     int maxElements) {
     // no need support this
     throw new UnsupportedOperationException("not supported");
   }

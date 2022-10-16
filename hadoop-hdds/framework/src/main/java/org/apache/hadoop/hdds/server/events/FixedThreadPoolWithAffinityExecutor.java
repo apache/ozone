@@ -56,13 +56,13 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
 
   private final String name;
 
-  private EventHandler<P> eventHandler;
+  private final EventHandler<P> eventHandler;
 
-  private EventPublisher eventPublisher;
+  private final EventPublisher eventPublisher;
 
-  private List<BlockingQueue<Q>> workQueues;
+  private final List<BlockingQueue<Q>> workQueues;
 
-  private List<ThreadPoolExecutor> executors;
+  private final List<ThreadPoolExecutor> executors;
 
   // MutableCounterLong is thread safe.
   @Metric
@@ -80,7 +80,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
   @Metric
   private MutableCounterLong dropped;
 
-  private AtomicBoolean isRunning = new AtomicBoolean(true);
+  private final AtomicBoolean isRunning = new AtomicBoolean(true);
 
   /**
    * Create FixedThreadPoolExecutor with affinity.

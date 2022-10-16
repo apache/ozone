@@ -156,7 +156,7 @@ import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportBase;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
 import org.apache.hadoop.util.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
@@ -478,7 +478,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // Use the same executor for both ICR and FCR.
     // The Executor maps the event to a thread for DN.
     // Dispatcher should always dispatch FCR first followed by ICR
-    List<BlockingQueue<ContainerReportBase>> queues
+    List<BlockingQueue<ContainerReport>> queues
         = initContainerReportQueue();
     List<ThreadPoolExecutor> executors
         = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(queues);
@@ -526,7 +526,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   @NotNull
-  private List<BlockingQueue<ContainerReportBase>> initContainerReportQueue() {
+  protected List<BlockingQueue<ContainerReport>> initContainerReportQueue() {
     int threadPoolSize = configuration.getInt(OZONE_SCM_EVENT_PREFIX +
             StringUtils.camelize(SCMEvents.CONTAINER_REPORT.getName()
                 + "_OR_"
@@ -539,10 +539,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
                 + SCMEvents.INCREMENTAL_CONTAINER_REPORT.getName())
             + ".queue.size",
         OZONE_SCM_EVENT_CONTAINER_REPORT_QUEUE_SIZE_DEFAULT);
-    List<BlockingQueue<ContainerReportBase>>
-        queues = new ArrayList<>();
+    List<BlockingQueue<ContainerReport>> queues = new ArrayList<>();
     for (int i = 0; i < threadPoolSize; ++i) {
-      queues.add(new ContainerReportQueue<>(queueSize));
+      queues.add(new ContainerReportQueue(queueSize));
     }
     return queues;
   }

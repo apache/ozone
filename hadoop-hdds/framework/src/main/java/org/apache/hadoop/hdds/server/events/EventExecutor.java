@@ -64,7 +64,7 @@ public interface EventExecutor<PAYLOAD> extends AutoCloseable {
   long scheduledEvents();
 
   /**
-   * Return the number of events scheduled to be processed.
+   * Return the number of dropped events to be processed.
    */
   default long droppedEvents() {
     return 0;
