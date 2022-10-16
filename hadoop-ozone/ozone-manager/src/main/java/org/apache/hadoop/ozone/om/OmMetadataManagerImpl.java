@@ -79,6 +79,8 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
@@ -98,6 +100,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_L
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 
 import org.apache.ratis.util.ExitUtils;
 import org.eclipse.jetty.util.StringUtil;
@@ -225,7 +228,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   private DBStore store;
 
-  private final OzoneManagerLock lock;
+  private final IOzoneManagerLock lock;
 
   private Table userTable;
   private Table volumeTable;
@@ -286,6 +289,33 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     OzoneConfiguration conf = new OzoneConfiguration();
     this.lock = new OzoneManagerLock(conf);
     this.omEpoch = 0;
+  }
+
+  // metadata constructor for snapshots
+  private OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName)
+      throws IOException {
+    lock = new OmReadOnlyLock();
+    omEpoch = 0;
+    String snapshotDir = OMStorage.getOmDbDir(conf) +
+        OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
+    setStore(loadDB(conf, new File(snapshotDir),
+        OM_DB_NAME + snapshotDirName, true));
+    initializeOmTables();
+  }
+
+  /**
+   * Factory method for creating snapshot metadata manager.
+   *
+   * @param conf - ozone configuration
+   * @param snapshotDirName - the UUID that identifies the snapshot
+   * @return the metadata manager representing the snapshot
+   * @throws IOException
+   */
+  public static OmMetadataManagerImpl createSnapshotMetadataManager(
+      OzoneConfiguration conf, String snapshotDirName) throws IOException {
+    OmMetadataManagerImpl smm = new OmMetadataManagerImpl(conf,
+        snapshotDirName);
+    return smm;
   }
 
   @Override
@@ -415,17 +445,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
       throws IOException {
-    return loadDB(configuration, metaDir, OM_DB_NAME);
+    return loadDB(configuration, metaDir, OM_DB_NAME, false);
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
-      String dbName) throws IOException {
+      String dbName, boolean readOnly) throws IOException {
+
     final int maxFSSnapshots = configuration.getInt(
         OZONE_OM_FS_SNAPSHOT_MAX_LIMIT, OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
     RocksDBConfiguration rocksDBConfiguration =
         configuration.getObject(RocksDBConfiguration.class);
     DBStoreBuilder dbStoreBuilder = DBStoreBuilder.newBuilder(configuration,
         rocksDBConfiguration).setName(dbName)
+        .setOpenReadOnly(readOnly)
         .setPath(Paths.get(metaDir.getPath()))
         .setMaxFSSnapshots(maxFSSnapshots);
     DBStore dbStore = addOMTablesAndCodecs(dbStoreBuilder).build();
@@ -674,7 +706,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * @return OzoneManagerLock
    */
   @Override
-  public org.apache.hadoop.ozone.om.lock.OzoneManagerLock getLock() {
+  public IOzoneManagerLock getLock() {
     return lock;
   }
 

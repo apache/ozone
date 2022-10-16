@@ -149,7 +149,7 @@ function ozonecmd_case
     sh | shell)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneShell
       ozone_deprecate_envvar HDFS_OM_SH_OPTS OZONE_SH_OPTS
-      OZONE_SH_OPTS="${OZONE_SH_OPTS} -Dhadoop.log.file=ozone-shell.log -Dlog4j.configuration=file:${ozone_shell_log4j}"
+      OZONE_SH_OPTS="-Dhadoop.log.file=ozone-shell.log -Dlog4j.configuration=file:${ozone_shell_log4j} ${OZONE_SH_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     s3)
@@ -187,6 +187,7 @@ function ozonecmd_case
     ;;
     fs)
       OZONE_CLASSNAME=org.apache.hadoop.fs.ozone.OzoneFsShell
+      OZONE_CLIENT_OPTS="-Dhadoop.log.file=ozone-shell.log -Dlog4j.configuration=file:${ozone_shell_log4j} ${OZONE_CLIENT_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     daemonlog)

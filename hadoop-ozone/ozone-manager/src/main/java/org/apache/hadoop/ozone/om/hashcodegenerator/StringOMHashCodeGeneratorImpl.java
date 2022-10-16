@@ -24,7 +24,7 @@ package org.apache.hadoop.ozone.om.hashcodegenerator;
 public class StringOMHashCodeGeneratorImpl implements OMHashCodeGenerator {
 
   @Override
-  public int getHashCode(String resourceName) {
+  public long getHashCode(String resourceName) {
     return resourceName.hashCode();
   }
 

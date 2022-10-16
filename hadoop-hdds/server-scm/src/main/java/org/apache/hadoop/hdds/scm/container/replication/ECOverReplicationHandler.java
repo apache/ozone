@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -47,14 +48,15 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
   public static final Logger LOG =
       LoggerFactory.getLogger(ECOverReplicationHandler.class);
 
-  private final ECContainerHealthCheck ecContainerHealthCheck =
-      new ECContainerHealthCheck();
+  private final ECReplicationCheckHandler ecReplicationCheck;
   private final NodeManager nodeManager;
 
-  public ECOverReplicationHandler(PlacementPolicy placementPolicy,
-                                  NodeManager nodeManager) {
+  public ECOverReplicationHandler(ECReplicationCheckHandler ecReplicationCheck,
+      PlacementPolicy placementPolicy, NodeManager nodeManager) {
     super(placementPolicy);
+    this.ecReplicationCheck = ecReplicationCheck;
     this.nodeManager = nodeManager;
+
   }
 
   /**
@@ -74,9 +76,15 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult result, int remainingMaintenanceRedundancy) {
     ContainerInfo container = result.getContainerInfo();
-    ContainerHealthResult currentUnderRepRes = ecContainerHealthCheck
-        .checkHealth(container, replicas, pendingOps,
-            remainingMaintenanceRedundancy);
+
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setContainerInfo(container)
+        .setContainerReplicas(replicas)
+        .setPendingOps(pendingOps)
+        .setMaintenanceRedundancy(remainingMaintenanceRedundancy)
+        .build();
+    ContainerHealthResult currentUnderRepRes = ecReplicationCheck
+        .checkHealth(request);
     LOG.debug("Handling over-replicated EC container: {}", container);
 
     //sanity check

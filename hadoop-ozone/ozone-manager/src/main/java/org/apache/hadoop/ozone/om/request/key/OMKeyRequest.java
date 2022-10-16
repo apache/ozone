@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
@@ -809,5 +810,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     return OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,
           trxnLogIndex, isRatisEnabled);
+  }
+
+  protected OzoneLockStrategy getOzoneLockStrategy(OzoneManager ozoneManager) {
+    return ozoneManager.getOzoneLockProvider()
+        .createLockStrategy(getBucketLayout());
   }
 }

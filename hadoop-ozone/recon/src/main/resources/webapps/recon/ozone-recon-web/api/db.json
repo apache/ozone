@@ -1218,5 +1218,47 @@
       }
     ],
     "sizeDirectKey": 0
-  }
+  },
+  "taskStatus": [
+    {
+      "taskName": "ContainerKeyMapperTask",
+      "lastUpdatedTimestamp": 0,
+      "lastUpdatedSeqNumber": 0
+    },
+    {
+      "taskName": "FileSizeCountTask",
+      "lastUpdatedTimestamp": 0,
+      "lastUpdatedSeqNumber": 0
+    },
+    {
+      "taskName": "TableCountTask",
+      "lastUpdatedTimestamp": 0,
+      "lastUpdatedSeqNumber": 0
+    },
+    {
+      "taskName": "NSSummaryTaskWithFSO",
+      "lastUpdatedTimestamp": 0,
+      "lastUpdatedSeqNumber": 0
+    },
+    {
+      "taskName": "OmDeltaRequest",
+      "lastUpdatedTimestamp": 1663421088035,
+      "lastUpdatedSeqNumber": 0
+    },
+    {
+      "taskName": "OmSnapshotRequest",
+      "lastUpdatedTimestamp": 1663421088035,
+      "lastUpdatedSeqNumber": 0
+    },
+    {
+      "taskName": "ContainerHealthTask",
+      "lastUpdatedTimestamp": 0,
+      "lastUpdatedSeqNumber": 0
+    },
+    {
+      "taskName": "PipelineSyncTask",
+      "lastUpdatedTimestamp": 1663421094507,
+      "lastUpdatedSeqNumber": 0
+    }
+  ]
 }
