@@ -208,14 +208,13 @@ public class TestContainerBalancer {
   @Test
   public void testShouldRun() throws Exception {
     boolean doRun = containerBalancer.shouldRun();
-    // should be equal to average utilization of the cluster
-    Assertions.assertEquals(doRun, false);
+    Assertions.assertFalse(doRun);
     containerBalancer.saveConfiguration(balancerConfiguration, true, 0);
     doRun = containerBalancer.shouldRun();
-    Assertions.assertEquals(doRun, true);
+    Assertions.assertTrue(doRun);
     containerBalancer.saveConfiguration(balancerConfiguration, false, 0);
     doRun = containerBalancer.shouldRun();
-    Assertions.assertEquals(doRun, false);
+    Assertions.assertFalse(doRun);
   }
 
   @Test
@@ -266,7 +265,7 @@ public class TestContainerBalancer {
   }
 
   @Test
-  public void testStartStop() throws Exception {
+  public void testStartStopSCMCalls() throws Exception {
     Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
             Mockito.any(DatanodeDetails.class),
             Mockito.any(DatanodeDetails.class)))

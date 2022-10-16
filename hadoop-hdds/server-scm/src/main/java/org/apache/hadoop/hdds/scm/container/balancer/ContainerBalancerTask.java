@@ -60,8 +60,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
 
 /**
- * Container balancer is a service in SCM to move containers between over- and
- * under-utilized datanodes.
+ * Container balancer task performs move of containers between over- and
+ * under-utilized datanodes. This is triggered by Container Balancer.
  */
 public class ContainerBalancerTask implements Runnable {
 
@@ -158,18 +158,18 @@ public class ContainerBalancerTask implements Runnable {
    */
   public void run() {
     try {
-      balancer();
-    } catch (Throwable e) {
+      balance();
+    } catch (Exception e) {
       LOG.error("Container Balancer is stopped abnormally, ", e);
-    }
-    synchronized (this) {
-      taskStatus = Status.STOPPED;
+    } finally {
+      synchronized (this) {
+        taskStatus = Status.STOPPED;
+      }
     }
   }
 
   /**
-   * Tries to stop ContainerBalancer changing status to stopping. Calls
-   * {@link ContainerBalancerTask#stop()}.
+   * Changes the status from RUNNING to STOPPING.
    */
   public void stop() {
     synchronized (this) {
@@ -179,7 +179,7 @@ public class ContainerBalancerTask implements Runnable {
     }
   }
 
-  private void balancer() {
+  private void balance() {
     this.iterations = config.getIterations();
     if (this.iterations == -1) {
       //run balancer infinitely
@@ -932,9 +932,9 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   /**
-   * Checks if ContainerBalancer is currently running in this SCM.
+   * Checks if ContainerBalancerTask is currently running.
    *
-   * @return true if the currentBalancingThread is not null, otherwise false
+   * @return true if the status is RUNNING, otherwise false
    */
   private boolean isBalancerRunning() {
     return taskStatus == Status.RUNNING;

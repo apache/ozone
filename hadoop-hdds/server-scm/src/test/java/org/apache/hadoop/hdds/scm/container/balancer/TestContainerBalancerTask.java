@@ -231,9 +231,7 @@ public class TestContainerBalancerTask {
    */
   @Test
   public void
-      initializeIterationShouldUpdateUnBalancedNodesWhenThresholdChanges()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
+      initializeIterationShouldUpdateUnBalancedNodesWhenThresholdChanges() {
     List<DatanodeUsageInfo> expectedUnBalancedNodes;
     List<DatanodeUsageInfo> unBalancedNodesAccordingToBalancer;
 
