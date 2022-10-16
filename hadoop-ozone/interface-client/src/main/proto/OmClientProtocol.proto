@@ -122,7 +122,6 @@ enum Type {
 
   SetRangerServiceVersion = 107;
   RangerBGSync = 109;
-  CreateSnapshot = 110;
 
   EchoRPC = 110;
 
