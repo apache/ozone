@@ -61,7 +61,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DE
 
 /**
  * Container balancer task performs move of containers between over- and
- * under-utilized datanodes. This is triggered by Container Balancer.
+ * under-utilized datanodes.
  */
 public class ContainerBalancerTask implements Runnable {
 
@@ -119,11 +119,13 @@ public class ContainerBalancerTask implements Runnable {
   private int nextIterationIndex;
 
   /**
-   * Constructs ContainerBalancer with the specified arguments. Initializes
-   * ContainerBalancerMetrics. Container Balancer does not start on
-   * construction.
+   * Constructs ContainerBalancerTask with the specified arguments.
    *
    * @param scm the storage container manager
+   * @param nextIterationIndex next iteration index for continue
+   * @param containerBalancer the container balancer
+   * @param metrics the metrics
+   * @param config the config
    */
   public ContainerBalancerTask(StorageContainerManager scm,
                                int nextIterationIndex,
@@ -153,8 +155,7 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   /**
-   * Balances the cluster in iterations. Regularly checks if balancing has
-   * been stopped.
+   * Run the container balancer task.
    */
   public void run() {
     try {
@@ -207,7 +208,7 @@ public class ContainerBalancerTask implements Runnable {
           // one for sending command , one for running du, and one for
           // reporting back make it like this for now, a more suitable
           // value. can be set in the future if needed
-          wait(3 * nodeReportInterval);
+          Thread.currentThread().sleep(3 * nodeReportInterval);
         } catch (InterruptedException e) {
           LOG.info("Container Balancer was interrupted while waiting for" +
               "datanodes refreshing volume usage info");
@@ -263,7 +264,8 @@ public class ContainerBalancerTask implements Runnable {
       // this was the final iteration
       if (i != iterations - 1) {
         try {
-          wait(config.getBalancingInterval().toMillis());
+          Thread.currentThread().sleep(
+              config.getBalancingInterval().toMillis());
         } catch (InterruptedException e) {
           LOG.info("Container Balancer was interrupted while waiting for" +
               " next iteration.");
@@ -277,10 +279,9 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   /**
-   * Tries to stop ContainerBalancer. Logs the reason for stopping. Calls
-   * {@link ContainerBalancer#stopBalancer()}.
-   * @param stopReason a string specifying the reason for stopping
-   *                   ContainerBalancer.
+   * Logs the reason for stop and save configuration and stop the task.
+   * 
+   * @param stopReason a string specifying the reason for stop
    */
   private void tryStopWithSaveConfiguration(String stopReason) {
     synchronized (this) {
