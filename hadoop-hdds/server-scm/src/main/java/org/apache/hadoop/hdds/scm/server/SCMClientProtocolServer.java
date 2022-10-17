@@ -1001,6 +1001,22 @@ public class SCMClientProtocolServer implements
    * Get Datanode usage info such as capacity, SCMUsed, and remaining by ip
    * or uuid.
    *
+   * @param ipaddress Datanode Address String
+   * @param uuid Datanode UUID String
+   * @return List of DatanodeUsageInfoProto. Each element contains usage info
+   * such as capacity, SCMUsed, and remaining space.
+   * @throws IOException if admin authentication fails
+   */
+  @Override
+  public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
+      String ipaddress, String uuid, int clientVersion) throws IOException {
+    return getDatanodeUsageInfo(ipaddress, uuid, null, clientVersion);
+  }
+
+  /**
+   * Get Datanode usage info such as capacity, SCMUsed, and remaining by ip
+   * or uuid.
+   *
    * @param ipaddress Datanode Address IP String
    * @param uuid Datanode UUID String
    * @param hostname Datanode Address hostname String
