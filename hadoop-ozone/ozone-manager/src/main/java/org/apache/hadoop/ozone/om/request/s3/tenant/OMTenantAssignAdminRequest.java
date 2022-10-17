@@ -116,6 +116,13 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
           OMException.ResultCodes.INVALID_TENANT_ID);
     }
 
+    // Prevent assigning the same user as admin.
+    if (accessIdInfo.getIsAdmin()) {
+      throw new OMException("accessId '" + accessId +
+          "' is already the tenant '" + tenantId + "' admin.",
+          OMException.ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
+    }
+
     final boolean delegated;
     if (request.hasDelegated()) {
       delegated = request.getDelegated();

@@ -399,6 +399,14 @@ public class TestOzoneTenantShell {
           + "  \"isDelegatedAdmin\": true\n" + "}\n", true, true);
       checkOutput(err, "", true);
 
+      //Re-assign same admin
+      executeHA(tenantShell, new String[] {"--verbose", "user", "assign-admin",
+          tenantName + "$" + userName, "--tenant=" + tenantName,
+          "--delegated=true"});
+      checkOutput(out, "", true);
+      checkOutput(err, "accessId 'devaa$alice' is " +
+          "already the tenant 'devaa' admin.\n", true);
+
       // Clean up
       executeHA(tenantShell, new String[] {"--verbose", "user", "revoke-admin",
           tenantName + "$" + userName, "--tenant=" + tenantName});
