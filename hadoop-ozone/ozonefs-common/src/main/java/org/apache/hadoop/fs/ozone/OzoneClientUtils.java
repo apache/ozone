@@ -35,6 +35,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -49,6 +51,8 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETE
  * Shared Utilities for Ozone FS and related classes.
  */
 public final class OzoneClientUtils {
+  static final Logger LOG =
+      LoggerFactory.getLogger(OzoneClientUtils.class);
   private OzoneClientUtils() {
     // Not used.
   }
@@ -233,6 +237,16 @@ public final class OzoneClientUtils {
 
   public static boolean isKeyEncrypted(OmKeyInfo keyInfo) {
     return !Objects.isNull(keyInfo.getFileEncryptionInfo());
+  }
+
+  public static int limitValue(int confValue, String confName, int maxLimit) {
+    int limitVal = confValue;
+    if (confValue > maxLimit) {
+      LOG.warn("{} config value is greater than max value : {}, " +
+          "limiting the config value to max value..", confName, maxLimit);
+      limitVal = maxLimit;
+    }
+    return limitVal;
   }
 
 }
