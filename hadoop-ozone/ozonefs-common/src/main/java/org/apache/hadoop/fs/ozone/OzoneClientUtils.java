@@ -35,6 +35,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Set;
@@ -48,6 +50,8 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETE
  * Shared Utilities for Ozone FS and related classes.
  */
 public final class OzoneClientUtils {
+  static final Logger LOG =
+      LoggerFactory.getLogger(OzoneClientUtils.class);
   private OzoneClientUtils() {
     // Not used.
   }
@@ -223,5 +227,13 @@ public final class OzoneClientUtils {
             combineMode, rpcClient, keyInfo);
     helper.compute();
     return helper.getFileChecksum();
+  }
+
+  public static int limitValue(int confValue, String confName, int maxLimit) {
+    int limitVal = confValue > maxLimit
+        ? maxLimit : confValue;
+    LOG.warn("{} config value is greater than max value : {}, " +
+        "limiting the config value to max value..", confName, maxLimit);
+    return limitVal;
   }
 }

@@ -119,11 +119,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     listingPageSize = conf.getInt(
         OZONE_CLIENT_FS_LISTING_PAGE_SIZE,
         OZONE_CLIENT_FS_LISTING_PAGE_SIZE_DEFAULT);
-    Preconditions.checkArgument(this.listingPageSize <=
-            OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE,
-        OZONE_CLIENT_FS_LISTING_PAGE_SIZE +
-            " value should not be greater than the value of " +
-            OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE);
+    listingPageSize = OzoneClientUtils.limitValue(listingPageSize,
+        OZONE_CLIENT_FS_LISTING_PAGE_SIZE,
+        OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE);
     setConf(conf);
     Preconditions.checkNotNull(name.getScheme(),
         "No scheme provided in %s", name);
