@@ -230,10 +230,12 @@ public final class OzoneClientUtils {
   }
 
   public static int limitValue(int confValue, String confName, int maxLimit) {
-    int limitVal = confValue > maxLimit
-        ? maxLimit : confValue;
-    LOG.warn("{} config value is greater than max value : {}, " +
-        "limiting the config value to max value..", confName, maxLimit);
+    int limitVal = confValue;
+    if (confValue > maxLimit) {
+      LOG.warn("{} config value is greater than max value : {}, " +
+          "limiting the config value to max value..", confName, maxLimit);
+      limitVal = maxLimit;
+    }
     return limitVal;
   }
 }
