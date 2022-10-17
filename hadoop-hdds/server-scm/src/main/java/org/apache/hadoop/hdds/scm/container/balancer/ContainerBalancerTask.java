@@ -208,7 +208,7 @@ public class ContainerBalancerTask implements Runnable {
           // one for sending command , one for running du, and one for
           // reporting back make it like this for now, a more suitable
           // value. can be set in the future if needed
-          Thread.currentThread().sleep(3 * nodeReportInterval);
+          Thread.sleep(3 * nodeReportInterval);
         } catch (InterruptedException e) {
           LOG.info("Container Balancer was interrupted while waiting for" +
               "datanodes refreshing volume usage info");
@@ -264,8 +264,7 @@ public class ContainerBalancerTask implements Runnable {
       // this was the final iteration
       if (i != iterations - 1) {
         try {
-          Thread.currentThread().sleep(
-              config.getBalancingInterval().toMillis());
+          Thread.sleep(config.getBalancingInterval().toMillis());
         } catch (InterruptedException e) {
           LOG.info("Container Balancer was interrupted while waiting for" +
               " next iteration.");
