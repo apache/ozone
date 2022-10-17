@@ -509,20 +509,20 @@ public class PipelineManagerImpl implements PipelineManager {
       if (p.getPipelineState() == Pipeline.PipelineState.ALLOCATED &&
           (currentTime.toEpochMilli() - p.getCreationTimestamp()
               .toEpochMilli() >= pipelineScrubTimeoutInMills)) {
-        LOG.info("Scrubbing pipeline: id: " + p.getId().toString() +
-            " since it stays at ALLOCATED stage for " +
+        LOG.info("Scrubbing pipeline: id: {} since it stays at ALLOCATED " +
+            "stage for {} mins.", p.getId(),
             Duration.between(currentTime, p.getCreationTimestamp())
-                .toMinutes() + " mins.");
+                .toMinutes());
         closePipeline(p, false);
       }
       // scrub pipelines who stay CLOSED for too long.
       if (p.getPipelineState() == Pipeline.PipelineState.CLOSED) {
-        LOG.info("Scrubbing pipeline: id: " + p.getId().toString() +
-            " since it stays at CLOSED stage.");
+        LOG.info("Scrubbing pipeline: id: {} since it stays at CLOSED stage.",
+            p.getId());
         closeContainersForPipeline(p.getId());
         removePipeline(p);
       }
-      // If a datanode is stopped and then SCM is restarted, a pipline can get
+      // If a datanode is stopped and then SCM is restarted, a pipeline can get
       // stuck in an open state. For Ratis, provided some other DNs that were
       // part of the open pipeline register to SCM after the restart, the Ratis
       // pipeline close will get triggered by the DNs. For EC that will never
@@ -530,6 +530,8 @@ public class PipelineManagerImpl implements PipelineManager {
       // close any pipelines in the scrubber if they have nodes which are not
       // registered
       if (isOpenWithUnregisteredNodes(p)) {
+        LOG.info("Scrubbing pipeline: id: {} as it has unregistered nodes",
+            p.getId());
         closeContainersForPipeline(p.getId());
         closePipeline(p, true);
       }
