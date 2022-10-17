@@ -788,7 +788,7 @@ public class ReplicationManager implements SCMService {
     return ReplicationManager.class.getSimpleName();
   }
 
-  public ReplicationManagerMetrics getMetrics() {
+  public synchronized ReplicationManagerMetrics getMetrics() {
     return metrics;
   }
 

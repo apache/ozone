@@ -122,13 +122,9 @@ public class EmptyContainerHandler extends AbstractCheck {
           rp.getState() == ContainerReplicaProto.State.CLOSED);
       Preconditions.assertTrue(rp.getKeyCount() == 0);
 
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(
-            "Trying to delete empty replica with index {} for container " +
-                "{} on datanode {}", rp.getReplicaIndex(),
-            containerInfo.containerID(),
-            rp.getDatanodeDetails().getUuidString());
-      }
+      LOG.debug("Trying to delete empty replica with index {} for container " +
+              "{} on datanode {}", rp.getReplicaIndex(),
+          containerInfo.containerID(), rp.getDatanodeDetails().getUuidString());
       try {
         replicationManager.sendDeleteCommand(containerInfo,
             rp.getReplicaIndex(), rp.getDatanodeDetails());

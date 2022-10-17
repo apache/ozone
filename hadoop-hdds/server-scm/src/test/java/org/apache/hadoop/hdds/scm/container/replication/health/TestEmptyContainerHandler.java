@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.replication.health;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -72,12 +73,16 @@ public class TestEmptyContainerHandler {
    * return true for empty and CLOSED EC containers.
    */
   @Test
-  public void testEmptyAndClosedECContainerReturnsTrue() {
+  public void testEmptyAndClosedECContainerReturnsTrue()
+      throws InvalidStateTransitionException, IOException, TimeoutException {
+    long keyCount = 0L;
+    long bytesUsed = 123L;
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        ecReplicationConfig, 1, CLOSED, 0L, 123L);
+        ecReplicationConfig, 1, CLOSED, keyCount, bytesUsed);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.CLOSED, 0L, 123L, 1, 2, 3, 4, 5);
+            ContainerReplicaProto.State.CLOSED, keyCount, bytesUsed,
+            1, 2, 3, 4, 5);
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
@@ -86,16 +91,20 @@ public class TestEmptyContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    assertAndVerify(request, true, 5);
+    assertAndVerify(request, true, 5, 1);
   }
 
   @Test
-  public void testEmptyAndClosedRatisContainerReturnsTrue() {
+  public void testEmptyAndClosedRatisContainerReturnsTrue()
+      throws InvalidStateTransitionException, IOException, TimeoutException {
+    long keyCount = 0L;
+    long bytesUsed = 123L;
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        ratisReplicationConfig, 1, CLOSED, 0L, 123L);
+        ratisReplicationConfig, 1, CLOSED, keyCount, bytesUsed);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.CLOSED, 0L, 123L, 0, 0, 0);
+            ContainerReplicaProto.State.CLOSED, keyCount, bytesUsed,
+            0, 0, 0);
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
@@ -104,7 +113,7 @@ public class TestEmptyContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    assertAndVerify(request, true, 3);
+    assertAndVerify(request, true, 3, 1);
   }
 
   /**
@@ -112,14 +121,18 @@ public class TestEmptyContainerHandler {
    * in CLOSED state.
    */
   @Test
-  public void testEmptyAndNonClosedECContainerReturnsFalse() {
+  public void testEmptyAndNonClosedECContainerReturnsFalse()
+      throws InvalidStateTransitionException, IOException, TimeoutException {
+    long keyCount = 0L;
+    long bytesUsed = 123L;
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        ecReplicationConfig, 1, CLOSING, 0L, 123L);
+        ecReplicationConfig, 1, CLOSING, keyCount, bytesUsed);
 
     // though key count is 0, the container and its replicas are not CLOSED
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.OPEN, 0L, 123L, 1, 2, 3, 4, 5);
+            ContainerReplicaProto.State.OPEN, keyCount, bytesUsed,
+            1, 2, 3, 4, 5);
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
@@ -128,7 +141,7 @@ public class TestEmptyContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    assertAndVerify(request, false, 0);
+    assertAndVerify(request, false, 0, 0);
   }
 
   /**
@@ -136,14 +149,18 @@ public class TestEmptyContainerHandler {
    * 0 key count. Number of used bytes are not considered.
    */
   @Test
-  public void testNonEmptyRatisContainerReturnsFalse() {
+  public void testNonEmptyRatisContainerReturnsFalse()
+      throws InvalidStateTransitionException, IOException, TimeoutException {
+    long keyCount = 5L;
+    long bytesUsed = 123L;
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        ratisReplicationConfig, 1, CLOSED, 5L, 123L);
+        ratisReplicationConfig, 1, CLOSED, keyCount, bytesUsed);
 
     // though container and its replicas are CLOSED, key count is not 0
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.CLOSED, 5L, 123L, 0, 0, 0);
+            ContainerReplicaProto.State.CLOSED, keyCount, bytesUsed,
+            0, 0, 0);
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
@@ -152,16 +169,29 @@ public class TestEmptyContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    assertAndVerify(request, false, 0);
+    assertAndVerify(request, false, 0, 0);
   }
 
+  /**
+   * Handler should return false when there is a non-empty replica.
+   */
   @Test
-  public void testEmptyContainerWithNonZeroBytesUsedReturnsTrue() {
+  public void testEmptyECContainerWithNonEmptyReplicaReturnsFalse()
+      throws InvalidStateTransitionException, IOException, TimeoutException {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        ratisReplicationConfig, 1, CLOSED, 0L, 123L);
+        ecReplicationConfig, 1, CLOSED, 0L, 0L);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.CLOSED, 0L, 123L, 0, 0, 0);
+            ContainerReplicaProto.State.CLOSED, 0L, 0L,
+            1, 2, 3, 4);
+
+    // add a non-empty replica
+    DatanodeDetails mockDn = MockDatanodeDetails.randomDatanodeDetails();
+    containerReplicas.add(
+        ReplicationTestUtil.createContainerReplica(containerInfo.containerID(),
+            5, HddsProtos.NodeOperationalState.IN_SERVICE,
+            ContainerReplicaProto.State.CLOSED, 1L, 100L, mockDn,
+            mockDn.getUuid()));
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
@@ -170,24 +200,33 @@ public class TestEmptyContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    assertAndVerify(request, true, 3);
+    // should return false because there is a non-empty replica
+    assertAndVerify(request, false, 0, 0);
   }
 
+  /**
+   * Asserts that handler returns the specified assertion and delete command
+   * to replicas is sent the specified number of times.
+   * @param request ContainerCheckRequest object to pass to the handler
+   * @param assertion true if expecting the handler to return true, else false
+   * @param times number of times the delete command is expected to be sent
+   * @param numEmptyExpected number of EMPTY and CLOSED containers expected
+   *                         to be found in ReplicationManagerReport
+   */
   private void assertAndVerify(ContainerCheckRequest request,
-      boolean assertion, int times) {
+      boolean assertion, int times, long numEmptyExpected)
+      throws IOException, InvalidStateTransitionException, TimeoutException {
     Assertions.assertEquals(assertion, emptyContainerHandler.handle(request));
-    try {
-      Mockito.verify(replicationManager, Mockito.times(times))
-          .sendDeleteCommand(Mockito.any(ContainerInfo.class), Mockito.anyInt(),
-              Mockito.any(DatanodeDetails.class));
+    Mockito.verify(replicationManager, Mockito.times(times))
+        .sendDeleteCommand(Mockito.any(ContainerInfo.class), Mockito.anyInt(),
+            Mockito.any(DatanodeDetails.class));
+    Assertions.assertEquals(numEmptyExpected, request.getReport().getStat(
+        ReplicationManagerReport.HealthState.EMPTY));
 
-      if (times > 0) {
-        Mockito.verify(containerManager, Mockito.times(1))
-            .updateContainerState(Mockito.any(ContainerID.class),
-                Mockito.any(HddsProtos.LifeCycleEvent.class));
-      }
-    } catch (Exception e) {
-      // meaningless; do nothing
+    if (times > 0) {
+      Mockito.verify(containerManager, Mockito.times(1))
+          .updateContainerState(Mockito.any(ContainerID.class),
+              Mockito.any(HddsProtos.LifeCycleEvent.class));
     }
   }
 
