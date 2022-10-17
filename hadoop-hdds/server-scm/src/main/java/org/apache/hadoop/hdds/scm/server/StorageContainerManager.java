@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
@@ -157,8 +158,6 @@ import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
-import org.apache.hadoop.util.StringUtils;
-import org.jetbrains.annotations.NotNull;
 
 import javax.management.ObjectName;
 import java.io.IOException;
@@ -184,9 +183,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_CONTAINER_REPORT_QUEUE_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_PREFIX;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
@@ -479,7 +475,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // The Executor maps the event to a thread for DN.
     // Dispatcher should always dispatch FCR first followed by ICR
     List<BlockingQueue<ContainerReport>> queues
-        = initContainerReportQueue();
+        = ScmUtils.initContainerReportQueue(configuration);
     List<ThreadPoolExecutor> executors
         = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(queues);
     EventExecutor<ContainerReportFromDatanode>
@@ -523,27 +519,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
     eventQueue.addHandler(SCMEvents.CRL_STATUS_REPORT, crlStatusReportHandler);
 
-  }
-
-  @NotNull
-  protected List<BlockingQueue<ContainerReport>> initContainerReportQueue() {
-    int threadPoolSize = configuration.getInt(OZONE_SCM_EVENT_PREFIX +
-            StringUtils.camelize(SCMEvents.CONTAINER_REPORT.getName()
-                + "_OR_"
-                + SCMEvents.INCREMENTAL_CONTAINER_REPORT.getName())
-            + ".thread.pool.size",
-        OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT);
-    int queueSize = configuration.getInt(OZONE_SCM_EVENT_PREFIX +
-            StringUtils.camelize(SCMEvents.CONTAINER_REPORT.getName()
-                + "_OR_"
-                + SCMEvents.INCREMENTAL_CONTAINER_REPORT.getName())
-            + ".queue.size",
-        OZONE_SCM_EVENT_CONTAINER_REPORT_QUEUE_SIZE_DEFAULT);
-    List<BlockingQueue<ContainerReport>> queues = new ArrayList<>();
-    for (int i = 0; i < threadPoolSize; ++i) {
-      queues.add(new ContainerReportQueue(queueSize));
-    }
-    return queues;
   }
 
   private void initializeCertificateClient() {
