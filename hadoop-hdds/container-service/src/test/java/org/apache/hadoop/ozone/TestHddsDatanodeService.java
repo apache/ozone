@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.ScmTestMock;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -44,34 +45,36 @@ import org.apache.hadoop.thirdparty.com.google.common.io.Files;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ServicePlugin;
 
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.Rule;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test class for {@link HddsDatanodeService}.
  */
-@RunWith(Parameterized.class)
+
 public class TestHddsDatanodeService {
 
-  @Rule
-  public final TemporaryFolder tempDir = new TemporaryFolder();
+  @TempDir
+  private File tempDir;
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestHddsDatanodeService.class);
 
   private final String clusterId = UUID.randomUUID().toString();
   private final OzoneConfiguration conf = new OzoneConfiguration();
-  private final String schemaVersion;
   private static final int SCM_SERVER_COUNT = 1;
   private static final String FILE_SEPARATOR = File.separator;
 
@@ -80,17 +83,7 @@ public class TestHddsDatanodeService {
   private List<RPC.Server> scmServers;
   private List<ScmTestMock> mockServers;
 
-  public TestHddsDatanodeService(ContainerTestVersionInfo info) {
-    this.schemaVersion = info.getSchemaVersion();
-    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
-  }
-
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
-
-  @Before
+  @BeforeEach
   public void setUp() throws IOException {
     // Set SCM
     serverAddresses = new ArrayList<>();
@@ -126,18 +119,22 @@ public class TestHddsDatanodeService {
     conf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, volumeDir);
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     FileUtil.fullyDelete(testDir);
   }
 
-  @Test
-  public void testStartup() throws IOException {
+  @ParameterizedTest
+  @ValueSource(strings = {OzoneConsts.SCHEMA_V1,
+      OzoneConsts.SCHEMA_V2, OzoneConsts.SCHEMA_V3})
+  public void testStartup(String schemaVersion) throws IOException {
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
     String[] args = new String[] {};
     HddsDatanodeService service = HddsDatanodeService
         .createHddsDatanodeService(args);
+    LOG.info("SchemaV3_enabled: " +
+        conf.get(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED));
     service.start(conf);
-
     assertNotNull(service.getDatanodeDetails());
     assertNotNull(service.getDatanodeDetails().getHostName());
     assertFalse(service.getDatanodeStateMachine().isDaemonStopped());
@@ -158,7 +155,9 @@ public class TestHddsDatanodeService {
       volume.format(clusterId);
       volume.createWorkingDir(clusterId, null);
       volume.createDeleteServiceDir();
-      tempHddsVolumes[i] = tempDir.newFolder();
+      if (this.tempDir.isDirectory()) {
+        tempHddsVolumes[i] = tempDir;
+      }
       hddsDirs.append(tempHddsVolumes[i]).append(",");
 
       // Write to tmp dir under volume
