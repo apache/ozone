@@ -529,6 +529,7 @@ public class TestContainerBalancerTask {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ContainerBalancerConfiguration cbc = ozoneConfiguration.
         getObject(ContainerBalancerConfiguration.class);
+    cbc.setBalancingInterval(1);
     ContainerBalancer sb = new ContainerBalancer(scm);
     containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
         sb.getMetrics(), cbc);
