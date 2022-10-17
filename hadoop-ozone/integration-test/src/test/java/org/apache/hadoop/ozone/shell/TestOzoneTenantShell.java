@@ -415,6 +415,12 @@ public class TestOzoneTenantShell {
           + "  \"isDelegatedAdmin\": false\n" + "}\n", true, true);
       checkOutput(err, "", true);
 
+      executeHA(tenantShell, new String[] {"--verbose", "user", "revoke-admin",
+          tenantName + "$" + userName, "--tenant=" + tenantName});
+      checkOutput(out, "", true);
+      checkOutput(err, "accessId 'devaa$alice' is already not " +
+          "the tenant 'devaa' admin.\n", true);
+
       executeHA(tenantShell, new String[] {
           "user", "revoke", tenantName + "$" + userName});
       checkOutput(out, "", true);

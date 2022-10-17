@@ -120,7 +120,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     if (accessIdInfo.getIsAdmin()) {
       throw new OMException("accessId '" + accessId +
           "' is already the tenant '" + tenantId + "' admin.",
-          OMException.ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
+          OMException.ResultCodes.INVALID_REQUEST);
     }
 
     final boolean delegated;

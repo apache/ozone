@@ -116,6 +116,13 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
           OMException.ResultCodes.INVALID_TENANT_ID);
     }
 
+    // Check if the accessId is already the tenant admin
+    if (!accessIdInfo.getIsAdmin()) {
+      throw new OMException("accessId '" + accessId +
+          "' is already not the tenant '" + tenantId + "' admin.",
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
+
     // Acquire write lock to authorizer (Ranger)
     multiTenantManager.getAuthorizerLock().tryWriteLockInOMRequest();
     try {
