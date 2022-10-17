@@ -87,7 +87,7 @@ public class TestClosingContainerHandler {
         ratisReplicationConfig, 1, CLOSED);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.CLOSING, 1, 2, 3);
+            ContainerReplicaProto.State.CLOSING, 0, 0, 0);
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.EMPTY_LIST)
@@ -133,9 +133,9 @@ public class TestClosingContainerHandler {
         ratisReplicationConfig, 1, CLOSING);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.UNHEALTHY, 1, 2);
+            ContainerReplicaProto.State.UNHEALTHY, 0, 0);
     ContainerReplica openReplica = ReplicationTestUtil.createContainerReplica(
-        containerInfo.containerID(), 3,
+        containerInfo.containerID(), 0,
         HddsProtos.NodeOperationalState.IN_SERVICE,
         ContainerReplicaProto.State.OPEN);
     containerReplicas.add(openReplica);
@@ -181,9 +181,9 @@ public class TestClosingContainerHandler {
         ratisReplicationConfig, 1, CLOSING);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.CLOSING, 1, 2);
+            ContainerReplicaProto.State.CLOSING, 0, 0);
     containerReplicas.add(ReplicationTestUtil.createContainerReplica(
-        containerInfo.containerID(), 3,
+        containerInfo.containerID(), 0,
         HddsProtos.NodeOperationalState.IN_SERVICE,
         ContainerReplicaProto.State.OPEN));
 

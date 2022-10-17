@@ -584,6 +584,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       } catch (Exception ex) {
         LOG.error("Datanode CRL store stop failed", ex);
       }
+      RatisDropwizardExports.clear(ratisMetricsMap);
     }
   }
 
