@@ -99,6 +99,13 @@ public final class NodeDecommissionMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector
         .addRecord(METRICS_SOURCE_NAME);
+    trackedDecommissioningMaintenanceNodesTotal.snapshot(builder, all);
+    trackedRecommissionNodesTotal.snapshot(builder, all);
+    trackedPipelinesWaitingToCloseTotal.snapshot(builder, all);
+    trackedContainersUnderReplicatedTotal.snapshot(builder, all);
+    trackedContainersUnhealthyTotal.snapshot(builder, all);
+    trackedContainersSufficientlyReplicatedTotal.snapshot(builder, all);
+
     registry.snapshot(builder, all);
   }
 
