@@ -80,6 +80,9 @@ public class OMPerformanceMetrics {
   @Metric(about = "s3VolumeInfo latency nanoseconds")
   private MutableRate s3VolumeContextLatencyNs;
 
+  @Metric(about = "Client requests forcing container info cache refresh")
+  private MutableRate forceContainerCacheRefresh;
+
 
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
@@ -132,5 +135,9 @@ public class OMPerformanceMetrics {
 
   public MutableRate getGetKeyInfoResolveBucketLatencyNs() {
     return getKeyInfoResolveBucketLatencyNs;
+  }
+
+  public void setForceContainerCacheRefresh(boolean value) {
+    forceContainerCacheRefresh.add(value ? 1L : 0L);
   }
 }

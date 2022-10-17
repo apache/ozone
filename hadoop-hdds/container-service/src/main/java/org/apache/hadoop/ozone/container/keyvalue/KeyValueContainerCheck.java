@@ -66,9 +66,10 @@ public class KeyValueContainerCheck {
 
   private String metadataPath;
   private HddsVolume volume;
+  private KeyValueContainer container;
 
   public KeyValueContainerCheck(String metadataPath, ConfigurationSource conf,
-      long containerID, HddsVolume volume) {
+      long containerID, HddsVolume volume, KeyValueContainer container) {
     Preconditions.checkArgument(metadataPath != null);
 
     this.checkConfig = conf;
@@ -76,6 +77,7 @@ public class KeyValueContainerCheck {
     this.onDiskContainerData = null;
     this.metadataPath = metadataPath;
     this.volume = volume;
+    this.container = container;
   }
 
   /**
@@ -230,8 +232,6 @@ public class KeyValueContainerCheck {
 
     onDiskContainerData.setDbFile(dbFile);
 
-    ContainerLayoutVersion layout = onDiskContainerData.getLayoutVersion();
-
     try (DBHandle db = BlockUtils.getDB(onDiskContainerData, checkConfig);
         BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator(
             onDiskContainerData.getContainerID(),
@@ -239,31 +239,89 @@ public class KeyValueContainerCheck {
 
       while (kvIter.hasNext()) {
         BlockData block = kvIter.nextBlock();
-        for (ContainerProtos.ChunkInfo chunk : block.getChunks()) {
-          File chunkFile = layout.getChunkFile(onDiskContainerData,
-              block.getBlockID(), ChunkInfo.getFromProtoBuf(chunk));
 
-          if (!chunkFile.exists()) {
-            // concurrent mutation in Block DB? lookup the block again.
-            String blockKey =
-                onDiskContainerData.blockKey(block.getBlockID().getLocalID());
-            BlockData bdata = db.getStore()
-                    .getBlockDataTable()
-                    .get(blockKey);
-            // In EC, client may write empty putBlock in padding block nodes.
-            // So, we need to make sure, chunk length > 0, before declaring
-            // the missing chunk file.
-            if (bdata != null && bdata.getChunks().size() > 0 && bdata
-                .getChunks().get(0).getLen() > 0) {
-              throw new IOException(
-                  "Missing chunk file " + chunkFile.getAbsolutePath());
+        // If holding read lock for the entire duration, including wait() calls
+        // in DataTransferThrottler, would effectively make other threads
+        // throttled.
+        // Here try optimistically and retry with the container lock to
+        // make sure reading the latest record. If the record is just removed,
+        // the block should be skipped to scan.
+        try {
+          scanBlock(block, throttler, canceler);
+        } catch (OzoneChecksumException ex) {
+          throw ex;
+        } catch (IOException ex) {
+          if (getBlockDataFromDBWithLock(db, block) == null) {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Scanned outdated blockData {} in container {}.",
+                  block, containerID);
             }
-          } else if (chunk.getChecksumData().getType()
-              != ContainerProtos.ChecksumType.NONE) {
-            verifyChecksum(block, chunk, chunkFile, layout, throttler,
-                canceler);
+          } else {
+            throw ex;
           }
         }
+      }
+    }
+  }
+
+  /**
+   *  Attempt to read the block data without the container lock.
+   *  The block onDisk might be in modification by other thread and not yet
+   *  flushed to DB, so the content might be outdated.
+   *
+   * @param db DB of container
+   * @param block last queried blockData
+   * @return blockData in DB
+   * @throws IOException
+   */
+  private BlockData getBlockDataFromDB(DBHandle db, BlockData block)
+      throws IOException {
+    String blockKey =
+        onDiskContainerData.blockKey(block.getBlockID().getLocalID());
+    return db.getStore().getBlockDataTable().get(blockKey);
+  }
+
+  /**
+   *  Attempt to read the block data with the container lock.
+   *  The container lock ensure the latest DB record could be retrieved, since
+   *  other block related write operation will acquire the container write lock.
+   *
+   * @param db DB of container
+   * @param block last queried blockData
+   * @return blockData in DB
+   * @throws IOException
+   */
+  private BlockData getBlockDataFromDBWithLock(DBHandle db, BlockData block)
+      throws IOException {
+    container.readLock();
+    try {
+      return getBlockDataFromDB(db, block);
+    } finally {
+      container.readUnlock();
+    }
+  }
+
+  private void scanBlock(BlockData block, DataTransferThrottler throttler,
+      Canceler canceler) throws IOException {
+    ContainerLayoutVersion layout = onDiskContainerData.getLayoutVersion();
+
+    for (ContainerProtos.ChunkInfo chunk : block.getChunks()) {
+      File chunkFile = layout.getChunkFile(onDiskContainerData,
+          block.getBlockID(), ChunkInfo.getFromProtoBuf(chunk));
+
+      if (!chunkFile.exists()) {
+        // In EC, client may write empty putBlock in padding block nodes.
+        // So, we need to make sure, chunk length > 0, before declaring
+        // the missing chunk file.
+        if (block.getChunks().size() > 0 && block
+            .getChunks().get(0).getLen() > 0) {
+          throw new IOException(
+              "Missing chunk file " + chunkFile.getAbsolutePath());
+        }
+      } else if (chunk.getChecksumData().getType()
+          != ContainerProtos.ChecksumType.NONE) {
+        verifyChecksum(block, chunk, chunkFile, layout, throttler,
+            canceler);
       }
     }
   }
