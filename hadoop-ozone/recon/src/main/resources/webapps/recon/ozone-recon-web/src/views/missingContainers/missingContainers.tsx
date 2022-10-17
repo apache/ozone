@@ -672,7 +672,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
             </TabPane>
             <TabPane key='5' tab='All-Replicated'>
               <Table
-                expandRowByClick dataSource={adataSource} columns={MCOLUMNS}
+                expandRowByClick dataSource={adataSource} columns={ACOLUMNS}
                 loading={loading}
                 pagination={paginationConfig} rowKey='containerID'
                 expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
