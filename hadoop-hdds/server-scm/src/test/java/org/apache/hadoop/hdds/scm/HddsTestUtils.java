@@ -659,6 +659,7 @@ public final class HddsTestUtils {
         .setOwner("TEST");
   }
 
+
   public static ContainerInfo getContainer(
       final HddsProtos.LifeCycleState state) {
     return getDefaultContainerInfoBuilder(state)
@@ -709,7 +710,24 @@ public final class HddsTestUtils {
       final UUID originNodeId,
       final DatanodeDetails datanodeDetails) {
     return getReplicas(containerId, state, CONTAINER_USED_BYTES_DEFAULT,
-        CONTAINER_NUM_KEYS_DEFAULT, sequenceId, originNodeId, datanodeDetails);
+            CONTAINER_NUM_KEYS_DEFAULT, sequenceId, originNodeId,
+            datanodeDetails);
+  }
+
+  public static ContainerReplica.ContainerReplicaBuilder getReplicaBuilder(
+          final ContainerID containerId,
+          final ContainerReplicaProto.State state,
+          final long usedBytes,
+          final long keyCount,
+          final long sequenceId,
+          final UUID originNodeId,
+          final DatanodeDetails datanodeDetails) {
+    return ContainerReplica.newBuilder()
+            .setContainerID(containerId).setContainerState(state)
+            .setDatanodeDetails(datanodeDetails)
+            .setOriginNodeId(originNodeId).setSequenceId(sequenceId)
+            .setBytesUsed(usedBytes)
+            .setKeyCount(keyCount);
   }
 
   public static ContainerReplica getReplicas(
@@ -720,16 +738,31 @@ public final class HddsTestUtils {
       final long sequenceId,
       final UUID originNodeId,
       final DatanodeDetails datanodeDetails) {
-    return ContainerReplica.newBuilder()
-        .setContainerID(containerId)
-        .setContainerState(state)
-        .setDatanodeDetails(datanodeDetails)
-        .setOriginNodeId(originNodeId)
-        .setSequenceId(sequenceId)
-        .setBytesUsed(usedBytes)
-        .setKeyCount(keyCount)
-        .build();
+    ContainerReplica.ContainerReplicaBuilder builder =
+            getReplicaBuilder(containerId, state, usedBytes, keyCount,
+                    sequenceId, originNodeId, datanodeDetails);
+    return builder.build();
   }
+
+  public static Set<ContainerReplica> getReplicasWithReplicaIndex(
+          final ContainerID containerId,
+          final ContainerReplicaProto.State state,
+          final long usedBytes,
+          final long keyCount,
+          final long sequenceId,
+          final DatanodeDetails... datanodeDetails) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    int replicaIndex = 1;
+    for (DatanodeDetails datanode : datanodeDetails) {
+      replicas.add(getReplicaBuilder(containerId, state,
+              usedBytes, keyCount, sequenceId, datanode.getUuid(), datanode)
+              .setReplicaIndex(replicaIndex).build());
+      replicaIndex += 1;
+    }
+    return replicas;
+  }
+
+
 
   public static Pipeline getRandomPipeline() {
     List<DatanodeDetails> nodes = new ArrayList<>();
@@ -791,5 +824,28 @@ public final class HddsTestUtils {
           .build());
     }
     return containerInfoList;
+  }
+
+  public static ContainerReplicaProto createContainerReplica(
+          ContainerID containerId, ContainerReplicaProto.State state,
+          String originNodeId, long usedBytes, long keyCount,
+          int replicaIndex) {
+
+    return ContainerReplicaProto.newBuilder()
+                    .setContainerID(containerId.getId())
+                    .setState(state)
+                    .setOriginNodeId(originNodeId)
+                    .setFinalhash("e16cc9d6024365750ed8dbd194ea46d2")
+                    .setSize(5368709120L)
+                    .setUsed(usedBytes)
+                    .setKeyCount(keyCount)
+                    .setReadCount(100000000L)
+                    .setWriteCount(100000000L)
+                    .setReadBytes(2000000000L)
+                    .setWriteBytes(2000000000L)
+                    .setBlockCommitSequenceId(10000L)
+                    .setDeleteTransactionId(0)
+                    .setReplicaIndex(replicaIndex)
+                    .build();
   }
 }

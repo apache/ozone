@@ -201,7 +201,6 @@ public class TestBlockDeletion {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
         .setReplicationConfig(repConfig)
-        .setRefreshPipeline(true)
         .build();
     List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
         om.lookupKey(keyArgs).getKeyLocationVersions();
@@ -312,7 +311,6 @@ public class TestBlockDeletion {
         .setReplicationConfig(
             RatisReplicationConfig
                 .getInstance(HddsProtos.ReplicationFactor.THREE))
-        .setRefreshPipeline(true)
         .build();
     List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
         om.lookupKey(keyArgs).getKeyLocationVersions();
@@ -369,12 +367,13 @@ public class TestBlockDeletion {
         LogCapturer.captureLogs(LegacyReplicationManager.LOG);
     logCapturer.clearOutput();
 
+    Thread.sleep(2000);
     scm.getReplicationManager().processAll();
     ((EventQueue)scm.getEventQueue()).processAll(1000);
     GenericTestUtils.waitFor(() -> logCapturer.getOutput()
-        .contains("Resend delete Container"), 500, 3000);
+        .contains("Resend delete Container"), 500, 5000);
     cluster.restartHddsDatanode(0, true);
-    Thread.sleep(1000);
+    Thread.sleep(2000);
 
     scm.getReplicationManager().processAll();
     ((EventQueue)scm.getEventQueue()).processAll(1000);
@@ -508,7 +507,6 @@ public class TestBlockDeletion {
           .setReplicationConfig(
               RatisReplicationConfig
                   .getInstance(HddsProtos.ReplicationFactor.THREE))
-          .setRefreshPipeline(true)
           .build();
       writeClient.deleteKey(keyArgs);
     }

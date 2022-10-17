@@ -23,10 +23,10 @@ import java.util.ArrayList;
 
 import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test replicator metric measurement.
@@ -35,7 +35,7 @@ public class TestMeasuredReplicator {
 
   private MeasuredReplicator measuredReplicator;
 
-  @Before
+  @BeforeEach
   public void initReplicator() {
     measuredReplicator = new MeasuredReplicator(task -> {
 
@@ -55,7 +55,7 @@ public class TestMeasuredReplicator {
     });
   }
 
-  @After
+  @AfterEach
   public void closeReplicator() throws Exception {
     measuredReplicator.close();
   }
@@ -69,13 +69,13 @@ public class TestMeasuredReplicator {
 
     //THEN
     //even containers should be failed
-    Assert.assertEquals(2, measuredReplicator.getSuccess().value());
-    Assert.assertEquals(1, measuredReplicator.getFailure().value());
+    Assertions.assertEquals(2, measuredReplicator.getSuccess().value());
+    Assertions.assertEquals(1, measuredReplicator.getFailure().value());
 
     //sum of container ids (success) in kb
-    Assert.assertEquals((1 + 3) * 1024,
+    Assertions.assertEquals((1 + 3) * 1024,
         measuredReplicator.getTransferredBytes().value());
-    Assert.assertEquals(2 * 1024,
+    Assertions.assertEquals(2 * 1024,
         measuredReplicator.getFailureBytes().value());
   }
 
@@ -91,12 +91,10 @@ public class TestMeasuredReplicator {
     //even containers should be failed
     long successTime = measuredReplicator.getSuccessTime().value();
     long failureTime = measuredReplicator.getFailureTime().value();
-    Assert.assertTrue(
-        "Measured time should be at least 300 ms but was " + successTime,
-        successTime >= 300L);
-    Assert.assertTrue(
-        "Measured time should be at least 300 ms but was " + failureTime,
-        failureTime >= 300L);
+    Assertions.assertTrue(successTime >= 300L,
+        "Measured time should be at least 300 ms but was " + successTime);
+    Assertions.assertTrue(failureTime >= 300L,
+        "Measured time should be at least 300 ms but was " + failureTime);
   }
 
   @Test
@@ -107,7 +105,7 @@ public class TestMeasuredReplicator {
 
     //THEN
     //even containers should be failed, supposed to be zero
-    Assert.assertEquals(0, measuredReplicator.getFailureTime().value());
+    Assertions.assertEquals(0, measuredReplicator.getFailureTime().value());
   }
 
   @Test
@@ -118,7 +116,7 @@ public class TestMeasuredReplicator {
 
     //THEN
     //even containers should be failed, supposed to be zero
-    Assert.assertEquals(0, measuredReplicator.getSuccessTime().value());
+    Assertions.assertEquals(0, measuredReplicator.getSuccessTime().value());
   }
 
   @Test
@@ -132,6 +130,6 @@ public class TestMeasuredReplicator {
     };
     measuredReplicator.replicate(task);
     // There might be some deviation, so we use >= 1000 here.
-    Assert.assertTrue(measuredReplicator.getQueueTime().value() >= 1000);
+    Assertions.assertTrue(measuredReplicator.getQueueTime().value() >= 1000);
   }
 }

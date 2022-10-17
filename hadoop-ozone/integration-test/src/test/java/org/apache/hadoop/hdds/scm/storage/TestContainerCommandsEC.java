@@ -658,8 +658,13 @@ public class TestContainerCommandsEC {
         out.write(values[i]);
       }
     }
+//    List<ContainerID> containerIDs =
+//        new ArrayList<>(scm.getContainerManager().getContainerIDs());
     List<ContainerID> containerIDs =
-        new ArrayList<>(scm.getContainerManager().getContainerIDs());
+            scm.getContainerManager().getContainers()
+                    .stream()
+                    .map(ContainerInfo::containerID)
+                    .collect(Collectors.toList());
     Assertions.assertEquals(1, containerIDs.size());
     containerID = containerIDs.get(0).getId();
     List<Pipeline> pipelines = scm.getPipelineManager().getPipelines(repConfig);

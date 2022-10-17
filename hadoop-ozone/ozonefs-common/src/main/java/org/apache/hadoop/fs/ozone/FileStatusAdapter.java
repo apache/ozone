@@ -47,11 +47,16 @@ public final class FileStatusAdapter {
   private final Path symlink;
   private final BlockLocation[] blockLocations;
 
+  private final boolean isEncrypted;
+
+  private final boolean isErasureCoded;
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   public FileStatusAdapter(long length, Path path, boolean isdir,
       short blockReplication, long blocksize, long modificationTime,
       long accessTime, short permission, String owner,
-      String group, Path symlink, BlockLocation[] locations) {
+      String group, Path symlink, BlockLocation[] locations,
+      boolean isEncrypted, boolean isErasureCoded) {
     this.length = length;
     this.path = path;
     this.isdir = isdir;
@@ -64,6 +69,8 @@ public final class FileStatusAdapter {
     this.group = group;
     this.symlink = symlink;
     this.blockLocations = locations.clone();
+    this.isEncrypted = isEncrypted;
+    this.isErasureCoded = isErasureCoded;
   }
 
 
@@ -109,6 +116,14 @@ public final class FileStatusAdapter {
 
   public long getLength() {
     return length;
+  }
+
+  public boolean isEncrypted() {
+    return isEncrypted;
+  }
+
+  public boolean isErasureCoded() {
+    return isErasureCoded;
   }
 
   @SuppressFBWarnings("EI_EXPOSE_REP")

@@ -59,6 +59,7 @@ import java.util.Map;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_O3TRASH_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.addTrailingSlashIfNeeded;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.pathToKey;
@@ -123,8 +124,7 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   @Override
   public URI getUri() {
-    throw new UnsupportedOperationException(
-        "fs.getUri() not implemented in TrashOzoneFileSystem");
+    return URI.create(OZONE_O3TRASH_URI_SCHEME + ":///");
   }
 
   @Override

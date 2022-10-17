@@ -44,15 +44,14 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -85,6 +84,9 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
+import org.apache.hadoop.ozone.om.service.KeyDeletingService;
+import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
@@ -127,6 +129,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.util.Time.monotonicNow;
@@ -320,10 +323,36 @@ public class KeyManagerImpl implements KeyManager {
   public OmKeyInfo lookupKey(OmKeyArgs args, String clientAddress)
       throws IOException {
     Preconditions.checkNotNull(args);
+
+    OmKeyInfo value = captureLatencyNs(metrics.getLookupReadKeyInfoLatencyNs(),
+        () -> readKeyInfo(args));
+
+    // If operation is head, do not perform any additional steps based on flags.
+    // As head operation does not need any of those details.
+    if (!args.isHeadOp()) {
+
+      // add block token for read.
+      captureLatencyNs(metrics.getLookupGenerateBlockTokenLatencyNs(),
+          () -> addBlockToken4Read(value));
+
+      // Refresh container pipeline info from SCM
+      // based on OmKeyArgs.refreshPipeline flag
+      // value won't be null as the check is done inside try/catch block.
+      captureLatencyNs(metrics.getLookupRefreshLocationLatencyNs(),
+          () -> refresh(value));
+
+      if (args.getSortDatanodes()) {
+        sortDatanodes(clientAddress, value);
+      }
+    }
+
+    return value;
+  }
+
+  private OmKeyInfo readKeyInfo(OmKeyArgs args) throws IOException {
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
-    long start = Time.monotonicNowNanos();
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
 
@@ -354,44 +383,17 @@ public class KeyManagerImpl implements KeyManager {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
-    metrics.addLookupReadKeyInfoLatency(Time.monotonicNowNanos() - start);
 
     if (value == null) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("volume:{} bucket:{} Key:{} not found", volumeName,
-                bucketName, keyName);
+            bucketName, keyName);
       }
       throw new OMException("Key:" + keyName + " not found", KEY_NOT_FOUND);
     }
-
-
     if (args.getLatestVersionLocation()) {
       slimLocationVersion(value);
     }
-
-    // If operation is head, do not perform any additional steps based on flags.
-    // As head operation does not need any of those details.
-    if (!args.isHeadOp()) {
-
-      // add block token for read.
-      start = Time.monotonicNowNanos();
-      addBlockToken4Read(value);
-      metrics.addLookupGenerateBlockTokenLatency(
-          Time.monotonicNowNanos() - start);
-
-      // Refresh container pipeline info from SCM
-      // based on OmKeyArgs.refreshPipeline flag
-      // value won't be null as the check is done inside try/catch block.
-      start = Time.monotonicNowNanos();
-      refresh(value);
-      metrics.addLookupRefreshLocationLatency(Time.monotonicNowNanos() - start);
-
-      if (args.getSortDatanodes()) {
-        sortDatanodes(clientAddress, value);
-      }
-
-    }
-
     return value;
   }
 
@@ -1336,26 +1338,26 @@ public class KeyManagerImpl implements KeyManager {
             FILE_NOT_FOUND);
   }
 
-  private OmKeyInfo createDirectoryKey(String volumeName, String bucketName,
-      String keyName, List<OzoneAcl> acls) throws IOException {
+  private OmKeyInfo createDirectoryKey(OmKeyInfo keyInfo, String keyName)
+          throws IOException {
     // verify bucket exists
-    OmBucketInfo bucketInfo = getBucketInfo(volumeName, bucketName);
+    OmBucketInfo bucketInfo = getBucketInfo(keyInfo.getVolumeName(),
+            keyInfo.getBucketName());
 
     String dir = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
     FileEncryptionInfo encInfo = getFileEncryptionInfo(bucketInfo);
     return new OmKeyInfo.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
+        .setVolumeName(keyInfo.getVolumeName())
+        .setBucketName(keyInfo.getBucketName())
         .setKeyName(dir)
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
-        .setReplicationConfig(RatisReplicationConfig
-            .getInstance(ReplicationFactor.ONE))
+        .setReplicationConfig(keyInfo.getReplicationConfig())
         .setFileEncryptionInfo(encInfo)
-        .setAcls(acls)
+        .setAcls(keyInfo.getAcls())
         .build();
   }
   /**
@@ -1641,8 +1643,7 @@ public class KeyManagerImpl implements KeyManager {
               if (!isKeyDeleted(entryInDb, keyTable)) {
                 if (!entryKeyName.equals(immediateChild)) {
                   OmKeyInfo fakeDirEntry = createDirectoryKey(
-                      omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
-                      immediateChild, omKeyInfo.getAcls());
+                      omKeyInfo, immediateChild);
                   cacheKeyMap.put(entryInDb,
                       new OzoneFileStatus(fakeDirEntry,
                           scmBlockSize, true));
@@ -1931,5 +1932,61 @@ public class KeyManagerImpl implements KeyManager {
       return buckInfo.getBucketLayout().isFileSystemOptimized();
     }
     return false;
+  }
+
+  @Override
+  public OmKeyInfo getKeyInfo(OmKeyArgs args, String clientAddress)
+      throws IOException {
+    Preconditions.checkNotNull(args);
+
+    OmKeyInfo value = captureLatencyNs(
+        metrics.getGetKeyInfoReadKeyInfoLatencyNs(),
+        () -> readKeyInfo(args));
+
+    // If operation is head, do not perform any additional steps based on flags.
+    // As head operation does not need any of those details.
+    if (!args.isHeadOp()) {
+
+      // add block token for read.
+      captureLatencyNs(metrics.getGetKeyInfoGenerateBlockTokenLatencyNs(),
+          () -> addBlockToken4Read(value));
+
+      // get container pipeline info from cache.
+      captureLatencyNs(metrics.getGetKeyInfoRefreshLocationLatencyNs(),
+          () -> refreshPipelineFromCache(value,
+              args.isForceUpdateContainerCacheFromSCM()));
+
+      if (args.getSortDatanodes()) {
+        sortDatanodes(clientAddress, value);
+      }
+    }
+    return value;
+  }
+
+  protected void refreshPipelineFromCache(OmKeyInfo keyInfo,
+                                          boolean forceRefresh)
+      throws IOException {
+    Set<Long> containerIds = keyInfo.getKeyLocationVersions().stream()
+        .flatMap(v -> v.getLocationList().stream())
+        .map(BlockLocationInfo::getContainerID)
+        .collect(Collectors.toSet());
+
+    metrics.setForceContainerCacheRefresh(forceRefresh);
+    Map<Long, Pipeline> containerLocations =
+        scmClient.getContainerLocations(containerIds, forceRefresh);
+
+    for (OmKeyLocationInfoGroup key : keyInfo.getKeyLocationVersions()) {
+      for (List<OmKeyLocationInfo> omKeyLocationInfoList :
+          key.getLocationLists()) {
+        for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoList) {
+          Pipeline pipeline = containerLocations.get(
+              omKeyLocationInfo.getContainerID());
+          if (pipeline != null &&
+              !pipeline.equals(omKeyLocationInfo.getPipeline())) {
+            omKeyLocationInfo.setPipeline(pipeline);
+          }
+        }
+      }
+    }
   }
 }

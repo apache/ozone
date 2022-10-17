@@ -338,7 +338,6 @@ Apache License
    org.codehaus.jackson:jackson-jaxrs
    org.codehaus.jackson:jackson-mapper-asl
    org.codehaus.jackson:jackson-xc
-   org.codehaus.jettison:jettison
    org.hamcrest:hamcrest-all
    org.javassist:javassist
    org.jboss.weld.servlet:weld-servlet
