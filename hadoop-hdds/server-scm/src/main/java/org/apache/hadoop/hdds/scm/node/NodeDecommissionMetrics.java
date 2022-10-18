@@ -38,8 +38,8 @@ import java.util.Map;
 @Metrics(about = "Node Decommission Metrics", context = OzoneConsts.OZONE)
 public final class NodeDecommissionMetrics implements MetricsSource {
   public static final String METRICS_SOURCE_NAME =
-        org.apache.hadoop.hdds.scm.node.NodeDecommissionMetrics
-                .class.getSimpleName();
+      org.apache.hadoop.hdds.scm.node.NodeDecommissionMetrics
+          .class.getSimpleName();
 
   @Metric("Number of nodes tracked for decommissioning and maintenance.")
   private MutableGaugeLong trackedDecommissioningMaintenanceNodesTotal;
@@ -85,11 +85,11 @@ public final class NodeDecommissionMetrics implements MetricsSource {
    */
   public static NodeDecommissionMetrics create() {
     return DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
-            "Metrics tracking the progress of nodes in the "
-                    + "Decommissioning and Maintenance workflows.  "
-                    + "Tracks num nodes in mode and container "
-                    + "replications state and pipelines waiting to close",
-            new NodeDecommissionMetrics());
+        "Metrics tracking the progress of nodes in the "
+            + "Decommissioning and Maintenance workflows.  "
+            + "Tracks num nodes in mode and container "
+            + "replications state and pipelines waiting to close",
+        new NodeDecommissionMetrics());
   }
 
   /**
@@ -119,7 +119,7 @@ public final class NodeDecommissionMetrics implements MetricsSource {
   public void setTrackedDecommissioningMaintenanceNodesTotal(
             long numNodesTracked) {
     trackedDecommissioningMaintenanceNodesTotal
-            .set(numNodesTracked);
+        .set(numNodesTracked);
   }
 
   public void setTrackedRecommissionNodesTotal(
@@ -130,25 +130,25 @@ public final class NodeDecommissionMetrics implements MetricsSource {
   public void setTrackedPipelinesWaitingToCloseTotal(
           long numTrackedPipelinesWaitToClose) {
     trackedPipelinesWaitingToCloseTotal
-            .set(numTrackedPipelinesWaitToClose);
+        .set(numTrackedPipelinesWaitToClose);
   }
 
   public void setTrackedContainersUnderReplicatedTotal(
           long numTrackedUnderReplicated) {
     trackedContainersUnderReplicatedTotal
-            .set(numTrackedUnderReplicated);
+        .set(numTrackedUnderReplicated);
   }
 
   public void setTrackedContainersUnhealthyTotal(
           long numTrackedUnhealthy) {
     trackedContainersUnhealthyTotal
-            .set(numTrackedUnhealthy);
+        .set(numTrackedUnhealthy);
   }
 
   public void setTrackedContainersSufficientlyReplicatedTotal(
           long numTrackedSufficientlyReplicated) {
     trackedContainersSufficientlyReplicatedTotal
-            .set(numTrackedSufficientlyReplicated);
+        .set(numTrackedSufficientlyReplicated);
   }
 
   public long getTrackedDecommissioningMaintenanceNodesTotal() {
@@ -178,45 +178,37 @@ public final class NodeDecommissionMetrics implements MetricsSource {
   public void metricRecordPipelineWaitingToCloseByHost(String host,
                                                        long num) {
     trackedPipelinesWaitingToCloseByHost.computeIfAbsent(host,
-            hostID -> registry.newGauge(
-                    Interns.info("trackedPipelinesWaitingToClose-" + hostID,
-                            "Number of pipelines waiting to close for "
-                                    + "host in decommissioning and "
-                                    + "maintenance mode"),
-                    0L)
-    ).set(num);
+        hostID -> registry.newGauge(
+            Interns.info("trackedPipelinesWaitingToClose-" + hostID,
+                "Number of pipelines waiting to close for "
+                    + "host in decommissioning and "
+                    + "maintenance mode"), 0L)).set(num);
   }
 
   public void metricRecordOfReplicationByHost(String host,
-                               long sufficientlyReplicated,
-                               long underReplicated,
-                               long unhealthy) {
+                                              long sufficientlyReplicated,
+                                              long underReplicated,
+                                              long unhealthy) {
     trackedSufficientlyReplicatedByHost.computeIfAbsent(host,
-            hostID -> registry.newGauge(
-                    Interns.info("trackedSufficientlyReplicated-" + hostID,
-                            "Number of sufficiently replicated containers "
-                                    + "for host in decommissioning and "
-                                    + "maintenance mode"),
-                    0L)
-    ).set(sufficientlyReplicated);
+        hostID -> registry.newGauge(
+            Interns.info("trackedSufficientlyReplicated-" + hostID,
+                "Number of sufficiently replicated containers "
+                    + "for host in decommissioning and "
+                    + "maintenance mode"), 0L)).set(sufficientlyReplicated);
 
     trackedUnderReplicatedByHost.computeIfAbsent(host,
-            hostID -> registry.newGauge(
-                    Interns.info("trackedUnderReplicated-" + hostID,
-                            "Number of under-replicated containers "
-                                    + "for host in decommissioning and "
-                                    + "maintenance mode"),
-                    0L)
-    ).set(underReplicated);
+        hostID -> registry.newGauge(
+            Interns.info("trackedUnderReplicated-" + hostID,
+                "Number of under-replicated containers "
+                    + "for host in decommissioning and "
+                    + "maintenance mode"), 0L)).set(underReplicated);
 
     trackedUnhealthyContainersByHost.computeIfAbsent(host,
-            hostID -> registry.newGauge(
-                    Interns.info("trackedUnhealthyContainers-" + hostID,
-                            "Number of unhealthy containers "
-                                    + "for host in decommissioning and "
-                                    + "maintenance mode"),
-                    0L)
-    ).set(unhealthy);
+        hostID -> registry.newGauge(
+            Interns.info("trackedUnhealthyContainers-" + hostID,
+                "Number of unhealthy containers "
+                    + "for host in decommissioning and "
+                    + "maintenance mode"), 0L)).set(unhealthy);
   }
 
   @VisibleForTesting

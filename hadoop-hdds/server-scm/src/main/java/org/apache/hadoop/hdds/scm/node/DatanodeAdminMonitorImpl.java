@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -85,8 +84,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private long unhealthyContainers = 0;
   private long underReplicatedContainers = 0;
 
-  @SuppressFBWarnings(value = "SIC_INNER_SHOULD_BE_STATIC")
-  private final class ContainerStateInWorkflow {
+  private static final class ContainerStateInWorkflow {
     private long sufficientlyReplicated = 0;
     private long unhealthyContainers = 0;
     private long underReplicatedContainers = 0;
@@ -94,8 +92,8 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
     private ContainerStateInWorkflow(String host,
                                      long sufficientlyReplicated,
-                                    long underReplicatedContainers,
-                                    long unhealthyContainers) {
+                                     long underReplicatedContainers,
+                                     long unhealthyContainers) {
       this.host = host;
       this.sufficientlyReplicated = sufficientlyReplicated;
       this.unhealthyContainers = unhealthyContainers;
@@ -103,12 +101,13 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     }
 
     public void setAll(long sufficiently,
-                    long under,
-                    long unhealthy) {
+                       long under,
+                       long unhealthy) {
       sufficientlyReplicated = sufficiently;
       underReplicatedContainers = under;
       unhealthyContainers = unhealthy;
     }
+
     public void reset() {
       sufficientlyReplicated = 0L;
       underReplicatedContainers = 0L;
@@ -203,7 +202,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       processTransitioningNodes();
       if (trackedNodes.size() > 0 || pendingNodes.size() > 0) {
         LOG.info("There are {} nodes tracked for decommission and " +
-                "maintenance. {} pending nodes.",
+            "maintenance.  {} pending nodes.",
             trackedNodes.size(), pendingNodes.size());
       }
       setMetricsToGauge();
@@ -353,8 +352,8 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       NodeStatus nodeStatus) {
     if (!nodeStatus.isDecommission() && !nodeStatus.isMaintenance()) {
       LOG.warn("Datanode {} has an operational state of {} when it should " +
-              "be undergoing decommission or maintenance. Aborting admin for " +
-              "this node.", dn, nodeStatus.getOperationalState());
+          "be undergoing decommission or maintenance. Aborting admin for " +
+          "this node.", dn, nodeStatus.getOperationalState());
       return false;
     }
     if (nodeStatus.isDead() && !nodeStatus.isInMaintenance()) {
@@ -428,13 +427,10 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
         "unhealthy containers",
         dn, sufficientlyReplicated, underReplicated, unhealthy);
     containerStateByHost.computeIfAbsent(dn.getHostName(),
-            hostID -> new ContainerStateInWorkflow(hostID,
-                    0L,
-                    0L,
-                    0L)
-    ).setAll(sufficientlyReplicated,
-            underReplicated,
-            unhealthy);
+        hostID -> new ContainerStateInWorkflow(hostID, 0L, 0L, 0L))
+            .setAll(sufficientlyReplicated,
+                underReplicated,
+                unhealthy);
     sufficientlyReplicatedContainers += sufficientlyReplicated;
     underReplicatedContainers += underReplicated;
     unhealthyContainers += unhealthy;

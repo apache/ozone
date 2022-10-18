@@ -56,18 +56,18 @@ public final class DatanodeAdminMonitorTestUtil {
    * @return A containerReplica with the given ID and state
    */
   public static ContainerReplica generateReplica(
-          ContainerID containerID,
-          HddsProtos.NodeOperationalState nodeState,
-          StorageContainerDatanodeProtocolProtos.ContainerReplicaProto
-                  .State replicaState) {
+      ContainerID containerID,
+      HddsProtos.NodeOperationalState nodeState,
+      StorageContainerDatanodeProtocolProtos.ContainerReplicaProto
+          .State replicaState) {
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     dn.setPersistedOpState(nodeState);
     return ContainerReplica.newBuilder()
-            .setContainerState(replicaState)
-            .setContainerID(containerID)
-            .setSequenceId(1)
-            .setDatanodeDetails(dn)
-            .build();
+        .setContainerState(replicaState)
+        .setContainerID(containerID)
+        .setSequenceId(1)
+        .setDatanodeDetails(dn)
+        .build();
   }
 
   /**
@@ -81,17 +81,17 @@ public final class DatanodeAdminMonitorTestUtil {
    *         replica set
    */
   public static ContainerReplicaCount generateReplicaCount(
-          ContainerID containerID,
-          HddsProtos.LifeCycleState containerState,
-          HddsProtos.NodeOperationalState...states) {
+      ContainerID containerID,
+      HddsProtos.LifeCycleState containerState,
+      HddsProtos.NodeOperationalState...states) {
     Set<ContainerReplica> replicas = new HashSet<>();
     for (HddsProtos.NodeOperationalState s : states) {
       replicas.add(generateReplica(containerID, s, CLOSED));
     }
     ContainerInfo container = new ContainerInfo.Builder()
-            .setContainerID(containerID.getId())
-            .setState(containerState)
-            .build();
+        .setContainerID(containerID.getId())
+        .setState(containerState)
+        .build();
 
     return new RatisContainerReplicaCount(container, replicas, 0, 0, 3, 2);
   }
@@ -108,17 +108,16 @@ public final class DatanodeAdminMonitorTestUtil {
    * @throws ContainerNotFoundException
    */
   public static void mockGetContainerReplicaCount(
-          ReplicationManager repManager,
-          HddsProtos.LifeCycleState containerState,
-          HddsProtos.NodeOperationalState...replicaStates)
-          throws ContainerNotFoundException {
+      ReplicationManager repManager,
+      HddsProtos.LifeCycleState containerState,
+      HddsProtos.NodeOperationalState...replicaStates)
+      throws ContainerNotFoundException {
     reset(repManager);
     Mockito.when(repManager.getContainerReplicaCount(
-            Mockito.any(ContainerID.class)))
-            .thenAnswer(invocation ->
-                    generateReplicaCount(
-                            (ContainerID)invocation.getArguments()[0],
-                            containerState, replicaStates));
+        Mockito.any(ContainerID.class)))
+        .thenAnswer(invocation ->
+            generateReplicaCount((ContainerID)invocation.getArguments()[0],
+                containerState, replicaStates));
   }
 
   /**
