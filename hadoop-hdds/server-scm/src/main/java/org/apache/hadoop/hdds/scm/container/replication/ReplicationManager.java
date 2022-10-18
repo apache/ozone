@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeleteContainerCommandProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -51,6 +52,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -361,6 +363,37 @@ public class ReplicationManager implements SCMService {
   public void sendCloseContainerEvent(ContainerID containerID) {
     eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
   }
+
+  /**
+   * Sends delete container command for the given container to the given
+   * datanode.
+   *
+   * @param container Container to be deleted
+   * @param replicaIndex Index of the container replica to be deleted
+   * @param datanode  The datanode on which the replica should be deleted
+   * @throws NotLeaderException when this SCM is not the leader
+   */
+  public void sendDeleteCommand(final ContainerInfo container, int replicaIndex,
+      final DatanodeDetails datanode) throws NotLeaderException {
+    LOG.info("Sending delete container command for container {}" +
+        " to datanode {}", container.containerID(), datanode);
+
+    final DeleteContainerCommand deleteCommand =
+        new DeleteContainerCommand(container.containerID(), false);
+    deleteCommand.setTerm(getScmTerm());
+
+    final CommandForDatanode<DeleteContainerCommandProto> datanodeCommand =
+        new CommandForDatanode<>(datanode.getUuid(), deleteCommand);
+    eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
+    containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(),
+        datanode, replicaIndex);
+
+    synchronized (this) {
+      metrics.incrNumDeletionCmdsSent();
+      metrics.incrNumDeletionBytesTotal(container.getUsedBytes());
+    }
+  }
+
 
   /**
    * Add an under replicated container back to the queue if it was unable to
@@ -757,7 +790,7 @@ public class ReplicationManager implements SCMService {
     return ReplicationManager.class.getSimpleName();
   }
 
-  public ReplicationManagerMetrics getMetrics() {
+  public synchronized ReplicationManagerMetrics getMetrics() {
     return metrics;
   }
 
