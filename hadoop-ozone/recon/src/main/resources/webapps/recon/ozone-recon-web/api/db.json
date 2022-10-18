@@ -1343,7 +1343,7 @@
       }
     ]
   },
-  "Over_REPLICATED": {
+  "OVER_REPLICATED": {
     "missingCount": 0,
     "underReplicatedCount": 1,
     "overReplicatedCount": 0,
@@ -1506,88 +1506,5 @@
         ]
       }
     ]
-  },
-  "ALL_REPLICAS_UNHEALTHY": {
-    "missingCount": 0,
-    "underReplicatedCount": 1,
-    "overReplicatedCount": 1,
-    "misReplicatedCount": 1,
-    "containers": [
-      {
-        "containerID": 2,
-        "containerState": "ALL_REPLICAS_UNHEALTHY",
-        "unhealthySince": 1665590446222,
-        "expectedReplicaCount": 3,
-        "actualReplicaCount": 2,
-        "replicaDeltaCount": 1,
-        "reason": null,
-        "keys": 1,
-        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
-        "replicas": [
-          {
-            "containerId": 2,
-            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
-            "datanodeHost": "ozone_datanode_2.ozone_allreplica2",
-            "firstSeenTime": 1665588176660,
-            "lastSeenTime": 1665590397315,
-            "lastBcsId": 2
-          },
-          {
-            "containerId": 2,
-            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
-            "datanodeHost": "ozone_datanode_3.ozone_allreplica2",
-            "firstSeenTime": 1665588176616,
-            "lastSeenTime": 1665590392293,
-            "lastBcsId": 2
-          },
-          {
-            "containerId": 2,
-            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
-            "datanodeHost": "ozone_datanode_1.ozone_allreplica2",
-            "firstSeenTime": 1665588176660,
-            "lastSeenTime": 1665590272289,
-            "lastBcsId": 0
-          }
-        ]
-      },
-      {
-        "containerID": 3,
-        "containerState": "ALL_REPLICAS_UNHEALTHY",
-        "unhealthySince": 1665590446222,
-        "expectedReplicaCount": 4,
-        "actualReplicaCount": 2,
-        "replicaDeltaCount": 2,
-        "reason": null,
-        "keys": 1,
-        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
-        "replicas": [
-          {
-            "containerId": 3,
-            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
-            "datanodeHost": "ozone_datanode_2.ozone_allreplica3",
-            "firstSeenTime": 1665588176660,
-            "lastSeenTime": 1665590397315,
-            "lastBcsId": 2
-          },
-          {
-            "containerId": 3,
-            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
-            "datanodeHost": "ozone_datanode_3.ozone_allreplica3",
-            "firstSeenTime": 1665588176616,
-            "lastSeenTime": 1665590392293,
-            "lastBcsId": 2
-          },
-          {
-            "containerId": 3,
-            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
-            "datanodeHost": "ozone_datanode_1.ozone_allreplica3",
-            "firstSeenTime": 1665588176660,
-            "lastSeenTime": 1665590272289,
-            "lastBcsId": 0
-          }
-        ]
-      }
-    ]
   }
- 
 }

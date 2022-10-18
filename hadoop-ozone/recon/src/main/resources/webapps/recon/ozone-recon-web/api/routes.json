@@ -26,6 +26,5 @@
   "/task/status": "/taskStatus",
   "/containers/unhealthy/UNDER_REPLICATED": "/UNDER_REPLICATED",
   "/containers/unhealthy/OVER_REPLICATED": "/OVER_REPLICATED",
-  "/containers/unhealthy/MIS_REPLICATED": "/MIS_REPLICATED",
-  "/containers/unhealthy/ALL_REPLICAS_UNHEALTHY": "/ALL_REPLICAS_UNHEALTHY"
+  "/containers/unhealthy/MIS_REPLICATED": "/MIS_REPLICATED"
 }

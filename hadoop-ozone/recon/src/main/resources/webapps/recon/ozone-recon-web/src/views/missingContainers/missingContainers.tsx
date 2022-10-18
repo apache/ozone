@@ -36,7 +36,7 @@ interface IMissingContainerResponse {
   pipelineID: string;
 }
 
-interface IAllContainerResponse {
+interface IContainerResponse {
   containerID: number;
   containerState: string;
   unhealthySince: string;
@@ -46,7 +46,7 @@ interface IAllContainerResponse {
   reason: string;
   keys: number;
   pipelineID: string;
-  replicas: IContainerReplicaAll[];
+  replicas: IContainerReplicas[];
 }
 
 export interface IContainerReplica {
@@ -56,7 +56,7 @@ export interface IContainerReplica {
   lastReportTimestamp: number;
 }
 
-export interface IContainerReplicaAll {
+export interface IContainerReplicas {
   containerId: number;
   datanodeUuid: string;
   datanodeHost: string;
@@ -70,12 +70,12 @@ export interface IMissingContainersResponse {
   containers: IMissingContainerResponse[];
 }
 
-interface IAllReplicatedContainersResponse {
+interface IUnhealthyContainersResponse {
   missingCount: number;
   underReplicatedCount: number;
   overReplicatedCount: number;
   misReplicatedCount: number;
-  containers: IAllContainerResponse[];
+  containers: IContainerResponse[];
 }
 
 interface IKeyResponse {
@@ -189,24 +189,24 @@ const KEY_TABLE_COLUMNS = [
   }
 ];
 
-const UCOLUMNS = [
+const REPLICATEDCOLUMNS = [
   {
     title: 'Container ID',
     dataIndex: 'containerID',
     key: 'containerID',
-    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.containerID - b.containerID
+    sorter: (a: IContainerResponse, b: IContainerResponse) => a.containerID - b.containerID
   },
   {
     title: 'No. of Keys',
     dataIndex: 'keys',
     key: 'keys',
-    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.keys - b.keys
+    sorter: (a: IContainerResponse, b: IContainerResponse) => a.keys - b.keys
   },
   {
     title: 'Active/Expected Replica(s)',
     dataIndex: 'expectedReplicaCount',
     key: 'expectedReplicaCount',
-    render: (expectedReplicaCount: number, record: IAllContainerResponse) => {
+    render: (expectedReplicaCount: number, record: IContainerResponse) => {
       const actualReplicaCount = record.actualReplicaCount;
       return (
         <span>
@@ -219,7 +219,7 @@ const UCOLUMNS = [
     title: 'Datanodes',
     dataIndex: 'replicas',
     key: 'replicas',
-    render: (replicas: IContainerReplicaAll[]) => (
+    render: (replicas: IContainerReplicas[]) => (
       <div>
         {replicas && replicas.map(replica => {
           const tooltip = (
@@ -250,230 +250,14 @@ const UCOLUMNS = [
     title: 'Pipeline ID',
     dataIndex: 'pipelineID',
     key: 'pipelineID',
-    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.pipelineID.localeCompare(b.pipelineID)
+    sorter: (a: IContainerResponse, b: IContainerResponse) => a.pipelineID.localeCompare(b.pipelineID)
   },
   {
     title: 'Unhealthy Since',
     dataIndex: 'unhealthySince',
     key: 'unhealthySince',
     render: (unhealthySince: number) => timeFormat(unhealthySince),
-    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.unhealthySince - b.unhealthySince
-  }
-];
-
-const OCOLUMNS = [
-  {
-    title: 'Container ID',
-    dataIndex: 'containerID',
-    key: 'containerID',
-    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.containerID - b.containerID
-  },
-  {
-    title: 'No. of Keys',
-    dataIndex: 'keys',
-    key: 'keys',
-    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.keys - b.keys
-  },
-  {
-    title: 'Active/Expected Replica(s)',
-    dataIndex: 'expectedReplicaCount',
-    key: 'expectedReplicaCount',
-    render: (expectedReplicaCount: number, record: IAllContainerResponse) => {
-      const actualReplicaCount = record.actualReplicaCount;
-      return (
-        <span>
-          {actualReplicaCount} / {expectedReplicaCount}
-        </span>
-      );
-    }
-  },
-  {
-    title: 'Datanodes',
-    dataIndex: 'replicas',
-    key: 'replicas',
-    render: (replicas: IContainerReplicaAll[]) => (
-      <div>
-        {replicas && replicas.map(replica => {
-          const tooltip = (
-            <div>
-              <div>First Report Time: {timeFormat(replica.firstSeenTime)}</div>
-              <div>Last Report Time: {timeFormat(replica.lastSeenTime)}</div>
-            </div>
-          );
-          return (
-            <div key={replica.datanodeHost}>
-              <Tooltip
-                placement='left'
-                title={tooltip}
-              >
-                <Icon type='info-circle' className='icon-small'/>
-              </Tooltip>
-              <span className='pl-5'>
-                {replica.datanodeHost}
-              </span>
-            </div>
-          );
-        }
-        )}
-      </div>
-    )
-  },
-  {
-    title: 'Pipeline ID',
-    dataIndex: 'pipelineID',
-    key: 'pipelineID',
-    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.pipelineID.localeCompare(b.pipelineID)
-  },
-  {
-    title: 'Unhealthy Since',
-    dataIndex: 'unhealthySince',
-    key: 'unhealthySince',
-    render: (unhealthySince: number) => timeFormat(unhealthySince),
-    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.unhealthySince - b.unhealthySince
-  }
-];
-
-const MCOLUMNS = [
-  {
-    title: 'Container ID',
-    dataIndex: 'containerID',
-    key: 'containerID',
-    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.containerID - b.containerID
-  },
-  {
-    title: 'No. of Keys',
-    dataIndex: 'keys',
-    key: 'keys',
-    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.keys - b.keys
-  },
-  {
-    title: 'Active/Expected Replica(s)',
-    dataIndex: 'expectedReplicaCount',
-    key: 'expectedReplicaCount',
-    render: (expectedReplicaCount: number, record: IAllContainerResponse) => {
-      const actualReplicaCount = record.actualReplicaCount;
-      return (
-        <span>
-          {actualReplicaCount} / {expectedReplicaCount}
-        </span>
-      );
-    }
-  },
-  {
-    title: 'Datanodes',
-    dataIndex: 'replicas',
-    key: 'replicas',
-    render: (replicas: IContainerReplicaAll[]) => (
-      <div>
-        {replicas && replicas.map(replica => {
-          const tooltip = (
-            <div>
-              <div>First Report Time: {timeFormat(replica.firstSeenTime)}</div>
-              <div>Last Report Time: {timeFormat(replica.lastSeenTime)}</div>
-            </div>
-          );
-          return (
-            <div key={replica.datanodeHost}>
-              <Tooltip
-                placement='left'
-                title={tooltip}
-              >
-                <Icon type='info-circle' className='icon-small'/>
-              </Tooltip>
-              <span className='pl-5'>
-                {replica.datanodeHost}
-              </span>
-            </div>
-          );
-        }
-        )}
-      </div>
-    )
-  },
-  {
-    title: 'Pipeline ID',
-    dataIndex: 'pipelineID',
-    key: 'pipelineID',
-    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.pipelineID.localeCompare(b.pipelineID)
-  },
-  {
-    title: 'Unhealthy Since',
-    dataIndex: 'unhealthySince',
-    key: 'unhealthySince',
-    render: (unhealthySince: number) => timeFormat(unhealthySince),
-    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.unhealthySince - b.unhealthySince
-  }
-];
-
-const ACOLUMNS = [
-  {
-    title: 'Container ID',
-    dataIndex: 'containerID',
-    key: 'containerID',
-    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.containerID - b.containerID
-  },
-  {
-    title: 'No. of Keys',
-    dataIndex: 'keys',
-    key: 'keys',
-    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.keys - b.keys
-  },
-  {
-    title: 'Active/Expected Replica(s)',
-    dataIndex: 'expectedReplicaCount',
-    key: 'expectedReplicaCount',
-    render: (expectedReplicaCount: number, record: IAllContainerResponse) => {
-      const actualReplicaCount = record.actualReplicaCount;
-      return (
-        <span>
-          {actualReplicaCount} / {expectedReplicaCount}
-        </span>
-      );
-    }
-  },
-  {
-    title: 'Datanodes',
-    dataIndex: 'replicas',
-    key: 'replicas',
-    render: (replicas: IContainerReplicaAll[]) => (
-      <div>
-        {replicas && replicas.map(replica => {
-          const tooltip = (
-            <div>
-              <div>First Report Time: {timeFormat(replica.firstSeenTime)}</div>
-              <div>Last Report Time: {timeFormat(replica.lastSeenTime)}</div>
-            </div>
-          );
-          return (
-            <div key={replica.datanodeHost}>
-              <Tooltip
-                placement='left'
-                title={tooltip}
-              >
-                <Icon type='info-circle' className='icon-small'/>
-              </Tooltip>
-              <span className='pl-5'>
-                {replica.datanodeHost}
-              </span>
-            </div>
-          );
-        }
-        )}
-      </div>
-    )
-  },
-  {
-    title: 'Pipeline ID',
-    dataIndex: 'pipelineID',
-    key: 'pipelineID',
-    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.pipelineID.localeCompare(b.pipelineID)
-  },
-  {
-    title: 'Unhealthy Since',
-    dataIndex: 'unhealthySince',
-    key: 'unhealthySince',
-    render: (unhealthySince: number) => timeFormat(unhealthySince),
-    sorter: (a: IAllContainerResponse, b: IAllContainerResponse) => a.unhealthySince - b.unhealthySince
+    sorter: (a: IContainerResponse, b: IContainerResponse) => a.unhealthySince - b.unhealthySince
   }
 ];
 
@@ -491,10 +275,9 @@ interface IExpandedRowState {
 interface IMissingContainersState {
   loading: boolean;
   dataSource: IMissingContainerResponse[];
-  udataSource: IAllContainerResponse[];
-  odataSource: IAllContainerResponse[];
-  mdataSource: IAllContainerResponse[];
-  adataSource: IAllContainerResponse[];
+  udataSource: IContainerResponse[];
+  odataSource: IContainerResponse[];
+  mdataSource: IContainerResponse[];
   totalCount: number;
   expandedRowData: IExpandedRow;
 }
@@ -508,7 +291,6 @@ export class MissingContainers extends React.Component<Record<string, object>, I
       udataSource: [],
       odataSource: [],
       mdataSource: [],
-      adataSource: [],
       totalCount: 0,
       expandedRowData: {}
     };
@@ -524,33 +306,28 @@ export class MissingContainers extends React.Component<Record<string, object>, I
       axios.get('/api/v1/containers/missing'),
       axios.get('/api/v1/containers/unhealthy/UNDER_REPLICATED'),
       axios.get('/api/v1/containers/unhealthy/OVER_REPLICATED'),
-      axios.get('/api/v1/containers/unhealthy/MIS_REPLICATED'),
-      axios.get('/api/v1/containers/unhealthy/ALL_REPLICAS_UNHEALTHY'),
+      axios.get('/api/v1/containers/unhealthy/MIS_REPLICATED')
     ]).then(axios.spread((missingContainersResponse, underReplicatedResponse, overReplicatedResponse, misReplicatedResponse, allReplicatedResponse) => {
       
       const missingContainersResponse1: IMissingContainersResponse = missingContainersResponse.data;
       const totalCount = missingContainersResponse1.totalCount;
       const missingContainers: IMissingContainerResponse[] = missingContainersResponse1.containers;
 
-      const underReplicatedResponse1: IAllReplicatedContainersResponse = underReplicatedResponse.data;
-      const uContainers: IAllContainerResponse[] = underReplicatedResponse1.containers;
+      const underReplicatedResponse1: IUnhealthyContainersResponse = underReplicatedResponse.data;
+      const uContainers: IContainerResponse[] = underReplicatedResponse1.containers;
       
-      const overReplicatedResponse1: IAllReplicatedContainersResponse = overReplicatedResponse.data;
-      const oContainers: IAllContainerResponse[] = overReplicatedResponse1.containers;
+      const overReplicatedResponse1: IUnhealthyContainersResponse = overReplicatedResponse.data;
+      const oContainers: IContainerResponse[] = overReplicatedResponse1.containers;
       
-      const misReplicatedResponse1: IAllReplicatedContainersResponse = misReplicatedResponse.data;
-      const mContainers: IAllContainerResponse[] = misReplicatedResponse1.containers;
-
-      const allReplicatedResponse1: IAllReplicatedContainersResponse = allReplicatedResponse.data;
-      const aContainers: IAllContainerResponse[] = allReplicatedResponse1.containers;
-      
+      const misReplicatedResponse1: IUnhealthyContainersResponse = misReplicatedResponse.data;
+      const mContainers: IContainerResponse[] = misReplicatedResponse1.containers;
+ 
       this.setState({
         loading: false,
         dataSource: missingContainers,
         udataSource: uContainers,
         odataSource: oContainers,
         mdataSource: mContainers,
-        adataSource: aContainers,
         totalCount
       });
     })).catch(error => {
@@ -563,15 +340,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
 
   onShowSizeChange = (current: number, pageSize: number) => {
     console.log(current, pageSize);
-  };
-
-  onTabChange = (activeKey: string) => {
-    // Fetch inactive pipelines if tab is switched to "Inactive"
-    if (activeKey === '2') {
-      // Fetch inactive pipelines in the future
-    }
-  };
-
+  }; 
   onRowExpandClick = (expanded: boolean, record: IMissingContainerResponse) => {
     if (expanded) {
       this.setState(({expandedRowData}) => {
@@ -629,7 +398,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
   };
 
   render() {
-    const {dataSource, loading, udataSource, odataSource, mdataSource ,adataSource} = this.state;
+    const {dataSource, loading, udataSource, odataSource, mdataSource} = this.state;
     const paginationConfig: PaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} missing containers`,
       showSizeChanger: true,
@@ -641,7 +410,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
           Containers
         </div>
         <div className='content-div'>
-          <Tabs defaultActiveKey='1' onChange={this.onTabChange}>
+          <Tabs defaultActiveKey='1'>
             <TabPane key='1' tab="Missing">
               <Table
                 expandRowByClick dataSource={dataSource} columns={COLUMNS}
@@ -651,28 +420,21 @@ export class MissingContainers extends React.Component<Record<string, object>, I
             </TabPane>
             <TabPane key='2' tab='Under-Replicated'>
               <Table
-                expandRowByClick dataSource={udataSource} columns={UCOLUMNS}
+                expandRowByClick dataSource={udataSource} columns={REPLICATEDCOLUMNS}
                 loading={loading}
                 pagination={paginationConfig} rowKey='containerID'
                 expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
             </TabPane>
             <TabPane key='3' tab='Over-Replicated'>
               <Table
-                expandRowByClick dataSource={odataSource} columns={OCOLUMNS}
+                expandRowByClick dataSource={odataSource} columns={REPLICATEDCOLUMNS}
                 loading={loading}
                 pagination={paginationConfig} rowKey='containerID'
                 expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
             </TabPane>
             <TabPane key='4' tab='Mis-Replicated'>
               <Table
-                expandRowByClick dataSource={mdataSource} columns={MCOLUMNS}
-                loading={loading}
-                pagination={paginationConfig} rowKey='containerID'
-                expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
-            </TabPane>
-            <TabPane key='5' tab='All-Replicated'>
-              <Table
-                expandRowByClick dataSource={adataSource} columns={ACOLUMNS}
+                expandRowByClick dataSource={mdataSource} columns={REPLICATEDCOLUMNS}
                 loading={loading}
                 pagination={paginationConfig} rowKey='containerID'
                 expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
