@@ -348,7 +348,6 @@ public class TestPipelineManagerImpl {
   @Test
   public void testRemovePipeline() throws Exception {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    pipelineManager.setScmContext(scmContext);
     // Create a pipeline
     Pipeline pipeline = pipelineManager.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
@@ -398,7 +397,6 @@ public class TestPipelineManagerImpl {
   @Test
   public void testClosePipelineShouldFailOnFollower() throws Exception {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    pipelineManager.setScmContext(scmContext);
     Pipeline pipeline = pipelineManager.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     Assertions.assertEquals(1, pipelineManager.getPipelines().size());
@@ -420,7 +418,6 @@ public class TestPipelineManagerImpl {
   @Test
   public void testPipelineReport() throws Exception {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    pipelineManager.setScmContext(scmContext);
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(conf, new ArrayList<>(), null, pipelineManager,
             new EventQueue(), serviceManager, scmContext);
@@ -578,7 +575,6 @@ public class TestPipelineManagerImpl {
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, 50, TimeUnit.SECONDS);
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    pipelineManager.setScmContext(scmContext);
     Pipeline allocatedPipeline = pipelineManager
         .createPipeline(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE));
@@ -638,7 +634,6 @@ public class TestPipelineManagerImpl {
   @Test
   public void testScrubOpenWithUnregisteredNodes() throws Exception {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    pipelineManager.setScmContext(scmContext);
     Pipeline pipeline = pipelineManager
         .createPipeline(new ECReplicationConfig(3, 2));
     pipelineManager.openPipeline(pipeline.getId());
@@ -666,7 +661,6 @@ public class TestPipelineManagerImpl {
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, 10, TimeUnit.SECONDS);
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    pipelineManager.setScmContext(scmContext);
     Pipeline pipeline = pipelineManager
         .createPipeline(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE));
@@ -797,7 +791,6 @@ public class TestPipelineManagerImpl {
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
             .captureLogs(LoggerFactory.getLogger(PipelineManagerImpl.class));
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    pipelineManager.setScmContext(scmContext);
     Pipeline pipeline = pipelineManager.createPipeline(
             RatisReplicationConfig
                 .getInstance(HddsProtos.ReplicationFactor.THREE));
