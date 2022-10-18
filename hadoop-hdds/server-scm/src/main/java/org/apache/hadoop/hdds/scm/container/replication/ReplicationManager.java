@@ -388,8 +388,10 @@ public class ReplicationManager implements SCMService {
     containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(),
         datanode, replicaIndex);
 
-    metrics.incrNumDeletionCmdsSent();
-    metrics.incrNumDeletionBytesTotal(container.getUsedBytes());
+    synchronized (this) {
+      metrics.incrNumDeletionCmdsSent();
+      metrics.incrNumDeletionBytesTotal(container.getUsedBytes());
+    }
   }
 
 
