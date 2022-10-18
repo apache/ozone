@@ -3368,4 +3368,15 @@
       optimum performance.
     </description>
   </property>
+
+  <property>
+    <name>ozone.server.fs.listing.page.size</name>
+    <value>1024</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Default listing page size value used for listing items on fs related sub-commands output. Kindly set
+      this config value responsibly to avoid high resource usage. Maximum value restricted is 5000 for
+      optimum performance.
+    </description>
+  </property>
 </configuration>

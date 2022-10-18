@@ -24,6 +24,8 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -37,6 +39,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GR
  * Utility class for ozone configurations.
  */
 public final class OzoneConfigUtil {
+  static final Logger LOG =
+      LoggerFactory.getLogger(OzoneConfigUtil.class);
   private OzoneConfigUtil() {
   }
 
@@ -123,5 +127,28 @@ public final class OzoneConfigUtil {
       }
     }
     return replicationConfig;
+  }
+
+  /**
+   * Limits or cap the client config value to server supported config value,
+   * if client config value crosses the server supported config value.
+   * @param clientConfValue - the client config value to be capped
+   * @param clientConfName - the client config name
+   * @param serverConfName - the server config name
+   * @param serverConfValue - the server config value
+   * @return the capped config value
+   */
+  public static long limitValue(long clientConfValue, String clientConfName,
+                                String serverConfName, long serverConfValue) {
+    long limitVal = clientConfValue;
+    if (clientConfValue > serverConfValue) {
+      LOG.warn("{} config value is greater than server config {} " +
+          "value currently set at : {}, " +
+              "so limiting the config value to be used at server side " +
+              "to max value supported at server - {}",
+          clientConfName, serverConfName, serverConfValue, serverConfValue);
+      limitVal = serverConfValue;
+    }
+    return limitVal;
   }
 }

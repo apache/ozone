@@ -531,6 +531,16 @@ public final class OzoneConfigKeys {
   public static final int
       OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE = 5000;
 
+  public static final String
+      OZONE_SERVER_FS_LISTING_PAGE_SIZE =
+      "ozone.server.fs.listing.page.size";
+
+  public static final int
+      OZONE_SERVER_FS_LISTING_PAGE_SIZE_DEFAULT = 1024;
+
+  public static final int
+      OZONE_SERVER_FS_MAX_LISTING_PAGE_SIZE = 5000;
+
   /**
    * There is no need to instantiate this class.
    */
