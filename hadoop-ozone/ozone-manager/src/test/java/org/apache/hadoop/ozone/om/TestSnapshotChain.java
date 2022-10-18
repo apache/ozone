@@ -115,6 +115,16 @@ public class TestSnapshotChain {
       }
       sinfos.put(sinfo.getSnapshotID(), sinfo);
     }
+    // append snapshot to the sinfos (the end).
+    if (chainManager.getLatestGlobalSnapshot() != null) {
+      sinfo = sinfos.get(snapshotID);
+      sinfo.setGlobalPreviousSnapshotID(chainManager
+              .getLatestGlobalSnapshot());
+      sinfo.setPathPreviousSnapshotID(chainManager
+              .getLatestPathSnapshot(String
+                      .join("/", "vol1", "bucket1")));
+      sinfos.put(snapshotID, sinfo);
+    }
     chainManager.deleteSnapshot(sinfos.get(snapshotID));
   }
 
@@ -237,17 +247,6 @@ public class TestSnapshotChain {
     // add snapshotID2 and delete snapshotID1
     // should have snapshotID3 and snapshotID2
     deleteSnapshot(snapshotID1);
-    // start with latest snapshot in chain
-    SnapshotInfo sinfo = sinfos
-            .get(snapshotID2);
-    // update previous snapshots for adding new snapshotID2
-    sinfo.setPathPreviousSnapshotID(chainManager
-        .getLatestPathSnapshot(String
-            .join("/", "vol1", "bucket1")));
-    sinfo.setGlobalPreviousSnapshotID(chainManager
-        .getLatestGlobalSnapshot());
-    sinfos.put(snapshotID2, sinfo);
-
     chainManager
         .addSnapshot(sinfos.get(snapshotID2));
 
@@ -259,6 +258,8 @@ public class TestSnapshotChain {
             chainManager.nextGlobalSnapshot(snapshotID3));
     Assert.assertEquals(false,
             chainManager.hasNextGlobalSnapshot(snapshotID2));
+    Assert.assertEquals(snapshotID3, chainManager
+            .previousGlobalSnapshot(snapshotID2));
   }
 
   @Test
