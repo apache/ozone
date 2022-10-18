@@ -419,27 +419,27 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                 </Col>
               </Row>
               <Row>
-                {(duResponse.size > 0)?
-                    <div style={{height: 800}}>
+                {(duResponse.size > 0) ?
+                  <div style={{height: 800}}>
                     <div className='metadatainformation'>
                       <br/> {' '}
                         You can also view its metadata details by clicking the top right button.
                     </div>
                     <Plot
-                    data={plotData}
-                    layout={
-                      {
-                        width: 800,
-                        height: 750,
-                        font: {
-                          family: 'Roboto, sans-serif',
-                          size: 15
-                        },
-                        showlegend: true,
-                        title: 'Disk Usage for ' + returnPath + ' (Total Size: ' + this.byteToSize(duResponse.size, 1) + ')'
+                      data={plotData}
+                      layout={
+                        {
+                          width: 800,
+                          height: 750,
+                          font: {
+                            family: 'Roboto, sans-serif',
+                            size: 15
+                          },
+                          showlegend: true,
+                          title: 'Disk Usage for ' + returnPath + ' (Total Size: ' + this.byteToSize(duResponse.size, 1) + ')'
+                        }
                       }
-                    }
-                    onClick={(duResponse.subPathCount === 0) ? undefined : e => this.clickPieSection(e, returnPath)}/>
+                      onClick={(duResponse.subPathCount === 0) ? undefined : e => this.clickPieSection(e, returnPath)}/>
                   </div>
                     :
                   <div style={{height: 800}} className='metadatainformation'><br/>
