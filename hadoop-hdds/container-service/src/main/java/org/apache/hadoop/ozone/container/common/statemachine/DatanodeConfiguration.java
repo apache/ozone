@@ -77,7 +77,7 @@ public class DatanodeConfiguration {
   static final int ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT = 64;
   // one hour
   static final long ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT =
-      1 * 60 * 60 * 1000 * 1000;
+      1L * 60 * 60 * 1000 * 1000;
   static final int ROCKSDB_MAX_OPEN_FILES_DEFAULT = 1024;
   public static final String ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY =
       "hdds.datanode.rocksdb.log.max-file-size";
