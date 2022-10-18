@@ -182,7 +182,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
         sizeStr = subpaths.map(subpath => {
           return this.byteToSize(subpath.size, 1);
-        }); 
+        });
       }
     
       this.setState({
@@ -421,10 +421,6 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
               <Row>
                 {(duResponse.size > 0) ?
                   <div style={{height: 800}}>
-                    <div className='metadatainformation'>
-                      <br/> {' '}
-                        You can also view its metadata details by clicking the top right button.
-                    </div>
                     <Plot
                       data={plotData}
                       layout={
