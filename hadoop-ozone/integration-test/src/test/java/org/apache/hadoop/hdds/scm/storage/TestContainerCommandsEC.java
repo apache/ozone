@@ -496,7 +496,7 @@ public class TestContainerCommandsEC {
           readContainerResponseProto.getContainerData().getState());
       i++;
     }
-    Assertions.assertEquals(metrics.getNumReconstruction(), 1L);
+    Assertions.assertEquals(metrics.getReconstructionTotal(), 1L);
   }
 
   private void createKeyAndWriteData(String keyString, OzoneBucket bucket)

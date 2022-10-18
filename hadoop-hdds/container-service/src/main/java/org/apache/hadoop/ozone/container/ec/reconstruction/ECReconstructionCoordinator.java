@@ -164,12 +164,13 @@ public class ECReconstructionCoordinator implements Closeable {
         containerOperationClient
             .closeContainer(containerID, dn, repConfig, containerToken);
       }
-      metrics.incNumReconstruction();
-      metrics.incNumBlockGroupReconstruction(blockLocationInfoMap.size());
+      metrics.incReconstructionTotal();
+      metrics.incBlockGroupReconstructionTotal(blockLocationInfoMap.size());
     } catch (Exception e) {
       // Any exception let's delete the recovering containers.
-      metrics.incNumReconstructionFails();
-      metrics.incNumBlockGroupReconstructionFails(blockLocationInfoMap.size());
+      metrics.incReconstructionFailsTotal();
+      metrics.incBlockGroupReconstructionFailsTotal(
+          blockLocationInfoMap.size());
       LOG.warn(
           "Exception while reconstructing the container {}. Cleaning up"
               + " all the recovering containers in the reconstruction process.",

@@ -160,7 +160,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
       }
       if (reconstructionReader) {
         XceiverClientManager.getXceiverClientMetrics()
-            .incNumECReconstruction();
+            .incECReconstructionTotal();
       }
     } catch (IOException e) {
       if (reconstructionReader) {
@@ -168,7 +168,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
         // is nothing left to try. It will re-try until it has insufficient
         // locations internally, so if an error comes here, just re-throw it.
         XceiverClientManager.getXceiverClientMetrics()
-            .incNumECReconstructionFails();
+            .incECReconstructionFailsTotal();
         throw e;
       }
       if (e instanceof BadDataLocationException) {

@@ -313,7 +313,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         omMetrics.incNumKeys();
       }
       if (commitKeyRequest.getKeyArgs().hasEcReplicationConfig()) {
-        omMetrics.incNumEcKeys();
+        omMetrics.incEcKeysTotal();
       }
       omMetrics.incDataCommittedBytes(omKeyInfo.getDataSize());
       LOG.debug("Key committed. Volume:{}, Bucket:{}, Key:{}", volumeName,
@@ -323,7 +323,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       LOG.error("Key commit failed. Volume:{}, Bucket:{}, Key:{}. Exception:{}",
               volumeName, bucketName, keyName, exception);
       if (commitKeyRequest.getKeyArgs().hasEcReplicationConfig()) {
-        omMetrics.incNumEcKeyCreateFails();
+        omMetrics.incEcKeyCreateFailsTotal();
       }
       omMetrics.incNumKeyCommitFails();
       break;

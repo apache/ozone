@@ -372,7 +372,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       break;
     case FAILURE:
       if (createKeyRequest.getKeyArgs().hasEcReplicationConfig()) {
-        omMetrics.incNumEcKeyCreateFails();
+        omMetrics.incEcKeyCreateFailsTotal();
       }
       LOG.error("Key creation failed. Volume:{}, Bucket:{}, Key:{}. ",
               createKeyRequest.getKeyArgs().getVolumeName(),

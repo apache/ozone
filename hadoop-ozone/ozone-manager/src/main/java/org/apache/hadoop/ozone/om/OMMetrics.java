@@ -196,10 +196,10 @@ public class OMMetrics {
   private @Metric MutableCounterLong numFiles;
 
   //EC Metrics
-  private @Metric MutableCounterLong numECKeyCreates;
-  private @Metric MutableCounterLong numECKeyCreateFails;
-  private @Metric MutableCounterLong numECBucketCreates;
-  private @Metric MutableCounterLong numECBucketCreateFails;
+  private @Metric MutableCounterLong ecKeyCreateTotal;
+  private @Metric MutableCounterLong ecKeyCreateFailsTotal;
+  private @Metric MutableCounterLong ecBucketCreateTotal;
+  private @Metric MutableCounterLong ecBucketCreateFailsTotal;
 
   private final DBCheckpointMetrics dbCheckpointMetrics;
 
@@ -1167,20 +1167,20 @@ public class OMMetrics {
     numTrashAtomicDirDeletes.incr();
   }
 
-  public void incNumEcKeys() {
-    numECKeyCreates.incr();
+  public void incEcKeysTotal() {
+    ecKeyCreateTotal.incr();
   }
 
-  public void incNumEcBuckets() {
-    numECBucketCreates.incr();
+  public void incEcBucketsTotal() {
+    ecBucketCreateTotal.incr();
   }
 
-  public void incNumEcKeyCreateFails() {
-    numECKeyCreateFails.incr();
+  public void incEcKeyCreateFailsTotal() {
+    ecKeyCreateFailsTotal.incr();
   }
 
-  public void incNumEcBucketCreateFails() {
-    numECBucketCreateFails.incr();
+  public void incEcBucketCreateFailsTotal() {
+    ecBucketCreateFailsTotal.incr();
   }
 
   public void unRegister() {

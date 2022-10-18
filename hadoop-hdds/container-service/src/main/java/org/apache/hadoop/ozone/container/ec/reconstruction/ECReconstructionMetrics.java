@@ -35,10 +35,10 @@ public final class ECReconstructionMetrics {
   private static final String SOURCE =
       ECReconstructionMetrics.class.getSimpleName();
 
-  private @Metric MutableCounterLong numBlockGroupReconstruction;
-  private @Metric MutableCounterLong numBlockGroupReconstructionFails;
-  private @Metric MutableCounterLong numReconstruction;
-  private @Metric MutableCounterLong numReconstructionFails;
+  private @Metric MutableCounterLong blockGroupReconstructionTotal;
+  private @Metric MutableCounterLong blockGroupReconstructionFailsTotal;
+  private @Metric MutableCounterLong reconstructionTotal;
+  private @Metric MutableCounterLong reconstructionFailsTotal;
 
   private ECReconstructionMetrics() {
   }
@@ -54,27 +54,27 @@ public final class ECReconstructionMetrics {
     ms.unregisterSource(SOURCE);
   }
 
-  public void incNumBlockGroupReconstruction(long count) {
-    numBlockGroupReconstruction.incr(count);
+  public void incBlockGroupReconstructionTotal(long count) {
+    blockGroupReconstructionTotal.incr(count);
   }
 
-  public void incNumBlockGroupReconstructionFails(long count) {
-    numBlockGroupReconstructionFails.incr(count);
+  public void incBlockGroupReconstructionFailsTotal(long count) {
+    blockGroupReconstructionFailsTotal.incr(count);
   }
 
-  public void incNumReconstruction() {
-    numReconstruction.incr();
+  public void incReconstructionTotal() {
+    reconstructionTotal.incr();
   }
 
-  public void incNumReconstructionFails() {
-    numReconstructionFails.incr();
+  public void incReconstructionFailsTotal() {
+    reconstructionFailsTotal.incr();
   }
 
-  public long getNumReconstruction() {
-    return numReconstruction.value();
+  public long getReconstructionTotal() {
+    return reconstructionTotal.value();
   }
 
-  public long getNumBlockGroupReconstruction() {
-    return numBlockGroupReconstruction.value();
+  public long getBlockGroupReconstructionTotal() {
+    return blockGroupReconstructionTotal.value();
   }
 }

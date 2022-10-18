@@ -214,7 +214,7 @@ public class TestOmMetrics {
     writeClient.deleteBucket(ecBucketInfo.getVolumeName(),
         ecBucketInfo.getBucketName());
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumECBucketCreates", 1L, omMetrics);
+    assertCounter("EcBucketCreateTotal", 1L, omMetrics);
 
     bucketInfo = createBucketInfo(false);
     writeClient.createBucket(bucketInfo);
@@ -247,7 +247,7 @@ public class TestOmMetrics {
       //Expected failure
     }
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumECBucketCreateFails", 1L, omMetrics);
+    assertCounter("EcBucketCreateFailsTotal", 1L, omMetrics);
 
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumBucketOps", 17L, omMetrics);
@@ -300,7 +300,7 @@ public class TestOmMetrics {
     doKeyOps(keyArgs);
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumKeyOps", 14L, omMetrics);
-    assertCounter("NumECKeyCreates", 1L, omMetrics);
+    assertCounter("EcKeyCreateTotal", 1L, omMetrics);
 
     keyArgs = createKeyArgs(volumeName, bucketName,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
@@ -360,7 +360,7 @@ public class TestOmMetrics {
       //Expected Failure
     }
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumECKeyCreateFails", 1L, omMetrics);
+    assertCounter("EcKeyCreateFailsTotal", 1L, omMetrics);
 
     cluster.restartOzoneManager();
     assertCounter("NumKeys", 2L, omMetrics);

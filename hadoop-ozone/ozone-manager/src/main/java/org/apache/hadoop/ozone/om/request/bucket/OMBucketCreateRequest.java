@@ -261,13 +261,13 @@ public class OMBucketCreateRequest extends OMClientRequest {
           omBucketInfo.getBucketLayout(), volumeName);
       omMetrics.incNumBuckets();
       if (isECBucket(bucketInfo)) {
-        omMetrics.incNumEcBuckets();
+        omMetrics.incEcBucketsTotal();
       }
       return omClientResponse;
     } else {
       omMetrics.incNumBucketCreateFails();
       if (isECBucket(bucketInfo)) {
-        omMetrics.incNumEcBucketCreateFails();
+        omMetrics.incEcBucketCreateFailsTotal();
       }
       LOG.error("Bucket creation failed for bucket:{} in volume:{}",
           bucketName, volumeName, exception);
