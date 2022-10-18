@@ -478,13 +478,16 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         = ScmUtils.initContainerReportQueue(configuration);
     List<ThreadPoolExecutor> executors
         = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(queues);
+    Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
+        = new ConcurrentHashMap<>();
     EventExecutor<ContainerReportFromDatanode>
         containerReportExecutors =
         new FixedThreadPoolWithAffinityExecutor<>(
             EventQueue.getExecutorName(SCMEvents.CONTAINER_REPORT,
                 containerReportHandler),
             containerReportHandler, queues, eventQueue,
-            ContainerReportFromDatanode.class, executors);
+            ContainerReportFromDatanode.class, executors,
+            reportExecutorMap);
     EventExecutor<IncrementalContainerReportFromDatanode>
         incrementalReportExecutors =
         new FixedThreadPoolWithAffinityExecutor<>(
@@ -492,7 +495,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
                 SCMEvents.INCREMENTAL_CONTAINER_REPORT,
                 incrementalContainerReportHandler),
             incrementalContainerReportHandler, queues, eventQueue,
-            IncrementalContainerReportFromDatanode.class, executors);
+            IncrementalContainerReportFromDatanode.class, executors,
+            reportExecutorMap);
 
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
         containerReportHandler);

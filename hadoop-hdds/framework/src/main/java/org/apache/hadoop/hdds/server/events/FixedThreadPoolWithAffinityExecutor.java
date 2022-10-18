@@ -29,7 +29,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -51,8 +50,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
   private static final Logger LOG =
       LoggerFactory.getLogger(FixedThreadPoolWithAffinityExecutor.class);
 
-  private static final Map<String, FixedThreadPoolWithAffinityExecutor>
-      EXECUTOR_MAP = new ConcurrentHashMap<>();
+  private final Map<String, FixedThreadPoolWithAffinityExecutor> executorMap;
 
   private final String name;
 
@@ -92,23 +90,24 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
   public FixedThreadPoolWithAffinityExecutor(
       String name, EventHandler<P> eventHandler,
       List<BlockingQueue<Q>> workQueues, EventPublisher eventPublisher,
-      Class<P> clazz, List<ThreadPoolExecutor> executors) {
+      Class<P> clazz, List<ThreadPoolExecutor> executors,
+      Map<String, FixedThreadPoolWithAffinityExecutor> executorMap) {
     this.name = name;
     this.eventHandler = eventHandler;
     this.workQueues = workQueues;
     this.eventPublisher = eventPublisher;
     this.executors = executors;
-
-    EXECUTOR_MAP.put(clazz.getName(), this);
+    this.executorMap = executorMap;
+    executorMap.put(clazz.getName(), this);
 
     // Add runnable which will wait for task over another queue
     // This needs terminate canceling each task in shutdown
     int i = 0;
     for (BlockingQueue<Q> queue : workQueues) {
       ThreadPoolExecutor threadPoolExecutor = executors.get(i);
-      if (threadPoolExecutor.getQueue().size() == 0) {
+      if (threadPoolExecutor.getActiveCount() == 0) {
         threadPoolExecutor.submit(new ContainerReportProcessTask<>(queue,
-            isRunning));
+            isRunning, executorMap));
       }
       ++i;
     }
@@ -187,7 +186,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
     for (ThreadPoolExecutor executor : executors) {
       executor.shutdown();
     }
-    EXECUTOR_MAP.clear();
+    executorMap.clear();
     DefaultMetricsSystem.instance().unregisterSource(EVENT_QUEUE + name);
   }
 
@@ -202,11 +201,14 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
   public static class ContainerReportProcessTask<P> implements Runnable {
     private BlockingQueue<P> queue;
     private AtomicBoolean isRunning;
+    private Map<String, FixedThreadPoolWithAffinityExecutor> executorMap;
 
     public ContainerReportProcessTask(BlockingQueue<P> queue,
-                                      AtomicBoolean isRunning) {
+        AtomicBoolean isRunning,
+        Map<String, FixedThreadPoolWithAffinityExecutor> executorMap) {
       this.queue = queue;
       this.isRunning = isRunning;
+      this.executorMap = executorMap;
     }
 
     @Override
@@ -218,7 +220,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
             continue;
           }
 
-          FixedThreadPoolWithAffinityExecutor executor = EXECUTOR_MAP.get(
+          FixedThreadPoolWithAffinityExecutor executor = executorMap.get(
               report.getClass().getName());
           if (null == executor) {
             LOG.warn("Executor for report is not found");

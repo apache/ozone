@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdds.server.events;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,12 +79,14 @@ public class TestEventQueue {
     BlockingQueue<Long> eventQueue = new LinkedBlockingQueue<>();
     List<BlockingQueue<Long>> queues = new ArrayList<>();
     queues.add(eventQueue);
+    Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
+        = new ConcurrentHashMap<>();
     queue.addHandler(EVENT1,
         new FixedThreadPoolWithAffinityExecutor<>(
             EventQueue.getExecutorName(EVENT1, testHandler),
             testHandler, queues, queue, Long.class,
             FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(
-            queues)), testHandler);
+            queues), reportExecutorMap), testHandler);
 
     queue.fireEvent(EVENT1, 11L);
     queue.fireEvent(EVENT1, 11L);
