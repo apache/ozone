@@ -377,12 +377,12 @@ public class TestRatisReplicationCheckHandler {
   }
 
   @Test
-  public void testOverReplicatedContainerDueToMaintenance() {
+  public void testOverReplicatedContainerDueToMaintenanceIsHealthy() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
         Pair.of(IN_SERVICE, 0), Pair.of(IN_MAINTENANCE, 0),
-        Pair.of(IN_MAINTENANCE, 2));
+        Pair.of(IN_MAINTENANCE, 0));
 
     requestBuilder.setContainerReplicas(replicas)
         .setContainerInfo(container);
