@@ -876,7 +876,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           throw new FileNotFoundException("File not found. path:" + f);
         }
       }
-      LOG.warn("GetFileStatus failed for path {}", f, e);
       throw e;
     }
     return fileStatus;
