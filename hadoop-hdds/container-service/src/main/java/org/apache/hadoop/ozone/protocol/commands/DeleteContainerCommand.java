@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeleteContainerCommandProto;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 
 /**
  * SCM command which tells the datanode to delete a container.
@@ -53,6 +54,11 @@ public class DeleteContainerCommand extends
 
   public DeleteContainerCommand(long containerId, boolean forceFlag) {
     this.containerId = containerId;
+    this.force = forceFlag;
+  }
+
+  public DeleteContainerCommand(ContainerID containerID, boolean forceFlag) {
+    this.containerId = containerID.getId();
     this.force = forceFlag;
   }
 
