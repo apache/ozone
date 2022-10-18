@@ -36,7 +36,7 @@ public final class ManagedRocksObjectUtils {
     assertClosed(rocksObject, null);
   }
 
-  static void assertClosed(ManagedObject<?> object) {
+  public static void assertClosed(ManagedObject<?> object) {
     assertClosed(object.get(), object.getStackTrace());
   }
 
