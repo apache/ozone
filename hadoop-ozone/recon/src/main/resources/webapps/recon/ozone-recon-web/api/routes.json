@@ -24,6 +24,7 @@
   "/namespace/quota?path=*": "/quota",
   "/task/status": "/taskStatus",
   "/containers/missing": "/missingContainers",
+  "/containers/unhealthy/MISSING": "/containerUnhealthyMissing",
   "/containers/unhealthy/UNDER_REPLICATED": "/containerUnhealthyUnderReplicated",
   "/containers/unhealthy/OVER_REPLICATED": "/containerUnhealthyOverReplicated",
   "/containers/unhealthy/MIS_REPLICATED": "/containerUnhealthyMisReplicated"

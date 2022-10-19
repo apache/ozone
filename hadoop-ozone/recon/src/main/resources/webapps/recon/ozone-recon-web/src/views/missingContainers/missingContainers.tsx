@@ -274,7 +274,7 @@ interface IExpandedRowState {
 
 interface IMissingContainersState {
   loading: boolean;
-  dataSource: IMissingContainerResponse[];
+  missingDataSource: IContainerResponse[];
   underReplicatedDataSource: IContainerResponse[];
   overReplicatedDataSource: IContainerResponse[];
   misReplicatedDataSource: IContainerResponse[];
@@ -287,7 +287,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
     super(props);
     this.state = {
       loading: false,
-      dataSource: [],
+      missingDataSource: [],
       underReplicatedDataSource: [],
       overReplicatedDataSource: [],
       misReplicatedDataSource: [],
@@ -303,15 +303,15 @@ export class MissingContainers extends React.Component<Record<string, object>, I
     });
 
     axios.all([
-      axios.get('/api/v1/containers/missing'),
+      axios.get('/api/v1/containers/unhealthy/MISSING'),
       axios.get('/api/v1/containers/unhealthy/UNDER_REPLICATED'),
       axios.get('/api/v1/containers/unhealthy/OVER_REPLICATED'),
       axios.get('/api/v1/containers/unhealthy/MIS_REPLICATED')
     ]).then(axios.spread((missingContainersResponse, underReplicatedResponse, overReplicatedResponse, misReplicatedResponse, allReplicatedResponse) => {
-      
-      const missingContainersResponseData: IMissingContainersResponse = missingContainersResponse.data;
-      const totalCount = missingContainersResponseData.totalCount;
-      const missingContainers: IMissingContainerResponse[] = missingContainersResponseData.containers;
+
+      const missingContainersResponseData: IUnhealthyContainersResponse = missingContainersResponse.data;
+      const totalCount = missingContainersResponseData.missingCount;
+      const missingContainers: IContainerResponse[] = missingContainersResponseData.containers;
 
       const underReplicatedResponseData: IUnhealthyContainersResponse = underReplicatedResponse.data;
       const uContainers: IContainerResponse[] = underReplicatedResponseData.containers;
@@ -324,7 +324,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
  
       this.setState({
         loading: false,
-        dataSource: missingContainers,
+        missingDataSource: missingContainers,
         underReplicatedDataSource: uContainers,
         overReplicatedDataSource: oContainers,
         misReplicatedDataSource: mContainers,
@@ -399,7 +399,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
   };
 
   render() {
-    const {dataSource, loading, underReplicatedDataSource, overReplicatedDataSource, misReplicatedDataSource} = this.state;
+    const {missingDataSource, loading, underReplicatedDataSource, overReplicatedDataSource, misReplicatedDataSource} = this.state;
     const paginationConfig: PaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} missing containers`,
       showSizeChanger: true,
@@ -414,7 +414,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
           <Tabs defaultActiveKey='1'>
             <TabPane key='1' tab="Missing">
               <Table
-                expandRowByClick dataSource={dataSource} columns={COLUMNS}
+                expandRowByClick dataSource={missingDataSource} columns={COLUMNS}
                 loading={loading}
                 pagination={paginationConfig} rowKey='containerID'
                 expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
