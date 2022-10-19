@@ -118,6 +118,10 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   }
 
   private void createBlockReader() {
+    if (reconstructionReader) {
+      XceiverClientManager.getXceiverClientMetrics()
+          .incECReconstructionTotal();
+    }
     blockReader = ecBlockInputStreamFactory.create(reconstructionReader,
         failedLocations, repConfig, blockInfo, verifyChecksum,
         xceiverClientFactory, refreshFunction);
@@ -157,10 +161,6 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
         buf.mark();
         lastPosition = blockReader.getPos();
         totalRead += blockReader.read(buf);
-      }
-      if (reconstructionReader) {
-        XceiverClientManager.getXceiverClientMetrics()
-            .incECReconstructionTotal();
       }
     } catch (IOException e) {
       if (reconstructionReader) {
