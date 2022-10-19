@@ -72,9 +72,9 @@ public class NSSummaryTask implements ReconOmTask {
   public NSSummaryTask(ReconNamespaceSummaryManager
                        reconNamespaceSummaryManager,
                        ReconOMMetadataManager
-                           reconOMMetadataManager,
+                       reconOMMetadataManager,
                        OzoneConfiguration
-                             ozoneConfiguration) {
+                       ozoneConfiguration) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
     this.ozoneConfiguration = ozoneConfiguration;
@@ -96,6 +96,8 @@ public class NSSummaryTask implements ReconOmTask {
     success = nsSummaryTaskWithFSO.processWithFSO(events);
     if (success) {
       success = nsSummaryTaskWithLegacy.processWithLegacy(events);
+    } else {
+      LOG.error("processWithFSO failed.");
     }
     return new ImmutablePair<>(getTaskName(), success);
   }

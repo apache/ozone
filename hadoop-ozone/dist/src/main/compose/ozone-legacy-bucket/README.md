@@ -14,8 +14,8 @@
 
 # For Legacy Bucket Operations
 
-For Legacy buckets, `ozone.om.enable.filesystem.paths` has to be true otherwise a
-Legacy buckets acts like an OBS bucket.
+For Legacy buckets, set `ozone.om.enable.filesystem.paths` to `true` for them to behave like FSO buckets, 
+otherwise Legacy buckets act like OBS buckets.
 
-This is the same as `compose/ozone` but for testing operations that need `filesystem.paths`
+This is the same as `compose/ozone` but for testing operations that need `ozone.om.enable.filesystem.paths`
 flag enabled.

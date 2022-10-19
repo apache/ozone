@@ -110,11 +110,12 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
     }
   }
 
-  public boolean isOBSBucket(String path) throws IOException {
+  public boolean isObjectStoreBucket(String path) throws IOException {
     OFSPath ofsPath = new OFSPath(path);
 
     boolean enableFileSystemPaths = getOzoneConfig()
-        .get(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS).equals("true");
+        .get(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS)
+        .equalsIgnoreCase("true");
 
     OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(getOzoneConfig());
     ObjectStore objectStore = ozoneClient.getObjectStore();

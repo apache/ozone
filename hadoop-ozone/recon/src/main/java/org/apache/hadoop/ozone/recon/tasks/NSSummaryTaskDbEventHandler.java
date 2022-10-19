@@ -45,9 +45,9 @@ public class NSSummaryTaskDbEventHandler {
   private ReconOMMetadataManager reconOMMetadataManager;
 
   public NSSummaryTaskDbEventHandler(ReconNamespaceSummaryManager
-                               reconNamespaceSummaryManager,
-                            ReconOMMetadataManager
-                                reconOMMetadataManager) {
+                                     reconNamespaceSummaryManager,
+                                     ReconOMMetadataManager
+                                     reconOMMetadataManager) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
   }

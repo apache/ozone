@@ -52,25 +52,24 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskWithLegacy.class);
 
-  private OzoneConfiguration ozoneConfiguration;
+  private boolean enableFileSystemPaths;
 
   public NSSummaryTaskWithLegacy(ReconNamespaceSummaryManager
                                  reconNamespaceSummaryManager,
                                  ReconOMMetadataManager
                                  reconOMMetadataManager,
                                  OzoneConfiguration
-                                     ozoneConfiguration) {
+                                 ozoneConfiguration) {
     super(reconNamespaceSummaryManager, reconOMMetadataManager);
-    this.ozoneConfiguration = ozoneConfiguration;
+    // true if FileSystemPaths enabled
+    enableFileSystemPaths =
+        ozoneConfiguration.get(OMConfigKeys
+            .OZONE_OM_ENABLE_FILESYSTEM_PATHS).equalsIgnoreCase("true");
   }
 
   public boolean processWithLegacy(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
-    // true if FileSystemPaths enabled
-    boolean enableFileSystemPaths =
-        ozoneConfiguration.get(OMConfigKeys
-            .OZONE_OM_ENABLE_FILESYSTEM_PATHS).equals("true");
 
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, ? extends
@@ -201,10 +200,6 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
   public boolean reprocessWithLegacy(OMMetadataManager omMetadataManager) {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
-    // true if FileSystemPaths enabled
-    boolean enableFileSystemPaths =
-        ozoneConfiguration.get(OMConfigKeys
-            .OZONE_OM_ENABLE_FILESYSTEM_PATHS).equals("true");
 
     try {
       Table<String, OmKeyInfo> keyTable =
@@ -274,7 +269,10 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
   private void setKeyParentID(OmKeyInfo keyInfo) throws IOException {
     String[] keyPath = keyInfo.getKeyName().split(OM_KEY_PREFIX);
 
-    //if (keyPath > 1) there is one or more directories
+    // If the path contains only one key then keyPath.length
+    // will be 1 and the parent will be a bucket.
+    // If the keyPath.length is greater than 1 then
+    // there is at least one directory.
     if (keyPath.length > 1) {
       String[] dirs = Arrays.copyOf(keyPath, keyPath.length - 1);
       String parentKeyName = String.join(OM_KEY_PREFIX, dirs);

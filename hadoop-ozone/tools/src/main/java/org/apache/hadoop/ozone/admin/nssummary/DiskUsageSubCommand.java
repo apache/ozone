@@ -106,7 +106,7 @@ public class DiskUsageSubCommand implements Callable {
     if (duResponse.get("status").equals("PATH_NOT_FOUND")) {
       printPathNotFound();
     } else {
-      if (parent.isOBSBucket(path) ||
+      if (parent.isObjectStoreBucket(path) ||
           !parent.bucketIsPresentInThePath(path)) {
         printBucketReminder();
       }

@@ -183,11 +183,11 @@ public final class OMMetadataManagerTestUtils {
             .build());
   }
 
-  @SuppressWarnings("checkstyle:parameternumber")
   /**
    * Write a key on OM instance.
    * @throw IOException while writing.
    */
+  @SuppressWarnings("checkstyle:parameternumber")
   public static void writeKeyToOm(OMMetadataManager omMetadataManager,
                                     String key,
                                     String bucket,
@@ -235,6 +235,7 @@ public final class OMMetadataManagerTestUtils {
                                   List<OmKeyLocationInfoGroup> locationVersions,
                                   BucketLayout bucketLayout)
           throws IOException {
+
     String omKey;
     if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
       omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
@@ -255,12 +256,12 @@ public final class OMMetadataManagerTestUtils {
                     .build());
   }
 
-  @SuppressWarnings("checkstyle:parameternumber")
   /**
    * Write a directory as key on OM instance.
    * We don't need to set size.
    * @throws IOException
    */
+  @SuppressWarnings("checkstyle:parameternumber")
   public static void writeDirToOm(OMMetadataManager omMetadataManager,
                                   String key,
                                   String bucket,
