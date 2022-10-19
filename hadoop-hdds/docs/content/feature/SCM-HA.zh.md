@@ -147,7 +147,7 @@ SCM 上的子 CA 用于为集群中的 OM/DN 颁发签名证书。 只有原始 
 
 ### 原始 SCM
 
-原始 SCM 由配置区区臭氧.scm.primordial.node.id 确定。
+原始 SCM 由配置 ozone.scm.primordial.node.id 确定。
 此值可以是 SCM 的节点 ID 或原始机名。
 如果配置是未定义的，则运行 init 的节点被视为原始 SCM。
 
