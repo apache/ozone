@@ -1,7 +1,6 @@
 {
   "/api/v1/*": "/$1",
   "/containers/:id/keys": "/keys",
-  "/containers/missing": "/missingContainers",
   "/utilization/fileCount": "/fileSizeCounts",
   "/namespace/du?path=/&files=true": "/root",
   "/namespace/du?path=/vol:id&files=true": "/volume",
@@ -24,7 +23,8 @@
   "/namespace/summary?path=*": "/metadata",
   "/namespace/quota?path=*": "/quota",
   "/task/status": "/taskStatus",
-  "/containers/unhealthy/UNDER_REPLICATED": "/UNDER_REPLICATED",
-  "/containers/unhealthy/OVER_REPLICATED": "/OVER_REPLICATED",
-  "/containers/unhealthy/MIS_REPLICATED": "/MIS_REPLICATED"
+  "/containers/missing": "/missingContainers",
+  "/containers/unhealthy/UNDER_REPLICATED": "/containerUnhealthyUnderReplicated",
+  "/containers/unhealthy/OVER_REPLICATED": "/containerUnhealthyOverReplicated",
+  "/containers/unhealthy/MIS_REPLICATED": "/containerUnhealthyMisReplicated"
 }

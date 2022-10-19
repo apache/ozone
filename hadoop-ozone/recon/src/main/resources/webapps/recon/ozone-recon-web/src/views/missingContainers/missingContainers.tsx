@@ -189,7 +189,7 @@ const KEY_TABLE_COLUMNS = [
   }
 ];
 
-const REPLICATEDCOLUMNS = [
+const CONTAINER_TAB_COLUMNS = [
   {
     title: 'Container ID',
     dataIndex: 'containerID',
@@ -275,9 +275,9 @@ interface IExpandedRowState {
 interface IMissingContainersState {
   loading: boolean;
   dataSource: IMissingContainerResponse[];
-  udataSource: IContainerResponse[];
-  odataSource: IContainerResponse[];
-  mdataSource: IContainerResponse[];
+  underReplicatedDataSource: IContainerResponse[];
+  overReplicatedDataSource: IContainerResponse[];
+  misReplicatedDataSource: IContainerResponse[];
   totalCount: number;
   expandedRowData: IExpandedRow;
 }
@@ -288,9 +288,9 @@ export class MissingContainers extends React.Component<Record<string, object>, I
     this.state = {
       loading: false,
       dataSource: [],
-      udataSource: [],
-      odataSource: [],
-      mdataSource: [],
+      underReplicatedDataSource: [],
+      overReplicatedDataSource: [],
+      misReplicatedDataSource: [],
       totalCount: 0,
       expandedRowData: {}
     };
@@ -309,25 +309,25 @@ export class MissingContainers extends React.Component<Record<string, object>, I
       axios.get('/api/v1/containers/unhealthy/MIS_REPLICATED')
     ]).then(axios.spread((missingContainersResponse, underReplicatedResponse, overReplicatedResponse, misReplicatedResponse, allReplicatedResponse) => {
       
-      const missingContainersResponse1: IMissingContainersResponse = missingContainersResponse.data;
-      const totalCount = missingContainersResponse1.totalCount;
-      const missingContainers: IMissingContainerResponse[] = missingContainersResponse1.containers;
+      const missingContainersResponseData: IMissingContainersResponse = missingContainersResponse.data;
+      const totalCount = missingContainersResponseData.totalCount;
+      const missingContainers: IMissingContainerResponse[] = missingContainersResponseData.containers;
 
-      const underReplicatedResponse1: IUnhealthyContainersResponse = underReplicatedResponse.data;
-      const uContainers: IContainerResponse[] = underReplicatedResponse1.containers;
+      const underReplicatedResponseData: IUnhealthyContainersResponse = underReplicatedResponse.data;
+      const uContainers: IContainerResponse[] = underReplicatedResponseData.containers;
       
-      const overReplicatedResponse1: IUnhealthyContainersResponse = overReplicatedResponse.data;
-      const oContainers: IContainerResponse[] = overReplicatedResponse1.containers;
+      const overReplicatedResponseData: IUnhealthyContainersResponse = overReplicatedResponse.data;
+      const oContainers: IContainerResponse[] = overReplicatedResponseData.containers;
       
-      const misReplicatedResponse1: IUnhealthyContainersResponse = misReplicatedResponse.data;
-      const mContainers: IContainerResponse[] = misReplicatedResponse1.containers;
+      const misReplicatedResponseData: IUnhealthyContainersResponse = misReplicatedResponse.data;
+      const mContainers: IContainerResponse[] = misReplicatedResponseData.containers;
  
       this.setState({
         loading: false,
         dataSource: missingContainers,
-        udataSource: uContainers,
-        odataSource: oContainers,
-        mdataSource: mContainers,
+        underReplicatedDataSource: uContainers,
+        overReplicatedDataSource: oContainers,
+        misReplicatedDataSource: mContainers,
         totalCount
       });
     })).catch(error => {
@@ -340,7 +340,8 @@ export class MissingContainers extends React.Component<Record<string, object>, I
 
   onShowSizeChange = (current: number, pageSize: number) => {
     console.log(current, pageSize);
-  }; 
+  };
+  
   onRowExpandClick = (expanded: boolean, record: IMissingContainerResponse) => {
     if (expanded) {
       this.setState(({expandedRowData}) => {
@@ -398,7 +399,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
   };
 
   render() {
-    const {dataSource, loading, udataSource, odataSource, mdataSource} = this.state;
+    const {dataSource, loading, underReplicatedDataSource, overReplicatedDataSource, misReplicatedDataSource} = this.state;
     const paginationConfig: PaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} missing containers`,
       showSizeChanger: true,
@@ -420,21 +421,21 @@ export class MissingContainers extends React.Component<Record<string, object>, I
             </TabPane>
             <TabPane key='2' tab='Under-Replicated'>
               <Table
-                expandRowByClick dataSource={udataSource} columns={REPLICATEDCOLUMNS}
+                expandRowByClick dataSource={underReplicatedDataSource} columns={CONTAINER_TAB_COLUMNS}
                 loading={loading}
                 pagination={paginationConfig} rowKey='containerID'
                 expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
             </TabPane>
             <TabPane key='3' tab='Over-Replicated'>
               <Table
-                expandRowByClick dataSource={odataSource} columns={REPLICATEDCOLUMNS}
+                expandRowByClick dataSource={overReplicatedDataSource} columns={CONTAINER_TAB_COLUMNS}
                 loading={loading}
                 pagination={paginationConfig} rowKey='containerID'
                 expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
             </TabPane>
             <TabPane key='4' tab='Mis-Replicated'>
               <Table
-                expandRowByClick dataSource={mdataSource} columns={REPLICATEDCOLUMNS}
+                expandRowByClick dataSource={misReplicatedDataSource} columns={CONTAINER_TAB_COLUMNS}
                 loading={loading}
                 pagination={paginationConfig} rowKey='containerID'
                 expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
