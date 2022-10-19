@@ -52,6 +52,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>zookeeper</artifactId>
         </exclusion>
         <exclusion>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.codehaus.jackson</groupId>
           <artifactId>jackson-mapper-asl</artifactId>
         </exclusion>
