@@ -79,9 +79,7 @@ public class TestRocksDBCheckpointDiffer {
         "./rocksdb-data",
         1000,
         "./rocksdb-data-cp",
-        "./SavedCompacted_Files/",
-        "./rocksdb-data-cf/",
-        0,
+        "./SavedCompacted_Files/", 0,
         "snap_id_");
     lastSnapshotPrefix = "snap_id_" + lastSnapshotCounter;
 
@@ -144,7 +142,7 @@ public class TestRocksDBCheckpointDiffer {
     rocksDB = differ.getRocksDBInstanceWithCompactionTracking(dbPathArg);
 
     differ.setCompactionLogParentDir(".");
-    differ.setCompactionLogFilenameBySeqNum(rocksDB.getLatestSequenceNumber());
+    differ.setCurrentCompactionLog(rocksDB.getLatestSequenceNumber());
 
     Random random = new Random();
     // key-value

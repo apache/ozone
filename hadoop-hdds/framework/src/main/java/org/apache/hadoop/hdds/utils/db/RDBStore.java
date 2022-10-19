@@ -82,12 +82,13 @@ public class RDBStore implements DBStore {
     dbLocation = dbFile;
 
     try {
-      rocksDBCheckpointDiffer =
-          new RocksDBCheckpointDiffer(
-              dbLocation.getAbsolutePath(), maxFSSnapshots,
+      rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
+          dbLocation.getAbsolutePath(),
+          maxFSSnapshots,
           Paths.get(dbLocation.getParent(), "db.checkpoints").toString(),
           Paths.get(dbLocation.getParent(), "db.savedSSTFiles").toString(),
-          dbLocation.getAbsolutePath(), 0, "Snapshot_");
+          0,
+          "Snapshot_");
       rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
 
       // TODO: DEV OPTION. Makes compaction much much more frequent. Remove later.
@@ -138,7 +139,7 @@ public class RDBStore implements DBStore {
       // Finish the initialization of compaction DAG tracker by setting the
       // sequence number as current compaction log filename.
       rocksDBCheckpointDiffer.setCompactionLogParentDir(snapshotsParentDir);
-      rocksDBCheckpointDiffer.setCompactionLogFilenameBySeqNum(
+      rocksDBCheckpointDiffer.setCurrentCompactionLog(
           db.getLatestSequenceNumber());
 
       //Initialize checkpoint manager
