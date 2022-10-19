@@ -51,6 +51,7 @@ import org.apache.ratis.server.protocol.TermIndex;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
 
+import org.apache.ratis.util.LifeCycle;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -273,7 +274,9 @@ public class TestSCMInstallSnapshotWithHA {
 
     Assert.assertTrue(logCapture.getOutput()
         .contains("Failed to reload SCM state and instantiate services."));
-    Assert.assertTrue(followerSM.getLifeCycleState().isPausingOrPaused());
+    final LifeCycle.State s = followerSM.getLifeCycleState();
+    Assert.assertTrue("Unexpected lifeCycle state: " + s,
+        s == LifeCycle.State.NEW || s.isPausingOrPaused());
 
     // Verify correct reloading
     followerSM.setInstallingDBCheckpoint(
