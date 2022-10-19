@@ -611,6 +611,7 @@ function ozone_bootstrap
   OZONE_REEXECED_CMD=false
   OZONE_SUBCMD_SECURESERVICE=false
   OZONE_SUBCMD_SUPPORTDAEMONIZATION=false
+  OZONE_VALIDATE_CLASSPATH=false
 
   ozone_set_deprecated_var HADOOP_OZONE_HOME OZONE_HOME
   ozone_set_deprecated_hadoop_vars HOME LIBEXEC_DIR OPTS OS_TYPE
@@ -2661,6 +2662,110 @@ function ozone_generic_java_subcmd_handler
   fi
 }
 
+## @description Validates if all jars as indicated in the corresponding ${OZONE_RUN_ARTIFACT_NAME} classpath file are present
+## @audience private
+## @stability evolving
+## @replaceable yes
+function validate_classpath
+{
+  if [ -n "$1" ]; then
+    case "$1" in
+      -h|--help)
+        echo "Usage I: ozone classpath <ARTIFACTNAME> --validate"
+        echo "Usage II: ozone --daemon start|status|stop csi|datanode|om|recon|s3g|scm --validate"
+        echo
+        echo "Options:"
+        echo
+        echo "  -h, --help"
+        echo "      This help text."
+        echo
+        echo "  --validate"
+        echo "      Validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present."
+        echo
+        exit 0
+        ;;
+      --validate)
+        validate_classpath_util "$2"
+        ;;
+      *)
+        echo "Invalid option "$1". Use --help to see the valid options."
+        exit 1
+        ;;
+    esac
+  fi
+}
+
+## @description Utility function of validate_classpath
+## @audience private
+## @stability evolving
+## @replaceable yes
+function validate_classpath_util
+{
+  local FLAG_FAIL
+  FLAG_FAIL=1
+
+  if [ -n "$1" ]; then
+    if [ "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" == false ]; then
+      echo "unrecognized option"
+      exit 1
+    fi
+    case "$1" in
+      -h|--help)
+        echo "Usage: ozone --daemon start|status|stop csi|datanode|om|recon|s3g|scm --validate --continue"
+        echo
+        echo "Options:"
+        echo
+        echo "  -h, --help"
+        echo "      This help text."
+        echo
+        echo "  --continue"
+        echo "      The command execution shall continue even if the validation fails."
+        echo
+        exit 0
+        ;;
+      --continue)
+        echo "The command execution shall continue even if the validation fails."
+        FLAG_FAIL=0
+        ;;
+      *)
+        echo "Invalid option '$1'. Use --help to see the valid options."
+        exit 1
+        ;;
+    esac
+  fi
+
+  local CLASSPATH_FILE
+  CLASSPATH_FILE="${OZONE_HOME}/share/ozone/classpath/${OZONE_RUN_ARTIFACT_NAME}.classpath"
+  echo "Validating classpath file: $(realpath "$CLASSPATH_FILE")"
+  if [[ ! -e "$CLASSPATH_FILE" ]]; then
+    echo "ERROR: Classpath file descriptor $CLASSPATH_FILE is missing"
+    exit 1
+  fi
+
+  source "$CLASSPATH_FILE"
+  OIFS=$IFS
+  IFS=':'
+
+  local flag
+  flag=1
+  for jar in $classpath; do
+    if [[ ! -e "$jar" ]]; then
+      flag=0
+      echo "ERROR: Jar file $(realpath "$jar") is missing"
+    fi
+  done
+
+  IFS=$OIFS
+
+  if [[ "$flag" == 0 ]] && [[ "$FLAG_FAIL" == 0 ]]; then
+    echo "Validation FAILED due to missing jar files! Continuing command execution..."
+  elif [[ "$flag" == 0 ]] && [[ "$FLAG_FAIL" == 1 ]]; then
+    echo "Validation FAILED due to missing jar files!"
+    exit 1
+  else
+    echo "Validation SUCCESSFUL, all the required jars are present!"
+  fi
+}
 
 ## @description Add all the required jar files to the classpath
 ## @audience private

@@ -94,6 +94,7 @@ function ozonecmd_case
     classpath)
       if [[ "$#" -gt 0 ]]; then
         OZONE_RUN_ARTIFACT_NAME="$1"
+        OZONE_VALIDATE_CLASSPATH="true"
         OZONE_CLASSNAME="org.apache.hadoop.util.Classpath"
         #remove the artifact name and replace it with glob
         # (We need at least one argument to execute the Classpath helper class)
@@ -115,6 +116,7 @@ function ozonecmd_case
       OZONE_DATANODE_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_DATANODE_OPTS}"
       OZONE_CLASSNAME=org.apache.hadoop.ozone.HddsDatanodeService
       OZONE_RUN_ARTIFACT_NAME="ozone-datanode"
+      OZONE_VALIDATE_CLASSPATH="true"
     ;;
     envvars)
       echo "JAVA_HOME='${JAVA_HOME}'"
@@ -145,6 +147,7 @@ function ozonecmd_case
       OZONE_OM_OPTS="${OZONE_OM_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/om-audit-log4j2.properties"
       OZONE_OM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_OM_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-manager"
+      OZONE_VALIDATE_CLASSPATH="true"
     ;;
     sh | shell)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneShell
@@ -164,12 +167,14 @@ function ozonecmd_case
       OZONE_SCM_OPTS="${OZONE_SCM_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/scm-audit-log4j2.properties"
       OZONE_SCM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_SCM_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="hdds-server-scm"
+      OZONE_VALIDATE_CLASSPATH="true"
     ;;
     s3g)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.ozone.s3.Gateway'
       OZONE_S3G_OPTS="${OZONE_S3G_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/s3g-audit-log4j2.properties"
       OZONE_RUN_ARTIFACT_NAME="ozone-s3gateway"
+      OZONE_VALIDATE_CLASSPATH="true"
     ;;
     tenant)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.tenant.TenantShell
@@ -179,11 +184,13 @@ function ozonecmd_case
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.ozone.csi.CsiServer'
       OZONE_RUN_ARTIFACT_NAME="ozone-csi"
+      OZONE_VALIDATE_CLASSPATH="true"
     ;;
     recon)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.ozone.recon.ReconServer'
       OZONE_RUN_ARTIFACT_NAME="ozone-recon"
+      OZONE_VALIDATE_CLASSPATH="true"
     ;;
     fs)
       OZONE_CLASSNAME=org.apache.hadoop.fs.ozone.OzoneFsShell
@@ -273,6 +280,14 @@ if declare -f ozone_subcommand_"${OZONE_SUBCMD}" >/dev/null 2>&1; then
   "ozone_subcommand_${OZONE_SUBCMD}" "${OZONE_SUBCMD_ARGS[@]}"
 else
   ozonecmd_case "${OZONE_SUBCMD}" "${OZONE_SUBCMD_ARGS[@]}"
+fi
+
+if [[ "${OZONE_VALIDATE_CLASSPATH}" == true ]]; then
+  if [[ "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" == true ]] && [[ "${OZONE_DAEMON_MODE}" =~ ^st(art|op|atus)$ ]]; then
+    validate_classpath "$1" "$2"
+  elif [[ "${OZONE_SUBCMD}" == classpath ]]; then
+    validate_classpath "$2" "$3"
+  fi
 fi
 
 ozone_assemble_classpath
