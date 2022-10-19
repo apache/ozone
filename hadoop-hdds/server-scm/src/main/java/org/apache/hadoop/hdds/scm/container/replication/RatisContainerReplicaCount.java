@@ -15,10 +15,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.container;
+package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import java.util.Set;
 
@@ -243,11 +244,27 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    */
   @Override
   public boolean isSufficientlyReplicated() {
-    return missingReplicas() + inFlightDel <= 0;
+    return isSufficientlyReplicated(false);
   }
 
   /**
-   * Return true is the container is over replicated. Decommission and
+   * Return true if the container is sufficiently replicated. Decommissioning
+   * and Decommissioned containers are ignored in this check, assuming they will
+   * eventually be removed from the cluster.
+   * This check ignores inflight additions, if includePendingAdd is false,
+   * otherwise it will assume they complete ok.
+   *
+   * @return True if the container is sufficiently replicated and False
+   *         otherwise.
+   */
+  public boolean isSufficientlyReplicated(boolean includePendingAdd) {
+    // Positive for under-rep, negative for over-rep
+    int delta = redundancyDelta(true, includePendingAdd);
+    return delta <= 0;
+  }
+
+  /**
+   * Return true if the container is over replicated. Decommission and
    * maintenance containers are ignored for this check.
    * The check ignores inflight additions, as they may fail, but it does
    * consider inflight deletes, as they would reduce the over replication when
@@ -257,7 +274,67 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    */
   @Override
   public boolean isOverReplicated() {
-    return missingReplicas() + inFlightDel < 0;
+    return isOverReplicated(true);
+  }
+
+  /**
+   * Return true if the container is over replicated. Decommission and
+   * maintenance containers are ignored for this check.
+   * The check ignores inflight additions, as they may fail, but it does
+   * consider inflight deletes if includePendingDelete is true.
+   *
+   * @return True if the container is over replicated, false otherwise.
+   */
+  public boolean isOverReplicated(boolean includePendingDelete) {
+    return getExcessRedundancy(includePendingDelete) > 0;
+  }
+
+  /**
+   * @return Return Excess Redundancy replica nums.
+   */
+  public int getExcessRedundancy(boolean includePendingDelete) {
+    int excessRedundancy = redundancyDelta(includePendingDelete, false);
+    if (excessRedundancy >= 0) {
+      // either perfectly replicated or under replicated
+      return 0;
+    }
+    return -excessRedundancy;
+  }
+
+  /**
+   * Return the delta from the expected number of replicas, optionally
+   * considering inflight add and deletes.
+   * @param includePendingDelete
+   * @param includePendingAdd
+   * @return zero if perfectly replicated, a negative value for over replication
+   *         and a positive value for under replication. The magnitude of the
+   *         return value indicates how many replias the container is over or
+   *         under replicated by.
+   */
+  private int redundancyDelta(boolean includePendingDelete,
+      boolean includePendingAdd) {
+    int excessRedundancy = missingReplicas();
+    if (includePendingDelete) {
+      excessRedundancy += inFlightDel;
+    }
+    if (includePendingAdd) {
+      excessRedundancy -= inFlightAdd;
+    }
+    return excessRedundancy;
+  }
+
+  /**
+   * How many more replicas can be lost before the container is
+   * unreadable, assuming any infligh deletes will complete. For containers
+   * which are under-replicated due to decommission
+   * or maintenance only, the remaining redundancy will include those
+   * decommissioning or maintenance replicas, as they are technically still
+   * available until the datanode processes are stopped.
+   * @return Count of remaining redundant replicas.
+   */
+  public int getRemainingRedundancy() {
+    return Math.max(0,
+        healthyCount + decommissionCount + maintenanceCount - inFlightDel - 1);
   }
 
   /**
