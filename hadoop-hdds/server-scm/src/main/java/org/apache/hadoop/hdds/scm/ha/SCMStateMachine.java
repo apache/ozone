@@ -353,8 +353,11 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void pause() {
-    getLifeCycle().transition(LifeCycle.State.PAUSING);
-    getLifeCycle().transition(LifeCycle.State.PAUSED);
+    final LifeCycle lc = getLifeCycle();
+    if (lc.getCurrentState() != LifeCycle.State.NEW) {
+      lc.transition(LifeCycle.State.PAUSING);
+      lc.transition(LifeCycle.State.PAUSED);
+    }
   }
 
   @Override

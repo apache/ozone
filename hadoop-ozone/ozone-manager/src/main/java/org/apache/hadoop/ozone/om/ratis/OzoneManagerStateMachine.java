@@ -391,8 +391,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     if (getLifeCycleState() == LifeCycle.State.PAUSED) {
       return;
     }
-    getLifeCycle().transition(LifeCycle.State.PAUSING);
-    getLifeCycle().transition(LifeCycle.State.PAUSED);
+    final LifeCycle lc = getLifeCycle();
+    if (lc.getCurrentState() != LifeCycle.State.NEW) {
+      getLifeCycle().transition(LifeCycle.State.PAUSING);
+      getLifeCycle().transition(LifeCycle.State.PAUSED);
+    }
+
     ozoneManagerDoubleBuffer.stop();
   }
 
