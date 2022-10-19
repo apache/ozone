@@ -72,7 +72,6 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -885,8 +884,8 @@ public class TestBlockDeletingService {
       iterator.nextBlock();
       count += 1;
     }
-    Assertions.assertEquals(expectedCount, count, "Excepted: " + expectedCount
+    Assert.assertEquals("Excepted: " + expectedCount
         + ", but actual: " + count + " in the blockData table of container: "
-        + containerID + ".");
+        + containerID + ".", expectedCount, count);
   }
 }
