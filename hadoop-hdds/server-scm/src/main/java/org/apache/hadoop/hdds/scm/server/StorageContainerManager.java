@@ -1072,7 +1072,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmStorageConfig.getScmId());
 
       // Initialize security if security is enabled later.
-      initializeSecurityIfNeeded(conf, scmhaNodeDetails, scmStorageConfig);
+      initializeSecurityIfNeeded(
+          conf, scmhaNodeDetails, scmStorageConfig, false);
 
       return true;
     }
@@ -1097,7 +1098,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       }
 
       // Initialize security if security is enabled later.
-      initializeSecurityIfNeeded(conf, scmhaNodeDetails, scmStorageConfig);
+      initializeSecurityIfNeeded(
+          conf, scmhaNodeDetails, scmStorageConfig, false);
 
     } else {
       try {
@@ -1136,14 +1138,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @param scmStorageConfig
    * @throws IOException
    */
-  private static void initializeSecurityIfNeeded(OzoneConfiguration conf,
-      SCMHANodeDetails scmhaNodeDetails, SCMStorageConfig scmStorageConfig)
+  private static void initializeSecurityIfNeeded(
+      OzoneConfiguration conf, SCMHANodeDetails scmhaNodeDetails,
+      SCMStorageConfig scmStorageConfig, boolean isPrimordial)
       throws IOException {
     // Initialize security if security is enabled later.
     if (OzoneSecurityUtil.isSecurityEnabled(conf)
         && scmStorageConfig.getScmCertSerialId() == null) {
       HASecurityUtils.initializeSecurity(scmStorageConfig, conf,
-          getScmAddress(scmhaNodeDetails, conf), true);
+          getScmAddress(scmhaNodeDetails, conf), isPrimordial);
       scmStorageConfig.forceInitialize();
       LOG.info("SCM unsecure cluster is converted to secure cluster. " +
               "Persisted SCM Certificate SerialID {}",
@@ -1233,7 +1236,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       final boolean isSCMHAEnabled = scmStorageConfig.isSCMHAEnabled();
 
       // Initialize security if security is enabled later.
-      initializeSecurityIfNeeded(conf, haDetails, scmStorageConfig);
+      initializeSecurityIfNeeded(conf, haDetails, scmStorageConfig, true);
 
       if (SCMHAUtils.isSCMHAEnabled(conf) && !isSCMHAEnabled) {
         SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
