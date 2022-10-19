@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.management.ObjectName;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -438,6 +439,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static final int MSECS_PER_MINUTE = 60 * 1000;
 
   private final boolean isSecurityEnabled;
+  private final AtomicBoolean isStopped = new AtomicBoolean(false);
 
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
@@ -1967,7 +1969,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omRatisServer == null) {
         // This needs to be done before initializing Ratis.
         RatisDropwizardExports.
-            registerRatisMetricReporters(ratisMetricsMap);
+            registerRatisMetricReporters(ratisMetricsMap, isStopped);
         omRatisServer = OzoneManagerRatisServer.newOMRatisServer(
             configuration, this, omNodeDetails, peerNodesMap,
             secConfig, certClient, shouldBootstrap);
@@ -2037,6 +2039,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     try {
       omState = State.STOPPED;
+      isStopped.set(true);
       // Cancel the metrics timer and set to null.
       if (metricsTimer != null) {
         metricsTimer.cancel();
