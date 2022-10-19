@@ -522,24 +522,16 @@ public final class OzoneConfigKeys {
 
   // Items listing page size for fs client sub-commands output
   public static final String
-      OZONE_CLIENT_FS_LISTING_PAGE_SIZE =
-      "ozone.client.fs.listing.page.size";
+      OZONE_FS_LISTING_PAGE_SIZE = "ozone.fs.listing.page.size";
 
   public static final int
-      OZONE_CLIENT_FS_LISTING_PAGE_SIZE_DEFAULT = 1024;
+      OZONE_FS_LISTING_PAGE_SIZE_DEFAULT = 1024;
 
   public static final int
-      OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE = 5000;
+      OZONE_FS_MAX_LISTING_PAGE_SIZE = 5000;
 
   public static final String
-      OZONE_SERVER_FS_LISTING_PAGE_SIZE =
-      "ozone.server.fs.listing.page.size";
-
-  public static final int
-      OZONE_SERVER_FS_LISTING_PAGE_SIZE_DEFAULT = 1024;
-
-  public static final int
-      OZONE_SERVER_FS_MAX_LISTING_PAGE_SIZE = 5000;
+      OZONE_FS_LISTING_PAGE_SIZE_MAX = "ozone.fs.listing.page.size.max";
 
   /**
    * There is no need to instantiate this class.

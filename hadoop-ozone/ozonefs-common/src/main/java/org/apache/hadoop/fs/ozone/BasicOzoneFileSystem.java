@@ -69,11 +69,11 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FS_LISTING_PAGE_SIZE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FS_LISTING_PAGE_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_MAX_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -104,7 +104,7 @@ public class BasicOzoneFileSystem extends FileSystem {
   private OzoneClientAdapter adapter;
 
   private int listingPageSize =
-      OZONE_CLIENT_FS_LISTING_PAGE_SIZE_DEFAULT;
+      OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
 
   private static final Pattern URL_SCHEMA_PATTERN =
       Pattern.compile("([^\\.]+)\\.([^\\.]+)\\.{0,1}(.*)");
@@ -120,11 +120,11 @@ public class BasicOzoneFileSystem extends FileSystem {
   public void initialize(URI name, Configuration conf) throws IOException {
     super.initialize(name, conf);
     listingPageSize = conf.getInt(
-        OZONE_CLIENT_FS_LISTING_PAGE_SIZE,
-        OZONE_CLIENT_FS_LISTING_PAGE_SIZE_DEFAULT);
+        OZONE_FS_LISTING_PAGE_SIZE,
+        OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
     listingPageSize = OzoneClientUtils.limitValue(listingPageSize,
-        OZONE_CLIENT_FS_LISTING_PAGE_SIZE,
-        OZONE_CLIENT_FS_MAX_LISTING_PAGE_SIZE);
+        OZONE_FS_LISTING_PAGE_SIZE,
+        OZONE_FS_MAX_LISTING_PAGE_SIZE);
     setConf(conf);
     Preconditions.checkNotNull(name.getScheme(),
         "No scheme provided in %s", name);
