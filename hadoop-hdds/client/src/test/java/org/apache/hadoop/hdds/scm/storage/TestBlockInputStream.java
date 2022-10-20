@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.ozone.common.Checksum;
 
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusException;
 import org.junit.Assert;
@@ -60,7 +59,6 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.storage.TestChunkInputStream.generateRandomData;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
