@@ -114,8 +114,8 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
     OFSPath ofsPath = new OFSPath(path);
 
     boolean enableFileSystemPaths = getOzoneConfig()
-        .get(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS)
-        .equalsIgnoreCase("true");
+        .getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+            OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
 
     OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(getOzoneConfig());
     ObjectStore objectStore = ozoneClient.getObjectStore();

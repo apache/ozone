@@ -62,9 +62,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
                                  ozoneConfiguration) {
     super(reconNamespaceSummaryManager, reconOMMetadataManager);
     // true if FileSystemPaths enabled
-    enableFileSystemPaths =
-        ozoneConfiguration.get(OMConfigKeys
-            .OZONE_OM_ENABLE_FILESYSTEM_PATHS).equalsIgnoreCase("true");
+    enableFileSystemPaths = ozoneConfiguration
+        .getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+            OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
   }
 
   public boolean processWithLegacy(OMUpdateEventBatch events) {
