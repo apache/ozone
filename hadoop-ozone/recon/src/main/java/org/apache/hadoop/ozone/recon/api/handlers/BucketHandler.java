@@ -198,8 +198,9 @@ public abstract class BucketHandler {
         return new LegacyBucketHandler(reconNamespaceSummaryManager,
             omMetadataManager, reconSCM, bucketInfo);
       } else {
-        throw new RuntimeException("Unsupported bucket layout: " +
+        LOG.error("Unsupported bucket layout: " +
             bucketInfo.getBucketLayout());
+        return null;
       }
     }
   }
