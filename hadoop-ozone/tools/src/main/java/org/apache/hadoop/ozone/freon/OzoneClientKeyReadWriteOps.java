@@ -18,10 +18,10 @@ package org.apache.hadoop.ozone.freon;
 
 
 import com.codahale.metrics.Timer;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -186,14 +186,15 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
 
     });
   }
-
+  @SuppressFBWarnings
   public void processReadTasks(String keyName, OzoneClient client)
           throws RuntimeException, IOException {
-    OzoneKeyDetails keyDetails = client.getProxy().getKeyDetails(volumeName, bucketName, keyName);            
+    OzoneKeyDetails keyDetails = client.getProxy().
+            getKeyDetails(volumeName, bucketName, keyName);
     if (!readMetadataOnly) {
       byte[] data = new byte[objectSizeInBytes];
       try (OzoneInputStream introStream = keyDetails.getContent()) {
-         introStream.read(data);
+        introStream.read(data);
       } catch (Exception ex) {
         throw ex;
       }
@@ -203,7 +204,8 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   public void processWriteTasks(String keyName, OzoneClient ozoneClient)
           throws RuntimeException, IOException {
     try (OzoneOutputStream out =
-                 ozoneClient.getProxy().createKey(volumeName, bucketName, keyName, objectSizeInBytes, null, new HashMap())) {
+                 ozoneClient.getProxy().createKey(volumeName, bucketName,
+                         keyName, objectSizeInBytes, null, new HashMap())) {
       out.write(keyContent);
     } catch (Exception ex) {
       throw ex;
@@ -217,7 +219,7 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
       return TaskType.WRITE_TASK;
     }
     //mix workload
-    int tmp = ThreadLocalRandom.current().nextInt(1,101);
+    int tmp = ThreadLocalRandom.current().nextInt(1, 101);
     if (tmp  <= percentageRead) {
       return TaskType.READ_TASK;
     } else {

@@ -23,7 +23,6 @@ import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.slf4j.Logger;
@@ -37,11 +36,6 @@ import java.util.HashMap;
 import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.PURE_INDEX;
 import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.MD5;
 import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.FILE_DIR_SEPARATOR;
-
-// import com.fasterxml.jackson.databind.ObjectMapper;
-// import java.util.HashMap;
-// import java.util.Map;
-// import java.io.File;
 
 /**
  * Ozone range keys generator for performance test.
@@ -91,22 +85,13 @@ public class RangeKeysGenerator extends BaseFreonGenerator
           defaultValue = "1")
   private int objectSizeInBytes;
 
-  private int clientCount;
-
-  @CommandLine.Option(
-          names = "--debug",
-          description = "Enable debugging message.",
-          defaultValue = "false"
-  )
-  private boolean debug;
-
-
   @CommandLine.Option(
           names = "--om-service-id",
           description = "OM Service ID"
   )
   private String omServiceID = null;
   private KeyGeneratorUtil kg;
+  private int clientCount;
   private OzoneClient[] ozoneClients;
   private byte[] keyContent;
   private Timer timer;
@@ -162,13 +147,15 @@ public class RangeKeysGenerator extends BaseFreonGenerator
   }
 
 
-  public void loopRunner(Function<Integer, String> fn, OzoneClient client,
-                         int start, int end) throws Exception {
+  public void loopRunner(Function<Integer, String> keyNameGeneratefunc,
+                         OzoneClient client, int start, int end)
+          throws Exception {
     String keyName;
     for (int i = start; i < end + 1; i++) {
-      keyName = getPrefix() + FILE_DIR_SEPARATOR + fn.apply(i);
+      keyName = getPrefix() + FILE_DIR_SEPARATOR + keyNameGeneratefunc.apply(i);
       try (OzoneOutputStream out = client.getProxy().
-                        createKey(volumeName, bucketName, keyName, objectSizeInBytes, null, new HashMap())) {
+                        createKey(volumeName, bucketName, keyName,
+                                objectSizeInBytes, null, new HashMap())) {
         out.write(keyContent);
       }
     }
