@@ -85,6 +85,7 @@ public class TestOzoneContainerWithTLS {
   private OzoneBlockTokenSecretManager secretManager;
   private CertificateClientTestImpl caClient;
   private boolean blockTokenEnabled;
+  private long certExpireTime;
 
   public TestOzoneContainerWithTLS(boolean blockTokenEnabled) {
     this.blockTokenEnabled = blockTokenEnabled;
@@ -122,6 +123,9 @@ public class TestOzoneContainerWithTLS {
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME_DEFAULT,
         TimeUnit.MILLISECONDS);
 
+    // 5s
+    //long expiryTime = 5000;
+
     caClient = new CertificateClientTestImpl(conf);
     secretManager = new OzoneBlockTokenSecretManager(new SecurityConfig(conf),
         expiryTime, caClient.getCertificate().
@@ -158,7 +162,12 @@ public class TestOzoneContainerWithTLS {
       if (blockTokenEnabled) {
         secretManager.start(caClient);
         client.connect();
-        createSecureContainerForTesting(client, containerID, null);
+        long containerNum = 1000;
+        for (int i = 0; i < containerNum; i++) {
+          createSecureContainerForTesting(client, containerID, null);
+          System.out.println("Container " + containerID + " is created");
+          containerID = ContainerTestHelper.getTestContainerID();
+        }
       } else {
         createContainerForTesting(client, containerID);
         client.connect();
