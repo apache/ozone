@@ -887,7 +887,9 @@ public class StateContext {
         mp.putIfAbsent(e, new AtomicBoolean(true));
       });
       this.isFullReportReadyToBeSent.putIfAbsent(endpoint, mp);
-      getQueueMetrics().addEndpoint(endpoint);
+      if (getQueueMetrics() != null) {
+        getQueueMetrics().addEndpoint(endpoint);
+      }
     }
   }
 
