@@ -126,7 +126,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           omMetadataManager.getLock().acquireWriteLock(SNAPSHOT_LOCK,
               volumeName, bucketName, snapshotName);
 
-      //Check if snapshot already exists
+      // Check if snapshot already exists
       if (omMetadataManager.getSnapshotInfoTable().isExist(key)) {
         LOG.debug("snapshot: {} already exists ", key);
         throw new OMException("Snapshot already exists", FILE_ALREADY_EXISTS);

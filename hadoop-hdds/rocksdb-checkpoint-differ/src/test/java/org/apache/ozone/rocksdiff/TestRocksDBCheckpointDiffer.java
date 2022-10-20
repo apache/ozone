@@ -99,7 +99,7 @@ public class TestRocksDBCheckpointDiffer {
         differ.getCompactionFwdDAG());
 
     differ.diffAllSnapshots();
-    differ.dumpCompactioNodeTable();
+    differ.dumpCompactionNodeTable();
     for (GType gtype : GType.values()) {
       String fname = "fwdGraph_" + gtype.toString() +  ".png";
       String rname = "reverseGraph_"+ gtype.toString() + ".png";

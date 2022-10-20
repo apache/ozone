@@ -137,18 +137,25 @@ public final class OmSnapshotManager {
         ((RDBStore) omMetadataManager.getStore()).getDb()
             .getLatestSequenceNumber();
 
-    final RocksDBCheckpointDiffer checkpointDiffer =
+    final RocksDBCheckpointDiffer dbCpDiffer =
         omMetadataManager.getStore().getRocksDBCheckpointDiffer();
 
+    final DBCheckpoint dbCheckpoint = store.getSnapshot(
+        snapshotInfo.getCheckpointDirName());
+
+    // Write snapshot generation (latest sequence number) to compaction log.
+    // This will be used for DAG reconstruction as snapshotGeneration.
+    dbCpDiffer.appendSequenceNumberToCompactionLog(dbLatestSequenceNumber);
+
     // Set compaction log filename to the latest DB sequence number
-    // right before taking the RocksDB checkpoint
+    // right after taking the RocksDB checkpoint for Ozone snapshot.
     //
     // Note it doesn't matter if sequence number hasn't increased (even though
     // it shouldn't happen), since the writer always appends the file.
-    checkpointDiffer.setCompactionLogParentDir(store.getSnapshotsParentDir());
-    checkpointDiffer.setCurrentCompactionLog(dbLatestSequenceNumber);
+    dbCpDiffer.setCompactionLogParentDir(store.getSnapshotsParentDir());
+    dbCpDiffer.setCurrentCompactionLog(dbLatestSequenceNumber);
 
-    return store.getSnapshot(snapshotInfo.getCheckpointDirName());
+    return dbCheckpoint;
   }
 
   // Get OmSnapshot if the keyname has ".snapshot" key indicator
