@@ -155,7 +155,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       let pathLabels, values, percentage, sizeStr, pieces, subpathName;
 
       if (duResponse.subPathCount === 0 || subpaths === 0) {
-        pieces = duResponse && duResponse.path.split('/');
+        pieces = duResponse && duResponse.path != null && duResponse.path.split('/');
         subpathName = pieces[pieces.length - 1];
         pathLabels = [subpathName];
         values = [0.1];
