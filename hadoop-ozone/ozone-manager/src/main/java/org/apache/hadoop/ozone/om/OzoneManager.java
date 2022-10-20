@@ -2089,7 +2089,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public void shutDown(String message) {
     stop();
-    ExitUtils.terminate(1, message, LOG);
+    ExitUtils.terminate(0, message, LOG);
   }
 
   /**
