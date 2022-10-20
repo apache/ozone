@@ -271,7 +271,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     List<OmKeyLocationInfo> intersection = new ArrayList<>(allocatedBlockList);
     intersection.retainAll(locationInfoListFromCommitKeyRequest);
 
-    // Key table should have only two blocks.
+    // Key table should have three blocks.
     Assert.assertEquals(intersection,
         omKeyInfo.getLatestVersionLocations().getLocationList());
     Assert.assertEquals(3, intersection.size());
