@@ -53,33 +53,35 @@ Put
     ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}         PUTFILE.txt
 
-Check disk usage after create a file which uses Ratis replication type
-                   Execute               ozone fs -put NOTICE.txt ${DEEP_URL}/PUTFILE.txt
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
-                   Should contain        ${result}         PUTFILE.txt
 
 
-
-
-
-
+Check disk usage after create a file which uses RATIS replication type
+                ${vol} =        BuiltIn.Set Variable    /vol1
+               ${bucket} =      BuiltIn.Set Variable    /bucket1
+                                Execute               ozone sh volume create ${vol}
+                                Execute               ozone sh bucket create ${vol}${bucket} --replication 3 --type RATIS
+                                Execute               ozone fs -put NOTICE.txt ${vol}${bucket}/PUTFILE1.txt
+     ${expectedFileLength} =    Execute               stat -c %s NOTICE.txt
+     ${expectedDiskUsage} =     Get Disk Usage of File with RATIS Replication    ${expectedFileLength}    3
+     ${result} =                Execute               ozone fs -du ofs://om${vol}${bucket}
+                                Should contain        ${result}         PUTFILE1.txt
+                                Should contain        ${result}         ${expectedFileLength}
+                                Should contain        ${result}         ${expectedDiskUsage}
 
 
 
 Check disk usage after create a file which uses EC replication type
-                   Execute               ozone sh volume create /vol1
-                   Execute               ozone sh bucket create /vol1/bucket2 --type EC --replication rs-3-2-1024k
-                   Execute               ozone fs -put NOTICE.txt /vol1/bucket2/PUTFILE.txt
-    ${expectedFileLength} = sizeof(NOTICE.txt)     
-    dataStripeSize   =  3 * 1024
-    fullStripes       = ${expectedFileLength}  / dataStripeSize 
-    partialFirstChunk =
-    replicationOverhead = 
-    ${expectedDiskUsage} = ${expectedFileLength}     + replicationOverhead         
-    ${result} =    Execute               ozone fs -du /vol1/bucket2 | jq -r '.[].name'
-                   Should contain        ${result}         PUTFILE.txt
-                   Should contain        ${result}         ${expectedFileLength}
-                   Should contain        ${result}         ${expectedDiskUsage}
+                   ${vol} =    BuiltIn.Set Variable    /vol2
+                ${bucket} =    BuiltIn.Set Variable    /bucket2
+                               Execute                ozone sh volume create ${vol}
+                               Execute                ozone sh bucket create ${vol}${bucket} --type EC --replication rs-3-2-1024k
+                               Execute                ozone fs -put NOTICE.txt ${vol}${bucket}/PUTFILE2.txt
+    ${expectedFileLength} =    Execute                stat -c %s NOTICE.txt
+     ${expectedDiskUsage} =    Get Disk Usage of File with EC RS Replication    ${expectedFileLength}    3    2    1024
+                ${result} =    Execute                ozone fs -du ofs://om${vol}${bucket}
+                               Should contain         ${result}         PUTFILE2.txt
+                               Should contain         ${result}         ${expectedFileLength}
+                               Should contain         ${result}         ${expectedDiskUsage}
 
 
 List
