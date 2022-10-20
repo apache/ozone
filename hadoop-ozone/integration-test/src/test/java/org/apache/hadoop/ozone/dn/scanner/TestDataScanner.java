@@ -65,6 +65,8 @@ import java.util.UUID;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 
 /**
@@ -88,7 +90,8 @@ public class TestDataScanner {
   public static void init() throws Exception {
     ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set(HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL, "1s");
-    ozoneConfig.set(ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_ENABLED, String.valueOf(true));
+    ozoneConfig.set(ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_ENABLED,
+        String.valueOf(true));
     ozoneConfig.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, PlacementPolicy.class);
     ozoneConfig.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
@@ -158,8 +161,8 @@ public class TestDataScanner {
     ContainerSet containerSet = oc.getContainerSet();
     //Given an open and a closed container
     Assert.assertTrue(containerSet.containerCount() > 1);
-    Container<?> openContainer = getOpenContainer(containerSet);
-    Container<?> closedContainer = getClosedContainer(containerSet);
+    Container<?> openContainer = getContainerInState(containerSet, OPEN);
+    Container<?> closedContainer = getContainerInState(containerSet, CLOSED);
 
     //When deleting their metadata to make them unhealthy and scanning them
     deleteChunksDirForContainer(openContainer);
@@ -171,7 +174,7 @@ public class TestDataScanner {
         oc.getController());
     //Scan the open container and trigger on-demand scan for the closed one
     sb.scanContainer(openContainer);
-    tryReadKeyInBucket(bucket, keyNameInClosedContainer);
+    tryReadKeyWithMissingChunksDir(bucket, keyNameInClosedContainer);
     // wait for the incremental container report to propagate to SCM
     Thread.sleep(5000);
 
@@ -197,10 +200,10 @@ public class TestDataScanner {
 
   //ignore the result of the key read because it is expected to fail
   @SuppressWarnings("ResultOfMethodCallIgnored")
-  private void tryReadKeyInBucket(
+  private void tryReadKeyWithMissingChunksDir(
       OzoneBucket bucket, String keyNameInClosedContainer) throws IOException {
-    try (OzoneInputStream OIkey = bucket.readKey(keyNameInClosedContainer)) {
-      OIkey.read();
+    try (OzoneInputStream key = bucket.readKey(keyNameInClosedContainer)) {
+      key.read();
     } catch (StorageContainerException ignored) {
 
     }
@@ -213,22 +216,14 @@ public class TestDataScanner {
     Assert.assertFalse(chunksDir.exists());
   }
 
-  private Container<?> getOpenContainer(ContainerSet cs) {
+  private Container<?> getContainerInState(
+      ContainerSet cs, ContainerProtos.ContainerDataProto.State state) {
     return cs.getContainerMap().values().stream()
-        .filter(c -> ContainerProtos.ContainerDataProto.State.OPEN ==
+        .filter(c -> state ==
             c.getContainerState())
         .findAny()
         .orElseThrow(() ->
             new RuntimeException("No Open container found for testing"));
-  }
-
-  private Container<?> getClosedContainer(ContainerSet cs) {
-    return cs.getContainerMap().values().stream()
-        .filter(c -> ContainerProtos.ContainerDataProto.State.CLOSED ==
-            c.getContainerState())
-        .findAny()
-        .orElseThrow(() ->
-            new RuntimeException("No closed container found for testing"));
   }
 
   private OzoneOutputStream createKey(String volumeName, String bucketName,
