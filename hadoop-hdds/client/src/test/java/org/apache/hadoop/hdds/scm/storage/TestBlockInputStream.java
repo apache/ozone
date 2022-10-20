@@ -325,45 +325,6 @@ public class TestBlockInputStream {
     }
   }
 
-  @Test
-  public void testRefreshExitsIfPipelineHasSameNodes() throws Exception {
-    // GIVEN
-    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
-    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
-
-    final int len = 200;
-    final ChunkInputStream stream = mock(ChunkInputStream.class);
-    when(stream.read(any(), anyInt(), anyInt()))
-        .thenThrow(new StorageContainerException("test", CONTAINER_UNHEALTHY));
-    when(stream.getRemaining())
-        .thenReturn((long) len);
-
-    when(refreshPipeline.apply(blockID))
-        .thenAnswer(invocation -> samePipelineWithNewId(pipeline));
-
-    BlockInputStream subject = new DummyBlockInputStream(blockID, blockSize,
-        pipeline, null, false, null, refreshPipeline, chunks, null) {
-      @Override
-      protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
-        return stream;
-      }
-    };
-
-    try {
-      subject.initialize();
-
-      // WHEN
-      byte[] b = new byte[len];
-      LambdaTestUtils.intercept(StorageContainerException.class,
-          () -> subject.read(b, 0, len));
-
-      // THEN
-      verify(refreshPipeline).apply(blockID);
-    } finally {
-      subject.close();
-    }
-  }
-
   private static Stream<Arguments> exceptionsNotTriggerRefresh() {
     return Stream.of(
         Arguments.of(new SCMSecurityException("Security problem")),
