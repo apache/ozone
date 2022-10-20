@@ -94,65 +94,6 @@ interface IContainerKeysResponse {
   keys: IKeyResponse[];
 }
 
-const COLUMNS = [
-  {
-    title: 'Container ID',
-    dataIndex: 'containerID',
-    key: 'containerID',
-    sorter: (a: IMissingContainerResponse, b: IMissingContainerResponse) => a.containerID - b.containerID
-  },
-  {
-    title: 'No. of Keys',
-    dataIndex: 'keys',
-    key: 'keys',
-    sorter: (a: IMissingContainerResponse, b: IMissingContainerResponse) => a.keys - b.keys
-  },
-  {
-    title: 'Datanodes',
-    dataIndex: 'replicas',
-    key: 'replicas',
-    render: (replicas: IContainerReplica[]) => (
-      <div>
-        {replicas && replicas.map(replica => {
-          const tooltip = (
-            <div>
-              <div>First Report Time: {timeFormat(replica.firstReportTimestamp)}</div>
-              <div>Last Report Time: {timeFormat(replica.lastReportTimestamp)}</div>
-            </div>
-          );
-          return (
-            <div key={replica.datanodeHost}>
-              <Tooltip
-                placement='left'
-                title={tooltip}
-              >
-                <Icon type='info-circle' className='icon-small'/>
-              </Tooltip>
-              <span className='pl-5'>
-                {replica.datanodeHost}
-              </span>
-            </div>
-          );
-        }
-        )}
-      </div>
-    )
-  },
-  {
-    title: 'Pipeline ID',
-    dataIndex: 'pipelineID',
-    key: 'pipelineID',
-    sorter: (a: IMissingContainerResponse, b: IMissingContainerResponse) => a.pipelineID.localeCompare(b.pipelineID)
-  },
-  {
-    title: 'Missing Since',
-    dataIndex: 'missingSince',
-    key: 'missingSince',
-    render: (missingSince: number) => timeFormat(missingSince),
-    sorter: (a: IMissingContainerResponse, b: IMissingContainerResponse) => a.missingSince - b.missingSince
-  }
-];
-
 const KEY_TABLE_COLUMNS = [
   {
     title: 'Volume',
@@ -414,7 +355,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
           <Tabs defaultActiveKey='1'>
             <TabPane key='1' tab="Missing">
               <Table
-                expandRowByClick dataSource={missingDataSource} columns={COLUMNS}
+                expandRowByClick dataSource={missingDataSource} columns={CONTAINER_TAB_COLUMNS}
                 loading={loading}
                 pagination={paginationConfig} rowKey='containerID'
                 expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
