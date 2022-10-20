@@ -31,16 +31,20 @@ interface IAutoReloadPanelProps extends RouteComponentProps<object> {
   lastUpdatedOMDBFull: number;
   isLoading: boolean;
   togglePolling: (isEnabled: boolean) => void;
+  toggleChecking: (isEnabled: boolean) => void;
+  toggleCheck: boolean;
 }
 
 class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
   autoReloadToggleHandler = (checked: boolean, _event: Event) => {
-    const {togglePolling} = this.props;
+    const {togglePolling, toggleChecking} = this.props;
     togglePolling(checked);
+    toggleChecking(checked);
   };
 
   render() {
     const {onReload, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, isLoading} = this.props;
+    const toggleCheck = sessionStorage.getItem('toggleCheck') === 'false' ? false : true;
     
      const lastRefreshedText = lastRefreshed === 0 || lastRefreshed === undefined ? 'NA' :
       (
@@ -79,7 +83,7 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
     return (
       <div className='auto-reload-panel'>
         Auto Refresh
-        &nbsp;<Switch defaultChecked size='small' className='toggle-switch' onChange={this.autoReloadToggleHandler}/>
+        &nbsp;<Switch defaultChecked={toggleCheck} size='small' className='toggle-switch' onChange={this.autoReloadToggleHandler}/>
         &nbsp; | Refreshed at {lastRefreshedText}
         &nbsp;<Button shape='circle' icon='reload' size='small' loading={isLoading} onClick={onReload}/>
         {lastUpdatedDeltaFullText}

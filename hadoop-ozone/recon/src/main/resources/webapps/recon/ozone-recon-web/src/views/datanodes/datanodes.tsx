@@ -416,6 +416,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
             isLoading={loading}
             lastUpdated={lastUpdated}
             togglePolling={this.autoReload.handleAutoReloadToggle}
+            toggleChecking={this.autoReload.toggleChecking}
             onReload={this._loadData}
           />
         </div>

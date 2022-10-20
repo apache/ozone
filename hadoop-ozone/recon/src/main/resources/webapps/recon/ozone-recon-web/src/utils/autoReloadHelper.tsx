@@ -49,6 +49,10 @@ class AutoReloadHelper {
       this.stopPolling();
     }
   };
+
+  toggleChecking = (checked: boolean) => {
+    sessionStorage.setItem('toggleCheck', JSON.stringify(checked));
+  };
 }
 
 export {AutoReloadHelper};
