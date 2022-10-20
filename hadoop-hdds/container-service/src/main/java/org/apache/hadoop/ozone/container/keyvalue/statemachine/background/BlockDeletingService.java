@@ -501,8 +501,8 @@ public class BlockDeletingService extends BackgroundService {
           for (DeletedBlocksTransaction delTx : delBlocks) {
             deleter.apply(deleteTxns, batch, delTx.getTxID());
             for (Long blk : delTx.getLocalIDList()) {
-              String bID = blk.toString();
-              meta.getStore().getBlockDataTable().deleteWithBatch(batch, bID);
+              blockDataTable.deleteWithBatch(batch,
+                  containerData.blockKey(blk));
             }
           }
 
