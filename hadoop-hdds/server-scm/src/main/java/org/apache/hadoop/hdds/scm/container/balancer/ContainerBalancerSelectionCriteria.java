@@ -83,10 +83,6 @@ public class ContainerBalancerSelectionCriteria {
    * 3. Container size should be closer to 5GB.
    * 4. Container must not be in the configured exclude containers list.
    * 5. Container should be closed.
-   * 6. Container should not be an EC container
-   * //TODO Temporarily not considering EC containers as candidates
-   * @see
-   * <a href="https://issues.apache.org/jira/browse/HDDS-6940">HDDS-6940</a>
    *
    * @param node DatanodeDetails for which to find candidate containers.
    * @return NavigableSet of candidate containers that satisfy the criteria.
@@ -150,16 +146,6 @@ public class ContainerBalancerSelectionCriteria {
     return this::isContainerMoreUsed;
   }
 
-  /**
-   * Checks whether a Container has the ReplicationType
-   * {@link HddsProtos.ReplicationType#EC}.
-   * @param container container to check
-   * @return true if the ReplicationType is EC, else false
-   */
-  private boolean isECContainer(ContainerInfo container) {
-    return container.getReplicationType().equals(HddsProtos.ReplicationType.EC);
-  }
-
   private boolean shouldBeExcluded(ContainerID containerID,
                                    DatanodeDetails node) {
     ContainerInfo container;
@@ -170,7 +156,7 @@ public class ContainerBalancerSelectionCriteria {
           "candidate container. Excluding it.", containerID);
       return true;
     }
-    return !isContainerClosed(container) || isECContainer(container) ||
+    return !isContainerClosed(container) ||
         isContainerReplicatingOrDeleting(containerID) ||
         !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes());
   }
