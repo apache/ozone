@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECContainerOperationClient;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -390,8 +391,10 @@ public class TestContainerCommandsEC {
         new XceiverClientManager(config);
     createKeyAndWriteData(keyString, bucket);
     ECReconstructionCoordinator coordinator =
-        new ECReconstructionCoordinator(config, certClient);
+        new ECReconstructionCoordinator(config, certClient,
+            ECReconstructionMetrics.create());
 
+    ECReconstructionMetrics metrics = coordinator.getECReconstructionMetrics();
     OzoneKeyDetails key = bucket.getKey(keyString);
     long conID = key.getOzoneKeyLocations().get(0).getContainerID();
     Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
@@ -493,7 +496,7 @@ public class TestContainerCommandsEC {
           readContainerResponseProto.getContainerData().getState());
       i++;
     }
-
+    Assertions.assertEquals(metrics.getReconstructionTotal(), 1L);
   }
 
   private void createKeyAndWriteData(String keyString, OzoneBucket bucket)
@@ -565,7 +568,8 @@ public class TestContainerCommandsEC {
 
     Assert.assertThrows(IOException.class, () -> {
       ECReconstructionCoordinator coordinator =
-          new ECReconstructionCoordinator(config, certClient);
+          new ECReconstructionCoordinator(config, certClient,
+              ECReconstructionMetrics.create());
       coordinator.reconstructECContainerGroup(conID,
           (ECReplicationConfig) containerPipeline.getReplicationConfig(),
           sourceNodeMap, targetNodeMap);
