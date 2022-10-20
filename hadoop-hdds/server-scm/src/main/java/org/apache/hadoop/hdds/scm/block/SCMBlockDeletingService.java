@@ -152,10 +152,10 @@ public class SCMBlockDeletingService extends BackgroundService
               transactions.getDatanodeTransactionMap().entrySet()) {
             UUID dnId = entry.getKey();
             List<DeletedBlocksTransaction> dnTXs = entry.getValue();
-            processedTxIDs.addAll(dnTXs.stream()
-                .map(DeletedBlocksTransaction::getTxID)
-                .collect(Collectors.toSet()));
             if (!dnTXs.isEmpty()) {
+              processedTxIDs.addAll(dnTXs.stream()
+                  .map(DeletedBlocksTransaction::getTxID)
+                  .collect(Collectors.toSet()));
               // TODO commandQueue needs a cap.
               // We should stop caching new commands if num of un-processed
               // command is bigger than a limit, e.g 50. In case datanode goes
