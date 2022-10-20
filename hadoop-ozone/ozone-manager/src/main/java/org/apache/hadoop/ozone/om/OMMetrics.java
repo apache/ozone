@@ -197,6 +197,12 @@ public class OMMetrics {
   private @Metric MutableCounterLong numDirs;
   private @Metric MutableCounterLong numFiles;
 
+  //EC Metrics
+  private @Metric MutableCounterLong ecKeyCreateTotal;
+  private @Metric MutableCounterLong ecKeyCreateFailsTotal;
+  private @Metric MutableCounterLong ecBucketCreateTotal;
+  private @Metric MutableCounterLong ecBucketCreateFailsTotal;
+
   private final DBCheckpointMetrics dbCheckpointMetrics;
 
   public OMMetrics() {
@@ -1170,6 +1176,22 @@ public class OMMetrics {
 
   public void incNumTrashAtomicDirDeletes() {
     numTrashAtomicDirDeletes.incr();
+  }
+
+  public void incEcKeysTotal() {
+    ecKeyCreateTotal.incr();
+  }
+
+  public void incEcBucketsTotal() {
+    ecBucketCreateTotal.incr();
+  }
+
+  public void incEcKeyCreateFailsTotal() {
+    ecKeyCreateFailsTotal.incr();
+  }
+
+  public void incEcBucketCreateFailsTotal() {
+    ecBucketCreateFailsTotal.incr();
   }
 
   public void unRegister() {

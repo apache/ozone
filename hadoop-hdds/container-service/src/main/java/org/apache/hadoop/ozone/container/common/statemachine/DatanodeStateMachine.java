@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Refr
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionSupervisor;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -116,6 +117,7 @@ public class DatanodeStateMachine implements Closeable {
   private final ReadWriteLock constructionLock = new ReentrantReadWriteLock();
   private final MeasuredReplicator replicatorMetrics;
   private final ReplicationSupervisorMetrics replicationSupervisorMetrics;
+  private final ECReconstructionMetrics ecReconstructionMetrics;
 
   /**
    * Constructs a datanode state machine.
@@ -182,8 +184,11 @@ public class DatanodeStateMachine implements Closeable {
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);
 
+    ecReconstructionMetrics = ECReconstructionMetrics.create();
+
     ECReconstructionCoordinator ecReconstructionCoordinator =
-        new ECReconstructionCoordinator(conf, certClient);
+        new ECReconstructionCoordinator(conf, certClient,
+            ecReconstructionMetrics);
     ecReconstructionSupervisor =
         new ECReconstructionSupervisor(container.getContainerSet(), context,
             replicationConfig.getReplicationMaxStreams(),
@@ -378,6 +383,7 @@ public class DatanodeStateMachine implements Closeable {
     }
     context.setState(DatanodeStates.getLastState());
     replicationSupervisorMetrics.unRegister();
+    ecReconstructionMetrics.unRegister();
     executorService.shutdown();
     try {
       if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
