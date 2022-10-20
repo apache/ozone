@@ -150,8 +150,6 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
 
-      // Update the block length for each block, return the allocated but
-      // uncommitted blocks
       List<OmKeyLocationInfo> uncommitted = omKeyInfo.updateLocationInfoList(
           locationInfoList, false);
 
@@ -185,7 +183,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       // let the uncommitted blocks pretend as key's old version blocks
       // which will be deleted as RepeatedOmKeyInfo
-      if (uncommitted.size() > 0) {
+      if (!uncommitted.isEmpty()) {
         LOG.info("Detect allocated but uncommitted blocks {} in key {}.",
             uncommitted, keyName);
         OmKeyInfo pseudoKeyInfo = omKeyInfo.copyObject();

@@ -72,7 +72,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         getOmKeyCommitRequest(modifiedOmRequest);
 
     // Append 3 blocks locations.
-    List<OmKeyLocationInfo> allocatedLocationList = getKeyLocation(3, 0)
+    List<OmKeyLocationInfo> allocatedLocationList = getKeyLocation(3)
         .stream().map(OmKeyLocationInfo::getFromProtobuf)
         .collect(Collectors.toList());
 
@@ -196,14 +196,14 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
       throws Exception {
 
     // allocated block list
-    List<KeyLocation> allocatedKeyLocationList = getKeyLocation(5, 0);
+    List<KeyLocation> allocatedKeyLocationList = getKeyLocation(5);
 
     List<OmKeyLocationInfo> allocatedBlockList = allocatedKeyLocationList
         .stream().map(OmKeyLocationInfo::getFromProtobuf)
         .collect(Collectors.toList());
 
     // committed block list, with three blocks different with the allocated
-    List<KeyLocation> committedKeyLocationList = getKeyLocation(5, 3);
+    List<KeyLocation> committedKeyLocationList = getKeyLocation(3);
 
     OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest(
         committedKeyLocationList));
@@ -237,7 +237,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     // This is the first time to commit key, only the allocated but uncommitted
     // blocks should be deleted.
     Assert.assertEquals(1, toDeleteKeyList.size());
-    Assert.assertEquals(3, toDeleteKeyList.get(0).
+    Assert.assertEquals(2, toDeleteKeyList.get(0).
         getKeyLocationVersions().get(0).getLocationList().size());
 
     // Entry should be deleted from openKey Table.
@@ -274,7 +274,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     // Key table should have only two blocks.
     Assert.assertEquals(intersection,
         omKeyInfo.getLatestVersionLocations().getLocationList());
-    Assert.assertEquals(2, intersection.size());
+    Assert.assertEquals(3, intersection.size());
 
   }
 
@@ -555,7 +555,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   }
 
   private OMRequest createCommitKeyRequest() {
-    return createCommitKeyRequest(getKeyLocation(5, 0));
+    return createCommitKeyRequest(getKeyLocation(5));
   }
 
   /**
@@ -581,10 +581,10 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   /**
    * Create KeyLocation list.
    */
-  private List<KeyLocation> getKeyLocation(int count, int start) {
+  private List<KeyLocation> getKeyLocation(int count) {
     List<KeyLocation> keyLocations = new ArrayList<>();
 
-    for (int i = start; i < start + count; i++) {
+    for (int i = 0; i < count; i++) {
       KeyLocation keyLocation =
           KeyLocation.newBuilder()
               .setBlockID(HddsProtos.BlockID.newBuilder()

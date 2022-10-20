@@ -24,17 +24,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FileChecksumProto;
@@ -183,6 +179,7 @@ public final class OmKeyInfo extends WithParentObjectId {
   /**
    * updates the length of the each block in the list given.
    * This will be called when the key is being committed to OzoneManager.
+   * Return the uncommitted locationInfo to be deleted.
    *
    * @param locationInfoList list of locationInfo
    * @return allocated but uncommitted locationInfos
@@ -195,6 +192,7 @@ public final class OmKeyInfo extends WithParentObjectId {
   /**
    * updates the length of the each block in the list given.
    * This will be called when the key is being committed to OzoneManager.
+   * Return the uncommitted locationInfo to be deleted.
    *
    * @param locationInfoList list of locationInfo
    * @param isMpu a true represents multi part key, false otherwise
@@ -213,28 +211,14 @@ public final class OmKeyInfo extends WithParentObjectId {
 
     // Compare user given block location against allocatedBlockLocations
     // present in OmKeyInfo.
+    List<OmKeyLocationInfo> uncommittedBlocks = new ArrayList<>();
     List<OmKeyLocationInfo> updatedBlockLocations;
     if (skipBlockIDCheck) {
       updatedBlockLocations = locationInfoList;
     } else {
-      updatedBlockLocations =
-          verifyAndGetKeyLocations(locationInfoList, keyLocationInfoGroup);
+      updatedBlockLocations = verifyAndGetKeyLocations(locationInfoList,
+          keyLocationInfoGroup, uncommittedBlocks);
     }
-
-    // Every time the key commits, the uncommitted blocks should be detected
-    // If client not commit, the blocks should be cleaned by Open Key CleanUp
-    // Service.
-    // keyLocationInfoGroup has the allocated block location info
-    List<OmKeyLocationInfo> uncommittedBlocks =
-        new ArrayList<>(keyLocationInfoGroup.getBlocksLatestVersionOnly());
-    // Only check ContainerBlockID here to avoid the mismatch of the pipeline
-    // field and BcsId in the OmKeyLocationInfo, as the OmKeyInfoCodec ignores
-    // the pipeline field by default and bcsId would be updated in Ratis mode.
-    Set<ContainerBlockID> updatedBlockIDs = updatedBlockLocations.stream().
-        map(BlockLocationInfo::getBlockID).map(BlockID::getContainerBlockID).
-        collect(Collectors.toSet());
-    uncommittedBlocks.removeIf(block -> updatedBlockIDs.
-        contains(block.getBlockID().getContainerBlockID()));
 
     keyLocationInfoGroup.removeBlocks(latestVersion);
     // set each of the locationInfo object to the latest version
@@ -245,30 +229,47 @@ public final class OmKeyInfo extends WithParentObjectId {
     return uncommittedBlocks;
   }
 
+  /**
+   *  1. Verify committed KeyLocationInfos
+   *  2. find out the allocated but uncommitted KeyLocationInfos.
+   *
+   * @param locationInfoList committed KeyLocationInfos
+   * @param keyLocationInfoGroup allocated KeyLocationInfoGroup
+   * @param uncommittedLocationInfos list of uncommitted KeyLocationInfos
+   * @return verified KeyLocationInfos
+   */
   private List<OmKeyLocationInfo> verifyAndGetKeyLocations(
       List<OmKeyLocationInfo> locationInfoList,
-      OmKeyLocationInfoGroup keyLocationInfoGroup) {
+      OmKeyLocationInfoGroup keyLocationInfoGroup,
+      List<OmKeyLocationInfo> uncommittedLocationInfos) {
 
-    List<OmKeyLocationInfo> allocatedBlockLocations =
-        keyLocationInfoGroup.getBlocksLatestVersionOnly();
-    List<OmKeyLocationInfo> updatedBlockLocations = new ArrayList<>();
-
-    List<ContainerBlockID> existingBlockIDs = new ArrayList<>();
-    for (OmKeyLocationInfo existingLocationInfo : allocatedBlockLocations) {
-      BlockID existingBlockID = existingLocationInfo.getBlockID();
-      existingBlockIDs.add(existingBlockID.getContainerBlockID());
+    // Only check ContainerBlockID here to avoid the mismatch of the pipeline
+    // field and BcsId in the OmKeyLocationInfo, as the OmKeyInfoCodec ignores
+    // the pipeline field by default and bcsId would be updated in Ratis mode.
+    Map<ContainerBlockID, OmKeyLocationInfo> allocatedBlockLocations =
+        new HashMap<>();
+    for (OmKeyLocationInfo existingLocationInfo : keyLocationInfoGroup.
+        getLocationList()) {
+      ContainerBlockID existingBlockID = existingLocationInfo.getBlockID().
+          getContainerBlockID();
+      // The case of overwriting value should never happen
+      allocatedBlockLocations.put(existingBlockID, existingLocationInfo);
     }
 
+    List<OmKeyLocationInfo> updatedBlockLocations = new ArrayList<>();
     for (OmKeyLocationInfo modifiedLocationInfo : locationInfoList) {
-      BlockID modifiedBlockID = modifiedLocationInfo.getBlockID();
-      if (existingBlockIDs.contains(modifiedBlockID.getContainerBlockID())) {
+      ContainerBlockID modifiedContainerBlockId =
+          modifiedLocationInfo.getBlockID().getContainerBlockID();
+      if (allocatedBlockLocations.containsKey(modifiedContainerBlockId)) {
         updatedBlockLocations.add(modifiedLocationInfo);
+        allocatedBlockLocations.remove(modifiedContainerBlockId);
       } else {
         LOG.warn("Unknown BlockLocation:{}, where the blockID of given "
             + "location doesn't match with the stored/allocated block of"
             + " keyName:{}", modifiedLocationInfo, keyName);
       }
     }
+    uncommittedLocationInfos.addAll(allocatedBlockLocations.values());
     return updatedBlockLocations;
   }
 

@@ -245,7 +245,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       // let the uncommitted blocks pretend as key's old version blocks
       // which will be deleted as RepeatedOmKeyInfo
-      if (uncommitted.size() > 0) {
+      if (!uncommitted.isEmpty()) {
         LOG.info("Detect allocated but uncommitted blocks {} in key {}.",
             uncommitted, keyName);
         OmKeyInfo pseudoKeyInfo = omKeyInfo.copyObject();
