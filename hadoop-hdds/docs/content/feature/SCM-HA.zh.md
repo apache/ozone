@@ -127,7 +127,7 @@ SCM 使用子 CA 证书来签署 OM/Datanodes 的证书。
 
 引导 SCM 时会从原始 SCM 获取签名证书并启动子 CA。
 
-SCM 上的子 CA 用于为集群中的 OM/DN 颁发签名证书。 只有原始 SCM 向 OM/DN 颁发证书。
+SCM 上的子 CA 用于为集群中的 OM/DN 颁发签名证书。 只有 leader SCM 向 OM/DN 颁发证书。
 
 ### 如何启用安全
 
