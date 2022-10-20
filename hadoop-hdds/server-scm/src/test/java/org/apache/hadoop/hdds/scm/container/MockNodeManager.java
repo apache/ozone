@@ -595,10 +595,12 @@ public class MockNodeManager implements NodeManager {
    * heartbeat message.
    * @param datanodeDetails
    * @param commandReport
+   * @param commandsToBeSent
    */
   @Override
   public void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
-      CommandQueueReportProto commandReport) {
+      CommandQueueReportProto commandReport,
+      Map<SCMCommandProto.Type, Integer> commandsToBeSent) {
     // do nothing.
   }
 

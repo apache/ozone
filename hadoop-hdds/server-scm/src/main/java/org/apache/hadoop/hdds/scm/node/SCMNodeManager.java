@@ -698,10 +698,12 @@ public class SCMNodeManager implements NodeManager {
    *
    * @param datanodeDetails
    * @param commandQueueReportProto
+   * @param commandsToBeSent
    */
   @Override
   public void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
-      CommandQueueReportProto commandQueueReportProto) {
+      CommandQueueReportProto commandQueueReportProto,
+      Map<SCMCommandProto.Type, Integer> commandsToBeSent) {
     LOG.debug("Processing Command Queue Report from [datanode={}]",
         datanodeDetails.getHostName());
     if (LOG.isTraceEnabled()) {
@@ -712,7 +714,8 @@ public class SCMNodeManager implements NodeManager {
     try {
       DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
       if (commandQueueReportProto != null) {
-        datanodeInfo.setCommandCounts(commandQueueReportProto);
+        datanodeInfo.setCommandCounts(commandQueueReportProto,
+            commandsToBeSent);
         metrics.incNumNodeCommandQueueReportProcessed();
       }
     } catch (NodeNotFoundException e) {
