@@ -53,11 +53,12 @@ public final class FileStatusAdapter {
   private final boolean isErasureCoded;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public FileStatusAdapter(long length, long diskConsumed, Path path, boolean isdir,
-      short blockReplication, long blocksize, long modificationTime,
-      long accessTime, short permission, String owner,
-      String group, Path symlink, BlockLocation[] locations,
-      boolean isEncrypted, boolean isErasureCoded) {
+  public FileStatusAdapter(long length, long diskConsumed, Path path,
+      boolean isdir, short blockReplication, long blocksize,
+      long modificationTime, long accessTime, short permission,
+      String owner, String group, Path symlink,
+      BlockLocation[] locations, boolean isEncrypted,
+      boolean isErasureCoded) {
     this.length = length;
     this.diskConsumed = diskConsumed;
     this.path = path;

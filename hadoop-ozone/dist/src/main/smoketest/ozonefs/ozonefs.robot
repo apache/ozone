@@ -182,6 +182,7 @@ Setup localdir1
 Get Disk Usage of File with EC RS Replication
                                      [arguments]    ${fileLength}    ${dataChunkCount}    ${parityChunkCount}    ${ecChunkSize}
     ${ecChunkSize} =                 Evaluate   ${ecChunkSize} * 1024
+    # the formula comes from https://github.com/apache/ozone/blob/master/hadoop-ozone/common/src/main/java/org/apache/hadoop/ozone/om/helpers/QuotaUtil.java#L42-L60
     ${dataStripeSize} =              Evaluate   ${dataChunkCount} * ${ecChunkSize} * 1024
     ${fullStripes} =                 Evaluate   ${fileLength}/${dataStripeSize}
     ${fullStripes} =                 Convert To Integer   ${fullStripes}                        
@@ -202,6 +203,7 @@ Get Disk Usage of File with EC RS Replication
 
 Get Disk Usage of File with RATIS Replication
                                      [arguments]          ${fileLength}    ${replicationFactor}
+    # the formula comes from https://github.com/apache/ozone/blob/master/hadoop-ozone/common/src/main/java/org/apache/hadoop/ozone/om/helpers/QuotaUtil.java#L42-L60
     ${expectedDiskUsage} =           Evaluate             ${fileLength} * ${replicationFactor}
     ${expectedDiskUsage} =           Convert To String    ${expectedDiskUsage}
                                      [return]             ${expectedDiskUsage}
