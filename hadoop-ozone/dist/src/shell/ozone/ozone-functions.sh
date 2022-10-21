@@ -2763,7 +2763,7 @@ function validate_classpath_util
     echo "Validation FAILED due to missing jar files!"
     exit 1
   else
-    echo "Validation SUCCESSFUL, all the required jars are present!"
+    echo "Validation SUCCESSFUL, all required jars are present!"
   fi
 }
 
