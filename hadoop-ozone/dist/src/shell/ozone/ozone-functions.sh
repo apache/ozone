@@ -2701,8 +2701,8 @@ function validate_classpath
 ## @replaceable yes
 function validate_classpath_util
 {
-  local FLAG_FAIL
-  FLAG_FAIL=1
+  local fail_on_missing
+  fail_on_missing=true
 
   if [ -n "$1" ]; then
     if [ "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" == false ]; then
@@ -2725,7 +2725,7 @@ function validate_classpath_util
         ;;
       --continue)
         echo "The command execution shall continue even if the validation fails."
-        FLAG_FAIL=0
+        fail_on_missing=false
         ;;
       *)
         echo "Invalid option '$1'. Use --help to see the valid options."
@@ -2746,20 +2746,20 @@ function validate_classpath_util
   OIFS=$IFS
   IFS=':'
 
-  local flag
-  flag=1
+  local found_missing_jars
+  found_missing_jars=false
   for jar in $classpath; do
     if [[ ! -e "$jar" ]]; then
-      flag=0
+      found_missing_jars=true
       echo "ERROR: Jar file $(realpath "$jar") is missing"
     fi
   done
 
   IFS=$OIFS
 
-  if [[ "$flag" == 0 ]] && [[ "$FLAG_FAIL" == 0 ]]; then
+  if [[ "$found_missing_jars" == true ]] && [[ "$fail_on_missing" == false ]]; then
     echo "Validation FAILED due to missing jar files! Continuing command execution..."
-  elif [[ "$flag" == 0 ]] && [[ "$FLAG_FAIL" == 1 ]]; then
+  elif [[ "$found_missing_jars" == true ]] && [[ "$fail_on_missing" == true ]]; then
     echo "Validation FAILED due to missing jar files!"
     exit 1
   else
