@@ -54,7 +54,6 @@ Put
                    Should contain        ${result}         PUTFILE.txt
 
 
-
 Check disk usage after create a file which uses RATIS replication type
                 ${vol} =        BuiltIn.Set Variable    /vol1
                ${bucket} =      BuiltIn.Set Variable    /bucket1
@@ -178,3 +177,32 @@ Setup localdir1
                    Execute               ozone fs -mkdir -p ${BASE_URL}testdir1
                    Execute               ozone fs -copyFromLocal /tmp/localdir1 ${BASE_URL}testdir1/
                    Execute               ozone fs -put NOTICE.txt ${BASE_URL}testdir1/NOTICE.txt
+
+
+Get Disk Usage of File with EC RS Replication
+                                     [arguments]           ${fileLength}      ${dataChunkCount}     ${parityChunkCount}    ${ecChunkSize}
+    ${ecChunkSize} =                 Evaluate   ${ecChunkSize} * 1024
+    ${dataStripeSize} =              Evaluate   ${dataChunkCount} * ${ecChunkSize} * 1024
+    ${fullStripes} =                 Evaluate   ${fileLength}/${dataStripeSize}
+    ${fullStripes} =                 Convert To Integer   ${fullStripes}                        
+    # rounds to ones digit
+    ${fullStripes} =                 Convert to Number    ${fullStripes} 0
+    ${partialFirstChunk} =           Evaluate   ${fileLength} % ${dataStripeSize}                            
+    ${ecChunkSize} =                 Convert To Integer   ${ecChunkSize}
+    ${partialFirstChunk} =           Convert To Integer   ${partialFirstChunk}
+    ${partialFirstChunkOptions} =    Create List   ${ecChunkSize}   ${partialFirstChunk}
+    ${partialFirstChunk} =           Evaluate   min(${partialFirstChunkOptions})
+    ${replicationOverhead} =         Evaluate   ${fullStripes} * 2 * 1024 * 1024 + ${partialFirstChunk} * 2                            
+    ${expectedDiskUsage} =           Evaluate   ${fileLength} + ${replicationOverhead}
+    # Convert float to int
+    ${expectedDiskUsage} =           Convert To Integer    ${expectedDiskUsage}
+    ${expectedDiskUsage} =           Convert To String    ${expectedDiskUsage}
+                                     [return]             ${expectedDiskUsage}
+
+
+Get Disk Usage of File with RATIS Replication
+                                     [arguments]          ${fileLength}    ${replicationFactor}
+    ${expectedDiskUsage} =           Evaluate             ${fileLength} * ${replicationFactor}
+    ${expectedDiskUsage} =           Convert To String    ${expectedDiskUsage}
+                                     [return]             ${expectedDiskUsage}
+
