@@ -57,30 +57,30 @@ Put
 Check disk usage after create a file which uses RATIS replication type
                 ${vol} =        BuiltIn.Set Variable    /vol1
                ${bucket} =      BuiltIn.Set Variable    /bucket1
-                                Execute               ozone sh volume create ${vol}
-                                Execute               ozone sh bucket create ${vol}${bucket} --replication 3 --type RATIS
-                                Execute               ozone fs -put NOTICE.txt ${vol}${bucket}/PUTFILE1.txt
-     ${expectedFileLength} =    Execute               stat -c %s NOTICE.txt
+                                Execute                 ozone sh volume create ${vol}
+                                Execute                 ozone sh bucket create ${vol}${bucket} --type RATIS --replication 3 
+                                Execute                 ozone fs -put NOTICE.txt ${vol}${bucket}/PUTFILE1.txt
+     ${expectedFileLength} =    Execute                 stat -c %s NOTICE.txt
      ${expectedDiskUsage} =     Get Disk Usage of File with RATIS Replication    ${expectedFileLength}    3
-     ${result} =                Execute               ozone fs -du ofs://om${vol}${bucket}
-                                Should contain        ${result}         PUTFILE1.txt
-                                Should contain        ${result}         ${expectedFileLength}
-                                Should contain        ${result}         ${expectedDiskUsage}
+     ${result} =                Execute                 ozone fs -du ofs://om${vol}${bucket}
+                                Should contain          ${result}         PUTFILE1.txt
+                                Should contain          ${result}         ${expectedFileLength}
+                                Should contain          ${result}         ${expectedDiskUsage}
 
 
 
 Check disk usage after create a file which uses EC replication type
                    ${vol} =    BuiltIn.Set Variable    /vol2
                 ${bucket} =    BuiltIn.Set Variable    /bucket2
-                               Execute                ozone sh volume create ${vol}
-                               Execute                ozone sh bucket create ${vol}${bucket} --type EC --replication rs-3-2-1024k
-                               Execute                ozone fs -put NOTICE.txt ${vol}${bucket}/PUTFILE2.txt
-    ${expectedFileLength} =    Execute                stat -c %s NOTICE.txt
+                               Execute                  ozone sh volume create ${vol}
+                               Execute                  ozone sh bucket create ${vol}${bucket} --type EC --replication rs-3-2-1024k
+                               Execute                  ozone fs -put NOTICE.txt ${vol}${bucket}/PUTFILE2.txt
+    ${expectedFileLength} =    Execute                  stat -c %s NOTICE.txt
      ${expectedDiskUsage} =    Get Disk Usage of File with EC RS Replication    ${expectedFileLength}    3    2    1024
-                ${result} =    Execute                ozone fs -du ofs://om${vol}${bucket}
-                               Should contain         ${result}         PUTFILE2.txt
-                               Should contain         ${result}         ${expectedFileLength}
-                               Should contain         ${result}         ${expectedDiskUsage}
+                ${result} =    Execute                  ozone fs -du ofs://om${vol}${bucket}
+                               Should contain           ${result}         PUTFILE2.txt
+                               Should contain           ${result}         ${expectedFileLength}
+                               Should contain           ${result}         ${expectedDiskUsage}
 
 
 List
@@ -180,7 +180,7 @@ Setup localdir1
 
 
 Get Disk Usage of File with EC RS Replication
-                                     [arguments]           ${fileLength}      ${dataChunkCount}     ${parityChunkCount}    ${ecChunkSize}
+                                     [arguments]    ${fileLength}    ${dataChunkCount}    ${parityChunkCount}    ${ecChunkSize}
     ${ecChunkSize} =                 Evaluate   ${ecChunkSize} * 1024
     ${dataStripeSize} =              Evaluate   ${dataChunkCount} * ${ecChunkSize} * 1024
     ${fullStripes} =                 Evaluate   ${fileLength}/${dataStripeSize}
