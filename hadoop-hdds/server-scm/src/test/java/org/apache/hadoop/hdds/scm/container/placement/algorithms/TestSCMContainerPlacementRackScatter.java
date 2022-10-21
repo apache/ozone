@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
+import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,7 +51,9 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
@@ -87,7 +90,20 @@ public class TestSCMContainerPlacementRackScatter {
         IntStream.of(20, 25, 30));
   }
 
+  private void updateStorageInDatanode(int dnIndex, long used, long remaining) {
+    StorageReportProto storage = HddsTestUtils.createStorageReport(
+            dnInfos.get(dnIndex).getUuid(),
+            "/data1-" + dnInfos.get(dnIndex).getUuidString(),
+            STORAGE_CAPACITY, used, remaining, null);
+    dnInfos.get(dnIndex).updateStorageReports(
+            new ArrayList<>(Arrays.asList(storage)));
+  }
+
   private void setup(int datanodeCount) {
+    setup(datanodeCount, NODE_PER_RACK);
+  }
+
+  private void setup(int datanodeCount, int nodesPerRack) {
     //initialize network topology instance
     conf = new OzoneConfiguration();
     // We are using small units here
@@ -105,7 +121,7 @@ public class TestSCMContainerPlacementRackScatter {
       // Totally 6 racks, each has 5 datanodes
       DatanodeDetails datanodeDetails =
           MockDatanodeDetails.createDatanodeDetails(
-          hostname + i, rack + (i / NODE_PER_RACK));
+          hostname + i, rack + (i / nodesPerRack));
 
       datanodes.add(datanodeDetails);
       cluster.add(datanodeDetails);
@@ -495,6 +511,64 @@ public class TestSCMContainerPlacementRackScatter {
     stat = policy.validateContainerPlacement(dns, 1);
     assertTrue(stat.isPolicySatisfied());
     assertEquals(0, stat.misReplicationCount());
+  }
+
+  public List<DatanodeDetails> getDatanodes(List<Integer> dnIndexes) {
+    return dnIndexes.stream().map(datanodes::get).collect(Collectors.toList());
+  }
+
+  private void assertPlacementPolicySatisfied(List<DatanodeDetails> usedDns,
+      List<DatanodeDetails> additionalNodes,
+      List<DatanodeDetails> excludedNodes, int requiredNodes,
+      boolean isSatisfied, int misReplication) {
+    assertFalse(excludedNodes.stream().anyMatch(additionalNodes::contains));
+    ContainerPlacementStatus stat = policy.validateContainerPlacement(
+            Stream.of(usedDns, additionalNodes)
+                    .flatMap(List::stream).collect(Collectors.toList()),
+            requiredNodes);
+    assertEquals(isSatisfied, stat.isPolicySatisfied());
+    assertEquals(misReplication, stat.misReplicationCount());
+  }
+
+  @Test
+  public void testValidChooseNodesWithUsedNodes() throws SCMException {
+    setup(5, 2);
+    List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1));
+    List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(2));
+    List<DatanodeDetails> additionalNodes = policy.chooseDatanodes(usedDns,
+            excludedDns, null, 2, 0, 5);
+    assertPlacementPolicySatisfied(usedDns, additionalNodes, excludedDns, 4,
+            true, 0);
+  }
+
+  @Test
+  public void testChooseNodesWithUsedNodesWithInsufficientRequiredNodeCount() {
+    setup(5, 2);
+    List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1));
+    List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(2));
+    SCMException exception = Assertions.assertThrows(SCMException.class, () ->
+            policy.chooseDatanodes(usedDns, excludedDns,
+                    null, 1, 0, 5));
+    assertEquals("Required nodes size: 1 is less than " +
+            "required number of racks to choose: 2.", exception.getMessage());
+    assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
+            exception.getResult());
+  }
+
+  @Test
+  public void testInValidChooseNodesWithUsedNodesWithInsufficientRacks() {
+    setup(6, 2);
+    List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1));
+    updateStorageInDatanode(4, 99, 1);
+    List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(5));
+    SCMException exception = Assertions.assertThrows(SCMException.class, () ->
+            policy.chooseDatanodes(usedDns, excludedDns,
+                    null, 2, 0, 5));
+    assertEquals("Chosen nodes size from Unique Racks: 1, but required " +
+            "nodes to choose from Unique Racks: 2 do not match.",
+            exception.getMessage());
+    assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES,
+            exception.getResult());
   }
 
   @Test

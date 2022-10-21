@@ -352,7 +352,7 @@ public class ReconStorageContainerManagerFacade
   @Override
   public void shutDown(String message) {
     stop();
-    ExitUtils.terminate(1, message, LOG);
+    ExitUtils.terminate(0, message, LOG);
   }
 
   public ReconDatanodeProtocolServer getDatanodeProtocolServer() {
@@ -425,11 +425,12 @@ public class ReconStorageContainerManagerFacade
           ReconSCMDBDefinition.NODES.getTable(dbStore);
       Table<UUID, DatanodeDetails> newNodeTable =
           ReconSCMDBDefinition.NODES.getTable(newStore);
-      TableIterator<UUID, ? extends KeyValue<UUID,
-          DatanodeDetails>> iterator = nodeTable.iterator();
-      while (iterator.hasNext()) {
-        KeyValue<UUID, DatanodeDetails> keyValue = iterator.next();
-        newNodeTable.put(keyValue.getKey(), keyValue.getValue());
+      try (TableIterator<UUID, ? extends KeyValue<UUID,
+          DatanodeDetails>> iterator = nodeTable.iterator()) {
+        while (iterator.hasNext()) {
+          KeyValue<UUID, DatanodeDetails> keyValue = iterator.next();
+          newNodeTable.put(keyValue.getKey(), keyValue.getValue());
+        }
       }
       sequenceIdGen.reinitialize(
           ReconSCMDBDefinition.SEQUENCE_ID.getTable(newStore));

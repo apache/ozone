@@ -98,7 +98,7 @@ public final class S3SecretRequestHelper {
     // to a tenant), fall back to the old permission check.
     final String fullPrincipal = ugi.getUserName();
     if (!isAccessIdAssignedToTenant &&
-        !fullPrincipal.equals(accessId) && !ozoneManager.isAdmin(ugi)) {
+        !fullPrincipal.equals(accessId) && !ozoneManager.isS3Admin(ugi)) {
 
       throw new OMException("Requested accessId '" + accessId +
           "' doesn't match current user '" + fullPrincipal +

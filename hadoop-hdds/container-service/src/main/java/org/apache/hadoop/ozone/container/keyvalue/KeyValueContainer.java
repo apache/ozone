@@ -259,8 +259,13 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
     } catch (IOException ex) {
       onFailure(containerData.getVolume());
-      throw new StorageContainerException("Error while creating/ updating " +
-          ".container file. ContainerID: " + containerId, ex,
+      String containerExceptionMessage = "Error while creating/updating" +
+            " container file. ContainerID: " + containerId +
+            ", container path: " + containerFile.getAbsolutePath();
+      if (tempContainerFile == null) {
+        containerExceptionMessage += " Temporary file could not be created.";
+      }
+      throw new StorageContainerException(containerExceptionMessage, ex,
           CONTAINER_FILES_CREATE_ERROR);
     } finally {
       if (tempContainerFile != null && tempContainerFile.exists()) {
@@ -823,7 +828,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     long containerId = containerData.getContainerID();
     KeyValueContainerCheck checker =
         new KeyValueContainerCheck(containerData.getMetadataPath(), config,
-            containerId, containerData.getVolume());
+            containerId, containerData.getVolume(), this);
     return checker.fastCheck();
   }
 
@@ -844,7 +849,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     long containerId = containerData.getContainerID();
     KeyValueContainerCheck checker =
         new KeyValueContainerCheck(containerData.getMetadataPath(), config,
-            containerId, containerData.getVolume());
+            containerId, containerData.getVolume(), this);
 
     return checker.fullCheck(throttler, canceler);
   }

@@ -121,30 +121,6 @@ const renderDatanodeOpState = (opState: DatanodeOpState) => {
 
 const COLUMNS = [
   {
-    title: 'State',
-    dataIndex: 'state',
-    key: 'state',
-    isVisible: true,
-    filterMultiple: true,
-    filters: DatanodeStateList.map(state => ({text: state, value: state})),
-    onFilter: (value: DatanodeState, record: IDatanode) => record.state === value,
-    render: (text: DatanodeState) => renderDatanodeState(text),
-    sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state),
-    fixed: 'left'
-  },
-  {
-    title: 'Operational State',
-    dataIndex: 'opState',
-    key: 'opState',
-    isVisible: true,
-    filterMultiple: true,
-    filters: DatanodeOpStateList.map(state => ({text: state, value: state})),
-    onFilter: (value: DatanodeOpState, record: IDatanode) => record.opState === value,
-    render: (text: DatanodeOpState) => renderDatanodeOpState(text),
-    sorter: (a: IDatanode, b: IDatanode) => a.opState.localeCompare(b.opState),
-    fixed: 'left'
-  },
-  {
     title: 'Hostname',
     dataIndex: 'hostname',
     key: 'hostname',
@@ -154,6 +130,31 @@ const COLUMNS = [
     defaultSortOrder: 'ascend' as const,
     fixed: 'left'
   },
+  {
+    title: 'State',
+    dataIndex: 'state',
+    key: 'state',
+    isVisible: true,
+    isSearchable: true,
+    filterMultiple: true,
+    filters: DatanodeStateList.map(state => ({text: state, value: state})),
+    onFilter: (value: DatanodeState, record: IDatanode) => record.state === value,
+    render: (text: DatanodeState) => renderDatanodeState(text),
+    sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state)
+  },
+  {
+    title: 'Operational State',
+    dataIndex: 'opState',
+    key: 'opState',
+    isVisible: true,
+    isSearchable: true,
+    filterMultiple: true,
+    filters: DatanodeOpStateList.map(state => ({text: state, value: state})),
+    onFilter: (value: DatanodeOpState, record: IDatanode) => record.opState === value,
+    render: (text: DatanodeOpState) => renderDatanodeOpState(text),
+    sorter: (a: IDatanode, b: IDatanode) => a.opState.localeCompare(b.opState)
+  },
+ 
   {
     title: 'Uuid',
     dataIndex: 'uuid',

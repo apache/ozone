@@ -17,17 +17,22 @@
  */
 package org.apache.hadoop.ozone;
 
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.failure.Failures;
+import org.apache.hadoop.ozone.freon.FreonReplicationOptions;
 import org.apache.hadoop.ozone.loadgenerators.LoadGenerator;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.BeforeClass;
 import org.junit.AfterClass;
 import org.junit.Ignore;
 import org.junit.Test;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -48,6 +53,8 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
 
   private static List<Class<? extends LoadGenerator>> loadClasses
       = new ArrayList<>();
+
+  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE }
 
   @Option(names = {"-d", "--num-datanodes", "--numDatanodes"},
       description = "num of datanodes. Full name --numDatanodes will be" +
@@ -91,6 +98,15 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
           "--failureInterval will be removed in later versions.")
   private static int failureInterval = 300; // 5 minute period between failures.
 
+  @CommandLine.Mixin
+  private static FreonReplicationOptions freonReplication =
+          new FreonReplicationOptions();
+
+  @Option(names = {"-l", "--layout"},
+      description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}")
+  private static AllowedBucketLayouts allowedBucketLayout =
+      AllowedBucketLayouts.FILE_SYSTEM_OPTIMIZED;
+
   private static MiniOzoneChaosCluster cluster;
   private static MiniOzoneLoadGenerator loadGenerator;
 
@@ -124,13 +140,23 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
 
+    BucketLayout bucketLayout =
+        BucketLayout.valueOf(allowedBucketLayout.toString());
+    final BucketArgs.Builder builder = BucketArgs.newBuilder();
+
+    freonReplication.fromParams(configuration).ifPresent(config ->
+            builder.setDefaultReplicationConfig(
+                    new DefaultReplicationConfig(config)));
+    builder.setBucketLayout(bucketLayout);
+
     MiniOzoneLoadGenerator.Builder loadBuilder =
         new MiniOzoneLoadGenerator.Builder()
         .setVolume(volume)
         .setConf(configuration)
         .setNumBuffers(numBuffers)
         .setNumThreads(numThreads)
-        .setOMServiceId(omServiceId);
+        .setOMServiceId(omServiceId)
+        .setBucketArgs(builder.build());
     loadClasses.forEach(loadBuilder::addLoadGenerator);
     loadGenerator = loadBuilder.build();
   }

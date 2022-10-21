@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -100,9 +101,12 @@ public class ECReconstructionCoordinator implements Closeable {
 
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final TokenHelper tokenHelper;
+  private final ContainerClientMetrics clientMetrics;
+  private final ECReconstructionMetrics metrics;
 
   public ECReconstructionCoordinator(ConfigurationSource conf,
-      CertificateClient certificateClient) throws IOException {
+      CertificateClient certificateClient,
+      ECReconstructionMetrics metrics) throws IOException {
     this.containerOperationClient = new ECContainerOperationClient(conf,
         certificateClient);
     this.byteBufferPool = new ElasticByteBufferPool();
@@ -117,6 +121,8 @@ public class ECReconstructionCoordinator implements Closeable {
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, () -> ecReconstructExecutor);
     tokenHelper = new TokenHelper(conf, certificateClient);
+    this.clientMetrics = ContainerClientMetrics.acquire();
+    this.metrics = metrics;
   }
 
   public void reconstructECContainerGroup(long containerID,
@@ -158,8 +164,13 @@ public class ECReconstructionCoordinator implements Closeable {
         containerOperationClient
             .closeContainer(containerID, dn, repConfig, containerToken);
       }
+      metrics.incReconstructionTotal();
+      metrics.incBlockGroupReconstructionTotal(blockLocationInfoMap.size());
     } catch (Exception e) {
       // Any exception let's delete the recovering containers.
+      metrics.incReconstructionFailsTotal();
+      metrics.incBlockGroupReconstructionFailsTotal(
+          blockLocationInfoMap.size());
       LOG.warn(
           "Exception while reconstructing the container {}. Cleaning up"
               + " all the recovering containers in the reconstruction process.",
@@ -179,8 +190,8 @@ public class ECReconstructionCoordinator implements Closeable {
           LOG.error("Exception while deleting the container {} at target: {}",
               containerID, dn, ioe);
         }
-        throw e;
       }
+      throw e;
     }
 
   }
@@ -242,7 +253,7 @@ public class ECReconstructionCoordinator implements Closeable {
                 this.containerOperationClient.getXceiverClientManager(),
                 this.containerOperationClient
                     .singleNodePipeline(datanodeDetails, repConfig), bufferPool,
-                configuration, blockLocationInfo.getToken());
+                configuration, blockLocationInfo.getToken(), clientMetrics);
         bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
         // Make sure it's clean. Don't want to reuse the erroneously returned
         // buffers from the pool.
@@ -440,5 +451,9 @@ public class ECReconstructionCoordinator implements Closeable {
       blockGroupLen = Math.min(putBlockLen, blockGroupLen);
     }
     return blockGroupLen == Long.MAX_VALUE ? 0 : blockGroupLen;
+  }
+
+  public ECReconstructionMetrics getECReconstructionMetrics() {
+    return this.metrics;
   }
 }

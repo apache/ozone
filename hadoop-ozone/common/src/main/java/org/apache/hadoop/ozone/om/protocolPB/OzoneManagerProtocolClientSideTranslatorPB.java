@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
+import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -101,6 +102,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetDelegationTokenResponseProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextRequest;
@@ -173,6 +176,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantRevokeUserAccessIdRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -772,20 +777,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   }
 
-
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
     LookupKeyRequest.Builder req = LookupKeyRequest.newBuilder();
-    KeyArgs keyArgs = KeyArgs.newBuilder()
-        .setVolumeName(args.getVolumeName())
-        .setBucketName(args.getBucketName())
-        .setKeyName(args.getKeyName())
-        .setDataSize(args.getDataSize())
-        .setSortDatanodes(args.getSortDatanodes())
-        .setLatestVersionLocation(args.getLatestVersionLocation())
-        .setHeadOp(args.isHeadOp())
-        .build();
-    req.setKeyArgs(keyArgs);
+    req.setKeyArgs(args.toProtobuf());
 
     OMRequest omRequest = createOMRequest(Type.LookupKey)
         .setLookupKeyRequest(req)
@@ -795,6 +790,23 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         handleError(submitRequest(omRequest)).getLookupKeyResponse();
 
     return OmKeyInfo.getFromProtobuf(resp.getKeyInfo());
+  }
+
+  @Override
+  public KeyInfoWithVolumeContext getKeyInfo(OmKeyArgs args,
+                                             boolean assumeS3Context)
+      throws IOException {
+    GetKeyInfoRequest.Builder req = GetKeyInfoRequest.newBuilder();
+    req.setKeyArgs(args.toProtobuf());
+    req.setAssumeS3Context(assumeS3Context);
+
+    OMRequest omRequest = createOMRequest(Type.GetKeyInfo)
+        .setGetKeyInfoRequest(req)
+        .build();
+
+    GetKeyInfoResponse resp =
+        handleError(submitRequest(omRequest)).getGetKeyInfoResponse();
+    return KeyInfoWithVolumeContext.fromProtobuf(resp);
   }
 
   @Override
@@ -2023,6 +2035,24 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setCancelPrepareRequest(cancelPrepareRequest).build();
 
     return handleError(submitRequest(omRequest)).getCancelPrepareResponse();
+  }
+
+  @Override
+  public EchoRPCResponse echoRPCReq(byte[] payloadReq,
+                                    int payloadSizeResp)
+          throws IOException {
+    EchoRPCRequest echoRPCRequest =
+            EchoRPCRequest.newBuilder()
+                    .setPayloadReq(ByteString.copyFrom(payloadReq))
+                    .setPayloadSizeResp(payloadSizeResp)
+                    .build();
+
+    OMRequest omRequest = createOMRequest(Type.EchoRPC)
+            .setEchoRPCRequest(echoRPCRequest).build();
+
+    EchoRPCResponse echoRPCResponse =
+            handleError(submitRequest(omRequest)).getEchoRPCResponse();
+    return echoRPCResponse;
   }
 
   @VisibleForTesting

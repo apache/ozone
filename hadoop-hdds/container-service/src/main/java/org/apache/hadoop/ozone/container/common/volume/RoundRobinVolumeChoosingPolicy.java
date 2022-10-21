@@ -27,6 +27,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.logIfSomeVolumesOutOfSpace;
+import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.throwDiskOutOfSpace;
+
 /**
  * Choose volumes in round-robin order.
  * The caller should synchronize access to the list of volumes.
@@ -48,38 +51,31 @@ public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
       throw new DiskOutOfSpaceException("No more available volumes");
     }
 
+    AvailableSpaceFilter filter = new AvailableSpaceFilter(maxContainerSize);
+
     // since volumes could've been removed because of the failure
     // make sure we are not out of bounds
     int nextIndex = nextVolumeIndex.get();
     int currentVolumeIndex = nextIndex < volumes.size() ? nextIndex : 0;
 
     int startVolumeIndex = currentVolumeIndex;
-    long maxAvailable = 0;
 
     while (true) {
       final HddsVolume volume = volumes.get(currentVolumeIndex);
       // adjust for remaining capacity in Open containers
-      long availableVolumeSize = volume.getAvailable()
-          - volume.getCommittedBytes();
+      boolean hasEnoughSpace = filter.test(volume);
 
       currentVolumeIndex = (currentVolumeIndex + 1) % volumes.size();
 
-      if (availableVolumeSize > maxContainerSize) {
+      if (hasEnoughSpace) {
+        logIfSomeVolumesOutOfSpace(filter, LOG);
         nextVolumeIndex.compareAndSet(nextIndex, currentVolumeIndex);
         return volume;
       }
 
-      if (availableVolumeSize > maxAvailable) {
-        maxAvailable = availableVolumeSize;
-      }
-
       if (currentVolumeIndex == startVolumeIndex) {
-        throw new DiskOutOfSpaceException("Out of space: "
-            + "The volume with the most available space (=" + maxAvailable
-            + " B) is less than the container size (=" + maxContainerSize
-            + " B).");
+        throwDiskOutOfSpace(filter, LOG);
       }
-
     }
   }
 }

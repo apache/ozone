@@ -182,7 +182,7 @@ public class TestStorageContainerManagerHA {
         .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true).build();
+        .build();
     final OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     final List<OmKeyLocationInfo> keyLocationInfos =
         keyInfo.getKeyLocationVersions().get(0).getBlocksLatestVersionOnly();

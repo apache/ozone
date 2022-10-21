@@ -37,6 +37,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Container placement policy that scatter datanodes on different racks
@@ -76,85 +77,22 @@ public final class SCMContainerPlacementRackScatter
     this.metrics = metrics;
   }
 
-  /**
-   * Called by SCM to choose datanodes.
-   *
-   *
-   * @param excludedNodes - list of the datanodes to exclude.
-   * @param favoredNodes - list of nodes preferred. This is a hint to the
-   *                     allocator, whether the favored nodes will be used
-   *                     depends on whether the nodes meets the allocator's
-   *                     requirement.
-   * @param nodesRequiredToChoose - number of datanodes required.
-   * @param dataSizeRequired - size required for the container.
-   * @param metadataSizeRequired - size required for Ratis metadata.
-   * @return List of datanodes.
-   * @throws SCMException  SCMException
-   */
-  @Override
-  protected List<DatanodeDetails> chooseDatanodesInternal(
-      final List<DatanodeDetails> excludedNodes,
-      final List<DatanodeDetails> favoredNodes,
-      final int nodesRequiredToChoose, final long metadataSizeRequired,
-      final long dataSizeRequired) throws SCMException {
-    if (nodesRequiredToChoose <= 0) {
-      String errorMsg = "num of nodes required to choose should bigger" +
-          "than 0, but the given num is " + nodesRequiredToChoose;
-      throw new SCMException(errorMsg, null);
+  public Set<DatanodeDetails> chooseNodesFromRacks(List<Node> racks,
+          List<Node> unavailableNodes,
+          List<DatanodeDetails> mutableFavoredNodes,
+          int nodesRequired, final long metadataSizeRequired,
+          final long dataSizeRequired, int maxOuterLoopIterations) {
+    if (nodesRequired <= 0) {
+      return Collections.emptySet();
     }
-    metrics.incrDatanodeRequestCount(nodesRequiredToChoose);
-    int nodesRequired = nodesRequiredToChoose;
-    int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
-    List<Node> availableNodes = networkTopology.getNodes(
-        networkTopology.getMaxLevel());
-    int totalNodesCount = availableNodes.size();
-    if (excludedNodes != null) {
-      availableNodes.removeAll(excludedNodes);
-    }
-    if (availableNodes.size() < nodesRequired) {
-      throw new SCMException("No enough datanodes to choose. " +
-          "TotalNode = " + totalNodesCount +
-          " AvailableNode = " + availableNodes.size() +
-          " RequiredNode = " + nodesRequired +
-          " ExcludedNode = " + excludedNodesCount,
-          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
-    }
-
-    List<DatanodeDetails> mutableFavoredNodes = new ArrayList<>();
-    if (favoredNodes != null) {
-      // Generate mutableFavoredNodes, only stores valid favoredNodes
-      for (DatanodeDetails datanodeDetails : favoredNodes) {
-        if (isValidNode(datanodeDetails, metadataSizeRequired,
-            dataSizeRequired)) {
-          mutableFavoredNodes.add(datanodeDetails);
-        }
-      }
-      Collections.shuffle(mutableFavoredNodes);
-    }
-    if (excludedNodes != null) {
-      mutableFavoredNodes.removeAll(excludedNodes);
-    }
-
-    // For excluded nodes, we sort their racks at rear
-    List<Node> racks = getAllRacks();
-    if (excludedNodes != null && excludedNodes.size() > 0) {
-      racks = sortRackWithExcludedNodes(racks, excludedNodes);
-    }
-
     List<Node> toChooseRacks = new LinkedList<>();
     Set<DatanodeDetails> chosenNodes = new LinkedHashSet<>();
-    List<Node> unavailableNodes = new ArrayList<>();
     Set<Node> skippedRacks = new HashSet<>();
-    if (excludedNodes != null) {
-      unavailableNodes.addAll(excludedNodes);
-    }
-
     // If the result doesn't change after retryCount, we return with exception
     int retryCount = 0;
-    while (nodesRequired > 0) {
+    while (nodesRequired > 0 && maxOuterLoopIterations > 0) {
       if (retryCount > OUTER_LOOP_MAX_RETRY) {
-        throw new SCMException("No satisfied datanode to meet the" +
-            " excludedNodes and affinityNode constrains.", null);
+        return chosenNodes;
       }
       int chosenListSize = chosenNodes.size();
 
@@ -196,7 +134,7 @@ public final class SCMContainerPlacementRackScatter
           continue;
         }
         Node node = chooseNode(rack.getNetworkFullPath(), unavailableNodes,
-            metadataSizeRequired, dataSizeRequired);
+                metadataSizeRequired, dataSizeRequired);
         if (node != null) {
           chosenNodes.add((DatanodeDetails) node);
           mutableFavoredNodes.remove(node);
@@ -220,25 +158,171 @@ public final class SCMContainerPlacementRackScatter
         // If chosenNodes changed, reset the retryCount
         retryCount = 0;
       }
+      maxOuterLoopIterations--;
     }
-    List<DatanodeDetails> result = new ArrayList<>(chosenNodes);
-    ContainerPlacementStatus placementStatus =
-        validateContainerPlacement(result, nodesRequiredToChoose);
-    if (!placementStatus.isPolicySatisfied()) {
-      String errorMsg = "ContainerPlacementPolicy not met, currentRacks is " +
-          placementStatus.actualPlacementCount() + "desired racks is" +
-          placementStatus.expectedPlacementCount();
+    return chosenNodes;
+  }
+
+  /**
+   * Called by SCM to choose datanodes.
+   *
+   * @param usedNodes - list of the datanodes to already chosen in the
+   *                      pipeline.
+   * @param excludedNodes - list of the datanodes to exclude.
+   * @param favoredNodes - list of nodes preferred. This is a hint to the
+   *                     allocator, whether the favored nodes will be used
+   *                     depends on whether the nodes meets the allocator's
+   *                     requirement.
+   * @param nodesRequiredToChoose - number of datanodes required.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
+   * @return List of datanodes.
+   * @throws SCMException  SCMException
+   */
+  @Override
+  protected List<DatanodeDetails> chooseDatanodesInternal(
+          List<DatanodeDetails> usedNodes,
+          final List<DatanodeDetails> excludedNodes,
+          final List<DatanodeDetails> favoredNodes,
+          final int nodesRequiredToChoose, final long metadataSizeRequired,
+          final long dataSizeRequired) throws SCMException {
+    if (nodesRequiredToChoose <= 0) {
+      String errorMsg = "num of nodes required to choose should bigger" +
+          "than 0, but the given num is " + nodesRequiredToChoose;
       throw new SCMException(errorMsg, null);
     }
+    metrics.incrDatanodeRequestCount(nodesRequiredToChoose);
+    int nodesRequired = nodesRequiredToChoose;
+    int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
+    List<Node> availableNodes = networkTopology.getNodes(
+        networkTopology.getMaxLevel());
+    int totalNodesCount = availableNodes.size();
+    if (excludedNodes != null) {
+      availableNodes.removeAll(excludedNodes);
+    }
+    if (availableNodes.size() < nodesRequired) {
+      throw new SCMException("No enough datanodes to choose. " +
+          "TotalNode = " + totalNodesCount +
+          " AvailableNode = " + availableNodes.size() +
+          " RequiredNode = " + nodesRequired +
+          " ExcludedNode = " + excludedNodesCount,
+          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    }
+
+    List<DatanodeDetails> mutableFavoredNodes = new ArrayList<>();
+    if (favoredNodes != null) {
+      // Generate mutableFavoredNodes, only stores valid favoredNodes
+      for (DatanodeDetails datanodeDetails : favoredNodes) {
+        if (isValidNode(datanodeDetails, metadataSizeRequired,
+            dataSizeRequired)) {
+          mutableFavoredNodes.add(datanodeDetails);
+        }
+      }
+      Collections.shuffle(mutableFavoredNodes);
+    }
+    if (excludedNodes != null) {
+      mutableFavoredNodes.removeAll(excludedNodes);
+    }
+
+    if (usedNodes == null) {
+      usedNodes = Collections.emptyList();
+    }
+    List<Node> racks = getAllRacks();
+    Set<Node> usedRacks = usedNodes.stream()
+            .map(node -> networkTopology.getAncestor(node, RACK_LEVEL))
+            .filter(node -> node != null)
+            .collect(Collectors.toSet());
+    int requiredReplicationFactor = usedNodes.size() + nodesRequired;
+    int numberOfRacksRequired =
+            getRequiredRackCount(requiredReplicationFactor);
+    int additionalRacksRequired = numberOfRacksRequired - usedRacks.size();
+    if (nodesRequired < additionalRacksRequired) {
+      String reason = "Required nodes size: " + nodesRequired
+              + " is less than required number of racks to choose: "
+              + additionalRacksRequired + ".";
+      LOG.warn("Placement policy cannot choose the enough racks. {}"
+                      + "Total number of Required Racks: {} Used Racks Count:" +
+                      " {}, Required Nodes count: {}",
+              reason, numberOfRacksRequired, usedRacks.size(), nodesRequired);
+      throw new SCMException(reason,
+              SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    }
+    // For excluded nodes, we sort their racks at rear
+    racks = sortRackWithExcludedNodes(racks, excludedNodes, usedRacks);
+
+    List<Node> unavailableNodes = new ArrayList<>();
+    if (excludedNodes != null) {
+      unavailableNodes.addAll(excludedNodes);
+    }
+    unavailableNodes.addAll(usedNodes);
+
+    Set<DatanodeDetails> chosenNodes = new LinkedHashSet<>();
+
+    if (racks.size() < additionalRacksRequired) {
+      String reason = "Number of existing racks: " + racks.size()
+              + "is less than additional required number of racks to choose: "
+              + additionalRacksRequired + " do not match.";
+      LOG.warn("Placement policy cannot choose the enough racks. {}"
+                      + "Total number of Required Racks: {} Used Racks Count:" +
+                      " {}, Required Nodes count: {}",
+              reason, numberOfRacksRequired, usedRacks.size(), nodesRequired);
+      throw new SCMException(reason,
+              SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    }
+
+    chosenNodes.addAll(chooseNodesFromRacks(racks, unavailableNodes,
+            mutableFavoredNodes, additionalRacksRequired,
+            metadataSizeRequired, dataSizeRequired, 1));
+
+    if (chosenNodes.size() < additionalRacksRequired) {
+      String reason = "Chosen nodes size from Unique Racks: " + chosenNodes
+              .size() + ", but required nodes to choose from Unique Racks: "
+              + additionalRacksRequired + " do not match.";
+      LOG.warn("Placement policy could not choose the enough nodes from " +
+                      "available racks."
+                      + " {} Available racks count: {}," +
+                      " Excluded nodes count: {}",
+              reason, racks.size(), excludedNodesCount);
+      throw new SCMException(reason,
+              SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
+    }
+
+    if (chosenNodes.size() < nodesRequired) {
+      racks.addAll(usedRacks);
+      usedRacks.addAll(chosenNodes.stream()
+              .map(node -> networkTopology.getAncestor(node, RACK_LEVEL))
+              .filter(node -> node != null)
+              .collect(Collectors.toSet()));
+      sortRackWithExcludedNodes(racks, excludedNodes, usedRacks);
+      racks.addAll(usedRacks);
+      chosenNodes.addAll(chooseNodesFromRacks(racks, unavailableNodes,
+              mutableFavoredNodes, nodesRequired - chosenNodes.size(),
+              metadataSizeRequired, dataSizeRequired, Integer.MAX_VALUE));
+    }
+
+    List<DatanodeDetails> result = new ArrayList<>(chosenNodes);
+
     if (nodesRequiredToChoose != chosenNodes.size()) {
       String reason = "Chosen nodes size: " + chosenNodes
-          .size() + ", but required nodes to choose: " + nodesRequiredToChoose
-          + " do not match.";
+              .size() + ", but required nodes to choose: "
+              + nodesRequiredToChoose + " do not match.";
       LOG.warn("Placement policy could not choose the enough nodes."
-              + " {} Available nodes count: {}, Excluded nodes count: {}",
-          reason, totalNodesCount, excludedNodesCount);
+               + " {} Available nodes count: {}, Excluded nodes count: {}",
+              reason, totalNodesCount, excludedNodesCount);
       throw new SCMException(reason,
-          SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
+              SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
+    }
+
+    ContainerPlacementStatus placementStatus =
+        validateContainerPlacement(
+                Stream.of(usedNodes, result)
+                      .flatMap(List::stream).collect(Collectors.toList()),
+                requiredReplicationFactor);
+    if (!placementStatus.isPolicySatisfied()) {
+      String errorMsg = "ContainerPlacementPolicy not met, currentRacks is " +
+          placementStatus.actualPlacementCount() + " desired racks is " +
+          placementStatus.expectedPlacementCount();
+      throw new SCMException(errorMsg, null);
     }
     return result;
   }
@@ -328,19 +412,25 @@ public final class SCMContainerPlacementRackScatter
    * racks, so we sort these racks at rear.
    * @param racks
    * @param excludedNodes
+   * @param usedRacks
    * @return
    */
   private List<Node> sortRackWithExcludedNodes(List<Node> racks,
-      List<DatanodeDetails> excludedNodes) {
+          List<DatanodeDetails> excludedNodes, Set<Node> usedRacks) {
+    if ((excludedNodes == null || excludedNodes.isEmpty())
+            && usedRacks.isEmpty()) {
+      return racks;
+    }
     Set<Node> lessPreferredRacks = excludedNodes.stream()
         .map(node -> networkTopology.getAncestor(node, RACK_LEVEL))
         // Dead Nodes have been removed from the topology and so have a
         // null rack. We need to exclude those from the rack list.
         .filter(node -> node != null)
+        .filter(node -> !usedRacks.contains(node))
         .collect(Collectors.toSet());
     List <Node> result = new ArrayList<>();
     for (Node rack : racks) {
-      if (!lessPreferredRacks.contains(rack)) {
+      if (!usedRacks.contains(rack) && !lessPreferredRacks.contains(rack)) {
         result.add(rack);
       }
     }

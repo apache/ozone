@@ -106,7 +106,6 @@ public class TestOmBlockVersioning {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setDataSize(1000)
-        .setRefreshPipeline(true)
         .setAcls(new ArrayList<>())
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
         .build();
@@ -186,7 +185,6 @@ public class TestOmBlockVersioning {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setDataSize(1000)
-        .setRefreshPipeline(true)
         .build();
 
     String dataString = RandomStringUtils.randomAlphabetic(100);

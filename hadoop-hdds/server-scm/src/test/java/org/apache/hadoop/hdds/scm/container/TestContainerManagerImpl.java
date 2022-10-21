@@ -101,7 +101,7 @@ public class TestContainerManagerImpl {
   }
 
   @Test
-  public void testAllocateContainer() throws Exception {
+  void testAllocateContainer() throws Exception {
     Assertions.assertTrue(
         containerManager.getContainers().isEmpty());
     final ContainerInfo container = containerManager.allocateContainer(
@@ -113,7 +113,7 @@ public class TestContainerManagerImpl {
   }
 
   @Test
-  public void testUpdateContainerState() throws Exception {
+  void testUpdateContainerState() throws Exception {
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "admin");
@@ -145,7 +145,7 @@ public class TestContainerManagerImpl {
   }
 
   @Test
-  public void testGetContainers() throws Exception {
+  void testGetContainers() throws Exception {
     Assertions.assertTrue(
         containerManager.getContainers().isEmpty());
 
@@ -191,7 +191,7 @@ public class TestContainerManagerImpl {
   }
 
   @Test
-  public void testAllocateContainersWithECReplicationConfig() throws Exception {
+  void testAllocateContainersWithECReplicationConfig() throws Exception {
     final ContainerInfo admin = containerManager
         .allocateContainer(new ECReplicationConfig(3, 2), "admin");
     Assertions.assertEquals(1, containerManager.getContainers().size());
@@ -200,7 +200,7 @@ public class TestContainerManagerImpl {
   }
 
   @Test
-  public void testUpdateContainerReplicaInvokesPendingOp()
+  void testUpdateContainerReplicaInvokesPendingOp()
       throws IOException, TimeoutException {
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
@@ -221,7 +221,7 @@ public class TestContainerManagerImpl {
   }
 
   @Test
-  public void testRemoveContainerReplicaInvokesPendingOp()
+  void testRemoveContainerReplicaInvokesPendingOp()
       throws IOException, TimeoutException {
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(

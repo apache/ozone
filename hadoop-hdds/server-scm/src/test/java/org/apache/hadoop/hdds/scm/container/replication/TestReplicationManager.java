@@ -48,9 +48,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.Map;
-import java.util.Queue;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
@@ -78,8 +76,7 @@ public class TestReplicationManager {
   private Set<ContainerInfo> containerInfoSet;
   private ReplicationConfig repConfig;
   private ReplicationManagerReport repReport;
-  private Queue<ContainerHealthResult.UnderReplicatedHealthResult> underRep;
-  private Queue<ContainerHealthResult.OverReplicatedHealthResult> overRep;
+  private ReplicationQueue repQueue;
 
   @Before
   public void setup() throws IOException {
@@ -119,8 +116,7 @@ public class TestReplicationManager {
     containerInfoSet = new HashSet<>();
     repConfig = new ECReplicationConfig(3, 2);
     repReport = new ReplicationManagerReport();
-    underRep = replicationManager.createUnderReplicatedQueue();
-    overRep = new LinkedList<>();
+    repQueue = new ReplicationQueue();
 
     // Ensure that RM will run when asked.
     Mockito.when(scmContext.isLeaderReady()).thenReturn(true);
@@ -139,12 +135,10 @@ public class TestReplicationManager {
         HddsProtos.LifeCycleState.OPEN);
     // It is under replicated, but as its still open it is seen as healthy.
     addReplicas(container, ContainerReplicaProto.State.OPEN, 1, 2, 3, 4);
-    ContainerHealthResult result = replicationManager.processContainer(
-        container, underRep, overRep, repReport);
-    Assert.assertEquals(ContainerHealthResult.HealthState.HEALTHY,
-        result.getHealthState());
-    Assert.assertEquals(0, underRep.size());
-    Assert.assertEquals(0, overRep.size());
+    replicationManager.processContainer(
+        container, repQueue, repReport);
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
   }
 
   @Test
@@ -154,16 +148,14 @@ public class TestReplicationManager {
         HddsProtos.LifeCycleState.OPEN);
     // Container is open but replicas are closed, so it is open but unhealthy.
     addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
-    ContainerHealthResult result = replicationManager.processContainer(
-        container, underRep, overRep, repReport);
-    Assert.assertEquals(ContainerHealthResult.HealthState.UNHEALTHY,
-        result.getHealthState());
+    replicationManager.processContainer(
+        container, repQueue, repReport);
     Mockito.verify(eventPublisher, Mockito.times(1))
         .fireEvent(SCMEvents.CLOSE_CONTAINER, container.containerID());
     Assert.assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.OPEN_UNHEALTHY));
-    Assert.assertEquals(0, underRep.size());
-    Assert.assertEquals(0, overRep.size());
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
   }
 
   @Test
@@ -172,12 +164,10 @@ public class TestReplicationManager {
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
 
-    ContainerHealthResult result = replicationManager.processContainer(
-        container, underRep, overRep, repReport);
-    Assert.assertEquals(ContainerHealthResult.HealthState.HEALTHY,
-        result.getHealthState());
-    Assert.assertEquals(0, underRep.size());
-    Assert.assertEquals(0, overRep.size());
+    replicationManager.processContainer(
+        container, repQueue, repReport);
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
   }
 
   @Test
@@ -186,12 +176,10 @@ public class TestReplicationManager {
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
 
-    ContainerHealthResult result = replicationManager.processContainer(
-        container, underRep, overRep, repReport);
-    Assert.assertEquals(ContainerHealthResult.HealthState.UNDER_REPLICATED,
-        result.getHealthState());
-    Assert.assertEquals(1, underRep.size());
-    Assert.assertEquals(0, overRep.size());
+    replicationManager.processContainer(
+        container, repQueue, repReport);
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
     Assert.assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
@@ -205,18 +193,14 @@ public class TestReplicationManager {
     containerReplicaPendingOps.scheduleAddReplica(container.containerID(),
         MockDatanodeDetails.randomDatanodeDetails(), 5);
 
-    ContainerHealthResult result = replicationManager.processContainer(
-        container, underRep, overRep, repReport);
-    Assert.assertEquals(ContainerHealthResult.HealthState.UNDER_REPLICATED,
-        result.getHealthState());
+    replicationManager.processContainer(
+        container, repQueue, repReport);
     // As the pending replication fixes the under replication, nothing is added
     // to the under replication list.
-    Assert.assertEquals(0, underRep.size());
-    Assert.assertEquals(0, overRep.size());
-    Assert.assertTrue(((ContainerHealthResult.UnderReplicatedHealthResult)
-        result).isSufficientlyReplicatedAfterPending());
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
     // As the container is still under replicated, as the pending have not
-    // completed yet, the container is still marked as under-replciated in the
+    // completed yet, the container is still marked as under-replicated in the
     // report.
     Assert.assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
@@ -229,14 +213,12 @@ public class TestReplicationManager {
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2);
 
-    ContainerHealthResult result = replicationManager.processContainer(
-        container, underRep, overRep, repReport);
-    Assert.assertEquals(ContainerHealthResult.HealthState.UNDER_REPLICATED,
-        result.getHealthState());
+    replicationManager.processContainer(
+        container, repQueue, repReport);
     // If it is unrecoverable, there is no point in putting it into the under
     // replication list. It will be checked again on the next RM run.
-    Assert.assertEquals(0, underRep.size());
-    Assert.assertEquals(0, overRep.size());
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
     Assert.assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(1, repReport.getStat(
@@ -250,15 +232,13 @@ public class TestReplicationManager {
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 5, 5);
 
-    ContainerHealthResult result = replicationManager.processContainer(
-        container, underRep, overRep, repReport);
+    replicationManager.processContainer(
+        container, repQueue, repReport);
     // If it is both under and over replicated, we set it to the most important
     // state, which is under-replicated. When that is fixed, over replication
     // will be handled.
-    Assert.assertEquals(ContainerHealthResult.HealthState.UNDER_REPLICATED,
-        result.getHealthState());
-    Assert.assertEquals(1, underRep.size());
-    Assert.assertEquals(0, overRep.size());
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
     Assert.assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(0, repReport.getStat(
@@ -271,12 +251,10 @@ public class TestReplicationManager {
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED,
         1, 2, 3, 4, 5, 5);
-    ContainerHealthResult result = replicationManager.processContainer(
-        container, underRep, overRep, repReport);
-    Assert.assertEquals(ContainerHealthResult.HealthState.OVER_REPLICATED,
-        result.getHealthState());
-    Assert.assertEquals(0, underRep.size());
-    Assert.assertEquals(1, overRep.size());
+    replicationManager.processContainer(
+        container, repQueue, repReport);
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
     Assert.assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
   }
@@ -290,14 +268,12 @@ public class TestReplicationManager {
         1, 2, 3, 4, 5, 5);
     containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(),
         MockDatanodeDetails.randomDatanodeDetails(), 5);
-    ContainerHealthResult result = replicationManager.processContainer(
-        container, underRep, overRep, repReport);
-    Assert.assertEquals(ContainerHealthResult.HealthState.OVER_REPLICATED,
-        result.getHealthState());
-    Assert.assertEquals(0, underRep.size());
+    replicationManager.processContainer(
+        container, repQueue, repReport);
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
     // If the pending replication fixes the over-replication, nothing is added
     // to the over replication list.
-    Assert.assertEquals(0, overRep.size());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
     Assert.assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
   }

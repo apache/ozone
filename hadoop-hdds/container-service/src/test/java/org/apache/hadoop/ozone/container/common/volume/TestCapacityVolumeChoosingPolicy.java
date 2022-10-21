@@ -25,10 +25,10 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.apache.ozone.test.GenericTestUtils.getTestDir;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests {@link CapacityVolumeChoosingPolicy}.
@@ -54,7 +55,7 @@ public class TestCapacityVolumeChoosingPolicy {
   private static final String VOLUME_2 = BASE_DIR + "disk2";
   private static final String VOLUME_3 = BASE_DIR + "disk3";
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     policy = new CapacityVolumeChoosingPolicy();
 
@@ -79,13 +80,14 @@ public class TestCapacityVolumeChoosingPolicy {
         .conf(CONF)
         .usageCheckFactory(factory3)
         .build();
+    vol3.incCommittedBytes(50);
 
     volumes.add(vol1);
     volumes.add(vol2);
     volumes.add(vol3);
   }
 
-  @After
+  @AfterEach
   public void cleanUp() {
     volumes.forEach(HddsVolume::shutdown);
   }
@@ -96,9 +98,9 @@ public class TestCapacityVolumeChoosingPolicy {
     HddsVolume hddsVolume2 = volumes.get(1);
     HddsVolume hddsVolume3 = volumes.get(2);
 
-    Assert.assertEquals(100L, hddsVolume1.getAvailable());
-    Assert.assertEquals(200L, hddsVolume2.getAvailable());
-    Assert.assertEquals(300L, hddsVolume3.getAvailable());
+    Assertions.assertEquals(100L, hddsVolume1.getAvailable());
+    Assertions.assertEquals(200L, hddsVolume2.getAvailable());
+    Assertions.assertEquals(300L, hddsVolume3.getAvailable());
 
     Map<HddsVolume, Integer> chooseCount = new HashMap<>();
     chooseCount.put(hddsVolume1, 0);
@@ -111,24 +113,22 @@ public class TestCapacityVolumeChoosingPolicy {
       chooseCount.put(volume, chooseCount.get(volume) + 1);
     }
 
-    Assert.assertTrue(chooseCount.get(hddsVolume3) >
+    Assertions.assertTrue(chooseCount.get(hddsVolume3) >
         chooseCount.get(hddsVolume1));
-    Assert.assertTrue(chooseCount.get(hddsVolume3) >
+    Assertions.assertTrue(chooseCount.get(hddsVolume3) >
         chooseCount.get(hddsVolume2));
   }
 
   @Test
-  public void testCapacityPolicyExceptionMessage() throws Exception {
-    int blockSize = 300;
-    try {
-      policy.chooseVolume(volumes, blockSize);
-      Assert.fail("expected to throw DiskOutOfSpaceException");
-    } catch (DiskOutOfSpaceException e) {
-      Assert.assertEquals("Not returning the expected message",
-          "Out of space: All volumes are less than the container size (="
-              + blockSize + " B).",
-          e.getMessage());
-    }
+  public void throwsDiskOutOfSpaceIfRequestMoreThanAvailable() {
+    Exception e = Assertions.assertThrows(DiskOutOfSpaceException.class,
+        () -> policy.chooseVolume(volumes, 500));
+
+    String msg = e.getMessage();
+    assertTrue(
+        msg.contains("No volumes have enough space for a new container.  " +
+            "Most available space: 250 bytes"),
+        msg);
   }
 
 }

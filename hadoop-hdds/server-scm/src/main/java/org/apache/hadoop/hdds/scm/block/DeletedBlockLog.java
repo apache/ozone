@@ -72,6 +72,15 @@ public interface DeletedBlockLog extends Closeable {
   void incrementCount(List<Long> txIDs)
       throws IOException, TimeoutException;
 
+
+  /**
+   * Reset DeletedBlock transaction retry count.
+   *
+   * @param txIDs transactionId list to be reset
+   * @return num of successful reset
+   */
+  int resetCount(List<Long> txIDs) throws IOException, TimeoutException;
+
   /**
    * Commits a transaction means to delete all footprints of a transaction
    * from the log. This method doesn't guarantee all transactions can be
