@@ -737,12 +737,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   private FileStatus[] convertFileStatusArr(FileStatusAdapter[] adapterArr) {
-    FileStatus[] result = new FileStatus[adapterArr.length];
+    FileStatus[] fileStatuses = new FileStatus[adapterArr.length];
     int index = 0;
-    for (FileStatusAdapter ff : adapterArr) {
-      result[index++] = convertFileStatus(ff);      
+    for (FileStatusAdapter statusAdapter : adapterArr) {
+      fileStatuses[index++] = convertFileStatus(statusAdapter);      
     }
-    return result;
+    return fileStatuses;
   }
 
   
