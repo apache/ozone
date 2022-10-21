@@ -147,12 +147,13 @@ public class RangeKeysGenerator extends BaseFreonGenerator
   }
 
 
-  public void loopRunner(Function<Integer, String> keyNameGeneratefunc,
+  public void loopRunner(Function<Integer, String> keyNameGeneratorfunc,
                          OzoneClient client, int start, int end)
           throws Exception {
     String keyName;
     for (int i = start; i < end + 1; i++) {
-      keyName = getPrefix() + FILE_DIR_SEPARATOR + keyNameGeneratefunc.apply(i);
+      keyName = getPrefix() + FILE_DIR_SEPARATOR +
+              keyNameGeneratorfunc.apply(i);
       try (OzoneOutputStream out = client.getProxy().
                         createKey(volumeName, bucketName, keyName,
                                 objectSizeInBytes, null, new HashMap())) {
