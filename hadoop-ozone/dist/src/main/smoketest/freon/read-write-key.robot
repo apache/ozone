@@ -39,10 +39,10 @@ Read 10 keys' metadata from pre-generated keys
 Write 10 keys of size 1 byte each from key index 0 to 99
     ${keysCount} =     BuiltIn.Set Variable   10
     ${size} =          BuiltIn.Set Variable   1
-    ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 10 --percentage-read 0 --size ${size} -r 100 -v voltest -b buckettest -p performanceTest2
+    ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 10 --percentage-read 0 --size ${size} -r 100 -v voltest -b buckettest -p performanceTest
                        Should contain   ${result}   Successful executions: ${keysCount}
     ${keyName} =       Execute          echo -n '1' | md5sum | head -c 7
-    ${result} =        Execute          ozone sh key info /voltest/buckettest/performanceTest2/${keyName}
+    ${result} =        Execute          ozone sh key info /voltest/buckettest/performanceTest/${keyName}
                        Should contain   ${result}   \"dataSize\" : 1
 
 
