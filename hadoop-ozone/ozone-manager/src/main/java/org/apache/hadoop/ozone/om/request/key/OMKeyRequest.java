@@ -816,4 +816,29 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return ozoneManager.getOzoneLockProvider()
         .createLockStrategy(getBucketLayout());
   }
+
+  /**
+   * Warp the uncommitted blocks as pseudoKeyInfo.
+   *
+   * @param uncommitted Uncommitted OmKeyLocationInfo
+   * @param omKeyInfo   Args for key block
+   * @return pseudoKeyInfo
+   */
+  protected OmKeyInfo warpUncommittedBlocksAsPseudoKey(
+      List<OmKeyLocationInfo> uncommitted, OmKeyInfo omKeyInfo) {
+    if (uncommitted.isEmpty()) {
+      return null;
+    }
+    LOG.info("Detect allocated but uncommitted blocks {} in key {}.",
+        uncommitted, omKeyInfo.getKeyName());
+    OmKeyInfo pseudoKeyInfo = omKeyInfo.copyObject();
+    // set dataSize -1 here to distinguish from normal keyInfo
+    pseudoKeyInfo.setDataSize(-1);
+    List<OmKeyLocationInfoGroup> uncommittedGroups = new ArrayList<>();
+    // version not matters in the current logic of keyDeletingService,
+    // all versions of blocks will be deleted.
+    uncommittedGroups.add(new OmKeyLocationInfoGroup(0, uncommitted));
+    pseudoKeyInfo.setKeyLocationVersions(uncommittedGroups);
+    return pseudoKeyInfo;
+  }
 }

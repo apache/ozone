@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -245,22 +244,12 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       // let the uncommitted blocks pretend as key's old version blocks
       // which will be deleted as RepeatedOmKeyInfo
-      if (!uncommitted.isEmpty()) {
-        LOG.info("Detect allocated but uncommitted blocks {} in key {}.",
-            uncommitted, keyName);
-        OmKeyInfo pseudoKeyInfo = omKeyInfo.copyObject();
-        // set dataSize -1 here to distinguish from normal keyInfo
-        pseudoKeyInfo.setDataSize(-1);
-        List<OmKeyLocationInfoGroup> uncommittedGroups = new ArrayList<>();
-        // version not matters in the current logic of keyDeletingService,
-        // all versions of blocks will be deleted.
-        uncommittedGroups.add(new OmKeyLocationInfoGroup(0, uncommitted));
-        pseudoKeyInfo.setKeyLocationVersions(uncommittedGroups);
-        if (oldKeyVersionsToDelete == null) {
-          oldKeyVersionsToDelete = new RepeatedOmKeyInfo(pseudoKeyInfo);
-        } else {
-          oldKeyVersionsToDelete.addOmKeyInfo(pseudoKeyInfo);
-        }
+      OmKeyInfo pseudoKeyInfo = warpUncommittedBlocksAsPseudoKey(uncommitted,
+          omKeyInfo);
+      if (oldKeyVersionsToDelete != null) {
+        oldKeyVersionsToDelete.addOmKeyInfo(pseudoKeyInfo);
+      } else {
+        oldKeyVersionsToDelete = new RepeatedOmKeyInfo(pseudoKeyInfo);
       }
 
       // Add to cache of open key table and key table.
