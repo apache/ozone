@@ -52,7 +52,9 @@ interface IOverviewState {
   buckets: number;
   keys: number;
   missingContainersCount: number;
-  lastUpdated: number;
+  lastRefreshed: number;
+  lastUpdatedOMDBDelta: number;
+  lastUpdatedOMDBFull: number;
 }
 
 export class Overview extends React.Component<Record<string, object>, IOverviewState> {
@@ -75,7 +77,9 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       buckets: 0,
       keys: 0,
       missingContainersCount: 0,
-      lastUpdated: 0
+      lastRefreshed: 0,
+      lastUpdatedOMDBDelta: 0,
+      lastUpdatedOMDBFull: 0
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -86,11 +90,17 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     });
     axios.all([
       axios.get('/api/v1/clusterState'),
-      axios.get('/api/v1/containers/missing')
-    ]).then(axios.spread((clusterStateResponse, missingContainersResponse) => {
+      axios.get('/api/v1/containers/missing'),
+      axios.get('/api/v1/task/status')
+    ]).then(axios.spread((clusterStateResponse, missingContainersResponse,taskstatusResponse) => {
+      
       const clusterState: IClusterStateResponse = clusterStateResponse.data;
-      const missingContainers: IMissingContainersResponse = missingContainersResponse.data;
+      const missingContainers: IMissingContainersResponse = missingContainersResponse.data;     
+      const taskStatus = taskstatusResponse.data;
       const missingContainersCount = missingContainers.totalCount;
+      const omDBDeltaObject = taskStatus && taskStatus.find((item:any) => item.taskName === 'OmDeltaRequest');
+      const omDBFullObject = taskStatus && taskStatus.find((item:any) => item.taskName === 'OmSnapshotRequest');
+    
       this.setState({
         loading: false,
         datanodes: `${clusterState.healthyDatanodes}/${clusterState.totalDatanodes}`,
@@ -101,7 +111,9 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         buckets: clusterState.buckets,
         keys: clusterState.keys,
         missingContainersCount,
-        lastUpdated: Number(moment())
+        lastRefreshed: Number(moment()),
+        lastUpdatedOMDBDelta: omDBDeltaObject && omDBDeltaObject.lastUpdatedTimestamp,
+        lastUpdatedOMDBFull: omDBFullObject && omDBFullObject.lastUpdatedTimestamp
       });
     })).catch(error => {
       this.setState({
@@ -122,14 +134,15 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
 
   render() {
     const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets,
-      keys, missingContainersCount, lastUpdated} = this.state;
+      keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull} = this.state;
+      
     const datanodesElement = (
       <span>
         <Icon type='check-circle' theme='filled' className='icon-success icon-small'/> {datanodes} <span className='ant-card-meta-description meta'>HEALTHY</span>
       </span>
     );
     const containersTooltip = missingContainersCount === 1 ? 'container is missing' : 'containers are missing';
-    const containersLink = missingContainersCount > 0 ? '/MissingContainers' : '';
+    const containersLink = missingContainersCount > 0 ? '/MissingContainers' : '/Containers';
     const duLink = '/DiskUsage';
     const containersElement = missingContainersCount > 0 ? (
       <span>
@@ -145,7 +158,9 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       <div className='overview-content'>
         <div className='page-header'>
           Overview
-          <AutoReloadPanel isLoading={loading} lastUpdated={lastUpdated} togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
+          <AutoReloadPanel isLoading={loading} lastRefreshed={lastRefreshed}
+          lastUpdatedOMDBDelta={lastUpdatedOMDBDelta} lastUpdatedOMDBFull={lastUpdatedOMDBFull}
+          togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
         </div>
         <Row gutter={[25, 25]}>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
@@ -178,7 +193,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
             <OverviewCard loading={loading} title='Volumes' data={volumes.toString()} icon='inbox' linkToUrl={duLink}/>
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-            <OverviewCard loading={loading} title='Buckets' data={buckets.toString()} icon='folder-open'/>
+            <OverviewCard loading={loading} title='Buckets' data={buckets.toString()} icon='folder-open' linkToUrl='/Buckets'/>
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
             <OverviewCard loading={loading} title='Keys' data={keys.toString()} icon='file-text'/>

@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.BackgroundService;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -42,6 +43,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
@@ -79,6 +81,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -371,8 +374,8 @@ public class TestBlockDeletingService {
       DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
           (DatanodeStoreSchemaTwoImpl) ds;
       try (
-          TableIterator<Long, ? extends Table.KeyValue<Long, 
-              StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>> 
+          TableIterator<Long, ? extends Table.KeyValue<Long,
+              StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>>
               iter = dnStoreTwoImpl.getDeleteTransactionTable().iterator()) {
         while (iter.hasNext()) {
           StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
@@ -429,16 +432,18 @@ public class TestBlockDeletingService {
     containerSet.listContainer(0L, 1, containerData);
     Assert.assertEquals(1, containerData.size());
     KeyValueContainerData data = (KeyValueContainerData) containerData.get(0);
+    KeyPrefixFilter filter = Objects.equals(schemaVersion, SCHEMA_V1) ?
+        data.getDeletingBlockKeyFilter() : data.getUnprefixedKeyFilter();
 
     try (DBHandle meta = BlockUtils.getDB(data, conf)) {
       Map<Long, Container<?>> containerMap = containerSet.getContainerMapCopy();
+      assertBlockDataTableRecordCount(3, meta, filter, data.getContainerID());
       // NOTE: this test assumes that all the container is KetValueContainer and
       // have DeleteTransactionId in KetValueContainerData. If other
       // types is going to be added, this test should be checked.
       long transactionId = ((KeyValueContainerData) containerMap
           .get(containerData.get(0).getContainerID()).getContainerData())
           .getDeleteTransactionId();
-
       long containerSpace = containerData.get(0).getBytesUsed();
       // Number of deleted blocks in container should be equal to 0 before
       // block delete
@@ -487,8 +492,91 @@ public class TestBlockDeletingService {
       Assert.assertEquals(3,
           deletingServiceMetrics.getSuccessCount()
               - deleteSuccessCount);
+
+      // check if blockData get deleted
+      assertBlockDataTableRecordCount(0, meta, filter, data.getContainerID());
     }
 
+    svc.shutdown();
+  }
+
+  @Test
+  public void testWithUnrecordedBlocks() throws Exception {
+    // Skip schemaV1, when markBlocksForDeletionSchemaV1, the unrecorded blocks
+    // from received TNXs will be skipped to delete and will not be added into
+    // the NumPendingDeletionBlocks
+    if (Objects.equals(schemaVersion, SCHEMA_V1)) {
+      return;
+    }
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionLimit(2);
+    this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    conf.setFromObject(dnConf);
+    ContainerSet containerSet = new ContainerSet(1000);
+
+    createToDeleteBlocks(containerSet, 2, 3, 1);
+
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        });
+    BlockDeletingServiceTestImpl svc =
+        getBlockDeletingService(containerSet, conf, keyValueHandler);
+    svc.start();
+    GenericTestUtils.waitFor(svc::isStarted, 100, 3000);
+
+    // Ensure 2 container was created
+    List<ContainerData> containerData = Lists.newArrayList();
+    containerSet.listContainer(0L, 2, containerData);
+    Assert.assertEquals(2, containerData.size());
+    KeyValueContainerData ctr1 = (KeyValueContainerData) containerData.get(0);
+    KeyValueContainerData ctr2 = (KeyValueContainerData) containerData.get(1);
+    KeyPrefixFilter filter = Objects.equals(schemaVersion, SCHEMA_V1) ?
+        ctr1.getDeletingBlockKeyFilter() : ctr1.getUnprefixedKeyFilter();
+
+    try (DBHandle meta = BlockUtils.getDB(ctr1, conf)) {
+      // create unrecorded blocks in a new txn and update metadata,
+      // service shall first choose the top pendingDeletion container
+      // if using the TopNOrderedContainerDeletionChoosingPolicy
+      List<Long> unrecordedBlocks = new ArrayList<>();
+      int numUnrecorded = 4;
+      for (int i = 0; i < numUnrecorded; i++) {
+        unrecordedBlocks.add(System.nanoTime() + i);
+      }
+      createTxn(ctr1, unrecordedBlocks, 100, ctr1.getContainerID());
+      ctr1.updateDeleteTransactionId(100);
+      ctr1.incrPendingDeletionBlocks(numUnrecorded);
+      updateMetaData(ctr1, (KeyValueContainer) containerSet.getContainer(
+          ctr1.getContainerID()), 3, 1);
+      // Ensure there are 3 + 4 = 7 blocks under deletion
+      Assert.assertEquals(7, getUnderDeletionBlocksCount(meta, ctr1));
+    }
+
+    assertBlockDataTableRecordCount(3, ctr1, filter);
+    assertBlockDataTableRecordCount(3, ctr2, filter);
+    Assert.assertEquals(3, ctr2.getNumPendingDeletionBlocks());
+
+    // Totally 2 container * 3 blocks + 4 unrecorded block = 10 blocks
+    // So we shall experience 5 rounds to delete all blocks
+    // Unrecorded blocks should not affect the actual NumPendingDeletionBlocks
+    deleteAndWait(svc, 1);
+    deleteAndWait(svc, 2);
+    deleteAndWait(svc, 3);
+    deleteAndWait(svc, 4);
+    deleteAndWait(svc, 5);
+    GenericTestUtils.waitFor(() -> ctr2.getNumPendingDeletionBlocks() == 0,
+        200, 2000);
+
+    // To make sure the container stat calculation is right
+    Assert.assertEquals(0, ctr1.getBlockCount());
+    Assert.assertEquals(0, ctr1.getBytesUsed());
+    Assert.assertEquals(0, ctr2.getBlockCount());
+    Assert.assertEquals(0, ctr2.getBytesUsed());
+
+    // check if blockData get deleted
+    assertBlockDataTableRecordCount(0, ctr1, filter);
+    assertBlockDataTableRecordCount(0, ctr2, filter);
     svc.shutdown();
   }
 
@@ -756,5 +844,48 @@ public class TestBlockDeletingService {
     } finally {
       service.shutdown();
     }
+  }
+
+  /**
+   *  Check blockData record count of certain container (DBHandle not provided).
+   *
+   * @param expectedCount expected records in the table
+   * @param containerData KeyValueContainerData
+   * @param filter KeyPrefixFilter
+   * @throws IOException
+   */
+  private void assertBlockDataTableRecordCount(int expectedCount,
+      KeyValueContainerData containerData, KeyPrefixFilter filter)
+      throws IOException {
+    try (DBHandle handle = BlockUtils.getDB(containerData, conf)) {
+      long containerID = containerData.getContainerID();
+      assertBlockDataTableRecordCount(expectedCount, handle, filter,
+          containerID);
+    }
+  }
+
+  /**
+   *  Check blockData record count of certain container (DBHandle provided).
+   *
+   * @param expectedCount expected records in the table
+   * @param handle DB handle
+   * @param filter KeyPrefixFilter
+   * @param containerID the container ID to filter results
+   * @throws IOException
+   */
+  private void assertBlockDataTableRecordCount(int expectedCount,
+      DBHandle handle, KeyPrefixFilter filter, long containerID)
+      throws IOException {
+    long count = 0L;
+    BlockIterator<BlockData> iterator = handle.getStore().
+        getBlockIterator(containerID, filter);
+    iterator.seekToFirst();
+    while (iterator.hasNext()) {
+      iterator.nextBlock();
+      count += 1;
+    }
+    Assert.assertEquals("Excepted: " + expectedCount
+        + ", but actual: " + count + " in the blockData table of container: "
+        + containerID + ".", expectedCount, count);
   }
 }

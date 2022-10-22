@@ -62,7 +62,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   </organization>
 
   <properties>
-    <hadoop.version>3.3.1</hadoop.version>
+    <hadoop.version>3.3.4</hadoop.version>
 
     <!-- version for hdds/ozone components -->
     <hdds.version>${ozone.version}</hdds.version>
@@ -72,10 +72,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
     <!-- Apache Ratis version -->
-    <ratis.version>2.3.0</ratis.version>
+    <ratis.version>2.4.0</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
-    <ratis.thirdparty.version>1.0.0</ratis.thirdparty.version>
+    <ratis.thirdparty.version>1.0.2</ratis.thirdparty.version>
 
     <!-- Apache Ranger plugin version -->
     <ranger.version>2.3.0</ranger.version>
@@ -133,11 +133,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- jersey version -->
     <jersey.version>1.19</jersey.version>
-    <jersey2.version>2.33</jersey2.version>
+    <jersey2.version>2.34</jersey2.version>
 
     <!-- jackson versions -->
-    <jackson2.version>2.13.2</jackson2.version>
-    <jackson2.databind.version>2.13.2.2</jackson2.databind.version>
+    <jackson2-bom.version>2.13.4.20221013</jackson2-bom.version>
 
     <!-- jaegertracing veresion -->
     <jaeger.version>1.6.0</jaeger.version>
@@ -150,10 +149,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <httpcore.version>4.4.13</httpcore.version>
 
     <!-- SLF4J/LOG4J version -->
-    <slf4j.version>1.7.30</slf4j.version>
+    <slf4j.version>1.7.36</slf4j.version>
     <log4j.version>1.2.17</log4j.version>
     <log4j2.version>2.17.1</log4j2.version>
     <disruptor.version>3.4.2</disruptor.version>
+    <reload4j.version>1.2.22</reload4j.version>
 
     <prometheus.version>0.7.0</prometheus.version>
 
@@ -241,7 +241,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <checkstyle.version>9.3</checkstyle.version>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
     <aws-java-sdk.version>1.12.261</aws-java-sdk.version>
-    <hsqldb.version>2.3.4</hsqldb.version>
     <frontend-maven-plugin.version>1.12.0</frontend-maven-plugin.version>
     <!-- the version of Hadoop declared in the version resources; can be overridden
     so that Hadoop 3.x can declare itself a 2.x artifact. -->
@@ -249,7 +248,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <proto-backwards-compatibility.version>1.0.7</proto-backwards-compatibility.version>
 
     <swagger-annotations-version>1.5.4</swagger-annotations-version>
-    <snakeyaml.version>1.26</snakeyaml.version>
+    <snakeyaml.version>1.32</snakeyaml.version>
     <sonar.java.binaries>${basedir}/target/classes</sonar.java.binaries>
 
     <aspectj.version>1.9.7</aspectj.version>
@@ -365,12 +364,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-hdfs-rbf</artifactId>
         <version>${hadoop.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-hdfs</artifactId>
-        <version>${hadoop.version}</version>
-        <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -1065,9 +1058,9 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${commons-logging-api.version}</version>
       </dependency>
       <dependency>
-        <groupId>log4j</groupId>
-        <artifactId>log4j</artifactId>
-        <version>${log4j.version}</version>
+        <groupId>ch.qos.reload4j</groupId>
+        <artifactId>reload4j</artifactId>
+        <version>${reload4j.version}</version>
         <exclusions>
           <exclusion>
             <groupId>com.sun.jdmk</groupId>
@@ -1210,7 +1203,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-log4j12</artifactId>
+        <artifactId>slf4j-reload4j</artifactId>
         <version>${slf4j.version}</version>
       </dependency>
       <dependency>
@@ -1234,39 +1227,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>5.0.3</version>
       </dependency>
       <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-core</artifactId>
-        <version>${jackson2.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-databind</artifactId>
-        <version>${jackson2.databind.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-annotations</artifactId>
-        <version>${jackson2.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.module</groupId>
-        <artifactId>jackson-module-jaxb-annotations</artifactId>
-        <version>${jackson2.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.dataformat</groupId>
-        <artifactId>jackson-dataformat-cbor</artifactId>
-        <version>${jackson2.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.dataformat</groupId>
-        <artifactId>jackson-dataformat-xml</artifactId>
-        <version>${jackson2.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.datatype</groupId>
-        <artifactId>jackson-datatype-jsr310</artifactId>
-        <version>${jackson2.version}</version>
+        <groupId>com.fasterxml.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
+        <version>${jackson2-bom.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>org.hamcrest</groupId>
@@ -1289,6 +1254,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-core</artifactId>
+        <version>${mockito2.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.mockito</groupId>
+        <artifactId>mockito-junit-jupiter</artifactId>
         <version>${mockito2.version}</version>
         <scope>test</scope>
       </dependency>
@@ -1350,11 +1321,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>1.1.1</version>
       </dependency>
 
-      <dependency>
-        <groupId>org.hsqldb</groupId>
-        <artifactId>hsqldb</artifactId>
-        <version>${hsqldb.version}</version>
-      </dependency>
       <dependency>
         <groupId>org.kohsuke.metainf-services</groupId>
         <artifactId>metainf-services</artifactId>
@@ -1431,17 +1397,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.glassfish.jaxb</groupId>
         <artifactId>jaxb-runtime</artifactId>
         <version>2.3.0.1</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.jettison</groupId>
-        <artifactId>jettison</artifactId>
-        <version>1.1</version>
-        <exclusions>
-          <exclusion>
-            <groupId>stax</groupId>
-            <artifactId>stax-api</artifactId>
-          </exclusion>
-        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.sun.jersey</groupId>
@@ -1569,11 +1524,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>io.swagger</groupId>
         <artifactId>swagger-annotations</artifactId>
         <version>${swagger-annotations-version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.jaxrs</groupId>
-        <artifactId>jackson-jaxrs-json-provider</artifactId>
-        <version>${jackson2.version}</version>
       </dependency>
       <dependency>
         <groupId>org.yaml</groupId>

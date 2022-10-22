@@ -212,12 +212,14 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   private void init() throws InsufficientLocationsException {
+    initialized = false;
     if (decoder == null) {
       decoder = CodecUtil.createRawDecoderWithFallback(getRepConfig());
     }
     if (!hasSufficientLocations()) {
-      throw new InsufficientLocationsException("There are insufficient " +
-          "datanodes to read the EC block");
+      String msg = "There are insufficient datanodes to read the EC block";
+      LOG.debug(msg);
+      throw new InsufficientLocationsException(msg);
     }
     allocateInternalBuffers();
     if (!isOfflineRecovery()) {
@@ -365,9 +367,6 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         loadDataBuffersFromStream();
         break;
       } catch (IOException e) {
-        // Re-init now the bad block has been excluded. If we have ran out of
-        // locations, init will throw an InsufficientLocations exception.
-        init();
         // seek to the current position so it rewinds any blocks we read
         // already.
         seek(getPos());
@@ -375,6 +374,9 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         for (ByteBuffer b : bufs) {
           b.position(0);
         }
+        // Re-init now the bad block has been excluded. If we have run out of
+        // locations, init will throw an InsufficientLocations exception.
+        init();
       } catch (InterruptedException ie) {
         Thread.currentThread().interrupt();
         throw new IOException("Interrupted waiting for reads to complete", ie);
@@ -547,6 +549,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     for (int i : internalBuffers) {
       if (decoderInputBuffers[i] != null) {
         decoderInputBuffers[i].clear();
+        decoderInputBuffers[i].limit(getRepConfig().getEcChunkSize());
       }
     }
   }

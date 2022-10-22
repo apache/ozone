@@ -24,10 +24,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
@@ -38,12 +40,14 @@ import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.assertj.core.util.Lists;
+import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +72,7 @@ public class TestECUnderReplicationHandler {
   private PlacementPolicy policy;
   private static final int DATA = 3;
   private static final int PARITY = 2;
+  private ECReplicationCheckHandler replicationCheck;
 
   @BeforeEach
   public void setup() {
@@ -83,10 +88,11 @@ public class TestECUnderReplicationHandler {
     container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
     policy = ReplicationTestUtil
-        .getSimpleTestPlacementPolicy(nodeManager, conf);
+            .getSimpleTestPlacementPolicy(nodeManager, conf);
     NodeSchema[] schemas =
         new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
+    replicationCheck = new ECReplicationCheckHandler();
   }
 
   @Test
@@ -193,6 +199,35 @@ public class TestECUnderReplicationHandler {
   }
 
   @Test
+  public void testUnderReplicationWithInvalidPlacement()
+          throws IOException {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+            .createReplicas(Pair.of(DECOMMISSIONING, 1),
+                    Pair.of(DECOMMISSIONING, 2), Pair.of(IN_SERVICE, 3),
+                    Pair.of(IN_SERVICE, 4));
+    PlacementPolicy mockedPolicy = Mockito.spy(policy);
+    ContainerPlacementStatus mockedContainerPlacementStatus =
+            Mockito.mock(ContainerPlacementStatus.class);
+    Mockito.when(mockedContainerPlacementStatus.isPolicySatisfied())
+            .thenReturn(false);
+    Mockito.when(mockedPolicy.validateContainerPlacement(Mockito.anyList(),
+            Mockito.anyInt())).thenReturn(mockedContainerPlacementStatus);
+    Mockito.when(mockedPolicy.validateContainerPlacement(Mockito.anyList(),
+            Mockito.anyInt())).thenAnswer(invocationOnMock -> {
+              Set<DatanodeDetails> dns =
+                      new HashSet<>(invocationOnMock.getArgument(0));
+              Assert.assertTrue(
+                      availableReplicas.stream()
+                      .map(ContainerReplica::getDatanodeDetails)
+                      .filter(dn -> dn.getPersistedOpState() == IN_SERVICE)
+                      .allMatch(dns::contains));
+              return mockedContainerPlacementStatus;
+            });
+    testUnderReplicationWithMissingIndexes(Collections.emptyList(),
+            availableReplicas, 0, 0, mockedPolicy);
+  }
+
+  @Test
   public void testExceptionIfNoNodesFound() {
     PlacementPolicy noNodesPolicy = ReplicationTestUtil
         .getNoNodesTestPlacementPolicy(nodeManager, conf);
@@ -260,7 +295,8 @@ public class TestECUnderReplicationHandler {
       int decomIndexes, int maintenanceIndexes,
       PlacementPolicy placementPolicy) throws IOException {
     ECUnderReplicationHandler ecURH =
-        new ECUnderReplicationHandler(placementPolicy, conf, nodeManager);
+        new ECUnderReplicationHandler(replicationCheck,
+            placementPolicy, conf, nodeManager);
     ContainerHealthResult.UnderReplicatedHealthResult result =
         Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
     Mockito.when(result.isUnrecoverable()).thenReturn(false);

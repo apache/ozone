@@ -84,7 +84,8 @@ public final class SCMContainerPlacementRackAware
    * There are two scenarios, one is choosing all nodes for a new pipeline.
    * Another is choosing node to meet replication requirement.
    *
-   *
+   * @param usedNodes - list of the datanodes to already chosen in the
+   *                      pipeline.
    * @param excludedNodes - list of the datanodes to exclude.
    * @param favoredNodes - list of nodes preferred. This is a hint to the
    *                     allocator, whether the favored nodes will be used
@@ -98,9 +99,11 @@ public final class SCMContainerPlacementRackAware
    */
   @Override
   protected List<DatanodeDetails> chooseDatanodesInternal(
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
-      throws SCMException {
+          List<DatanodeDetails> usedNodes,
+          List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes, int nodesRequired,
+          long metadataSizeRequired, long dataSizeRequired)
+          throws SCMException {
     Preconditions.checkArgument(nodesRequired > 0);
     metrics.incrDatanodeRequestCount(nodesRequired);
     int datanodeCount = networkTopology.getNumOfLeafNode(NetConstants.ROOT);
@@ -326,7 +329,8 @@ public final class SCMContainerPlacementRackAware
   /**
    * Choose a batch of datanodes on different rack than excludedNodes or
    * chosenNodes.
-   *
+   * TODO HDDS-7226: Update Implementation to accomodate for already used
+   * nodes to conform to existing placement policy.
    *
    * @param excludedNodes - list of the datanodes to excluded. Can be null.
    * @param chosenNodes - list of nodes already chosen. These nodes should also

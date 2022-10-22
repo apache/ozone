@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
 import java.io.IOException;
+import java.util.Objects;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
@@ -209,7 +210,7 @@ public final class OzoneClientUtils {
     }
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volume.getName())
         .setBucketName(bucket.getName()).setKeyName(keyName)
-        .setRefreshPipeline(true).setSortDatanodesInPipeline(true)
+        .setSortDatanodesInPipeline(true)
         .setLatestVersionLocation(true).build();
     OmKeyInfo keyInfo = rpcClient.getOzoneManagerClient().lookupKey(keyArgs);
 
@@ -224,4 +225,14 @@ public final class OzoneClientUtils {
     helper.compute();
     return helper.getFileChecksum();
   }
+
+  public static boolean isKeyErasureCode(OmKeyInfo keyInfo) {
+    return keyInfo.getReplicationConfig().getReplicationType() ==
+            HddsProtos.ReplicationType.EC;
+  }
+
+  public static boolean isKeyEncrypted(OmKeyInfo keyInfo) {
+    return !Objects.isNull(keyInfo.getFileEncryptionInfo());
+  }
+
 }

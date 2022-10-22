@@ -267,6 +267,7 @@ CDDL
 Apache License
 =====================
 
+   ch.qos.reload4j:reload4j
    com.carrotsearch:hppc
    com.fasterxml.jackson.core:jackson-annotations
    com.fasterxml.jackson.core:jackson-core
@@ -327,7 +328,6 @@ Apache License
    io.opentracing:opentracing-util
    jakarta.validation:jakarta.validation-api
    javax.enterprise:cdi-api
-   log4j:log4j
    net.minidev:accessors-smart
    net.minidev:json-smart
    net.java.dev.jna:jna
@@ -338,7 +338,6 @@ Apache License
    org.codehaus.jackson:jackson-jaxrs
    org.codehaus.jackson:jackson-mapper-asl
    org.codehaus.jackson:jackson-xc
-   org.codehaus.jettison:jettison
    org.hamcrest:hamcrest-all
    org.javassist:javassist
    org.jboss.weld.servlet:weld-servlet
@@ -363,7 +362,7 @@ MIT
    net.sf.jopt-simple:jopt-simple
    org.codehaus.mojo:animal-sniffer-annotations
    org.slf4j:slf4j-api
-   org.slf4j:slf4j-log4j12
+   org.slf4j:slf4j-reload4j
 
 
 EPL 2.0

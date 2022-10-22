@@ -44,8 +44,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
-import org.apache.hadoop.hdds.scm.container.replication.OverReplicatedProcessor;
-import org.apache.hadoop.hdds.scm.container.replication.UnderReplicatedProcessor;
 import org.apache.hadoop.hdds.scm.crl.CRLStatusReportHandler;
 import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
@@ -739,34 +737,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           clock,
           legacyRM,
           containerReplicaPendingOps);
-      ReplicationManager.ReplicationManagerConfiguration rmConf = conf
-          .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
-
-      UnderReplicatedProcessor underReplicatedProcessor =
-          new UnderReplicatedProcessor(replicationManager,
-              containerReplicaPendingOps, eventQueue);
-
-      BackgroundSCMService underReplicatedQueueThread =
-          new BackgroundSCMService.Builder().setClock(clock)
-              .setScmContext(scmContext)
-              .setServiceName("UnderReplicatedQueueThread")
-              .setIntervalInMillis(rmConf.getUnderReplicatedInterval())
-              .setWaitTimeInMillis(backgroundServiceSafemodeWaitMs)
-              .setPeriodicalTask(underReplicatedProcessor::processAll).build();
-      serviceManager.register(underReplicatedQueueThread);
-
-      OverReplicatedProcessor overReplicatedProcessor =
-          new OverReplicatedProcessor(replicationManager,
-              containerReplicaPendingOps, eventQueue);
-
-      BackgroundSCMService overReplicatedQueueThread =
-          new BackgroundSCMService.Builder().setClock(clock)
-              .setScmContext(scmContext)
-              .setServiceName("OverReplicatedQueueThread")
-              .setIntervalInMillis(rmConf.getOverReplicatedInterval())
-              .setWaitTimeInMillis(backgroundServiceSafemodeWaitMs)
-              .setPeriodicalTask(overReplicatedProcessor::processAll).build();
-      serviceManager.register(overReplicatedQueueThread);
     }
     serviceManager.register(replicationManager);
     if (configurator.getScmSafeModeManager() != null) {
@@ -1102,7 +1072,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmStorageConfig.getScmId());
 
       // Initialize security if security is enabled later.
-      initializeSecurityIfNeeded(conf, scmhaNodeDetails, scmStorageConfig);
+      initializeSecurityIfNeeded(
+          conf, scmhaNodeDetails, scmStorageConfig, false);
 
       return true;
     }
@@ -1127,7 +1098,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       }
 
       // Initialize security if security is enabled later.
-      initializeSecurityIfNeeded(conf, scmhaNodeDetails, scmStorageConfig);
+      initializeSecurityIfNeeded(
+          conf, scmhaNodeDetails, scmStorageConfig, false);
 
     } else {
       try {
@@ -1166,14 +1138,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @param scmStorageConfig
    * @throws IOException
    */
-  private static void initializeSecurityIfNeeded(OzoneConfiguration conf,
-      SCMHANodeDetails scmhaNodeDetails, SCMStorageConfig scmStorageConfig)
+  private static void initializeSecurityIfNeeded(
+      OzoneConfiguration conf, SCMHANodeDetails scmhaNodeDetails,
+      SCMStorageConfig scmStorageConfig, boolean isPrimordial)
       throws IOException {
     // Initialize security if security is enabled later.
     if (OzoneSecurityUtil.isSecurityEnabled(conf)
         && scmStorageConfig.getScmCertSerialId() == null) {
       HASecurityUtils.initializeSecurity(scmStorageConfig, conf,
-          getScmAddress(scmhaNodeDetails, conf), true);
+          getScmAddress(scmhaNodeDetails, conf), isPrimordial);
       scmStorageConfig.forceInitialize();
       LOG.info("SCM unsecure cluster is converted to secure cluster. " +
               "Persisted SCM Certificate SerialID {}",
@@ -1263,7 +1236,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       final boolean isSCMHAEnabled = scmStorageConfig.isSCMHAEnabled();
 
       // Initialize security if security is enabled later.
-      initializeSecurityIfNeeded(conf, haDetails, scmStorageConfig);
+      initializeSecurityIfNeeded(conf, haDetails, scmStorageConfig, true);
 
       if (SCMHAUtils.isSCMHAEnabled(conf) && !isSCMHAEnabled) {
         SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
@@ -1666,24 +1639,26 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
 
+    if (ms != null) {
+      ms.stop();
+    }
+
+    scmSafeModeManager.stop();
+    serviceManager.stop();
+    RatisDropwizardExports.clear(ratisMetricsMap);
+
     try {
       LOG.info("Stopping SCM MetadataStore.");
       scmMetadataStore.stop();
     } catch (Exception ex) {
       LOG.error("SCM Metadata store stop failed", ex);
     }
-
-    if (ms != null) {
-      ms.stop();
-    }
-
-    scmSafeModeManager.stop();
   }
 
   @Override
   public void shutDown(String message) {
     stop();
-    ExitUtils.terminate(1, message, LOG);
+    ExitUtils.terminate(0, message, LOG);
   }
 
   /**

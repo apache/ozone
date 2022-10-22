@@ -54,6 +54,20 @@ public class RatisDropwizardExports extends DropwizardExports {
         r2 -> deregisterDropwizard(r2, ratisMetricsMap));
   }
 
+  public static void clear(Map<String, RatisDropwizardExports>
+                               ratisMetricsMap) {
+    ratisMetricsMap.entrySet().stream().forEach(e -> {
+      // remove and deregister from registry only one registered
+      // as unregistered element if performed unregister again will
+      // cause null pointer exception by registry
+      Collector c = ratisMetricsMap.remove(e.getKey());
+      if (c != null) {
+        CollectorRegistry.defaultRegistry.unregister(c);
+      }
+    });
+    MetricRegistries.global().clear();
+  }
+
   private static void registerDropwizard(RatisMetricRegistry registry,
       Map<String, RatisDropwizardExports> ratisMetricsMap) {
     RatisDropwizardExports rde = new RatisDropwizardExports(

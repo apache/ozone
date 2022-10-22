@@ -133,7 +133,7 @@ public final class  ReconServerConfigKeys {
 
   public static final String OZONE_RECON_SCM_SNAPSHOT_ENABLED =
       "ozone.recon.scm.snapshot.enabled";
-  public static final boolean OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT = false;
+  public static final boolean OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT = true;
 
   public static final String OZONE_RECON_SCM_CONNECTION_TIMEOUT =
       "ozone.recon.scm.connection.timeout";
