@@ -2535,9 +2535,10 @@ function ozone_parse_args
           shift
           ((OZONE_PARSE_COUNTER=OZONE_PARSE_COUNTER+2))
         else
+          help_text=$'The --validate flag validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present\n\n'
           usage_text=$'Usage I: ozone --validate classpath <ARTIFACTNAME>\nUsage II: ozone --validate [OPTIONS] --daemon start|status|stop csi|datanode|om|recon|s3g|scm\n\n'
           option_description=$'  OPTIONS is none or any of:\n\ncontinue\tcommand execution shall continue even if validation fails'
-          ozone_error "${usage_text}${option_description}"
+          ozone_error "${help_text}${usage_text}${option_description}"
           exit 1
         fi
       ;;
