@@ -171,7 +171,7 @@ public class TestClosingContainerHandler {
         repConfig, 1, CLOSING);
 
     final int replicas = repConfig.getRequiredNodes();
-    final int closing = replicas / 2 + 1;
+    final int closing = replicas / 2;
     final boolean force = repConfig.getReplicationType() != RATIS;
 
     Set<ContainerReplica> containerReplicas = new HashSet<>();
