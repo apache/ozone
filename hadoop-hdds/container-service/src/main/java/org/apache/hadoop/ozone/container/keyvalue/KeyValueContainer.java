@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
@@ -825,10 +826,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public boolean scanMetaData() {
-    long containerId = containerData.getContainerID();
     KeyValueContainerCheck checker =
-        new KeyValueContainerCheck(containerData.getMetadataPath(), config,
-            containerId, containerData.getVolume(), this);
+        new KeyValueContainerCheck(this, config, null);
     return checker.fastCheck();
   }
 
@@ -839,17 +838,16 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public boolean scanData(DataTransferThrottler throttler, Canceler canceler) {
+  public boolean scanData(DataTransferThrottler throttler, Canceler canceler,
+      ContainerController controller) {
     if (!shouldScanData()) {
       throw new IllegalStateException("The checksum verification can not be" +
           " done for container in state "
           + containerData.getState());
     }
 
-    long containerId = containerData.getContainerID();
-    KeyValueContainerCheck checker =
-        new KeyValueContainerCheck(containerData.getMetadataPath(), config,
-            containerId, containerData.getVolume(), this);
+    KeyValueContainerCheck checker = new KeyValueContainerCheck(this, config,
+        controller);
 
     return checker.fullCheck(throttler, canceler);
   }

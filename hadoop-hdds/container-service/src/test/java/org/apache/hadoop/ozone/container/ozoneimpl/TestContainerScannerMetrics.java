@@ -156,8 +156,8 @@ public class TestContainerScannerMetrics {
     when(c.getContainerData()).thenReturn(data);
     when(c.shouldScanData()).thenReturn(shouldScanData);
     when(c.scanMetaData()).thenReturn(scanMetaDataSuccess);
-    when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
-        .thenReturn(scanDataSuccess);
+    when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class),
+        any(ContainerController.class))).thenReturn(scanDataSuccess);
   }
 
 }

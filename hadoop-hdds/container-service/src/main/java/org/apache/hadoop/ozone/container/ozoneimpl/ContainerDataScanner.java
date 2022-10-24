@@ -67,7 +67,7 @@ public class ContainerDataScanner extends AbstractContainerScanner {
     ContainerData containerData = c.getContainerData();
     long containerId = containerData.getContainerID();
     logScanStart(containerData);
-    if (!c.scanData(throttler, canceler)) {
+    if (!c.scanData(throttler, canceler, controller)) {
       metrics.incNumUnHealthyContainers();
       controller.markContainerUnhealthy(containerId);
     } else {

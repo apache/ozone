@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -180,6 +181,20 @@ public class ContainerController {
     final Container container = containerSet.getContainer(containerId);
     if (container != null) {
       getHandler(container).deleteContainer(container, force);
+    }
+  }
+
+  /**
+   * Deletes the given orphan chunks in the certain container.
+   * @param containerId Id of the container
+   * @param chunks      the set of orphan chunk files
+   * @throws IOException
+   */
+  public void deleteOrphanChunks(final long containerId, Set<File> chunks)
+      throws IOException {
+    final Container container = containerSet.getContainer(containerId);
+    if (container != null) {
+      getHandler(container).deleteOrphanChunks(container, chunks);
     }
   }
 

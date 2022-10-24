@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -27,6 +28,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 
@@ -78,6 +80,8 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.apache.hadoop.ozone.container.ozoneimpl.AbstractContainerGarbageCollector;
+import org.apache.hadoop.ozone.container.ozoneimpl.SimpleContainerGarbageCollector;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -123,6 +127,7 @@ public class KeyValueHandler extends Handler {
   private final ContainerType containerType;
   private final BlockManager blockManager;
   private final ChunkManager chunkManager;
+  private final AbstractContainerGarbageCollector garbageCollector;
   private final VolumeChoosingPolicy volumeChoosingPolicy;
   private final long maxContainerSize;
   private final Function<ByteBuffer, ByteString> byteBufferToByteString;
@@ -144,6 +149,8 @@ public class KeyValueHandler extends Handler {
         DatanodeConfiguration.class).isChunkDataValidationCheck();
     chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager,
         volSet);
+    garbageCollector = new SimpleContainerGarbageCollector(config);
+
     try {
       volumeChoosingPolicy = conf.getClass(
           HDDS_DATANODE_VOLUME_CHOOSING_POLICY, RoundRobinVolumeChoosingPolicy
@@ -254,6 +261,11 @@ public class KeyValueHandler extends Handler {
   @VisibleForTesting
   public BlockManager getBlockManager() {
     return this.blockManager;
+  }
+
+  @VisibleForTesting
+  public AbstractContainerGarbageCollector getGarbageCollector() {
+    return garbageCollector;
   }
 
   /**
@@ -1108,6 +1120,12 @@ public class KeyValueHandler extends Handler {
         LOG.debug("block {} chunk {} deleted", blockData.getBlockID(), info);
       }
     }
+  }
+
+  @Override
+  public void deleteOrphanChunks(Container container, Set<File> files)
+      throws IOException {
+    garbageCollector.collectGarbage(container, files);
   }
 
   private void deleteInternal(Container container, boolean force)

@@ -36,6 +36,7 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.hdfs.util.RwLock;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 
 /**
  * Interface for Container Operations.
@@ -178,8 +179,12 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
    *                  perform I/O bandwidth throttling
    * @param canceler  A reference of {@link Canceler} used to cancel the
    *                  I/O bandwidth throttling (e.g. for shutdown purpose).
+   * @param controller A reference of {@link ContainerController} used to
+   *                   handle orphan chunks
+   *
    * @return true if the checksum verification succeeds
    *         false otherwise
    */
-  boolean scanData(DataTransferThrottler throttler, Canceler canceler);
+  boolean scanData(DataTransferThrottler throttler, Canceler canceler,
+      ContainerController controller);
 }

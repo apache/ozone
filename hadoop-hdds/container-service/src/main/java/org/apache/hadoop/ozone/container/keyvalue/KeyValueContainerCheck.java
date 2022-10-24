@@ -43,12 +43,17 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerGarbageCollectorConfiguration;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 
 /**
  * Class to run integrity checks on Datanode Containers.
@@ -60,24 +65,24 @@ public class KeyValueContainerCheck {
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyValueContainerCheck.class);
 
-  private long containerID;
   private KeyValueContainerData onDiskContainerData; //loaded from fs/disk
-  private ConfigurationSource checkConfig;
+  private final ConfigurationSource checkConfig;
+  private final long containerID;
+  private final String metadataPath;
+  private final HddsVolume volume;
+  private final KeyValueContainer container;
+  private final ContainerController controller;
 
-  private String metadataPath;
-  private HddsVolume volume;
-  private KeyValueContainer container;
-
-  public KeyValueContainerCheck(String metadataPath, ConfigurationSource conf,
-      long containerID, HddsVolume volume, KeyValueContainer container) {
-    Preconditions.checkArgument(metadataPath != null);
-
+  public KeyValueContainerCheck(KeyValueContainer container,
+      ConfigurationSource conf, ContainerController controller) {
+    KeyValueContainerData containerData = container.getContainerData();
     this.checkConfig = conf;
-    this.containerID = containerID;
-    this.onDiskContainerData = null;
-    this.metadataPath = metadataPath;
-    this.volume = volume;
     this.container = container;
+    this.volume = containerData.getVolume();
+    this.containerID = containerData.getContainerID();
+    this.metadataPath = containerData.getMetadataPath();
+    this.onDiskContainerData = null;
+    this.controller = controller;
   }
 
   /**
@@ -232,6 +237,8 @@ public class KeyValueContainerCheck {
 
     onDiskContainerData.setDbFile(dbFile);
 
+    Set<File> recordedChunks = new HashSet<>();
+
     try (DBHandle db = BlockUtils.getDB(onDiskContainerData, checkConfig);
         BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator(
             onDiskContainerData.getContainerID(),
@@ -247,7 +254,7 @@ public class KeyValueContainerCheck {
         // make sure reading the latest record. If the record is just removed,
         // the block should be skipped to scan.
         try {
-          scanBlock(block, throttler, canceler);
+          scanBlock(block, throttler, canceler, recordedChunks);
         } catch (OzoneChecksumException ex) {
           throw ex;
         } catch (IOException ex) {
@@ -261,6 +268,84 @@ public class KeyValueContainerCheck {
           }
         }
       }
+    }
+
+    ContainerGarbageCollectorConfiguration cgcConfig = checkConfig.
+        getObject(ContainerGarbageCollectorConfiguration.class);
+    if (cgcConfig.isRemoveEnabled()) {
+      // To be compatible with SchemaV1
+      addPendingDeletionChunks(recordedChunks);
+
+      File chunkDir = ContainerUtils.getChunkDir(container.getContainerData());
+      scanOrphanChunksAndDelete(recordedChunks, chunkDir);
+    }
+  }
+
+  /**
+   *  Get all on disk chunks (all files in the chunk dir).
+   *
+   * @param chunkDir the path of chunk storage
+   * @return The File set
+   */
+  private Set<File> getOnDiskChunks(File chunkDir) {
+    Set<File> existingChunks = new HashSet<>();
+    File[] chunks = chunkDir.listFiles();
+    if (chunks != null) {
+      existingChunks.addAll(Arrays.asList(chunks));
+    }
+    return existingChunks;
+  }
+
+  /**
+   *  If using schemaV1, the prefixed blocks to be deleted will also be
+   *  considered as unreferenced due to the key filter.
+   *  Need to add those as recorded to avoid affecting the process of block
+   *  deleting service.
+   *
+   * @param recordedChunks the chunk record of the container DB
+   * @throws IOException
+   */
+  private void addPendingDeletionChunks(Set<File> recordedChunks)
+      throws IOException {
+    if (onDiskContainerData.getSchemaVersion().equals(SCHEMA_V1)) {
+      try (DBHandle db = BlockUtils.getDB(onDiskContainerData, checkConfig);
+           BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator(
+               onDiskContainerData.getContainerID(),
+               onDiskContainerData.getDeletingBlockKeyFilter())) {
+        while (kvIter.hasNext()) {
+          BlockData block = kvIter.nextBlock();
+          for (ContainerProtos.ChunkInfo chunk : block.getChunks()) {
+            File chunkFile = onDiskContainerData.getLayoutVersion().
+                getChunkFile(onDiskContainerData, block.getBlockID(),
+                    ChunkInfo.getFromProtoBuf(chunk));
+            if (chunkFile.exists()) {
+              recordedChunks.add(chunkFile);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Scan the chunk directory, and delete the files with no records in
+   * BlockData Table.
+   *
+   * @param recordedChunks the set of all recorded chunk files
+   */
+  private void scanOrphanChunksAndDelete(Set<File> recordedChunks,
+      File chunkDir) {
+    if (controller != null) {
+      try {
+        Set<File> orphanChunks = getOnDiskChunks(chunkDir);
+        orphanChunks.removeAll(recordedChunks);
+        controller.deleteOrphanChunks(containerID, orphanChunks);
+      } catch (IOException ex) {
+        LOG.error("Failed to delete orphan chunks of container:{} at {}",
+            containerID, chunkDir, ex);
+      }
+    } else {
+      LOG.error("Cannot scanOrphanChunksAndDelete as controller is null");
     }
   }
 
@@ -302,7 +387,7 @@ public class KeyValueContainerCheck {
   }
 
   private void scanBlock(BlockData block, DataTransferThrottler throttler,
-      Canceler canceler) throws IOException {
+      Canceler canceler, Set<File> recorded) throws IOException {
     ContainerLayoutVersion layout = onDiskContainerData.getLayoutVersion();
 
     for (ContainerProtos.ChunkInfo chunk : block.getChunks()) {
@@ -318,10 +403,13 @@ public class KeyValueContainerCheck {
           throw new IOException(
               "Missing chunk file " + chunkFile.getAbsolutePath());
         }
-      } else if (chunk.getChecksumData().getType()
-          != ContainerProtos.ChecksumType.NONE) {
-        verifyChecksum(block, chunk, chunkFile, layout, throttler,
-            canceler);
+      } else {
+        recorded.add(chunkFile);
+        if (chunk.getChecksumData().getType()
+            != ContainerProtos.ChecksumType.NONE) {
+          verifyChecksum(block, chunk, chunkFile, layout, throttler,
+              canceler);
+        }
       }
     }
   }

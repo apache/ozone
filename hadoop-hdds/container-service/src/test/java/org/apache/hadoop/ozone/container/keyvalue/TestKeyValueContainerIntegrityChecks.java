@@ -116,6 +116,9 @@ public class TestKeyValueContainerIntegrityChecks {
     return conf;
   }
 
+  public MutableVolumeSet getVolumeSet() {
+    return volumeSet;
+  }
 
   /**
    * Creates a container with normal and deleted blocks.

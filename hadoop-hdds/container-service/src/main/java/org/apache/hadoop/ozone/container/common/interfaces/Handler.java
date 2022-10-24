@@ -18,9 +18,11 @@
 
 package org.apache.hadoop.ozone.container.common.interfaces;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -189,6 +191,16 @@ public abstract class Handler {
    * @throws IOException
    */
   public abstract void deleteBlock(Container container, BlockData blockData)
+      throws IOException;
+
+  /**
+   * Deletes the given orphan files in the container.
+   *
+   * @param container container whose orphan chunk is to be deleted
+   * @param files     files to be deleted
+   * @throws IOException
+   */
+  public abstract void deleteOrphanChunks(Container container, Set<File> files)
       throws IOException;
 
   public void setClusterID(String clusterID) {
