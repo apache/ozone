@@ -658,7 +658,7 @@ public final class RocksDatabase {
     return getLongProperty(family, ESTIMATE_NUM_KEYS);
   }
 
-  private long getLongProperty(String key) throws IOException {
+  public long getLongProperty(String key) throws IOException {
     assertClose();
     try {
       counter.incrementAndGet();
@@ -671,7 +671,7 @@ public final class RocksDatabase {
     }
   }
 
-  private long getLongProperty(ColumnFamily family, String key)
+  public long getLongProperty(ColumnFamily family, String key)
       throws IOException {
     assertClose();
     try {
@@ -711,6 +711,10 @@ public final class RocksDatabase {
     } finally {
       counter.decrementAndGet();
     }
+  }
+
+  public List<LiveFileMetaData> getLiveFilesMetaData() {
+    return db.get().getLiveFilesMetaData();
   }
 
   public ManagedTransactionLogIterator getUpdatesSince(long sequenceNumber)
