@@ -45,7 +45,7 @@ import java.util.stream.Collectors;
     name = "usageinfo",
     description = "List usage information " +
         "(such as Capacity, SCMUsed, Remaining) of a datanode by IP address " +
-        "or UUID or Host name",
+        "or Host name or UUID",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class UsageInfoSubcommand extends ScmSubcommand {
@@ -61,17 +61,14 @@ public class UsageInfoSubcommand extends ScmSubcommand {
   private ExclusiveArguments exclusiveArguments;
 
   private static class ExclusiveArguments {
-    @CommandLine.Option(names = {"--ip"}, paramLabel = "IP", description =
-        "Show info by datanode ip address.", defaultValue = "")
-    private String ipaddress;
+    @CommandLine.Option(names = {"--address"}, paramLabel = "ADDRESS",
+        description = "Show info by datanode ip or hostname address.",
+        defaultValue = "")
+    private String address;
 
     @CommandLine.Option(names = {"--uuid"}, paramLabel = "UUID", description =
         "Show info by datanode UUID.", defaultValue = "")
     private String uuid;
-
-    @CommandLine.Option(names = {"--hostname"}, paramLabel = "HOSTNAME",
-        description = "Show info by datanode hostname.", defaultValue = "")
-    private String hostname;
 
     @CommandLine.Option(names = {"-m", "--most-used"},
         description = "Show the most used datanodes.",
@@ -102,12 +99,11 @@ public class UsageInfoSubcommand extends ScmSubcommand {
       throw new IOException("Count must be an integer greater than 0.");
     }
 
-    // fetch info by ip or uuid or hostname
-    if (!Strings.isNullOrEmpty(exclusiveArguments.ipaddress) ||
-        !Strings.isNullOrEmpty(exclusiveArguments.uuid) ||
-        !Strings.isNullOrEmpty(exclusiveArguments.hostname)) {
-      infoList = scmClient.getDatanodeUsageInfo(exclusiveArguments.ipaddress,
-          exclusiveArguments.uuid, exclusiveArguments.hostname);
+    // fetch info by ip or hostname or uuid
+    if (!Strings.isNullOrEmpty(exclusiveArguments.address) ||
+        !Strings.isNullOrEmpty(exclusiveArguments.uuid)) {
+      infoList = scmClient.getDatanodeUsageInfo(exclusiveArguments.address,
+          exclusiveArguments.uuid);
     } else { // get info of most used or least used nodes
       infoList = scmClient.getDatanodeUsageInfo(exclusiveArguments.mostUsed,
           count);

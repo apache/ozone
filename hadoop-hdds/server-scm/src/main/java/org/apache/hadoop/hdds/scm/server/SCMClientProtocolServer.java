@@ -999,9 +999,9 @@ public class SCMClientProtocolServer implements
 
   /**
    * Get Datanode usage info such as capacity, SCMUsed, and remaining by ip
-   * or uuid.
+   * or hostname or uuid.
    *
-   * @param ipaddress Datanode Address String
+   * @param address Datanode Address String
    * @param uuid Datanode UUID String
    * @return List of DatanodeUsageInfoProto. Each element contains usage info
    * such as capacity, SCMUsed, and remaining space.
@@ -1009,25 +1009,7 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid, int clientVersion) throws IOException {
-    return getDatanodeUsageInfo(ipaddress, uuid, null, clientVersion);
-  }
-
-  /**
-   * Get Datanode usage info such as capacity, SCMUsed, and remaining by ip
-   * or uuid.
-   *
-   * @param ipaddress Datanode Address IP String
-   * @param uuid Datanode UUID String
-   * @param hostname Datanode Address hostname String
-   * @return List of DatanodeUsageInfoProto. Each element contains usage info
-   * such as capacity, SCMUsed, and remaining space.
-   * @throws IOException if admin authentication fails
-   */
-  @Override
-  public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid,
-      String hostname, int clientVersion) throws IOException {
+      String address, String uuid, int clientVersion) throws IOException {
 
     // check admin authorisation
     try {
@@ -1037,14 +1019,12 @@ public class SCMClientProtocolServer implements
       throw e;
     }
 
-    // get datanodes by ip or uuid or hostname
+    // get datanodes by ip or uuid
     List<DatanodeDetails> nodes = new ArrayList<>();
     if (!Strings.isNullOrEmpty(uuid)) {
       nodes.add(scm.getScmNodeManager().getNodeByUuid(uuid));
-    } else if (!Strings.isNullOrEmpty(ipaddress)) {
-      nodes = scm.getScmNodeManager().getNodesByIpAddress(ipaddress);
-    } else if (!Strings.isNullOrEmpty(hostname)) {
-      nodes = scm.getScmNodeManager().getNodesByHostName(hostname);
+    } else if (!Strings.isNullOrEmpty(address)) {
+      nodes = scm.getScmNodeManager().getNodesByAddress(address);
     } else {
       throw new IOException(
           "Could not get datanode with the specified parameters."

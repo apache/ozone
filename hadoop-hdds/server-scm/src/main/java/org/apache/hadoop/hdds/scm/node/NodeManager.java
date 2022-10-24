@@ -356,24 +356,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   List<DatanodeDetails> getNodesByAddress(String address);
 
   /**
-   * Given datanode Ipaddress, returns a list of
-   * DatanodeDetails for the datanodes running at that address.
-   *
-   * @param ipAddress datanode ip address
-   * @return the given datanode, or empty list if none found
-   */
-  List<DatanodeDetails> getNodesByIpAddress(String ipAddress);
-
-  /**
-   * Given datanode hostname, returns a list of
-   * DatanodeDetails for the datanodes running at that hostname.
-   *
-   * @param hostname datanode hostname address
-   * @return the given datanode, or empty list if none found
-   */
-  List<DatanodeDetails> getNodesByHostName(String hostname);
-
-  /**
    * Get cluster map as in network topology for this node manager.
    * @return cluster map
    */

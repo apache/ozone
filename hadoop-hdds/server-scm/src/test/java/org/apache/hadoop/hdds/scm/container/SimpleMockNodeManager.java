@@ -338,16 +338,6 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public List<DatanodeDetails> getNodesByIpAddress(String ipAddress) {
-    return null;
-  }
-
-  @Override
-  public List<DatanodeDetails> getNodesByHostName(String hostName) {
-    return null;
-  }
-
-  @Override
   public NetworkTopology getClusterNetworkTopologyMap() {
     return null;
   }

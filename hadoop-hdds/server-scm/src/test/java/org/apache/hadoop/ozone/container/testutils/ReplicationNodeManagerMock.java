@@ -486,16 +486,6 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   @Override
-  public List<DatanodeDetails> getNodesByIpAddress(String ipAddress) {
-    return new LinkedList<>();
-  }
-
-  @Override
-  public List<DatanodeDetails> getNodesByHostName(String hostName) {
-    return new LinkedList<>();
-  }
-
-  @Override
   public NetworkTopology getClusterNetworkTopologyMap() {
     return null;
   }
