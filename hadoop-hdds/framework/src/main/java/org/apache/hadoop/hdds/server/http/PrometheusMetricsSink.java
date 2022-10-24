@@ -24,9 +24,11 @@ import java.io.Writer;
 import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.List;
 import java.util.regex.Pattern;
 import org.apache.commons.configuration2.SubsetConfiguration;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.DecayRpcSchedulerUtil;
 import org.apache.hadoop.metrics2.AbstractMetric;
 import org.apache.hadoop.metrics2.MetricType;
 import org.apache.hadoop.metrics2.MetricsRecord;
@@ -61,11 +63,18 @@ public class PrometheusMetricsSink implements MetricsSink {
       if (metrics.type() == MetricType.COUNTER
           || metrics.type() == MetricType.GAUGE) {
 
+        String metricName = DecayRpcSchedulerUtil
+            .splitMetricNameIfNeeded(metricsRecord.name(), metrics.name());
+
         String key = prometheusName(
-            metricsRecord.name(), metrics.name());
+            metricsRecord.name(), metricName);
 
         String prometheusMetricKeyAsString =
             getPrometheusMetricKeyAsString(metricsRecord, key);
+
+        if (DecayRpcSchedulerUtil.USERNAME_LIST.size() > 0) {
+          DecayRpcSchedulerUtil.USERNAME_LIST.clear();
+        }
 
         String metricKey = "# TYPE "
             + key
@@ -86,8 +95,11 @@ public class PrometheusMetricsSink implements MetricsSink {
         .append("{");
     String sep = "";
 
+    List<MetricsTag> metricTagList = DecayRpcSchedulerUtil
+        .tagListWithUsernameIfNeeded(metricsRecord);
+
     //add tags
-    for (MetricsTag tag : metricsRecord.tags()) {
+    for (MetricsTag tag : metricTagList) {
       String tagName = tag.name().toLowerCase();
 
       //ignore specific tag which includes sub-hierarchy
