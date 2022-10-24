@@ -80,7 +80,7 @@ Cat file
 
 Delete file
     ${result} =    Execute               ozone fs -rm -skipTrash ${DEEP_URL}/subdir1/NOTICE.txt
-                   Should Be Empty       ${result}
+                   Should Be Equal       ${result}     Deleted ${DEEP_URL}/subdir1/NOTICE.txt
     ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should not contain    ${result}       NOTICE.txt
 
