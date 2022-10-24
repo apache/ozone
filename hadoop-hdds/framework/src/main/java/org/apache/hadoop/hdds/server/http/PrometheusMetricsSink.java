@@ -65,16 +65,15 @@ public class PrometheusMetricsSink implements MetricsSink {
 
         String metricName = DecayRpcSchedulerUtil
             .splitMetricNameIfNeeded(metricsRecord.name(), metrics.name());
+        // If there is no username this should be null
+        String username = DecayRpcSchedulerUtil
+            .checkMetricNameForUsername(metricsRecord.name(), metrics.name());
 
         String key = prometheusName(
             metricsRecord.name(), metricName);
 
         String prometheusMetricKeyAsString =
-            getPrometheusMetricKeyAsString(metricsRecord, key);
-
-        if (DecayRpcSchedulerUtil.USERNAME_LIST.size() > 0) {
-          DecayRpcSchedulerUtil.USERNAME_LIST.clear();
-        }
+            getPrometheusMetricKeyAsString(metricsRecord, key, username);
 
         String metricKey = "# TYPE "
             + key
@@ -89,14 +88,17 @@ public class PrometheusMetricsSink implements MetricsSink {
   }
 
   private String getPrometheusMetricKeyAsString(MetricsRecord metricsRecord,
-      String key) {
+      String key, String username) {
     StringBuilder prometheusMetricKey = new StringBuilder();
     prometheusMetricKey.append(key)
         .append("{");
     String sep = "";
 
+    // tagListWithUsernameIfNeeded() checks if username is null.
+    // If it's not then it returns a list with the existing
+    // metric tags and a username tag.
     List<MetricsTag> metricTagList = DecayRpcSchedulerUtil
-        .tagListWithUsernameIfNeeded(metricsRecord);
+        .tagListWithUsernameIfNeeded(metricsRecord, username);
 
     //add tags
     for (MetricsTag tag : metricTagList) {

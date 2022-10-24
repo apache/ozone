@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecord;
 import org.apache.hadoop.metrics2.MetricsTag;
@@ -45,21 +46,39 @@ public final class DecayRpcSchedulerUtil {
     }
   };
 
-  public static final List<String> USERNAME_LIST = new ArrayList<>();
-
   /**
    * For Decay_Rpc_Scheduler, the metric name is in format
    * "Caller(<callers_username>).Volume"
    * or
    * "Caller(<callers_username>).Priority"
-   * Split it, store the username in a list to register it as a tag
-   * and return only the metric.
+   * Split it and return the metric.
    * @param recordName
    * @param metricName "Caller(xyz).Volume" or "Caller(xyz).Priority"
    * @return "Volume" or "Priority"
    */
   public static String splitMetricNameIfNeeded(String recordName,
                                                String metricName) {
+    if (recordName.toLowerCase().contains("decayrpcscheduler") &&
+        metricName.toLowerCase().contains("caller(")) {
+      // names will contain ["Caller(xyz)", "Volume" / "Priority"]
+      String[] names = metricName.split("[.]");
+
+      // "Volume" or "Priority"
+      return names[1];
+    }
+    return metricName;
+  }
+
+  /**
+   * For Decay_Rpc_Scheduler, split the metric name
+   * and then get the part that is in the format "Caller(<callers_username>)"
+   * and split it to return the username.
+   * @param recordName
+   * @param metricName
+   * @return caller username or null if not present
+   */
+  public static String checkMetricNameForUsername(String recordName,
+                                                  String metricName) {
     if (recordName.toLowerCase().contains("decayrpcscheduler") &&
         metricName.toLowerCase().contains("caller(")) {
       // names will contain ["Caller(xyz)", "Volume" / "Priority"]
@@ -72,13 +91,10 @@ public final class DecayRpcSchedulerUtil {
       String[] subStrings = caller.split("[()]");
 
       String username = subStrings[1];
-      USERNAME_LIST.add(username);
 
-      // "Volume" or "Priority"
-      return names[1];
+      return username;
     }
-
-    return metricName;
+    return null;
   }
 
   /**
@@ -88,11 +104,10 @@ public final class DecayRpcSchedulerUtil {
    * @return the new list with the metric tags and the username tag
    */
   public static List<MetricsTag> tagListWithUsernameIfNeeded(
-      MetricsRecord metricsRecord) {
+      MetricsRecord metricsRecord, String username) {
     List<MetricsTag> list = new ArrayList<>(metricsRecord.tags());
 
-    if (USERNAME_LIST.size() > 0) {
-      String username = USERNAME_LIST.get(0);
+    if (!Strings.isNullOrEmpty(username)) {
       MetricsTag tag = new MetricsTag(USERNAME_INFO, username);
       list.add(tag);
     }
