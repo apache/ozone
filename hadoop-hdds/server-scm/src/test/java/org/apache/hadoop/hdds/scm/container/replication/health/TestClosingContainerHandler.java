@@ -53,9 +53,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.R
 public class TestClosingContainerHandler {
   private ReplicationManager replicationManager;
   private ClosingContainerHandler closingContainerHandler;
-  private static final ECReplicationConfig ecReplicationConfig =
+  private static final ECReplicationConfig EC_REPLICATION_CONFIG =
       new ECReplicationConfig(3, 2);
-  private static final RatisReplicationConfig ratisReplicationConfig =
+  private static final RatisReplicationConfig RATIS_REPLICATION_CONFIG =
       RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
 
   @BeforeEach
@@ -65,7 +65,7 @@ public class TestClosingContainerHandler {
   }
 
   private static Stream<ReplicationConfig> replicationConfigs() {
-    return Stream.of(ratisReplicationConfig, ecReplicationConfig);
+    return Stream.of(RATIS_REPLICATION_CONFIG, EC_REPLICATION_CONFIG);
   }
 
   /**
@@ -76,7 +76,7 @@ public class TestClosingContainerHandler {
   @Test
   public void testNonClosingContainerReturnsFalse() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        ecReplicationConfig, 1, CLOSED);
+        EC_REPLICATION_CONFIG, 1, CLOSED);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.CLOSING, 1, 2, 3, 4, 5);
@@ -94,7 +94,7 @@ public class TestClosingContainerHandler {
   @Test
   public void testNonClosingRatisContainerReturnsFalse() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        ratisReplicationConfig, 1, CLOSED);
+        RATIS_REPLICATION_CONFIG, 1, CLOSED);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.CLOSING, 0, 0, 0);
@@ -117,7 +117,7 @@ public class TestClosingContainerHandler {
   @Test
   public void testUnhealthyReplicaIsNotClosed() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        ecReplicationConfig, 1, CLOSING);
+        EC_REPLICATION_CONFIG, 1, CLOSING);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.UNHEALTHY, 1, 2, 3, 4);
@@ -140,7 +140,7 @@ public class TestClosingContainerHandler {
   @Test
   public void testUnhealthyRatisReplicaIsNotClosed() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        ratisReplicationConfig, 1, CLOSING);
+        RATIS_REPLICATION_CONFIG, 1, CLOSING);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.UNHEALTHY, 0, 0);
@@ -176,7 +176,7 @@ public class TestClosingContainerHandler {
     Set<ContainerReplica> containerReplicas = new HashSet<>();
 
     // Add CLOSING container replicas with index [1, closing]
-    for (int i = 1; i <= closing; i++ ) {
+    for (int i = 1; i <= closing; i++) {
       containerReplicas.add(ReplicationTestUtil.createContainerReplica(
           containerInfo.containerID(), i,
           HddsProtos.NodeOperationalState.IN_SERVICE,
@@ -184,7 +184,7 @@ public class TestClosingContainerHandler {
     }
 
     // Add OPEN container replicas with index [closing + 1, replicas]
-    for (int i = closing + 1; i <= replicas; i++ ) {
+    for (int i = closing + 1; i <= replicas; i++) {
       containerReplicas.add(ReplicationTestUtil.createContainerReplica(
           containerInfo.containerID(), i,
           HddsProtos.NodeOperationalState.IN_SERVICE,
@@ -211,7 +211,7 @@ public class TestClosingContainerHandler {
   @Test
   public void testOpenOrClosingRatisReplicasAreClosed() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        ratisReplicationConfig, 1, CLOSING);
+        RATIS_REPLICATION_CONFIG, 1, CLOSING);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.CLOSING, 0, 0);
