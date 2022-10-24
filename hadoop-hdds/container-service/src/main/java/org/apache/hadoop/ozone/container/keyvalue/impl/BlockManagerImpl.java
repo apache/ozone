@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -122,7 +123,9 @@ public class BlockManagerImpl implements BlockManager {
     try (DBHandle db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
-      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
+      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG + " " +
+          containerData.getDbFile().getAbsolutePath() + " " +
+          containerData.getSchemaVersion() + " " + DatanodeStoreCache.getInstance().size() );
 
       long bcsId = data.getBlockCommitSequenceId();
       long containerBCSId = containerData.getBlockCommitSequenceId();
