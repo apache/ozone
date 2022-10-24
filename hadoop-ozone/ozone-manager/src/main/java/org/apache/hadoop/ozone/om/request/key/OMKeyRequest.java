@@ -832,8 +832,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     LOG.info("Detect allocated but uncommitted blocks {} in key {}.",
         uncommitted, omKeyInfo.getKeyName());
     OmKeyInfo pseudoKeyInfo = omKeyInfo.copyObject();
-    // set dataSize -1 here to distinguish from normal keyInfo
-    pseudoKeyInfo.setDataSize(-1);
+    // TODO dataSize of pseudoKey is not real here
     List<OmKeyLocationInfoGroup> uncommittedGroups = new ArrayList<>();
     // version not matters in the current logic of keyDeletingService,
     // all versions of blocks will be deleted.
