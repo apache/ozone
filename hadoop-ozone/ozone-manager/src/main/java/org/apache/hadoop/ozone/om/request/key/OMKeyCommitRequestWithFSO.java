@@ -184,10 +184,12 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       // which will be deleted as RepeatedOmKeyInfo
       OmKeyInfo pseudoKeyInfo = warpUncommittedBlocksAsPseudoKey(uncommitted,
           omKeyInfo);
-      if (oldKeyVersionsToDelete != null) {
-        oldKeyVersionsToDelete.addOmKeyInfo(pseudoKeyInfo);
-      } else {
-        oldKeyVersionsToDelete = new RepeatedOmKeyInfo(pseudoKeyInfo);
+      if (pseudoKeyInfo != null) {
+        if (oldKeyVersionsToDelete != null) {
+          oldKeyVersionsToDelete.addOmKeyInfo(pseudoKeyInfo);
+        } else {
+          oldKeyVersionsToDelete = new RepeatedOmKeyInfo(pseudoKeyInfo);
+        }
       }
 
       // Add to cache of open key table and key table.
