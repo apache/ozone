@@ -65,14 +65,15 @@ public final class DatanodeStoreCache {
       synchronized (this) {
         db = datanodeStoreMap.get(containerDBPath);
         if (db == null) {
-          DatanodeStore store = new DatanodeStoreSchemaThreeImpl(
-              conf, containerDBPath, false);
-          if (store != null) {
+          try {
+            DatanodeStore store = new DatanodeStoreSchemaThreeImpl(
+                conf, containerDBPath, false);
             db = new RawDB(store, containerDBPath);
             datanodeStoreMap.put(containerDBPath, db);
-          } else {
-            throw new IOException("Failed to get the DB store " +
-                containerDBPath);
+          } catch (IOException e) {
+            LOG.error("Failed to get DB store {}", containerDBPath, e);
+            throw new IOException("Failed to get DB store " +
+                containerDBPath, e);
           }
         }
       }
