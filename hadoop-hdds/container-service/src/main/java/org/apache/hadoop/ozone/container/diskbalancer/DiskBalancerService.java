@@ -327,14 +327,12 @@ public class DiskBalancerService extends BackgroundService {
     private HddsVolume sourceVolume;
     private HddsVolume destVolume;
     private ContainerData containerData;
-    private long containerId;
 
     DiskBalancerTask(ContainerData containerData,
         HddsVolume sourceVolume, HddsVolume destVolume) {
       this.containerData = containerData;
       this.sourceVolume = sourceVolume;
       this.destVolume = destVolume;
-      this.containerId = containerData.getContainerID();
     }
 
     @Override
