@@ -62,6 +62,8 @@ public abstract class StorageVolume
   private static final Logger LOG =
       LoggerFactory.getLogger(StorageVolume.class);
 
+  public static final String TMP_DIR = "tmp";
+
   /**
    * Type for StorageVolume.
    */
@@ -111,10 +113,13 @@ public abstract class StorageVolume
 
   private String workingDir;
 
+  private File tmpDir;
+
   protected StorageVolume(Builder<?> b) throws IOException {
     if (!b.failedVolume) {
       StorageLocation location = StorageLocation.parse(b.volumeRootStr);
       storageDir = new File(location.getUri().getPath(), b.storageDirStr);
+      tmpDir = new File(location.getUri().getPath(), TMP_DIR);
       this.volumeInfo = new VolumeInfo.Builder(b.volumeRootStr, b.conf)
           .storageType(b.storageType)
           .usageCheckFactory(b.usageCheckFactory)
@@ -368,6 +373,11 @@ public abstract class StorageVolume
     }
   }
 
+  public String getVolumeRootDir() {
+    return volumeInfo != null ? volumeInfo.getRootDir() : null;
+  }
+
+
   public long getCapacity() {
     return volumeInfo != null ? volumeInfo.getCapacity() : 0;
   }
@@ -386,6 +396,10 @@ public abstract class StorageVolume
 
   public String getWorkingDir() {
     return this.workingDir;
+  }
+
+  public File getTmpDir() {
+    return this.tmpDir;
   }
 
   public void refreshVolumeInfo() {

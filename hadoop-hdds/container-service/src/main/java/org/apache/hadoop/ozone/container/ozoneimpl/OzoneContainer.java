@@ -54,6 +54,8 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
@@ -113,6 +115,7 @@ public class OzoneContainer {
   private final StaleRecoveringContainerScrubbingService
       recoveringContainerScrubbingService;
   private final GrpcTlsConfig tlsClientConfig;
+  private final DiskBalancerService diskBalancerService;
   private final AtomicReference<InitializingStatus> initializingStatus;
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
@@ -222,6 +225,15 @@ public class OzoneContainer {
         new BlockDeletingService(this, blockDeletingSvcInterval.toMillis(),
             blockDeletingServiceTimeout, TimeUnit.MILLISECONDS,
             blockDeletingServiceWorkerSize, config);
+
+    Duration diskBalancerSvcInterval = conf.getObject(
+        DatanodeConfiguration.class).getDiskBalancerInterval();
+    Duration diskBalancerSvcTimeout = conf.getObject(
+        DatanodeConfiguration.class).getDiskBalancerTimeout();
+    diskBalancerService =
+        new DiskBalancerService(this, diskBalancerSvcInterval.toMillis(),
+            diskBalancerSvcTimeout.toMillis(), TimeUnit.MILLISECONDS, 1,
+            config);
 
     Duration recoveringContainerScrubbingSvcInterval = conf.getObject(
         DatanodeConfiguration.class).getRecoveringContainerScrubInterval();
@@ -503,7 +515,14 @@ public class OzoneContainer {
   }
 
   public DiskBalancerReportProto getDiskBalancerReport() {
-    // TODO: Return real disk balancer report
-    return null;
+    return diskBalancerService.getDiskBalancerReportProto();
+  }
+
+  public DiskBalancerInfo getDiskBalancerInfo() {
+    return diskBalancerService.getDiskBalancerInfo();
+  }
+
+  public DiskBalancerService getDiskBalancerService() {
+    return diskBalancerService;
   }
 }
