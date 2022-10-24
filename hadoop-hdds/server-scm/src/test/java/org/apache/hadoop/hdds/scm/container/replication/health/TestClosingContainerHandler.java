@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.replication.health;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -32,13 +33,19 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 
 /**
  * Tests for {@link ClosingContainerHandler}.
@@ -46,16 +53,19 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CL
 public class TestClosingContainerHandler {
   private ReplicationManager replicationManager;
   private ClosingContainerHandler closingContainerHandler;
-  private ECReplicationConfig ecReplicationConfig;
-  private RatisReplicationConfig ratisReplicationConfig;
+  private static final ECReplicationConfig ecReplicationConfig =
+      new ECReplicationConfig(3, 2);
+  private static final RatisReplicationConfig ratisReplicationConfig =
+      RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
 
   @BeforeEach
   public void setup() {
-    ecReplicationConfig = new ECReplicationConfig(3, 2);
-    ratisReplicationConfig = RatisReplicationConfig.getInstance(
-        HddsProtos.ReplicationFactor.THREE);
     replicationManager = Mockito.mock(ReplicationManager.class);
     closingContainerHandler = new ClosingContainerHandler(replicationManager);
+  }
+
+  private static Stream<ReplicationConfig> replicationConfigs() {
+    return Stream.of(ratisReplicationConfig, ecReplicationConfig);
   }
 
   /**
@@ -153,26 +163,49 @@ public class TestClosingContainerHandler {
   /**
    * Close commands should be sent for Open or Closing replicas.
    */
-  @Test
-  public void testOpenOrClosingReplicasAreClosed() {
+  @ParameterizedTest
+  @MethodSource("replicationConfigs")
+  public void testOpenOrClosingReplicasAreClosed(ReplicationConfig repConfig) {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        ecReplicationConfig, 1, CLOSING);
-    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
-        .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.CLOSING, 1, 2);
-    containerReplicas.add(ReplicationTestUtil.createContainerReplica(
-        containerInfo.containerID(), 3,
-        HddsProtos.NodeOperationalState.IN_SERVICE,
-        ContainerReplicaProto.State.OPEN));
+        repConfig, 1, CLOSING);
+
+    final int replicas = repConfig.getRequiredNodes();
+    final int closing = replicas / 2 + 1;
+    final boolean force = repConfig.getReplicationType() != RATIS;
+
+    Set<ContainerReplica> containerReplicas = new HashSet<>();
+
+    // Add CLOSING container replicas with index [1, closing]
+    for (int i = 1; i <= closing; i++ ) {
+      containerReplicas.add(ReplicationTestUtil.createContainerReplica(
+          containerInfo.containerID(), i,
+          HddsProtos.NodeOperationalState.IN_SERVICE,
+          ContainerReplicaProto.State.CLOSING));
+    }
+
+    // Add OPEN container replicas with index [closing + 1, replicas]
+    for (int i = closing + 1; i <= replicas; i++ ) {
+      containerReplicas.add(ReplicationTestUtil.createContainerReplica(
+          containerInfo.containerID(), i,
+          HddsProtos.NodeOperationalState.IN_SERVICE,
+          ContainerReplicaProto.State.OPEN));
+    }
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
 
-    assertAndVerify(request, true, 3);
+    ArgumentCaptor<Boolean> forceCaptor =
+        ArgumentCaptor.forClass(Boolean.class);
+    Assertions.assertTrue(closingContainerHandler.handle(request));
+    Mockito.verify(replicationManager, Mockito.times(replicas))
+        .sendCloseContainerReplicaCommand(Mockito.any(ContainerInfo.class),
+            Mockito.any(DatanodeDetails.class), forceCaptor.capture());
+    forceCaptor.getAllValues()
+        .forEach(f -> Assertions.assertEquals(force, f));
   }
 
   @Test
