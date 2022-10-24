@@ -45,6 +45,7 @@ import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 
 /**
@@ -175,18 +176,22 @@ public class TestClosingContainerHandler {
 
     Set<ContainerReplica> containerReplicas = new HashSet<>();
 
-    // Add CLOSING container replicas with index [1, closing]
+    // Add CLOSING container replicas.
+    // For EC, replica index will be in [1, closing].
     for (int i = 1; i <= closing; i++) {
       containerReplicas.add(ReplicationTestUtil.createContainerReplica(
-          containerInfo.containerID(), i,
+          containerInfo.containerID(),
+          repConfig.getReplicationType() == EC ? i : 0,
           HddsProtos.NodeOperationalState.IN_SERVICE,
           ContainerReplicaProto.State.CLOSING));
     }
 
-    // Add OPEN container replicas with index [closing + 1, replicas]
+    // Add OPEN container replicas.
+    // For EC, replica index will be in [closing + 1, replicas].
     for (int i = closing + 1; i <= replicas; i++) {
       containerReplicas.add(ReplicationTestUtil.createContainerReplica(
-          containerInfo.containerID(), i,
+          containerInfo.containerID(),
+          repConfig.getReplicationType() == EC ? i : 0,
           HddsProtos.NodeOperationalState.IN_SERVICE,
           ContainerReplicaProto.State.OPEN));
     }
