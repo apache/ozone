@@ -27,10 +27,14 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
 
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffReport;
+import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,6 +52,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
  */
 public final class OmSnapshotManager {
   private final OzoneManager ozoneManager;
+  private final SnapshotDiffManager snapshotDiffManager;
   private final LoadingCache<String, OmSnapshot> snapshotCache;
 
   private static final Logger LOG =
@@ -55,6 +60,8 @@ public final class OmSnapshotManager {
 
   OmSnapshotManager(OzoneManager ozoneManager) {
     this.ozoneManager = ozoneManager;
+
+    this.snapshotDiffManager = new SnapshotDiffManager();
 
     // size of lru cache
     int cacheSize = ozoneManager.getConfiguration().getInt(
@@ -196,4 +203,40 @@ public final class OmSnapshotManager {
     return (keyParts.length > 1) &&
         (keyParts[0].compareTo(OM_SNAPSHOT_INDICATOR) == 0);
   }
-}
+
+  public SnapshotDiffReport getSnapshotDiffReport(final String volume,
+                                                  final String bucket,
+                                                  final String fromSnapshot,
+                                                  final String toSnapshot)
+      throws IOException {
+    // Validate fromSnapshot and toSnapshot
+    final SnapshotInfo fsInfo = getSnapshotInfo(volume, bucket, fromSnapshot);
+    final SnapshotInfo tsInfo = getSnapshotInfo(volume, bucket, toSnapshot);
+    verifySnapshotInfoForSnapDiff(fsInfo, tsInfo);
+
+    final String fsKey = SnapshotInfo.getTableKey(volume, bucket, fromSnapshot);
+    final String tsKey = SnapshotInfo.getTableKey(volume, bucket, toSnapshot);
+    try {
+      final OmSnapshot fs = snapshotCache.get(fsKey);
+      final OmSnapshot ts = snapshotCache.get(tsKey);
+      return snapshotDiffManager.getSnapshotDiffReport(volume, bucket, fs, ts);
+    } catch (ExecutionException | RocksDBException e) {
+      throw new IOException(e.getCause());
+    }
+  }
+
+  private void verifySnapshotInfoForSnapDiff(final SnapshotInfo fromSnapshot,
+                                             final SnapshotInfo toSnapshot)
+      throws IOException {
+    if ((fromSnapshot.getSnapshotStatus() != SnapshotStatus.SNAPSHOT_ACTIVE) ||
+        (toSnapshot.getSnapshotStatus() != SnapshotStatus.SNAPSHOT_ACTIVE)) {
+      // TODO: throw custom snapshot exception.
+      throw new IOException("Cannot generate snapshot diff for non-active " +
+          "snapshots.");
+    }
+    if (fromSnapshot.getCreationTime() > toSnapshot.getCreationTime()) {
+      throw new IOException("fromSnapshot should be older than to toSnapshot");
+    }
+  }
+
+  }
