@@ -1013,17 +1013,15 @@ public class OzoneBucket extends WithMetadata {
      * If prevKey is null it iterates from the first key in the bucket.
      * The returned keys match key prefix.
      * @param keyPrefix
+     * @param delimiter
+     * @param prevKey
      */
-    KeyIterator(String keyPrefix, String prevKey) throws IOException {
-      setKeyPrefix(keyPrefix);
-      this.currentValue = null;
-      this.currentIterator = getNextListOfKeys(prevKey).iterator();
-    }
-
     KeyIterator(String keyPrefix, String delimiter, String prevKey)
         throws IOException {
-      this(keyPrefix, prevKey);
-      this.delimiter = delimiter;
+      setKeyPrefix(keyPrefix);
+      setDelimiter(delimiter);
+      this.currentValue = null;
+      this.currentIterator = getNextListOfKeys(prevKey).iterator();
     }
 
     @Override
