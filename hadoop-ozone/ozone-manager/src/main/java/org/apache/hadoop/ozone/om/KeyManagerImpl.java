@@ -39,7 +39,6 @@ import java.util.Stack;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
@@ -1571,7 +1570,7 @@ public class KeyManagerImpl implements KeyManager {
       getIteratorForKeyInTableCache(
       boolean recursive, String startKey, String volumeName, String bucketName,
       TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
-      Table<String, OmKeyInfo> keyTable) {
+      Table<String, OmKeyInfo> keyTable) throws IOException {
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator;
     try {
       Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
