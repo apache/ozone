@@ -130,7 +130,7 @@ public class ContainerHealthResult {
      * Pass true to indicate the container is mis-replicated - ie it does not
      * meet the placement policy.
      * @param isMisRep True if the container is mis-replicated, false if not.
-     * @param misreplicationCount
+     * @param misrepCount
      * @return this object to allow calls to be chained
      */
     public UnderReplicatedHealthResult setMisreplication(
@@ -145,7 +145,7 @@ public class ContainerHealthResult {
      * pending replicas scheduled for create or delete.
      * @param isMisRep True if the container is mis-replicated considering
      *                 pending replicas, or false if not.
-     * @param misreplicationCount Misreplication Count after pending replicas
+     * @param misrepCount Misreplication Count after pending replicas
      * @return this object to allow calls to be chained
      */
     public UnderReplicatedHealthResult setMisReplicationAfterPending(
