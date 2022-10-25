@@ -328,6 +328,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   @Override
   public void markContainerUnhealthy() throws StorageContainerException {
     writeLock();
+    ContainerDataProto.State prevState = containerData.getState();
     try {
       updateContainerData(() ->
           containerData.setState(ContainerDataProto.State.UNHEALTHY));
@@ -336,7 +337,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       writeUnlock();
     }
     LOG.warn("Moving container {} to state UNHEALTHY from state:{} Trace:{}",
-            containerData.getContainerPath(), containerData.getState(),
+            containerData.getContainerPath(), prevState,
             StringUtils.getStackTrace(Thread.currentThread()));
   }
 
