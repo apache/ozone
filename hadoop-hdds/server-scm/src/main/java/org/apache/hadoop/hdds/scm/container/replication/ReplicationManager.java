@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithMismatchedReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosingContainerHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.DeletingContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.HealthCheck;
 import org.apache.hadoop.hdds.scm.container.replication.health.OpenContainerHandler;
@@ -220,6 +221,7 @@ public class ReplicationManager implements SCMService {
         .addNext(new ClosingContainerHandler(this))
         .addNext(new QuasiClosedContainerHandler(this))
         .addNext(new ClosedWithMismatchedReplicasHandler(this))
+        .addNext(new DeletingContainerHandler(this, containerManager))
         .addNext(ecReplicationCheckHandler)
         .addNext(ratisReplicationCheckHandler);
     start();
