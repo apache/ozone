@@ -139,14 +139,17 @@ public abstract class OMKeyRequest extends OMClientRequest {
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
     int numBlocks = (int) Math.min(preallocateBlocksMax,
         (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
+    // For EC, lastBlockSize = min(lastStripeSize, scmBlockSize)
+    long lastBlockSize = Math.min(scmBlockSize,
+        requestedSize - (numBlocks - 1) * scmBlockSize * dataGroupSize);
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
     List<AllocatedBlock> allocatedBlocks;
     try {
       allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, omID,
-              excludeList);
+          .allocateBlock(scmBlockSize, numBlocks, requestedSize,
+              replicationConfig, omID, excludeList);
     } catch (SCMException ex) {
       if (ex.getResult()
           .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
@@ -155,11 +158,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
       }
       throw ex;
     }
-    for (AllocatedBlock allocatedBlock : allocatedBlocks) {
+    for (int i = 0; i < numBlocks; i++) {
+      AllocatedBlock allocatedBlock = allocatedBlocks.get(i);
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());
       OmKeyLocationInfo.Builder builder = new OmKeyLocationInfo.Builder()
           .setBlockID(blockID)
-          .setLength(scmBlockSize)
+          .setLength(i + 1 == numBlocks ? lastBlockSize : scmBlockSize)
           .setOffset(0)
           .setPipeline(allocatedBlock.getPipeline());
       if (grpcBlockTokenEnabled) {

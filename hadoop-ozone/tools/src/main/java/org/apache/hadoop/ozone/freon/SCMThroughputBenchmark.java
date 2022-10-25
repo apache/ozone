@@ -482,8 +482,8 @@ public final class SCMThroughputBenchmark implements Callable<Void> {
     private void doAllocateBlock(long size, int nBlocks,
         ReplicationConfig config) {
       try {
-        scmBlockClient.allocateBlock(size, nBlocks, config, "STB",
-            new ExcludeList());
+        scmBlockClient.allocateBlock(size, nBlocks, 0,
+            config, "STB", new ExcludeList());
         succBlockCounter.incrementAndGet();
       } catch (IOException e) {
         LOG.error("{}", e);

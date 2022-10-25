@@ -140,6 +140,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
    *
    * @param size              - size of the block.
    * @param num               - number of blocks.
+   * @param requestedSize     - total size requested.
    * @param replicationConfig - replication configuration of the blocks.
    * @param excludeList       - exclude list while allocating blocks.
    * @return allocated block accessing info (key, pipeline).
@@ -147,7 +148,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<AllocatedBlock> allocateBlock(
-      long size, int num,
+      long size, int num, long requestedSize,
       ReplicationConfig replicationConfig,
       String owner, ExcludeList excludeList
   ) throws IOException {
@@ -157,6 +158,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
         AllocateScmBlockRequestProto.newBuilder()
             .setSize(size)
             .setNumBlocks(num)
+            .setRequestedSize(requestedSize)
             .setType(replicationConfig.getReplicationType())
             .setOwner(owner)
             .setExcludeList(excludeList.getProtoBuf());

@@ -215,7 +215,7 @@ public class TestKeyManagerImpl {
     mockContainerClient();
 
     Mockito.when(mockScmBlockLocationProtocol
-        .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
+        .allocateBlock(Mockito.anyLong(), Mockito.anyInt(), Mockito.anyLong(),
             any(ReplicationConfig.class),
             Mockito.anyString(),
             any(ExcludeList.class))).thenThrow(

@@ -143,9 +143,12 @@ message AllocateScmBlockRequestProto {
   required string owner = 5;
   optional ExcludeListProto excludeList = 7;
 
-  //used for EC replicaiton instead of the replication factor
+  //used for EC replication instead of the replication factor
   optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 8;
 
+  // If requestedSize is greater than 0, size and numBlocks can be ignored.
+  // It is up to SCM to decide how many blocks to allocate.
+  optional uint64 requestedSize = 9;
 }
 
 /**

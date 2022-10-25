@@ -174,7 +174,7 @@ public class TestOMKeyRequest {
         .setPipeline(pipeline);
 
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(),
-        any(ReplicationConfig.class),
+        anyLong(), any(ReplicationConfig.class),
         anyString(), any(ExcludeList.class))).thenAnswer(invocation -> {
           int num = invocation.getArgument(1);
           List<AllocatedBlock> allocatedBlocks = new ArrayList<>(num);

@@ -30,8 +30,10 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
@@ -70,6 +72,9 @@ import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.IO_
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,6 +96,7 @@ public class SCMBlockProtocolServer implements
   private final InetSocketAddress blockRpcAddress;
   private final ProtocolMessageMetrics<ProtocolMessageEnum>
       protocolMessageMetrics;
+  private final long scmBlockSize;
 
   /**
    * The RPC server that listens to requests from block service clients.
@@ -102,6 +108,9 @@ public class SCMBlockProtocolServer implements
     final int handlerCount =
         conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
             OZONE_SCM_HANDLER_COUNT_DEFAULT);
+
+    this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
+        OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
 
     RPC.setProtocolEngine(conf, ScmBlockLocationProtocolPB.class,
         ProtobufRpcEngine.class);
@@ -173,25 +182,38 @@ public class SCMBlockProtocolServer implements
 
   @Override
   public List<AllocatedBlock> allocateBlock(
-      long size, int num,
+      long size, int num, long requestedSize,
       ReplicationConfig replicationConfig,
       String owner, ExcludeList excludeList
   ) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("size", String.valueOf(size));
     auditMap.put("num", String.valueOf(num));
+    auditMap.put("requestedSize", String.valueOf(requestedSize));
     auditMap.put("replication", replicationConfig.toString());
     auditMap.put("owner", owner);
     List<AllocatedBlock> blocks = new ArrayList<>(num);
 
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Allocating {} blocks of size {}, with {}",
-          num, size, excludeList);
+      LOG.debug("Allocating {} blocks of size {}, " +
+          "requestedSize is {}, with {}",
+          num, size, requestedSize, excludeList);
+    }
+    long lastBlockSize = size; // for backward compatibility
+    if (requestedSize > 0) {
+      size = scmBlockSize;
+      int numData = replicationConfig instanceof ECReplicationConfig ?
+          ((ECReplicationConfig) replicationConfig).getData() : 1;
+      num = (int) ((requestedSize - 1) / (scmBlockSize * numData) + 1);
+      // For EC, lastBlockSize = min(lastStripeSize, scmBlockSize)
+      lastBlockSize = Math.min(scmBlockSize,
+          requestedSize - (num - 1) * scmBlockSize * numData);
     }
     try {
       for (int i = 0; i < num; i++) {
         AllocatedBlock block = scm.getScmBlockManager()
-            .allocateBlock(size, replicationConfig, owner, excludeList);
+            .allocateBlock(i + 1 == num ? lastBlockSize : size,
+                replicationConfig, owner, excludeList);
         if (block != null) {
           blocks.add(block);
         }
