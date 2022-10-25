@@ -41,6 +41,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLoca
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -57,6 +59,9 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  * Handles CommitKey request - prefix layout.
  */
 public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMKeyCommitRequestWithFSO.class);
 
   public OMKeyCommitRequestWithFSO(OMRequest omRequest,
       BucketLayout bucketLayout) {
@@ -144,10 +149,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
 
-      // Update the block length for each block
-      List<OmKeyLocationInfo> allocatedLocationInfoList =
-          omKeyInfo.getLatestVersionLocations().getLocationList();
-      omKeyInfo.updateLocationInfoList(locationInfoList, false);
+      List<OmKeyLocationInfo> uncommitted = omKeyInfo.updateLocationInfoList(
+          locationInfoList, false);
 
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
@@ -175,6 +178,18 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
         checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
         omBucketInfo.incrUsedNamespace(1L);
+      }
+
+      // let the uncommitted blocks pretend as key's old version blocks
+      // which will be deleted as RepeatedOmKeyInfo
+      OmKeyInfo pseudoKeyInfo = wrapUncommittedBlocksAsPseudoKey(uncommitted,
+          omKeyInfo);
+      if (pseudoKeyInfo != null) {
+        if (oldKeyVersionsToDelete != null) {
+          oldKeyVersionsToDelete.addOmKeyInfo(pseudoKeyInfo);
+        } else {
+          oldKeyVersionsToDelete = new RepeatedOmKeyInfo(pseudoKeyInfo);
+        }
       }
 
       // Add to cache of open key table and key table.
