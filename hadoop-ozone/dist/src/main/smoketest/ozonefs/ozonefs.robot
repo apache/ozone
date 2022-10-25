@@ -209,8 +209,3 @@ Get Disk Usage of File with RATIS Replication
     ${expectedDiskUsage} =           Convert To String    ${expectedDiskUsage}
                                      [return]             ${expectedDiskUsage}
 
-#Generate Random String
-#    ${randomString} =   tr -dc A-Za-z0-9 </dev/urandom | head -c 13
-#                       [return]   ${randomString}
-
-
