@@ -1327,17 +1327,18 @@ public class OzoneBucket extends WithMetadata {
         keysResultList.add(ozoneKey);
 
         if (status.isDirectory()) {
+          // If a slash ('/') delimiter is defined, children can be considered
+          // as CommonPrefix. So we do not need to fetch recursively.
+          if (StringUtils.isNotBlank(getDelimiter()) &&
+              OZONE_URI_DELIMITER.equals(getDelimiter())) {
+            return false;
+          }
           // Adding in-progress keyPath back to the stack to make sure
           // all the siblings will be fetched.
           stack.push(new ImmutablePair<>(keyPrefix, keyInfo.getKeyName()));
-          // If a slash ('/') delimiter is defined, children can be considered
-          // as CommonPrefix. So we do not need fetch recursively.
-          if (StringUtils.isBlank(getDelimiter()) ||
-              !OZONE_URI_DELIMITER.equals(getDelimiter())) {
-            // Adding current directory to the stack, so that this dir will be
-            // the top element. Moving seek pointer to fetch sub-paths
-            stack.push(new ImmutablePair<>(keyInfo.getKeyName(), ""));
-          }
+          // Adding current directory to the stack, so that this dir will be
+          // the top element. Moving seek pointer to fetch sub-paths
+          stack.push(new ImmutablePair<>(keyInfo.getKeyName(), ""));
           // Return it so that the next iteration will be
           // started using the stacked items.
           return true;
