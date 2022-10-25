@@ -138,8 +138,6 @@ public class ECReplicationCheckHandler extends AbstractCheck {
   public ContainerHealthResult checkHealth(ContainerCheckRequest request) {
     ContainerInfo container = request.getContainerInfo();
     Set<ContainerReplica> replicas = request.getContainerReplicas();
-    List<DatanodeDetails> dns = replicas.stream()
-        .map(ContainerReplica::getDatanodeDetails).collect(Collectors.toList());
     int totalNumberOfNodesRequired = container.getReplicationConfig()
             .getRequiredNodes();
     List<ContainerReplicaOp> replicaPendingOps = request.getPendingOps();
