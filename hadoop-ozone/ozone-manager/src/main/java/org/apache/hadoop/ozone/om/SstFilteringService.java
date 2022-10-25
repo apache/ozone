@@ -53,7 +53,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMI
 
 /**
  * When snapshots are taken, an entire snapshot of the
- * OM RocksDB is captured and it will SST files corresponding
+ * OM RocksDB is captured and it will contain SST files corresponding
  * to all volumes/buckets and keys and also have data from
  * all the tables (columnFamilies) defined in the rocksdb
  * This is a background service which will cleanup and filter out
