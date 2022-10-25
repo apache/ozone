@@ -155,10 +155,12 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
               && replicas.size() - pendingDelete >= requiredNodes,
           replicaCount.isSufficientlyReplicated(true),
           replicaCount.isUnrecoverable());
-      result.setMisReplicated(!isPolicySatisfied)
-          .setMisReplicatedAfterPending(
-              !placementStatusWithPending.isPolicySatisfied())
-          .setDueToMisReplication(
+      result.setMisreplication(!isPolicySatisfied,
+              placementStatus.misReplicationCount())
+            .setMisReplicationAfterPending(
+                    !placementStatusWithPending.isPolicySatisfied(),
+                    placementStatusWithPending.misReplicationCount())
+            .setDueToMisReplication(
               !isPolicySatisfied && replicaCount.isSufficientlyReplicated());
       return result;
     }

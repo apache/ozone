@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -199,7 +198,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         ((ContainerHealthResult.UnderReplicatedHealthResult)
             currentUnderRepRes);
     if (containerHealthResult.isSufficientlyReplicatedAfterPending() &&
-            containerHealthResult.getPlacementStatus().isPolicySatisfied()) {
+            containerHealthResult.isDueToMisReplication()) {
       LOG.info("The container {} with replicas {} is sufficiently replicated",
           container.getContainerID(), replicaCount.getReplicas());
       return emptyMap();
@@ -273,7 +272,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           commands, createdIndexes);
       commands.putAll(processMisreplication(replicas, deletionInFlight,
               container, excludedNodes, sources, createdIndexes,
-              containerHealthResult.getPlacementStatus()));
+              containerHealthResult));
     } catch (IOException | IllegalStateException ex) {
       LOG.warn("Exception while processing for creating the EC reconstruction" +
               " container commands for {}.",
@@ -400,7 +399,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
    * @param excludedNodes
    * @param sources
    * @param createdIndexes
-   * @param placementStatus
+   * @param containerHealthResult
    * @throws IOException
    */
   private Map<DatanodeDetails, SCMCommand<?>> processMisreplication(
@@ -408,10 +407,13 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           List<DatanodeDetails> deletionInFlight, ContainerInfo container,
           List<DatanodeDetails> excludedNodes,
           Map<Integer, Pair<ContainerReplica, NodeStatus>> sources,
-          Set<Integer> createdIndexes, ContainerPlacementStatus placementStatus)
+          Set<Integer> createdIndexes,
+          ContainerHealthResult.UnderReplicatedHealthResult
+                  containerHealthResult)
           throws IOException {
-    if (placementStatus.isPolicySatisfied() ||
-            placementStatus.misReplicationCount() <= createdIndexes.size()) {
+    if (containerHealthResult.isSufficientlyReplicatedAfterPending() ||
+            containerHealthResult.getMisreplicationCountAfterPending()
+                    <= createdIndexes.size()) {
       return Collections.emptyMap();
     }
     Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
@@ -424,7 +426,8 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                     .sorted(Comparator.comparingLong(Map.Entry::getValue))
                     .map(Map.Entry::getKey).collect(Collectors.toList());
     int additionalCopiesForPlacementStatus =
-            placementStatus.misReplicationCount() - createdIndexes.size();
+            containerHealthResult.getMisreplicationCountAfterPending()
+                    - createdIndexes.size();
     List<DatanodeDetails> targets = getTargetDatanodes(excludedNodes, container,
             additionalCopiesForPlacementStatus);
     excludedNodes.addAll(targets);

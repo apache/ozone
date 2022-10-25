@@ -80,14 +80,9 @@ public class TestUnderReplicatedProcessor {
   public void testEcReconstructionCommand() throws IOException {
     ContainerInfo container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
-    ContainerPlacementStatus placementStatus =
-            Mockito.mock(ContainerPlacementStatus.class);
-    Mockito.when(placementStatus.isPolicySatisfied()).thenReturn(true);
-
     Mockito.when(replicationManager.dequeueUnderReplicatedContainer())
         .thenReturn(new ContainerHealthResult
-                .UnderReplicatedHealthResult(container, 3, false, false, false,
-                        placementStatus),
+                .UnderReplicatedHealthResult(container, 3, false, false, false),
             (ContainerHealthResult.UnderReplicatedHealthResult) null);
     List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
         sourceNodes = new ArrayList<>();
@@ -136,8 +131,7 @@ public class TestUnderReplicatedProcessor {
     Mockito.when(placementStatus.isPolicySatisfied()).thenReturn(true);
     Mockito.when(replicationManager.dequeueUnderReplicatedContainer())
         .thenReturn(new ContainerHealthResult
-                .UnderReplicatedHealthResult(container, 3, true, false, false,
-                        placementStatus),
+                .UnderReplicatedHealthResult(container, 3, true, false, false),
             (ContainerHealthResult.UnderReplicatedHealthResult) null);
     List<DatanodeDetails> sourceDns = new ArrayList<>();
     sourceDns.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -176,8 +170,7 @@ public class TestUnderReplicatedProcessor {
     Mockito.when(placementStatus.isPolicySatisfied()).thenReturn(true);
     Mockito.when(replicationManager.dequeueUnderReplicatedContainer())
         .thenReturn(new ContainerHealthResult
-                .UnderReplicatedHealthResult(container, 3, false, false, false,
-                        placementStatus),
+                .UnderReplicatedHealthResult(container, 3, false, false, false),
             (ContainerHealthResult.UnderReplicatedHealthResult) null);
 
     Mockito.when(replicationManager

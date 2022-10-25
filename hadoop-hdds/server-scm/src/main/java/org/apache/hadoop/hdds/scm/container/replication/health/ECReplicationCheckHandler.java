@@ -29,6 +29,8 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ECContainerReplicaCount;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -66,10 +68,18 @@ public class ECReplicationCheckHandler extends AbstractCheck {
     //        states? It would need to be added to legacy RM too.
     if (health.getHealthState()
         == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
-      report.incrementAndSample(
-          ReplicationManagerReport.HealthState.UNDER_REPLICATED, containerID);
       ContainerHealthResult.UnderReplicatedHealthResult underHealth
-          = ((ContainerHealthResult.UnderReplicatedHealthResult) health);
+              = ((ContainerHealthResult.UnderReplicatedHealthResult) health);
+      if (underHealth.isDueToMisReplication()) {
+        report.incrementAndSample(
+                ReplicationManagerReport.HealthState.MIS_REPLICATED,
+                containerID);
+      } else {
+        report.incrementAndSample(
+                ReplicationManagerReport.HealthState.UNDER_REPLICATED,
+                containerID);
+      }
+
       if (underHealth.isUnrecoverable()) {
         // TODO - do we need a new health state for unrecoverable EC?
         report.incrementAndSample(
@@ -77,7 +87,8 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       }
       // TODO - if it is unrecoverable, should we return false to other
       //        handlers can be tried?
-      if (!underHealth.isSufficientlyReplicatedAfterPending() &&
+      if ((!underHealth.isSufficientlyReplicatedAfterPending() ||
+          underHealth.isMisReplicatedAfterPending()) &&
           !underHealth.isUnrecoverable()) {
         request.getReplicationQueue().enqueue(underHealth);
       }
@@ -98,6 +109,32 @@ public class ECReplicationCheckHandler extends AbstractCheck {
     return false;
   }
 
+  /**
+   * Given a set of ContainerReplica, transform it to a list of DatanodeDetails
+   * and then check if the list meets the container placement policy.
+   * @param replicas List of containerReplica
+   * @param replicationFactor Expected Replication Factor of the containe
+   * @return ContainerPlacementStatus indicating if the policy is met or not
+   */
+  private ContainerPlacementStatus getPlacementStatus(
+          Set<ContainerReplica> replicas, int replicationFactor,
+          List<ContainerReplicaOp> pendingOps) {
+
+    Set<DatanodeDetails> replicaDns = replicas.stream()
+            .map(ContainerReplica::getDatanodeDetails)
+            .collect(Collectors.toSet());
+    for (ContainerReplicaOp op : pendingOps) {
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+        replicaDns.add(op.getTarget());
+      }
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+        replicaDns.remove(op.getTarget());
+      }
+    }
+    return placementPolicy.validateContainerPlacement(
+            new ArrayList<>(replicaDns), replicationFactor);
+  }
+
   public ContainerHealthResult checkHealth(ContainerCheckRequest request) {
     ContainerInfo container = request.getContainerInfo();
     Set<ContainerReplica> replicas = request.getContainerReplicas();
@@ -112,8 +149,10 @@ public class ECReplicationCheckHandler extends AbstractCheck {
 
     ECReplicationConfig repConfig =
         (ECReplicationConfig) container.getReplicationConfig();
-    ContainerPlacementStatus placementStatus = placementPolicy
-            .validateContainerPlacement(dns, totalNumberOfNodesRequired);
+    ContainerPlacementStatus placementStatusAfterPending = getPlacementStatus(
+            replicas, totalNumberOfNodesRequired, replicaPendingOps);
+    ContainerPlacementStatus placementStatus = getPlacementStatus(
+            replicas, totalNumberOfNodesRequired, Collections.emptyList());
     if (!replicaCount.isSufficientlyReplicated(false) ||
             !placementStatus.isPolicySatisfied()) {
       List<Integer> missingIndexes = replicaCount
@@ -132,7 +171,14 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       return new ContainerHealthResult.UnderReplicatedHealthResult(
           container, remainingRedundancy, dueToDecommission,
           replicaCount.isSufficientlyReplicated(true),
-          replicaCount.isUnrecoverable(), placementStatus);
+          replicaCount.isUnrecoverable())
+              .setMisreplication(!placementStatus.isPolicySatisfied(),
+                  placementStatus.misReplicationCount())
+              .setMisReplicationAfterPending(
+                      !placementStatusAfterPending.isPolicySatisfied(),
+                      placementStatusAfterPending.misReplicationCount())
+              .setDueToMisReplication(
+               replicaCount.isSufficientlyReplicated(false));
     }
 
     if (replicaCount.isOverReplicated(false)) {

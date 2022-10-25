@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
@@ -109,33 +108,35 @@ public class ContainerHealthResult {
     private final boolean sufficientlyReplicatedAfterPending;
     private boolean dueToMisReplication = false;
     private boolean isMisReplicated = false;
+
+    private int misreplicationCount = 0;
     private boolean isMisReplicatedAfterPending = false;
+
+    private int misreplicationCountAfterPending = 0;
     private final boolean unrecoverable;
     private int requeueCount = 0;
 
-    private final ContainerPlacementStatus placementStatus;
-
     public UnderReplicatedHealthResult(ContainerInfo containerInfo,
         int remainingRedundancy, boolean dueToDecommission,
-        boolean replicatedOkWithPending, boolean unrecoverable,
-        ContainerPlacementStatus placementStatus) {
+        boolean replicatedOkWithPending, boolean unrecoverable) {
       super(containerInfo, HealthState.UNDER_REPLICATED);
       this.remainingRedundancy = remainingRedundancy;
       this.dueToDecommission = dueToDecommission;
       this.sufficientlyReplicatedAfterPending = replicatedOkWithPending;
       this.unrecoverable = unrecoverable;
-      this.placementStatus = placementStatus;
     }
 
     /**
      * Pass true to indicate the container is mis-replicated - ie it does not
      * meet the placement policy.
      * @param isMisRep True if the container is mis-replicated, false if not.
+     * @param misreplicationCount
      * @return this object to allow calls to be chained
      */
-    public UnderReplicatedHealthResult
-        setMisReplicated(boolean isMisRep) {
+    public UnderReplicatedHealthResult setMisreplication(
+            boolean isMisRep, int misrepCount) {
       this.isMisReplicated = isMisRep;
+      this.misreplicationCount = misrepCount;
       return this;
     }
 
@@ -144,11 +145,13 @@ public class ContainerHealthResult {
      * pending replicas scheduled for create or delete.
      * @param isMisRep True if the container is mis-replicated considering
      *                 pending replicas, or false if not.
+     * @param misreplicationCount Misreplication Count after pending replicas
      * @return this object to allow calls to be chained
      */
-    public UnderReplicatedHealthResult
-        setMisReplicatedAfterPending(boolean isMisRep) {
+    public UnderReplicatedHealthResult setMisReplicationAfterPending(
+            boolean isMisRep, int misrepCount) {
       this.isMisReplicatedAfterPending = isMisRep;
+      this.misreplicationCountAfterPending = misrepCount;
       return this;
     }
 
@@ -271,8 +274,12 @@ public class ContainerHealthResult {
     public boolean isUnrecoverable() {
       return unrecoverable;
     }
-    public ContainerPlacementStatus getPlacementStatus() {
-      return placementStatus;
+    public int getMisreplicationCount() {
+      return misreplicationCount;
+    }
+
+    public int getMisreplicationCountAfterPending() {
+      return misreplicationCountAfterPending;
     }
   }
 
