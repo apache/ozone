@@ -336,9 +336,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } finally {
       writeUnlock();
     }
-    LOG.warn("Moving container {} to state UNHEALTHY from state:{} Trace:{}",
-            containerData.getContainerPath(), prevState,
-            StringUtils.getStackTrace(Thread.currentThread()));
+    LOG.warn("Moving container {} to state {} from state:{} Trace:{}",
+            containerData.getContainerPath(), containerData.getState(),
+            prevState, StringUtils.getStackTrace(Thread.currentThread()));
   }
 
   @Override
