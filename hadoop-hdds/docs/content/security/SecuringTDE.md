@@ -121,7 +121,7 @@ logins using configured
 
 The below two configurations must be added to the kms-site.xml to allow the S3Gateway principal to act as a proxy for other users. In this example, "ozone.s3g.kerberos.principal" is assumed to be "s3g"
 
-```
+```xml
 <property>
   <name>hadoop.kms.proxyuser.s3g.users</name>
   <value>user1,user2,user3</value>
