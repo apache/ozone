@@ -14,7 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Smoke test for Recon Namespace Summary Endpoint for FSO buckets.
+Documentation       Smoke test for Recon Namespace Summary Endpoint for ${BUCKET_LAYOUT} buckets.
 Library             OperatingSystem
 Library             String
 Library             BuiltIn
@@ -29,6 +29,7 @@ ${SUMMARY_URL}              ${ADMIN_NAMESPACE_URL}/summary
 ${DISK_USAGE_URL}           ${ADMIN_NAMESPACE_URL}/du
 ${QUOTA_USAGE_URL}          ${ADMIN_NAMESPACE_URL}/quota
 ${FILE_SIZE_DIST_URL}       ${ADMIN_NAMESPACE_URL}/dist
+${BUCKET_LAYOUT}            FILE_SYSTEM_OPTIMIZED
 ${VOLUME}
 ${BUCKET}
 
@@ -42,7 +43,7 @@ Create volume
 Create bucket
     ${random} =     Generate Random String  5  [LOWER]
                     Set Suite Variable     ${BUCKET}    buc-${random}
-    ${result} =     Execute             ozone sh bucket create -l FILE_SYSTEM_OPTIMIZED /${VOLUME}/${BUCKET}
+    ${result} =     Execute             ozone sh bucket create -l ${BUCKET_LAYOUT} /${VOLUME}/${BUCKET}
                     Should not contain  ${result}       Failed
 
 Create keys
@@ -83,7 +84,7 @@ Check Access
     kinit as recon admin
     Check http return code      ${url}       200
 
-Test Summary                            
+Test Summary
     [Arguments]         ${url}        ${expected}
            ${result} =         Execute                              curl --negotiate -u : -LSs ${url}
                                Should contain      ${result}       \"status\":\"OK\"
@@ -131,7 +132,8 @@ Check Recon Namespace Summary Key
     Wait For Summary      ${SUMMARY_URL}?path=/${VOLUME}/${BUCKET}/file1   KEY
 
 Check Recon Namespace Summary Directory
-    Wait For Summary      ${SUMMARY_URL}?path=/${VOLUME}/${BUCKET}/dir1/dir2   DIRECTORY
+    Run Keyword If    '${BUCKET_LAYOUT}' == 'LEGACY'                    Wait For Summary      ${SUMMARY_URL}?path=/${VOLUME}/${BUCKET}/dir1/dir2/   DIRECTORY
+    Run Keyword If    '${BUCKET_LAYOUT}' == 'FILE_SYSTEM_OPTIMIZED'     Wait For Summary      ${SUMMARY_URL}?path=/${VOLUME}/${BUCKET}/dir1/dir2    DIRECTORY
 
 Check Recon Namespace Disk Usage
     Wait For Summary      ${DISK_USAGE_URL}?path=/${VOLUME}/${BUCKET}&files=true&replica=true     \"sizeWithReplica\"
