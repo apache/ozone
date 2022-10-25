@@ -216,12 +216,15 @@ public class DirectoryDeletingService extends BackgroundService {
           deletedDirsCount.addAndGet(dirNum);
           movedDirsCount.addAndGet(subDirNum);
           movedFilesCount.addAndGet(subFileNum);
-          LOG.info("Number of dirs deleted: {}, Number of sub-files moved:" +
-                  " {} to DeletedTable, Number of sub-dirs moved {} to " +
-                  "DeletedDirectoryTable, iteration elapsed: {}ms," +
-                  " totalRunCount: {}",
-              dirNum, subFileNum, subDirNum,
-              Time.monotonicNow() - startTime, getRunCount());
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Number of dirs deleted: {}, Number of sub-files moved:" +
+                    " {} to DeletedTable, Number of sub-dirs moved {} to " +
+                    "DeletedDirectoryTable, iteration elapsed: {}ms," +
+                    " totalRunCount: {}",
+                dirNum, subFileNum, subDirNum,
+                Time.monotonicNow() - startTime, getRunCount());
+          }
+
 
         } catch (IOException e) {
           LOG.error("Error while running delete directories and files " +
