@@ -110,6 +110,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_TRASH_KE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
@@ -117,6 +119,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
@@ -151,6 +155,8 @@ public class KeyManagerImpl implements KeyManager {
   private final boolean grpcBlockTokenEnabled;
 
   private BackgroundService keyDeletingService;
+
+  private BackgroundService snapshotSstFilteringService;
 
   private final KeyProviderCryptoExtension kmsProvider;
   private final boolean enableFileSystemPaths;
@@ -236,6 +242,21 @@ public class KeyManagerImpl implements KeyManager {
           TimeUnit.MILLISECONDS, serviceTimeout, ozoneManager, configuration);
       openKeyCleanupService.start();
     }
+
+    if (snapshotSstFilteringService == null) {
+      long serviceInterval = configuration.getTimeDuration(
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      long serviceTimeout = configuration.getTimeDuration(
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT,
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      snapshotSstFilteringService =
+          new SstFilteringService(serviceInterval, TimeUnit.MILLISECONDS,
+              serviceTimeout, ozoneManager, configuration);
+      snapshotSstFilteringService.start();
+    }
   }
 
   KeyProviderCryptoExtension getKMSProvider() {
@@ -255,6 +276,10 @@ public class KeyManagerImpl implements KeyManager {
     if (openKeyCleanupService != null) {
       openKeyCleanupService.shutdown();
       openKeyCleanupService = null;
+    }
+    if (snapshotSstFilteringService != null) {
+      snapshotSstFilteringService.shutdown();
+      snapshotSstFilteringService = null;
     }
   }
 
@@ -568,6 +593,10 @@ public class KeyManagerImpl implements KeyManager {
 
   public BackgroundService getOpenKeyCleanupService() {
     return openKeyCleanupService;
+  }
+
+  public BackgroundService getSnapshotSstFilteringService() {
+    return snapshotSstFilteringService;
   }
 
   @Override
