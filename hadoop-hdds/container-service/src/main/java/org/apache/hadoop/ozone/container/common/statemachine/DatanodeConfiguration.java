@@ -75,8 +75,10 @@ public class DatanodeConfiguration {
   static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = false;
   static final long ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT = 32 * 1024 * 1024;
   static final int ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT = 64;
+  // one hour
   static final long ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT =
-      6 * 60 * 60 * 1000 * 1000;
+      1L * 60 * 60 * 1000 * 1000;
+  static final int ROCKSDB_MAX_OPEN_FILES_DEFAULT = 1024;
   public static final String ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY =
       "hdds.datanode.rocksdb.log.max-file-size";
   public static final String ROCKSDB_LOG_MAX_FILE_NUM_KEY =
@@ -338,15 +340,23 @@ public class DatanodeConfiguration {
   )
   private int rocksdbMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
 
-  @Config(key = "rocksdb.delete_obsolete_files_period",
-      defaultValue = "6h", timeUnit = MICROSECONDS,
+  @Config(key = "rocksdb.delete-obsolete-files-period",
+      defaultValue = "1h", timeUnit = MICROSECONDS,
       type = ConfigType.TIME,
       tags = { DATANODE },
       description = "Periodicity when obsolete files get deleted. " +
-          "Default is 6h."
+          "Default is 1h."
   )
   private long rocksdbDeleteObsoleteFilesPeriod =
       ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
+
+  @Config(key = "rocksdb.max-open-files",
+      defaultValue = "1024",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "The total number of files that a RocksDB can open. "
+  )
+  private int rocksdbMaxOpenFiles = ROCKSDB_MAX_OPEN_FILES_DEFAULT;
 
   @PostConstruct
   public void validate() {
@@ -561,5 +571,13 @@ public class DatanodeConfiguration {
 
   public void setRocksdbDeleteObsoleteFilesPeriod(long period) {
     this.rocksdbDeleteObsoleteFilesPeriod = period;
+  }
+
+  public void setRocksdbMaxOpenFiles(int count) {
+    this.rocksdbMaxOpenFiles = count;
+  }
+
+  public int getRocksdbMaxOpenFiles() {
+    return this.rocksdbMaxOpenFiles;
   }
 }
