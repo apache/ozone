@@ -72,7 +72,7 @@ public class DeletedBlockLogStateManagerImpl
   }
 
   public TableIterator<Long, TypedTable.KeyValue<Long,
-      DeletedBlocksTransaction>> getReadOnlyIterator() {
+      DeletedBlocksTransaction>> getReadOnlyIterator() throws IOException {
     return new TableIterator<Long, TypedTable.KeyValue<Long,
         DeletedBlocksTransaction>>() {
 

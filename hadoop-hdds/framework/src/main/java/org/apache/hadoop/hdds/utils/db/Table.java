@@ -151,8 +151,10 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    * Returns the iterator for this metadata store.
    *
    * @return MetaStoreIterator
+   * @throws IOException on failure.
    */
-  TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator();
+  TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator()
+      throws IOException;
 
   /**
    * Returns a prefixed iterator for this metadata store.

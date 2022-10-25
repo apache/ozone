@@ -275,7 +275,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public TableIterator<KEY, TypedKeyValue> iterator() {
+  public TableIterator<KEY, TypedKeyValue> iterator() throws IOException {
     TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator =
         rawTable.iterator();
     return new TypedTableIterator(iterator, keyType, valueType);
