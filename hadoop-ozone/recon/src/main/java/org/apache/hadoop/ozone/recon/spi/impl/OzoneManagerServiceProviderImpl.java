@@ -29,7 +29,9 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
@@ -79,6 +81,8 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT;
 import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
+
+import org.checkerframework.checker.units.qual.A;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.rocksdb.RocksDBException;
@@ -112,7 +116,7 @@ public class OzoneManagerServiceProviderImpl
   private long deltaUpdateLimit;
   private int deltaUpdateLoopLimit;
 
-  private volatile boolean isSyncDataFromOMRunning = false;
+  private AtomicBoolean isSyncDataFromOMRunning;
 
   /**
    * OM Snapshot related task names.
@@ -193,6 +197,7 @@ public class OzoneManagerServiceProviderImpl
     this.metrics = OzoneManagerSyncMetrics.create();
     this.deltaUpdateLimit = deltaUpdateLimits;
     this.deltaUpdateLoopLimit = deltaUpdateLoopLimits;
+    this.isSyncDataFromOMRunning = new AtomicBoolean();
   }
 
   public void registerOMDBTasks() {
@@ -272,11 +277,16 @@ public class OzoneManagerServiceProviderImpl
 
   @Override
   public boolean triggerSyncDataFromOMImmediately() {
-    if (!isSyncDataFromOMRunning) {
+    if (!isSyncDataFromOMRunning.get()) {
+      // We are shutting down the scheduler and then starting another one,
+      // so we can set the initialDelay to 0, which indicates an OM DB sync
+      // immediately.
       stopSyncDataFromOMThread();
       scheduler = Executors.newScheduledThreadPool(1);
       startSyncDataFromOM(0L);
       return true;
+    } else {
+      LOG.debug("OM DB sync is already running.");
     }
     return false;
   }
@@ -469,72 +479,71 @@ public class OzoneManagerServiceProviderImpl
    */
   @VisibleForTesting
   public boolean syncDataFromOM() {
-    if (isSyncDataFromOMRunning) {
-      LOG.debug("syncDataFromOM() is already running");
-      return false;
-    }
-    isSyncDataFromOMRunning = true;
+    if (isSyncDataFromOMRunning.compareAndSet(false, true)) {
+      try {
+        LOG.info("Syncing data from Ozone Manager.");
+        long currentSequenceNumber = getCurrentOMDBSequenceNumber();
+        LOG.debug("Seq number of Recon's OM DB : {}", currentSequenceNumber);
+        boolean fullSnapshot = false;
 
-    try {
-      LOG.info("Syncing data from Ozone Manager.");
-      long currentSequenceNumber = getCurrentOMDBSequenceNumber();
-      LOG.debug("Seq number of Recon's OM DB : {}", currentSequenceNumber);
-      boolean fullSnapshot = false;
-
-      if (currentSequenceNumber <= 0) {
-        fullSnapshot = true;
-      } else {
-        try (OMDBUpdatesHandler omdbUpdatesHandler =
-            new OMDBUpdatesHandler(omMetadataManager)) {
-          LOG.info("Obtaining delta updates from Ozone Manager");
-          // Get updates from OM and apply to local Recon OM DB.
-          getAndApplyDeltaUpdatesFromOM(currentSequenceNumber,
-              omdbUpdatesHandler);
-          // Update timestamp of successful delta updates query.
-          ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-              OmSnapshotTaskName.OmDeltaRequest.name(),
-              System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
-          reconTaskStatusDao.update(reconTaskStatusRecord);
-
-          // Pass on DB update events to tasks that are listening.
-          reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
-              omdbUpdatesHandler.getEvents()), omMetadataManager);
-        } catch (InterruptedException intEx) {
-          Thread.currentThread().interrupt();
-        } catch (Exception e) {
-          metrics.incrNumDeltaRequestsFailed();
-          LOG.warn("Unable to get and apply delta updates from OM.", e);
+        if (currentSequenceNumber <= 0) {
           fullSnapshot = true;
-        }
-      }
-
-      if (fullSnapshot) {
-        try {
-          metrics.incrNumSnapshotRequests();
-          LOG.info("Obtaining full snapshot from Ozone Manager");
-          // Update local Recon OM DB to new snapshot.
-          boolean success = updateReconOmDBWithNewSnapshot();
-          // Update timestamp of successful delta updates query.
-          if (success) {
-            ReconTaskStatus reconTaskStatusRecord =
-                new ReconTaskStatus(
-                    OmSnapshotTaskName.OmSnapshotRequest.name(),
-                    System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
+        } else {
+          try (OMDBUpdatesHandler omdbUpdatesHandler =
+              new OMDBUpdatesHandler(omMetadataManager)) {
+            LOG.info("Obtaining delta updates from Ozone Manager");
+            // Get updates from OM and apply to local Recon OM DB.
+            getAndApplyDeltaUpdatesFromOM(currentSequenceNumber,
+                omdbUpdatesHandler);
+            // Update timestamp of successful delta updates query.
+            ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
+                OmSnapshotTaskName.OmDeltaRequest.name(),
+                System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
             reconTaskStatusDao.update(reconTaskStatusRecord);
 
-            // Reinitialize tasks that are listening.
-            LOG.info("Calling reprocess on Recon tasks.");
-            reconTaskController.reInitializeTasks(omMetadataManager);
+            // Pass on DB update events to tasks that are listening.
+            reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
+                omdbUpdatesHandler.getEvents()), omMetadataManager);
+          } catch (InterruptedException intEx) {
+            Thread.currentThread().interrupt();
+          } catch (Exception e) {
+            metrics.incrNumDeltaRequestsFailed();
+            LOG.warn("Unable to get and apply delta updates from OM.", e);
+            fullSnapshot = true;
           }
-        } catch (InterruptedException intEx) {
-          Thread.currentThread().interrupt();
-        } catch (Exception e) {
-          metrics.incrNumSnapshotRequestsFailed();
-          LOG.error("Unable to update Recon's metadata with new OM DB. ", e);
         }
+
+        if (fullSnapshot) {
+          try {
+            metrics.incrNumSnapshotRequests();
+            LOG.info("Obtaining full snapshot from Ozone Manager");
+            // Update local Recon OM DB to new snapshot.
+            boolean success = updateReconOmDBWithNewSnapshot();
+            // Update timestamp of successful delta updates query.
+            if (success) {
+              ReconTaskStatus reconTaskStatusRecord =
+                  new ReconTaskStatus(
+                      OmSnapshotTaskName.OmSnapshotRequest.name(),
+                      System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
+              reconTaskStatusDao.update(reconTaskStatusRecord);
+
+              // Reinitialize tasks that are listening.
+              LOG.info("Calling reprocess on Recon tasks.");
+              reconTaskController.reInitializeTasks(omMetadataManager);
+            }
+          } catch (InterruptedException intEx) {
+            Thread.currentThread().interrupt();
+          } catch (Exception e) {
+            metrics.incrNumSnapshotRequestsFailed();
+            LOG.error("Unable to update Recon's metadata with new OM DB. ", e);
+          }
+        }
+      } finally {
+        isSyncDataFromOMRunning.set(false);
       }
-    } finally {
-      isSyncDataFromOMRunning = false;
+    } else {
+      LOG.debug("OM DB sync is already running.");
+      return false;
     }
     return true;
   }
