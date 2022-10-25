@@ -44,11 +44,14 @@ public final class ManagedRocksObjectUtils {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
     if (rocksObject.isOwningHandle()) {
       ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
-      LOG.warn("{} is not closed properly",
+      String warning = String.format("%s is not closed properly",
           rocksObject.getClass().getSimpleName());
       if (stackTrace != null && LOG.isDebugEnabled()) {
-        LOG.debug("StackTrace for unclosed instance: {}", stackTrace);
+        String debugMessage = String
+            .format("%n StackTrace for unclosed instance: %s", stackTrace);
+        warning = warning.concat(debugMessage);
       }
+      LOG.warn(warning);
     }
   }
 }
