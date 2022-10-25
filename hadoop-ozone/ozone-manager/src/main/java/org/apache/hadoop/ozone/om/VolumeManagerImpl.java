@@ -35,6 +35,9 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Volume Manager implementation.
+ */
 public class VolumeManagerImpl implements VolumeManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(VolumeManagerImpl.class);
