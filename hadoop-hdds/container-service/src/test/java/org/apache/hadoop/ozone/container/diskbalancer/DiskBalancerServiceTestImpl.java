@@ -26,7 +26,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 /**
@@ -49,7 +48,6 @@ public class DiskBalancerServiceTestImpl extends DiskBalancerService {
         TimeUnit.MILLISECONDS, threadCount, conf);
   }
 
-  @VisibleForTesting
   public void runBalanceTasks() {
     if (latch.getCount() > 0) {
       this.latch.countDown();
@@ -58,7 +56,6 @@ public class DiskBalancerServiceTestImpl extends DiskBalancerService {
     }
   }
 
-  @VisibleForTesting
   public boolean isStarted() {
     return latch != null && testingThread.isAlive();
   }

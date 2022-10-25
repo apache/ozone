@@ -1159,7 +1159,6 @@ public class SCMClientProtocolServer implements
   public List<DatanodeAdminError> startDiskBalancer(Optional<Double> threshold,
       Optional<Long> bandwidthInMB, Optional<Integer> parallelThread,
       Optional<List<String>> hosts) throws IOException {
-    // check admin authorisation
     try {
       getScm().checkAdminAccess(getRemoteUser());
     } catch (IOException e) {
@@ -1174,7 +1173,6 @@ public class SCMClientProtocolServer implements
   @Override
   public List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
       throws IOException {
-    // check admin authorisation
     try {
       getScm().checkAdminAccess(getRemoteUser());
     } catch (IOException e) {
@@ -1190,7 +1188,6 @@ public class SCMClientProtocolServer implements
       Optional<Double> threshold, Optional<Long> bandwidthInMB,
       Optional<Integer> parallelThread, Optional<List<String>> hosts)
       throws IOException {
-    // check admin authorisation
     try {
       getScm().checkAdminAccess(getRemoteUser());
     } catch (IOException e) {

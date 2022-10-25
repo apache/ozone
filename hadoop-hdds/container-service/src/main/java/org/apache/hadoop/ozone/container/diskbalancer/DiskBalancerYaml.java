@@ -98,7 +98,6 @@ public final class DiskBalancerYaml {
       // Needed for snake-yaml introspection.
     }
 
-    @SuppressWarnings({"parameternumber", "java:S107"}) // required for yaml
     private DiskBalancerInfoYaml(boolean shouldRun, double threshold,
         long bandwidthInMB, int parallelThread) {
       this.shouldRun = shouldRun;
