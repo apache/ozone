@@ -1257,10 +1257,11 @@ public class RpcClient implements ClientProtocol {
     List<OmKeyLocationInfo> keyLocationInfos
         = keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly();
 
-    for (OmKeyLocationInfo keyLocationInfo : keyLocationInfos) {
+    for (OmKeyLocationInfo locationInfo : keyLocationInfos) {
       Map<DatanodeDetails, OzoneInputStream> blocks = new HashMap<>();
 
-      Pipeline pipelineBefore = keyLocationInfo.getPipeline();
+
+      Pipeline pipelineBefore = locationInfo.getPipeline();
       List<DatanodeDetails> datanodes = pipelineBefore.getNodes();
 
       for (DatanodeDetails dn : datanodes) {
@@ -1269,22 +1270,47 @@ public class RpcClient implements ClientProtocol {
         Pipeline pipeline
             = new Pipeline.Builder(pipelineBefore).setNodes(nodes)
             .setId(PipelineID.randomId()).build();
-        keyLocationInfo.setPipeline(pipeline);
+        OmKeyLocationInfo dnKeyLocation = new OmKeyLocationInfo.Builder()
+            .setBlockID(locationInfo.getBlockID())
+            .setLength(locationInfo.getLength())
+            .setOffset(locationInfo.getOffset())
+            .setToken(locationInfo.getToken())
+            .setPartNumber(locationInfo.getPartNumber())
+            .setCreateVersion(locationInfo.getCreateVersion())
+            .setPipeline(pipeline)
+            .build();
 
-        List<OmKeyLocationInfo> keyLocationInfoList = new ArrayList<>();
-        keyLocationInfoList.add(keyLocationInfo);
+        List<OmKeyLocationInfo> keyLocationInfoList =
+            Collections.singletonList(dnKeyLocation);
         OmKeyLocationInfoGroup keyLocationInfoGroup
             = new OmKeyLocationInfoGroup(0, keyLocationInfoList);
-        List<OmKeyLocationInfoGroup> keyLocationInfoGroups = new ArrayList<>();
-        keyLocationInfoGroups.add(keyLocationInfoGroup);
+        List<OmKeyLocationInfoGroup> keyLocationInfoGroups =
+            Collections.singletonList(keyLocationInfoGroup);
 
         keyInfo.setKeyLocationVersions(keyLocationInfoGroups);
-        OzoneInputStream is = getInputStreamWithRetryFunction(keyInfo);
+        OmKeyInfo dnKeyInfo = new OmKeyInfo.Builder()
+            .setVolumeName(keyInfo.getVolumeName())
+            .setBucketName(keyInfo.getBucketName())
+            .setKeyName(keyInfo.getKeyName())
+            .setOmKeyLocationInfos(keyInfo.getKeyLocationVersions())
+            .setDataSize(keyInfo.getDataSize())
+            .setCreationTime(keyInfo.getCreationTime())
+            .setModificationTime(keyInfo.getModificationTime())
+            .setReplicationConfig(keyInfo.getReplicationConfig())
+            .setFileEncryptionInfo(keyInfo.getFileEncryptionInfo())
+            .setAcls(keyInfo.getAcls())
+            .setObjectID(keyInfo.getObjectID())
+            .setUpdateID(keyInfo.getUpdateID())
+            .setParentObjectID(keyInfo.getParentObjectID())
+            .setFileChecksum(keyInfo.getFileChecksum())
+            .build();
+        dnKeyInfo.setMetadata(keyInfo.getMetadata());
+        dnKeyInfo.setKeyLocationVersions(keyLocationInfoGroups);
 
-        blocks.put(dn, is);
+        blocks.put(dn, createInputStream(dnKeyInfo, Function.identity()));
       }
 
-      result.put(keyLocationInfo, blocks);
+      result.put(locationInfo, blocks);
     }
 
     return result;
