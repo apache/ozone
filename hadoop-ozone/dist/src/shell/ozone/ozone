@@ -276,9 +276,7 @@ else
   ozonecmd_case "${OZONE_SUBCMD}" "${OZONE_SUBCMD_ARGS[@]}"
 fi
 
-if [[ "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" == true && "${OZONE_DAEMON_MODE}" =~ ^st(art|op|atus)$ ]] || [[ "${OZONE_SUBCMD}" == classpath ]]; then
-  ozone_validate_classpath
-fi
+ozone_validate_classpath
 
 ozone_assemble_classpath
 

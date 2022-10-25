@@ -48,7 +48,8 @@ function ozone_debug
 ## @replaceable yes
 function ozone_validate_classpath
 {
-  if [[ "${OZONE_VALIDATE_CLASSPATH}" == true ]]; then
+  if [[ ( "${OZONE_VALIDATE_CLASSPATH}" == true && ( "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" == true &&
+        "${OZONE_DAEMON_MODE}" =~ ^st(art|op|atus)$ ) || ( "${OZONE_SUBCMD}" == classpath ) ) ]]; then
     ozone_validate_classpath_util
   fi
 }
