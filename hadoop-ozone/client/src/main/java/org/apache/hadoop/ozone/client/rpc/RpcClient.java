@@ -1243,7 +1243,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public Map< OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream> >
+  public Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream> >
       getKeysEveryReplicas(String volumeName,
                          String bucketName,
                          String keyName) throws IOException {
@@ -1253,7 +1253,7 @@ public class RpcClient implements ClientProtocol {
 
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
-    OmKeyInfo keyInfo = getKeyInfo(volumeName, bucketName, keyName, false);
+    OmKeyInfo keyInfo = getKeyInfo(volumeName, bucketName, keyName, true);
     List<OmKeyLocationInfo> keyLocationInfos
         = keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly();
 
