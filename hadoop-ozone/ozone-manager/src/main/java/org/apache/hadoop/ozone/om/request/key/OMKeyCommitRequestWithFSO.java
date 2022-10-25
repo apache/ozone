@@ -182,7 +182,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       // let the uncommitted blocks pretend as key's old version blocks
       // which will be deleted as RepeatedOmKeyInfo
-      OmKeyInfo pseudoKeyInfo = warpUncommittedBlocksAsPseudoKey(uncommitted,
+      OmKeyInfo pseudoKeyInfo = wrapUncommittedBlocksAsPseudoKey(uncommitted,
           omKeyInfo);
       if (pseudoKeyInfo != null) {
         if (oldKeyVersionsToDelete != null) {

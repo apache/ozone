@@ -818,13 +818,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * Warp the uncommitted blocks as pseudoKeyInfo.
+   * Wrap the uncommitted blocks as pseudoKeyInfo.
    *
    * @param uncommitted Uncommitted OmKeyLocationInfo
    * @param omKeyInfo   Args for key block
    * @return pseudoKeyInfo
    */
-  protected OmKeyInfo warpUncommittedBlocksAsPseudoKey(
+  protected OmKeyInfo wrapUncommittedBlocksAsPseudoKey(
       List<OmKeyLocationInfo> uncommitted, OmKeyInfo omKeyInfo) {
     if (uncommitted.isEmpty()) {
       return null;
