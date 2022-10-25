@@ -213,29 +213,6 @@ public class TestClosingContainerHandler {
         .forEach(f -> Assertions.assertEquals(force, f));
   }
 
-  @Test
-  public void testOpenOrClosingRatisReplicasAreClosed() {
-    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        RATIS_REPLICATION_CONFIG, 1, CLOSING);
-    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
-        .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.CLOSING, 0, 0);
-    containerReplicas.add(ReplicationTestUtil.createContainerReplica(
-        containerInfo.containerID(), 0,
-        HddsProtos.NodeOperationalState.IN_SERVICE,
-        ContainerReplicaProto.State.OPEN));
-
-    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
-        .setReport(new ReplicationManagerReport())
-        .setContainerInfo(containerInfo)
-        .setContainerReplicas(containerReplicas)
-        .build();
-
-    assertAndVerify(request, true, 3);
-  }
-
-
   private void assertAndVerify(ContainerCheckRequest request,
       boolean assertion, int times) {
     Assertions.assertEquals(assertion, closingContainerHandler.handle(request));
