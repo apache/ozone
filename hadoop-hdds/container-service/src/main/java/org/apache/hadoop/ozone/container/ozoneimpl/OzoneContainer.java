@@ -309,7 +309,7 @@ public class OzoneContainer {
     ContainerScannerConfiguration c = config.getObject(
         ContainerScannerConfiguration.class);
     if (!c.isEnabled()) {
-      LOG.info("Background container scanner has been disabled.");
+      LOG.info("Container scanners have been disabled.");
       return;
     }
     initOnDemandContainerScanner(c);
@@ -342,7 +342,7 @@ public class OzoneContainer {
   private void initOnDemandContainerScanner(ContainerScannerConfiguration c) {
     if (c.getOnDemandBandwidthPerVolume() == 0L) {
       LOG.warn(ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY + " is set to 0, " +
-          "so on-demand container data scanner will not start.");
+          "so the on-demand container data scanner will not start.");
       return;
     }
     OnDemandContainerScanner.init(c, controller);

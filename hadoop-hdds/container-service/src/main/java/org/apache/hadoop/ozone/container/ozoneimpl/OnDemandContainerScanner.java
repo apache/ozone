@@ -146,6 +146,8 @@ public final class OnDemandContainerScanner {
   private synchronized void shutdownScanner() {
     instance = null;
     metrics.unregister();
+    this.canceler.cancel("On-demand container" +
+        " scanner is shutting down.");
     if (!scanExecutor.isShutdown()) {
       scanExecutor.shutdown();
     }
@@ -159,7 +161,7 @@ public final class OnDemandContainerScanner {
     } catch (InterruptedException e) {
       LOG.warn("On demand scanner interrupted while waiting for shut down.");
       scanExecutor.shutdownNow();
-      throw new RuntimeException(e);
+      Thread.currentThread().interrupt();
     }
   }
 }

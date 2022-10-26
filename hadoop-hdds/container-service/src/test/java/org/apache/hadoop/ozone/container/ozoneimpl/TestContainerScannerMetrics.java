@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -139,7 +140,7 @@ public class TestContainerScannerMetrics {
   }
 
   @Test
-  public void testOnDemandScannerMetrics() {
+  public void testOnDemandScannerMetrics() throws Exception {
     OnDemandContainerScanner.init(conf, controller);
     ArrayList<Optional<Future<?>>> resultFutureList = Lists.newArrayList();
     resultFutureList.add(OnDemandContainerScanner.scanContainer(corruptData));
@@ -155,9 +156,12 @@ public class TestContainerScannerMetrics {
   }
 
   private void waitOnScannerToFinish(
-      ArrayList<Optional<Future<?>>> resultFutureList) {
+      ArrayList<Optional<Future<?>>> resultFutureList)
+      throws ExecutionException, InterruptedException {
     for (Optional<Future<?>> future : resultFutureList) {
-      future.ifPresent(ContainerTestUtils::waitForScanToFinish);
+      if (future.isPresent()) {
+        future.get().get();
+      }
     }
   }
 

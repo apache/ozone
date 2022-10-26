@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -142,10 +141,9 @@ public class TestDataScanner {
     key.write(data);
 
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
-    TestHelper.waitForContainerClose(key, cluster);
     key.flush();
+    TestHelper.waitForContainerClose(key, cluster);
     key.close();
-
     String keyNameInOpenContainer = "keyNameInOpenContainer";
     OzoneOutputStream key2 = createKey(volumeName, bucketName,
         keyNameInOpenContainer);
@@ -203,9 +201,7 @@ public class TestDataScanner {
   private void tryReadKeyWithMissingChunksDir(
       OzoneBucket bucket, String keyNameInClosedContainer) throws IOException {
     try (OzoneInputStream key = bucket.readKey(keyNameInClosedContainer)) {
-      key.read();
-    } catch (StorageContainerException ignored) {
-
+      Assert.assertThrows(IOException.class, key::read);
     }
   }
 

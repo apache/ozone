@@ -52,7 +52,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -164,15 +163,6 @@ public final class ContainerTestUtils {
         hddsVolumeSet.getVolumesList())) {
       StorageVolumeUtil.checkVolume(volume, scmID, clusterID, conf,
           null, null);
-    }
-  }
-
-  public static void waitForScanToFinish(Future<?> scanResult) {
-    try {
-      scanResult.get();
-    } catch (Exception e) {
-      throw new RuntimeException("Error while waiting" +
-          " for on-demand scan to finish");
     }
   }
 

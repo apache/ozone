@@ -34,6 +34,7 @@ import org.mockito.verification.VerificationMode;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -122,10 +123,10 @@ public class TestOnDemandContainerScanner {
 
   private void testContainerMarkedUnhealthy(
       Container<?> container, VerificationMode invocationTimes)
-      throws IOException {
+      throws InterruptedException, ExecutionException, IOException {
     Optional<Future<?>> result =
         OnDemandContainerScanner.scanContainer(container);
-    result.ifPresent(ContainerTestUtils::waitForScanToFinish);
+    result.get().get();
     Mockito.verify(controller, invocationTimes).markContainerUnhealthy(
         container.getContainerData().getContainerID());
   }

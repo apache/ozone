@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,10 +54,9 @@ public class ContainerScannerConfiguration {
   public static final long DATA_SCAN_INTERVAL_DEFAULT =
       Duration.ofDays(7).toMillis();
 
-  private static final long BYTES_IN_MEGABYTES = 1048576L;
-  public static final long BANDWIDTH_PER_VOLUME_DEFAULT = BYTES_IN_MEGABYTES;
+  public static final long BANDWIDTH_PER_VOLUME_DEFAULT = OzoneConsts.MB * 5L;
   public static final long ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT =
-      BYTES_IN_MEGABYTES * 5L;
+      OzoneConsts.MB * 5L;
 
   @Config(key = "enabled",
       type = ConfigType.BOOLEAN,
@@ -86,7 +86,7 @@ public class ContainerScannerConfiguration {
 
   @Config(key = "volume.bytes.per.second",
       type = ConfigType.LONG,
-      defaultValue = "1048576",
+      defaultValue = "5242880",
       tags = {ConfigTag.STORAGE},
       description = "Config parameter to throttle I/O bandwidth used"
           + " by scanner per volume.")
@@ -97,7 +97,7 @@ public class ContainerScannerConfiguration {
       defaultValue = "5242880",
       tags = {ConfigTag.STORAGE},
       description = "Config parameter to throttle I/O bandwidth used"
-          + " by on demand scanner per volume.")
+          + " by the demand container scanner per volume.")
   private long onDemandBandwidthPerVolume
       = ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT;
 
