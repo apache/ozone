@@ -309,7 +309,8 @@ public class OzoneContainer {
     ContainerScannerConfiguration c = config.getObject(
         ContainerScannerConfiguration.class);
     if (!c.isEnabled()) {
-      LOG.info("Container scanners have been disabled.");
+      LOG.info("Scheduled background container scanners and " +
+          "the on-demand container scanner have been disabled.");
       return;
     }
     initOnDemandContainerScanner(c);
