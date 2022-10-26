@@ -587,7 +587,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     // This needs to be done before initializing Ratis.
     RatisDropwizardExports.registerRatisMetricReporters(ratisMetricsMap,
-        isStopped);
+        () -> isStopped.get());
     if (configurator.getSCMHAManager() != null) {
       scmHAManager = configurator.getSCMHAManager();
     } else {
