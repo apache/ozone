@@ -113,6 +113,7 @@ public class TestLDBCli {
     }
     rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
     dbScanner.setParent(rdbParser);
+    dbScanner.setStartKey("/sampleVol/sampleBuck/key3");
     Assert.assertEquals(5, getKeyNames(dbScanner).size());
     Assert.assertTrue(getKeyNames(dbScanner).contains("key1"));
     Assert.assertTrue(getKeyNames(dbScanner).contains("key5"));
