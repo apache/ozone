@@ -57,7 +57,6 @@ public class NodeDecommissionManager {
   private EventPublisher eventQueue;
   private ReplicationManager replicationManager;
   private OzoneConfiguration conf;
-  private boolean useHostnames;
   private long monitorInterval;
 
   private static final Logger LOG =
@@ -116,12 +115,17 @@ public class NodeDecommissionManager {
             + host.getRawHostname(), e);
       }
       String dnsName;
-      if (useHostnames) {
-        dnsName = addr.getHostName();
+      String hostName = addr.getHostName();
+      String hostAddress = addr.getHostAddress();
+      List<DatanodeDetails> found = nodeManager.getNodesByAddress(hostAddress);
+
+      if (found.size() == 0) {
+        found = nodeManager.getNodesByAddress(hostName);
+        dnsName = hostName;
       } else {
-        dnsName = addr.getHostAddress();
+        dnsName = hostAddress;
       }
-      List<DatanodeDetails> found = nodeManager.getNodesByAddress(dnsName);
+
       if (found.size() == 0) {
         throw new InvalidHostStringException("Host " + host.getRawHostname()
             + " (" + dnsName + ") is not running any datanodes registered"
@@ -185,10 +189,6 @@ public class NodeDecommissionManager {
     executor = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setNameFormat("DatanodeAdminManager-%d")
             .setDaemon(true).build());
-
-    useHostnames = conf.getBoolean(
-        DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
 
     monitorInterval = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,

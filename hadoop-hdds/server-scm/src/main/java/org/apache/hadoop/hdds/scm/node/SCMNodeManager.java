@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.node;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -121,10 +120,7 @@ public class SCMNodeManager implements NodeManager {
   private final SCMStorageConfig scmStorageConfig;
   private final NetworkTopology clusterMap;
   private final DNSToSwitchMapping dnsToSwitchMapping;
-  private final boolean useHostname;
   private final ConcurrentHashMap<String, Set<String>> dnsToUuidMap =
-      new ConcurrentHashMap<>();
-  private final Map<String, Set<String>> addressToUuidMap =
       new ConcurrentHashMap<>();
   private final int numPipelinesPerMetadataVolume;
   private final int heavyNodeCriteria;
@@ -161,9 +157,6 @@ public class SCMNodeManager implements NodeManager {
     this.dnsToSwitchMapping =
         ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
             : new CachedDNSToSwitchMapping(newInstance));
-    this.useHostname = conf.getBoolean(
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     this.numPipelinesPerMetadataVolume =
         conf.getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME,
             ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT);
@@ -367,23 +360,23 @@ public class SCMNodeManager implements NodeManager {
     InetAddress dnAddress = Server.getRemoteIp();
     if (dnAddress != null) {
       // Mostly called inside an RPC, update ip
-      if (!useHostname) {
-        datanodeDetails.setHostName(dnAddress.getHostName());
-      }
+      datanodeDetails.setHostName(dnAddress.getHostName());
+
       datanodeDetails.setIpAddress(dnAddress.getHostAddress());
     }
 
-    String dnsName;
     String networkLocation;
     String ipAddress = datanodeDetails.getIpAddress();
     String hostName = datanodeDetails.getHostName();
     datanodeDetails.setNetworkName(datanodeDetails.getUuidString());
-    if (useHostname) {
-      dnsName = datanodeDetails.getHostName();
-    } else {
-      dnsName = datanodeDetails.getIpAddress();
+    
+    // Firstly, use ip address
+    networkLocation = nodeResolve(ipAddress);
+    
+    // If null, use hostname
+    if (networkLocation == null) {
+      networkLocation = nodeResolve(hostName);
     }
-    networkLocation = nodeResolve(dnsName);
     if (networkLocation != null) {
       datanodeDetails.setNetworkLocation(networkLocation);
     }
@@ -395,11 +388,9 @@ public class SCMNodeManager implements NodeManager {
         // Check that datanode in nodeStateManager has topology parent set
         DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
         Preconditions.checkState(dn.getParent() != null);
-        addEntryToDnsToUuidMap(dnsName,
+        addEntryToDnsToUuidMap(ipAddress,
             datanodeDetails.getUuidString());
-        addEntryToAddressToUuidMap(ipAddress,
-            datanodeDetails.getUuidString());
-        addEntryToAddressToUuidMap(hostName,
+        addEntryToDnsToUuidMap(hostName,
             datanodeDetails.getUuidString());
         // Updating Node Report, as registration is successful
         processNodeReport(datanodeDetails, nodeReport);
@@ -428,23 +419,15 @@ public class SCMNodeManager implements NodeManager {
                   datanodeDetails);
           clusterMap.update(datanodeInfo, datanodeDetails);
 
-          String oldDnsName;
           String oldIpAddress = datanodeInfo.getIpAddress();
           String oldHostName = datanodeInfo.getHostName();
-          if (useHostname) {
-            oldDnsName = datanodeInfo.getHostName();
-          } else {
-            oldDnsName = datanodeInfo.getIpAddress();
-          }
-          updateEntryFromDnsToUuidMap(oldDnsName,
-                  dnsName,
-                  datanodeDetails.getUuidString());
-          updateEntryFromAddressToUuidMap(oldIpAddress,
+          updateEntryFromDnsToUuidMap(oldIpAddress,
               ipAddress,
               datanodeDetails.getUuidString());
-          updateEntryFromAddressToUuidMap(oldHostName,
+          updateEntryFromDnsToUuidMap(oldHostName,
               hostName,
               datanodeDetails.getUuidString());
+
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
           DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
           Preconditions.checkState(dn.getParent() != null);
@@ -473,26 +456,10 @@ public class SCMNodeManager implements NodeManager {
    * @param dnsName String representing the hostname or IP of the node
    * @param uuid    String representing the UUID of the registered node.
    */
-  @SuppressFBWarnings(value = "AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION")
   private synchronized void addEntryToDnsToUuidMap(
           String dnsName, String uuid) {
-    Set<String> dnList = dnsToUuidMap.get(dnsName);
-    if (dnList == null) {
-      dnList = ConcurrentHashMap.newKeySet();
-      dnsToUuidMap.put(dnsName, dnList);
-    }
-    dnList.add(uuid);
-  }
-
-  /**
-   *
-   * @param address
-   * @param uuid
-   */
-  private void addEntryToAddressToUuidMap(
-      String address, String uuid) {
-    addressToUuidMap
-        .computeIfAbsent(address, any -> ConcurrentHashMap.newKeySet())
+    dnsToUuidMap
+        .computeIfAbsent(dnsName, any -> ConcurrentHashMap.newKeySet())
         .add(uuid);
   }
 
@@ -509,32 +476,11 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
-  private synchronized void removeEntryFromAddressToUuidMap(
-      String address) {
-    if (!addressToUuidMap.containsKey(address)) {
-      return;
-    }
-    Set<String> dnSet = addressToUuidMap.get(address);
-    if (dnSet.contains(address)) {
-      dnSet.remove(address);
-    }
-    if (dnSet.isEmpty()) {
-      addressToUuidMap.remove(address);
-    }
-  }
-
   private synchronized void updateEntryFromDnsToUuidMap(String oldDnsName,
                                                         String newDnsName,
                                                         String uuid) {
     removeEntryFromDnsToUuidMap(oldDnsName);
     addEntryToDnsToUuidMap(newDnsName, uuid);
-  }
-
-  private synchronized void updateEntryFromAddressToUuidMap(String oldAddress,
-                                                            String newAddress,
-                                                            String uuid) {
-    removeEntryFromAddressToUuidMap(oldAddress);
-    addEntryToAddressToUuidMap(newAddress, uuid);
   }
 
   /**
@@ -1272,7 +1218,7 @@ public class SCMNodeManager implements NodeManager {
       LOG.warn("address is null");
       return results;
     }
-    Set<String> uuids = addressToUuidMap.get(address);
+    Set<String> uuids = dnsToUuidMap.get(address);
     if (uuids == null) {
       LOG.warn("Cannot find node for address {}", address);
       return results;
