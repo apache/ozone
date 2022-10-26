@@ -24,7 +24,6 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.junit.Assert;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
@@ -37,16 +36,10 @@ import java.util.UUID;
 
 public class TestCommandQueue {
 
-  private final long containerID = 1;
-  private CommandQueue commandQueue;
-
-  @BeforeEach
-  public void setup() {
-    commandQueue = new CommandQueue();
-  }
-
   @Test
   public void testSummaryUpdated() {
+    CommandQueue commandQueue = new CommandQueue();
+    long containerID = 1;
     SCMCommand<?> closeContainerCommand =
         new CloseContainerCommand(containerID, PipelineID.randomId());
     SCMCommand<?> createPipelineCommand =
