@@ -68,7 +68,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY
  * Tests ozone containers via secure grpc/netty.
  */
 @RunWith(Parameterized.class)
-@Ignore("TODO:HDDS-1157")
 public class TestOzoneContainerWithTLS {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestOzoneContainerWithTLS.class);
@@ -126,7 +125,7 @@ public class TestOzoneContainerWithTLS {
     // 5s
     //long expiryTime = 5000;
 
-    caClient = new CertificateClientTestImpl(conf);
+    caClient = new CertificateClientTestImpl(conf, false);
     secretManager = new OzoneBlockTokenSecretManager(new SecurityConfig(conf),
         expiryTime, caClient.getCertificate().
         getSerialNumber().toString());
