@@ -126,7 +126,9 @@ public class TestOnDemandContainerScanner {
       throws InterruptedException, ExecutionException, IOException {
     Optional<Future<?>> result =
         OnDemandContainerScanner.scanContainer(container);
-    result.get().get();
+    if (result.isPresent()) {
+      result.get().get();
+    }
     Mockito.verify(controller, invocationTimes).markContainerUnhealthy(
         container.getContainerData().getContainerID());
   }
