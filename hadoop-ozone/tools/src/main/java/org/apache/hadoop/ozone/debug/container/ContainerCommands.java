@@ -42,13 +42,14 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerReader;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
 import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Spec;
 
 import java.io.File;
@@ -109,7 +110,7 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
   public void loadContainersFromVolumes() throws IOException {
     OzoneConfiguration conf = parent.getOzoneConf();
 
-    ContainerSet containerSet = new ContainerSet();
+    ContainerSet containerSet = new ContainerSet(1000);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 
@@ -121,6 +122,16 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
 
     volumeSet = new MutableVolumeSet(datanodeUuid, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
+
+    if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
+      MutableVolumeSet dbVolumeSet =
+          HddsServerUtil.getDatanodeDbDirs(conf).isEmpty() ? null :
+          new MutableVolumeSet(datanodeUuid, conf, null,
+              StorageVolume.VolumeType.DB_VOLUME, null);
+      // load rocksDB with readOnly mode, otherwise it will fail.
+      HddsVolumeUtil.loadAllHddsVolumeDbStore(
+          volumeSet, dbVolumeSet, true, LOG);
+    }
 
     Map<ContainerProtos.ContainerType, Handler> handlers = new HashMap<>();
 
@@ -152,7 +163,7 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
       HddsVolume volume = volumeSetIterator.next();
       LOG.info("Loading container metadata from volume " + volume.toString());
       final ContainerReader reader =
-          new ContainerReader(volumeSet, volume, containerSet, conf);
+          new ContainerReader(volumeSet, volume, containerSet, conf, false);
       reader.run();
     }
 
@@ -191,7 +202,7 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
           "Version file " + versionFile + " is missing");
     }
 
-    return HddsVolumeUtil
+    return StorageVolumeUtil
         .getProperty(props, OzoneConsts.DATANODE_UUID, versionFile);
   }
 

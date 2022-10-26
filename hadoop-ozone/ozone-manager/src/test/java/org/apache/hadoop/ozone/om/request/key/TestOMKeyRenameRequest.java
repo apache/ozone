@@ -56,7 +56,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         clientID, replicationType, replicationFactor, omMetadataManager);
 
     OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(modifiedOmRequest);
+        new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -102,7 +102,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         omMetadataManager);
 
     OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(modifiedOmRequest);
+        new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -119,7 +119,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         doPreExecute(createRenameKeyRequest(toKeyName));
 
     OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(modifiedOmRequest);
+        new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -139,7 +139,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
     OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(modifiedOmRequest);
+        new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -163,7 +163,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         omMetadataManager);
 
     OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(modifiedOmRequest);
+        new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -188,7 +188,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         omMetadataManager);
 
     OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(modifiedOmRequest);
+        new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -207,7 +207,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
   private OMRequest doPreExecute(OMRequest originalOmRequest) throws Exception {
     OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(originalOmRequest);
+        new OMKeyRenameRequest(originalOmRequest, getBucketLayout());
 
     OMRequest modifiedOmRequest = omKeyRenameRequest.preExecute(ozoneManager);
 

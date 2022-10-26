@@ -45,6 +45,12 @@ Get object from s3
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 /tmp/testfile.result
     Compare files               /tmp/testfile              /tmp/testfile.result
 
+#This test depends on the previous test case. Can't be executed alone
+Get object with wrong signature
+    Pass Execution If          '${SECURITY_ENABLED}' == 'false'    Skip in unsecure cluster
+    ${result} =                 Execute and Ignore Error   curl -i -H 'Authorization: AWS scm/scm@EXAMPLE.COM:asdfqwerty' ${ENDPOINT_URL}/${BUCKET}/${PREFIX}/putobject/key=value/f1
+                                Should contain             ${result}        403 Forbidden
+
 Get Partial object from s3 with both start and endoffset
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=0-4 /tmp/testfile1.result
                                 Should contain             ${result}        ContentRange
@@ -153,3 +159,29 @@ Zero byte file
 
     ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-10000 /tmp/testfile2.result   255
                                 Should contain             ${result}        InvalidRange
+
+Create file with user defined metadata
+                                Execute                   echo "Randomtext" > /tmp/testfile2
+                                Execute AWSS3ApiCli       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1 --body /tmp/testfile2 --metadata="custom-key1=custom-value1,custom-key2=custom-value2"
+
+    ${result} =                 Execute AWSS3APICli       head-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1
+                                Should contain            ${result}    \"custom-key1\": \"custom-value1\"
+                                Should contain            ${result}    \"custom-key2\": \"custom-value2\"
+
+    ${result} =                 Execute                   ozone sh key info /s3v/${BUCKET}/${PREFIX}/putobject/custom-metadata/key1
+                                Should contain            ${result}   \"custom-key1\" : \"custom-value1\"
+                                Should contain            ${result}   \"custom-key2\" : \"custom-value2\"
+
+Create file with user defined metadata with gdpr enabled value in request
+                                Execute                    echo "Randomtext" > /tmp/testfile2
+                                Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="gdprEnabled=true,custom-key2=custom-value2"
+    ${result} =                 Execute AWSS3ApiCli        head-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2
+                                Should contain             ${result}   \"custom-key2\": \"custom-value2\"
+                                Should not contain         ${result}   \"gdprEnabled\": \"true\"
+
+
+Create file with user defined metadata size larger than 2 KB
+                                Execute                    echo "Randomtext" > /tmp/testfile2
+    ${custom_metadata_value} =  Execute                    printf 'v%.0s' {1..3000}
+    ${result} =                 Execute AWSS3APICli and ignore error        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="custom-key1=${custom_metadata_value}"
+                                Should not contain                          ${result}   custom-key1: ${custom_metadata_value}

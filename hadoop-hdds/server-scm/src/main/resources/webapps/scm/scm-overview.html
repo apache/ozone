@@ -37,6 +37,7 @@
         <th>HEALTHY</th>
         <th>STALE</th>
         <th>DEAD</th>
+        <th>HEALTHY_READONLY</th>
     </tr>
     </thead>
     <tbody>
@@ -69,6 +70,20 @@
     <tr ng-hide="!$ctrl.overview.jmx.PrimordialNode">
         <td> Primordial Node (HA) </td>
         <td>{{$ctrl.overview.jmx.PrimordialNode}}</td>
+    </tr>
+    </tbody>
+</table>
+
+<h2>Meta-Data Volume Information</h2>
+<table class="table table-bordered table-striped" class="col-md-6">
+    <tbody>
+    <tr>
+        <td>Ratis Directory</td>
+        <td>{{$ctrl.overview.jmx.RatisLogDirectory}}</td>
+    </tr>
+    <tr>
+        <td>RocksDB Directory</td>
+        <td>{{$ctrl.overview.jmx.RocksDbDirectory}}</td>
     </tr>
     </tbody>
 </table>

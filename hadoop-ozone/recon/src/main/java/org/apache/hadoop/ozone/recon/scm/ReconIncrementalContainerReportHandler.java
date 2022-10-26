@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -90,7 +91,8 @@ public class ReconIncrementalContainerReportHandler
         success = false;
         LOG.error("Received ICR from unknown datanode {}.",
             report.getDatanodeDetails(), ex);
-      } catch (IOException | InvalidStateTransitionException e) {
+      } catch (IOException | InvalidStateTransitionException |
+               TimeoutException e) {
         success = false;
         LOG.error("Exception while processing ICR for container {}",
             replicaProto.getContainerID());

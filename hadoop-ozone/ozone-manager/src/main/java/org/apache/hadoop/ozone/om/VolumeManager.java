@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * OM volume manager interface for read operations on a volume.
+ * VolumeManager is responsible for read operations on a volume.
  */
 public interface VolumeManager extends IOzoneAcl {
 

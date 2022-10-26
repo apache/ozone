@@ -44,14 +44,13 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.grpc.server.GrpcLogAppender;
 import org.apache.ratis.server.leader.FollowerInfo;
-import org.junit.After;
 import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.event.Level;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
@@ -61,13 +60,8 @@ import static org.apache.hadoop.ozone.om.TestOzoneManagerHA.createKey;
 /**
  * Test for OM bootstrap process.
  */
+@Timeout(500)
 public class TestAddRemoveOzoneManager {
-
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
-
-  @Rule
-  public Timeout timeout = new Timeout(5000_000);
 
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
@@ -113,7 +107,7 @@ public class TestAddRemoveOzoneManager {
         .getOmStateMachine().getLastAppliedTermIndex().getIndex();
   }
 
-  @After
+  @AfterEach
   public void shutdown() throws Exception {
     if (cluster != null) {
       cluster.shutdown();
@@ -214,6 +208,7 @@ public class TestAddRemoveOzoneManager {
    * 2. Force bootstrap without upating config on any OM -> fail
    */
   @Test
+  @Flaky("HDDS-6077")
   public void testBootstrapWithoutConfigUpdate() throws Exception {
     // Setup 1 node cluster
     setupCluster(1);

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
@@ -37,7 +39,8 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 /**
  * Response for CommitKey request.
  */
-@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE, DELETED_TABLE})
+@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE, DELETED_TABLE,
+    BUCKET_TABLE})
 public class OMKeyCommitResponse extends OmKeyResponse {
 
   private OmKeyInfo omKeyInfo;
@@ -100,6 +103,11 @@ public class OMKeyCommitResponse extends OmKeyResponse {
 
   protected String getOzoneKeyName() {
     return ozoneKeyName;
+  }
+
+  @VisibleForTesting
+  public RepeatedOmKeyInfo getKeysToDelete() {
+    return keysToDelete;
   }
 
   protected void updateDeletedTable(OMMetadataManager omMetadataManager,

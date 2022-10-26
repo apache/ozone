@@ -22,11 +22,11 @@ import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorS
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction.Action.CLOSE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -50,6 +50,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.Descriptors.Descriptor;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
@@ -58,11 +59,14 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.Message;
 
 /**
  * Test class for Datanode StateContext.
@@ -243,10 +247,10 @@ public class TestStateContext {
     }
   }
 
-  void checkReportCount(List<GeneratedMessage> reports,
+  void checkReportCount(List<Message> reports,
       Map<String, Integer> expectedReportCount) {
     Map<String, Integer> reportCount = new HashMap<>();
-    for (GeneratedMessage report : reports) {
+    for (Message report : reports) {
       final String reportName = report.getDescriptorForType().getFullName();
       reportCount.put(reportName, reportCount.getOrDefault(reportName, 0) + 1);
     }
@@ -268,7 +272,7 @@ public class TestStateContext {
     assertNull(context1.getContainerReports());
     assertNull(context1.getNodeReport());
     assertNull(context1.getPipelineReports());
-    GeneratedMessage containerReports =
+    Message containerReports =
         newMockReport(StateContext.CONTAINER_REPORTS_PROTO_NAME);
     context1.refreshFullReport(containerReports);
 
@@ -280,7 +284,7 @@ public class TestStateContext {
 
     // NodeReport
     StateContext context2 = newStateContext(conf, datanodeStateMachineMock);
-    GeneratedMessage nodeReport =
+    Message nodeReport =
         newMockReport(StateContext.NODE_REPORT_PROTO_NAME);
     context2.refreshFullReport(nodeReport);
 
@@ -292,7 +296,7 @@ public class TestStateContext {
 
     // PipelineReports
     StateContext context3 = newStateContext(conf, datanodeStateMachineMock);
-    GeneratedMessage pipelineReports =
+    Message pipelineReports =
         newMockReport(StateContext.PIPELINE_REPORTS_PROTO_NAME);
     context3.refreshFullReport(pipelineReports);
 
@@ -314,8 +318,8 @@ public class TestStateContext {
     return stateContext;
   }
 
-  private GeneratedMessage newMockReport(String messageType) {
-    GeneratedMessage report = mock(GeneratedMessage.class);
+  private Message newMockReport(String messageType) {
+    Message report = mock(Message.class);
     if (StateContext
         .INCREMENTAL_CONTAINER_REPORT_PROTO_NAME.equals(messageType)) {
       report =
@@ -339,7 +343,7 @@ public class TestStateContext {
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
 
-    GeneratedMessage generatedMessage =
+    Message generatedMessage =
         newMockReport(StateContext.COMMAND_STATUS_REPORTS_PROTO_NAME);
 
     // Try to add report with zero endpoint. Should not be stored.
@@ -352,7 +356,7 @@ public class TestStateContext {
 
     // Add report. Should be added to all endpoints.
     stateContext.addIncrementalReport(generatedMessage);
-    List<GeneratedMessage> allAvailableReports =
+    List<Message> allAvailableReports =
         stateContext.getAllAvailableReports(scm1);
     assertEquals(1, allAvailableReports.size());
     assertEquals(1, stateContext.getAllAvailableReports(scm2).size());
@@ -498,7 +502,7 @@ public class TestStateContext {
     }
     executorService.submit((Callable<String>) futureTwo::get);
 
-    Assert.assertFalse(stateContext.isThreadPoolAvailable(executorService));
+    Assertions.assertFalse(stateContext.isThreadPoolAvailable(executorService));
 
     futureOne.complete("futureOne");
     LambdaTestUtils.await(1000, 100, () ->
@@ -616,4 +620,36 @@ public class TestStateContext {
     checkReportCount(ctx.getAllAvailableReportsUpToLimit(scm2, 100),
         expectedReportCount);
   }
+
+  @Test
+  public void testCommandQueueSummary() throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanodeStateMachineMock =
+        mock(DatanodeStateMachine.class);
+    OzoneContainer o = mock(OzoneContainer.class);
+    ContainerSet s = mock(ContainerSet.class);
+    when(datanodeStateMachineMock.getContainer()).thenReturn(o);
+    when(o.getContainerSet()).thenReturn(s);
+    when(s.getContainerReport())
+        .thenReturn(
+            StorageContainerDatanodeProtocolProtos
+                .ContainerReportsProto.getDefaultInstance());
+    StateContext ctx = new StateContext(conf, DatanodeStates.getInitState(),
+        datanodeStateMachineMock);
+    ctx.addCommand(new ReplicateContainerCommand(1, null));
+    ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
+    ctx.addCommand(new ReplicateContainerCommand(2, null));
+    ctx.addCommand(new ReplicateContainerCommand(3, null));
+    ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
+    ctx.addCommand(new CloseContainerCommand(1, PipelineID.randomId()));
+
+    Map<SCMCommandProto.Type, Integer> summary = ctx.getCommandQueueSummary();
+    Assertions.assertEquals(3,
+        summary.get(SCMCommandProto.Type.replicateContainerCommand).intValue());
+    Assertions.assertEquals(2,
+        summary.get(SCMCommandProto.Type.closePipelineCommand).intValue());
+    Assertions.assertEquals(1,
+        summary.get(SCMCommandProto.Type.closeContainerCommand).intValue());
+  }
+
 }

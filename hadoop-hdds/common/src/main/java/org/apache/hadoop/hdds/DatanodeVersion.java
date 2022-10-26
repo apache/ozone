@@ -17,6 +17,12 @@
  */
 package org.apache.hadoop.hdds;
 
+import java.util.Arrays;
+import java.util.Map;
+
+import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toMap;
+
 /**
  * Versioning for datanode.
  */
@@ -31,6 +37,10 @@ public enum DatanodeVersion implements ComponentVersion {
 
   public static final DatanodeVersion CURRENT = latest();
   public static final int CURRENT_VERSION = CURRENT.version;
+
+  private static final Map<Integer, DatanodeVersion> BY_PROTO_VALUE =
+      Arrays.stream(values())
+          .collect(toMap(DatanodeVersion::toProtoValue, identity()));
 
   private final int version;
   private final String description;
@@ -51,11 +61,7 @@ public enum DatanodeVersion implements ComponentVersion {
   }
 
   public static DatanodeVersion fromProtoValue(int value) {
-    DatanodeVersion[] versions = DatanodeVersion.values();
-    if (value >= versions.length || value < 0) {
-      return FUTURE_VERSION;
-    }
-    return versions[value];
+    return BY_PROTO_VALUE.getOrDefault(value, FUTURE_VERSION);
   }
 
   private static DatanodeVersion latest() {

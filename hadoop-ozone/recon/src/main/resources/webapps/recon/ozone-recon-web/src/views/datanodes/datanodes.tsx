@@ -53,6 +53,7 @@ interface IDatanodeResponse {
   setupTime: number;
   revision: string;
   buildDate: string;
+  networkLocation: string;
 }
 
 interface IDatanodesResponse {
@@ -77,12 +78,13 @@ interface IDatanode {
   setupTime: number;
   revision: string;
   buildDate: string;
+  networkLocation: string;
 }
 
 interface IPipeline {
   pipelineID: string;
   replicationType: string;
-  replicationFactor: number;
+  replicationFactor: string;
   leaderNode: string;
 }
 
@@ -119,30 +121,6 @@ const renderDatanodeOpState = (opState: DatanodeOpState) => {
 
 const COLUMNS = [
   {
-    title: 'State',
-    dataIndex: 'state',
-    key: 'state',
-    isVisible: true,
-    filterMultiple: true,
-    filters: DatanodeStateList.map(state => ({text: state, value: state})),
-    onFilter: (value: DatanodeState, record: IDatanode) => record.state === value,
-    render: (text: DatanodeState) => renderDatanodeState(text),
-    sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state),
-    fixed: 'left'
-  },
-  {
-    title: 'Operational State',
-    dataIndex: 'opState',
-    key: 'opState',
-    isVisible: true,
-    filterMultiple: true,
-    filters: DatanodeOpStateList.map(state => ({text: state, value: state})),
-    onFilter: (value: DatanodeOpState, record: IDatanode) => record.opState === value,
-    render: (text: DatanodeOpState) => renderDatanodeOpState(text),
-    sorter: (a: IDatanode, b: IDatanode) => a.opState.localeCompare(b.opState),
-    fixed: 'left'
-  },
-  {
     title: 'Hostname',
     dataIndex: 'hostname',
     key: 'hostname',
@@ -152,6 +130,31 @@ const COLUMNS = [
     defaultSortOrder: 'ascend' as const,
     fixed: 'left'
   },
+  {
+    title: 'State',
+    dataIndex: 'state',
+    key: 'state',
+    isVisible: true,
+    isSearchable: true,
+    filterMultiple: true,
+    filters: DatanodeStateList.map(state => ({text: state, value: state})),
+    onFilter: (value: DatanodeState, record: IDatanode) => record.state === value,
+    render: (text: DatanodeState) => renderDatanodeState(text),
+    sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state)
+  },
+  {
+    title: 'Operational State',
+    dataIndex: 'opState',
+    key: 'opState',
+    isVisible: true,
+    isSearchable: true,
+    filterMultiple: true,
+    filters: DatanodeOpStateList.map(state => ({text: state, value: state})),
+    onFilter: (value: DatanodeOpState, record: IDatanode) => record.opState === value,
+    render: (text: DatanodeOpState) => renderDatanodeOpState(text),
+    sorter: (a: IDatanode, b: IDatanode) => a.opState.localeCompare(b.opState)
+  },
+ 
   {
     title: 'Uuid',
     dataIndex: 'uuid',
@@ -246,7 +249,7 @@ const COLUMNS = [
     defaultSortOrder: 'ascend' as const
   },
   {
-    title: 'SetupTime',
+    title: 'Setup Time',
     dataIndex: 'setupTime',
     key: 'setupTime',
     isVisible: true,
@@ -265,12 +268,21 @@ const COLUMNS = [
     defaultSortOrder: 'ascend' as const
   },
   {
-    title: 'BuildDate',
+    title: 'Build Date',
     dataIndex: 'buildDate',
     key: 'buildDate',
     isVisible: true,
     isSearchable: true,
     sorter: (a: IDatanode, b: IDatanode) => a.buildDate.localeCompare(b.buildDate),
+    defaultSortOrder: 'ascend' as const
+  },
+  {
+    title: 'Network Location',
+    dataIndex: 'networkLocation',
+    key: 'networkLocation',
+    isVisible: true,
+    isSearchable: true,
+    sorter: (a: IDatanode, b: IDatanode) => a.networkLocation.localeCompare(b.networkLocation),
     defaultSortOrder: 'ascend' as const
   }
 ];
@@ -342,7 +354,8 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           version: datanode.version,
           setupTime: datanode.setupTime,
           revision: datanode.revision,
-          buildDate: datanode.buildDate
+          buildDate: datanode.buildDate,
+          networkLocation: datanode.networkLocation
         };
       });
 

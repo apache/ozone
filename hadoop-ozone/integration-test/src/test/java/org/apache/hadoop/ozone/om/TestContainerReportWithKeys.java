@@ -123,7 +123,6 @@ public class TestContainerReportWithKeys {
             StandaloneReplicationConfig
                 .getInstance(HddsProtos.ReplicationFactor.ONE))
         .setDataSize(keySize)
-        .setRefreshPipeline(true)
         .build();
 
 

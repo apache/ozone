@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.container.report.ContainerReportValidator;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -39,6 +40,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Handles container reports from datanode.
@@ -186,7 +188,11 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
             // This is a new Container not in the nodeManager -> dn map yet
             nodeManager.addContainer(datanodeDetails, cid);
           }
-          processSingleReplica(datanodeDetails, container, replica, publisher);
+          if (container == null || ContainerReportValidator
+                  .validate(container, datanodeDetails, replica)) {
+            processSingleReplica(datanodeDetails, container,
+                    replica, publisher);
+          }
         }
         // Anything left in expectedContainersInDatanode was not in the full
         // report, so it is now missing on the DN. We need to remove it from the
@@ -233,7 +239,8 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
     try {
       processContainerReplica(
           datanodeDetails, container, replicaProto, publisher);
-    } catch (IOException | InvalidStateTransitionException e) {
+    } catch (IOException | InvalidStateTransitionException |
+             TimeoutException e) {
       LOG.error("Exception while processing container report for container" +
               " {} from datanode {}.", replicaProto.getContainerID(),
           datanodeDetails, e);

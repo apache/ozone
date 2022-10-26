@@ -30,6 +30,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -78,10 +81,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA
 import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
-import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.WriteBatch;
-import org.rocksdb.WriteOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -412,17 +412,17 @@ public class OzoneManagerServiceProviderImpl
     if (null != dbUpdates && dbUpdates.getCurrentSequenceNumber() != -1) {
       latestSequenceNumberOfOM = dbUpdates.getLatestSequenceNumber();
       RDBStore rocksDBStore = (RDBStore) omMetadataManager.getStore();
-      RocksDB rocksDB = rocksDBStore.getDb();
+      final RocksDatabase rocksDB = rocksDBStore.getDb();
       numUpdates = dbUpdates.getData().size();
       if (numUpdates > 0) {
         metrics.incrNumUpdatesInDeltaTotal(numUpdates);
       }
       for (byte[] data : dbUpdates.getData()) {
-        try (WriteBatch writeBatch = new WriteBatch(data)) {
+        try (ManagedWriteBatch writeBatch = new ManagedWriteBatch(data)) {
           writeBatch.iterate(omdbUpdatesHandler);
           try (RDBBatchOperation rdbBatchOperation =
                    new RDBBatchOperation(writeBatch)) {
-            try (WriteOptions wOpts = new WriteOptions()) {
+            try (ManagedWriteOptions wOpts = new ManagedWriteOptions()) {
               rdbBatchOperation.commit(rocksDB, wOpts);
             }
           }

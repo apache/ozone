@@ -14,7 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test ozone Debug CLI
+Documentation       Keyword definitions for Ozone Debug CLI tests
 Library             Collections
 Resource            ../lib/os.robot
 
@@ -26,7 +26,13 @@ Execute read-replicas CLI tool
     File Should Exist               ${directory}/${TESTFILE}_manifest
     [Return]                        ${directory}
 
-Compare JSON
+Read Replicas Manifest
+    ${manifest} =        Get File        ${DIR}/${TESTFILE}_manifest
+    ${json} =            Evaluate        json.loads('''${manifest}''')        json
+    Validate JSON                        ${json}
+    [return]    ${json}
+
+Validate JSON
     [arguments]                     ${json}
     Should Be Equal                 ${json}[filename]                   ${VOLUME}/${BUCKET}/${TESTFILE}
     ${file_size} =                  Get File Size                       ${TESTFILE}
@@ -42,29 +48,48 @@ Compare JSON
     Should Be Equal As Integers     ${json}[blocks][1][length]          451424
     Should Not Be Empty             Convert To String       ${json}[blocks][1][offset]
 
-Check for datanodes
-    [arguments]                     ${datanodes}    ${datanodes_expected}
-    Lists Should Be Equal	        ${datanodes}    ${datanodes_expected}   ignore_order=True
+Get Replica Filenames
+    [arguments]                     ${json}    ${replica}
 
-Check for all datanodes
-    [arguments]                     ${json}
-    ${datanodes_expected} =         Create List  ozone_datanode_1.ozone_default  ozone_datanode_2.ozone_default  ozone_datanode_3.ozone_default
-    ${datanodes_b1} =               Create List   ${json}[blocks][0][replicas][0][hostname]    ${json}[blocks][0][replicas][1][hostname]   ${json}[blocks][0][replicas][2][hostname]
-    Check for datanodes             ${datanodes_b1}    ${datanodes_expected}
-    ${datanodes_b2} =               Create List   ${json}[blocks][1][replicas][0][hostname]    ${json}[blocks][1][replicas][1][hostname]   ${json}[blocks][1][replicas][2][hostname]
-    Check for datanodes             ${datanodes_b2}    ${datanodes_expected}
+    ${list} =     Create List
 
-Check checksum mismatch error
-    [arguments]                     ${json}     ${datanode}
-    ${datanodes} =                  Create List     ${json}[blocks][0][replicas][0][hostname]   ${json}[blocks][0][replicas][1][hostname]   ${json}[blocks][0][replicas][2][hostname]
-    ${index} =                      Get Index From List         ${datanodes}        ${datanode}
-    Should Contain                  ${json}[blocks][0][replicas][${index}][exception]           Checksum mismatch
+    FOR    ${block}    IN RANGE    2
+        ${datanode} =    Set Variable    ${json}[blocks][${block}][replicas][${replica}][hostname]
+        ${n} =           Evaluate    ${block} + 1
+        Append To List   ${list}    ${DIR}/${TESTFILE}_block${n}_${datanode}
+    END
 
-Check unavailable datanode error
-    [arguments]                     ${json}     ${datanode}
-    ${datanodes_b1} =               Create List   ${json}[blocks][0][replicas][0][hostname]    ${json}[blocks][0][replicas][1][hostname]   ${json}[blocks][0][replicas][2][hostname]
-    ${index_b1} =                   Get Index From List     ${datanodes_b1}        ${datanode}
-    Should Contain                  ${json}[blocks][0][replicas][${index_b1}][exception]           UNAVAILABLE
-    ${datanodes_b2} =               Create List   ${json}[blocks][1][replicas][0][hostname]    ${json}[blocks][1][replicas][1][hostname]   ${json}[blocks][1][replicas][2][hostname]
-    ${index_b2} =                   Get Index From List     ${datanodes_b2}        ${datanode}
-    Should Contain                  ${json}[blocks][0][replicas][${index_b2}][exception]           UNAVAILABLE
+    ${filenames} =   Catenate    @{list}
+
+    [return]    ${filenames}
+
+Verify Healthy Replica
+    [arguments]              ${json}    ${replica}    ${expected_md5sum}
+
+    ${block_filenames} =     Get Replica Filenames    ${json}    ${replica}
+    ${md5sum} =              Execute     cat ${block_filenames} | md5sum | awk '{print $1}'
+    Should Be Equal          ${md5sum}   ${expected_md5sum}
+
+Verify Corrupt Replica
+    [arguments]              ${json}    ${replica}    ${valid_md5sum}
+
+    ${block_filenames} =     Get Replica Filenames    ${json}    ${replica}
+    ${md5sum} =              Execute     cat ${block_filenames} | md5sum | awk '{print $1}'
+    Should Not Be Equal      ${md5sum}   ${valid_md5sum}
+
+Verify Stale Replica
+    [arguments]              ${json}    ${replica}
+
+    FOR    ${block}    IN RANGE    2
+        ${n} =           Evaluate        ${block} + 1
+        ${datanode} =    Set Variable    ${json}[blocks][${block}][replicas][${replica}][hostname]
+        ${filename} =    Set Variable    ${DIR}/${TESTFILE}_block${n}_${datanode}
+
+        IF    '${datanode}' == '${STALE_DATANODE}'
+            File Should Be Empty    ${filename}
+            Should Contain          ${json}[blocks][${block}][replicas][${replica}][exception]    UNAVAILABLE
+        ELSE
+            ${filesize} =                   Get File Size    ${filename}
+            Should Be Equal As Integers     ${json}[blocks][${block}][length]          ${filesize}
+        END
+    END

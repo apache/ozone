@@ -29,10 +29,11 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -47,7 +48,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 /**
  * Tests for RatisPipelineUtils.
  */
-@Ignore
+@Disabled("HDDS-3419")
 public class TestRatisPipelineCreateAndDestroy {
 
   private MiniOzoneCluster cluster;
@@ -70,12 +71,12 @@ public class TestRatisPipelineCreateAndDestroy {
     pipelineManager = scm.getPipelineManager();
   }
 
-  @After
+  @AfterEach
   public void cleanup() {
     cluster.shutdown();
   }
 
-  @Test(timeout = 180000)
+  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 180000)
   public void testAutomaticPipelineCreationOnPipelineDestroy()
       throws Exception {
     int numOfDatanodes = 6;
@@ -96,7 +97,7 @@ public class TestRatisPipelineCreateAndDestroy {
     waitForPipelines(2);
   }
 
-  @Test(timeout = 180000)
+  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 180000)
   public void testAutomaticPipelineCreationDisablingFactorONE()
       throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
@@ -119,7 +120,7 @@ public class TestRatisPipelineCreateAndDestroy {
     waitForPipelines(2);
   }
 
-  @Test(timeout = 180000)
+  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 180000)
   public void testPipelineCreationOnNodeRestart() throws Exception {
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL,
         5, TimeUnit.SECONDS);

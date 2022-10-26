@@ -60,12 +60,16 @@ public class SCMHAInvocationHandler implements InvocationHandler {
   @Override
   public Object invoke(final Object proxy, final Method method,
                        final Object[] args) throws Throwable {
+    // Javadoc for InvocationHandler#invoke specifies that args will be null
+    // if the method takes no arguments. Convert this to an empty array for
+    // easier handling.
+    Object[] convertedArgs = (args == null) ? new Object[]{} : args;
     try {
       long startTime = Time.monotonicNow();
       final Object result =
           ratisHandler != null && method.isAnnotationPresent(Replicate.class) ?
-              invokeRatis(method, args) :
-              invokeLocal(method, args);
+              invokeRatis(method, convertedArgs) :
+              invokeLocal(method, convertedArgs);
       LOG.debug("Call: {} took {} ms", method, Time.monotonicNow() - startTime);
       return result;
     } catch (InvocationTargetException iEx) {

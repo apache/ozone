@@ -18,19 +18,25 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.rocksdb.RocksIterator;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -47,11 +53,13 @@ import static org.mockito.Mockito.when;
 public class TestRDBStoreIterator {
 
   private RocksIterator rocksDBIteratorMock;
+  private ManagedRocksIterator managedRocksIterator;
   private RDBTable rocksTableMock;
 
-  @Before
+  @BeforeEach
   public void setup() {
     rocksDBIteratorMock = mock(RocksIterator.class);
+    managedRocksIterator = new ManagedRocksIterator(rocksDBIteratorMock);
     rocksTableMock = mock(RDBTable.class);
   }
 
@@ -71,7 +79,7 @@ public class TestRDBStoreIterator {
 
     Consumer<ByteArrayKeyValue> consumerStub = mock(Consumer.class);
 
-    RDBStoreIterator iter = new RDBStoreIterator(rocksDBIteratorMock);
+    RDBStoreIterator iter = new RDBStoreIterator(managedRocksIterator);
     iter.forEachRemaining(consumerStub);
 
     ArgumentCaptor<ByteArrayKeyValue> capture =
@@ -95,7 +103,7 @@ public class TestRDBStoreIterator {
   public void testHasNextDependsOnIsvalid() {
     when(rocksDBIteratorMock.isValid()).thenReturn(true, true, false);
 
-    RDBStoreIterator iter = new RDBStoreIterator(rocksDBIteratorMock);
+    RDBStoreIterator iter = new RDBStoreIterator(managedRocksIterator);
 
     assertTrue(iter.hasNext());
     assertFalse(iter.hasNext());
@@ -104,7 +112,7 @@ public class TestRDBStoreIterator {
   @Test
   public void testNextCallsIsValidThenGetsTheValueAndStepsToNext() {
     when(rocksDBIteratorMock.isValid()).thenReturn(true);
-    RDBStoreIterator iter = new RDBStoreIterator(rocksDBIteratorMock);
+    RDBStoreIterator iter = new RDBStoreIterator(managedRocksIterator);
 
     InOrder verifier = inOrder(rocksDBIteratorMock);
 
@@ -118,14 +126,14 @@ public class TestRDBStoreIterator {
 
   @Test
   public void testConstructorSeeksToFirstElement() {
-    new RDBStoreIterator(rocksDBIteratorMock);
+    new RDBStoreIterator(managedRocksIterator);
 
     verify(rocksDBIteratorMock, times(1)).seekToFirst();
   }
 
   @Test
   public void testSeekToFirstSeeks() {
-    RDBStoreIterator iter = new RDBStoreIterator(rocksDBIteratorMock);
+    RDBStoreIterator iter = new RDBStoreIterator(managedRocksIterator);
 
     iter.seekToFirst();
 
@@ -134,7 +142,7 @@ public class TestRDBStoreIterator {
 
   @Test
   public void testSeekToLastSeeks() {
-    RDBStoreIterator iter = new RDBStoreIterator(rocksDBIteratorMock);
+    RDBStoreIterator iter = new RDBStoreIterator(managedRocksIterator);
 
     iter.seekToLast();
 
@@ -147,7 +155,7 @@ public class TestRDBStoreIterator {
     when(rocksDBIteratorMock.key()).thenReturn(new byte[]{0x00});
     when(rocksDBIteratorMock.value()).thenReturn(new byte[]{0x7f});
 
-    RDBStoreIterator iter = new RDBStoreIterator(rocksDBIteratorMock);
+    RDBStoreIterator iter = new RDBStoreIterator(managedRocksIterator);
     ByteArrayKeyValue val = iter.seek(new byte[]{0x55});
 
     InOrder verifier = inOrder(rocksDBIteratorMock);
@@ -167,7 +175,7 @@ public class TestRDBStoreIterator {
     when(rocksDBIteratorMock.isValid()).thenReturn(true);
     when(rocksDBIteratorMock.key()).thenReturn(new byte[]{0x00});
 
-    RDBStoreIterator iter = new RDBStoreIterator(rocksDBIteratorMock);
+    RDBStoreIterator iter = new RDBStoreIterator(managedRocksIterator);
     byte[] key = null;
     if (iter.hasNext()) {
       ByteArrayKeyValue entry = iter.next();
@@ -187,7 +195,7 @@ public class TestRDBStoreIterator {
     when(rocksDBIteratorMock.key()).thenReturn(new byte[]{0x00});
     when(rocksDBIteratorMock.value()).thenReturn(new byte[]{0x7f});
 
-    RDBStoreIterator iter = new RDBStoreIterator(rocksDBIteratorMock);
+    RDBStoreIterator iter = new RDBStoreIterator(managedRocksIterator);
     ByteArrayKeyValue entry;
     byte[] key = null;
     byte[] value = null;
@@ -212,7 +220,7 @@ public class TestRDBStoreIterator {
     when(rocksDBIteratorMock.key()).thenReturn(testKey);
 
     RDBStoreIterator iter =
-        new RDBStoreIterator(rocksDBIteratorMock, rocksTableMock);
+        new RDBStoreIterator(managedRocksIterator, rocksTableMock);
     iter.removeFromDB();
 
     InOrder verifier = inOrder(rocksDBIteratorMock, rocksTableMock);
@@ -221,17 +229,68 @@ public class TestRDBStoreIterator {
     verifier.verify(rocksTableMock, times(1)).delete(testKey);
   }
 
-  @Test(expected = UnsupportedOperationException.class)
-  public void testRemoveFromDBWithoutDBTableSet() throws Exception {
-    RDBStoreIterator iter = new RDBStoreIterator(rocksDBIteratorMock);
-    iter.removeFromDB();
+  @Test
+  public void testRemoveFromDBWithoutDBTableSet() {
+    RDBStoreIterator iter = new RDBStoreIterator(managedRocksIterator);
+    assertThrows(UnsupportedOperationException.class,
+        iter::removeFromDB);
   }
 
   @Test
   public void testCloseCloses() throws Exception {
-    RDBStoreIterator iter = new RDBStoreIterator(rocksDBIteratorMock);
+    RDBStoreIterator iter = new RDBStoreIterator(managedRocksIterator);
     iter.close();
 
     verify(rocksDBIteratorMock, times(1)).close();
+  }
+
+  @Test
+  public void testNullPrefixedIterator() throws IOException {
+    RDBStoreIterator iter = new RDBStoreIterator(managedRocksIterator,
+        rocksTableMock, null);
+    verify(rocksDBIteratorMock, times(1)).seekToFirst();
+    clearInvocations(rocksDBIteratorMock);
+
+    iter.seekToFirst();
+    verify(rocksDBIteratorMock, times(1)).seekToFirst();
+    clearInvocations(rocksDBIteratorMock);
+
+    when(rocksDBIteratorMock.isValid()).thenReturn(true);
+    assertTrue(iter.hasNext());
+    verify(rocksDBIteratorMock, times(1)).isValid();
+    verify(rocksDBIteratorMock, times(0)).key();
+
+    iter.seekToLast();
+    verify(rocksDBIteratorMock, times(1)).seekToLast();
+
+    iter.close();
+  }
+
+  @Test
+  public void testNormalPrefixedIterator() throws IOException {
+    byte[] testPrefix = "sample".getBytes(StandardCharsets.UTF_8);
+    RDBStoreIterator iter = new RDBStoreIterator(managedRocksIterator,
+        rocksTableMock, testPrefix);
+    verify(rocksDBIteratorMock, times(1)).seek(testPrefix);
+    clearInvocations(rocksDBIteratorMock);
+
+    iter.seekToFirst();
+    verify(rocksDBIteratorMock, times(1)).seek(testPrefix);
+    clearInvocations(rocksDBIteratorMock);
+
+    when(rocksDBIteratorMock.isValid()).thenReturn(true);
+    when(rocksDBIteratorMock.key()).thenReturn(testPrefix);
+    assertTrue(iter.hasNext());
+    verify(rocksDBIteratorMock, times(1)).isValid();
+    verify(rocksDBIteratorMock, times(1)).key();
+
+    try {
+      iter.seekToLast();
+      fail("Prefixed iterator does not support seekToLast");
+    } catch (Exception e) {
+      assertTrue(e instanceof UnsupportedOperationException);
+    }
+
+    iter.close();
   }
 }

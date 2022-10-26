@@ -19,12 +19,14 @@ Library             OperatingSystem
 Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
+Resource            ../ozone-lib/freon.robot
 Test Timeout        5 minutes
 
 *** Variables ***
 ${ENDPOINT_URL}       http://recon:9888
 ${API_ENDPOINT_URL}   ${ENDPOINT_URL}/api/v1
 ${ADMIN_API_ENDPOINT_URL}   ${API_ENDPOINT_URL}/containers
+${UNHEALTHY_ENDPOINT_URL}   ${API_ENDPOINT_URL}/containers/unhealthy
 ${NON_ADMIN_API_ENDPOINT_URL}   ${API_ENDPOINT_URL}/clusterState
 
 *** Keywords ***
@@ -56,11 +58,8 @@ Check http return code
                         END
 
 *** Test Cases ***
-Generate Freon data
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
-                        Execute                             ozone freon rk --replication-type=RATIS --num-of-volumes 1 --num-of-buckets 1 --num-of-keys 10 --key-size 1025
-
 Check if Recon picks up OM data
+    [Setup]    Freon OCKG    n=10    args=-s 1025 -v recon -b api
     Wait Until Keyword Succeeds     90sec      10sec        Check if Recon picks up container from OM
 
 Check if Recon picks up DN heartbeats
@@ -111,6 +110,19 @@ Check admin only api access
 
     kinit as recon admin
     Check http return code      ${ADMIN_API_ENDPOINT_URL}       200
+
+Check unhealthy, (admin) api access
+    Execute    kdestroy
+    Check http return code      ${UNHEALTHY_ENDPOINT_URL}       401
+
+    kinit as non admin
+    Check http return code      ${UNHEALTHY_ENDPOINT_URL}       403
+
+    kinit as ozone admin
+    Check http return code      ${UNHEALTHY_ENDPOINT_URL}       200
+
+    kinit as recon admin
+    Check http return code      ${UNHEALTHY_ENDPOINT_URL}       200
 
 Check normal api access
     Execute    kdestroy

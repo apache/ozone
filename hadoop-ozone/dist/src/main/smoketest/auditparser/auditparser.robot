@@ -18,12 +18,13 @@ Documentation       Smoketest ozone cluster startup
 Library             OperatingSystem
 Library             BuiltIn
 Resource            ../commonlib.robot
+Resource            ../ozone-lib/freon.robot
 Test Timeout        5 minutes
 
 *** Variables ***
 ${user}              hadoop
-${count}             4
-${auditworkdir}      /tmp/
+${buckets}           5
+${auditworkdir}      /tmp
 
 *** Keywords ***
 Set username
@@ -31,14 +32,15 @@ Set username
     Set Suite Variable     ${user}         testuser/${hostname}@EXAMPLE.COM
     [return]               ${user}
 
-*** Test Cases ***
-Initiating freon to generate data
-    ${result} =        Execute              ozone freon randomkeys --num-of-volumes 5 --num-of-buckets 5 --num-of-keys 5 --num-of-threads 1
-                       Wait Until Keyword Succeeds      3min       10sec     Should contain   ${result}   Number of Keys added: 125
-                       Should Not Contain               ${result}  ERROR
+Create data
+    Freon OMBG    prefix=auditparser    n=${buckets}
+    Freon OCKG    prefix=auditparser    n=100
 
+*** Test Cases ***
 Testing audit parser
-    ${logdir} =        Get Environment Variable      HADOOP_LOG_DIR     /var/log/hadoop
+    [Setup]            Create data
+
+    ${logdir} =        Get Environment Variable      OZONE_LOG_DIR     /var/log/ozone
     ${logfile} =       Execute              ls -t "${logdir}" | grep om-audit | head -1
                        Execute              ozone auditparser "${auditworkdir}/audit.db" load "${logdir}/${logfile}"
     ${result} =        Execute              ozone auditparser "${auditworkdir}/audit.db" template top5cmds
@@ -48,7 +50,7 @@ Testing audit parser
                        Should Contain       ${result}  ${user}
     ${result} =        Execute              ozone auditparser "${auditworkdir}/audit.db" query "select count(*) from audit where op='CREATE_VOLUME' and RESULT='SUCCESS'"
     ${result} =        Convert To Number     ${result}
-                       Should be true       ${result}>${count}
+                       Should be true       ${result}>=1
     ${result} =        Execute              ozone auditparser "${auditworkdir}/audit.db" query "select count(*) from audit where op='CREATE_BUCKET' and RESULT='SUCCESS'"
     ${result} =        Convert To Number     ${result}
-                       Should be true       ${result}>${count}
+                       Should be true       ${result}>=${buckets}

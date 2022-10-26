@@ -39,11 +39,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT;
 
 /**
  * {@link DeletedBlockLogStateManager} implementation
@@ -58,15 +56,12 @@ public class DeletedBlockLogStateManagerImpl
   private Table<Long, DeletedBlocksTransaction> deletedTable;
   private ContainerManager containerManager;
   private final DBTransactionBuffer transactionBuffer;
-  private final int maxRetry;
   private final Set<Long> deletingTxIDs;
   private final Set<Long> skippingRetryTxIDs;
 
   public DeletedBlockLogStateManagerImpl(ConfigurationSource conf,
              Table<Long, DeletedBlocksTransaction> deletedTable,
              ContainerManager containerManager, DBTransactionBuffer txBuffer) {
-    this.maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY,
-        OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT);
     this.deletedTable = deletedTable;
     this.containerManager = containerManager;
     this.transactionBuffer = txBuffer;
@@ -77,7 +72,7 @@ public class DeletedBlockLogStateManagerImpl
   }
 
   public TableIterator<Long, TypedTable.KeyValue<Long,
-      DeletedBlocksTransaction>> getReadOnlyIterator() {
+      DeletedBlocksTransaction>> getReadOnlyIterator() throws IOException {
     return new TableIterator<Long, TypedTable.KeyValue<Long,
         DeletedBlocksTransaction>>() {
 
@@ -207,6 +202,38 @@ public class DeletedBlockLogStateManagerImpl
         skippingRetryTxIDs.add(txID);
       }
     }
+  }
+
+  @Override
+  public int resetRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
+      throws IOException {
+    Objects.requireNonNull(txIDs, "txIds cannot be null.");
+    int resetCount = 0;
+    for (long txId: txIDs) {
+      try {
+        DeletedBlocksTransaction transaction = deletedTable.get(txId);
+        if (transaction == null) {
+          LOG.warn("txId {} is not found in deletedTable.", txId);
+          continue;
+        }
+        if (transaction.getCount() != -1) {
+          LOG.warn("txId {} has already been reset in deletedTable.", txId);
+          continue;
+        }
+        transactionBuffer.addToBuffer(deletedTable, txId,
+            transaction.toBuilder().setCount(0).build());
+        resetCount += 1;
+        if (LOG.isDebugEnabled()) {
+          LOG.info("Reset deleted block Txn retry count to 0 in container {}" +
+              " with txnId {} ", transaction.getContainerID(), txId);
+        }
+      } catch (IOException ex) {
+        LOG.error("Could not reset deleted block transaction {}.", txId, ex);
+        throw ex;
+      }
+    }
+    LOG.info("Reset in total {} deleted block Txn retry count", resetCount);
+    return resetCount;
   }
 
   public void onFlush() {

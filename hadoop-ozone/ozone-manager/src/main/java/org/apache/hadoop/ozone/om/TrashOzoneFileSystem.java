@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -47,6 +48,7 @@ import org.apache.ratis.protocol.RaftClientRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
@@ -57,6 +59,7 @@ import java.util.Map;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_O3TRASH_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.addTrailingSlashIfNeeded;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.pathToKey;
@@ -121,8 +124,7 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   @Override
   public URI getUri() {
-    throw new UnsupportedOperationException(
-        "fs.getUri() not implemented in TrashOzoneFileSystem");
+    return URI.create(OZONE_O3TRASH_URI_SCHEME + ":///");
   }
 
   @Override
@@ -163,8 +165,9 @@ public class TrashOzoneFileSystem extends FileSystem {
         equals(dstPath.getBucketName()));
     Preconditions.checkArgument(srcPath.getTrashRoot().
         toString().equals(dstPath.getTrashRoot().toString()));
-    RenameIterator iterator = new RenameIterator(src, dst);
-    iterator.iterate();
+    try (RenameIterator iterator = new RenameIterator(src, dst)) {
+      iterator.iterate();
+    }
     return true;
   }
 
@@ -193,8 +196,9 @@ public class TrashOzoneFileSystem extends FileSystem {
     if (bucket.getBucketLayout().isFileSystemOptimized()) {
       return deleteFSO(srcPath);
     }
-    DeleteIterator iterator = new DeleteIterator(path, true);
-    iterator.iterate();
+    try (DeleteIterator iterator = new DeleteIterator(path, true)) {
+      iterator.iterate();
+    }
     return true;
   }
 
@@ -341,7 +345,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     }
   }
 
-  private abstract class OzoneListingIterator {
+  private abstract class OzoneListingIterator implements Closeable {
     private final Path path;
     private final FileStatus status;
     private String pathKey;
@@ -419,6 +423,11 @@ public class TrashOzoneFileSystem extends FileSystem {
     FileStatus getStatus() {
       return status;
     }
+
+    @Override
+    public void close() throws IOException {
+      keyIterator.close();
+    }
   }
 
 
@@ -446,6 +455,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     try {
       omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
               .setClientId(CLIENT_ID.toString())
+              .setVersion(ClientVersion.CURRENT_VERSION)
               .setUserInfo(getUserInfo())
               .setRenameKeyRequest(renameKeyRequest)
               .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
@@ -510,6 +520,7 @@ public class TrashOzoneFileSystem extends FileSystem {
       omRequest =
           OzoneManagerProtocolProtos.OMRequest.newBuilder()
               .setClientId(CLIENT_ID.toString())
+              .setVersion(ClientVersion.CURRENT_VERSION)
               .setUserInfo(getUserInfo())
               .setDeleteKeyRequest(deleteKeyRequest)
               .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKey)
@@ -577,6 +588,7 @@ public class TrashOzoneFileSystem extends FileSystem {
       try {
         omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setClientId(CLIENT_ID.toString())
+            .setVersion(ClientVersion.CURRENT_VERSION)
             .setUserInfo(getUserInfo())
             .setDeleteKeysRequest(deleteKeysRequest)
             .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKeys)

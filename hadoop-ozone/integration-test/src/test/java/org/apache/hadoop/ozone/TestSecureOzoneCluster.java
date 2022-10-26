@@ -34,9 +34,11 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
@@ -94,7 +96,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
@@ -172,7 +173,6 @@ public final class TestSecureOzoneCluster {
     try {
       conf = new OzoneConfiguration();
       conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
-      conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, false);
 
       conf.setInt(OZONE_SCM_CLIENT_PORT_KEY,
           getPort(OZONE_SCM_CLIENT_PORT_DEFAULT, 100));
@@ -186,7 +186,7 @@ public final class TestSecureOzoneCluster {
       conf.setInt(OZONE_SCM_RATIS_PORT_KEY, getPort(1200, 100));
       conf.setInt(OZONE_SCM_GRPC_PORT_KEY, getPort(1201, 100));
       conf.set(OZONE_OM_ADDRESS_KEY, "localhost:1202");
-
+      conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
 
       DefaultMetricsSystem.setMiniClusterMode(true);
       ExitUtils.disableSystemExit();
@@ -220,6 +220,7 @@ public final class TestSecureOzoneCluster {
     } catch (Exception e) {
       LOG.error("Failed to stop TestSecureOzoneCluster", e);
     }
+    DefaultConfigManager.clearDefaultConfigs();
   }
 
   private void createCredentialsInKDC() throws Exception {
@@ -390,7 +391,8 @@ public final class TestSecureOzoneCluster {
     scmStore.initialize();
     if (SCMHAUtils.isSCMHAEnabled(conf)) {
       SCMRatisServerImpl.initialize(clusterId, scmId,
-          SCMHANodeDetails.loadSCMHAConfig(conf).getLocalNodeDetails(), conf);
+          SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
+                  .getLocalNodeDetails(), conf);
     }
   }
 
@@ -620,7 +622,7 @@ public final class TestSecureOzoneCluster {
   }
 
   @Test
-  public void testGetS3SecretAndRevokeS3Secret() throws Exception {
+  public void testGetSetRevokeS3Secret() throws Exception {
 
     // Setup secure OM for start
     setupOm(conf);
@@ -651,6 +653,15 @@ public final class TestSecureOzoneCluster {
       // Revoke the existing secret
       omClient.revokeS3Secret(username);
 
+      // Set secret should fail since the accessId is revoked
+      final String secretKeySet = "somesecret1";
+      try {
+        omClient.setS3Secret(username, secretKeySet);
+      } catch (OMException omEx) {
+        assertEquals(OMException.ResultCodes.ACCESS_ID_NOT_FOUND,
+            omEx.getResult());
+      }
+
       // Get a new secret
       S3SecretValue attempt3 = omClient.getS3Secret(username);
 
@@ -659,6 +670,12 @@ public final class TestSecureOzoneCluster {
 
       // accessKey is still the same because it is derived from username
       assertEquals(attempt3.getAwsAccessKey(), attempt2.getAwsAccessKey());
+
+      // Admin can set secret for any user
+      omClient.setS3Secret(username, secretKeySet);
+      assertEquals(secretKeySet, omClient.getS3Secret(username).getAwsSecret());
+      // Clean up
+      omClient.revokeS3Secret(username);
 
       // Admin can get and revoke other users' secrets
       // omClient's ugi is current user, which is added as an OM admin

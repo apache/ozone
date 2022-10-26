@@ -129,5 +129,8 @@ public class TestOzoneFileSystemMissingParent {
     LambdaTestUtils.intercept(OMException.class,
         "Cannot create file : parent/file " + "as parent "
             + "directory doesn't exist", () -> stream.close());
+
+    // cleanup
+    fs.delete(renamedPath, true);
   }
 }

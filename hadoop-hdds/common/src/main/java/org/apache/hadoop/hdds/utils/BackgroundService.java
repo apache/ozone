@@ -77,6 +77,15 @@ public abstract class BackgroundService {
     return threadGroup.activeCount();
   }
 
+  @VisibleForTesting
+  public void runPeriodicalTaskNow() throws Exception {
+    BackgroundTaskQueue tasks = getTasks();
+    while (tasks.size() > 0) {
+      tasks.poll().call();
+    }
+  }
+
+
   // start service
   public void start() {
     exec.scheduleWithFixedDelay(service, 0, interval, unit);

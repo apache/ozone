@@ -41,6 +41,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -59,7 +60,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 
-import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
@@ -82,6 +82,7 @@ import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.ratis.util.StringUtils;
@@ -559,7 +560,7 @@ public final class OzoneManagerRatisServer {
   public void stop() {
     try {
       server.close();
-      omStateMachine.stop();
+      omStateMachine.close();
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -568,14 +569,12 @@ public final class OzoneManagerRatisServer {
   //TODO simplify it to make it shorter
   @SuppressWarnings("methodlength")
   private RaftProperties newRaftProperties(ConfigurationSource conf) {
-    final RaftProperties properties = new RaftProperties();
-
     // Set RPC type
     final String rpcType = conf.get(
         OMConfigKeys.OZONE_OM_RATIS_RPC_TYPE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_RPC_TYPE_DEFAULT);
     final RpcType rpc = SupportedRpcType.valueOfIgnoreCase(rpcType);
-    RaftConfigKeys.Rpc.setType(properties, rpc);
+    final RaftProperties properties = RatisHelper.newRaftProperties(rpc);
 
     // Set the ratis port number
     if (rpc == SupportedRpcType.GRPC) {
@@ -726,7 +725,20 @@ public final class OzoneManagerRatisServer {
 
   private static Map<String, String> getOMHAConfigs(
       ConfigurationSource configuration) {
-    return configuration.getPropsWithPrefix(OZONE_OM_HA_PREFIX + ".");
+    return configuration
+        .getPropsMatchPrefixAndTrimPrefix(OZONE_OM_HA_PREFIX + ".");
+  }
+
+  public RaftPeer getLeader() throws IOException {
+    RaftServer.Division division = server.getDivision(raftGroupId);
+    if (division.getInfo().isLeader()) {
+      return division.getPeer();
+    } else {
+      ByteString leaderId = division.getInfo().getRoleInfoProto()
+          .getFollowerInfo().getLeaderInfo().getId().getId();
+      return leaderId.isEmpty() ? null :
+          division.getRaftConf().getPeer(RaftPeerId.valueOf(leaderId));
+    }
   }
 
   /**
@@ -813,21 +825,16 @@ public final class OzoneManagerRatisServer {
 
   private static Parameters createServerTlsParameters(SecurityConfig conf,
       CertificateClient caClient) throws IOException {
-    Parameters parameters = new Parameters();
-
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
       List<X509Certificate> caList = HAUtils.buildCAX509List(caClient,
           conf.getConfiguration());
       GrpcTlsConfig config = new GrpcTlsConfig(
           caClient.getPrivateKey(), caClient.getCertificate(),
           caList, true);
-      GrpcConfigKeys.Server.setTlsConf(parameters, config);
-      GrpcConfigKeys.Admin.setTlsConf(parameters, config);
-      GrpcConfigKeys.Client.setTlsConf(parameters, config);
-      GrpcConfigKeys.TLS.setConf(parameters, config);
+      return RatisHelper.setServerTlsConf(config);
     }
 
-    return parameters;
+    return null;
   }
 
 }

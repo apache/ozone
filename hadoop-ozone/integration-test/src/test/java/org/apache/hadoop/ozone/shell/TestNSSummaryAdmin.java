@@ -110,7 +110,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     // Should throw warning - only buckets can have bucket layout.
     Assert.assertTrue(
         getOutContentString().contains(
-            "[Warning] Namespace CLI is only designed for FSO mode."));
+            "[Warning] Namespace CLI is not designed for OBS bucket layout."));
     Assert.assertTrue(getOutContentString()
         .contains("Put more files into it to visualize DU"));
     Assert.assertTrue(getOutContentString().contains(
@@ -128,7 +128,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     // Should not throw warning, since bucket is in FSO bucket layout.
     Assert.assertFalse(
         getOutContentString().contains(
-            "[Warning] Namespace CLI is only designed for FSO mode."));
+            "[Warning] Namespace CLI is not designed for OBS bucket layout."));
     Assert.assertTrue(getOutContentString()
         .contains("Put more files into it to visualize DU"));
     Assert.assertTrue(getOutContentString().contains(
@@ -146,7 +146,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     // Should throw warning, since bucket is in OBS bucket layout.
     Assert.assertTrue(
         getOutContentString().contains(
-            "[Warning] Namespace CLI is only designed for FSO mode."));
+            "[Warning] Namespace CLI is not designed for OBS bucket layout."));
     Assert.assertTrue(getOutContentString()
         .contains("Put more files into it to visualize DU"));
     Assert.assertTrue(getOutContentString().contains(

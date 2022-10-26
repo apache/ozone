@@ -23,6 +23,7 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -45,6 +46,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -108,7 +110,7 @@ public class TestParentAcl {
     writeClient = omTestManagers.getWriteClient();
     nativeAuthorizer = new OzoneNativeAuthorizer(volumeManager, bucketManager,
         keyManager, prefixManager,
-        Collections.singletonList("om"));
+        new OzoneAdmins(Collections.singletonList("om")));
     adminUgi = UserGroupInformation.createUserForTesting("om",
         new String[]{"ozone"});
     testUgi = UserGroupInformation.createUserForTesting("testuser",
@@ -129,6 +131,7 @@ public class TestParentAcl {
   // LIST        LIST         READ      (V1 LIST=>READ)
   // READ_ACL    READ_ACL     READ      (V1 READ_ACL=>READ)
   @Test
+  @Flaky("HDDS-6335")
   public void testKeyAcl()
       throws IOException {
     OzoneObj keyObj;

@@ -113,6 +113,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAU
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
+
+import org.apache.ratis.util.ExitUtils;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -168,6 +170,7 @@ public class TestKeyManagerImpl {
 
   @BeforeClass
   public static void setUp() throws Exception {
+    ExitUtils.disableSystemExit();
     conf = new OzoneConfiguration();
     dir = GenericTestUtils.getRandomizedTestDir();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
@@ -250,14 +253,15 @@ public class TestKeyManagerImpl {
 
   private static void mockContainerClient() {
     ScmClient scmClient = new ScmClient(scm.getBlockProtocolServer(),
-        mockScmContainerClient);
+        mockScmContainerClient, conf);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
         "scmClient", scmClient);
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmClient", scmClient);
   }
   private static void mockBlockClient() {
-    ScmClient scmClient = new ScmClient(mockScmBlockLocationProtocol, null);
+    ScmClient scmClient = new ScmClient(mockScmBlockLocationProtocol, null,
+        conf);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
         "scmClient", scmClient);
     HddsWhiteboxTestUtils.setInternalState(om,
@@ -1276,6 +1280,7 @@ public class TestKeyManagerImpl {
 
     StorageContainerLocationProtocol sclProtocolMock = mock(
         StorageContainerLocationProtocol.class);
+    OMPerformanceMetrics metrics = mock(OMPerformanceMetrics.class);
 
     List<Long> containerIDs = new ArrayList<>();
     containerIDs.add(100L);
@@ -1331,7 +1336,7 @@ public class TestKeyManagerImpl {
     omKeyInfo.appendNewBlocks(omKeyLocationInfoList, false);
 
     KeyManagerImpl keyManagerImpl =
-        new KeyManagerImpl(ozoneManager, scmClientMock, conf, "om1");
+        new KeyManagerImpl(ozoneManager, scmClientMock, conf, metrics);
 
     keyManagerImpl.refresh(omKeyInfo);
 
@@ -1354,6 +1359,7 @@ public class TestKeyManagerImpl {
 
     ScmClient scmClientMock = mock(ScmClient.class);
     when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);
+    OMPerformanceMetrics metrics = mock(OMPerformanceMetrics.class);
 
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo("v1",
         "b1", "k1", ReplicationType.RATIS,
@@ -1371,7 +1377,7 @@ public class TestKeyManagerImpl {
     omKeyInfo.appendNewBlocks(omKeyLocationInfoList, false);
 
     KeyManagerImpl keyManagerImpl =
-        new KeyManagerImpl(ozoneManager, scmClientMock, conf, "om1");
+        new KeyManagerImpl(ozoneManager, scmClientMock, conf, metrics);
 
     try {
       keyManagerImpl.refresh(omKeyInfo);

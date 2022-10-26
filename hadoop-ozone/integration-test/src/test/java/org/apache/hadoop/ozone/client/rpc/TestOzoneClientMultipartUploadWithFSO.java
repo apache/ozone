@@ -18,9 +18,11 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
@@ -620,8 +622,10 @@ public class TestOzoneClientMultipartUploadWithFSO {
     OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
         bucket.listParts(keyName, uploadID, 0, 3);
 
-    Assert.assertEquals(RATIS,
-        ozoneMultipartUploadPartListParts.getReplicationType());
+    Assert.assertEquals(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        ozoneMultipartUploadPartListParts.getReplicationConfig());
+
     Assert.assertEquals(3,
         ozoneMultipartUploadPartListParts.getPartInfoList().size());
 
@@ -722,8 +726,9 @@ public class TestOzoneClientMultipartUploadWithFSO {
     OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
         bucket.listParts(keyName, uploadID, 0, 2);
 
-    Assert.assertEquals(RATIS,
-        ozoneMultipartUploadPartListParts.getReplicationType());
+    Assert.assertEquals(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        ozoneMultipartUploadPartListParts.getReplicationConfig());
 
     Assert.assertEquals(2,
         ozoneMultipartUploadPartListParts.getPartInfoList().size());
@@ -821,8 +826,9 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
     Assert.assertEquals(0,
         ozoneMultipartUploadPartListParts.getPartInfoList().size());
-    Assert.assertEquals(RATIS,
-        ozoneMultipartUploadPartListParts.getReplicationType());
+    Assert.assertEquals(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        ozoneMultipartUploadPartListParts.getReplicationConfig());
 
     // As we don't have any parts with greater than partNumberMarker and list
     // is not truncated, so it should return false here.
@@ -972,11 +978,14 @@ public class TestOzoneClientMultipartUploadWithFSO {
       OMMetadataManager omMetadataManager) throws IOException {
 
     String fileName = OzoneFSUtils.getFileName(keyName);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
     long parentID = getParentID(volumeName, bucketName, keyName,
         omMetadataManager);
 
-    String multipartKey = omMetadataManager.getMultipartKey(parentID,
-        fileName, multipartUploadID);
+    String multipartKey = omMetadataManager.getMultipartKey(volumeId, bucketId,
+            parentID, fileName, multipartUploadID);
 
     return multipartKey;
   }
@@ -984,11 +993,10 @@ public class TestOzoneClientMultipartUploadWithFSO {
   private long getParentID(String volumeName, String bucketName,
       String keyName, OMMetadataManager omMetadataManager) throws IOException {
     Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-        omMetadataManager.getBucketTable().get(bucketKey);
-    long bucketId = omBucketInfo.getObjectID();
-    return OMFileRequest.getParentID(bucketId, pathComponents,
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return OMFileRequest.getParentID(volumeId, bucketId, pathComponents,
         keyName, omMetadataManager);
   }
 

@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager.MoveResult;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -40,9 +41,13 @@ public final class ContainerBalancerMetrics {
       " in the latest iteration.")
   private MutableCounterLong dataSizeMovedGBInLatestIteration;
 
-  @Metric(about = "Number of containers that Container Balancer moved" +
-      " in the latest iteration.")
-  private MutableCounterLong numMovedContainersInLatestIteration;
+  @Metric(about = "Number of completed container moves performed by " +
+      "Container Balancer in the latest iteration.")
+  private MutableCounterLong numContainerMovesCompletedInLatestIteration;
+
+  @Metric(about = "Number of timeout container moves performed by " +
+      "Container Balancer in the latest iteration.")
+  private MutableCounterLong numContainerMovesTimeoutInLatestIteration;
 
   @Metric(about = "Number of iterations that Container Balancer has run for.")
   private MutableCounterLong numIterations;
@@ -56,6 +61,26 @@ public final class ContainerBalancerMetrics {
 
   @Metric(about = "Number of unbalanced datanodes.")
   private MutableCounterLong numDatanodesUnbalanced;
+
+  @Metric(about = "Total number of completed container moves across all " +
+      "iterations of Container Balancer.")
+  private MutableCounterLong numContainerMovesCompleted;
+
+  @Metric(about = "Total number of timeout container moves across " +
+      "all iterations of Container Balancer.")
+  private MutableCounterLong numContainerMovesTimeout;
+
+  @Metric(about = "Total data size in GB moved across all iterations of " +
+      "Container Balancer.")
+  private MutableCounterLong dataSizeMovedGB;
+
+  @Metric(about = "Total number container for which moves failed " +
+      "exceptionally across all iterations of Container Balancer.")
+  private MutableCounterLong numContainerMovesFailed;
+
+  @Metric(about = "Total number container for which moves failed " +
+      "exceptionally in latest iteration of Container Balancer.")
+  private MutableCounterLong numContainerMovesFailedInLatestIteration;
 
   /**
    * Create and register metrics named {@link ContainerBalancerMetrics#NAME}
@@ -92,21 +117,77 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Gets the number of containers moved by Container Balancer in the latest
-   * iteration.
-   * @return number of containers
+   * Gets the number of container moves performed by Container Balancer in the
+   * latest iteration.
+   * @return number of container moves
    */
-  public long getNumMovedContainersInLatestIteration() {
-    return numMovedContainersInLatestIteration.value();
+  public long getNumContainerMovesCompletedInLatestIteration() {
+    return numContainerMovesCompletedInLatestIteration.value();
   }
 
-  public void incrementNumMovedContainersInLatestIteration(long valueToAdd) {
-    this.numMovedContainersInLatestIteration.incr(valueToAdd);
+  public void incrementNumContainerMovesCompletedInLatestIteration(
+      long valueToAdd) {
+    this.numContainerMovesCompletedInLatestIteration.incr(valueToAdd);
   }
 
-  public void resetNumMovedContainersInLatestIteration() {
-    numMovedContainersInLatestIteration.incr(
-        -getNumMovedContainersInLatestIteration());
+  public void incrementCurrentIterationContainerMoveMetric(
+      MoveResult result,
+      long valueToAdd) {
+    if (result == null) {
+      return;
+    }
+    switch (result) {
+    case COMPLETED:
+      this.numContainerMovesCompletedInLatestIteration.incr(valueToAdd);
+      break;
+    case REPLICATION_FAIL_TIME_OUT:
+    case DELETION_FAIL_TIME_OUT:
+      this.numContainerMovesTimeoutInLatestIteration.incr(valueToAdd);
+      break;
+    // TODO: Add metrics for other errors that need to be tracked.
+    case FAIL_NOT_RUNNING:
+    case REPLICATION_FAIL_INFLIGHT_REPLICATION:
+    case FAIL_NOT_LEADER:
+    case REPLICATION_FAIL_NOT_EXIST_IN_SOURCE:
+    case REPLICATION_FAIL_EXIST_IN_TARGET:
+    case REPLICATION_FAIL_CONTAINER_NOT_CLOSED:
+    case REPLICATION_FAIL_INFLIGHT_DELETION:
+    case REPLICATION_FAIL_NODE_NOT_IN_SERVICE:
+    case DELETION_FAIL_NODE_NOT_IN_SERVICE:
+    case REPLICATION_FAIL_NODE_UNHEALTHY:
+    case DELETION_FAIL_NODE_UNHEALTHY:
+    case DELETE_FAIL_POLICY:
+    case PLACEMENT_POLICY_NOT_SATISFIED:
+    case UNEXPECTED_REMOVE_SOURCE_AT_INFLIGHT_REPLICATION:
+    case UNEXPECTED_REMOVE_TARGET_AT_INFLIGHT_DELETION:
+    case FAIL_CAN_NOT_RECORD_TO_DB:
+    default:
+      break;
+    }
+  }
+
+  public void resetNumContainerMovesCompletedInLatestIteration() {
+    numContainerMovesCompletedInLatestIteration.incr(
+        -getNumContainerMovesCompletedInLatestIteration());
+  }
+
+  /**
+   * Gets the number of timeout container moves performed by
+   * Container Balancer in the latest iteration.
+   * @return number of timeout container moves
+   */
+  public long getNumContainerMovesTimeoutInLatestIteration() {
+    return numContainerMovesTimeoutInLatestIteration.value();
+  }
+
+  public void incrementNumContainerMovesTimeoutInLatestIteration(
+      long valueToAdd) {
+    this.numContainerMovesTimeoutInLatestIteration.incr(valueToAdd);
+  }
+
+  public void resetNumContainerMovesTimeoutInLatestIteration() {
+    numContainerMovesTimeoutInLatestIteration.incr(
+        -getNumContainerMovesTimeoutInLatestIteration());
   }
 
   /**
@@ -169,5 +250,50 @@ public final class ContainerBalancerMetrics {
 
   public void resetNumDatanodesUnbalanced() {
     numDatanodesUnbalanced.incr(-getNumDatanodesUnbalanced());
+  }
+
+  public long getNumContainerMovesCompleted() {
+    return numContainerMovesCompleted.value();
+  }
+
+  public void incrementNumContainerMovesCompleted(long valueToAdd) {
+    numContainerMovesCompleted.incr(valueToAdd);
+  }
+
+  public long getNumContainerMovesTimeout() {
+    return numContainerMovesTimeout.value();
+  }
+
+  public void incrementNumContainerMovesTimeout(long valueToAdd) {
+    numContainerMovesTimeout.incr(valueToAdd);
+  }
+
+  public long getDataSizeMovedGB() {
+    return dataSizeMovedGB.value();
+  }
+
+  public void incrementDataSizeMovedGB(long valueToAdd) {
+    dataSizeMovedGB.incr(valueToAdd);
+  }
+
+  public long getNumContainerMovesFailed() {
+    return numContainerMovesFailed.value();
+  }
+
+  public void incrementNumContainerMovesFailed(long valueToAdd) {
+    numContainerMovesFailed.incr(valueToAdd);
+  }
+
+  public long getNumContainerMovesFailedInLatestIteration() {
+    return numContainerMovesFailedInLatestIteration.value();
+  }
+
+  public void incrementNumContainerMovesFailedInLatestIteration(
+      long valueToAdd) {
+    numContainerMovesFailedInLatestIteration.incr(valueToAdd);
+  }
+  public void resetNumContainerMovesFailedInLatestIteration() {
+    numContainerMovesFailedInLatestIteration.incr(
+        -getNumContainerMovesFailedInLatestIteration());
   }
 }

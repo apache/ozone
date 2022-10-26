@@ -18,8 +18,9 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -69,8 +70,14 @@ public class TestOzoneManagerHAKeyDeletion extends TestOzoneManagerHA {
     // Check delete table is empty or not on all OMs.
     getCluster().getOzoneManagersList().forEach((om) -> {
       try {
-        GenericTestUtils.waitFor(() ->
-                !om.getMetadataManager().getDeletedTable().iterator().hasNext(),
+        GenericTestUtils.waitFor(() -> {
+          try {
+            return !om.getMetadataManager().getDeletedTable().iterator()
+                .hasNext();
+          } catch (Exception ex) {
+            return false;
+          }
+        },
             10000, 120000);
       } catch (Exception ex) {
         fail("TestOzoneManagerHAKeyDeletion failed");

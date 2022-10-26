@@ -23,6 +23,7 @@ Test Timeout        5 minutes
 
 *** Keywords ***
 Get and use Token in Secure Cluster
+    Run Keyword   Kinit test user     testuser     testuser.keytab
     Execute                      ozone sh token get -t /tmp/ozone.token
     File Should Not Be Empty     /tmp/ozone.token
     Execute                      kdestroy

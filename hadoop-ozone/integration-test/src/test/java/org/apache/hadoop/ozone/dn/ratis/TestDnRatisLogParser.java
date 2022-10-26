@@ -24,7 +24,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.segmentparser.DatanodeRatisLogParser;
@@ -57,7 +56,6 @@ public class TestDnRatisLogParser {
   @Before
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1).setTotalPipelineNumLimit(2).build();
     cluster.waitForClusterToBeReady();
@@ -77,7 +75,6 @@ public class TestDnRatisLogParser {
 
   @Test
   public void testRatisLogParsing() throws Exception {
-    cluster.stop();
     OzoneConfiguration conf = cluster.getHddsDatanodes().get(0).getConf();
     String path =
         conf.get(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);

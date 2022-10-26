@@ -22,5 +22,39 @@
         <td>Rpc port</td>
         <td>{{$ctrl.overview.jmx.RpcPort}}</td>
     </tr>
+    <tr>
+        <td>OM Roles (HA)	</td>
+        <td>{{$ctrl.overview.jmx.RatisRoles}}</td>
+    </tr>
+    <tr>
+        <td>Current-Role</td>
+        <td>{{$ctrl.role.Role}}</td>
+    </tr>
+    <tr>
+        <td>Group-Id</td>
+        <td>{{$ctrl.role.GroupId}}</td>
+    </tr>
+    <tr ng-hide="!$ctrl.electionCount.Count || $ctrl.electionCount.Count==-1">
+        <td>Election-Count</td>
+        <td>{{$ctrl.electionCount.Count}}</td>
+    </tr>
+    <tr ng-hide="!$ctrl.elapsedTime.Value || $ctrl.elapsedTime.Value==-1">
+        <td>Last Election Elapsed Time</td>
+        <td>{{$ctrl.elapsedTime.Value}}</td>
+    </tr>
+    </tbody>
+</table>
+
+<h2>Meta-Data Volume Information</h2>
+<table class="table table-bordered table-striped" class="col-md-6">
+    <tbody>
+    <tr>
+        <td>Ratis Log directory</td>
+        <td>{{$ctrl.overview.jmx.RatisLogDirectory}}</td>
+    </tr>
+    <tr>
+        <td>RocksDB Directory</td>
+        <td>{{$ctrl.overview.jmx.RocksDbDirectory}}</td>
+    </tr>
     </tbody>
 </table>

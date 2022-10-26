@@ -194,10 +194,11 @@ public final class HttpServer2 implements FilterContainer {
   static final String STATE_DESCRIPTION_NOT_LIVE = " - not live";
   private final SignerSecretProvider secretProvider;
   private XFrameOption xFrameOption;
+  private HttpServer2Metrics metrics;
   private boolean xFrameOptionIsEnabled;
-  public static final String HTTP_HEADER_PREFIX = "hadoop.http.header.";
+  public static final String HTTP_HEADER_PREFIX = "ozone.http.header.";
   private static final String HTTP_HEADER_REGEX =
-      "hadoop\\.http\\.header\\.([a-zA-Z\\-_]+)";
+      "ozone\\.http\\.header\\.([a-zA-Z\\-_]+)";
   static final String X_XSS_PROTECTION =
       "X-XSS-Protection:1; mode=block";
   static final String X_CONTENT_TYPE_OPTIONS =
@@ -604,6 +605,7 @@ public final class HttpServer2 implements FilterContainer {
       threadPool.setMaxThreads(maxThreads);
     }
 
+    metrics = HttpServer2Metrics.create(threadPool, name);
     SessionHandler handler = webAppContext.getSessionHandler();
     handler.setHttpOnly(true);
     handler.getSessionCookieConfig().setSecure(true);
@@ -621,9 +623,8 @@ public final class HttpServer2 implements FilterContainer {
     final String appDir = getWebAppsPath(name);
     addDefaultApps(contexts, appDir, conf);
     webServer.setHandler(handlers);
-
-    Map<String, String> xFrameParams = setHeaders(conf);
-    addGlobalFilter("safety", QuotingInputFilter.class.getName(), xFrameParams);
+    Map<String, String> config = generateFilterConfiguration(conf);
+    addGlobalFilter("safety", QuotingInputFilter.class.getName(), config);
     final FilterInitializer[] initializers = getFilterInitializers(conf);
     if (initializers != null) {
       conf.set(BIND_ADDRESS, hostName);
@@ -1366,6 +1367,7 @@ public final class HttpServer2 implements FilterContainer {
       // clear & stop webAppContext attributes to avoid memory leaks.
       webAppContext.clearAttributes();
       webAppContext.stop();
+      metrics.unRegister();
     } catch (Exception e) {
       LOG.error("Error while stopping web app context for webapp "
           + webAppContext.getDisplayName(), e);
@@ -1515,6 +1517,7 @@ public final class HttpServer2 implements FilterContainer {
         UserGroupInformation.createRemoteUser(remoteUser);
     return adminsAcl != null && adminsAcl.isUserAllowed(remoteUserUGI);
   }
+
 
   /**
    * A very simple servlet to serve up a text representation of the current
@@ -1674,7 +1677,7 @@ public final class HttpServer2 implements FilterContainer {
       } else if (mime.startsWith("application/xml")) {
         httpResponse.setContentType("text/xml; charset=utf-8");
       }
-      headerMap.forEach((k, v) -> httpResponse.addHeader(k, v));
+      headerMap.forEach((k, v) -> httpResponse.setHeader(k, v));
       chain.doFilter(quoted, httpResponse);
     }
 
@@ -1742,15 +1745,23 @@ public final class HttpServer2 implements FilterContainer {
     }
   }
 
-  private Map<String, String> setHeaders(ConfigurationSource conf) {
-    Map<String, String> xFrameParams = new HashMap<>();
-
-    xFrameParams.putAll(getDefaultHeaders());
+  /**
+   * Generate the configuration for the Quoting filter used.
+   * @param conf global configuration
+   * @return relevant configuration
+   */
+  private Map<String, String> generateFilterConfiguration(
+      ConfigurationSource conf) {
+    Map<String, String> config = new HashMap<>();
+    // Add headers to the configuration.
+    config.putAll(getDefaultHeaders());
     if (this.xFrameOptionIsEnabled) {
-      xFrameParams.put(HTTP_HEADER_PREFIX + X_FRAME_OPTIONS,
+      config.put(HTTP_HEADER_PREFIX + X_FRAME_OPTIONS,
           this.xFrameOption.toString());
     }
-    return xFrameParams;
+    // Config overrides default
+    config.putAll(conf.getPropsMatchPrefix(HTTP_HEADER_PREFIX));
+    return config;
   }
 
   private Map<String, String> getDefaultHeaders() {

@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
@@ -228,6 +229,26 @@ public final class HddsUtils {
   }
 
   /**
+   * Retrieve a number, trying the supplied config keys in order.
+   * Each config value may be absent
+   *
+   * @param conf Conf
+   * @param keys a list of configuration key names.
+   *
+   * @return first number found from the given keys, or absent.
+   */
+  public static OptionalInt getNumberFromConfigKeys(
+      ConfigurationSource conf, String... keys) {
+    for (final String key : keys) {
+      final String value = conf.getTrimmed(key);
+      if (value != null) {
+        return OptionalInt.of(Integer.parseInt(value));
+      }
+    }
+    return OptionalInt.empty();
+  }
+
+  /**
    * Retrieve the port number, trying the supplied config keys in order.
    * Each config value may be absent, or if present in the format
    * host:port (the :port part is optional).
@@ -397,6 +418,16 @@ public final class HddsUtils {
   }
 
   /**
+   * Returns true if the container is in open to write state
+   * (OPEN or RECOVERING).
+   *
+   * @param state - container state
+   */
+  public static boolean isOpenToWriteState(State state) {
+    return state == State.OPEN || state == State.RECOVERING;
+  }
+
+  /**
    * Not all datanode container cmd protocol has embedded ozone block token.
    * Block token are issued by Ozone Manager and return to Ozone client to
    * read/write data on datanode via input/output stream.
@@ -433,6 +464,7 @@ public final class HddsUtils {
     case DeleteContainer:
     case ReadContainer:
     case UpdateContainer:
+    case ListBlock:
       return true;
     default:
       return false;

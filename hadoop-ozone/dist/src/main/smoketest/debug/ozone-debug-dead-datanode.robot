@@ -14,31 +14,28 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test read-replicas in case of one datanode is unavailable
+Documentation       Test read-replicas in case of one datanode is dead
 Library             OperatingSystem
 Resource            ../lib/os.robot
 Resource            ozone-debug.robot
 Test Timeout        5 minute
 *** Variables ***
-${VOLUME}           cli-debug-volume
+${PREFIX}           ${EMPTY}
+${VOLUME}           cli-debug-volume${PREFIX}
 ${BUCKET}           cli-debug-bucket
 ${TESTFILE}         testfile
 
 *** Test Cases ***
 Test ozone debug read-replicas with one datanode DEAD
-    ${directory} =                      Execute read-replicas CLI tool
-    ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     5
-    ${dn1_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_1.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_1.ozone_default | md5sum | awk '{print $1}'
-    ${dn3_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_3.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_3.ozone_default | md5sum | awk '{print $1}'
-    ${testfile_md5sum} =                Execute     md5sum testfile | awk '{print $1}'
-    Should Be Equal                     ${dn1_md5sum}   ${testfile_md5sum}
-    Should Be Equal                     ${dn3_md5sum}   ${testfile_md5sum}
-    ${manifest} =                       Get File        ${directory}/${TESTFILE}_manifest
-    ${json} =                           Evaluate        json.loads('''${manifest}''')        json
-    Compare JSON                        ${json}
-    ${datanodes_expected} =             Create List  ozone_datanode_1.ozone_default  ozone_datanode_3.ozone_default
-    ${datanodes_b1} =                   Create List   ${json}[blocks][0][replicas][0][hostname]    ${json}[blocks][0][replicas][1][hostname]
-    Check for datanodes                 ${datanodes_b1}    ${datanodes_expected}
-    ${datanodes_b2} =                   Create List   ${json}[blocks][1][replicas][0][hostname]    ${json}[blocks][1][replicas][1][hostname]
-    Check for datanodes                 ${datanodes_b2}    ${datanodes_expected}
+    ${directory} =                 Execute read-replicas CLI tool
+    Set Test Variable    ${DIR}         ${directory}
+
+    ${count_files} =               Count Files In Directory    ${directory}
+    Should Be Equal As Integers    ${count_files}     5
+
+    ${json} =                      Read Replicas Manifest
+    ${md5sum} =                    Execute     md5sum testfile | awk '{print $1}'
+
+    FOR    ${replica}    IN RANGE    2
+        Verify Healthy Replica   ${json}    ${replica}    ${md5sum}
+    END

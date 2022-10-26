@@ -32,8 +32,6 @@ import com.google.common.base.Supplier;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.log4j.Appender;
 import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
@@ -137,6 +135,7 @@ public abstract class GenericTestUtils {
    *
    * @return a string to use in paths
    */
+  @SuppressWarnings("java:S2245") // no need for secure random
   public static String getRandomizedTempPath() {
     return getTempPath(RandomStringUtils.randomAlphanumeric(10));
   }
@@ -251,11 +250,6 @@ public abstract class GenericTestUtils {
     private WriterAppender appender;
     private Logger logger;
 
-    public static LogCapturer captureLogs(Log l) {
-      Logger logger = ((Log4JLogger) l).getLogger();
-      return new LogCapturer(logger, getDefaultLayout());
-    }
-
     public static LogCapturer captureLogs(org.slf4j.Logger logger) {
       return new LogCapturer(toLog4j(logger), getDefaultLayout());
     }
@@ -340,6 +334,48 @@ public abstract class GenericTestUtils {
     public void close() throws Exception {
       IOUtils.closeQuietly(bytesPrintStream);
       System.setErr(oldErr);
+    }
+  }
+
+  /**
+   * Capture output printed to {@link System#out}.
+   * <p>
+   * Usage:
+   * <pre>
+   *   try (SystemOutCapturer capture = new SystemOutCapturer()) {
+   *     ...
+   *     // Call capture.getOutput() to get the output string
+   *   }
+   * </pre>
+   * <p>
+   * TODO: Add lambda support once Java 8 is common.
+   * <pre>
+   *   SystemOutCapturer.withCapture(capture -> {
+   *     ...
+   *   })
+   * </pre>
+   */
+  public static class SystemOutCapturer implements AutoCloseable {
+    private final ByteArrayOutputStream bytes;
+    private final PrintStream bytesPrintStream;
+    private final PrintStream oldOut;
+
+    public SystemOutCapturer() throws
+        UnsupportedEncodingException {
+      bytes = new ByteArrayOutputStream();
+      bytesPrintStream = new PrintStream(bytes, false, UTF_8.name());
+      oldOut = System.out;
+      System.setOut(new TeePrintStream(oldOut, bytesPrintStream));
+    }
+
+    public String getOutput() throws UnsupportedEncodingException {
+      return bytes.toString(UTF_8.name());
+    }
+
+    @Override
+    public void close() throws Exception {
+      IOUtils.closeQuietly(bytesPrintStream);
+      System.setOut(oldOut);
     }
   }
 

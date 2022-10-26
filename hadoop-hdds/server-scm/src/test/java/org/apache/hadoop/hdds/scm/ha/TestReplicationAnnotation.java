@@ -26,9 +26,9 @@ import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
@@ -44,7 +44,7 @@ public class TestReplicationAnnotation {
   private SCMHAInvocationHandler scmhaInvocationHandler;
   private SCMRatisServer scmRatisServer;
 
-  @Before
+  @BeforeEach
   public void setup() {
     scmRatisServer = new SCMRatisServer() {
       @Override
@@ -64,6 +64,11 @@ public class TestReplicationAnnotation {
 
       @Override
       public void stop() throws IOException {
+      }
+
+      @Override
+      public boolean isStopped() {
+        return false;
       }
 
       @Override
@@ -113,10 +118,10 @@ public class TestReplicationAnnotation {
 
     try {
       proxy.addContainer(HddsProtos.ContainerInfoProto.getDefaultInstance());
-      Assert.fail("Cannot reach here: should have seen a IOException");
+      Assertions.fail("Cannot reach here: should have seen a IOException");
     } catch (IOException ignore) {
-      Assert.assertNotNull(ignore.getMessage() != null);
-      Assert.assertEquals("submitRequest is called.",
+      Assertions.assertNotNull(ignore.getMessage() != null);
+      Assertions.assertEquals("submitRequest is called.",
           ignore.getMessage());
     }
 
@@ -134,10 +139,10 @@ public class TestReplicationAnnotation {
       certificateStore.storeValidCertificate(BigInteger.valueOf(100L),
           KeyStoreTestUtil.generateCertificate("CN=Test", keyPair, 30,
           "SHA256withRSA"), HddsProtos.NodeType.DATANODE);
-      Assert.fail("Cannot reach here: should have seen a IOException");
+      Assertions.fail("Cannot reach here: should have seen a IOException");
     } catch (IOException ignore) {
-      Assert.assertNotNull(ignore.getMessage() != null);
-      Assert.assertEquals("submitRequest is called.",
+      Assertions.assertNotNull(ignore.getMessage() != null);
+      Assertions.assertEquals("submitRequest is called.",
           ignore.getMessage());
     }
 

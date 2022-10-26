@@ -42,14 +42,14 @@ hadoop.security.key.provider.path  | KMS uri. <br> 比如 kms://http@kms-host:96
    * 使用 hadoop key 命令创建桶加密密钥，和 HDFS 加密区域的使用方法类似。
 
   ```bash
-  hadoop key create encKey
+  hadoop key create enckey
   ```
   上面这个命令会创建一个用于保护桶数据的密钥。创建完成之后，你可以告诉 Ozone 在读写某个桶中的数据时使用这个密钥。
 
    * 将加密密钥分配给桶
 
   ```bash
-  ozone sh bucket create -k encKey /vol/encryptedbucket
+  ozone sh bucket create -k enckey /vol/encryptedbucket
   ```
 
-这条命令执行后，所以写往 _encryptedbucket_ 的数据都会用 encKey 进行加密，当读取里面的数据时，客户端通过 KMS 获取密钥进行解密。换句话说，Ozone 中存储的数据一直是加密的，但用户和客户端对此完全无感知。
+这条命令执行后，所以写往 _encryptedbucket_ 的数据都会用 enckey 进行加密，当读取里面的数据时，客户端通过 KMS 获取密钥进行解密。换句话说，Ozone 中存储的数据一直是加密的，但用户和客户端对此完全无感知。

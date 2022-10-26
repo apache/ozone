@@ -60,6 +60,7 @@ import static org.apache.commons.lang3.RandomStringUtils.randomAscii;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@SuppressWarnings("java:S2245") // no need for secure random
 public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
     Callable<Void> {
 
