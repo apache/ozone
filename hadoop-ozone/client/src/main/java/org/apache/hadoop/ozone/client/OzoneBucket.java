@@ -1331,7 +1331,7 @@ public class OzoneBucket extends WithMetadata {
           // as CommonPrefix. So we do not need to fetch recursively.
           if (StringUtils.isNotBlank(getDelimiter()) &&
               OZONE_URI_DELIMITER.equals(getDelimiter())) {
-            return false;
+            continue;
           }
           // Adding in-progress keyPath back to the stack to make sure
           // all the siblings will be fetched.
