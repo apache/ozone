@@ -63,9 +63,18 @@ public class TestEmptyContainerHandler {
         HddsProtos.ReplicationFactor.THREE);
     replicationManager = Mockito.mock(ReplicationManager.class);
     containerManager = Mockito.mock(ContainerManager.class);
+    
+    Mockito.doAnswer(invocation -> {
+      containerManager.updateContainerState(
+          ((ContainerID)invocation.getArguments()[0]),
+          (HddsProtos.LifeCycleEvent) invocation.getArguments()[1]);
+      return null;
+    }).when(replicationManager).updateContainerState(
+        Mockito.any(ContainerID.class),
+        Mockito.any(HddsProtos.LifeCycleEvent.class));
 
     emptyContainerHandler =
-        new EmptyContainerHandler(replicationManager, containerManager);
+        new EmptyContainerHandler(replicationManager);
   }
 
   /**

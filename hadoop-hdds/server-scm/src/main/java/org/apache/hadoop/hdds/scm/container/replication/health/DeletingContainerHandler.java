@@ -22,18 +22,14 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.Set;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 /**
@@ -42,15 +38,12 @@ import java.util.stream.Collectors;
  */
 public class DeletingContainerHandler extends AbstractCheck {
   private final ReplicationManager replicationManager;
-  private final ContainerManager containerManager;
 
   public static final Logger LOG =
       LoggerFactory.getLogger(DeletingContainerHandler.class);
 
-  public DeletingContainerHandler(ReplicationManager replicationManager,
-                                  ContainerManager containerManager) {
+  public DeletingContainerHandler(ReplicationManager replicationManager) {
     this.replicationManager = replicationManager;
-    this.containerManager = containerManager;
   }
 
   /**
@@ -75,15 +68,8 @@ public class DeletingContainerHandler extends AbstractCheck {
     }
 
     if (request.getContainerReplicas().size() == 0) {
-      try {
-        containerManager.updateContainerState(
-            cID, HddsProtos.LifeCycleEvent.CLEANUP);
-        LOG.debug("Container {} state changes to DELETED", cID);
-      } catch (IOException | InvalidStateTransitionException |
-               TimeoutException e) {
-        LOG.error("Failed to cleanup empty container {}",
-            request.getContainerInfo(), e);
-      }
+      replicationManager.updateContainerState(
+          cID, HddsProtos.LifeCycleEvent.CLEANUP);
       return true;
     }
 

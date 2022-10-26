@@ -110,8 +110,18 @@ public class TestDeletingContainerHandler {
     containerManager = new ContainerManagerImpl(conf,
         scmhaManager, sequenceIdGen, pipelineManager,
         SCMDBDefinition.CONTAINERS.getTable(dbStore), pendingOpsMock);
+
+    Mockito.doAnswer(invocation -> {
+      containerManager.updateContainerState(
+          ((ContainerID)invocation.getArguments()[0]),
+          (HddsProtos.LifeCycleEvent) invocation.getArguments()[1]);
+      return null;
+    }).when(replicationManager).updateContainerState(
+        Mockito.any(ContainerID.class),
+        Mockito.any(HddsProtos.LifeCycleEvent.class));
+
     deletingContainerHandler =
-        new DeletingContainerHandler(replicationManager, containerManager);
+        new DeletingContainerHandler(replicationManager);
   }
 
   @AfterEach
