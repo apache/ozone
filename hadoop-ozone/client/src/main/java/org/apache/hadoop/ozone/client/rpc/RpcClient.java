@@ -1865,11 +1865,13 @@ public class RpcClient implements ClientProtocol {
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
 
       List<OzoneCryptoInputStream> cryptoInputStreams = new ArrayList<>();
-      for (LengthInputStream lengthInputStream : lengthInputStreams) {
+      for (int i = 0; i < lengthInputStreams.size(); i++) {
+        LengthInputStream lengthInputStream = lengthInputStreams.get(i);
         final OzoneCryptoInputStream ozoneCryptoInputStream =
             new OzoneCryptoInputStream(lengthInputStream,
                 OzoneKMSUtil.getCryptoCodec(conf, feInfo),
-                decrypted.getMaterial(), feInfo.getIV());
+                decrypted.getMaterial(), feInfo.getIV(),
+                keyInfo.getKeyName(), i);
         cryptoInputStreams.add(ozoneCryptoInputStream);
       }
       return new MultipartCryptoKeyInputStream(keyInfo.getKeyName(),
