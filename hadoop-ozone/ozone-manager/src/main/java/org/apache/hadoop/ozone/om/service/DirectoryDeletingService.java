@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -42,7 +42,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -192,16 +191,15 @@ public class DirectoryDeletingService extends BackgroundService {
           // limit. If count reached limit then there can be some more child
           // paths to be visited and will keep the parent deleted directory
           // for one more pass.
-            final Optional<String> purgeDeletedDir = remainNum > 0 ?
-                Optional.of(pendingDeletedDirInfo.getKey()) :
-                Optional.empty();
+            String purgeDeletedDir = remainNum > 0 ?
+                pendingDeletedDirInfo.getKey() : null;
 
             PurgePathRequest request = wrapPurgeRequest(volumeId, bucketId,
                 purgeDeletedDir, subFiles, subDirs);
             purgePathRequestList.add(request);
 
             // Count up the purgeDeletedDir, subDirs and subFiles
-            if (purgeDeletedDir.isPresent()) {
+            if (purgeDeletedDir != null) {
               dirNum++;
             }
             subDirNum += subDirs.size();
@@ -302,14 +300,18 @@ public class DirectoryDeletingService extends BackgroundService {
 
   private PurgePathRequest wrapPurgeRequest(final long volumeId,
       final long bucketId,
-      final Optional<String> purgeDeletedDir,
+      final String purgeDeletedDir,
       final List<OmKeyInfo> purgeDeletedFiles,
       final List<OmKeyInfo> markDirsAsDeleted) {
     // Put all keys to be purged in a list
     PurgePathRequest.Builder purgePathsRequest = PurgePathRequest.newBuilder();
     purgePathsRequest.setVolumeId(volumeId);
     purgePathsRequest.setBucketId(bucketId);
-    purgeDeletedDir.ifPresent(purgePathsRequest::setDeletedDir);
+
+    if (purgeDeletedDir != null) {
+      purgePathsRequest.setDeletedDir(purgeDeletedDir);
+    }
+
     for (OmKeyInfo purgeFile : purgeDeletedFiles) {
       purgePathsRequest.addDeletedSubFiles(
           purgeFile.getProtobuf(true, ClientVersion.CURRENT_VERSION));
