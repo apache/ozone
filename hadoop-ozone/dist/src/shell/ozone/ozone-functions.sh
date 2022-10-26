@@ -65,12 +65,14 @@ function ozone_validate_classpath
   [[ "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" == true && "${OZONE_DAEMON_MODE}" =~ ^st(art|op|atus)$ ]] &&
   OZONE_OPTION_DAEMON=true || OZONE_OPTION_DAEMON=false
 
-  if [[ "${OZONE_VALIDATE_CLASSPATH}" == true && ( ( "${OZONE_VALIDATE_FAIL_ON_MISSING_JARS}" == true &&
-        ( "${OZONE_OPTION_DAEMON}" == true || "${OZONE_SUBCMD}" == classpath ) ) ||
-        ( "${OZONE_VALIDATE_FAIL_ON_MISSING_JARS}" == false && "${OZONE_OPTION_DAEMON}" == true ) ) ]]; then
-    ozone_validate_classpath_util
-  else
-    ozone_validate_classpath_usage
+  if [[ "${OZONE_VALIDATE_CLASSPATH}" == true ]]; then
+    if [[ ( "${OZONE_VALIDATE_FAIL_ON_MISSING_JARS}" == true && ( "${OZONE_OPTION_DAEMON}" == true ||
+          "${OZONE_SUBCMD}" == classpath ) ) || ( "${OZONE_VALIDATE_FAIL_ON_MISSING_JARS}" == false &&
+          "${OZONE_OPTION_DAEMON}" == true ) ]]; then
+      ozone_validate_classpath_util
+    else
+      ozone_validate_classpath_usage
+    fi
   fi
 }
 
