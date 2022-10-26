@@ -1224,7 +1224,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>com.fasterxml.woodstox</groupId>
         <artifactId>woodstox-core</artifactId>
-        <version>5.0.3</version>
+        <version>5.4.0</version>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.jackson</groupId>
