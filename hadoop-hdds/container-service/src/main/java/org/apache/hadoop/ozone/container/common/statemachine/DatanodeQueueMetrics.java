@@ -172,7 +172,7 @@ public final class DatanodeQueueMetrics implements MetricsSource {
   }
 
   private MetricsInfo getMetricsInfo(String prefix, String metricName) {
-    String metric = prefix + WordUtils.capitalize(metricName);
+    String metric = prefix + WordUtils.capitalize(metricName) + "Size";
     String description = "Queue size of " + metricName + " from " + prefix;
     return info(metric, description);
   }
