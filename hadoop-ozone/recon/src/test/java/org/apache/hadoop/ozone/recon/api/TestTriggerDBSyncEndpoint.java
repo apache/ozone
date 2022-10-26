@@ -83,13 +83,15 @@ public class TestTriggerDBSyncEndpoint {
         temporaryFolder.newFolder().getAbsolutePath());
     configuration.set(OZONE_OM_ADDRESS_KEY, "localhost:9862");
 
-    OzoneManagerProtocol ozoneManagerProtocol = mock(OzoneManagerProtocol.class);
+    OzoneManagerProtocol ozoneManagerProtocol
+        = mock(OzoneManagerProtocol.class);
     when(ozoneManagerProtocol.getDBUpdates(any(OzoneManagerProtocolProtos
         .DBUpdatesRequest.class))).thenReturn(new DBUpdates());
 
     OMMetadataManager omMetadataManager =
         initializeNewOmMetadataManager(temporaryFolder.newFolder());
-    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
+    ReconOMMetadataManager reconOMMetadataManager
+        = getTestReconOmMetadataManager(omMetadataManager,
         temporaryFolder.newFolder());
 
     ReconUtils reconUtilsMock = mock(ReconUtils.class);

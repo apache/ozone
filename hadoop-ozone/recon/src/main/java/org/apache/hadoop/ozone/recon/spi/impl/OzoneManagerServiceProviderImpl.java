@@ -31,7 +31,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
@@ -82,7 +81,6 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT;
 import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
 
-import org.checkerframework.checker.units.qual.A;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.rocksdb.RocksDBException;
@@ -524,7 +522,8 @@ public class OzoneManagerServiceProviderImpl
               ReconTaskStatus reconTaskStatusRecord =
                   new ReconTaskStatus(
                       OmSnapshotTaskName.OmSnapshotRequest.name(),
-                      System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
+                      System.currentTimeMillis(),
+                      getCurrentOMDBSequenceNumber());
               reconTaskStatusDao.update(reconTaskStatusRecord);
 
               // Reinitialize tasks that are listening.
