@@ -320,7 +320,7 @@ public class DatanodeInfo extends DatanodeDetails {
         // there is a command queued for. The DNs should return a count for all
         // command types even if they have a zero count, so this is really to
         // handle something being wrong on the DN where it sends a spare report.
-        // It really should never happe.
+        // It really should never happen.
         mutableCmds.remove(command);
         commandCounts.put(command, cmdCount);
       }
