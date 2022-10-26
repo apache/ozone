@@ -64,8 +64,13 @@ public class DeletingContainerHandler extends AbstractCheck {
   public boolean handle(ContainerCheckRequest request) {
     ContainerInfo containerInfo = request.getContainerInfo();
     ContainerID cID = containerInfo.containerID();
+    HddsProtos.LifeCycleState containerState = containerInfo.getState();
 
-    if (containerInfo.getState() != HddsProtos.LifeCycleState.DELETING) {
+    if (containerState == HddsProtos.LifeCycleState.DELETED) {
+      return true;
+    }
+
+    if (containerState != HddsProtos.LifeCycleState.DELETING) {
       return false;
     }
 
