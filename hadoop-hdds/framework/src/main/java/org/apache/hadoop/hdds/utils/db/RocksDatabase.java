@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import com.google.common.annotations.VisibleForTesting;
-import javafx.util.Pair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;

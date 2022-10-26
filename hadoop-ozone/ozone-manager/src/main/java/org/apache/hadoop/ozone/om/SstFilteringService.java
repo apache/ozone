@@ -18,7 +18,8 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import javafx.util.Pair;
+
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
@@ -180,11 +181,11 @@ public class SstFilteringService extends BackgroundService {
 
       List<Pair<String, String>> prefixPairs = new ArrayList<>();
       prefixPairs
-          .add(new Pair<>(OmMetadataManagerImpl.KEY_TABLE, filterPrefix));
+          .add(Pair.of(OmMetadataManagerImpl.KEY_TABLE, filterPrefix));
       prefixPairs.add(
-          new Pair<>(OmMetadataManagerImpl.DIRECTORY_TABLE, filterPrefixFSO));
+          Pair.of(OmMetadataManagerImpl.DIRECTORY_TABLE, filterPrefixFSO));
       prefixPairs
-          .add(new Pair<>(OmMetadataManagerImpl.FILE_TABLE, filterPrefixFSO));
+          .add(Pair.of(OmMetadataManagerImpl.FILE_TABLE, filterPrefixFSO));
       return prefixPairs;
     }
   }
