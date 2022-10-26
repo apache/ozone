@@ -18,46 +18,26 @@
 
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
-import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
-import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
-import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Assert;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -65,76 +45,34 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETING;
 
 /**
  * Tests for {@link DeletingContainerHandler}.
  */
 public class TestDeletingContainerHandler {
   private ReplicationManager replicationManager;
-  private File testDir;
-  private ContainerManager containerManager;
   private DeletingContainerHandler deletingContainerHandler;
   private ECReplicationConfig ecReplicationConfig;
   private RatisReplicationConfig ratisReplicationConfig;
-  private ContainerReplicaPendingOps pendingOpsMock;
-  private SequenceIdGenerator sequenceIdGen;
-  private SCMHAManager scmhaManager;
-  private NodeManager nodeManager;
-  private PipelineManager pipelineManager;
-  private DBStore dbStore;
+
 
   @BeforeEach
   public void setup() throws IOException {
-    final OzoneConfiguration conf = SCMTestUtils.getConf();
-    testDir = GenericTestUtils.getTestDir(
-        TestDeletingContainerHandler.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    dbStore = DBStoreBuilder.createDBStore(
-        conf, new SCMDBDefinition());
+
     ecReplicationConfig = new ECReplicationConfig(3, 2);
     ratisReplicationConfig = RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE);
-    scmhaManager = SCMHAManagerStub.getInstance(true);
     replicationManager = Mockito.mock(ReplicationManager.class);
-    pendingOpsMock = Mockito.mock(ContainerReplicaPendingOps.class);
-    nodeManager = new MockNodeManager(true, 10);
-    sequenceIdGen = new SequenceIdGenerator(
-        conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
-    pipelineManager =
-        new MockPipelineManager(dbStore, scmhaManager, nodeManager);
-    containerManager = new ContainerManagerImpl(conf,
-        scmhaManager, sequenceIdGen, pipelineManager,
-        SCMDBDefinition.CONTAINERS.getTable(dbStore), pendingOpsMock);
 
-    Mockito.doAnswer(invocation -> {
-      containerManager.updateContainerState(
-          ((ContainerID)invocation.getArguments()[0]),
-          (HddsProtos.LifeCycleEvent) invocation.getArguments()[1]);
-      return null;
-    }).when(replicationManager).updateContainerState(
-        Mockito.any(ContainerID.class),
-        Mockito.any(HddsProtos.LifeCycleEvent.class));
+    Mockito.doNothing().when(replicationManager)
+        .updateContainerState(Mockito.any(ContainerID.class),
+            Mockito.any(HddsProtos.LifeCycleEvent.class));
 
     deletingContainerHandler =
         new DeletingContainerHandler(replicationManager);
-  }
-
-  @AfterEach
-  public void cleanup() throws Exception {
-    if (containerManager != null) {
-      containerManager.close();
-    }
-
-    if (dbStore != null) {
-      dbStore.close();
-    }
-
-    FileUtil.fullyDelete(testDir);
   }
 
   /**
@@ -183,29 +121,20 @@ public class TestDeletingContainerHandler {
    * change the state of the container to DELETED.
    */
   @Test
-  public void testCleanupIfNoReplicaExist()
-      throws IOException, TimeoutException, InvalidStateTransitionException {
+  public void testCleanupIfNoReplicaExist() {
     //ratis container
     cleanupIfNoReplicaExist(RatisReplicationConfig.getInstance(
-        HddsProtos.ReplicationFactor.THREE));
+        HddsProtos.ReplicationFactor.THREE), 1);
 
     //ec container
-    cleanupIfNoReplicaExist(ecReplicationConfig);
+    cleanupIfNoReplicaExist(ecReplicationConfig, 2);
   }
 
 
-  private void cleanupIfNoReplicaExist(ReplicationConfig replicationConfig)
-      throws IOException, TimeoutException, InvalidStateTransitionException {
-    ContainerInfo containerInfo = containerManager.allocateContainer(
-        replicationConfig, "admin");
-    ContainerID cID = containerInfo.containerID();
-
-    //change the state of the container to Deleting
-    containerManager.updateContainerState(cID,
-        HddsProtos.LifeCycleEvent.FINALIZE);
-    containerManager.updateContainerState(cID, HddsProtos.LifeCycleEvent.CLOSE);
-    containerManager.updateContainerState(cID,
-        HddsProtos.LifeCycleEvent.DELETE);
+  private void cleanupIfNoReplicaExist(
+      ReplicationConfig replicationConfig, int times) {
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        replicationConfig, 1, DELETING);
 
     Set<ContainerReplica> containerReplicas = new HashSet<>();
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
@@ -216,7 +145,9 @@ public class TestDeletingContainerHandler {
         .build();
 
     Assert.assertTrue(deletingContainerHandler.handle(request));
-    Assert.assertTrue(containerInfo.getState() == DELETED);
+    Mockito.verify(replicationManager, Mockito.times(times))
+        .updateContainerState(Mockito.any(ContainerID.class),
+            Mockito.any(HddsProtos.LifeCycleEvent.class));
   }
 
   /**
@@ -224,15 +155,13 @@ public class TestDeletingContainerHandler {
    * for each replica there is a pending delete, then do nothing.
    */
   @Test
-  public void testNoNeedResendDeleteCommand()
-      throws IOException, TimeoutException, InvalidStateTransitionException {
+  public void testNoNeedResendDeleteCommand() throws NotLeaderException {
     //ratis container
-    ContainerInfo containerInfo = containerManager.allocateContainer(
-        RatisReplicationConfig.getInstance(
-            HddsProtos.ReplicationFactor.THREE), "admin");
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, DELETING);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.CLOSING, 0, 0, 0);
+            ContainerReplicaProto.State.CLOSED, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     containerReplicas.forEach(r -> pendingOps.add(
         ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
@@ -240,11 +169,11 @@ public class TestDeletingContainerHandler {
     resendDeleteCommand(containerInfo, containerReplicas, pendingOps, 0);
 
     //EC container
-    containerInfo = containerManager.allocateContainer(
-        ecReplicationConfig, "admin");
+    containerInfo = ReplicationTestUtil.createContainerInfo(
+        ecReplicationConfig, 1, DELETING);
     containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.CLOSING, 1, 2, 3, 4, 5);
+            ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
     pendingOps.clear();
     containerReplicas.forEach(r -> pendingOps.add(
         ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
@@ -259,15 +188,13 @@ public class TestDeletingContainerHandler {
    * command.
    */
   @Test
-  public void testResendDeleteCommand()
-      throws IOException, TimeoutException, InvalidStateTransitionException {
+  public void testResendDeleteCommand() throws NotLeaderException {
     //ratis container
-    ContainerInfo containerInfo = containerManager.allocateContainer(
-        RatisReplicationConfig.getInstance(
-            HddsProtos.ReplicationFactor.THREE), "admin");
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, DELETING);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.CLOSING, 0, 0, 0);
+            ContainerReplicaProto.State.CLOSED, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     Set<ContainerReplica> tempContainerReplicas = new HashSet<>();
     tempContainerReplicas.addAll(containerReplicas);
@@ -281,11 +208,11 @@ public class TestDeletingContainerHandler {
     resendDeleteCommand(containerInfo, containerReplicas, pendingOps, 1);
 
     //EC container
-    containerInfo = containerManager.allocateContainer(
-        ecReplicationConfig, "admin");
+    containerInfo = ReplicationTestUtil.createContainerInfo(
+        ecReplicationConfig, 1, DELETING);
     containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.CLOSING, 1, 2, 3, 4, 5);
+            ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
     pendingOps.clear();
     tempContainerReplicas.clear();
     tempContainerReplicas.addAll(containerReplicas);
@@ -308,16 +235,7 @@ public class TestDeletingContainerHandler {
   private void resendDeleteCommand(ContainerInfo containerInfo,
                                    Set<ContainerReplica> containerReplicas,
                                    List<ContainerReplicaOp> pendingOps,
-                                   int times)
-      throws InvalidStateTransitionException, IOException, TimeoutException {
-    ContainerID cID = containerInfo.containerID();
-    //change the state of the container to Deleting
-    containerManager.updateContainerState(cID,
-        HddsProtos.LifeCycleEvent.FINALIZE);
-    containerManager.updateContainerState(cID, HddsProtos.LifeCycleEvent.CLOSE);
-    containerManager.updateContainerState(cID,
-        HddsProtos.LifeCycleEvent.DELETE);
-
+                                   int times) throws NotLeaderException {
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(pendingOps)
         .setReport(new ReplicationManagerReport())
