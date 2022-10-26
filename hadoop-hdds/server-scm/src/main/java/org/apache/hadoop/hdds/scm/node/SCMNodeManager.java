@@ -729,10 +729,23 @@ public class SCMNodeManager implements NodeManager {
    * @param cmdType
    * @return The queued count or -1 if no data has been received from the DN.
    */
+  @Override
   public int getNodeQueuedCommandCount(DatanodeDetails datanodeDetails,
       SCMCommandProto.Type cmdType) throws NodeNotFoundException {
     DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
     return datanodeInfo.getCommandCount(cmdType);
+  }
+
+  /**
+   * Get the number of commands of the given type queued in the SCM CommandQueue
+   * for the given datanode.
+   * @param dnID The UUID of the datanode.
+   * @param cmdType The Type of command to query the current count for.
+   * @return The count of commands queued, or zero if none.
+   */
+  @Override
+  public int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType) {
+    return commandQueue.getDatanodeCommandCount(dnID, cmdType);
   }
 
   /**

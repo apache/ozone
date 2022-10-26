@@ -318,6 +318,15 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       SCMCommandProto.Type cmdType) throws NodeNotFoundException;
 
   /**
+   * Get the number of commands of the given type queued in the SCM CommandQueue
+   * for the given datanode.
+   * @param dnID The UUID of the datanode.
+   * @param cmdType The Type of command to query the current count for.
+   * @return The count of commands queued, or zero if none.
+   */
+  int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType);
+
+  /**
    * Get list of SCMCommands in the Command Queue for a particular Datanode.
    * @param dnID - Datanode uuid.
    * @return list of commands
