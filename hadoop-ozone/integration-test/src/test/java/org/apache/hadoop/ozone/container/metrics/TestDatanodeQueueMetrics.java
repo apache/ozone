@@ -96,10 +96,10 @@ public class TestDatanodeQueueMetrics {
     for (SCMCommandProto.Type type: SCMCommandProto.Type.values()) {
       Assertions.assertEquals(0,
           getGauge(STATE_CONTEXT_COMMAND_QUEUE_PREFIX +
-              WordUtils.capitalize(String.valueOf(type))));
+              WordUtils.capitalize(String.valueOf(type)) + "Size"));
       Assertions.assertEquals(0,
           getGauge(COMMAND_DISPATCHER_QUEUE_PREFIX +
-              WordUtils.capitalize(String.valueOf(type))));
+              WordUtils.capitalize(String.valueOf(type)) + "Size"));
     }
 
   }
