@@ -28,6 +28,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.protobuf.BlockingService;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -290,7 +291,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   // Used to keep track of pending replication and pending deletes for
   // container replicas.
   private ContainerReplicaPendingOps containerReplicaPendingOps;
-
+  private final AtomicBoolean isStopped = new AtomicBoolean(false);
+  
   /**
    * Creates a new StorageContainerManager. Configuration will be
    * updated with information on the actual listening addresses used
@@ -584,7 +586,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       clusterMap = new NetworkTopologyImpl(conf);
     }
     // This needs to be done before initializing Ratis.
-    RatisDropwizardExports.registerRatisMetricReporters(ratisMetricsMap);
+    RatisDropwizardExports.registerRatisMetricReporters(ratisMetricsMap,
+        () -> isStopped.get());
     if (configurator.getSCMHAManager() != null) {
       scmHAManager = configurator.getSCMHAManager();
     } else {
@@ -1522,6 +1525,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public void stop() {
+    if (isStopped.getAndSet(true)) {
+      LOG.info("Storage Container Manager is not running.");
+      return;
+    }
     try {
       if (containerBalancer.isBalancerRunning()) {
         LOG.info("Stopping Container Balancer service.");
