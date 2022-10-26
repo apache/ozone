@@ -1170,7 +1170,7 @@ public class LegacyReplicationManager {
             .map(ContainerReplica::getDatanodeDetails)
             .collect(Collectors.toList());
         if (source.size() > 0) {
-          LOG.debug("Replicating an unhealthy container replica as there " +
+          LOG.info("Replicating an unhealthy container replica as there " +
               "are no closed or quasi-closed replicas for container {}", id);
         }
       }
@@ -1504,7 +1504,7 @@ public class LegacyReplicationManager {
     // highest bcsId = container bcsId is lost, and since ContainerReportHandler
     // only increments the bcsId, the container bcsId is not updated even
     // though the replica is lost).
-    final Long sequenceId = replicas.stream()
+    final Long highestHealthySeqID = replicas.stream()
         .filter(r -> !r.getState().equals(State.UNHEALTHY))
         .map(ContainerReplica::getSequenceId)
         .max(Long::compare)
@@ -1534,7 +1534,7 @@ public class LegacyReplicationManager {
 
     // Filter out the unhealthy replicas which have higher bcsId than
     // healthy (closed/ quasi-closed) replicas.
-    unhealthyReplicas.removeIf(r -> r.getSequenceId() > sequenceId);
+    unhealthyReplicas.removeIf(r -> r.getSequenceId() > highestHealthySeqID);
 
     if (unhealthyReplicas.isEmpty()) {
       return;

@@ -654,8 +654,8 @@ public class TestLegacyReplicationManager {
   /**
    * When a QUASI_CLOSED container is over replicated, ReplicationManager
    * deletes the excess replicas. While choosing the replica for deletion
-   * ReplicationManager should prioritize unhealthy replica over QUASI_CLOSED
-   * replica.
+   * ReplicationManager should prioritize deleting the unhealthy replica over
+   * QUASI_CLOSED replica if the unhealthy replica does not have a larger BCSID.
    */
   @Test
   public void testOverReplicatedQuasiClosedContainerWithUnhealthyReplica()
