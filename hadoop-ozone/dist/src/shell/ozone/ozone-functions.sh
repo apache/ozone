@@ -42,15 +42,35 @@ function ozone_debug
   fi
 }
 
+## @description Displays usage text for the '--validate' option
+## @audience private
+## @stability evolving
+## @replaceable yes
+function ozone_validate_classpath_usage
+{
+  description=$'The --validate flag validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present\n\n'
+  usage_text=$'Usage I: ozone --validate classpath <ARTIFACTNAME>\nUsage II: ozone --validate [OPTIONS] --daemon start|status|stop csi|datanode|om|recon|s3g|scm\n\n'
+  options=$'  OPTIONS is none or any of:\n\ncontinue\tcommand execution shall continue even if validation fails'
+  ozone_error "${description}${usage_text}${options}"
+  exit 1
+}
+
 ## @description Validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present
 ## @audience private
 ## @stability evolving
 ## @replaceable yes
 function ozone_validate_classpath
 {
-  if [[ ( "${OZONE_VALIDATE_CLASSPATH}" == true && ( "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" == true &&
-        "${OZONE_DAEMON_MODE}" =~ ^st(art|op|atus)$ ) || ( "${OZONE_SUBCMD}" == classpath ) ) ]]; then
+  local OZONE_OPTION_DAEMON
+  [[ "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" == true && "${OZONE_DAEMON_MODE}" =~ ^st(art|op|atus)$ ]] &&
+  OZONE_OPTION_DAEMON=true || OZONE_OPTION_DAEMON=false
+
+  if [[ "${OZONE_VALIDATE_CLASSPATH}" == true && ( ( "${OZONE_VALIDATE_FAIL_ON_MISSING_JARS}" == true &&
+        ( "${OZONE_OPTION_DAEMON}" == true || "${OZONE_SUBCMD}" == classpath ) ) ||
+        ( "${OZONE_VALIDATE_FAIL_ON_MISSING_JARS}" == false && "${OZONE_OPTION_DAEMON}" == true ) ) ]]; then
     ozone_validate_classpath_util
+  else
+    ozone_validate_classpath_usage
   fi
 }
 
@@ -2529,18 +2549,11 @@ function ozone_parse_args
       --validate)
         shift
         OZONE_VALIDATE_CLASSPATH=true
-        if [[ "${1}" == "classpath" || "${1}" == "--daemon" ]]; then
-          ((OZONE_PARSE_COUNTER=OZONE_PARSE_COUNTER+1))
-        elif [[ "${1}" == "continue" && "${2}" == "--daemon" ]]; then
+        ((OZONE_PARSE_COUNTER=OZONE_PARSE_COUNTER+1))
+        if [[ "${1}" == "continue" ]]; then
           OZONE_VALIDATE_FAIL_ON_MISSING_JARS=false
           shift
-          ((OZONE_PARSE_COUNTER=OZONE_PARSE_COUNTER+2))
-        else
-          help_text=$'The --validate flag validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present\n\n'
-          usage_text=$'Usage I: ozone --validate classpath <ARTIFACTNAME>\nUsage II: ozone --validate [OPTIONS] --daemon start|status|stop csi|datanode|om|recon|s3g|scm\n\n'
-          option_description=$'  OPTIONS is none or any of:\n\ncontinue\tcommand execution shall continue even if validation fails'
-          ozone_error "${help_text}${usage_text}${option_description}"
-          exit 1
+          ((OZONE_PARSE_COUNTER=OZONE_PARSE_COUNTER+1))
         fi
       ;;
       --debug)
