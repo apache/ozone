@@ -383,6 +383,98 @@ public class TestOmSnapshot {
         snapshotKeyPrefix + key1);
   }
 
+  @Test
+  public void testListDeleteKey()
+          throws IOException, InterruptedException, TimeoutException {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buc-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume vol = store.getVolume(volume);
+    vol.createBucket(bucket);
+    OzoneBucket volbucket = vol.getBucket(bucket);
+
+    String key = "key-";
+    byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+    OzoneOutputStream oneKey = volbucket.createKey(
+            key + RandomStringUtils.randomNumeric(5),
+            value.length, RATIS, ONE,
+            new HashMap<>());
+    oneKey.write(value);
+    oneKey.close();
+
+    String snapshotKeyPrefix = createSnapshot(volume, bucket);
+    Iterator<? extends OzoneKey> volBucketIter =
+            volbucket.listKeys(snapshotKeyPrefix + "key-");
+    int volBucketKeyCount = 0;
+    while (volBucketIter.hasNext()) {
+      volBucketIter.next();
+      volBucketKeyCount++;
+    }
+    Assert.assertEquals(1, volBucketKeyCount);
+
+    deleteKeys(volbucket);
+
+    snapshotKeyPrefix = createSnapshot(volume, bucket);
+    Iterator<? extends OzoneKey> volBucketIter2 =
+            volbucket.listKeys(snapshotKeyPrefix);
+    while (volBucketIter2.hasNext()) {
+      fail();
+    }
+  }
+
+  @Test
+  public void testListAddNewKey()
+          throws IOException, InterruptedException, TimeoutException {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buc-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume vol = store.getVolume(volume);
+    vol.createBucket(bucket);
+    OzoneBucket volbucket = vol.getBucket(bucket);
+
+    String key = "key-";
+    byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+    OzoneOutputStream oneKey = volbucket.createKey(
+            key + "1-" + RandomStringUtils.randomNumeric(5),
+            value.length, RATIS, ONE,
+            new HashMap<>());
+    oneKey.write(value);
+    oneKey.close();
+
+    String snapshotKeyPrefix1 = createSnapshot(volume, bucket);
+
+    OzoneOutputStream twoKey = volbucket.createKey(
+            key + "2-" + RandomStringUtils.randomNumeric(5),
+            value.length, RATIS, ONE,
+            new HashMap<>());
+    twoKey.write(value);
+    twoKey.close();
+
+    String snapshotKeyPrefix2 = createSnapshot(volume, bucket);
+
+    Iterator<? extends OzoneKey> volBucketIter =
+            volbucket.listKeys(snapshotKeyPrefix1 + "key-");
+    int volBucketKeyCount = 0;
+    while (volBucketIter.hasNext()) {
+      volBucketIter.next();
+      volBucketKeyCount++;
+    }
+    Assert.assertEquals(1, volBucketKeyCount);
+
+
+    Iterator<? extends OzoneKey> volBucketIter2 =
+            volbucket.listKeys(snapshotKeyPrefix2 + "key-");
+    int volBucketKeyCount2 = 0;
+    while (volBucketIter2.hasNext()) {
+      volBucketIter2.next();
+      volBucketKeyCount2++;
+    }
+    Assert.assertEquals(2, volBucketKeyCount2);
+
+    deleteKeys(volbucket);
+
+  }
+
   private String createSnapshot()
       throws IOException, InterruptedException, TimeoutException {
     return createSnapshot(volumeName, bucketName);
