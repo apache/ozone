@@ -149,6 +149,14 @@ public final class OzoneConfigUtil {
           clientConfName, serverConfName, serverConfValue, serverConfValue);
       limitVal = serverConfValue;
     }
+    // Below logic of limiting min page size as 2 is due to behavior of
+    // startKey for getting file status where startKey once reached at
+    // leaf/key level, then startKey itself being returned when page size is
+    // set as 1 and non-recursive listStatus API at client side will go into
+    // infinite loop.
+    if (limitVal <= 1) {
+      limitVal = 2;
+    }
     return limitVal;
   }
 }
