@@ -627,8 +627,10 @@ public final class RocksDatabase {
           // Instead perform the level check here
           // itself to avoid failed delete attempts for lower level files.
           if (liveFileMetaData.level() == lastLevel && lastLevel != 0) {
-            String firstDbKey = new String(liveFileMetaData.smallestKey());
-            String lastDbKey = new String(liveFileMetaData.largestKey());
+            String firstDbKey = new String(liveFileMetaData.smallestKey(),
+                StandardCharsets.UTF_8);
+            String lastDbKey = new String(liveFileMetaData.largestKey(),
+                StandardCharsets.UTF_8);
             boolean isKeyWithPrefixPresent =
                 firstDbKey.compareTo(prefixForColumnFamily) <= 0
                     && prefixForColumnFamily.compareTo(lastDbKey) <= 0;
