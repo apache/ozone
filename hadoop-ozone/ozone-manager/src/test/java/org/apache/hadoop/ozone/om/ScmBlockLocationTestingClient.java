@@ -112,6 +112,7 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
 
   /**
    * Returns Fake blocks to the BlockManager so we get blocks in the Database.
+   * @param requestedSize - Total size to allocate.
    * @param config - ReplicationConfig.
    * @param owner - String owner.
    * @param excludeList list of dns/pipelines to exclude
