@@ -298,12 +298,11 @@ public class TestWritableECContainerProvider {
     // Update all the containers to make them nearly full, but with enough space
     // for an EC block to be striped across them.
     for (ContainerInfo c : allocatedContainers) {
-      c.setUsedBytes(getMaxContainerSize() - 30 * 1024 * 1024);
+      c.setUsedBytes(getMaxContainerSize() - 90 * 1024 * 1024);
     }
 
     // Get a new container of size 50 and ensure it is one of the original set.
-    // We ask for a space of 50, but as it is stripped across the EC group it
-    // will actually need 50 / dataNum space
+    // We ask for a space of 50 MB, and will actually need 50 MB space.
     ContainerInfo newContainer =
         provider.getContainer(50 * 1024 * 1024, repConfig, OWNER,
             new ExcludeList());
