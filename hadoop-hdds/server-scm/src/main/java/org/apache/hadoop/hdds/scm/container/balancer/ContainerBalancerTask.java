@@ -20,10 +20,8 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -467,10 +465,13 @@ public class ContainerBalancerTask implements Runnable {
     findSourceStrategy.reInitialize(getPotentialSources(), config, lowerLimit);
     List<DatanodeUsageInfo> potentialTargets = getPotentialTargets();
     findTargetStrategy.reInitialize(potentialTargets, config, upperLimit);
+    findSourceStrategy.reInitialize(getPotentialSources(), config, lowerLimit);
 
     moveSelectionToFutureMap = new HashMap<>(unBalancedNodes.size());
     boolean isMoveGeneratedInThisIteration = false;
     iterationResult = IterationResult.ITERATION_COMPLETED;
+    boolean canAdaptWhenNearingLimits = true;
+    boolean canAdaptOnReachingLimits = true;
 
     // match each source node with a target
     while (true) {
@@ -479,11 +480,26 @@ public class ContainerBalancerTask implements Runnable {
         break;
       }
 
-      if (checkIterationLimits()) {
-        /* scheduled enough moves to hit either maxSizeToMovePerIteration or
-        maxDatanodesPercentageToInvolvePerIteration limit
-        */
-        break;
+      /* if balancer is approaching the iteration limits for max datanodes to
+       involve and max size to move, take some action in
+       adaptWhenNearingIterationLimits()
+      */
+      if (canAdaptWhenNearingLimits) {
+        if (!adaptWhenNearingIterationLimits()) {
+          // we weren't able to adapt, so this iteration cannot continue
+          break;
+        }
+        canAdaptWhenNearingLimits = false;
+      } else if (canAdaptOnReachingLimits) {
+        /*
+        if balancer has hit the iteration limits, then take some action in
+        adaptOnReachingIterationLimits()
+         */
+        if (!adaptOnReachingIterationLimits()) {
+          // we weren't able to adapt, so this iteration cannot continue
+          break;
+        }
+        canAdaptOnReachingLimits = false;
       }
 
       DatanodeDetails source =
@@ -631,7 +647,8 @@ public class ContainerBalancerTask implements Runnable {
    */
   private ContainerMoveSelection matchSourceWithTarget(DatanodeDetails source) {
     NavigableSet<ContainerID> candidateContainers =
-        selectionCriteria.getCandidateContainers(source);
+        selectionCriteria.getCandidateContainers(source,
+            sizeScheduledForMoveInLatestIteration);
 
     if (candidateContainers.isEmpty()) {
       if (LOG.isDebugEnabled()) {
@@ -663,37 +680,69 @@ public class ContainerBalancerTask implements Runnable {
     return moveSelection;
   }
 
-  /**
-   * Checks if limits maxDatanodesPercentageToInvolvePerIteration and
-   * maxSizeToMovePerIteration have been hit.
-   *
-   * @return true if a limit was hit, else false
-   */
-  private boolean checkIterationLimits() {
-    int maxDatanodesToInvolve =
-        (int) (maxDatanodesRatioToInvolvePerIteration * totalNodesInCluster);
-    if (countDatanodesInvolvedPerIteration + 2 > maxDatanodesToInvolve) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Hit max datanodes to involve limit. {} datanodes have" +
-                " already been scheduled for balancing and the limit is {}.",
-            countDatanodesInvolvedPerIteration, maxDatanodesToInvolve);
-      }
-      return true;
-    }
-    if (sizeScheduledForMoveInLatestIteration +
-        (long) ozoneConfiguration.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
-        StorageUnit.BYTES) > maxSizeToMovePerIteration) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Hit max size to move limit. {} bytes have already been " +
-                "scheduled for balancing and the limit is {} bytes.",
-            sizeScheduledForMoveInLatestIteration,
-            maxSizeToMovePerIteration);
-      }
+  private boolean reachedMaxSizeToMovePerIteration() {
+    // since candidate containers in ContainerBalancerSelectionCriteria are
+    // filtered out according to this limit, balancer should not have crossed it
+    if (sizeScheduledForMoveInLatestIteration >= maxSizeToMovePerIteration) {
+      LOG.warn("Reached max size to move limit. {} bytes have already been" +
+              " scheduled for balancing and the limit is {} bytes.",
+          sizeScheduledForMoveInLatestIteration, maxSizeToMovePerIteration);
       return true;
     }
     return false;
+  }
+
+  private boolean adaptWhenNearingIterationLimits() {
+    // check if we've reached max size to move limit
+    if (reachedMaxSizeToMovePerIteration()) {
+      // return false because we cannot adapt if we've reached max size to
+      // move limit
+      return false;
+    }
+
+    // check if we've nearing max datanodes to involve
+    int maxDatanodesToInvolve =
+        (int) (maxDatanodesRatioToInvolvePerIteration * totalNodesInCluster);
+    if (countDatanodesInvolvedPerIteration + 1 == maxDatanodesToInvolve) {
+      /* We're one datanode away from reaching the limit. Restrict potential
+      targets to targets that have already been selected.
+       */
+      findTargetStrategy.resetPotentialTargets(selectedTargets);
+      LOG.debug("Approaching max datanodes to involve limit. {} datanodes " +
+              "have already been selected for balancing and the limit is " +
+              "{}. Only already selected targets can be selected as targets" +
+              " now.",
+          countDatanodesInvolvedPerIteration, maxDatanodesToInvolve);
+    }
+
+    // we either didn't need to or were able to adapt, so return true
+    return true;
+  }
+
+  private boolean adaptOnReachingIterationLimits() {
+    // check if we've reached max size to move limit
+    if (reachedMaxSizeToMovePerIteration()) {
+      // return false because we cannot adapt if we've reached max size to
+      // move limit
+      return false;
+    }
+
+    // check if we've reached max datanodes to involve limit
+    int maxDatanodesToInvolve =
+        (int) (maxDatanodesRatioToInvolvePerIteration * totalNodesInCluster);
+    if (countDatanodesInvolvedPerIteration == maxDatanodesToInvolve) {
+      // restrict both to already selected sources and targets
+      findTargetStrategy.resetPotentialTargets(selectedTargets);
+      findSourceStrategy.resetPotentialSources(selectedSources);
+      LOG.debug("Reached max datanodes to involve limit. {} datanodes " +
+              "have already been selected for balancing and the limit " +
+              "is {}. Only already selected sources and targets can be " +
+              "involved in balancing now.",
+          countDatanodesInvolvedPerIteration, maxDatanodesToInvolve);
+    }
+
+    // we either didn't need to or were able to adapt, so return true
+    return true;
   }
 
   /**

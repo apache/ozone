@@ -133,7 +133,7 @@ public class TestContainerBalancerTask {
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
     conf.setFromObject(balancerConfiguration);
-    GenericTestUtils.setLogLevel(ContainerBalancer.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(ContainerBalancerTask.LOG, Level.DEBUG);
 
     averageUtilization = createCluster();
     mockNodeManager = new MockNodeManager(datanodeToContainersMap);
