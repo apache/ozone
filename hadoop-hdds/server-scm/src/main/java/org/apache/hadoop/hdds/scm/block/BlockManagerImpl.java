@@ -178,7 +178,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
         size, replicationConfig, owner, excludeList);
 
     if (containerInfo != null) {
-      return newBlock(containerInfo);
+      return newBlock(containerInfo, size);
     }
     // we have tried all strategies we know and but somehow we are not able
     // to get a container for this block. Log that info and return a null.
@@ -192,9 +192,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    * newBlock - returns a new block assigned to a container.
    *
    * @param containerInfo - Container Info.
+   * @param size - Block Size.
    * @return AllocatedBlock
    */
-  private AllocatedBlock newBlock(ContainerInfo containerInfo)
+  private AllocatedBlock newBlock(ContainerInfo containerInfo, long size)
       throws NotLeaderException, TimeoutException {
     try {
       final Pipeline pipeline = pipelineManager
@@ -203,10 +204,11 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       long containerID = containerInfo.getContainerID();
       AllocatedBlock.Builder abb =  new AllocatedBlock.Builder()
           .setContainerBlockID(new ContainerBlockID(containerID, localID))
-          .setPipeline(pipeline);
+          .setPipeline(pipeline)
+          .setSize(size);
       if (LOG.isTraceEnabled()) {
-        LOG.trace("New block allocated : {} Container ID: {}", localID,
-            containerID);
+        LOG.trace("New block allocated : {} Container ID: {} Block Size: {}",
+            localID, containerID, size);
       }
       pipelineManager.incNumBlocksAllocatedMetric(pipeline.getId());
       return abb.build();

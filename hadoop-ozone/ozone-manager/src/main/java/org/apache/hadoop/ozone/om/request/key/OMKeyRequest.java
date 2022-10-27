@@ -139,9 +139,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
     int numBlocks = (int) Math.min(preallocateBlocksMax,
         (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
-    // For EC, lastBlockSize = min(lastStripeSize, scmBlockSize)
-    long lastBlockSize = Math.min(scmBlockSize,
-        requestedSize - (numBlocks - 1) * scmBlockSize * dataGroupSize);
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
@@ -158,12 +155,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
       }
       throw ex;
     }
-    for (int i = 0; i < numBlocks; i++) {
-      AllocatedBlock allocatedBlock = allocatedBlocks.get(i);
+    for (AllocatedBlock allocatedBlock : allocatedBlocks) {
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());
       OmKeyLocationInfo.Builder builder = new OmKeyLocationInfo.Builder()
           .setBlockID(blockID)
-          .setLength(i + 1 == numBlocks ? lastBlockSize : scmBlockSize)
+          .setLength(allocatedBlock.hasSize() ?
+              allocatedBlock.getSize() : scmBlockSize)
           .setOffset(0)
           .setPipeline(allocatedBlock.getPipeline());
       if (grpcBlockTokenEnabled) {

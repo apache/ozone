@@ -26,8 +26,9 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
  * contains a Pipeline and the key.
  */
 public final class AllocatedBlock {
-  private Pipeline pipeline;
-  private ContainerBlockID containerBlockID;
+  private final Pipeline pipeline;
+  private final ContainerBlockID containerBlockID;
+  private final long size;
 
   /**
    * Builder for AllocatedBlock.
@@ -35,6 +36,7 @@ public final class AllocatedBlock {
   public static class Builder {
     private Pipeline pipeline;
     private ContainerBlockID containerBlockID;
+    private long size;
 
     public Builder setPipeline(Pipeline p) {
       this.pipeline = p;
@@ -46,14 +48,21 @@ public final class AllocatedBlock {
       return this;
     }
 
+    public Builder setSize(long s) {
+      this.size = s;
+      return this;
+    }
+
     public AllocatedBlock build() {
-      return new AllocatedBlock(pipeline, containerBlockID);
+      return new AllocatedBlock(pipeline, containerBlockID, size);
     }
   }
 
-  private AllocatedBlock(Pipeline pipeline, ContainerBlockID containerBlockID) {
+  private AllocatedBlock(Pipeline pipeline, ContainerBlockID containerBlockID,
+      long size) {
     this.pipeline = pipeline;
     this.containerBlockID = containerBlockID;
+    this.size = size;
   }
 
   public Pipeline getPipeline() {
@@ -62,5 +71,13 @@ public final class AllocatedBlock {
 
   public ContainerBlockID getBlockID() {
     return containerBlockID;
+  }
+
+  public boolean hasSize() {
+    return size > 0;
+  }
+
+  public long getSize() {
+    return size;
   }
 }

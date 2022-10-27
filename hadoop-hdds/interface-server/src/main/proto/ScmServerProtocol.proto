@@ -202,6 +202,7 @@ message DeleteScmBlockResult {
 message AllocateBlockResponse {
   optional ContainerBlockID containerBlockID = 1;
   optional hadoop.hdds.Pipeline pipeline = 2;
+  optional uint64 size = 3;
 }
 
 /**
