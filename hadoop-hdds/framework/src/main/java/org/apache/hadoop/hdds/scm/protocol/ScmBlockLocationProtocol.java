@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.protocol;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
@@ -87,7 +88,9 @@ public interface ScmBlockLocationProtocol extends Closeable {
   default List<AllocatedBlock> allocateBlock(long size, int numBlocks,
       ReplicationConfig replicationConfig, String owner,
       ExcludeList excludeList) throws IOException {
-    return allocateBlock(size * numBlocks, replicationConfig,
+    final int numData = replicationConfig instanceof ECReplicationConfig ?
+        ((ECReplicationConfig) replicationConfig).getData() : 1;
+    return allocateBlock(size * numBlocks * numData, replicationConfig,
         owner, excludeList);
   }
 
