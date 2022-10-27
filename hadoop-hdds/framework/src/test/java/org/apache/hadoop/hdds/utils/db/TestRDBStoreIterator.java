@@ -18,7 +18,12 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -61,6 +66,7 @@ public class TestRDBStoreIterator {
     rocksDBIteratorMock = mock(RocksIterator.class);
     managedRocksIterator = new ManagedRocksIterator(rocksDBIteratorMock);
     rocksTableMock = mock(RDBTable.class);
+    Logger.getLogger(ManagedRocksObjectUtils.class).setLevel(Level.DEBUG);
   }
 
   @Test
@@ -292,5 +298,30 @@ public class TestRDBStoreIterator {
     }
 
     iter.close();
+  }
+
+  @Test
+  @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
+  public void testGetStackTrace() {
+    ManagedRocksIterator iterator = mock(ManagedRocksIterator.class);
+    RocksIterator mock = mock(RocksIterator.class);
+    when(iterator.get()).thenReturn(mock);
+    when(mock.isOwningHandle()).thenReturn(true);
+    ManagedRocksObjectUtils.assertClosed(iterator);
+    verify(iterator, times(1)).getStackTrace();
+
+    iterator = new ManagedRocksIterator(rocksDBIteratorMock);
+
+    // construct the expected trace.
+    StackTraceElement[] traceElements = Thread.currentThread().getStackTrace();
+    StringBuilder sb = new StringBuilder();
+    // first 2 lines will differ.
+    for (int i = 2; i < traceElements.length; i++) {
+      sb.append(traceElements[i]);
+      sb.append("\n");
+    }
+    String expectedTrace = sb.toString();
+    String fromObjectInit = iterator.getStackTrace();
+    Assert.assertTrue(fromObjectInit.contains(expectedTrace));
   }
 }
