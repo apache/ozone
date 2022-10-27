@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -431,7 +432,7 @@ public final class RocksDatabase {
       ColumnFamilyHandle handle) throws IOException {
     for (ColumnFamilyHandle cf : getColumnFamilyHandles()) {
       try {
-        if (cfName.equals(new String(cf.getName()))) {
+        if (cfName.equals(new String(cf.getName(), StandardCharsets.UTF_8))) {
           handle = cf;
           break;
         }
@@ -612,8 +613,8 @@ public final class RocksDatabase {
   public void deleteFilesNotMatchingPrefix(
       List<Pair<String, String>> prefixPairs) throws RocksDBException {
     for (LiveFileMetaData liveFileMetaData : getSstFileList()) {
-      String sstFileColumnFamily =
-          new String(liveFileMetaData.columnFamilyName());
+      String sstFileColumnFamily = new String(liveFileMetaData
+          .columnFamilyName(), StandardCharsets.UTF_8);
       int lastLevel = getLastLevel();
       for (Pair<String, String> prefixPair : prefixPairs) {
         String columnFamily = prefixPair.getKey();

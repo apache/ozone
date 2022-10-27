@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -143,8 +144,8 @@ public class SstFilteringService extends BackgroundService {
 
             // mark the snapshot as filtered by writing to the file
             String content = snapshotInfo.getSnapshotID() + "\n";
-            Files.write(filePath, content.getBytes(), StandardOpenOption.CREATE,
-                StandardOpenOption.APPEND);
+            Files.write(filePath, content.getBytes(StandardCharsets.UTF_8),
+                StandardOpenOption.CREATE, StandardOpenOption.APPEND);
             snapshotLimit--;
             snapshotFilteredCount.getAndIncrement();
           }
