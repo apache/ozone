@@ -658,7 +658,7 @@ public final class RocksDatabase {
     return getLongProperty(family, ESTIMATE_NUM_KEYS);
   }
 
-  public long getLongProperty(String key) throws IOException {
+  private long getLongProperty(String key) throws IOException {
     assertClose();
     try {
       counter.incrementAndGet();
@@ -671,7 +671,7 @@ public final class RocksDatabase {
     }
   }
 
-  public long getLongProperty(ColumnFamily family, String key)
+  private long getLongProperty(ColumnFamily family, String key)
       throws IOException {
     assertClose();
     try {
