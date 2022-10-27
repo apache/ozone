@@ -49,7 +49,8 @@ Copy from local
                    Should Be Equal       ${result}         THREE
 
 Put
-                   Execute               ozone fs -put NOTICE.txt ${DEEP_URL}/PUTFILE.txt
+    ${result} =    Execute               ozone fs -put NOTICE.txt ${DEEP_URL}/PUTFILE.txt
+                   Should Be Empty       ${result}
     ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}         PUTFILE.txt
 

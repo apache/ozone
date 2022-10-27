@@ -72,11 +72,6 @@ function ozonecmd_case
   subcmd=$1
   shift
 
-  ozone_default_log4j="${OZONE_CONF_DIR}/log4j.properties"
-  ozone_shell_log4j="${OZONE_CONF_DIR}/ozone-shell-log4j.properties"
-  if [ ! -f "${ozone_shell_log4j}" ]; then
-    ozone_shell_log4j=${ozone_default_log4j}
-  fi
   # Add JVM parameter (org.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false)
   # for disabling netty PooledByteBufAllocator thread caches for non-netty threads.
   # This parameter significantly reduces GC pressure for Datanode.
@@ -149,7 +144,6 @@ function ozonecmd_case
     sh | shell)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneShell
       ozone_deprecate_envvar HDFS_OM_SH_OPTS OZONE_SH_OPTS
-      OZONE_SH_OPTS="-Dhadoop.log.file=ozone-shell.log -Dlog4j.configuration=file:${ozone_shell_log4j} ${OZONE_SH_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     s3)
@@ -187,7 +181,6 @@ function ozonecmd_case
     ;;
     fs)
       OZONE_CLASSNAME=org.apache.hadoop.fs.ozone.OzoneFsShell
-      OZONE_CLIENT_OPTS="-Dhadoop.log.file=ozone-shell.log -Dlog4j.configuration=file:${ozone_shell_log4j} ${OZONE_CLIENT_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     daemonlog)
@@ -225,6 +218,19 @@ function ozonecmd_case
       fi
     ;;
   esac
+}
+
+## @description  turn off logging for CLI by default
+## @audience     private
+function ozone_suppress_shell_log
+{
+  if [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]] \
+      && [[ "${OZONE_CLASSNAME}" != "org.apache.hadoop.ozone.freon.Freon" ]] \
+      && [[ -z "${OZONE_ORIGINAL_LOGLEVEL}" ]] \
+      && [[ -z "${OZONE_ORIGINAL_ROOT_LOGGER}" ]]; then
+    OZONE_LOGLEVEL=OFF
+    OZONE_ROOT_LOGGER="${OZONE_LOGLEVEL},console"
+  fi
 }
 
 # load functions
@@ -275,6 +281,7 @@ else
   ozonecmd_case "${OZONE_SUBCMD}" "${OZONE_SUBCMD_ARGS[@]}"
 fi
 
+ozone_suppress_shell_log
 ozone_assemble_classpath
 
 ozone_add_client_opts
