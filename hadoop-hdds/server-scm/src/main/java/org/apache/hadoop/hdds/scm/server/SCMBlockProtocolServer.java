@@ -197,15 +197,9 @@ public class SCMBlockProtocolServer implements
     int num = (int) ((requestedSize - 1) / (scmBlockSize * numData) + 1);
 
     if (LOG.isDebugEnabled()) {
-      if (replicationConfig instanceof ECReplicationConfig) {
-        LOG.debug("Requested Size {} replicationConfig {}," +
-                "allocating {} block groups of size {}, with {}",
-            requestedSize, replicationConfig, num, numData * size, excludeList);
-      } else {
-        LOG.debug("Requested Size {} replicationConfig {}," +
-                "allocating {} blocks of size {}, with {}",
-            requestedSize, replicationConfig, num, size, excludeList);
-      }
+      LOG.debug("Requested Size {} replicationConfig {}," +
+              "allocating {} blocks (or block groups) of size {}, with {}",
+          requestedSize, replicationConfig, num, numData * size, excludeList);
     }
 
     List<AllocatedBlock> blocks = new ArrayList<>(num);
