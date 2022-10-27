@@ -130,22 +130,32 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @throws IOException
    */
   @SuppressWarnings("parameternumber")
-  protected List< OmKeyLocationInfo > allocateBlock(ScmClient scmClient,
+  protected List<OmKeyLocationInfo> allocateBlock(ScmClient scmClient,
       OzoneBlockTokenSecretManager secretManager,
       ReplicationConfig replicationConfig, ExcludeList excludeList,
       long requestedSize, long scmBlockSize, int preallocateBlocksMax,
       boolean grpcBlockTokenEnabled, String omID) throws IOException {
-    int dataGroupSize = replicationConfig instanceof ECReplicationConfig
-        ? ((ECReplicationConfig) replicationConfig).getData() : 1;
-    int numBlocks = (int) Math.min(preallocateBlocksMax,
-        (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
 
-    List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
+    Preconditions.checkArgument(requestedSize > 0,
+        "Requested size must be greater than 0");
+
+    // Limit the number of blocks to preallocate to the configured maximum.
+    long requestedSizeMax;
+    if (replicationConfig instanceof ECReplicationConfig) {
+      int numData = ((ECReplicationConfig) replicationConfig).getData();
+      int numStripe = preallocateBlocksMax / numData;
+      numStripe = numStripe == 0 ? 1 : numStripe; // at least one stripe
+      requestedSizeMax = numData * numStripe * scmBlockSize;
+    } else {
+      requestedSizeMax = preallocateBlocksMax * scmBlockSize;
+    }
+    final long requestedSizeFinal = Math.min(requestedSize, requestedSizeMax);
+
     String remoteUser = getRemoteUser().getShortUserName();
     List<AllocatedBlock> allocatedBlocks;
     try {
       allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, requestedSize,
+          .allocateBlock(requestedSizeFinal,
               replicationConfig, omID, excludeList);
     } catch (SCMException ex) {
       if (ex.getResult()
@@ -155,6 +165,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       }
       throw ex;
     }
+    List<OmKeyLocationInfo> locationInfos =
+        new ArrayList<>(allocatedBlocks.size());
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());
       OmKeyLocationInfo.Builder builder = new OmKeyLocationInfo.Builder()

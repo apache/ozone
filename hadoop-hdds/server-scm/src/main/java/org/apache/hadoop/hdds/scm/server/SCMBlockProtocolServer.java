@@ -182,29 +182,33 @@ public class SCMBlockProtocolServer implements
 
   @Override
   public List<AllocatedBlock> allocateBlock(
-      long size, int num, long requestedSize,
+      long requestedSize,
       ReplicationConfig replicationConfig,
       String owner, ExcludeList excludeList
   ) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("size", String.valueOf(size));
-    auditMap.put("num", String.valueOf(num));
     auditMap.put("requestedSize", String.valueOf(requestedSize));
     auditMap.put("replication", replicationConfig.toString());
     auditMap.put("owner", owner);
-    List<AllocatedBlock> blocks = new ArrayList<>(num);
+
+    long size = scmBlockSize;
+    int numData = replicationConfig instanceof ECReplicationConfig ?
+        ((ECReplicationConfig) replicationConfig).getData() : 1;
+    int num = (int) ((requestedSize - 1) / (scmBlockSize * numData) + 1);
 
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Allocating {} blocks of size {}, " +
-          "requestedSize is {}, with {}",
-          num, size, requestedSize, excludeList);
+      if (replicationConfig instanceof ECReplicationConfig) {
+        LOG.debug("Requested Size {} replicationConfig {}," +
+                "allocating {} block groups of size {}, with {}",
+            requestedSize, replicationConfig, num, numData * size, excludeList);
+      } else {
+        LOG.debug("Requested Size {} replicationConfig {}," +
+                "allocating {} blocks of size {}, with {}",
+            requestedSize, replicationConfig, num, size, excludeList);
+      }
     }
-    if (requestedSize > 0) {
-      size = scmBlockSize;
-      int numData = replicationConfig instanceof ECReplicationConfig ?
-          ((ECReplicationConfig) replicationConfig).getData() : 1;
-      num = (int) ((requestedSize - 1) / (scmBlockSize * numData) + 1);
-    }
+
+    List<AllocatedBlock> blocks = new ArrayList<>(num);
     try {
       for (int i = 0; i < num; i++) {
         AllocatedBlock block = scm.getScmBlockManager()

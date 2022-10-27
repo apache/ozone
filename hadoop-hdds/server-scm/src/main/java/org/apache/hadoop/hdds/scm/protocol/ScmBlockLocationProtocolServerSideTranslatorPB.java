@@ -188,10 +188,17 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   public AllocateScmBlockResponseProto allocateScmBlock(
       AllocateScmBlockRequestProto request, int clientVersion)
       throws IOException {
+
+    final int numData = request.hasEcReplicationConfig() ?
+        request.getEcReplicationConfig().getData() : 1;
+
+    final long requestedSize = request.hasRequestedSize() ?
+        request.getRequestedSize() :
+        request.getNumBlocks() * request.getSize() * numData;
+
     List<AllocatedBlock> allocatedBlocks =
-        impl.allocateBlock(request.getSize(),
-            request.getNumBlocks(),
-            request.getRequestedSize(),
+        impl.allocateBlock(
+            requestedSize,
             ReplicationConfig.fromProto(
                 request.getType(),
                 request.getFactor(),
@@ -202,9 +209,12 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     AllocateScmBlockResponseProto.Builder builder =
         AllocateScmBlockResponseProto.newBuilder();
 
-    if (allocatedBlocks.size() < request.getNumBlocks()) {
-      throw new SCMException("Allocated " + allocatedBlocks.size() +
-          " blocks. Requested " + request.getNumBlocks() + " blocks",
+    final long allocatedSize = numData * allocatedBlocks.stream()
+        .mapToLong(AllocatedBlock::getSize)
+        .sum();
+    if (allocatedSize < requestedSize) {
+      throw new SCMException("Allocated " + allocatedSize +
+          " bytes. Requested " + requestedSize + " bytes",
           SCMException.ResultCodes.FAILED_TO_ALLOCATE_ENOUGH_BLOCKS);
     }
     for (AllocatedBlock block : allocatedBlocks) {
