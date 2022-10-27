@@ -199,21 +199,16 @@ public class SCMBlockProtocolServer implements
           "requestedSize is {}, with {}",
           num, size, requestedSize, excludeList);
     }
-    long lastBlockSize = size; // for backward compatibility
     if (requestedSize > 0) {
       size = scmBlockSize;
       int numData = replicationConfig instanceof ECReplicationConfig ?
           ((ECReplicationConfig) replicationConfig).getData() : 1;
       num = (int) ((requestedSize - 1) / (scmBlockSize * numData) + 1);
-      // For EC, lastBlockSize = min(lastStripeSize, scmBlockSize)
-      lastBlockSize = Math.min(scmBlockSize,
-          requestedSize - (num - 1) * scmBlockSize * numData);
     }
     try {
       for (int i = 0; i < num; i++) {
         AllocatedBlock block = scm.getScmBlockManager()
-            .allocateBlock(i + 1 == num ? lastBlockSize : size,
-                replicationConfig, owner, excludeList);
+            .allocateBlock(size, replicationConfig, owner, excludeList);
         if (block != null) {
           blocks.add(block);
         }
