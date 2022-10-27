@@ -72,7 +72,7 @@ public class RocksDBStoreMBean implements DynamicMBean, MetricsSource {
   public static final String ROCKSDB_PROPERTY_PREFIX = "rocksdb.";
 
   // RocksDB properties
-  private final String [][] cfPros = {
+  private final String[][] cfPros = {
       // 1 if a memtable flush is pending; otherwise, returns 0
       {"mem-table-flush-pending", "false", ""},
       // estimated total number of bytes compaction needs to rewrite to get
@@ -108,8 +108,8 @@ public class RocksDBStoreMBean implements DynamicMBean, MetricsSource {
   };
 
   // level-x sst file info (Global)
-  private final String NUM_FILES_AT_LEVEL = "num_files_at_level";
-  private final String SIZE_AT_LEVEL = "size_at_level";
+  private static final String NUM_FILES_AT_LEVEL = "num_files_at_level";
+  private static final String SIZE_AT_LEVEL = "size_at_level";
 
   public RocksDBStoreMBean(Statistics statistics, RocksDatabase db,
       String dbName) {
@@ -307,10 +307,10 @@ public class RocksDBStoreMBean implements DynamicMBean, MetricsSource {
     Map<String, Map<Integer, Map<String, Long>>> data = computeSstFileStat();
 
     // Export file number
-    ExportSstFileStat(rb, data.get(NUM_FILES_AT_LEVEL), NUM_FILES_AT_LEVEL);
+    exportSstFileStat(rb, data.get(NUM_FILES_AT_LEVEL), NUM_FILES_AT_LEVEL);
 
     // Export file total size
-    ExportSstFileStat(rb, data.get(SIZE_AT_LEVEL), SIZE_AT_LEVEL);
+    exportSstFileStat(rb, data.get(SIZE_AT_LEVEL), SIZE_AT_LEVEL);
   }
 
   private Map<String, Map<Integer, Map<String, Long>>> computeSstFileStat() {
@@ -328,7 +328,7 @@ public class RocksDBStoreMBean implements DynamicMBean, MetricsSource {
       String cf = Strings.fromByteArray(file.columnFamilyName());
       if (numStat != null) {
         Long value = numStat.get(cf);
-        numStat.put(cf, value == null? 1L : value + 1);
+        numStat.put(cf, value == null ? 1L : value + 1);
       } else {
         numStat = new HashMap<>();
         numStat.put(cf, 1L);
@@ -338,7 +338,7 @@ public class RocksDBStoreMBean implements DynamicMBean, MetricsSource {
       sizeStat = sizeStatPerCF.get(file.level());
       if (sizeStat != null) {
         Long value = sizeStat.get(cf);
-        sizeStat.put(cf, value == null? file.size() : value + file.size());
+        sizeStat.put(cf, value == null ? file.size() : value + file.size());
       } else {
         sizeStat = new HashMap<>();
         sizeStat.put(cf, file.size());
@@ -351,14 +351,14 @@ public class RocksDBStoreMBean implements DynamicMBean, MetricsSource {
     return ret;
   }
 
-  private void ExportSstFileStat(MetricsRecordBuilder rb,
+  private void exportSstFileStat(MetricsRecordBuilder rb,
       Map<Integer, Map<String, Long>> numStatPerCF, String metricName) {
     Map<String, Long> numStat;
-    for (Integer level: numStatPerCF.keySet()) {
-      numStat = numStatPerCF.get(level);
+    for (Map.Entry<Integer, Map<String, Long>> entry: numStatPerCF.entrySet()) {
+      numStat = entry.getValue();
       numStat.forEach((cf, v) -> rb.addCounter(Interns.info(
-            cf + "_" + metricName + level, "RocksDBProperty"), v));
-      rb.addCounter(Interns.info(metricName + level, "RocksDBProperty"),
+            cf + "_" + metricName + entry.getKey(), "RocksDBProperty"), v));
+      rb.addCounter(Interns.info(metricName + entry.getKey(), "RocksDBProperty"),
           numStat.values().stream().mapToLong(p -> p.longValue()).sum());
     }
   }
