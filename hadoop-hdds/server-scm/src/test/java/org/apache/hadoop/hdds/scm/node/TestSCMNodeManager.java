@@ -69,6 +69,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
@@ -76,6 +77,7 @@ import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
+import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -975,6 +977,40 @@ public class TestSCMNodeManager {
         node1, SCMCommandProto.Type.replicateContainerCommand));
     assertEquals(11, nodeManager.getNodeQueuedCommandCount(
         node1, SCMCommandProto.Type.closeContainerCommand));
+  }
+
+  @Test
+  public void testCommandCount()
+      throws AuthenticationException, IOException {
+    SCMNodeManager nodeManager = createNodeManager(getConf());
+
+    UUID datanode1 = UUID.randomUUID();
+    UUID datanode2 = UUID.randomUUID();
+    long containerID = 1;
+
+    SCMCommand<?> closeContainerCommand =
+        new CloseContainerCommand(containerID, PipelineID.randomId());
+    SCMCommand<?> createPipelineCommand =
+        new CreatePipelineCommand(PipelineID.randomId(),
+            HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE, Collections.emptyList());
+
+    nodeManager.onMessage(
+        new CommandForDatanode<>(datanode1, closeContainerCommand), null);
+    nodeManager.onMessage(
+        new CommandForDatanode<>(datanode1, closeContainerCommand), null);
+    nodeManager.onMessage(
+        new CommandForDatanode<>(datanode1, createPipelineCommand), null);
+
+    Assert.assertEquals(2, nodeManager.getCommandQueueCount(
+        datanode1, SCMCommandProto.Type.closeContainerCommand));
+    Assert.assertEquals(1, nodeManager.getCommandQueueCount(
+        datanode1, SCMCommandProto.Type.createPipelineCommand));
+    Assert.assertEquals(0, nodeManager.getCommandQueueCount(
+        datanode1, SCMCommandProto.Type.closePipelineCommand));
+
+    Assert.assertEquals(0, nodeManager.getCommandQueueCount(
+        datanode2, SCMCommandProto.Type.closeContainerCommand));
   }
 
   /**

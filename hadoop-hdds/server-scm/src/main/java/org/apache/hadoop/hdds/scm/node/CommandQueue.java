@@ -19,10 +19,12 @@ package org.apache.hadoop.hdds.scm.node;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,9 +40,8 @@ import java.util.concurrent.locks.ReentrantLock;
  * there where queued.
  */
 public class CommandQueue {
-  // This list is used as default return value.
-  private static final List<SCMCommand> DEFAULT_LIST = new ArrayList<>();
   private final Map<UUID, Commands> commandMap;
+  private final Map<UUID, Map<SCMCommandProto.Type, Integer>> summaryMap;
   private final Lock lock;
   private long commandsInQueue;
 
@@ -59,6 +60,7 @@ public class CommandQueue {
    */
   public CommandQueue() {
     commandMap = new HashMap<>();
+    summaryMap = new HashMap<>();
     lock = new ReentrantLock();
     commandsInQueue = 0;
   }
@@ -71,6 +73,7 @@ public class CommandQueue {
     lock.lock();
     try {
       commandMap.clear();
+      summaryMap.clear();
       commandsInQueue = 0;
     } finally {
       lock.unlock();
@@ -90,6 +93,7 @@ public class CommandQueue {
     lock.lock();
     try {
       Commands cmds = commandMap.remove(datanodeUuid);
+      summaryMap.remove(datanodeUuid);
       List<SCMCommand> cmdList = null;
       if (cmds != null) {
         cmdList = cmds.getCommands();
@@ -97,7 +101,28 @@ public class CommandQueue {
         // A post condition really.
         Preconditions.checkState(commandsInQueue >= 0);
       }
-      return cmds == null ? DEFAULT_LIST : cmdList;
+      return cmds == null ? Collections.emptyList() : cmdList;
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /**
+   * Returns the count of commands of the give type currently queued for the
+   * given datanode.
+   * @param datanodeUuid Datanode UUID.
+   * @param commandType The type of command for which to get the count.
+   * @return The currently queued command count, or zero if none are queued.
+   */
+  public int getDatanodeCommandCount(
+      final UUID datanodeUuid, SCMCommandProto.Type commandType) {
+    lock.lock();
+    try {
+      Map<SCMCommandProto.Type, Integer> summary = summaryMap.get(datanodeUuid);
+      if (summary == null) {
+        return 0;
+      }
+      return summary.getOrDefault(commandType, 0);
     } finally {
       lock.unlock();
     }
@@ -113,11 +138,12 @@ public class CommandQueue {
       command) {
     lock.lock();
     try {
-      if (commandMap.containsKey(datanodeUuid)) {
-        commandMap.get(datanodeUuid).add(command);
-      } else {
-        commandMap.put(datanodeUuid, new Commands(command));
-      }
+      commandMap.computeIfAbsent(datanodeUuid, s -> new Commands())
+          .add(command);
+      Map<SCMCommandProto.Type, Integer> summary =
+          summaryMap.computeIfAbsent(datanodeUuid, s -> new HashMap<>());
+      summary.put(command.getType(),
+          summary.getOrDefault(command.getType(), 0) + 1);
       commandsInQueue++;
     } finally {
       lock.unlock();
@@ -139,15 +165,6 @@ public class CommandQueue {
       commands = new ArrayList<>();
       updateTime = 0;
       readTime = 0;
-    }
-
-    /**
-     * Creates the object and populates with the command.
-     * @param command command to add to queue.
-     */
-    Commands(SCMCommand command) {
-      this();
-      this.add(command);
     }
 
     /**
