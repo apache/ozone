@@ -394,15 +394,10 @@ public class TestOmSnapshot {
     OzoneBucket volbucket = vol.getBucket(bucket);
 
     String key = "key-";
-    byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
-    OzoneOutputStream oneKey = volbucket.createKey(
-            key + RandomStringUtils.randomNumeric(5),
-            value.length, RATIS, ONE,
-            new HashMap<>());
-    oneKey.write(value);
-    oneKey.close();
-
+    createKeys(volbucket, key);
     String snapshotKeyPrefix = createSnapshot(volume, bucket);
+    deleteKeys(volbucket);
+
     Iterator<? extends OzoneKey> volBucketIter =
             volbucket.listKeys(snapshotKeyPrefix + "key-");
     int volBucketKeyCount = 0;
@@ -411,8 +406,6 @@ public class TestOmSnapshot {
       volBucketKeyCount++;
     }
     Assert.assertEquals(1, volBucketKeyCount);
-
-    deleteKeys(volbucket);
 
     snapshotKeyPrefix = createSnapshot(volume, bucket);
     Iterator<? extends OzoneKey> volBucketIter2 =
@@ -432,24 +425,12 @@ public class TestOmSnapshot {
     vol.createBucket(bucket);
     OzoneBucket volbucket = vol.getBucket(bucket);
 
-    String key = "key-";
-    byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
-    OzoneOutputStream oneKey = volbucket.createKey(
-            key + "1-" + RandomStringUtils.randomNumeric(5),
-            value.length, RATIS, ONE,
-            new HashMap<>());
-    oneKey.write(value);
-    oneKey.close();
-
+    String key1 = "key-1-";
+    createKeys(volbucket, key1);
     String snapshotKeyPrefix1 = createSnapshot(volume, bucket);
 
-    OzoneOutputStream twoKey = volbucket.createKey(
-            key + "2-" + RandomStringUtils.randomNumeric(5),
-            value.length, RATIS, ONE,
-            new HashMap<>());
-    twoKey.write(value);
-    twoKey.close();
-
+    String key2 = "key-2-";
+    createKeys(volbucket, key2);
     String snapshotKeyPrefix2 = createSnapshot(volume, bucket);
 
     Iterator<? extends OzoneKey> volBucketIter =
@@ -460,7 +441,6 @@ public class TestOmSnapshot {
       volBucketKeyCount++;
     }
     Assert.assertEquals(1, volBucketKeyCount);
-
 
     Iterator<? extends OzoneKey> volBucketIter2 =
             volbucket.listKeys(snapshotKeyPrefix2 + "key-");
@@ -508,5 +488,16 @@ public class TestOmSnapshot {
       bucket.deleteKey(key.getName());
     }
   }
+
+  private void createKeys(OzoneBucket bucket, String keyprefix) throws IOException {
+    byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+    OzoneOutputStream fileKey = bucket.createKey(
+            keyprefix + RandomStringUtils.randomNumeric(5),
+            value.length, RATIS, ONE,
+            new HashMap<>());
+    fileKey.write(value);
+    fileKey.close();
+  }
+
 }
 
