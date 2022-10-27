@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
@@ -50,7 +49,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CL
  */
 public class TestEmptyContainerHandler {
   private ReplicationManager replicationManager;
-  private ContainerManager containerManager;
   private EmptyContainerHandler emptyContainerHandler;
   private ECReplicationConfig ecReplicationConfig;
   private RatisReplicationConfig ratisReplicationConfig;
@@ -62,17 +60,6 @@ public class TestEmptyContainerHandler {
     ratisReplicationConfig = RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE);
     replicationManager = Mockito.mock(ReplicationManager.class);
-    containerManager = Mockito.mock(ContainerManager.class);
-    
-    Mockito.doAnswer(invocation -> {
-      containerManager.updateContainerState(
-          ((ContainerID)invocation.getArguments()[0]),
-          (HddsProtos.LifeCycleEvent) invocation.getArguments()[1]);
-      return null;
-    }).when(replicationManager).updateContainerState(
-        Mockito.any(ContainerID.class),
-        Mockito.any(HddsProtos.LifeCycleEvent.class));
-
     emptyContainerHandler =
         new EmptyContainerHandler(replicationManager);
   }
@@ -233,7 +220,7 @@ public class TestEmptyContainerHandler {
         ReplicationManagerReport.HealthState.EMPTY));
 
     if (times > 0) {
-      Mockito.verify(containerManager, Mockito.times(1))
+      Mockito.verify(replicationManager, Mockito.times(1))
           .updateContainerState(Mockito.any(ContainerID.class),
               Mockito.any(HddsProtos.LifeCycleEvent.class));
     }
