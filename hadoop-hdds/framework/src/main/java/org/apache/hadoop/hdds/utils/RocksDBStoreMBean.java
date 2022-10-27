@@ -358,7 +358,8 @@ public class RocksDBStoreMBean implements DynamicMBean, MetricsSource {
       numStat = entry.getValue();
       numStat.forEach((cf, v) -> rb.addCounter(Interns.info(
             cf + "_" + metricName + entry.getKey(), "RocksDBProperty"), v));
-      rb.addCounter(Interns.info(metricName + entry.getKey(), "RocksDBProperty"),
+      rb.addCounter(
+          Interns.info(metricName + entry.getKey(), "RocksDBProperty"),
           numStat.values().stream().mapToLong(p -> p.longValue()).sum());
     }
   }
