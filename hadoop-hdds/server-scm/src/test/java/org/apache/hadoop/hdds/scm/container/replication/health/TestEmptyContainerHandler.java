@@ -70,7 +70,7 @@ public class TestEmptyContainerHandler {
    */
   @Test
   public void testEmptyAndClosedECContainerReturnsTrue()
-      throws InvalidStateTransitionException, IOException, TimeoutException {
+      throws IOException {
     long keyCount = 0L;
     long bytesUsed = 123L;
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
@@ -92,7 +92,7 @@ public class TestEmptyContainerHandler {
 
   @Test
   public void testEmptyAndClosedRatisContainerReturnsTrue()
-      throws InvalidStateTransitionException, IOException, TimeoutException {
+      throws IOException {
     long keyCount = 0L;
     long bytesUsed = 123L;
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
@@ -118,7 +118,7 @@ public class TestEmptyContainerHandler {
    */
   @Test
   public void testEmptyAndNonClosedECContainerReturnsFalse()
-      throws InvalidStateTransitionException, IOException, TimeoutException {
+      throws IOException {
     long keyCount = 0L;
     long bytesUsed = 123L;
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
@@ -146,7 +146,7 @@ public class TestEmptyContainerHandler {
    */
   @Test
   public void testNonEmptyRatisContainerReturnsFalse()
-      throws InvalidStateTransitionException, IOException, TimeoutException {
+      throws IOException {
     long keyCount = 5L;
     long bytesUsed = 123L;
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
@@ -173,7 +173,7 @@ public class TestEmptyContainerHandler {
    */
   @Test
   public void testEmptyECContainerWithNonEmptyReplicaReturnsFalse()
-      throws InvalidStateTransitionException, IOException, TimeoutException {
+      throws IOException {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         ecReplicationConfig, 1, CLOSED, 0L, 0L);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
@@ -211,7 +211,7 @@ public class TestEmptyContainerHandler {
    */
   private void assertAndVerify(ContainerCheckRequest request,
       boolean assertion, int times, long numEmptyExpected)
-      throws IOException, InvalidStateTransitionException, TimeoutException {
+      throws IOException {
     Assertions.assertEquals(assertion, emptyContainerHandler.handle(request));
     Mockito.verify(replicationManager, Mockito.times(times))
         .sendDeleteCommand(Mockito.any(ContainerInfo.class), Mockito.anyInt(),
