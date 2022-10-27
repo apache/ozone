@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -964,16 +965,36 @@ public class TestSCMNodeManager {
         HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
     verify(eventPublisher,
         times(1)).fireEvent(NEW_NODE, node1);
+    Map<SCMCommandProto.Type, Integer> commandsToBeSent = new HashMap<>();
+    commandsToBeSent.put(SCMCommandProto.Type.replicateContainerCommand, 3);
+    commandsToBeSent.put(SCMCommandProto.Type.deleteBlocksCommand, 5);
+
     nodeManager.processNodeCommandQueueReport(node1,
         CommandQueueReportProto.newBuilder()
             .addCommand(SCMCommandProto.Type.replicateContainerCommand)
             .addCount(123)
             .addCommand(SCMCommandProto.Type.closeContainerCommand)
             .addCount(11)
-            .build());
+            .build(),
+        commandsToBeSent);
     assertEquals(-1, nodeManager.getNodeQueuedCommandCount(
         node1, SCMCommandProto.Type.closePipelineCommand));
-    assertEquals(123, nodeManager.getNodeQueuedCommandCount(
+    assertEquals(126, nodeManager.getNodeQueuedCommandCount(
+        node1, SCMCommandProto.Type.replicateContainerCommand));
+    assertEquals(11, nodeManager.getNodeQueuedCommandCount(
+        node1, SCMCommandProto.Type.closeContainerCommand));
+    assertEquals(5, nodeManager.getNodeQueuedCommandCount(
+        node1, SCMCommandProto.Type.deleteBlocksCommand));
+
+    // Send another report missing an earlier entry, and ensure it is not
+    // still reported as a stale value.
+    nodeManager.processNodeCommandQueueReport(node1,
+        CommandQueueReportProto.newBuilder()
+            .addCommand(SCMCommandProto.Type.closeContainerCommand)
+            .addCount(11)
+            .build(),
+        Collections.emptyMap());
+    assertEquals(-1, nodeManager.getNodeQueuedCommandCount(
         node1, SCMCommandProto.Type.replicateContainerCommand));
     assertEquals(11, nodeManager.getNodeQueuedCommandCount(
         node1, SCMCommandProto.Type.closeContainerCommand));

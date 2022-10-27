@@ -434,7 +434,8 @@ public class ReplicationNodeManagerMock implements NodeManager {
 
   @Override
   public void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
-      CommandQueueReportProto commandReport) {
+      CommandQueueReportProto commandReport,
+      Map<SCMCommandProto.Type, Integer> commandsToBeSent) {
     // Do nothing.
   }
 
