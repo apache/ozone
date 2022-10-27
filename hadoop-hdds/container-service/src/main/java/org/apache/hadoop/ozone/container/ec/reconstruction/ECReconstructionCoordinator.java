@@ -102,10 +102,11 @@ public class ECReconstructionCoordinator implements Closeable {
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final TokenHelper tokenHelper;
   private final ContainerClientMetrics clientMetrics;
+  private final ECReconstructionMetrics metrics;
 
   public ECReconstructionCoordinator(ConfigurationSource conf,
-                                     CertificateClient certificateClient)
-      throws IOException {
+      CertificateClient certificateClient,
+      ECReconstructionMetrics metrics) throws IOException {
     this.containerOperationClient = new ECContainerOperationClient(conf,
         certificateClient);
     this.byteBufferPool = new ElasticByteBufferPool();
@@ -121,6 +122,7 @@ public class ECReconstructionCoordinator implements Closeable {
         .getInstance(byteBufferPool, () -> ecReconstructExecutor);
     tokenHelper = new TokenHelper(conf, certificateClient);
     this.clientMetrics = ContainerClientMetrics.acquire();
+    this.metrics = metrics;
   }
 
   public void reconstructECContainerGroup(long containerID,
@@ -162,8 +164,13 @@ public class ECReconstructionCoordinator implements Closeable {
         containerOperationClient
             .closeContainer(containerID, dn, repConfig, containerToken);
       }
+      metrics.incReconstructionTotal();
+      metrics.incBlockGroupReconstructionTotal(blockLocationInfoMap.size());
     } catch (Exception e) {
       // Any exception let's delete the recovering containers.
+      metrics.incReconstructionFailsTotal();
+      metrics.incBlockGroupReconstructionFailsTotal(
+          blockLocationInfoMap.size());
       LOG.warn(
           "Exception while reconstructing the container {}. Cleaning up"
               + " all the recovering containers in the reconstruction process.",
@@ -444,5 +451,9 @@ public class ECReconstructionCoordinator implements Closeable {
       blockGroupLen = Math.min(putBlockLen, blockGroupLen);
     }
     return blockGroupLen == Long.MAX_VALUE ? 0 : blockGroupLen;
+  }
+
+  public ECReconstructionMetrics getECReconstructionMetrics() {
+    return this.metrics;
   }
 }

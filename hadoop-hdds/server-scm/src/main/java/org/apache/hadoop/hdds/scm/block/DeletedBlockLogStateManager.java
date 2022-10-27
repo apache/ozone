@@ -49,7 +49,8 @@ public interface DeletedBlockLogStateManager {
       throws IOException, TimeoutException;
 
   TableIterator<Long,
-      KeyValue<Long, DeletedBlocksTransaction>> getReadOnlyIterator();
+      KeyValue<Long, DeletedBlocksTransaction>> getReadOnlyIterator()
+      throws IOException;
 
   void onFlush();
 

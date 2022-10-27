@@ -28,6 +28,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.protobuf.BlockingService;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -290,7 +291,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   // Used to keep track of pending replication and pending deletes for
   // container replicas.
   private ContainerReplicaPendingOps containerReplicaPendingOps;
-
+  private final AtomicBoolean isStopped = new AtomicBoolean(false);
+  
   /**
    * Creates a new StorageContainerManager. Configuration will be
    * updated with information on the actual listening addresses used
@@ -584,7 +586,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       clusterMap = new NetworkTopologyImpl(conf);
     }
     // This needs to be done before initializing Ratis.
-    RatisDropwizardExports.registerRatisMetricReporters(ratisMetricsMap);
+    RatisDropwizardExports.registerRatisMetricReporters(ratisMetricsMap,
+        () -> isStopped.get());
     if (configurator.getSCMHAManager() != null) {
       scmHAManager = configurator.getSCMHAManager();
     } else {
@@ -788,45 +791,45 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     final CertificateServer scmCertificateServer;
     final CertificateServer rootCertificateServer;
+
+    // Start specific instance SCM CA server.
+    String subject = SCM_SUB_CA_PREFIX +
+        InetAddress.getLocalHost().getHostName();
+    if (configurator.getCertificateServer() != null) {
+      scmCertificateServer = configurator.getCertificateServer();
+    } else {
+      scmCertificateServer = new DefaultCAServer(subject,
+          scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
+          certificateStore, new DefaultProfile(),
+          scmCertificateClient.getComponentName());
+      // INTERMEDIARY_CA which issues certs to DN and OM.
+      scmCertificateServer.init(new SecurityConfig(configuration),
+          CertificateServer.CAType.INTERMEDIARY_CA);
+    }
+
     // If primary SCM node Id is set it means this is a cluster which has
     // performed init with SCM HA version code.
     if (scmStorageConfig.checkPrimarySCMIdInitialized()) {
-      // Start specific instance SCM CA server.
-      String subject = SCM_SUB_CA_PREFIX +
-          InetAddress.getLocalHost().getHostName();
-      if (configurator.getCertificateServer() != null) {
-        scmCertificateServer = configurator.getCertificateServer();
-      } else {
-        scmCertificateServer = new DefaultCAServer(subject,
-            scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
-            certificateStore, new DefaultProfile(),
-            scmCertificateClient.getComponentName());
-        // INTERMEDIARY_CA which issues certs to DN and OM.
-        scmCertificateServer.init(new SecurityConfig(configuration),
-            CertificateServer.CAType.INTERMEDIARY_CA);
-      }
-
       if (primaryScmNodeId.equals(scmStorageConfig.getScmId())) {
         if (configurator.getCertificateServer() != null) {
           rootCertificateServer = configurator.getCertificateServer();
         } else {
           rootCertificateServer =
-              HASecurityUtils.initializeRootCertificateServer(
-              conf, certificateStore, scmStorageConfig, new DefaultCAProfile());
+              HASecurityUtils.initializeRootCertificateServer(conf,
+                  certificateStore, scmStorageConfig, new DefaultCAProfile());
         }
         persistPrimarySCMCerts();
       } else {
         rootCertificateServer = null;
       }
     } else {
-      // On a upgraded cluster primary scm nodeId will not be set as init will
-      // not be run again after upgrade. So for a upgraded cluster where init
-      // has not happened again we will have setup like before where it has
-      // one CA server which is issuing certificates to DN and OM.
+      // On an upgraded cluster primary scm nodeId will not be set as init will
+      // not be run again after upgrade. For an upgraded cluster, besides one
+      // intermediate CA server which is issuing certificates to DN and OM,
+      // we will have one root CA server too.
       rootCertificateServer =
           HASecurityUtils.initializeRootCertificateServer(conf,
               certificateStore, scmStorageConfig, new DefaultProfile());
-      scmCertificateServer = rootCertificateServer;
     }
 
     // We need to pass getCACertificate as rootCA certificate,
@@ -1072,7 +1075,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmStorageConfig.getScmId());
 
       // Initialize security if security is enabled later.
-      initializeSecurityIfNeeded(conf, scmhaNodeDetails, scmStorageConfig);
+      initializeSecurityIfNeeded(
+          conf, scmhaNodeDetails, scmStorageConfig, false);
 
       return true;
     }
@@ -1097,7 +1101,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       }
 
       // Initialize security if security is enabled later.
-      initializeSecurityIfNeeded(conf, scmhaNodeDetails, scmStorageConfig);
+      initializeSecurityIfNeeded(
+          conf, scmhaNodeDetails, scmStorageConfig, false);
 
     } else {
       try {
@@ -1136,14 +1141,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @param scmStorageConfig
    * @throws IOException
    */
-  private static void initializeSecurityIfNeeded(OzoneConfiguration conf,
-      SCMHANodeDetails scmhaNodeDetails, SCMStorageConfig scmStorageConfig)
+  private static void initializeSecurityIfNeeded(
+      OzoneConfiguration conf, SCMHANodeDetails scmhaNodeDetails,
+      SCMStorageConfig scmStorageConfig, boolean isPrimordial)
       throws IOException {
     // Initialize security if security is enabled later.
     if (OzoneSecurityUtil.isSecurityEnabled(conf)
         && scmStorageConfig.getScmCertSerialId() == null) {
       HASecurityUtils.initializeSecurity(scmStorageConfig, conf,
-          getScmAddress(scmhaNodeDetails, conf), true);
+          getScmAddress(scmhaNodeDetails, conf), isPrimordial);
       scmStorageConfig.forceInitialize();
       LOG.info("SCM unsecure cluster is converted to secure cluster. " +
               "Persisted SCM Certificate SerialID {}",
@@ -1233,7 +1239,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       final boolean isSCMHAEnabled = scmStorageConfig.isSCMHAEnabled();
 
       // Initialize security if security is enabled later.
-      initializeSecurityIfNeeded(conf, haDetails, scmStorageConfig);
+      initializeSecurityIfNeeded(conf, haDetails, scmStorageConfig, true);
 
       if (SCMHAUtils.isSCMHAEnabled(conf) && !isSCMHAEnabled) {
         SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
@@ -1519,6 +1525,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public void stop() {
+    if (isStopped.getAndSet(true)) {
+      LOG.info("Storage Container Manager is not running.");
+      return;
+    }
     try {
       if (containerBalancer.isBalancerRunning()) {
         LOG.info("Stopping Container Balancer service.");
@@ -1655,7 +1665,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @Override
   public void shutDown(String message) {
     stop();
-    ExitUtils.terminate(1, message, LOG);
+    ExitUtils.terminate(0, message, LOG);
   }
 
   /**

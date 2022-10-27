@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -102,6 +103,11 @@ public class OMKeyCommitResponse extends OmKeyResponse {
 
   protected String getOzoneKeyName() {
     return ozoneKeyName;
+  }
+
+  @VisibleForTesting
+  public RepeatedOmKeyInfo getKeysToDelete() {
+    return keysToDelete;
   }
 
   protected void updateDeletedTable(OMMetadataManager omMetadataManager,

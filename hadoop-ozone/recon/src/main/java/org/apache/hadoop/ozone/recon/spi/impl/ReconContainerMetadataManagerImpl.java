@@ -506,12 +506,12 @@ public class ReconContainerMetadataManagerImpl
   }
 
   @Override
-  public TableIterator getContainerTableIterator() {
+  public TableIterator getContainerTableIterator() throws IOException {
     return containerKeyTable.iterator();
   }
 
   @Override
-  public TableIterator getKeyContainerTableIterator() {
+  public TableIterator getKeyContainerTableIterator() throws IOException {
     return keyContainerTable.iterator();
   }
 
