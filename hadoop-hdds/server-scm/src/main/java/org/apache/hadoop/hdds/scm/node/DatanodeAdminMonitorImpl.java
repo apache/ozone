@@ -77,14 +77,24 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private Queue<DatanodeDetails> cancelledNodes = new ArrayDeque();
   private Set<DatanodeDetails> trackedNodes = new HashSet<>();
   private NodeDecommissionMetrics metrics;
-  private long pipelinesWaitingToClose = 0;
-  private long sufficientlyReplicatedContainers = 0;
-  private long trackedDecomMaintenance = 0;
-  private long trackedRecommission = 0;
-  private long unhealthyContainers = 0;
-  private long underReplicatedContainers = 0;
+  private ThreadLocal<Long> pipelinesWaitingToClose =
+      ThreadLocal.withInitial(() -> 0L);
+  private ThreadLocal<Long> sufficientlyReplicatedContainers  =
+      ThreadLocal.withInitial(() -> 0L);
+  private ThreadLocal<Long> trackedDecomMaintenance  =
+      ThreadLocal.withInitial(() -> 0L);
+  private ThreadLocal<Long> trackedRecommission  =
+      ThreadLocal.withInitial(() -> 0L);
+  private ThreadLocal<Long> unhealthyContainers  =
+      ThreadLocal.withInitial(() -> 0L);
+  private ThreadLocal<Long> underReplicatedContainers  =
+      ThreadLocal.withInitial(() -> 0L);
 
-  private static final class ContainerStateInWorkflow {
+  /**
+   * Inner class for snapshot of Datanode ContainerState in
+   * Decommissioning and Maintenance mode workflow.
+   */
+  public static final class ContainerStateInWorkflow {
     private long sufficientlyReplicated = 0;
     private long unhealthyContainers = 0;
     private long underReplicatedContainers = 0;
@@ -96,7 +106,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
                                      long underReplicatedContainers,
                                      long unhealthyContainers,
                                      long pipelinesWaitingToClose) {
-      this.host = host;
       this.sufficientlyReplicated = sufficientlyReplicated;
       this.unhealthyContainers = unhealthyContainers;
       this.underReplicatedContainers = underReplicatedContainers;
@@ -115,19 +124,29 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       pipelinesWaitingToClose = num;
     }
 
-    public void reset() {
-      sufficientlyReplicated = 0L;
-      underReplicatedContainers = 0L;
-      unhealthyContainers = 0L;
-      pipelinesWaitingToClose = 0L;
-    }
-
     public String getHost() {
       return host;
     }
+
+    public long getSufficientlyReplicated() {
+      return sufficientlyReplicated;
+    }
+
+    public long getPipelinesWaitingToClose() {
+      return pipelinesWaitingToClose;
+    }
+
+    public long getUnderReplicatedContainers() {
+      return underReplicatedContainers;
+    }
+
+    public long getUnhealthyContainers() {
+      return unhealthyContainers;
+    }
   }
 
-  private Map<String, ContainerStateInWorkflow> containerStateByHost;
+  private ThreadLocal<Map<String, ContainerStateInWorkflow>>
+      containerStateByHost = new ThreadLocal<>();
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeAdminMonitorImpl.class);
@@ -144,8 +163,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     this.eventQueue = eventQueue;
     this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
-
-    containerStateByHost = new HashMap<>();
   }
 
   /**
@@ -200,11 +217,12 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   public void run() {
     try {
       synchronized (this) {
-        trackedRecommission = getCancelledCount();
+        containerStateByHost.set(new HashMap<>());
+        trackedRecommission.set(Long.valueOf(getCancelledCount()));
         processCancelledNodes();
         processPendingNodes();
-        trackedDecomMaintenance = getTrackedNodeCount();
-        removeStaleContainerMetrics();
+        trackedDecomMaintenance.set(Long.valueOf(getTrackedNodeCount()));
+        resetContainerMetrics();
       }
       processTransitioningNodes();
       if (trackedNodes.size() > 0 || pendingNodes.size() > 0) {
@@ -232,53 +250,25 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     return trackedNodes.size();
   }
 
-  synchronized void setMetricsToGauge() {
-    metrics.setTrackedContainersUnhealthyTotal(unhealthyContainers);
-    metrics.setTrackedRecommissionNodesTotal(trackedRecommission);
+  private synchronized void setMetricsToGauge() {
+    metrics.setTrackedContainersUnhealthyTotal(unhealthyContainers.get());
+    metrics.setTrackedRecommissionNodesTotal(trackedRecommission.get());
     metrics.setTrackedDecommissioningMaintenanceNodesTotal(
-            trackedDecomMaintenance);
+            trackedDecomMaintenance.get());
     metrics.setTrackedContainersUnderReplicatedTotal(
-            underReplicatedContainers);
+            underReplicatedContainers.get());
     metrics.setTrackedContainersSufficientlyReplicatedTotal(
-            sufficientlyReplicatedContainers);
-    metrics.setTrackedPipelinesWaitingToCloseTotal(pipelinesWaitingToClose);
-    for (Map.Entry<String, ContainerStateInWorkflow> e :
-            containerStateByHost.entrySet()) {
-      metrics.metricRecordOfContainerStateByHost(e.getKey(),
-          e.getValue().sufficientlyReplicated,
-          e.getValue().underReplicatedContainers,
-          e.getValue().unhealthyContainers,
-          e.getValue().pipelinesWaitingToClose);
-    }
+            sufficientlyReplicatedContainers.get());
+    metrics.setTrackedPipelinesWaitingToCloseTotal(pipelinesWaitingToClose
+        .get());
+    metrics.metricRecordOfContainerStateByHost(containerStateByHost.get());
   }
 
   void resetContainerMetrics() {
-    pipelinesWaitingToClose = 0;
-    sufficientlyReplicatedContainers = 0;
-    unhealthyContainers = 0;
-    underReplicatedContainers = 0;
-
-    for (Map.Entry<String, ContainerStateInWorkflow> e :
-            containerStateByHost.entrySet()) {
-      e.getValue().reset();
-    }
-  }
-
-  void removeStaleContainerMetrics() {
-    // remove from ContainerMetrics state nodes
-    // no longer in decommissioning and maintenance
-    // mode workflow
-    Iterator<String> containerMetricByHost = containerStateByHost.keySet()
-         .iterator();
-    Set<String> trackedHostIDs = new HashSet<>();
-    trackedNodes.forEach(node -> trackedHostIDs.add(node.getHostName()));
-    while (containerMetricByHost.hasNext()) {
-      String hostID = containerMetricByHost.next();
-      if (!trackedHostIDs.contains(hostID)) {
-        metrics.metricRemoveRecordOfContainerStateByHost(hostID);
-        containerStateByHost.remove(hostID);
-      }
-    }
+    pipelinesWaitingToClose.set(0L);
+    sufficientlyReplicatedContainers.set(0L);
+    unhealthyContainers.set(0L);
+    underReplicatedContainers.set(0L);
   }
 
   private void processCancelledNodes() {
@@ -301,7 +291,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   }
 
   private void processTransitioningNodes() {
-    resetContainerMetrics();
     Iterator<DatanodeDetails> iterator = trackedNodes.iterator();
 
     while (iterator.hasNext()) {
@@ -393,10 +382,17 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     } else {
       LOG.info("Waiting for pipelines to close for {}. There are {} " +
           "pipelines", dn, pipelines.size());
-      containerStateByHost.computeIfAbsent(dn.getHostName(),
-              hostID -> new ContainerStateInWorkflow(hostID, 0L, 0L, 0L, 0L))
-          .setPipelinesWaitingToClose(pipelines.size());
-      pipelinesWaitingToClose += pipelines.size();
+      Map<String, ContainerStateInWorkflow> metricsByHost =
+          containerStateByHost.get();
+      if (metricsByHost == null) {
+        metricsByHost = new HashMap<>();
+        containerStateByHost.set(metricsByHost);
+      }
+      metricsByHost.put(dn.getHostName(),
+          new ContainerStateInWorkflow(dn.getHostName(),
+              0L, 0L, 0L, pipelines.size()));
+      pipelinesWaitingToClose.set(
+          pipelinesWaitingToClose.get() + pipelines.size());
       return false;
     }
   }
@@ -446,14 +442,19 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     LOG.info("{} has {} sufficientlyReplicated, {} underReplicated and {} " +
         "unhealthy containers",
         dn, sufficientlyReplicated, underReplicated, unhealthy);
-    containerStateByHost.computeIfAbsent(dn.getHostName(),
-        hostID -> new ContainerStateInWorkflow(hostID, 0L, 0L, 0L, 0L))
-        .setReplicationState(sufficientlyReplicated,
-            underReplicated,
-            unhealthy);
-    sufficientlyReplicatedContainers += sufficientlyReplicated;
-    underReplicatedContainers += underReplicated;
-    unhealthyContainers += unhealthy;
+    Map<String, ContainerStateInWorkflow> metricsByHost =
+        containerStateByHost.get();
+    metricsByHost.put(dn.getHostName(),
+            new ContainerStateInWorkflow(dn.getHostName(),
+                sufficientlyReplicated,
+                underReplicated,
+                unhealthy, 0L));
+    sufficientlyReplicatedContainers.set(
+        sufficientlyReplicatedContainers.get() + sufficientlyReplicated);
+    underReplicatedContainers.set(
+        underReplicatedContainers.get() + underReplicated);
+    unhealthyContainers.set(
+        unhealthyContainers.get() + unhealthy);
     if (LOG.isDebugEnabled() && underReplicatedIDs.size() < 10000 &&
         unhealthyIDs.size() < 10000) {
       LOG.debug("{} has {} underReplicated [{}] and {} unhealthy [{}] " +
