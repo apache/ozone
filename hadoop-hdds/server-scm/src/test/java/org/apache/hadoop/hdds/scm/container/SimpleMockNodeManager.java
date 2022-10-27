@@ -309,6 +309,18 @@ public class SimpleMockNodeManager implements NodeManager {
     return -1;
   }
 
+  /**
+   * Get the number of commands of the given type queued in the SCM CommandQueue
+   * for the given datanode.
+   * @param dnID The UUID of the datanode.
+   * @param cmdType The Type of command to query the current count for.
+   * @return The count of commands queued, or zero if none.
+   */
+  @Override
+  public int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType) {
+    return 0;
+  }
+
   @Override
   public List<SCMCommand> getCommandQueue(UUID dnID) {
     return null;
