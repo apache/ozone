@@ -190,31 +190,10 @@ public class TestOmSnapshot {
      */
     String keyBaseA = "key-a-";
     for (int i = 0; i < 10; i++) {
-      byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
-      OzoneOutputStream one = volAbucketA.createKey(
-          keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      one.write(value);
-      one.close();
-      OzoneOutputStream two = volAbucketB.createKey(
-          keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      two.write(value);
-      two.close();
-      OzoneOutputStream three = volBbucketA.createKey(
-          keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      three.write(value);
-      three.close();
-      OzoneOutputStream four = volBbucketB.createKey(
-          keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      four.write(value);
-      four.close();
+      createFileKey(volAbucketA, keyBaseA + i + "-");
+      createFileKey(volAbucketB, keyBaseA + i + "-");
+      createFileKey(volBbucketA, keyBaseA + i + "-");
+      createFileKey(volBbucketB, keyBaseA + i + "-");
     }
     /*
     Create 10 keys in  vol-a-<random>/buc-a-<random>,
@@ -223,33 +202,11 @@ public class TestOmSnapshot {
      */
     String keyBaseB = "key-b-";
     for (int i = 0; i < 10; i++) {
-      byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
-      OzoneOutputStream one = volAbucketA.createKey(
-          keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      one.write(value);
-      one.close();
-      OzoneOutputStream two = volAbucketB.createKey(
-          keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      two.write(value);
-      two.close();
-      OzoneOutputStream three = volBbucketA.createKey(
-          keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      three.write(value);
-      three.close();
-      OzoneOutputStream four = volBbucketB.createKey(
-          keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      four.write(value);
-      four.close();
+      createFileKey(volAbucketA, keyBaseB + i + "-");
+      createFileKey(volAbucketB, keyBaseB + i + "-");
+      createFileKey(volBbucketA, keyBaseB + i + "-");
+      createFileKey(volBbucketB, keyBaseB + i + "-");
     }
-
 
     String snapshotKeyPrefix = createSnapshot(volumeA, bucketA);
     Iterator<? extends OzoneKey> volABucketAIter =
@@ -394,7 +351,7 @@ public class TestOmSnapshot {
     OzoneBucket volbucket = vol.getBucket(bucket);
 
     String key = "key-";
-    createKeys(volbucket, key);
+    createFileKey(volbucket, key);
     String snapshotKeyPrefix = createSnapshot(volume, bucket);
     deleteKeys(volbucket);
 
@@ -426,11 +383,11 @@ public class TestOmSnapshot {
     OzoneBucket volbucket = vol.getBucket(bucket);
 
     String key1 = "key-1-";
-    createKeys(volbucket, key1);
+    createFileKey(volbucket, key1);
     String snapshotKeyPrefix1 = createSnapshot(volume, bucket);
 
     String key2 = "key-2-";
-    createKeys(volbucket, key2);
+    createFileKey(volbucket, key2);
     String snapshotKeyPrefix2 = createSnapshot(volume, bucket);
 
     Iterator<? extends OzoneKey> volBucketIter =
@@ -489,7 +446,8 @@ public class TestOmSnapshot {
     }
   }
 
-  private void createKeys(OzoneBucket bucket, String keyprefix) throws IOException {
+  private void createFileKey(OzoneBucket bucket, String keyprefix)
+          throws IOException {
     byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
     OzoneOutputStream fileKey = bucket.createKey(
             keyprefix + RandomStringUtils.randomNumeric(5),
