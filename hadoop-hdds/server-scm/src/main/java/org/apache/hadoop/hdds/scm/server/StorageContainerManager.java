@@ -791,45 +791,45 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     final CertificateServer scmCertificateServer;
     final CertificateServer rootCertificateServer;
+
+    // Start specific instance SCM CA server.
+    String subject = SCM_SUB_CA_PREFIX +
+        InetAddress.getLocalHost().getHostName();
+    if (configurator.getCertificateServer() != null) {
+      scmCertificateServer = configurator.getCertificateServer();
+    } else {
+      scmCertificateServer = new DefaultCAServer(subject,
+          scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
+          certificateStore, new DefaultProfile(),
+          scmCertificateClient.getComponentName());
+      // INTERMEDIARY_CA which issues certs to DN and OM.
+      scmCertificateServer.init(new SecurityConfig(configuration),
+          CertificateServer.CAType.INTERMEDIARY_CA);
+    }
+
     // If primary SCM node Id is set it means this is a cluster which has
     // performed init with SCM HA version code.
     if (scmStorageConfig.checkPrimarySCMIdInitialized()) {
-      // Start specific instance SCM CA server.
-      String subject = SCM_SUB_CA_PREFIX +
-          InetAddress.getLocalHost().getHostName();
-      if (configurator.getCertificateServer() != null) {
-        scmCertificateServer = configurator.getCertificateServer();
-      } else {
-        scmCertificateServer = new DefaultCAServer(subject,
-            scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
-            certificateStore, new DefaultProfile(),
-            scmCertificateClient.getComponentName());
-        // INTERMEDIARY_CA which issues certs to DN and OM.
-        scmCertificateServer.init(new SecurityConfig(configuration),
-            CertificateServer.CAType.INTERMEDIARY_CA);
-      }
-
       if (primaryScmNodeId.equals(scmStorageConfig.getScmId())) {
         if (configurator.getCertificateServer() != null) {
           rootCertificateServer = configurator.getCertificateServer();
         } else {
           rootCertificateServer =
-              HASecurityUtils.initializeRootCertificateServer(
-              conf, certificateStore, scmStorageConfig, new DefaultCAProfile());
+              HASecurityUtils.initializeRootCertificateServer(conf,
+                  certificateStore, scmStorageConfig, new DefaultCAProfile());
         }
         persistPrimarySCMCerts();
       } else {
         rootCertificateServer = null;
       }
     } else {
-      // On a upgraded cluster primary scm nodeId will not be set as init will
-      // not be run again after upgrade. So for a upgraded cluster where init
-      // has not happened again we will have setup like before where it has
-      // one CA server which is issuing certificates to DN and OM.
+      // On an upgraded cluster primary scm nodeId will not be set as init will
+      // not be run again after upgrade. For an upgraded cluster, besides one
+      // intermediate CA server which is issuing certificates to DN and OM,
+      // we will have one root CA server too.
       rootCertificateServer =
           HASecurityUtils.initializeRootCertificateServer(conf,
               certificateStore, scmStorageConfig, new DefaultProfile());
-      scmCertificateServer = rootCertificateServer;
     }
 
     // We need to pass getCACertificate as rootCA certificate,
