@@ -156,7 +156,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
 
     final AllocateScmBlockRequestProto.Builder requestBuilder =
         AllocateScmBlockRequestProto.newBuilder()
-            .setSize(0) // deprecated required field
+            .setSize(blockSize)
             .setNumBlocks(0) // deprecated required field
             .setRequestedSize(requestedSize)
             .setType(replicationConfig.getReplicationType())
