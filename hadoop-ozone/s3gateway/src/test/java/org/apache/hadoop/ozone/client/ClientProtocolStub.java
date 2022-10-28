@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -581,6 +582,29 @@ public class ClientProtocolStub implements ClientProtocol {
   public Map<OmKeyLocationInfo,
       Map<DatanodeDetails, OzoneInputStream>> getKeysEveryReplicas(
       String volumeName, String bucketName, String keyName) throws IOException {
+    return null;
+  }
+
+  @Override
+  public OzoneDataStreamOutput createStreamKey(
+      String volumeName, String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata)
+      throws IOException {
+    return null;
+  }
+
+  @Override
+  public OzoneDataStreamOutput createMultipartStreamKey(
+      String volumeName, String bucketName, String keyName, long size,
+      int partNumber, String uploadID) throws IOException {
+    return null;
+  }
+
+  @Override
+  public OzoneDataStreamOutput createStreamFile(
+      String volumeName, String bucketName, String keyName, long size,
+      ReplicationConfig replicationConf, boolean overWrite, boolean recursive)
+      throws IOException {
     return null;
   }
 }
