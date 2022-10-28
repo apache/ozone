@@ -22,6 +22,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <artifactId>hdds</artifactId>
     <version>1.3.0-SNAPSHOT</version>
   </parent>
+
   <artifactId>rocksdb-checkpoint-differ</artifactId>
   <version>1.3.0-SNAPSHOT</version>
   <description>RocksDB Checkpoint Differ</description>
@@ -29,43 +30,33 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <packaging>jar</packaging>
 
   <dependencies>
-
     <dependency>
       <groupId>org.rocksdb</groupId>
       <artifactId>rocksdbjni</artifactId>
     </dependency>
-
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
     </dependency>
-
     <dependency>
       <groupId>com.github.vlsi.mxgraph</groupId>
       <artifactId>jgraphx</artifactId>
       <version>4.2.2</version>
     </dependency>
-
     <dependency>
       <groupId>org.jgrapht</groupId>
       <artifactId>jgrapht-core</artifactId>
       <version>1.5.0</version>
     </dependency>
-
     <dependency>
       <groupId>org.jgrapht</groupId>
       <artifactId>jgrapht-guava</artifactId>
       <version>1.5.0</version>
     </dependency>
-
     <dependency>
       <groupId>org.jgrapht</groupId>
       <artifactId>jgrapht-ext</artifactId>
       <version>1.4.0</version>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
     </dependency>
     <dependency>
       <groupId>com.github.spotbugs</groupId>
