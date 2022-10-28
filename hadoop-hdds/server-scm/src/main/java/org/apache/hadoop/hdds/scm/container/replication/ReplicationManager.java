@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithMismatchedReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosingContainerHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.DeletingContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.HealthCheck;
 import org.apache.hadoop.hdds.scm.container.replication.health.OpenContainerHandler;
@@ -51,6 +52,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
@@ -220,6 +222,7 @@ public class ReplicationManager implements SCMService {
         .addNext(new ClosingContainerHandler(this))
         .addNext(new QuasiClosedContainerHandler(this))
         .addNext(new ClosedWithMismatchedReplicasHandler(this))
+        .addNext(new DeletingContainerHandler(this))
         .addNext(ecReplicationCheckHandler)
         .addNext(ratisReplicationCheckHandler);
     start();
@@ -400,6 +403,23 @@ public class ReplicationManager implements SCMService {
     synchronized (this) {
       metrics.incrNumDeletionCmdsSent();
       metrics.incrNumDeletionBytesTotal(container.getUsedBytes());
+    }
+  }
+
+  /**
+   * update container state.
+   *
+   * @param containerID Container to be updated
+   * @param event the event to update the container
+   */
+  public void updateContainerState(ContainerID containerID,
+                                   HddsProtos.LifeCycleEvent event) {
+    try {
+      containerManager.updateContainerState(containerID, event);
+    } catch (IOException | InvalidStateTransitionException |
+             TimeoutException e) {
+      LOG.error("Failed to update the state of container {}, update Event {}",
+          containerID, event, e);
     }
   }
 
