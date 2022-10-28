@@ -578,7 +578,7 @@ public class TestOzoneShellHA {
   public void testDeleteToTrashOrSkipTrash() throws Exception {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
     OzoneConfiguration clientConf =
-        getClientConfForOzoneTrashPolicy(hostPrefix, cluster.getConf());
+        getClientConfForOFS(hostPrefix, cluster.getConf());
     OzoneFsShell shell = new OzoneFsShell(clientConf);
     FileSystem fs = FileSystem.get(clientConf);
     String ofsPrefix = hostPrefix + "/volumed2t/bucket1";
