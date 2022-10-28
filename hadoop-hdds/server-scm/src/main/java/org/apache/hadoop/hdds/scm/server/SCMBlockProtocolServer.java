@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -178,6 +179,11 @@ public class SCMBlockProtocolServer implements
   public void join() throws InterruptedException {
     LOG.trace("Join RPC server for Block Protocol");
     getBlockRpcServer().join();
+  }
+
+  @VisibleForTesting
+  public long getScmBlockSize() {
+    return scmBlockSize;
   }
 
   @Override

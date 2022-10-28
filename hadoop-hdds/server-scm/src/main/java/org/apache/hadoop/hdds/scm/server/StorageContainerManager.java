@@ -1761,6 +1761,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   @VisibleForTesting
+  public void setScmBlockManager(BlockManager blockManager) {
+    this.scmBlockManager = blockManager;
+  }
+
+  @VisibleForTesting
   public SCMSafeModeManager getScmSafeModeManager() {
     return scmSafeModeManager;
   }
