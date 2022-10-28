@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.protocol;
 
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
