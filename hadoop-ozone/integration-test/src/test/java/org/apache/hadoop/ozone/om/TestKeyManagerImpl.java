@@ -215,11 +215,12 @@ public class TestKeyManagerImpl {
     mockContainerClient();
 
     Mockito.when(mockScmBlockLocationProtocol
-        .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
+        .allocateBlock(Mockito.anyLong(),
             any(ReplicationConfig.class),
             Mockito.anyString(),
-            any(ExcludeList.class))).thenThrow(
-                new SCMException("SafeModePrecheck failed for allocateBlock",
+            any(ExcludeList.class),
+            Mockito.anyLong()))
+        .thenThrow(new SCMException("SafeModePrecheck failed for allocateBlock",
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);
     createBucket(VOLUME_NAME, BUCKET_NAME, false);
