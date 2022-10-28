@@ -29,7 +29,6 @@ import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.hdds.scm.node.DatanodeAdminMonitorImpl.ContainerStateInWorkflow;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -246,39 +245,48 @@ public final class NodeDecommissionMetrics implements MetricsSource {
             metric.getDescription()), 0L);
   }
 
-  public synchronized void metricRecordOfContainerStateByHost(
-      Map<String, ContainerStateInWorkflow> containerStatesByHost) {
-    trackedWorkflowContainerMetricByHost.clear();
-    for (Map.Entry<String, ContainerStateInWorkflow> e :
-        containerStatesByHost.entrySet()) {
-      trackedWorkflowContainerMetricByHost
-          .computeIfAbsent(MetricByHost.SufficientlyReplicated
-                  .getMetricName(e.getKey()),
-              hostID -> createContainerMetricsInfo(hostID, MetricByHost
-                  .SufficientlyReplicated))
-          .setValue(e.getValue().getSufficientlyReplicated());
+  public void metricRemoveRecordOfContainerStateByHost(String host) {
+    trackedWorkflowContainerMetricByHost.remove(
+        MetricByHost.SufficientlyReplicated.getMetricName(host));
+    trackedWorkflowContainerMetricByHost.remove(
+        MetricByHost.UnderReplicated.getMetricName(host));
+    trackedWorkflowContainerMetricByHost.remove(
+        MetricByHost.UnhealthyContainers.getMetricName(host));
+    trackedWorkflowContainerMetricByHost.remove(
+        MetricByHost.PipelinesWaitingToClose.getMetricName(host));
+  }
 
-      trackedWorkflowContainerMetricByHost
-          .computeIfAbsent(MetricByHost.UnderReplicated
-                  .getMetricName(e.getKey()),
-              hostID -> createContainerMetricsInfo(hostID, MetricByHost
-                  .UnderReplicated))
-          .setValue(e.getValue().getUnderReplicatedContainers());
+  public void metricRecordOfContainerStateByHost(
+      String host,
+      long sufficientlyReplicated,
+      long underReplicated,
+      long unhealthy,
+      long pipelinesWaitingToClose) {
+    trackedWorkflowContainerMetricByHost
+        .computeIfAbsent(MetricByHost.SufficientlyReplicated
+                .getMetricName(host),
+            hostID -> createContainerMetricsInfo(hostID, MetricByHost
+                .SufficientlyReplicated))
+        .setValue(sufficientlyReplicated);
 
-      trackedWorkflowContainerMetricByHost
-          .computeIfAbsent(MetricByHost.UnhealthyContainers
-                  .getMetricName(e.getKey()),
-              hostID -> createContainerMetricsInfo(hostID, MetricByHost
-                  .UnhealthyContainers))
-          .setValue(e.getValue().getUnhealthyContainers());
+    trackedWorkflowContainerMetricByHost
+        .computeIfAbsent(MetricByHost.UnderReplicated.getMetricName(host),
+            hostID -> createContainerMetricsInfo(hostID, MetricByHost
+                .UnderReplicated))
+        .setValue(underReplicated);
 
-      trackedWorkflowContainerMetricByHost
-          .computeIfAbsent(MetricByHost.PipelinesWaitingToClose.
-                  getMetricName(e.getKey()),
-              hostID -> createContainerMetricsInfo(hostID, MetricByHost
-                  .PipelinesWaitingToClose))
-          .setValue(e.getValue().getPipelinesWaitingToClose());
-    }
+    trackedWorkflowContainerMetricByHost
+        .computeIfAbsent(MetricByHost.UnhealthyContainers.getMetricName(host),
+            hostID -> createContainerMetricsInfo(hostID, MetricByHost
+                .UnhealthyContainers))
+        .setValue(unhealthy);
+
+    trackedWorkflowContainerMetricByHost
+        .computeIfAbsent(MetricByHost.PipelinesWaitingToClose.
+                getMetricName(host),
+            hostID -> createContainerMetricsInfo(hostID, MetricByHost
+                .PipelinesWaitingToClose))
+        .setValue(pipelinesWaitingToClose);
   }
 
   @VisibleForTesting
