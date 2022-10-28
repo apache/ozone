@@ -40,6 +40,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.Descriptors.Descriptor;
@@ -886,6 +887,9 @@ public class StateContext {
         mp.putIfAbsent(e, new AtomicBoolean(true));
       });
       this.isFullReportReadyToBeSent.putIfAbsent(endpoint, mp);
+      if (getQueueMetrics() != null) {
+        getQueueMetrics().addEndpoint(endpoint);
+      }
     }
   }
 
@@ -918,5 +922,24 @@ public class StateContext {
    */
   public long getReconHeartbeatFrequency() {
     return reconHeartbeatFrequency.get();
+  }
+
+  public Map<InetSocketAddress, Integer> getPipelineActionQueueSize() {
+    return pipelineActions.entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
+  }
+
+  public Map<InetSocketAddress, Integer> getContainerActionQueueSize() {
+    return containerActions.entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
+  }
+
+  public Map<InetSocketAddress, Integer> getIncrementalReportQueueSize() {
+    return incrementalReportsQueue.entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
+  }
+
+  public DatanodeQueueMetrics getQueueMetrics() {
+    return parentDatanodeStateMachine.getQueueMetrics();
   }
 }
