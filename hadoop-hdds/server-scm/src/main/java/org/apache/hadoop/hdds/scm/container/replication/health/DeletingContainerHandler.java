@@ -47,7 +47,7 @@ public class DeletingContainerHandler extends AbstractCheck {
   }
 
   /**
-   * If the replica size of the container is 0, change the state
+   * If the number of replicas of the container is 0, change the state
    * of the container to Deleted, otherwise resend delete command if needed.
    * @param request ContainerCheckRequest object representing the container
    * @return false if the specified container is not in DELETING state,
