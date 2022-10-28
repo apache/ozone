@@ -122,7 +122,8 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
         emptierInterval);
   }
 
-  @Override public boolean moveToTrash(Path path) throws IOException {
+  @Override
+  public boolean moveToTrash(Path path) throws IOException {
     if (validatePath(path)) {
       if (!isEnabled()) {
         return false;
