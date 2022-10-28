@@ -41,7 +41,6 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class CommandQueue {
   private final Map<UUID, Commands> commandMap;
-  private final Map<UUID, Map<SCMCommandProto.Type, Integer>> summaryMap;
   private final Lock lock;
   private long commandsInQueue;
 
@@ -60,7 +59,6 @@ public class CommandQueue {
    */
   public CommandQueue() {
     commandMap = new HashMap<>();
-    summaryMap = new HashMap<>();
     lock = new ReentrantLock();
     commandsInQueue = 0;
   }
@@ -73,7 +71,6 @@ public class CommandQueue {
     lock.lock();
     try {
       commandMap.clear();
-      summaryMap.clear();
       commandsInQueue = 0;
     } finally {
       lock.unlock();
@@ -93,7 +90,6 @@ public class CommandQueue {
     lock.lock();
     try {
       Commands cmds = commandMap.remove(datanodeUuid);
-      summaryMap.remove(datanodeUuid);
       List<SCMCommand> cmdList = null;
       if (cmds != null) {
         cmdList = cmds.getCommands();
@@ -118,11 +114,11 @@ public class CommandQueue {
       final UUID datanodeUuid, SCMCommandProto.Type commandType) {
     lock.lock();
     try {
-      Map<SCMCommandProto.Type, Integer> summary = summaryMap.get(datanodeUuid);
-      if (summary == null) {
+      Commands commands = commandMap.get(datanodeUuid);
+      if (commands == null) {
         return 0;
       }
-      return summary.getOrDefault(commandType, 0);
+      return commands.getCommandSummary(commandType);
     } finally {
       lock.unlock();
     }
@@ -140,10 +136,6 @@ public class CommandQueue {
     try {
       commandMap.computeIfAbsent(datanodeUuid, s -> new Commands())
           .add(command);
-      Map<SCMCommandProto.Type, Integer> summary =
-          summaryMap.computeIfAbsent(datanodeUuid, s -> new HashMap<>());
-      summary.put(command.getType(),
-          summary.getOrDefault(command.getType(), 0) + 1);
       commandsInQueue++;
     } finally {
       lock.unlock();
@@ -154,18 +146,10 @@ public class CommandQueue {
    * Class that stores commands for a datanode.
    */
   private static class Commands {
-    private long updateTime;
-    private long readTime;
-    private List<SCMCommand> commands;
-
-    /**
-     * Constructs a Commands class.
-     */
-    Commands() {
-      commands = new ArrayList<>();
-      updateTime = 0;
-      readTime = 0;
-    }
+    private long updateTime = 0;
+    private long readTime = 0;
+    private List<SCMCommand> commands = new ArrayList<>();
+    private final Map<SCMCommandProto.Type, Integer> summary = new HashMap<>();
 
     /**
      * Gets the last time the commands for this node was updated.
@@ -190,7 +174,13 @@ public class CommandQueue {
      */
     public void add(SCMCommand command) {
       this.commands.add(command);
+      summary.put(command.getType(),
+          summary.getOrDefault(command.getType(), 0) + 1);
       updateTime = Time.monotonicNow();
+    }
+
+    public int getCommandSummary(SCMCommandProto.Type commandType) {
+      return summary.getOrDefault(commandType, 0);
     }
 
     /**
@@ -200,6 +190,7 @@ public class CommandQueue {
     public List<SCMCommand> getCommands() {
       List<SCMCommand> temp = this.commands;
       this.commands = new ArrayList<>();
+      summary.clear();
       readTime = Time.monotonicNow();
       return temp;
     }
