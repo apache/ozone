@@ -102,9 +102,7 @@ public class TestSCMMXBean {
         "ClientRpcPort");
     assertEquals(scm.getClientRpcPort(), clientRpcPort);
 
-    ConcurrentMap<String, ContainerStat> map = scm.getContainerReportCache();
     ContainerStat stat = new ContainerStat(1, 2, 3, 4, 5, 6, 7);
-    map.put("nodeID", stat);
     TabularData data = (TabularData) mbs.getAttribute(
         bean, "ContainerReport");
 

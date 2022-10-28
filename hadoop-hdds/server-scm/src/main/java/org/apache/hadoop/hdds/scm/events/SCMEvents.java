@@ -210,9 +210,6 @@ public final class SCMEvents {
       new TypedEvent<>(CommandStatusReportHandler.DeleteBlockStatus.class,
           "Delete_Block_Status");
 
-  public static final TypedEvent<SafeModeStatus> SAFE_MODE_STATUS =
-      new TypedEvent<>(SafeModeStatus.class, "Safe mode status");
-
   /**
    * A CRL status report will be sent by datanodes. This report is received
    * and processed by SCMDatanodeHeartbeatDispatcher.

@@ -23,11 +23,9 @@ package org.apache.hadoop.hdds.scm.server;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
 import com.google.protobuf.BlockingService;
 
+import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
@@ -99,7 +97,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.ContainerStat;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -176,7 +173,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -252,10 +248,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * SCM mxbean.
    */
   private ObjectName scmInfoBeanName;
-  /**
-   * Key = DatanodeUuid, value = ContainerStat.
-   */
-  private final Cache<String, ContainerStat> containerReportCache;
 
   private ReplicationManager replicationManager;
 
@@ -332,7 +324,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
     configuration = conf;
     initMetrics();
-    containerReportCache = buildContainerReportCache();
 
     if (scmStorageConfig.getState() != StorageState.INITIALIZED) {
       String errMsg = "Please make sure you have run \'ozone scm --init\' " +
@@ -1328,33 +1319,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return securityProtocolServer;
   }
 
-  /**
-   * Initialize container reports cache that sent from datanodes.
-   */
-  @SuppressWarnings("UnstableApiUsage")
-  private Cache<String, ContainerStat> buildContainerReportCache() {
-    return
-        CacheBuilder.newBuilder()
-            .expireAfterAccess(Long.MAX_VALUE, TimeUnit.MILLISECONDS)
-            .maximumSize(Integer.MAX_VALUE)
-            .removalListener((
-                RemovalListener<String, ContainerStat>) removalNotification -> {
-                synchronized (containerReportCache) {
-                  ContainerStat stat = removalNotification.getValue();
-                  if (stat != null) {
-                    // TODO: Are we doing the right thing here?
-                    // remove invalid container report
-                    metrics.decrContainerStat(stat);
-                  }
-                  if (LOG.isDebugEnabled()) {
-                    LOG.debug("Remove expired container stat entry for " +
-                        "datanode: {}.", removalNotification.getKey());
-                  }
-                }
-              })
-            .build();
-  }
-
   private void registerMXBean() {
     final Map<String, String> jmxProperties = new HashMap<>();
     jmxProperties.put("component", "ServerRuntime");
@@ -1605,11 +1569,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.error("SCM block manager service stop failed.", ex);
     }
 
-    if (containerReportCache != null) {
-      containerReportCache.invalidateAll();
-      containerReportCache.cleanUp();
-    }
-
     stopSecretManager();
 
     if (metrics != null) {
@@ -1809,54 +1768,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  /**
-   * Invalidate container stat entry for given datanode.
-   *
-   * @param datanodeUuid
-   */
-  public void removeContainerReport(String datanodeUuid) {
-    synchronized (containerReportCache) {
-      containerReportCache.invalidate(datanodeUuid);
-    }
-  }
-
-  /**
-   * Get container stat of specified datanode.
-   *
-   * @param datanodeUuid
-   * @return
-   */
-  public ContainerStat getContainerReport(String datanodeUuid) {
-    ContainerStat stat = null;
-    synchronized (containerReportCache) {
-      stat = containerReportCache.getIfPresent(datanodeUuid);
-    }
-
-    return stat;
-  }
-
-  /**
-   * Returns a view of the container stat entries. Modifications made to the
-   * map will directly
-   * affect the cache.
-   *
-   * @return
-   */
-  public ConcurrentMap<String, ContainerStat> getContainerReportCache() {
-    return containerReportCache.asMap();
-  }
-
   @Override
   public Map<String, String> getContainerReport() {
-    Map<String, String> id2StatMap = new HashMap<>();
-    synchronized (containerReportCache) {
-      ConcurrentMap<String, ContainerStat> map = containerReportCache.asMap();
-      for (Map.Entry<String, ContainerStat> entry : map.entrySet()) {
-        id2StatMap.put(entry.getKey(), entry.getValue().toJsonString());
-      }
-    }
-
-    return id2StatMap;
+    return Collections.EMPTY_MAP;
   }
 
   /**
