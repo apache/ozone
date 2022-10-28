@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.protocol;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
@@ -65,16 +66,16 @@ public interface ScmBlockLocationProtocol extends Closeable {
   default List<AllocatedBlock> allocateBlock(long size, int numBlocks,
       ReplicationType type, ReplicationFactor factor, String owner,
       ExcludeList excludeList) throws IOException, TimeoutException {
-    return allocateBlock(size * numBlocks, size, ReplicationConfig
-        .fromProtoTypeAndFactor(type, factor), owner, excludeList);
+    return allocateBlock(size * numBlocks, ReplicationConfig
+        .fromProtoTypeAndFactor(type, factor), owner, excludeList, size);
   }
 
   /**
    * Asks SCM where a block should be allocated. SCM responds with the
    * set of datanodes that should be used creating this block.
    *
-   * @param requestedSize     - total size requested.
-   * @param blockSize         - client specified block size, 0 for default.
+   * @param size              - size of the block.
+   * @param numBlocks         - number of blocks.
    * @param replicationConfig - replicationConfiguration
    * @param owner             - service owner of the new block
    * @param excludeList       List of datanodes/containers to exclude during
@@ -83,9 +84,53 @@ public interface ScmBlockLocationProtocol extends Closeable {
    * @return allocated block accessing info (key, pipeline).
    * @throws IOException
    */
+  @Deprecated
+  default List<AllocatedBlock> allocateBlock(long size, int numBlocks,
+      ReplicationConfig replicationConfig, String owner,
+      ExcludeList excludeList) throws IOException {
+    int numData = replicationConfig instanceof ECReplicationConfig ?
+        ((ECReplicationConfig) replicationConfig).getData() : 1;
+    return allocateBlock(numBlocks * size * numData, replicationConfig, owner,
+        excludeList, size);
+  }
+
+  /**
+   * Asks SCM to allocate blocks of specified replication config.
+   * SCM responds with a list of blocks, including the size and
+   * location of each block. SCM will decide the max block size.
+   *
+   * @param requestedSize     - total size requested.
+   * @param replicationConfig - replicationConfiguration
+   * @param owner             - service owner of the new block
+   * @param excludeList       List of datanodes/containers to exclude during
+   *                          block allocation.
+   * @return allocated block accessing info (key, pipeline).
+   * @throws IOException
+   */
+  default List<AllocatedBlock> allocateBlock(long requestedSize,
+      ReplicationConfig replicationConfig, String owner,
+      ExcludeList excludeList) throws IOException {
+    return allocateBlock(requestedSize, replicationConfig,
+        owner, excludeList, 0);
+  }
+
+  /**
+   * Asks SCM to allocate blocks of specified replication config.
+   * SCM responds with a list of blocks, including the size and
+   * location of each block. Client can specify the max block size.
+   *
+   * @param requestedSize     - total size requested.
+   * @param replicationConfig - replicationConfiguration
+   * @param owner             - service owner of the new block
+   * @param excludeList       List of datanodes/containers to exclude during
+   *                          block allocation.
+   * @param blockSize         - client specified block size, 0 for default.
+   * @return allocated block accessing info (key, pipeline).
+   * @throws IOException
+   */
   List<AllocatedBlock> allocateBlock(long requestedSize,
-      long blockSize, ReplicationConfig replicationConfig, String owner,
-      ExcludeList excludeList) throws IOException;
+      ReplicationConfig replicationConfig, String owner,
+      ExcludeList excludeList, long blockSize) throws IOException;
 
   /**
    * Delete blocks for a set of object keys.

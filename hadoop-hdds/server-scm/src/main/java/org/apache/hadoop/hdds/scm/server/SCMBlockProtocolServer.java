@@ -188,9 +188,8 @@ public class SCMBlockProtocolServer implements
 
   @Override
   public List<AllocatedBlock> allocateBlock(
-      long requestedSize, long blockSize,
-      ReplicationConfig replicationConfig,
-      String owner, ExcludeList excludeList
+      long requestedSize, ReplicationConfig replicationConfig,
+      String owner, ExcludeList excludeList, long blockSize
   ) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("requestedSize", String.valueOf(requestedSize));

@@ -155,8 +155,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
     List<AllocatedBlock> allocatedBlocks;
     try {
       allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(requestedSizeFinal, scmBlockSize,
-              replicationConfig, omID, excludeList);
+          .allocateBlock(requestedSizeFinal, replicationConfig,
+              omID, excludeList, scmBlockSize);
     } catch (SCMException ex) {
       if (ex.getResult()
           .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {

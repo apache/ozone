@@ -147,8 +147,8 @@ public class TestSCMBlockProtocolServer {
       ReplicationConfig repConfig, int expectedBlocks)
       throws Exception {
     List<AllocatedBlock> blocks = server.allocateBlock(
-        requestedSize, blockSize, repConfig,
-        UUID.randomUUID().toString(), new ExcludeList());
+        requestedSize, repConfig, UUID.randomUUID().toString(),
+        new ExcludeList(), blockSize);
     Assertions.assertEquals(expectedBlocks, blocks.size());
 
     final long totalBlockSize = blocks.stream()
