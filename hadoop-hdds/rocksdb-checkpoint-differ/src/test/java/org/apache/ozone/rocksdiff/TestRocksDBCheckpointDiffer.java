@@ -30,6 +30,9 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
@@ -42,20 +45,16 @@ import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
-////CHECKSTYLE:OFF
 public class TestRocksDBCheckpointDiffer {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestRocksDBCheckpointDiffer.class);
 
-  private static final String dbPath   = "./rocksdb-data";
+  private static final String testDBPath = "./rocksdb-data";
   private static final int NUM_ROW = 250000;
   private static final int SNAPSHOT_EVERY_SO_MANY_KEYS = 49999;
-
-  // keeps track of all the snapshots created so far.
-  private static int lastSnapshotCounter = 0;
-  private static String lastSnapshotPrefix = "snap_id_";
 
   /**
    * Graph type.
@@ -66,7 +65,14 @@ public class TestRocksDBCheckpointDiffer {
     CUMUTATIVE_SIZE
   }
 
-  public static void main(String[] args) throws Exception {
+  @BeforeAll
+  public static void init() {
+    // Set differ log level to DEBUG
+    GenericTestUtils.setLogLevel(RocksDBCheckpointDiffer.getLog(), Level.DEBUG);
+  }
+
+  @Test
+  void testMain() throws Exception {
 
     // Delete the compaction log dir if it already exists
     File dir = new File("./compaction-log");
@@ -74,25 +80,17 @@ public class TestRocksDBCheckpointDiffer {
       deleteDirectory(dir);
     }
 
-    TestRocksDBCheckpointDiffer tester= new TestRocksDBCheckpointDiffer();
+    TestRocksDBCheckpointDiffer tester = new TestRocksDBCheckpointDiffer();
     RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer(
         "./rocksdb-data",
         1000,
         "./rocksdb-data-cp",
         "./SavedCompacted_Files/", 0,
         "snap_id_");
-    lastSnapshotPrefix = "snap_id_" + lastSnapshotCounter;
 
-//    // Delete the test DB dir if it already exists
-//    File dir = new File(dbPath);
-//    if (dir.exists()) {
-//      deleteDirectory(dir);
-//    }
+    RocksDB rocksDB = tester.createRocksDBInstance(testDBPath, differ);
+    tester.readRocksDBInstance(testDBPath, rocksDB, null, differ);
 
-    RocksDB rocksDB = tester.createRocksDBInstance(dbPath, differ);
-    Thread.sleep(1000);
-
-    tester.readRocksDBInstance(dbPath, rocksDB, null, differ);
     differ.printAllSnapshots();
     differ.traverseGraph(
         differ.getCompactionReverseDAG(),
@@ -100,6 +98,7 @@ public class TestRocksDBCheckpointDiffer {
 
     differ.diffAllSnapshots();
     differ.dumpCompactionNodeTable();
+
     for (GType gtype : GType.values()) {
       String fname = "fwdGraph_" + gtype.toString() +  ".png";
       String rname = "reverseGraph_"+ gtype.toString() + ".png";
@@ -109,6 +108,7 @@ public class TestRocksDBCheckpointDiffer {
 //      differ.pngPrintMutableGrapth(differ.getCompactionReverseDAG(), rname,
 //          gtype);
     }
+
     rocksDB.close();
   }
 
@@ -119,7 +119,7 @@ public class TestRocksDBCheckpointDiffer {
 
     return random.ints(leftLimit, rightLimit + 1)
         .filter(i -> (i <= 57 || i >= 65) && (i <= 90 || i >= 97))
-        .limit(7)
+        .limit(length)
         .collect(StringBuilder::new,
             StringBuilder::appendCodePoint, StringBuilder::append)
         .toString();
@@ -130,9 +130,9 @@ public class TestRocksDBCheckpointDiffer {
                                        RocksDBCheckpointDiffer differ)
       throws RocksDBException, InterruptedException {
 
-    LOG.info("Creating RocksDB instance at {}", dbPathArg);
+    LOG.debug("Creating RocksDB at '{}'", dbPathArg);
 
-    // Delete the test DB dir if it already exists
+    // Delete the test DB dir if it exists
     File dir = new File(dbPathArg);
     if (dir.exists()) {
       deleteDirectory(dir);
@@ -148,14 +148,13 @@ public class TestRocksDBCheckpointDiffer {
     // key-value
     for (int i = 0; i < NUM_ROW; ++i) {
       String generatedString = getRandomString(random, 7);
-      String keyStr = " My" + generatedString + "StringKey" + i;
-      String valueStr = " My " + generatedString + "StringValue" + i;
+      String keyStr = "Key-" + i + "-" + generatedString;
+      String valueStr = "Val-" + i + "-" + generatedString;
       byte[] key = keyStr.getBytes(UTF_8);
       rocksDB.put(key, valueStr.getBytes(UTF_8));
       if (i % SNAPSHOT_EVERY_SO_MANY_KEYS == 0) {
         differ.createSnapshot(rocksDB);
       }
-      //System.out.println(toStr(rocksDB.get(key));
     }
     differ.createSnapshot(rocksDB);
     return rocksDB;
@@ -298,7 +297,7 @@ public class TestRocksDBCheckpointDiffer {
         for (LiveFileMetaData m : liveFileMetaDataList) {
           System.out.println("Live File Metadata");
           System.out.println("\tFile :" + m.fileName());
-          System.out.println("\ttable :" + toStr(m.columnFamilyName()));
+          System.out.println("\tTable :" + toStr(m.columnFamilyName()));
           System.out.println("\tKey Range :" + toStr(m.smallestKey()) +
               " " + "<->" + toStr(m.largestKey()));
         }
@@ -308,7 +307,7 @@ public class TestRocksDBCheckpointDiffer {
         // key
         RocksIterator iter = rocksDB.newIterator(cfHandle);
         for (iter.seekToFirst(); iter.isValid(); iter.next()) {
-          System.out.println("iterator:" + toStr(iter.key()) + ":" +
+          System.out.println("Iterator:" + toStr(iter.key()) + ":" +
               toStr(iter.value()));
         }
       } finally {
@@ -328,14 +327,13 @@ public class TestRocksDBCheckpointDiffer {
   public void readRocksDBInstance(String dbPathArg, RocksDB rocksDB,
                                   FileWriter file,
                                   RocksDBCheckpointDiffer differ) {
-    System.out.println("Reading RocksDB instance at : " + dbPathArg);
+
+    LOG.info("Reading RocksDB: " + dbPathArg);
     boolean createdDB = false;
-    //
-    try (final Options options =
-             new Options().setParanoidChecks(true)
-                 .setCreateIfMissing(true)
-                 .setCompressionType(CompressionType.NO_COMPRESSION)
-                 .setForceConsistencyChecks(false)) {
+
+    try (final Options options = new Options()
+        .setParanoidChecks(true)
+        .setForceConsistencyChecks(false)) {
 
       if (rocksDB == null) {
         rocksDB = RocksDB.openReadOnly(options, dbPathArg);
@@ -345,11 +343,10 @@ public class TestRocksDBCheckpointDiffer {
       List<LiveFileMetaData> liveFileMetaDataList =
           rocksDB.getLiveFilesMetaData();
       for (LiveFileMetaData m : liveFileMetaDataList) {
-        System.out.println("Live File Metadata");
-        System.out.println("\tFile : " + m.fileName());
-        System.out.println("\tLevel : " + m.level());
-        System.out.println("\tTable : " + toStr(m.columnFamilyName()));
-        System.out.println("\tKey Range : " + toStr(m.smallestKey())
+        LOG.info("SST File: " + m.fileName());
+        LOG.info("\tLevel: " + m.level());
+        LOG.info("\tTable: " + toStr(m.columnFamilyName()));
+        LOG.info("\tKey Range: " + toStr(m.smallestKey())
             + " <-> " + toStr(m.largestKey()));
         if (differ.debugEnabled(DEBUG_DAG_LIVE_NODES)) {
           differ.printMutableGraphFromAGivenNode(m.fileName(), m.level(),
@@ -360,7 +357,7 @@ public class TestRocksDBCheckpointDiffer {
       if(differ.debugEnabled(DEBUG_READ_ALL_DB_KEYS)) {
         RocksIterator iter = rocksDB.newIterator();
         for (iter.seekToFirst(); iter.isValid(); iter.next()) {
-          System.out.println("iterator key:" + toStr(iter.key()) + ", " +
+          System.out.println("Iterator key:" + toStr(iter.key()) + ", " +
               "iter value:" + toStr(iter.value()));
           if (file != null) {
             file.write("iterator key:" + toStr(iter.key()) + ", iter " +
