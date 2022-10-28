@@ -24,6 +24,7 @@ import java.util.Random;
 import java.util.UUID;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -173,10 +174,19 @@ public class TestOMKeyRequest {
     AllocatedBlock.Builder blockBuilder = new AllocatedBlock.Builder()
         .setPipeline(pipeline);
 
-    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(),
-        any(ReplicationConfig.class),
-        anyString(), any(ExcludeList.class))).thenAnswer(invocation -> {
-          int num = invocation.getArgument(1);
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(),
+        any(ReplicationConfig.class), anyString(),
+        any(ExcludeList.class), anyLong())
+    ).thenAnswer(invocation -> {
+          long requestedSize = invocation.getArgument(0);
+          long blockSize = invocation.getArgument(4);
+          ReplicationConfig repConfig = invocation.getArgument(1);
+          int numData = repConfig instanceof ECReplicationConfig ?
+              ((ECReplicationConfig) repConfig).getData() : 1;
+          if (blockSize == 0) {
+            blockSize = scmBlockSize;
+          }
+          int num = (int) ((requestedSize - 1) / (blockSize * numData)) + 1;
           List<AllocatedBlock> allocatedBlocks = new ArrayList<>(num);
           for (int i = 0; i < num; i++) {
             blockBuilder.setContainerBlockID(
