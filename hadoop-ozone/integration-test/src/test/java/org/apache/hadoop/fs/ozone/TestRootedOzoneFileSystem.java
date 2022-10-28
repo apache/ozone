@@ -253,8 +253,6 @@ public class TestRootedOzoneFileSystem {
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
     // fs.ofs.impl would be loaded from META-INF, no need to manually set it
     fs = FileSystem.get(conf);
-    conf.setClass("fs.trash.classname", TrashPolicyOzone.class,
-        TrashPolicy.class);
     trash = new Trash(conf);
     ofs = (RootedOzoneFileSystem) fs;
     adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
