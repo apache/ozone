@@ -139,16 +139,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
     Preconditions.checkArgument(requestedSize > 0,
         "Requested size must be greater than 0");
 
+    int numData = replicationConfig instanceof ECReplicationConfig ?
+        ((ECReplicationConfig) replicationConfig).getData() : 1;
     // Limit the number of blocks to preallocate to the configured maximum.
-    long requestedSizeMax;
-    if (replicationConfig instanceof ECReplicationConfig) {
-      int numData = ((ECReplicationConfig) replicationConfig).getData();
-      int numStripe = preallocateBlocksMax / numData;
-      numStripe = numStripe == 0 ? 1 : numStripe; // at least one stripe
-      requestedSizeMax = numData * numStripe * scmBlockSize;
-    } else {
-      requestedSizeMax = preallocateBlocksMax * scmBlockSize;
-    }
+    final long requestedSizeMax = preallocateBlocksMax * scmBlockSize * numData;
     final long requestedSizeFinal = Math.min(requestedSize, requestedSizeMax);
 
     String remoteUser = getRemoteUser().getShortUserName();
