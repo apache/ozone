@@ -96,11 +96,6 @@ public class TestReplicationManagerMetrics {
     }
   }
 
-  @Test
-  public void testEReplicationMetrics() {
-
-  }
-
   private long getGauge(String metricName) {
     return getLongGauge(metricName,
         getMetrics(ReplicationManagerMetrics.METRICS_SOURCE_NAME));
