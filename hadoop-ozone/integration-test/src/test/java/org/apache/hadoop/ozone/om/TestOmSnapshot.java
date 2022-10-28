@@ -368,7 +368,7 @@ public class TestOmSnapshot {
     Iterator<? extends OzoneKey> volBucketIter2 =
             volbucket.listKeys(snapshotKeyPrefix);
     while (volBucketIter2.hasNext()) {
-      fail();
+      fail("The last snapshot should not have any keys in it!");
     }
   }
 
