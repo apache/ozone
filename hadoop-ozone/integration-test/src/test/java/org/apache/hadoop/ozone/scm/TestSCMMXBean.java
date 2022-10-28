@@ -43,7 +43,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Iterator;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeoutException;
 
 import javax.management.openmbean.CompositeData;
@@ -106,8 +105,8 @@ public class TestSCMMXBean {
     TabularData data = (TabularData) mbs.getAttribute(
         bean, "ContainerReport");
 
-    // verify report info
-    assertEquals(1, data.values().size());
+    // verify report info as empty implementation
+    assertEquals(0, data.values().size());
     for (Object obj : data.values()) {
       assertTrue(obj instanceof CompositeData);
       CompositeData d = (CompositeData) obj;
