@@ -270,7 +270,9 @@ public interface OzoneManagerProtocol
    * @param args the args of the key.
    * @return OmKeyInfo instance that client uses to talk to container.
    * @throws IOException
+   * @deprecated use {@link OzoneManagerProtocol#getKeyInfo} instead.
    */
+  @Deprecated
   OmKeyInfo lookupKey(OmKeyArgs args) throws IOException;
 
   /**
