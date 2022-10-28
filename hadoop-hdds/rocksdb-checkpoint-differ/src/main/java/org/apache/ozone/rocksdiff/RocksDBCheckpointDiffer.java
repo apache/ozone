@@ -18,6 +18,7 @@
 package org.apache.ozone.rocksdiff;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -25,7 +26,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.rocksdb.AbstractEventListener;
 import org.rocksdb.Checkpoint;
 import org.rocksdb.CompactionJobInfo;
-import org.rocksdb.CompressionType;
 import org.rocksdb.DBOptions;
 import org.rocksdb.FlushOptions;
 import org.rocksdb.LiveFileMetaData;
@@ -114,17 +114,45 @@ public class RocksDBCheckpointDiffer {
   private String compactionLogParentDir = null;
   private String compactionLogDir = null;
 
-  // Name of the directory to hold compaction logs (under parent dir)
+  // Name of the directory that holds compaction logs (under metadata dir)
   private static final String COMPACTION_LOG_DIR = "compaction-log/";
 
-  // For DB compaction SST DAG persistence and reconstruction
-  // Should be initialized to the latest sequence number
+  /**
+   * Compaction log path for DB compaction history persistence.
+   * This is the source of truth for in-memory SST DAG reconstruction upon
+   * OM restarts.
+   *
+   * Initialized to the latest sequence number on OM startup. And the log rolls
+   * over to a new file whenever an Ozone snapshot is taken.
+   */
   private volatile String currentCompactionLogPath = null;
 
   private static final String COMPACTION_LOG_FILENAME_SUFFIX = ".log";
-  // Prefix for the sequence number line when writing to compaction log
-  // right after taking an Ozone snapshot.
-  private static final String COMPACTION_LOG_SEQNUM_LINE_PREFIX = "SN ";
+
+  /**
+   * Marks the beginning of a comment line in the compaction log.
+   */
+  private static final String COMPACTION_LOG_COMMENT_LINE_PREFIX = "# ";
+
+  /**
+   * Marks the beginning of a compaction log entry.
+   */
+  private static final String COMPACTION_LOG_ENTRY_LINE_PREFIX = "C ";
+
+  /**
+   * Prefix for the sequence number line when writing to compaction log
+   * right after taking an Ozone snapshot.
+   */
+  private static final String COMPACTION_LOG_SEQNUM_LINE_PREFIX = "S ";
+
+  /**
+   * SST file extension. Must be lower case.
+   * Used to trim the file extension when writing compaction entries to the log
+   * to save space.
+   */
+  private static final String SST_FILE_EXTENSION = ".sst";
+  private static final int SST_FILE_EXTENSION_LENGTH =
+      SST_FILE_EXTENSION.length();
 
   public void setCompactionLogParentDir(String parentDir) {
     this.compactionLogParentDir = parentDir;
@@ -207,11 +235,11 @@ public class RocksDBCheckpointDiffer {
     // Create the directory if SST backup path does not already exist
     File dir = new File(saveCompactedFilePath);
     if (dir.exists()) {
-      deleteDirectory(dir);  // TODO: FOR EASE OF TESTING ONLY. DO NOT DELETE DIR WHEN MERGING
+      deleteDirectory(dir);  // TODO: DEV ONLY. DO NOT DELETE DIR WHEN MERGING THIS
     }
     if (!dir.mkdir()) {
       LOG.error("Failed to create SST file backup directory!");
-      // TODO: Throw unrecoverable exception and Crash OM ?
+      // TODO: Throw custom checked exception instead?
       throw new RuntimeException("Failed to create SST file backup directory. "
           + "Check write permission.");
     }
@@ -229,6 +257,9 @@ public class RocksDBCheckpointDiffer {
     //  (input files) ->
     //  {  (output files) + lastSnapshotCounter + currentCompactionGen }
     //  mapping.
+
+    // Load all previous compaction logs
+    loadAllCompactionLogs();
   }
 
   /**
@@ -418,6 +449,40 @@ public class RocksDBCheckpointDiffer {
     };
   }
 
+  /**
+   * Helper function to append the list of SST files to a StringBuilder
+   * for a compaction log entry.
+   *
+   * Does not append a new line.
+   *
+   * @param files
+   * @param filenameOffset
+   * @param sb
+   */
+  private static void appendCompactionLogStringBuilder(List<String> files,
+      int filenameOffset, StringBuilder sb) {
+
+    Iterator<String> it = files.iterator();
+    while (it.hasNext()) {
+      final String file = it.next();
+      if (!file.endsWith(SST_FILE_EXTENSION)) {
+        // Failed file extension check
+        final String errorMessage = String.format(
+            "Unexpected SST file extension for file '%s'. Expecting %s",
+            file, SST_FILE_EXTENSION);
+        LOG.error(errorMessage);
+        throw new RuntimeException(errorMessage);
+      }
+      final String fn = file.substring(filenameOffset,
+          file.length() - SST_FILE_EXTENSION_LENGTH);
+      sb.append(fn);
+      // Do not append delimiter if this is the last one
+      if (it.hasNext()) {
+        sb.append(',');
+      }
+    }
+  }
+
   private AbstractEventListener newCompactionCompletedListener() {
     return new AbstractEventListener() {
       @Override
@@ -436,27 +501,31 @@ public class RocksDBCheckpointDiffer {
 
           final StringBuilder sb = new StringBuilder();
 
-          // Print compaction reason as a comment in the log file.
-          // e.g. kLevelL0FilesNum / kLevelMaxLevelSize. TODO: Can remove
-          sb.append("# ").append(compactionJobInfo.compactionReason()).append('\n');
+          if (LOG.isDebugEnabled()) {
+            // Print compaction reason for this entry in the log file
+            // e.g. kLevelL0FilesNum / kLevelMaxLevelSize.
+            sb.append(COMPACTION_LOG_COMMENT_LINE_PREFIX)
+                .append(compactionJobInfo.compactionReason())
+                .append('\n');
+          }
+
+          // Mark the beginning of a compaction log
+          sb.append(COMPACTION_LOG_ENTRY_LINE_PREFIX);
 
           // Trim DB path, only keep the SST file name
           final int filenameBegin =
-              compactionJobInfo.inputFiles().get(0).lastIndexOf("/");
+              compactionJobInfo.inputFiles().get(0).lastIndexOf("/") + 1;
 
           // Append the list of input files
-          for (String file : compactionJobInfo.inputFiles()) {
-            final String fn = file.substring(filenameBegin + 1);
-            sb.append(fn).append('\t');  // TODO: nit: Trim last delimiter
-          }
-          sb.append('\n');
+          final List<String> inputFiles = compactionJobInfo.inputFiles();
+          appendCompactionLogStringBuilder(inputFiles, filenameBegin, sb);
+
+          // Insert delimiter between input files an output files
+          sb.append(':');
 
           // Append the list of output files
-          for (String file : compactionJobInfo.outputFiles()) {
-            final String fn = file.substring(filenameBegin + 1);
-            sb.append(fn).append('\t');  // TODO: nit: Trim last delimiter
-            LOG.info(file + ", ");
-          }
+          final List<String> outputFiles = compactionJobInfo.outputFiles();
+          appendCompactionLogStringBuilder(outputFiles, filenameBegin, sb);
           sb.append('\n');
 
           // Write input and output file names to compaction log
@@ -514,11 +583,9 @@ public class RocksDBCheckpointDiffer {
   public HashSet<String> readRocksDBLiveFiles(String dbPathArg) {
     RocksDB rocksDB = null;
     HashSet<String> liveFiles = new HashSet<>();
-    //
+
     try (Options options = new Options()
         .setParanoidChecks(true)
-        .setCreateIfMissing(true)
-        .setCompressionType(CompressionType.NO_COMPRESSION)
         .setForceConsistencyChecks(false)) {
       rocksDB = RocksDB.openReadOnly(options, dbPathArg);
       List<LiveFileMetaData> liveFileMetaDataList =
@@ -691,33 +758,40 @@ public class RocksDBCheckpointDiffer {
   }
 
   /**
-   * Print a diff list given src and destination snapshots.
+   * Load existing compaction log files to the in-memory DAG.
+   */
+  private void loadAllCompactionLogs() {
+    try {
+      try (Stream<Path> pathStream = Files.list(Paths.get(compactionLogDir))
+          .filter(e -> e.toString().toLowerCase().endsWith(".log"))
+          .sorted()) {
+        for (Path logPath : pathStream.collect(Collectors.toList())) {
+          LOG.debug("Loading compaction log: {}", logPath);
+          readCompactionLogToDAG(logPath.toString());
+        }
+      }
+    } catch (IOException e) {
+      throw new RuntimeException("Error listing compaction log dir " +
+          compactionLogDir, e);
+    }
+  }
+
+  /**
+   * Get a list of SST files that differs between src and destination snapshots.
    * <p>
    * Expected input: src is a snapshot taken AFTER the dest.
+   *
    * @param src source snapshot
    * @param dest destination snapshot
    * @throws RocksDBException
    */
-  private synchronized List<String> printSnapdiffSSTFiles(
-      Snapshot src, Snapshot dest) {
+  private synchronized List<String> getSSTDiffList(Snapshot src,
+      Snapshot dest) {
 
     LOG.warn("src db checkpoint: {}", src.dbPath);
     HashSet<String> srcSnapFiles = readRocksDBLiveFiles(src.dbPath);
     LOG.warn("dest db checkpoint: {}", dest.dbPath);
     HashSet<String> destSnapFiles = readRocksDBLiveFiles(dest.dbPath);
-
-    // Read compaction log until all dest (and src) db checkpoint SST
-    // nodes show up in the DAG.
-    loadCompactionDAGBySSTSet(srcSnapFiles);
-
-    // After srcSnapFiles is loaded, destSnapFiles should have been loaded in
-    // the process as well because of the assumption that src is a checkpoint
-    // taken AFTER dest.
-    if (!isSSTSetLoaded(destSnapFiles)) {
-      LOG.warn("Not all destination snapshot SST files are loaded. "
-          + "Some SST files might be newly flushed and haven't gone "
-          + "though any compactions yet.");
-    }
 
     HashSet<String> fwdDAGSameFiles = new HashSet<>();
     HashSet<String> fwdDAGDifferentFiles = new HashSet<>();
@@ -739,7 +813,6 @@ public class RocksDBCheckpointDiffer {
 
     System.out.print("Fwd DAG different files: ");
     for (String file : fwdDAGDifferentFiles) {
-      CompactionNode n = compactionNodeTable.get(file);  // TODO: REMOVE
       System.out.print(file + "\t");
       res.add(file);
     }
@@ -982,7 +1055,7 @@ public class RocksDBCheckpointDiffer {
       System.out.println();
       // Returns a list of SST files to be fed into RocksDiff
       List<String> sstListForRocksDiff =
-          printSnapdiffSSTFiles(allSnapshots[lastSnapshotCounter - 1], snap);
+          getSSTDiffList(allSnapshots[lastSnapshotCounter - 1], snap);
     }
   }
 
