@@ -53,11 +53,12 @@
     <tag>OZONE, CONTAINER, MANAGEMENT</tag>
     <description>The ipc port number of container.</description>
   </property>
+
   <property>
-    <name>dfs.container.ratis.datastream.enable</name>
-    <value>true</value>
+    <name>dfs.container.ratis.datastream.enabled</name>
+    <value>false</value>
     <tag>OZONE, CONTAINER, RATIS, DATASTREAM</tag>
-    <description>If enable datastream ipc of container.</description>
+    <description>It specifies whether to enable data stream of container.</description>
   </property>
   <property>
     <name>dfs.container.ratis.datastream.port</name>
@@ -3454,7 +3455,7 @@
   </property>
 
   <property>
-    <name>ozone.fs.datastream.enable</name>
+    <name>ozone.fs.datastream.enabled</name>
     <value>false</value>
     <tag>OZONE, DATANODE</tag>
     <description>
