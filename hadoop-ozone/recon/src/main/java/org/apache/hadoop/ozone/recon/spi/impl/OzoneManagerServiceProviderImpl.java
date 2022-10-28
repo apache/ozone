@@ -277,7 +277,7 @@ public class OzoneManagerServiceProviderImpl
   public boolean triggerSyncDataFromOMImmediately() {
     if (!isSyncDataFromOMRunning.get()) {
       // We are shutting down the scheduler and then starting another one,
-      // so we can set the initialDelay to 0, which indicates an OM DB sync
+      // setting the initialDelay to 0, which triggers an OM DB sync
       // immediately.
       stopSyncDataFromOMThread();
       scheduler = Executors.newScheduledThreadPool(1);

@@ -70,8 +70,6 @@ public class TestTriggerDBSyncEndpoint {
 
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
-
-  private TriggerDBSyncEndpoint triggerDBSyncEndpoint;
   private ReconTestInjector reconTestInjector;
 
   @Before
@@ -136,7 +134,7 @@ public class TestTriggerDBSyncEndpoint {
 
   @Test
   public void testTriggerDBSyncEndpointWithOM() {
-    triggerDBSyncEndpoint
+    TriggerDBSyncEndpoint triggerDBSyncEndpoint
         = reconTestInjector.getInstance(TriggerDBSyncEndpoint.class);
     Response response = triggerDBSyncEndpoint.triggerOMDBSync();
     Assertions.assertEquals(200, response.getStatus());
