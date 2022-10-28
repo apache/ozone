@@ -88,10 +88,10 @@ public final class OzoneConfigKeys {
   /**
    * Ratis Port where containers listen to datastream requests.
    */
-  public static final String DFS_CONTAINER_RATIS_DATASTREAM_ENABLE
-      = "dfs.container.ratis.datastream.enable";
-  public static final boolean DFS_CONTAINER_RATIS_DATASTREAM_ENABLE_DEFAULT
-      = true;
+  public static final String DFS_CONTAINER_RATIS_DATASTREAM_ENABLED
+      = "dfs.container.ratis.datastream.enabled";
+  public static final boolean DFS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT
+      = false;
   public static final String DFS_CONTAINER_RATIS_DATASTREAM_PORT
       = "dfs.container.ratis.datastream.port";
   public static final int DFS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT
@@ -100,9 +100,10 @@ public final class OzoneConfigKeys {
   /**
    * Flag to enable ratis streaming on filesystem writes.
    */
-  public static final String OZONE_FS_DATASTREAM_ENABLE =
-      "ozone.fs.datastream.enable";
-  public static final boolean OZONE_FS_DATASTREAM_ENABLE_DEFAULT = false;
+  public static final String OZONE_FS_DATASTREAM_ENABLED
+      = "ozone.fs.datastream.enabled";
+  public static final boolean OZONE_FS_DATASTREAM_ENABLED_DEFAULT
+      = false;
 
   /**
    * When set to true, allocate a random free port for ozone container, so that

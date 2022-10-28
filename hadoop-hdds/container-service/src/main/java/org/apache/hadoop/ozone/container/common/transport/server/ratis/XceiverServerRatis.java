@@ -161,8 +161,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     datanodeDetails = dd;
     assignPorts();
     this.streamEnable = conf.getBoolean(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE_DEFAULT);
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT);
     RaftProperties serverProperties = newRaftProperties();
     this.context = context;
     this.dispatcher = dispatcher;

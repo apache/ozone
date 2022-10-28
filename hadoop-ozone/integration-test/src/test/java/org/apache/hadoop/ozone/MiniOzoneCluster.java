@@ -321,6 +321,7 @@ public interface MiniOzoneCluster {
     
     protected Boolean randomContainerPort = true;
     protected Boolean randomContainerStreamPort = true;
+    protected Boolean enableContainerDatastream = true;
     protected Optional<String> datanodeReservedSpace = Optional.empty();
     protected Optional<Integer> chunkSize = Optional.empty();
     protected OptionalInt streamBufferSize = OptionalInt.empty();

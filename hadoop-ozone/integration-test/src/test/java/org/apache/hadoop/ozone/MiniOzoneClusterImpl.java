@@ -933,6 +933,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           randomContainerPort);
       conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
           randomContainerPort);
+      conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+          enableContainerDatastream);
       conf.setBoolean(DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT,
           randomContainerStreamPort);
 
