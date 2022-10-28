@@ -136,7 +136,7 @@ enum Status {
 * Request send to SCM asking allocate block of specified size.
 */
 message AllocateScmBlockRequestProto {
-  required uint64 size = 1 [deprecated = true];
+  required uint64 size = 1; // client specified block size, 0 means None
   required uint32 numBlocks = 2 [deprecated = true];
   required ReplicationType type = 3;
   optional hadoop.hdds.ReplicationFactor factor = 4;

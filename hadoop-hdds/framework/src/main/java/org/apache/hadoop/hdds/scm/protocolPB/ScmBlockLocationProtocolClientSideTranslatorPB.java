@@ -139,6 +139,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
    * set of datanodes that should be used creating this block.
    *
    * @param requestedSize     - total size requested.
+   * @param blockSize         - client specified block size, 0 for default.
    * @param replicationConfig - replication configuration of the blocks.
    * @param excludeList       - exclude list while allocating blocks.
    * @return allocated block accessing info (key, pipeline).
@@ -146,7 +147,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<AllocatedBlock> allocateBlock(
-      long requestedSize,
+      long requestedSize, long blockSize,
       ReplicationConfig replicationConfig,
       String owner, ExcludeList excludeList
   ) throws IOException {

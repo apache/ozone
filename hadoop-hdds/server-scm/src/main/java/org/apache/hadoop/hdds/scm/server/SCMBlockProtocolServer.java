@@ -182,31 +182,35 @@ public class SCMBlockProtocolServer implements
 
   @Override
   public List<AllocatedBlock> allocateBlock(
-      long requestedSize,
+      long requestedSize, long blockSize,
       ReplicationConfig replicationConfig,
       String owner, ExcludeList excludeList
   ) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("requestedSize", String.valueOf(requestedSize));
+    auditMap.put("blockSize", String.valueOf(blockSize));
     auditMap.put("replication", replicationConfig.toString());
     auditMap.put("owner", owner);
 
-    long size = scmBlockSize;
+    if (blockSize <= 0) {
+      blockSize = scmBlockSize;
+    }
     int numData = replicationConfig instanceof ECReplicationConfig ?
         ((ECReplicationConfig) replicationConfig).getData() : 1;
-    int num = (int) ((requestedSize - 1) / (scmBlockSize * numData) + 1);
+    int num = (int) ((requestedSize - 1) / (blockSize * numData) + 1);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Requested Size {} replicationConfig {}," +
               "allocating {} blocks (or block groups) of size {}, with {}",
-          requestedSize, replicationConfig, num, numData * size, excludeList);
+          requestedSize, replicationConfig,
+          num, numData * blockSize, excludeList);
     }
 
     List<AllocatedBlock> blocks = new ArrayList<>(num);
     try {
       for (int i = 0; i < num; i++) {
         AllocatedBlock block = scm.getScmBlockManager()
-            .allocateBlock(size, replicationConfig, owner, excludeList);
+            .allocateBlock(blockSize, replicationConfig, owner, excludeList);
         if (block != null) {
           blocks.add(block);
         }
