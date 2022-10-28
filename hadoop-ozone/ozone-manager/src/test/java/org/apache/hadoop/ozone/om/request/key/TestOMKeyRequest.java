@@ -70,7 +70,6 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.util.Time;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -178,24 +177,23 @@ public class TestOMKeyRequest {
         any(ReplicationConfig.class), anyString(),
         any(ExcludeList.class), anyLong())
     ).thenAnswer(invocation -> {
-          long requestedSize = invocation.getArgument(0);
-          long blockSize = invocation.getArgument(4);
-          ReplicationConfig repConfig = invocation.getArgument(1);
-          int numData = repConfig instanceof ECReplicationConfig ?
-              ((ECReplicationConfig) repConfig).getData() : 1;
-          if (blockSize == 0) {
-            blockSize = scmBlockSize;
-          }
-          int num = (int) ((requestedSize - 1) / (blockSize * numData)) + 1;
-          List<AllocatedBlock> allocatedBlocks = new ArrayList<>(num);
-          for (int i = 0; i < num; i++) {
-            blockBuilder.setContainerBlockID(
-                new ContainerBlockID(CONTAINER_ID + i, LOCAL_ID + i));
-            allocatedBlocks.add(blockBuilder.build());
-          }
-          return allocatedBlocks;
-        });
-
+      long requestedSize = invocation.getArgument(0);
+      long blockSize = invocation.getArgument(4);
+      ReplicationConfig repConfig = invocation.getArgument(1);
+      int numData = repConfig instanceof ECReplicationConfig ?
+          ((ECReplicationConfig) repConfig).getData() : 1;
+      if (blockSize == 0) {
+        blockSize = scmBlockSize;
+      }
+      int num = (int) ((requestedSize - 1) / (blockSize * numData)) + 1;
+      List<AllocatedBlock> allocatedBlocks = new ArrayList<>(num);
+      for (int i = 0; i < num; i++) {
+        blockBuilder.setContainerBlockID(
+            new ContainerBlockID(CONTAINER_ID + i, LOCAL_ID + i));
+        allocatedBlocks.add(blockBuilder.build());
+      }
+      return allocatedBlocks;
+    });
 
     volumeName = UUID.randomUUID().toString();
     bucketName = UUID.randomUUID().toString();
