@@ -18,7 +18,6 @@
 package org.apache.ozone.rocksdiff;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -46,6 +45,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -258,8 +258,7 @@ public class RocksDBCheckpointDiffer {
     //  {  (output files) + lastSnapshotCounter + currentCompactionGen }
     //  mapping.
 
-    // Load all previous compaction logs
-    loadAllCompactionLogs();
+    // Note: Previous compaction log files are loaded in RDBStore, not here.
   }
 
   /**
@@ -451,31 +450,17 @@ public class RocksDBCheckpointDiffer {
 
   /**
    * Helper function to append the list of SST files to a StringBuilder
-   * for a compaction log entry.
-   *
-   * Does not append a new line.
-   *
+   * for a compaction log entry. Does not append a new line.
    * @param files
-   * @param filenameOffset
    * @param sb
    */
   private static void appendCompactionLogStringBuilder(List<String> files,
-      int filenameOffset, StringBuilder sb) {
+      StringBuilder sb) {
 
     Iterator<String> it = files.iterator();
     while (it.hasNext()) {
-      final String file = it.next();
-      if (!file.endsWith(SST_FILE_EXTENSION)) {
-        // Failed file extension check
-        final String errorMessage = String.format(
-            "Unexpected SST file extension for file '%s'. Expecting %s",
-            file, SST_FILE_EXTENSION);
-        LOG.error(errorMessage);
-        throw new RuntimeException(errorMessage);
-      }
-      final String fn = file.substring(filenameOffset,
-          file.length() - SST_FILE_EXTENSION_LENGTH);
-      sb.append(fn);
+      final String filename = it.next();
+      sb.append(filename);
       // Do not append delimiter if this is the last one
       if (it.hasNext()) {
         sb.append(',');
@@ -513,28 +498,30 @@ public class RocksDBCheckpointDiffer {
           sb.append(COMPACTION_LOG_ENTRY_LINE_PREFIX);
 
           // Trim DB path, only keep the SST file name
-          final int filenameBegin =
+          final int filenameOffset =
               compactionJobInfo.inputFiles().get(0).lastIndexOf("/") + 1;
 
           // Append the list of input files
           final List<String> inputFiles = compactionJobInfo.inputFiles();
-          appendCompactionLogStringBuilder(inputFiles, filenameBegin, sb);
+          inputFiles.replaceAll(s -> s.substring(
+              filenameOffset, s.length() - SST_FILE_EXTENSION_LENGTH));
+          appendCompactionLogStringBuilder(inputFiles, sb);
 
           // Insert delimiter between input files an output files
           sb.append(':');
 
           // Append the list of output files
           final List<String> outputFiles = compactionJobInfo.outputFiles();
-          appendCompactionLogStringBuilder(outputFiles, filenameBegin, sb);
+          outputFiles.replaceAll(s -> s.substring(
+              filenameOffset, s.length() - SST_FILE_EXTENSION_LENGTH));
+          appendCompactionLogStringBuilder(outputFiles, sb);
           sb.append('\n');
 
           // Write input and output file names to compaction log
           appendToCurrentCompactionLog(sb.toString());
 
           // Populate the DAG
-          populateCompactionDAG(
-              compactionJobInfo.inputFiles().toArray(new String[0]),
-              compactionJobInfo.outputFiles().toArray(new String[0]),
+          populateCompactionDAG(inputFiles, outputFiles,
               db.getLatestSequenceNumber());
 
 //          if (debugEnabled(DEBUG_DAG_BUILD_UP)) {
@@ -564,6 +551,11 @@ public class RocksDBCheckpointDiffer {
    */
   public long getSSTFileSummary(String filename)
       throws RocksDBException {
+
+    if (!filename.endsWith(SST_FILE_EXTENSION)) {
+      filename += SST_FILE_EXTENSION;
+    }
+
     Options option = new Options();
     SstFileReader reader = new SstFileReader(option);
     try {
@@ -577,8 +569,33 @@ public class RocksDBCheckpointDiffer {
     return properties.getNumEntries();
   }
 
-  // Read the current Live manifest for a given RocksDB instance (Active or
-  // Checkpoint). Returns the list of currently active SST FileNames.
+  /**
+   * Helper method to trim the filename retrieved from LiveFileMetaData.
+   */
+  private String trimSSTFilename(String filename) {
+    if (!filename.startsWith("/")) {
+      final String errorMsg = String.format(
+          "Invalid start of filename: '%s'. Expected '/'", filename);
+      LOG.error(errorMsg);
+      throw new RuntimeException(errorMsg);
+    }
+    if (!filename.endsWith(SST_FILE_EXTENSION)) {
+      final String errorMsg = String.format(
+          "Invalid extension of file: '%s'. Expected '%s'",
+          filename, SST_FILE_EXTENSION_LENGTH);
+      LOG.error(errorMsg);
+      throw new RuntimeException(errorMsg);
+    }
+    return filename.substring("/".length(),
+        filename.length() - SST_FILE_EXTENSION_LENGTH);
+  }
+
+  /**
+   * Read the current Live manifest for a given RocksDB instance (Active or
+   * Checkpoint).
+   * @param dbPathArg
+   * @return a list of SST files (without extension) in the DB.
+   */
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   public HashSet<String> readRocksDBLiveFiles(String dbPathArg) {
     RocksDB rocksDB = null;
@@ -587,16 +604,18 @@ public class RocksDBCheckpointDiffer {
     try (Options options = new Options()
         .setParanoidChecks(true)
         .setForceConsistencyChecks(false)) {
+
       rocksDB = RocksDB.openReadOnly(options, dbPathArg);
       List<LiveFileMetaData> liveFileMetaDataList =
           rocksDB.getLiveFilesMetaData();
-      LOG.warn("Live File Metadata for DB: " + dbPathArg);
+      LOG.debug("SST File Metadata for DB: " + dbPathArg);
       for (LiveFileMetaData m : liveFileMetaDataList) {
-        LOG.warn("\tFile :" + m.fileName());
-        LOG.warn("\tLevel :" + m.level());
-        liveFiles.add(Paths.get(m.fileName()).getFileName().toString());
+        LOG.debug("File: {}, Level: {}", m.fileName(), m.level());
+        final String trimmedFilename = trimSSTFilename(m.fileName());
+        liveFiles.add(trimmedFilename);
       }
     } catch (RocksDBException e) {
+      LOG.error("Error during RocksDB operation: {}", e.getMessage());
       e.printStackTrace();
     } finally {
       if (rocksDB != null) {
@@ -606,7 +625,6 @@ public class RocksDBCheckpointDiffer {
     return liveFiles;
   }
 
-  private String[] sstTokensRead;
   private long reconstructionSnapshotGeneration;
 
   /**
@@ -616,60 +634,43 @@ public class RocksDBCheckpointDiffer {
 
     LOG.debug("Processing line: {}", line);
 
-    // Skip comments
     if (line.startsWith("#")) {
+      // Skip comments
       LOG.debug("Comment line, skipped");
-      return;
-    }
-
-    // Read sequence number as the snapshot generation for the nodes
-    if (line.startsWith(COMPACTION_LOG_SEQNUM_LINE_PREFIX)) {
+    } else if (line.startsWith(COMPACTION_LOG_SEQNUM_LINE_PREFIX)) {
+      // Read sequence number
       LOG.debug("Reading sequence number as snapshot generation");
       final String seqNumStr =
           line.substring(COMPACTION_LOG_SEQNUM_LINE_PREFIX.length()).trim();
+      // This would the snapshot generation for the nodes to come
       reconstructionSnapshotGeneration = Long.parseLong(seqNumStr);
-      return;
-    }
+    } else if (line.startsWith(COMPACTION_LOG_ENTRY_LINE_PREFIX)) {
+      // Read compaction log entry
 
-    if (sstTokensRead == null) {
-      // Store the tokens in the first line
-      sstTokensRead = line.split("\t");
-      LOG.debug("Number of input files: {}", sstTokensRead.length);
-      if (sstTokensRead.length == 0) {
-        // Sanity check. inputFiles should never be empty. outputFiles could.
-        throw new RuntimeException(
-            "Compaction inputFiles list is empty. File is corrupted?");
+      // Trim the beginning
+      line = line.substring(COMPACTION_LOG_SEQNUM_LINE_PREFIX.length());
+      final String[] io = line.split(":");
+      if (io.length != 2) {
+        LOG.error("Invalid line in compaction log: {}", line);
+        return;
       }
+      final String[] inputFiles = io[0].split(",");
+      final String[] outputFiles = io[1].split(",");
+      populateCompactionDAG(Arrays.asList(inputFiles),
+          Arrays.asList(outputFiles), reconstructionSnapshotGeneration);
     } else {
-      final String[] outputFilesRead = line.split("\t");
-      LOG.debug("Number of output files: {}", outputFilesRead.length);
-
-      // Populate the compaction DAG
-      populateCompactionDAG(sstTokensRead, outputFilesRead,
-          reconstructionSnapshotGeneration);
-
-      // Reset inputFilesRead to null so
-      sstTokensRead = null;
+      LOG.error("Invalid line in compaction log: {}", line);
     }
   }
 
   /**
    * Helper to read compaction log to the internal DAG.
-   * <p>
-   * DO NOT use this function in another context without understanding what it
-   * does, due to the state preserved between calls (in sstTokensRead).
    */
   private void readCompactionLogToDAG(String currCompactionLogPath) {
     LOG.debug("Loading compaction log: {}", currCompactionLogPath);
-    try (Stream<String> stream =
+    try (Stream<String> logLineStream =
         Files.lines(Paths.get(currCompactionLogPath), StandardCharsets.UTF_8)) {
-      assert (sstTokensRead == null);
-      stream.forEach(this::processCompactionLogLine);
-      if (sstTokensRead != null) {
-        // Sanity check. Temp variable must be null after parsing.
-        // Otherwise it means the compaction log is corrupted.
-        throw new RuntimeException("Missing output files line. Corrupted?");
-      }
+      logLineStream.forEach(this::processCompactionLogLine);
     } catch (IOException ioEx) {
       throw new RuntimeException(ioEx);
     }
@@ -720,7 +721,8 @@ public class RocksDBCheckpointDiffer {
     //  the DAG.
     try {
       try (Stream<Path> pathStream = Files.list(Paths.get(compactionLogDir))
-          .filter(e -> e.toString().toLowerCase().endsWith(".log"))
+          .filter(e -> e.toString()
+              .toLowerCase().endsWith(COMPACTION_LOG_FILENAME_SUFFIX))
           .sorted()) {
         for (Path logPath : pathStream.collect(Collectors.toList())) {
 
@@ -759,14 +761,18 @@ public class RocksDBCheckpointDiffer {
 
   /**
    * Load existing compaction log files to the in-memory DAG.
+   * This only needs to be done once during OM startup.
    */
-  private void loadAllCompactionLogs() {
+  public void loadAllCompactionLogs() {
+    if (compactionLogDir == null) {
+      throw new RuntimeException("Compaction log directory must be set first");
+    }
+    reconstructionSnapshotGeneration = 0L;
     try {
       try (Stream<Path> pathStream = Files.list(Paths.get(compactionLogDir))
           .filter(e -> e.toString().toLowerCase().endsWith(".log"))
           .sorted()) {
         for (Path logPath : pathStream.collect(Collectors.toList())) {
-          LOG.debug("Loading compaction log: {}", logPath);
           readCompactionLogToDAG(logPath.toString());
         }
       }
@@ -785,8 +791,7 @@ public class RocksDBCheckpointDiffer {
    * @param dest destination snapshot
    * @throws RocksDBException
    */
-  private synchronized List<String> getSSTDiffList(Snapshot src,
-      Snapshot dest) {
+  public synchronized List<String> getSSTDiffList(Snapshot src, Snapshot dest) {
 
     LOG.warn("src db checkpoint: {}", src.dbPath);
     HashSet<String> srcSnapFiles = readRocksDBLiveFiles(src.dbPath);
@@ -803,17 +808,17 @@ public class RocksDBCheckpointDiffer {
 
     System.out.println("Summary of diff from src '" + src.dbPath +
         "' to dest '" + dest.dbPath + "':");
-    System.out.print("Fwd DAG same files: ");
+    System.out.print("Fwd DAG same SST files:      ");
     for (String file : fwdDAGSameFiles) {
-      System.out.print(file + "\t");
+      System.out.print(file + " ");
     }
     System.out.println();
 
     List<String> res = new ArrayList<>();
 
-    System.out.print("Fwd DAG different files: ");
+    System.out.print("Fwd DAG different SST files: ");
     for (String file : fwdDAGDifferentFiles) {
-      System.out.print(file + "\t");
+      System.out.print(file + " ");
       res.add(file);
     }
     System.out.println();
@@ -1071,10 +1076,14 @@ public class RocksDBCheckpointDiffer {
    * Populate the compaction DAG with input and output SST files lists.
    */
   @SuppressFBWarnings({"AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION"})
-  private void populateCompactionDAG(String[] inputFiles, String[] outputFiles,
-      long seqNum) {
+  private void populateCompactionDAG(List<String> inputFiles,
+      List<String> outputFiles, long seqNum) {
 
-    LOG.info("Populating compaction DAG with lists of input and output files");
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Populating compaction DAG");
+      LOG.debug("Input files: {}", inputFiles);
+      LOG.debug("Output files: {}", outputFiles);
+    }
 
     for (String outfile : outputFiles) {
       CompactionNode outfileNode = compactionNodeTable.get(outfile);
@@ -1107,6 +1116,7 @@ public class RocksDBCheckpointDiffer {
           compactionDAGReverse.addNode(infileNode);
           compactionNodeTable.put(infile, infileNode);
         }
+        // Draw the edges
         if (outfileNode.fileName.compareToIgnoreCase(
             infileNode.fileName) != 0) {
           compactionDAGFwd.putEdge(outfileNode, infileNode);

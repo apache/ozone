@@ -141,6 +141,8 @@ public class RDBStore implements DBStore {
       rocksDBCheckpointDiffer.setCompactionLogParentDir(snapshotsParentDir);
       rocksDBCheckpointDiffer.setCurrentCompactionLog(
           db.getLatestSequenceNumber());
+      // Load all previous compaction logs
+      rocksDBCheckpointDiffer.loadAllCompactionLogs();
 
       //Initialize checkpoint manager
       checkPointManager = new RDBCheckpointManager(db, dbLocation.getName());
