@@ -134,7 +134,6 @@ public final class TestNSSummaryTaskWithFSO {
     reconNamespaceSummaryManager =
             reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
 
-
     NSSummary nonExistentSummary =
             reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
     Assert.assertNull(nonExistentSummary);
@@ -142,7 +141,7 @@ public final class TestNSSummaryTaskWithFSO {
     populateOMDB();
 
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
-        reconNamespaceSummaryManager);
+        reconNamespaceSummaryManager, reconOMMetadataManager);
   }
 
   /**
@@ -165,7 +164,11 @@ public final class TestNSSummaryTaskWithFSO {
 
       // Verify commit
       Assert.assertNotNull(reconNamespaceSummaryManager.getNSSummary(-1L));
-      nSSummaryTaskWithFso.reprocess(reconOMMetadataManager);
+
+      // reinit Recon RocksDB's namespace CF.
+      reconNamespaceSummaryManager.clearNSSummaryTable();
+
+      nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
       Assert.assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
 
       nsSummaryForBucket1 =
@@ -273,8 +276,8 @@ public final class TestNSSummaryTaskWithFSO {
     private static OMDBUpdateEvent keyEvent7;
     @BeforeClass
     public static void setUp() throws IOException {
-      nSSummaryTaskWithFso.reprocess(reconOMMetadataManager);
-      nSSummaryTaskWithFso.process(processEventBatch());
+      nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
+      nSSummaryTaskWithFso.processWithFSO(processEventBatch());
     }
 
     private static OMUpdateEventBatch processEventBatch() throws IOException {

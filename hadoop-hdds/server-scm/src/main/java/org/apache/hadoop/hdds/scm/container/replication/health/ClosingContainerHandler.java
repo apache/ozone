@@ -51,10 +51,13 @@ public class ClosingContainerHandler extends AbstractCheck {
       return false;
     }
 
+    boolean forceClose = request.getContainerInfo().getReplicationConfig()
+        .getReplicationType() != HddsProtos.ReplicationType.RATIS;
+
     for (ContainerReplica replica : request.getContainerReplicas()) {
       if (replica.getState() != ContainerReplicaProto.State.UNHEALTHY) {
         replicationManager.sendCloseContainerReplicaCommand(
-            containerInfo, replica.getDatanodeDetails(), false);
+            containerInfo, replica.getDatanodeDetails(), forceClose);
       }
     }
     return true;

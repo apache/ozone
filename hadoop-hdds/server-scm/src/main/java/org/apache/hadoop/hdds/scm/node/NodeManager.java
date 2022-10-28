@@ -301,11 +301,15 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   /**
    * Process the Command Queue Report sent from datanodes as part of the
    * heartbeat message.
-   * @param datanodeDetails
-   * @param commandReport
+   * @param datanodeDetails DatanodeDetails the report is from
+   * @param commandReport Command summary report from the DN when the heartbeat
+   *                      was created.
+   * @param commandsToBeSent Summary of command counts that will be sent to
+   *                         the Datanode as part of the current heartbeat
    */
   void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
-      CommandQueueReportProto commandReport);
+      CommandQueueReportProto commandReport,
+      Map<SCMCommandProto.Type, Integer> commandsToBeSent);
 
   /**
    * Get the number of commands of the given type queued on the datanode at the
@@ -316,6 +320,15 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    */
   int getNodeQueuedCommandCount(DatanodeDetails datanodeDetails,
       SCMCommandProto.Type cmdType) throws NodeNotFoundException;
+
+  /**
+   * Get the number of commands of the given type queued in the SCM CommandQueue
+   * for the given datanode.
+   * @param dnID The UUID of the datanode.
+   * @param cmdType The Type of command to query the current count for.
+   * @return The count of commands queued, or zero if none.
+   */
+  int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType);
 
   /**
    * Get list of SCMCommands in the Command Queue for a particular Datanode.
