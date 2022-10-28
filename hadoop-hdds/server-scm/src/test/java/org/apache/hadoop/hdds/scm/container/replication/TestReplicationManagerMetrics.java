@@ -62,6 +62,8 @@ public class TestReplicationManagerMetrics {
     Mockito.when(replicationManager.getLegacyReplicationManager())
         .thenReturn(lrm);
     Mockito.when(replicationManager.getContainerReport()).thenReturn(report);
+    Mockito.when(replicationManager.getContainerReplicaPendingOps())
+        .thenReturn(Mockito.mock(ContainerReplicaPendingOps.class));
     metrics = ReplicationManagerMetrics.create(replicationManager);
   }
 
@@ -92,6 +94,11 @@ public class TestReplicationManagerMetrics {
         ReplicationManagerReport.HealthState.values()) {
       Assertions.assertEquals(s.ordinal(), getGauge(s.getMetricName()));
     }
+  }
+
+  @Test
+  public void testEReplicationMetrics() {
+
   }
 
   private long getGauge(String metricName) {

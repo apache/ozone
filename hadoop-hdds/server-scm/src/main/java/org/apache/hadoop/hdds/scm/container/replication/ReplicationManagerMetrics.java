@@ -71,6 +71,14 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       "InflightMove",
       "Tracked inflight container move requests.");
 
+  private static final MetricsInfo INFLIGHT_EC_REPLICATION = Interns.info(
+      "InflightEcReplication",
+      "Tracked inflight EC container replication requests.");
+
+  private static final MetricsInfo INFLIGHT_EC_DELETION = Interns.info(
+      "InflightEcDeletion",
+      "Tracked inflight EC container deletion requests.");
+
   // Setup metric names and descriptions for Container Lifecycle states
   private static final Map<LifeCycleState, MetricsInfo> LIFECYCLE_STATE_METRICS
       = Collections.unmodifiableMap(
@@ -141,6 +149,29 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   private ReplicationManager replicationManager;
 
+  //EC Metrics
+  @Metric("Number of EC Replication commands sent.")
+  private MutableCounterLong ecReplicationCmdsSentTotal;
+
+  @Metric("Number of EC Deletion commands timeout.")
+  private MutableCounterLong ecDeletionCmdsSentTotal;
+
+  @Metric("Number of EC Replication commands completed.")
+  private MutableCounterLong ecReplicationCmdsCompletedTotal;
+
+  @Metric("Number of EC Deletion commands completed.")
+  private MutableCounterLong ecDeletionCmdsCompletedTotal;
+
+  @Metric("Number of EC Deletion commands completed.")
+  private MutableCounterLong ecReconstructionCmdsSentTotal;
+
+  @Metric("Number of EC Replication commands timeout.")
+  private MutableCounterLong ecReplicationCmdsTimeoutTotal;
+
+  @Metric("Number of EC Deletion commands timeout.")
+  private MutableCounterLong ecDeletionCmdsTimeoutTotal;
+
+
   public ReplicationManagerMetrics(ReplicationManager manager) {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
     this.replicationManager = manager;
@@ -160,7 +191,9 @@ public final class ReplicationManagerMetrics implements MetricsSource {
         .addGauge(INFLIGHT_REPLICATION_SKIPPED, getInflightReplicationSkipped())
         .addGauge(INFLIGHT_DELETION, getInflightDeletion())
         .addGauge(INFLIGHT_DELETION_SKIPPED, getInflightDeletionSkipped())
-        .addGauge(INFLIGHT_MOVE, getInflightMove());
+        .addGauge(INFLIGHT_MOVE, getInflightMove())
+        .addGauge(INFLIGHT_EC_REPLICATION, getEcReplication())
+        .addGauge(INFLIGHT_EC_DELETION, getEcDeletion());
 
     ReplicationManagerReport report = replicationManager.getContainerReport();
     for (Map.Entry<HddsProtos.LifeCycleState, MetricsInfo> e :
@@ -184,6 +217,13 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     numDeletionBytesCompleted.snapshot(builder, all);
     replicationTime.snapshot(builder, all);
     deletionTime.snapshot(builder, all);
+    ecReplicationCmdsSentTotal.snapshot(builder, all);
+    ecDeletionCmdsSentTotal.snapshot(builder, all);
+    ecReplicationCmdsCompletedTotal.snapshot(builder, all);
+    ecDeletionCmdsCompletedTotal.snapshot(builder, all);
+    ecReconstructionCmdsSentTotal.snapshot(builder, all);
+    ecReplicationCmdsTimeoutTotal.snapshot(builder, all);
+    ecDeletionCmdsTimeoutTotal.snapshot(builder, all);
   }
 
   public void unRegister() {
@@ -311,5 +351,59 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   public long getNumReplicationBytesCompleted() {
     return this.numReplicationBytesCompleted.value();
+  }
+
+  public void incrEcReplicationCmdsSentTotal() {
+    this.ecReplicationCmdsSentTotal.incr();
+  }
+
+  public void incrEcDeletionCmdsSentTotal() {
+    this.ecDeletionCmdsSentTotal.incr();
+  }
+
+  public void incrEcReplicationCmdsCompletedTotal() {
+    this.ecReplicationCmdsCompletedTotal.incr();
+  }
+
+  public void incrEcDeletionCmdsCompletedTotal() {
+    this.ecDeletionCmdsCompletedTotal.incr();
+  }
+
+  public void incrEcReconstructionCmdsSentTotal() {
+    this.ecReconstructionCmdsSentTotal.incr();
+  }
+
+  public long getEcReplication() {
+    return replicationManager.getContainerReplicaPendingOps()
+        .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD);
+  }
+
+  public long getEcDeletion() {
+    return replicationManager.getContainerReplicaPendingOps()
+        .getPendingOpCount(ContainerReplicaOp.PendingOpType.DELETE);
+  }
+
+  public void incrEcReplicationCmdsTimeoutTotal() {
+    this.ecReplicationCmdsTimeoutTotal.incr();
+  }
+
+  public void incrEcDeletionCmdsTimeoutTotal() {
+    this.ecDeletionCmdsTimeoutTotal.incr();
+  }
+
+  public long getEcReplicationCmdsTimeoutTotal() {
+    return ecReplicationCmdsTimeoutTotal.value();
+  }
+
+  public long getEcDeletionCmdsTimeoutTotal() {
+    return ecDeletionCmdsTimeoutTotal.value();
+  }
+
+  public long getEcReplicationCmdsCompletedTotal() {
+    return ecReplicationCmdsCompletedTotal.value();
+  }
+
+  public long getEcDeletionCmdsCompletedTotal() {
+    return ecDeletionCmdsCompletedTotal.value();
   }
 }
