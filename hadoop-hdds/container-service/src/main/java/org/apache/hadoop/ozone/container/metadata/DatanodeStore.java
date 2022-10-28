@@ -99,4 +99,10 @@ public interface DatanodeStore extends Closeable {
    * @return true if the DB is closed.
    */
   boolean isClosed();
+
+  /**
+   * Check if everything is good.
+   */
+  default void check() throws Exception {
+  }
 }

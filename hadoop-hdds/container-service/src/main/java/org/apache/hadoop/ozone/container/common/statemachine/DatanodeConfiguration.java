@@ -364,6 +364,31 @@ public class DatanodeConfiguration {
   )
   private int rocksdbMaxOpenFiles = ROCKSDB_MAX_OPEN_FILES_DEFAULT;
 
+  @Config(key = "rocksdb.auto-compaction-small-sst-file",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = { DATANODE },
+      description = "Auto compaction small sst files when threshold is met. "
+  )
+  private boolean autoCompactionSmallSstFile = true;
+
+  @Config(key = "rocksdb.auto-compaction-small-sst-file-size-threshold",
+      defaultValue = "1MB",
+      type = ConfigType.SIZE,
+      tags = { DATANODE },
+      description = "Sst files with size smaller than threshold is a target."
+  )
+  private long autoCompactionSmallSstFileSize = 1024 * 1024;
+
+  @Config(key = "rocksdb.auto-compaction-small-sst-file-num-threshold",
+      defaultValue = "512",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "Auto compaction will happen if the number of small Sst " +
+          " files exceeds this threshold."
+  )
+  private int autoCompactionSmallSstFileNum = 512;
+
   @PostConstruct
   public void validate() {
     if (containerDeleteThreads < 1) {
@@ -585,5 +610,29 @@ public class DatanodeConfiguration {
 
   public int getRocksdbMaxOpenFiles() {
     return this.rocksdbMaxOpenFiles;
+  }
+
+  public boolean autoCompactionSmallSstFile() {
+    return autoCompactionSmallSstFile;
+  }
+
+  public void setAutoCompactionSmallSstFile(boolean auto) {
+    this.autoCompactionSmallSstFile = auto;
+  }
+
+  public long getAutoCompactionSmallSstFileSize() {
+    return autoCompactionSmallSstFileSize;
+  }
+
+  public void setAutoCompactionSmallSstFileSize(long size) {
+    this.autoCompactionSmallSstFileSize = size;
+  }
+
+  public int getAutoCompactionSmallSstFileNum() {
+    return autoCompactionSmallSstFileNum;
+  }
+
+  public void setAutoCompactionSmallSstFileNum(int num) {
+    this.autoCompactionSmallSstFileNum = num;
   }
 }

@@ -148,6 +148,12 @@ public class DatanodeSchemaThreeDBDefinition
         + separator;
   }
 
+  public static byte[] getContainerKeyPrefixBytes(long containerID) {
+    // NOTE: Rocksdb normally needs a fixed length prefix.
+    return FixedLengthStringUtils.string2Bytes(
+        getContainerKeyPrefix(containerID));
+  }
+
   public static int getContainerKeyPrefixLength() {
     return FixedLengthStringUtils.string2Bytes(
         getContainerKeyPrefix(0L)).length;
@@ -155,6 +161,15 @@ public class DatanodeSchemaThreeDBDefinition
 
   public static String getKeyWithoutPrefix(String keyWithPrefix) {
     return keyWithPrefix.substring(keyWithPrefix.indexOf(separator) + 1);
+  }
+  /**
+   *
+   * @param key rocksDB original key
+   * @return containerID
+   */
+  public static long getContainerId(String key) {
+    int index = getContainerKeyPrefixLength();
+    return Long.parseLong(key.substring(0, index));
   }
 
   private void setSeparator(String keySeparator) {
