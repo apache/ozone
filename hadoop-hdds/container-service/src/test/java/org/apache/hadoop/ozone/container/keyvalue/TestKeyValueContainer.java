@@ -665,7 +665,7 @@ public class TestKeyValueContainer {
   }
 
   @Test
-  public void TestAutoCompactionSmallSstFile() throws IOException {
+  public void testAutoCompactionSmallSstFile() throws IOException {
     Assume.assumeTrue(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
     // Create a new HDDS volume
     HddsVolume newVolume = new HddsVolume.Builder(

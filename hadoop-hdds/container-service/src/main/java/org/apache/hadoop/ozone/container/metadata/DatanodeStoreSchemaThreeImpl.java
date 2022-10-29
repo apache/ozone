@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.bouncycastle.util.Strings;
-import org.rocksdb.CompactRangeOptions;
 import org.rocksdb.LiveFileMetaData;
 
 import java.io.File;
@@ -202,10 +201,11 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
             ManagedCompactRangeOptions options =
                 new ManagedCompactRangeOptions();
             options.setBottommostLevelCompaction(
-                CompactRangeOptions.BottommostLevelCompaction.kForce);
+                ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
             LOG.info("CF {} level {} small file number {} exceeds threshold {}"
                     + ". Auto compact small sst files.", entry.getKey(),
-                innerEntry.getKey(), innerEntry.getValue().size(), numThreshold);
+                innerEntry.getKey(), innerEntry.getValue().size(),
+                numThreshold);
             rocksDB.compactRange(columnFamily,
                 DatanodeSchemaThreeDBDefinition
                     .getContainerKeyPrefixBytes(startCId),
