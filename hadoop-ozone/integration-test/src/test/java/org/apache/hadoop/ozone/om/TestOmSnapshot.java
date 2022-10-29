@@ -190,31 +190,10 @@ public class TestOmSnapshot {
      */
     String keyBaseA = "key-a-";
     for (int i = 0; i < 10; i++) {
-      byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
-      OzoneOutputStream one = volAbucketA.createKey(
-          keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      one.write(value);
-      one.close();
-      OzoneOutputStream two = volAbucketB.createKey(
-          keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      two.write(value);
-      two.close();
-      OzoneOutputStream three = volBbucketA.createKey(
-          keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      three.write(value);
-      three.close();
-      OzoneOutputStream four = volBbucketB.createKey(
-          keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      four.write(value);
-      four.close();
+      createFileKey(volAbucketA, keyBaseA + i + "-");
+      createFileKey(volAbucketB, keyBaseA + i + "-");
+      createFileKey(volBbucketA, keyBaseA + i + "-");
+      createFileKey(volBbucketB, keyBaseA + i + "-");
     }
     /*
     Create 10 keys in  vol-a-<random>/buc-a-<random>,
@@ -223,33 +202,11 @@ public class TestOmSnapshot {
      */
     String keyBaseB = "key-b-";
     for (int i = 0; i < 10; i++) {
-      byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
-      OzoneOutputStream one = volAbucketA.createKey(
-          keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      one.write(value);
-      one.close();
-      OzoneOutputStream two = volAbucketB.createKey(
-          keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      two.write(value);
-      two.close();
-      OzoneOutputStream three = volBbucketA.createKey(
-          keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      three.write(value);
-      three.close();
-      OzoneOutputStream four = volBbucketB.createKey(
-          keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      four.write(value);
-      four.close();
+      createFileKey(volAbucketA, keyBaseB + i + "-");
+      createFileKey(volAbucketB, keyBaseB + i + "-");
+      createFileKey(volBbucketA, keyBaseB + i + "-");
+      createFileKey(volBbucketB, keyBaseB + i + "-");
     }
-
 
     String snapshotKeyPrefix = createSnapshot(volumeA, bucketA);
     Iterator<? extends OzoneKey> volABucketAIter =
@@ -383,6 +340,78 @@ public class TestOmSnapshot {
         snapshotKeyPrefix + key1);
   }
 
+  @Test
+  public void testListDeleteKey()
+          throws IOException, InterruptedException, TimeoutException {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buc-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume vol = store.getVolume(volume);
+    vol.createBucket(bucket);
+    OzoneBucket volbucket = vol.getBucket(bucket);
+
+    String key = "key-";
+    createFileKey(volbucket, key);
+    String snapshotKeyPrefix = createSnapshot(volume, bucket);
+    deleteKeys(volbucket);
+
+    Iterator<? extends OzoneKey> volBucketIter =
+            volbucket.listKeys(snapshotKeyPrefix + "key-");
+    int volBucketKeyCount = 0;
+    while (volBucketIter.hasNext()) {
+      volBucketIter.next();
+      volBucketKeyCount++;
+    }
+    Assert.assertEquals(1, volBucketKeyCount);
+
+    snapshotKeyPrefix = createSnapshot(volume, bucket);
+    Iterator<? extends OzoneKey> volBucketIter2 =
+            volbucket.listKeys(snapshotKeyPrefix);
+    while (volBucketIter2.hasNext()) {
+      fail("The last snapshot should not have any keys in it!");
+    }
+  }
+
+  @Test
+  public void testListAddNewKey()
+          throws IOException, InterruptedException, TimeoutException {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buc-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume vol = store.getVolume(volume);
+    vol.createBucket(bucket);
+    OzoneBucket volbucket = vol.getBucket(bucket);
+
+    String key1 = "key-1-";
+    createFileKey(volbucket, key1);
+    String snapshotKeyPrefix1 = createSnapshot(volume, bucket);
+
+    String key2 = "key-2-";
+    createFileKey(volbucket, key2);
+    String snapshotKeyPrefix2 = createSnapshot(volume, bucket);
+
+    Iterator<? extends OzoneKey> volBucketIter =
+            volbucket.listKeys(snapshotKeyPrefix1 + "key-");
+    int volBucketKeyCount = 0;
+    while (volBucketIter.hasNext()) {
+      volBucketIter.next();
+      volBucketKeyCount++;
+    }
+    Assert.assertEquals(1, volBucketKeyCount);
+
+    Iterator<? extends OzoneKey> volBucketIter2 =
+            volbucket.listKeys(snapshotKeyPrefix2 + "key-");
+    int volBucketKeyCount2 = 0;
+    while (volBucketIter2.hasNext()) {
+      volBucketIter2.next();
+      volBucketKeyCount2++;
+    }
+    Assert.assertEquals(2, volBucketKeyCount2);
+
+    deleteKeys(volbucket);
+
+  }
+
   private String createSnapshot()
       throws IOException, InterruptedException, TimeoutException {
     return createSnapshot(volumeName, bucketName);
@@ -416,5 +445,17 @@ public class TestOmSnapshot {
       bucket.deleteKey(key.getName());
     }
   }
+
+  private void createFileKey(OzoneBucket bucket, String keyprefix)
+          throws IOException {
+    byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+    OzoneOutputStream fileKey = bucket.createKey(
+            keyprefix + RandomStringUtils.randomNumeric(5),
+            value.length, RATIS, ONE,
+            new HashMap<>());
+    fileKey.write(value);
+    fileKey.close();
+  }
+
 }
 
