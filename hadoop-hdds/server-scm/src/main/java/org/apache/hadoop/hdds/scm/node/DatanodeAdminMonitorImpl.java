@@ -95,15 +95,8 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     private String host = "";
     private long pipelinesWaitingToClose = 0;
 
-    private ContainerStateInWorkflow(String host,
-                                     long sufficientlyReplicated,
-                                     long underReplicatedContainers,
-                                     long unhealthyContainers,
-                                     long pipelinesWaitingToClose) {
-      this.sufficientlyReplicated = sufficientlyReplicated;
-      this.unhealthyContainers = unhealthyContainers;
-      this.underReplicatedContainers = underReplicatedContainers;
-      this.pipelinesWaitingToClose = pipelinesWaitingToClose;
+    private ContainerStateInWorkflow(String host) {
+      this.host = host;
     }
 
     public void setReplicationState(long sufficiently,
@@ -112,13 +105,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       sufficientlyReplicated = sufficiently;
       underReplicatedContainers = under;
       unhealthyContainers = unhealthy;
-    }
-
-    public void reset() {
-      sufficientlyReplicated = 0L;
-      underReplicatedContainers = 0L;
-      unhealthyContainers = 0L;
-      pipelinesWaitingToClose = 0L;
     }
 
     public void setPipelinesWaitingToClose(long num) {
@@ -271,11 +257,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     sufficientlyReplicatedContainers = 0;
     unhealthyContainers = 0;
     underReplicatedContainers = 0;
-
-    for (Map.Entry<String, ContainerStateInWorkflow> e :
-            containerStateByHost.entrySet()) {
-      e.getValue().reset();
-    }
   }
 
   private void processCancelledNodes() {
@@ -391,7 +372,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       LOG.info("Waiting for pipelines to close for {}. There are {} " +
           "pipelines", dn, pipelines.size());
       containerStateByHost.computeIfAbsent(dn.getHostName(),
-              hostID -> new ContainerStateInWorkflow(hostID, 0L, 0L, 0L, 0L))
+              hostID -> new ContainerStateInWorkflow(hostID))
           .setPipelinesWaitingToClose(pipelines.size());
       pipelinesWaitingToClose += pipelines.size();
       return false;
@@ -444,7 +425,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
         "unhealthy containers",
         dn, sufficientlyReplicated, underReplicated, unhealthy);
     containerStateByHost.computeIfAbsent(dn.getHostName(),
-        hostID -> new ContainerStateInWorkflow(hostID, 0L, 0L, 0L, 0L))
+        hostID -> new ContainerStateInWorkflow(hostID))
         .setReplicationState(sufficientlyReplicated,
             underReplicated,
             unhealthy);

@@ -23,6 +23,7 @@ import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -64,19 +65,19 @@ public final class NodeDecommissionMetrics implements MetricsSource {
   private MetricsRegistry registry;
 
   private enum MetricByHost {
-    PipelinesWaitingToClose("TrackedPipelinesWaitingToClose",
+    PipelinesWaitingToClose("TrackedPipelinesWaitingToCloseDN",
         "Number of pipelines waiting to close for "
             + "host in decommissioning and "
             + "maintenance mode"),
-    SufficientlyReplicated("TrackedSufficientlyReplicated",
+    SufficientlyReplicated("TrackedSufficientlyReplicatedDN",
         "Number of sufficiently replicated containers "
             + "for host in decommissioning and "
             + "maintenance mode"),
-    UnderReplicated("TrackedUnderReplicated",
+    UnderReplicated("TrackedUnderReplicatedDN",
         "Number of under-replicated containers "
             + "for host in decommissioning and "
             + "maintenance mode"),
-    UnhealthyContainers("TrackedUnhealthyContainers",
+    UnhealthyContainers("TrackedUnhealthyContainersDN",
         "Number of unhealthy containers "
             + "for host in decommissioning and "
             + "maintenance mode");
@@ -91,6 +92,10 @@ public final class NodeDecommissionMetrics implements MetricsSource {
 
     public String getMetricName(String host) {
       return metricName + "-" + host;
+    }
+
+    public String getMetricName() {
+      return metricName;
     }
 
     public String getDescription() {
@@ -165,10 +170,19 @@ public final class NodeDecommissionMetrics implements MetricsSource {
     trackedContainersUnderReplicatedTotal.snapshot(builder, all);
     trackedContainersUnhealthyTotal.snapshot(builder, all);
     trackedContainersSufficientlyReplicatedTotal.snapshot(builder, all);
+    builder.endRecord();
 
     for (Map.Entry<String, TrackedWorkflowContainerState> e :
         trackedWorkflowContainerMetricByHost.entrySet()) {
-      builder.addGauge(e.getValue().getMetricsInfo(), e.getValue().getValue());
+      MetricsRecordBuilder recordBuilder = collector
+          .addRecord(METRICS_SOURCE_NAME);
+      recordBuilder.add(
+          new MetricsTag(Interns.info("datanode",
+              "datanode host in decommission maintenance workflow"),
+              e.getValue().getHost()));
+      recordBuilder.addGauge(e.getValue().getMetricsInfo(),
+          e.getValue().getValue());
+      recordBuilder.endRecord();
     }
   }
 
@@ -242,7 +256,7 @@ public final class NodeDecommissionMetrics implements MetricsSource {
       String host,
       MetricByHost metric) {
     return new TrackedWorkflowContainerState(host,
-        Interns.info(host,
+        Interns.info(metric.getMetricName(),
             metric.getDescription()), 0L);
   }
 
