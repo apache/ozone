@@ -229,7 +229,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     final byte[] data = new byte[8 * chunkSize];
     ThreadLocalRandom.current().nextBytes(data);
     final File file = new File(dir, "data");
-    try(FileOutputStream out = new FileOutputStream(file)) {
+    try (FileOutputStream out = new FileOutputStream(file)) {
       out.write(data);
     }
 
@@ -246,11 +246,11 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     // upload a key from the local file using memory-mapped buffers
     final String keyName = "key-" + UUID.randomUUID();
     try (RandomAccessFile raf = new RandomAccessFile(file, "r");
-        OzoneDataStreamOutput out = bucket.createStreamKey(
-        keyName, data.length)) {
+         OzoneDataStreamOutput out = bucket.createStreamKey(
+             keyName, data.length)) {
       final FileChannel channel = raf.getChannel();
       long off = 0;
-      for (long len = raf.length(); len > 0; ) {
+      for (long len = raf.length(); len > 0;) {
         final long writeLen = Math.min(len, chunkSize);
         final ByteBuffer mapped = channel.map(FileChannel.MapMode.READ_ONLY,
             off, writeLen);
@@ -268,7 +268,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     // verify the key content
     final byte[] buffer = new byte[data.length];
     try (OzoneInputStream in = keyDetails.getContent()) {
-      for(int off = 0; off < data.length; ) {
+      for (int off = 0; off < data.length;) {
         final int n = in.read(buffer, off, data.length - off);
         if (n < 0) {
           break;
