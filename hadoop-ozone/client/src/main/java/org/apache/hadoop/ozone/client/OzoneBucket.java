@@ -53,6 +53,7 @@ import org.apache.hadoop.util.Time;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -601,6 +602,21 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Creates a new key in the bucket, with default replication type RATIS and
+   * with replication factor THREE.
+   *
+   * @param key  Name of the key to be created.
+   * @param size Size of the data the key will point to.
+   * @return OzoneOutputStream to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput createStreamKey(String key, long size)
+      throws IOException {
+    return createStreamKey(key, size, defaultReplication,
+        Collections.emptyMap());
+  }
+
+  /**
    * Creates a new key in the bucket.
    *
    * @param key               Name of the key to be created.
@@ -610,12 +626,13 @@ public class OzoneBucket extends WithMetadata {
    * @throws IOException
    */
   public OzoneDataStreamOutput createStreamKey(String key, long size,
-      ReplicationConfig replicationConfig,
-      Map<String, String> keyMetadata)
+      ReplicationConfig replicationConfig, Map<String, String> keyMetadata)
       throws IOException {
-    return proxy
-        .createStreamKey(volumeName, name, key, size, replicationConfig,
-            keyMetadata);
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.createStreamKey(volumeName, name, key, size,
+        replicationConfig, keyMetadata);
   }
 
   /**
@@ -958,9 +975,8 @@ public class OzoneBucket extends WithMetadata {
   public OzoneDataStreamOutput createStreamFile(String keyName, long size,
       ReplicationConfig replicationConfig, boolean overWrite,
       boolean recursive) throws IOException {
-    return proxy
-        .createStreamFile(volumeName, name, keyName, size, replicationConfig,
-            overWrite, recursive);
+    return proxy.createStreamFile(volumeName, name, keyName, size,
+        replicationConfig, overWrite, recursive);
   }
 
   /**
