@@ -29,11 +29,13 @@ import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -240,7 +242,11 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
 
     // create a bucket
     final String bucketName = "buck-" + UUID.randomUUID();
-    volume.createBucket(bucketName);
+    final BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setDefaultReplicationConfig(
+            new DefaultReplicationConfig(ReplicationType.RATIS, THREE))
+        .build();
+    volume.createBucket(bucketName, bucketArgs);
     final OzoneBucket bucket = volume.getBucket(bucketName);
 
     // upload a key from the local file using memory-mapped buffers
