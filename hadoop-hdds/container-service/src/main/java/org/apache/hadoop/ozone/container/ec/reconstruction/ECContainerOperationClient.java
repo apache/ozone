@@ -32,15 +32,14 @@ import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -170,8 +169,8 @@ public class ECContainerOperationClient implements Closeable {
   Pipeline singleNodePipeline(DatanodeDetails dn,
       ECReplicationConfig repConfig, int replicaIndex) {
 
-    Map<DatanodeDetails, Integer> dnIndexMap = new HashMap<>();
-    dnIndexMap.put(dn, replicaIndex);
+    ImmutableMap<DatanodeDetails, Integer> dnIndexMap =
+        ImmutableMap.of(dn, replicaIndex);
     return Pipeline.newBuilder().setId(PipelineID.valueOf(dn.getUuid()))
         .setReplicationConfig(repConfig).setNodes(ImmutableList.of(dn))
         .setReplicaIndexes(dnIndexMap)

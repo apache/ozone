@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
@@ -131,8 +132,11 @@ public class ECBlockOutputStream extends BlockOutputStream {
       getContainerBlockData().clearChunks();
       getContainerBlockData().addAllChunks(newChunkList);
     } else {
+      ECReplicationConfig config = (ECReplicationConfig)
+          getXceiverClient().getPipeline().getReplicationConfig();
       throw new IOException("None of the block data have checksum " +
-          "which means parity+1 blocks are not present");
+          "which means " + config.getParity() + "(parity)+1 blocks are " +
+          "not present");
     }
 
     return executePutBlock(close, force, blockGroupLength);
@@ -169,17 +173,18 @@ public class ECBlockOutputStream extends BlockOutputStream {
   }
 
   private void updateChecksum(String checksum) {
-    List<ChunkInfo> chunkInfos = getContainerBlockData().getChunksList();
+    List<ChunkInfo> existingChunkInfos =
+        getContainerBlockData().getChunksList();
     ContainerProtos.KeyValue keyValue = ContainerProtos.KeyValue.newBuilder()
         .setKey(STRIPE_CHECKSUM).setValue(checksum).build();
-    List<ChunkInfo> chunks = new ArrayList<>();
-    for (ChunkInfo info: chunkInfos) {
+    List<ChunkInfo> updatedChunks = new ArrayList<>();
+    for (ChunkInfo info: existingChunkInfos) {
       ChunkInfo newInfo = ChunkInfo.newBuilder(info)
           .addMetadata(keyValue).build();
-      chunks.add(newInfo);
+      updatedChunks.add(newInfo);
     }
     getContainerBlockData().clearChunks();
-    getContainerBlockData().addAllChunks(chunks);
+    getContainerBlockData().addAllChunks(updatedChunks);
   }
 
   /**

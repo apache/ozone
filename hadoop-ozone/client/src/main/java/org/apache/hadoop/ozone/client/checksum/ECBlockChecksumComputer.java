@@ -65,7 +65,7 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
       computeCompositeCrc();
       return;
     default:
-      throw new IllegalArgumentException("unsupported combine mode");
+      throw new IllegalArgumentException("Unsupported combine mode");
     }
 
   }
@@ -105,7 +105,7 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
     MD5Hash fileMD5 = MD5Hash.digest(out.toByteArray());
     setOutBytes(fileMD5.getDigest());
 
-    LOG.debug("number of chunks={}, md5out={}",
+    LOG.debug("Number of chunks={}, md5hash={}",
         chunkInfoList.size(), fileMD5);
   }
 
@@ -122,7 +122,7 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
       dataChecksumType = DataChecksum.Type.CRC32;
       break;
     default:
-      throw new IllegalArgumentException("unsupported checksum type: " +
+      throw new IllegalArgumentException("Unsupported checksum type: " +
           firstChunkInfo.getChecksumData().getType());
     }
 
@@ -202,7 +202,7 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
     byte[] compositeCrcChunkChecksum = blockCrcComposer.digest();
     setOutBytes(compositeCrcChunkChecksum);
 
-    LOG.debug("number of chunks = {}, chunk checksum type is {}, " +
+    LOG.debug("Number of chunks = {}, chunk checksum type is {}, " +
             "composite checksum = {}", chunkInfoList.size(), dataChecksumType,
         compositeCrcChunkChecksum);
   }

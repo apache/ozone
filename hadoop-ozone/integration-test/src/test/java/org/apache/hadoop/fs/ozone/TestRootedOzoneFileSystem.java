@@ -23,7 +23,6 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.InvalidPathException;
@@ -62,7 +61,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
@@ -97,7 +95,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
@@ -1751,67 +1748,6 @@ public class TestRootedOzoneFileSystem {
       stream.unbuffer();
     }
 
-  }
-
-  /**
-   *  Test EC checksum with Replicated checksum.
-   */
-  @Test
-  public void testFileChecksum() throws IOException {
-    int dataLen = 1024 * 1024 * 5;
-    byte[] data = RandomStringUtils.randomAlphabetic(dataLen)
-        .getBytes(UTF_8);
-
-    BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setStorageType(StorageType.DISK);
-    builder.setBucketLayout(BucketLayout.LEGACY);
-    builder.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(ReplicationType.EC,
-            new ECReplicationConfig("RS-3-2-1024k")));
-    BucketArgs omBucketArgs = builder.build();
-
-    String vol = UUID.randomUUID().toString();
-    String ecBucket = UUID.randomUUID().toString();
-    final OzoneBucket bucket101 = TestDataUtil
-        .createVolumeAndBucket(cluster, vol, ecBucket, BucketLayout.LEGACY,
-            omBucketArgs);
-
-    Assert.assertEquals(ReplicationType.EC.name(),
-        bucket101.getReplicationConfig().getReplicationType().name());
-
-    try (OzoneFSOutputStream file = adapter
-        .createFile(vol + "/" + ecBucket + "/test", (short) 3, true, false)) {
-      file.write(data);
-    }
-
-    Path parent = new Path("/" + vol + "/" + ecBucket + "/");
-    Path ecKey = new Path(parent, "test");
-    FileChecksum ecChecksum = fs.getFileChecksum(ecKey);
-    String ecChecksumString = StringUtils.byteToHexString(
-        ecChecksum.getBytes(), 0, ecChecksum.getLength());
-
-    BucketArgs.Builder builder1 = BucketArgs.newBuilder();
-    builder1.setStorageType(StorageType.DISK);
-    builder1.setBucketLayout(BucketLayout.LEGACY);
-    BucketArgs omBucketArgs1 = builder1.build();
-
-    String vol2 = UUID.randomUUID().toString();
-    String legacyBucket = UUID.randomUUID().toString();
-    TestDataUtil.createVolumeAndBucket(cluster, vol2,
-        legacyBucket, BucketLayout.LEGACY, omBucketArgs1);
-
-    try (OzoneFSOutputStream file = adapter.createFile(vol2 +
-        "/" + legacyBucket + "/test", (short) 3, true, false)) {
-      file.write(data);
-    }
-
-    Path parent1 = new Path("/" + vol2 + "/" + legacyBucket + "/");
-    Path replicatedKey = new Path(parent1, "test");
-    FileChecksum replicatedChecksum =  fs.getFileChecksum(replicatedKey);
-    String replicatedChecksumString = StringUtils.byteToHexString(
-        replicatedChecksum.getBytes(), 0, replicatedChecksum.getLength());
-
-    Assert.assertEquals(replicatedChecksumString, ecChecksumString);
   }
 
   public void testNonPrivilegedUserMkdirCreateBucket() throws IOException {
