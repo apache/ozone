@@ -243,7 +243,7 @@
         </dependency>
         <dependency>
           <groupId>org.apache.ozone</groupId>
-          <artifactId>ozone-filesystem-hadoop-client</artifactId>
+          <artifactId>ozone-filesystem-hadoop3-client</artifactId>
         </dependency>
       </dependencies>
     </profile>

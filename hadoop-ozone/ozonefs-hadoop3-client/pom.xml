@@ -21,7 +21,7 @@
     <artifactId>ozone</artifactId>
     <version>1.3.0-SNAPSHOT</version>
   </parent>
-  <artifactId>ozone-filesystem-hadoop-client</artifactId>
+  <artifactId>ozone-filesystem-hadoop3-client</artifactId>
   <name>Apache Ozone FS Hadoop shaded 3.x compatibility</name>
   <packaging>jar</packaging>
   <version>1.3.0-SNAPSHOT</version>
