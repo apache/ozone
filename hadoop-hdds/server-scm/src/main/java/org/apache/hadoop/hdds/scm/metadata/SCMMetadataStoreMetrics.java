@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.metadata;
 
-import com.google.gson.Gson;
 import org.apache.commons.text.WordUtils;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -31,7 +30,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -48,10 +46,6 @@ public final class SCMMetadataStoreMetrics implements MetricsSource {
 
   public static final String METRICS_SOURCE_NAME =
       SCMMetadataStoreMetrics.class.getSimpleName();
-
-  private static final MetricsInfo ESTIMATED_KEY_COUNT = info(
-      "EstimatedKeyCount",
-      "Tracked estimated key count of all column families");
 
   private MetricsRegistry registry;
   private static SCMMetadataStoreMetrics instance;
@@ -84,7 +78,6 @@ public final class SCMMetadataStoreMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector.addRecord(METRICS_SOURCE_NAME);
 
-    Map<String, Long> keyCountMap = new HashMap<>();
     for (Map.Entry<String, MetricsInfo> entry: columnFamilyMetrics.entrySet()) {
       long count = 0L;
       try {
@@ -95,11 +88,7 @@ public final class SCMMetadataStoreMetrics implements MetricsSource {
             entry.getKey(), e);
       }
       builder.addGauge(entry.getValue(), count);
-      keyCountMap.put(entry.getKey(), count);
     }
-
-    Gson gson = new Gson();
-    builder.tag(ESTIMATED_KEY_COUNT, gson.toJson(keyCountMap));
   }
 
   public static synchronized void unRegister() {
