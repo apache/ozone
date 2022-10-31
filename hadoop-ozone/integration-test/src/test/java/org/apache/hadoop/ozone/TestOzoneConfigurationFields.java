@@ -66,7 +66,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     xmlPrefixToSkipCompare.add("ipc.client.rpc-timeout.ms");
     xmlPropsToSkipCompare.add("ozone.om.leader.election.minimum.timeout" +
         ".duration"); // Deprecated config
-    xmlPropsToSkipCompare.add("ozone.om.transport.class");
     configurationPropsToSkipCompare
         .add(ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION);
     // Currently replication and type configs moved to server side.
@@ -125,7 +124,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM,
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         OMConfigKeys.OZONE_OM_HA_PREFIX,
-        OMConfigKeys.OZONE_OM_TRANSPORT_CLASS,
         OMConfigKeys.OZONE_OM_GRPC_PORT_KEY,
         // TODO HDDS-2856
         OMConfigKeys.OZONE_RANGER_OM_IGNORE_SERVER_CERT,
