@@ -21,6 +21,12 @@
     <artifactId>ozone</artifactId>
     <version>1.3.0-SNAPSHOT</version>
   </parent>
+<!--
+  This is called "ozone-filesystem-hadoop3-client" to correspond with
+  the shaded hadoop jar that it works with:
+  "hadoop-client-api.jar", (as opposed to the unshaded hadoop jar:
+  "hadoop-common.jar")
+-->
   <artifactId>ozone-filesystem-hadoop3-client</artifactId>
   <name>Apache Ozone FS Hadoop shaded 3.x compatibility</name>
   <packaging>jar</packaging>
