@@ -86,13 +86,10 @@ public class RDBStore implements DBStore {
           dbLocation.getAbsolutePath(),
           maxFSSnapshots,
           Paths.get(dbLocation.getParent(), "db.checkpoints").toString(),
-          Paths.get(dbLocation.getParent(), "db.savedSSTFiles").toString(),
+          Paths.get(dbLocation.getParent(), "db.snapdiffssts").toString(),
           0,
           "Snapshot_");
       rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
-
-      // TODO: DEV OPTION. Makes compaction much much more frequent. Remove later.
-      dbOptions.setDbWriteBufferSize(6000000L);
 
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
           families, readOnly);

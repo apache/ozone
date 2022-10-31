@@ -233,9 +233,7 @@ public class RocksDBCheckpointDiffer {
 
     // Create the directory if SST backup path does not already exist
     File dir = new File(saveCompactedFilePath);
-    if (dir.exists()) {
-      deleteDirectory(dir);  // TODO: DEV ONLY. DO NOT DELETE DIR WHEN MERGING THIS
-    }
+
     if (!dir.mkdir()) {
       LOG.error("Failed to create SST file backup directory!");
       // TODO: Throw custom checked exception instead?
