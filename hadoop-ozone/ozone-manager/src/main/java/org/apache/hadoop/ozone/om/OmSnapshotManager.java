@@ -235,7 +235,8 @@ public final class OmSnapshotManager {
           "snapshots.");
     }
     if (fromSnapshot.getCreationTime() > toSnapshot.getCreationTime()) {
-      throw new IOException("fromSnapshot should be older than to toSnapshot");
+      throw new IOException("fromSnapshot:" + fromSnapshot.getName() +
+          " should be older than to toSnapshot:" + toSnapshot.getName());
     }
   }
 }

@@ -75,7 +75,7 @@ public class SnapshotDiffReport {
     private final String targetPath;
 
     private DiffReportEntry(final DiffType type, final String sourcePath,
-                           final String targetPath) {
+                            final String targetPath) {
       this.type = type;
       this.sourcePath = sourcePath;
       this.targetPath = targetPath;
@@ -89,7 +89,7 @@ public class SnapshotDiffReport {
     public static DiffReportEntry of(final DiffType type,
                                      final String sourcePath,
                                      final String targetPath) {
-      return new DiffReportEntry(type, sourcePath, null);
+      return new DiffReportEntry(type, sourcePath, targetPath);
 
     }
 

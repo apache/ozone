@@ -37,27 +37,22 @@ import java.util.stream.StreamSupport;
  * ManagedSSTFileReader provides an abstraction layer using which we can
  * iterate over multiple underlying SST files transparently.
  */
-public class ManagedSSTFileReader {
+public class ManagedSstFileReader {
 
   private final Collection<String> sstFiles;
 
-  public ManagedSSTFileReader(final Collection<String> sstFiles) {
+  public ManagedSstFileReader(final Collection<String> sstFiles) {
     this.sstFiles = sstFiles;
   }
   public Stream<String> getKeyStream() throws RocksDBException {
-    final OMSSTFileIterator iterator = new OMSSTFileIterator(sstFiles);
+    final OmSstFileIterator iterator = new OmSstFileIterator(sstFiles);
     final Spliterator<String> spliterator = Spliterators
         .spliteratorUnknownSize(iterator, 0);
     return StreamSupport.stream(spliterator, false).onClose(iterator::close);
   }
 
-  /**
-   * Closable Iterator.
-   */
-  public interface ClosableIterator<T> extends Iterator<T>, Closeable { }
-
-  private static final class OMSSTFileIterator implements
-      ClosableIterator<String> {
+  private static final class OmSstFileIterator implements
+      Iterator<String>, Closeable {
 
     private final Iterator<String> fileNameIterator;
     private final Options options;
@@ -66,7 +61,7 @@ public class ManagedSSTFileReader {
     private SstFileReader currentFileReader;
     private SstFileReaderIterator currentFileIterator;
 
-    private OMSSTFileIterator(Collection<String> files)
+    private OmSstFileIterator(Collection<String> files)
         throws RocksDBException {
       // TODO: Check if default Options and ReadOptions is enough.
       this.options = new Options();
@@ -84,7 +79,9 @@ public class ManagedSSTFileReader {
           }
         } while (moveToNextFile());
       } catch (RocksDBException e) {
-        return false;
+        // TODO: This exception has to be handled by the caller.
+        //  We have to do better exception handling.
+        throw new RuntimeException(e);
       }
       return false;
     }

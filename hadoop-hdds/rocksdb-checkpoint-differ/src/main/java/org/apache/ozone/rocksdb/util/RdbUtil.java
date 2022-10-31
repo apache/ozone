@@ -36,9 +36,9 @@ import java.util.stream.Collectors;
  * Temporary class to test snapshot diff functionality.
  * This should be removed later.
  */
-public final class RDBUtil {
+public final class RdbUtil {
 
-  private RDBUtil() { }
+  private RdbUtil() { }
 
   public static Set<String> getKeyTableSSTFiles(final String dbLocation)
       throws RocksDBException {

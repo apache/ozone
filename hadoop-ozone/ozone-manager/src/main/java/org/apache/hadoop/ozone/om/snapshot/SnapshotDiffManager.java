@@ -26,8 +26,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffReport.DiffType;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffReport.DiffReportEntry;
 
-import org.apache.ozone.rocksdb.util.ManagedSSTFileReader;
-import org.apache.ozone.rocksdb.util.RDBUtil;
+import org.apache.ozone.rocksdb.util.ManagedSstFileReader;
+import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
@@ -53,9 +53,9 @@ public class SnapshotDiffManager {
     // TODO: Once RocksDBCheckpointDiffer exposes method to get list
     //  of delta SST files, plug it in here.
 
-    Set<String> fromSnapshotFiles = RDBUtil.getKeyTableSSTFiles(fromSnapshot
+    Set<String> fromSnapshotFiles = RdbUtil.getKeyTableSSTFiles(fromSnapshot
         .getMetadataManager().getStore().getDbLocation().getPath());
-    Set<String> toSnapshotFiles = RDBUtil.getKeyTableSSTFiles(toSnapshot
+    Set<String> toSnapshotFiles = RdbUtil.getKeyTableSSTFiles(toSnapshot
         .getMetadataManager().getStore().getDbLocation().getPath());
 
     final Set<String> deltaFiles = new HashSet<>();
@@ -64,7 +64,7 @@ public class SnapshotDiffManager {
 
     // TODO: Filter out the files.
 
-    final Stream<String> keysToCheck = new ManagedSSTFileReader(deltaFiles)
+    final Stream<String> keysToCheck = new ManagedSstFileReader(deltaFiles)
         .getKeyStream();
 
     final BucketLayout bucketLayout = getBucketLayout(volume, bucket,
