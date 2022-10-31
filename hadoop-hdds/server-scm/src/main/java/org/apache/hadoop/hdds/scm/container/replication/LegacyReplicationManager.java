@@ -1267,58 +1267,69 @@ public class LegacyReplicationManager {
     if (excess > 0) {
 
       LOG.info("Container {} is over replicated. Expected replica count" +
-              " is {}, but found {}.", id, replicationFactor,
-          replicationFactor + excess);
+                      " is {}, but found {}.", id, replicationFactor,
+              replicationFactor + excess);
 
-      final List<ContainerReplica> eligibleReplicas = new ArrayList<>(replicas);
+      // The list of replicas that we can potentially delete to fix the over
+      // replicated state.
+      final List<ContainerReplica> deleteCandidates = new ArrayList<>(replicas);
 
       // Iterate replicas in deterministic order to avoid potential data loss.
       // See https://issues.apache.org/jira/browse/HDDS-4589.
       // N.B., sort replicas by (containerID, datanodeDetails).
-      eligibleReplicas.sort(
-          Comparator.comparingLong(ContainerReplica::hashCode));
+      deleteCandidates.sort(
+              Comparator.comparingLong(ContainerReplica::hashCode));
 
-      final Map<UUID, ContainerReplica> uniqueReplicas =
-          new LinkedHashMap<>();
-
-      if (container.getState() != LifeCycleState.CLOSED) {
-        replicas.stream()
-            .filter(r -> compareState(container.getState(), r.getState()))
-            .forEach(r -> uniqueReplicas
-                .putIfAbsent(r.getOriginDatanodeId(), r));
-
-        eligibleReplicas.removeAll(uniqueReplicas.values());
-      }
       // Replica which are maintenance or decommissioned are not eligible to
       // be removed, as they do not count toward over-replication and they
-      // also many not be available
-      eligibleReplicas.removeIf(r ->
-          r.getDatanodeDetails().getPersistedOpState() !=
-              NodeOperationalState.IN_SERVICE);
+      // also may not be available
+      deleteCandidates.removeIf(r ->
+              r.getDatanodeDetails().getPersistedOpState() !=
+                      NodeOperationalState.IN_SERVICE);
 
-      // If there are unhealthy replicas, then we should remove them even if it
-      // makes the container violate the placement policy, as excess unhealthy
-      // containers are not really useful. It will be corrected later as a
-      // mis-replicated container will be seen as under-replicated.
-      // Update - delete only those unhealthy replicas which have bcsId <
-      // container bcsId
-
-      final List<ContainerReplica> unhealthyReplicas = eligibleReplicas
-          .stream()
-          .filter(r -> !compareState(container.getState(), r.getState()))
-          .filter(r -> r.getSequenceId() < container.getSequenceId())
-          .collect(Collectors.toList());
-
-      for (ContainerReplica r : unhealthyReplicas) {
-        if (excess > 0) {
-          sendDeleteCommand(container, r.getDatanodeDetails(), true);
-          excess -= 1;
-        } else {
-          break;
+      if (container.getState() == LifeCycleState.CLOSED &&
+          deleteCandidates.stream().noneMatch(
+              r -> compareState(container.getState(), r.getState()))) {
+        // The under replicated handler runs before the over replicated
+        // handler. This will restore the correct number of healthy
+        // replicas if a healthy replica is available, otherwise restore
+        // using unhealthy replicas. If there are no healthy
+        // replicas, we should save unhealthy replicas with the highest BCSIDs.
+        final int requiredNodes = container.getReplicationConfig()
+            .getRequiredNodes();
+        List<ContainerReplica> unhealthySorted =
+            deleteCandidates.stream()
+                .sorted(Comparator.comparingLong(
+                    ContainerReplica::getSequenceId))
+                .limit(requiredNodes)
+                .collect(Collectors.toList());
+        deleteCandidates.removeAll(unhealthySorted);
+      } else {
+        // Container is not yet closed. Save all replicas from a
+        // unique origin node ID, including unhealthy replicas.
+        // If it is ever possible to recover unhealthy
+        // replicas, this could be used to close the container.
+        final Map<UUID, ContainerReplica> uniqueReplicas = new LinkedHashMap<>();
+        for (ContainerReplica replica : deleteCandidates) {
+          ContainerReplica existingReplica =
+                  uniqueReplicas.get(replica.getOriginDatanodeId());
+          if (existingReplica == null) {
+            // If there are no other replicas for this origin datanode yet,
+            // keep this one.
+            uniqueReplicas.put(replica.getOriginDatanodeId(), replica);
+          } else if (!compareState(container.getState(),
+                  existingReplica.getState()) &&
+                  compareState(container.getState(), replica.getState())) {
+            // If there is already a replica from this origin datanode but it
+            // is unhealthy, replace it with this healthy one.
+            uniqueReplicas.put(replica.getOriginDatanodeId(), replica);
+          }
         }
+
+        deleteCandidates.removeAll(uniqueReplicas.values());
       }
-      eligibleReplicas.removeAll(unhealthyReplicas);
-      removeExcessReplicasIfNeeded(excess, container, eligibleReplicas);
+
+      removeExcessReplicasIfNeeded(excess, container, deleteCandidates);
     }
   }
 
@@ -1524,9 +1535,9 @@ public class LegacyReplicationManager {
       // All the replicas are unstable.
       // This could happen when a closed replica is lost and all the other
       // replicas are in quasi-closed / unhealthy state with bcsId < container
-      // bcsId. Since we cannot determine which is the most upto date
+      // bcsId. Since we cannot determine which is the most up-to-date
       // replica, no replica should be deleted.
-      LOG.error("Cannot take any action on the unstable container {} as all " +
+      LOG.warn("Cannot take any action on the unstable container {} as all " +
           "the replicas are unstable (either in unhealthy state or have bcsId" +
           " less than container bcsId", container.getContainerID());
       return;

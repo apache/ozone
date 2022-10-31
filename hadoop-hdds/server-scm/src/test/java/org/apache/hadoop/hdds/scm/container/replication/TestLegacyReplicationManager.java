@@ -626,6 +626,7 @@ public class TestLegacyReplicationManager {
     @Test
     public void testQuasiClosedContainerWithUnhealthyReplica()
             throws IOException, TimeoutException {
+      // TODO this test may need to be updated.
       final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
       container.setUsedBytes(100);
       final ContainerID id = container.containerID();
@@ -748,7 +749,10 @@ public class TestLegacyReplicationManager {
                 randomDatanodeDetails(), QUASI_CLOSED, 10000L);
         ContainerReplica quasi2 = addReplicaToDn(container,
                 randomDatanodeDetails(), QUASI_CLOSED, 10000L);
-        addReplicaToDn(container, randomDatanodeDetails(), UNHEALTHY, 10010L);
+        // Even with a lower BCSID the unhealthy container should be saved.
+        // If it could be recovered in the future it could be used to fully
+        // close the container.
+        addReplicaToDn(container, randomDatanodeDetails(), UNHEALTHY, 900L);
 
         // Since the unhealthy replica has a unique origin node ID, it should
         // not be deleted.
@@ -789,28 +793,28 @@ public class TestLegacyReplicationManager {
 
     /**
      * 1 unhealthy replica.
-     * 3 closed replicas.
+     * 2 closed replicas.
      * Expectation: The unhealthy replica should be deleted.
      */
     @Test
     public void testOverReplicatedClosedAndUnhealthy() throws Exception {
-        final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
-        ContainerReplica unhealthy = addReplica(container,
-            NodeStatus.inServiceHealthy(), UNHEALTHY);
-        addReplica(container, NodeStatus.inServiceHealthy(), CLOSED);
-        addReplica(container, NodeStatus.inServiceHealthy(), CLOSED);
-        addReplica(container, NodeStatus.inServiceHealthy(), CLOSED);
+      final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+      ContainerReplica unhealthy = addReplica(container,
+              NodeStatus.inServiceHealthy(), UNHEALTHY);
+      addReplica(container, NodeStatus.inServiceHealthy(), CLOSED);
+      addReplica(container, NodeStatus.inServiceHealthy(), CLOSED);
+      addReplica(container, NodeStatus.inServiceHealthy(), CLOSED);
 
-        assertReplicaScheduled(0);
-        assertUnderReplicatedCount(0);
-        assertDeleteScheduled(1);
-        Assertions.assertTrue(
-            datanodeCommandHandler.getReceivedCommands().stream()
-                .anyMatch(c -> c.getCommand().getType() ==
-                    SCMCommandProto.Type.deleteContainerCommand &&
-                c.getDatanodeId() ==
-                    unhealthy.getDatanodeDetails().getUuid()));
-      }
+      assertReplicaScheduled(0);
+      assertUnderReplicatedCount(0);
+      assertDeleteScheduled(1);
+      Assertions.assertTrue(
+              datanodeCommandHandler.getReceivedCommands().stream()
+                      .anyMatch(c -> c.getCommand().getType() ==
+                              SCMCommandProto.Type.deleteContainerCommand &&
+                              c.getDatanodeId() ==
+                                      unhealthy.getDatanodeDetails().getUuid()));
+    }
 
     /**
      * 4 unhealthy replicas.
