@@ -142,7 +142,7 @@ public final class OzoneConfigUtil {
                                 String serverConfName, long serverConfValue) {
     long limitVal = clientConfValue;
     if (clientConfValue > serverConfValue) {
-      LOG.warn("{} config value is greater than server config {} " +
+      LOG.debug("{} config value is greater than server config {} " +
           "value currently set at : {}, " +
               "so limiting the config value to be used at server side " +
               "to max value supported at server - {}",
