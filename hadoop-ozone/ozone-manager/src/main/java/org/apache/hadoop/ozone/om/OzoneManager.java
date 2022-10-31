@@ -228,6 +228,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
@@ -3628,6 +3631,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, boolean allowPartialPrefixes)
       throws IOException {
+    long maxListingPageSize = configuration.getInt(
+        OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
+    maxListingPageSize = OzoneConfigUtil.limitValue(numEntries,
+        OZONE_FS_LISTING_PAGE_SIZE, OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        maxListingPageSize);
 
     ResolvedBucket bucket = resolveBucketLink(args);
 
@@ -3643,8 +3652,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     try {
       metrics.incNumListStatus();
-      return keyManager.listStatus(args, recursive, startKey, numEntries,
-              getClientAddress(), allowPartialPrefixes);
+      return keyManager.listStatus(args, recursive, startKey,
+          maxListingPageSize, getClientAddress(), allowPartialPrefixes);
     } catch (Exception ex) {
       metrics.incNumListStatusFails();
       auditSuccess = false;

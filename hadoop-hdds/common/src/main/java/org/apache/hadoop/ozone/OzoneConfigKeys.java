@@ -519,6 +519,20 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_OMAUDIT =
       "ozone.audit.log.debug.cmd.list.omaudit";
+
+  // Items listing page size for fs client sub-commands output
+  public static final String
+      OZONE_FS_LISTING_PAGE_SIZE = "ozone.fs.listing.page.size";
+
+  public static final int
+      OZONE_FS_LISTING_PAGE_SIZE_DEFAULT = 1024;
+
+  public static final int
+      OZONE_FS_MAX_LISTING_PAGE_SIZE = 5000;
+
+  public static final String
+      OZONE_FS_LISTING_PAGE_SIZE_MAX = "ozone.fs.listing.page.size.max";
+
   /**
    * There is no need to instantiate this class.
    */
