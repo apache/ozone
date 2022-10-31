@@ -39,8 +39,11 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -70,6 +73,7 @@ public class TestS3GatewayMetrics {
   private static final String ACL_MARKER = "acl";
   private static final String CONTENT = "0123456789";
   private S3GatewayMetrics metrics;
+  private ContainerRequestContext context;
 
 
   @Before
@@ -93,6 +97,12 @@ public class TestS3GatewayMetrics {
         "STANDARD");
     keyEndpoint.setHeaders(headers);
     metrics = bucketEndpoint.getMetrics();
+
+    context = Mockito.mock(ContainerRequestContext.class);
+    Mockito.when(context.getUriInfo()).thenReturn(Mockito.mock(UriInfo.class));
+    Mockito.when(context.getUriInfo().getQueryParameters())
+        .thenReturn(new MultivaluedHashMap<>());
+    keyEndpoint.setContext(context);
   }
 
   /**

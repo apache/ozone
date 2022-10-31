@@ -29,7 +29,7 @@ public final class ManagedRocksObjectUtils {
   private ManagedRocksObjectUtils() {
   }
 
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(ManagedRocksObjectUtils.class);
 
   static void assertClosed(RocksObject rocksObject) {

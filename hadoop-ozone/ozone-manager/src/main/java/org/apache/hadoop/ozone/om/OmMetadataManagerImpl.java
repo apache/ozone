@@ -176,6 +176,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * |  deletedDirTable | /volumeId/bucketId/parentId/dirName -> KeyInfo    |
    * |----------------------------------------------------------------------|
+   *
+   * Snapshot Tables:
+   * |----------------------------------------------------------------------|
+   * |  Column Family     |        VALUE                                    |
+   * |----------------------------------------------------------------------|
+   * |  snapshotInfoTable | /volume/bucket/snapshotName -> SnapshotInfo     |
+   * |----------------------------------------------------------------------|
    */
 
   public static final String USER_TABLE = "userTable";

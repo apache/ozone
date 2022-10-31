@@ -44,8 +44,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
-import org.apache.hadoop.hdds.scm.container.replication.OverReplicatedProcessor;
-import org.apache.hadoop.hdds.scm.container.replication.UnderReplicatedProcessor;
 import org.apache.hadoop.hdds.scm.crl.CRLStatusReportHandler;
 import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
@@ -77,6 +75,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.De
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.server.events.EventExecutor;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
@@ -182,7 +181,6 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
@@ -248,7 +246,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * SCM super user.
    */
-  private final Collection<String> scmAdminUsernames;
+  private final OzoneAdmins scmAdmins;
   /**
    * SCM mxbean.
    */
@@ -386,14 +384,20 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       securityProtocolServer = null;
     }
 
-    scmAdminUsernames = conf.getTrimmedStringCollection(OzoneConfigKeys
-        .OZONE_ADMINISTRATORS);
+    Collection<String> scmAdminUsernames =
+        conf.getTrimmedStringCollection(OzoneConfigKeys.OZONE_ADMINISTRATORS);
     String scmShortUsername =
         UserGroupInformation.getCurrentUser().getShortUserName();
 
     if (!scmAdminUsernames.contains(scmShortUsername)) {
       scmAdminUsernames.add(scmShortUsername);
     }
+
+    Collection<String> scmAdminGroups =
+        conf.getTrimmedStringCollection(
+            OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS);
+
+    scmAdmins = new OzoneAdmins(scmAdminUsernames, scmAdminGroups);
 
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
         eventQueue);
@@ -733,34 +737,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           clock,
           legacyRM,
           containerReplicaPendingOps);
-      ReplicationManager.ReplicationManagerConfiguration rmConf = conf
-          .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
-
-      UnderReplicatedProcessor underReplicatedProcessor =
-          new UnderReplicatedProcessor(replicationManager,
-              containerReplicaPendingOps, eventQueue);
-
-      BackgroundSCMService underReplicatedQueueThread =
-          new BackgroundSCMService.Builder().setClock(clock)
-              .setScmContext(scmContext)
-              .setServiceName("UnderReplicatedQueueThread")
-              .setIntervalInMillis(rmConf.getUnderReplicatedInterval())
-              .setWaitTimeInMillis(backgroundServiceSafemodeWaitMs)
-              .setPeriodicalTask(underReplicatedProcessor::processAll).build();
-      serviceManager.register(underReplicatedQueueThread);
-
-      OverReplicatedProcessor overReplicatedProcessor =
-          new OverReplicatedProcessor(replicationManager,
-              containerReplicaPendingOps, eventQueue);
-
-      BackgroundSCMService overReplicatedQueueThread =
-          new BackgroundSCMService.Builder().setClock(clock)
-              .setScmContext(scmContext)
-              .setServiceName("OverReplicatedQueueThread")
-              .setIntervalInMillis(rmConf.getOverReplicatedInterval())
-              .setWaitTimeInMillis(backgroundServiceSafemodeWaitMs)
-              .setPeriodicalTask(overReplicatedProcessor::processAll).build();
-      serviceManager.register(overReplicatedQueueThread);
     }
     serviceManager.register(replicationManager);
     if (configurator.getScmSafeModeManager() != null) {
@@ -1605,6 +1581,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.error("Storage Container Manager HTTP server stop failed.", ex);
     }
 
+    LOG.info("Stopping SCM LayoutVersionManager Service.");
+    scmLayoutVersionManager.close();
+
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().stop();
     }
@@ -1811,10 +1790,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public void checkAdminAccess(UserGroupInformation remoteUser)
       throws IOException {
-    if (remoteUser != null
-        && !scmAdminUsernames.contains(remoteUser.getUserName()) &&
-        !scmAdminUsernames.contains(remoteUser.getShortUserName()) &&
-        !scmAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
+    if (remoteUser != null && !scmAdmins.isAdmin(remoteUser)) {
       throw new AccessControlException(
           "Access denied for user " + remoteUser.getUserName() +
               ". Superuser privilege is required.");

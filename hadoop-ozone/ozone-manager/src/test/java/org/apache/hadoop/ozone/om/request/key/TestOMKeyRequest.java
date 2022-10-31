@@ -27,6 +27,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.KeyManager;
@@ -93,6 +94,7 @@ public class TestOMKeyRequest {
   protected ScmClient scmClient;
   protected OzoneBlockTokenSecretManager ozoneBlockTokenSecretManager;
   protected ScmBlockLocationProtocol scmBlockLocationProtocol;
+  protected OMPerformanceMetrics metrics;
 
   protected static final long CONTAINER_ID = 1000L;
   protected static final long LOCAL_ID = 100L;
@@ -145,8 +147,9 @@ public class TestOMKeyRequest {
     ozoneBlockTokenSecretManager =
         Mockito.mock(OzoneBlockTokenSecretManager.class);
     scmBlockLocationProtocol = Mockito.mock(ScmBlockLocationProtocol.class);
+    metrics = Mockito.mock(OMPerformanceMetrics.class);
     keyManager = new KeyManagerImpl(ozoneManager, scmClient, ozoneConfiguration,
-        "");
+        metrics);
     when(ozoneManager.getScmClient()).thenReturn(scmClient);
     when(ozoneManager.getBlockTokenSecretManager())
         .thenReturn(ozoneBlockTokenSecretManager);

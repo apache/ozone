@@ -114,6 +114,16 @@ public class TestInfoSubCommand {
       Matcher matcher = pattern.matcher(replica.get(0).getRenderedMessage());
       Assertions.assertTrue(matcher.matches());
     }
+    // Ensure the replicaIndex output is in order
+    if (includeIndex) {
+      List<Integer> indexList = new ArrayList<>();
+      for (int i = 1; i < datanodes.size() + 1; i++) {
+        String temp = "ReplicaIndex: " + i;
+        indexList.add(replica.get(0).getRenderedMessage().indexOf(temp));
+      }
+      Assertions.assertEquals(datanodes.size(), indexList.size());
+      Assertions.assertTrue(inSort(indexList));
+    }
     // Ensure ReplicaIndex is not mentioned as it was not passed in the proto:
     Pattern pattern = Pattern.compile(".*ReplicaIndex.*",
         Pattern.DOTALL);
@@ -181,6 +191,15 @@ public class TestInfoSubCommand {
     testJsonOutput();
   }
 
+  private static boolean inSort(List<Integer> list) {
+    for (int i = 0; i < list.size(); i++) {
+      if (list.indexOf(i) > list.indexOf(i + 1)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   private void testJsonOutput() throws IOException {
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
@@ -208,6 +227,7 @@ public class TestInfoSubCommand {
 
   private List<ContainerReplicaInfo> getReplicas(boolean includeIndex) {
     List<ContainerReplicaInfo> replicas = new ArrayList<>();
+    int index = 1;
     for (DatanodeDetails dn : datanodes) {
       ContainerReplicaInfo.Builder container
           = new ContainerReplicaInfo.Builder()
@@ -219,7 +239,7 @@ public class TestInfoSubCommand {
           .setKeyCount(1)
           .setSequenceId(1);
       if (includeIndex) {
-        container.setReplicaIndex(4);
+        container.setReplicaIndex(index++);
       }
       replicas.add(container.build());
     }

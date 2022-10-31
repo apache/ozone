@@ -27,7 +27,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   build-info:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     env:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
@@ -67,7 +67,7 @@ jobs:
   build:
     needs:
       - build-info
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 30
     if: needs.build-info.outputs.needs-build == 'true'
     strategy:
@@ -124,7 +124,7 @@ jobs:
     needs:
       - build-info
       - build
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 30
     if: needs.build-info.outputs.needs-compile == 'true'
     strategy:
@@ -162,7 +162,7 @@ jobs:
   basic:
     needs:
       - build-info
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 90
     if: needs.build-info.outputs.needs-basic-checks == 'true'
     strategy:
@@ -188,6 +188,10 @@ jobs:
             maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
         if: ${{ !contains('author,bats,docs', matrix.check) }}
+      - name: Setup java
+        uses: actions/setup-java@v1
+        with:
+          java-version: 8
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
       - name: Summary of failures
@@ -210,7 +214,7 @@ jobs:
     needs:
       - build-info
       - build
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 5
     if: needs.build-info.outputs.needs-dependency-check == 'true'
     steps:
@@ -239,7 +243,7 @@ jobs:
     needs:
       - build-info
       - build
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 150
     if: needs.build-info.outputs.needs-compose-tests == 'true'
     strategy:
@@ -286,7 +290,7 @@ jobs:
     needs:
       - build-info
       - build
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 60
     if: needs.build-info.outputs.needs-kubernetes-tests == 'true'
     steps:
@@ -316,7 +320,7 @@ jobs:
   integration:
     needs:
       - build-info
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 150
     if: needs.build-info.outputs.needs-integration-tests == 'true'
     strategy:
@@ -342,6 +346,10 @@ jobs:
             maven-repo-${{ hashFiles('**/pom.xml') }}-8
             maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
+      - name: Setup java
+        uses: actions/setup-java@v1
+        with:
+          java-version: 8
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
         if: matrix.profile != 'flaky'
@@ -365,7 +373,7 @@ jobs:
           rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
   coverage:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 30
     if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
     needs:

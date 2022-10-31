@@ -338,6 +338,48 @@ public abstract class GenericTestUtils {
   }
 
   /**
+   * Capture output printed to {@link System#out}.
+   * <p>
+   * Usage:
+   * <pre>
+   *   try (SystemOutCapturer capture = new SystemOutCapturer()) {
+   *     ...
+   *     // Call capture.getOutput() to get the output string
+   *   }
+   * </pre>
+   * <p>
+   * TODO: Add lambda support once Java 8 is common.
+   * <pre>
+   *   SystemOutCapturer.withCapture(capture -> {
+   *     ...
+   *   })
+   * </pre>
+   */
+  public static class SystemOutCapturer implements AutoCloseable {
+    private final ByteArrayOutputStream bytes;
+    private final PrintStream bytesPrintStream;
+    private final PrintStream oldOut;
+
+    public SystemOutCapturer() throws
+        UnsupportedEncodingException {
+      bytes = new ByteArrayOutputStream();
+      bytesPrintStream = new PrintStream(bytes, false, UTF_8.name());
+      oldOut = System.out;
+      System.setOut(new TeePrintStream(oldOut, bytesPrintStream));
+    }
+
+    public String getOutput() throws UnsupportedEncodingException {
+      return bytes.toString(UTF_8.name());
+    }
+
+    @Override
+    public void close() throws Exception {
+      IOUtils.closeQuietly(bytesPrintStream);
+      System.setOut(oldOut);
+    }
+  }
+
+  /**
    * Prints output to one {@link PrintStream} while copying to the other.
    * <p>
    * Closing the main {@link PrintStream} will NOT close the other.

@@ -41,7 +41,8 @@ public class ContainerHealthResult {
   private final HealthState healthState;
   private final List<SCMCommand> commands = new ArrayList<>();
 
-  ContainerHealthResult(ContainerInfo containerInfo, HealthState healthState) {
+  public ContainerHealthResult(ContainerInfo containerInfo,
+      HealthState healthState) {
     this.containerInfo = containerInfo;
     this.healthState = healthState;
   }
@@ -67,7 +68,7 @@ public class ContainerHealthResult {
    */
   public static class HealthyResult extends ContainerHealthResult {
 
-    HealthyResult(ContainerInfo containerInfo) {
+    public HealthyResult(ContainerInfo containerInfo) {
       super(containerInfo, HealthState.HEALTHY);
     }
   }
@@ -108,7 +109,7 @@ public class ContainerHealthResult {
     private final boolean unrecoverable;
     private int requeueCount = 0;
 
-    UnderReplicatedHealthResult(ContainerInfo containerInfo,
+    public UnderReplicatedHealthResult(ContainerInfo containerInfo,
         int remainingRedundancy, boolean dueToDecommission,
         boolean replicatedOkWithPending, boolean unrecoverable) {
       super(containerInfo, HealthState.UNDER_REPLICATED);
@@ -207,7 +208,7 @@ public class ContainerHealthResult {
     private final boolean sufficientlyReplicatedAfterPending;
 
 
-    OverReplicatedHealthResult(ContainerInfo containerInfo,
+    public OverReplicatedHealthResult(ContainerInfo containerInfo,
         int excessRedundancy, boolean replicatedOkWithPending) {
       super(containerInfo, HealthState.OVER_REPLICATED);
       this.excessRedundancy = excessRedundancy;

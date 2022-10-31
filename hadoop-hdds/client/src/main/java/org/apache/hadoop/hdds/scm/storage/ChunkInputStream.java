@@ -236,7 +236,7 @@ public class ChunkInputStream extends InputStream
    */
   @Override
   public synchronized void seek(long pos) throws IOException {
-    if (pos < 0 || pos >= length) {
+    if (pos < 0 || pos > length) {
       if (pos == 0) {
         // It is possible for length and pos to be zero in which case
         // seek should return instead of throwing exception
@@ -282,6 +282,7 @@ public class ChunkInputStream extends InputStream
 
   @Override
   public synchronized void close() {
+    releaseBuffers();
     releaseClient();
   }
 

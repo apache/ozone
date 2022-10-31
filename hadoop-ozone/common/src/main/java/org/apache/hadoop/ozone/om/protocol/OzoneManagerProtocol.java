@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
@@ -824,4 +825,17 @@ public interface OzoneManagerProtocol
   default CancelPrepareResponse cancelOzoneManagerPrepare() throws IOException {
     return CancelPrepareResponse.newBuilder().build();
   }
+
+  /**
+   * Send RPC request with or without payload to OM
+   * to benchmark RPC communication performance.
+   * @param payloadReq payload in request.
+   * @param payloadSizeResp payload size of response.
+   * @throws IOException if there is error in the RPC communication.
+   * @return EchoRPCResponse.
+   */
+  EchoRPCResponse echoRPCReq(byte[] payloadReq,
+                             int payloadSizeResp)
+          throws IOException;
+
 }
