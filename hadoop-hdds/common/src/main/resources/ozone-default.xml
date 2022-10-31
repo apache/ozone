@@ -3358,5 +3358,25 @@
     </description>
   </property>
 
+  <property>
+    <name>ozone.fs.listing.page.size</name>
+    <value>1024</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      Listing page size value used by client for listing number of items on fs related sub-commands output.
+      Kindly set this config value responsibly to avoid high resource usage. Maximum value restricted is 5000 for
+      optimum performance.
+    </description>
+  </property>
 
+  <property>
+    <name>ozone.fs.listing.page.size.max</name>
+    <value>5000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum listing page size value enforced by server for listing items on fs related sub-commands output. Kindly set
+      this config value responsibly to avoid high resource usage. Maximum value restricted is 5000 for
+      optimum performance.
+    </description>
+  </property>
 </configuration>
