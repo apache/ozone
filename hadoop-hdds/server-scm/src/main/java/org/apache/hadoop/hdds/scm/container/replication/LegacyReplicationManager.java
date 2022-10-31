@@ -1284,8 +1284,8 @@ public class LegacyReplicationManager {
       // be removed, as they do not count toward over-replication and they
       // also may not be available
       deleteCandidates.removeIf(r ->
-              r.getDatanodeDetails().getPersistedOpState() !=
-                      NodeOperationalState.IN_SERVICE);
+          r.getDatanodeDetails().getPersistedOpState() !=
+              NodeOperationalState.IN_SERVICE);
 
       if (container.getState() == LifeCycleState.CLOSED &&
           deleteCandidates.stream().noneMatch(
@@ -1309,17 +1309,18 @@ public class LegacyReplicationManager {
         // unique origin node ID, including unhealthy replicas.
         // If it is ever possible to recover unhealthy
         // replicas, this could be used to close the container.
-        final Map<UUID, ContainerReplica> uniqueReplicas = new LinkedHashMap<>();
+        final Map<UUID, ContainerReplica> uniqueReplicas =
+            new LinkedHashMap<>();
         for (ContainerReplica replica : deleteCandidates) {
           ContainerReplica existingReplica =
-                  uniqueReplicas.get(replica.getOriginDatanodeId());
+              uniqueReplicas.get(replica.getOriginDatanodeId());
           if (existingReplica == null) {
             // If there are no other replicas for this origin datanode yet,
             // keep this one.
             uniqueReplicas.put(replica.getOriginDatanodeId(), replica);
           } else if (!compareState(container.getState(),
-                  existingReplica.getState()) &&
-                  compareState(container.getState(), replica.getState())) {
+              existingReplica.getState()) &&
+              compareState(container.getState(), replica.getState())) {
             // If there is already a replica from this origin datanode but it
             // is unhealthy, replace it with this healthy one.
             uniqueReplicas.put(replica.getOriginDatanodeId(), replica);
