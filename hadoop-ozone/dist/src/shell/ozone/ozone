@@ -34,6 +34,7 @@ function ozone_usage
   ozone_add_option "--loglevel level" "set the log4j level for this command"
   ozone_add_option "--workers" "turn on worker mode"
   ozone_add_option "--jvmargs arguments" "append JVM options to any existing options defined in the OZONE_OPTS environment variable. Any defined in OZONE_CLIENT_OPTS will be append after these jvmargs"
+  ozone_add_option "--validate (continue)" "validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present, command execution shall continue post validation failure if 'continue' is passed"
 
   ozone_add_subcommand "auditparser" client "runs audit parser tool"
   ozone_add_subcommand "classpath" client "prints the class path needed for running ozone commands"
@@ -280,6 +281,8 @@ if declare -f ozone_subcommand_"${OZONE_SUBCMD}" >/dev/null 2>&1; then
 else
   ozonecmd_case "${OZONE_SUBCMD}" "${OZONE_SUBCMD_ARGS[@]}"
 fi
+
+ozone_validate_classpath
 
 ozone_suppress_shell_log
 ozone_assemble_classpath
