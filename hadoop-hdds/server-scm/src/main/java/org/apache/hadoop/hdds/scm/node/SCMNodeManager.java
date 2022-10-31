@@ -369,13 +369,10 @@ public class SCMNodeManager implements NodeManager {
     String ipAddress = datanodeDetails.getIpAddress();
     String hostName = datanodeDetails.getHostName();
     datanodeDetails.setNetworkName(datanodeDetails.getUuidString());
-    
-    // Firstly, use ip address
-    networkLocation = nodeResolve(ipAddress);
-    
-    // If null, use hostname
-    if (networkLocation == null) {
+    if (Strings.isNullOrEmpty(ipAddress)) {
       networkLocation = nodeResolve(hostName);
+    } else {
+      networkLocation = nodeResolve(ipAddress);
     }
     if (networkLocation != null) {
       datanodeDetails.setNetworkLocation(networkLocation);
@@ -458,9 +455,11 @@ public class SCMNodeManager implements NodeManager {
    */
   private synchronized void addEntryToDnsToUuidMap(
           String dnsName, String uuid) {
-    dnsToUuidMap
-        .computeIfAbsent(dnsName, any -> ConcurrentHashMap.newKeySet())
-        .add(uuid);
+    if (!Strings.isNullOrEmpty(dnsName)) {
+      dnsToUuidMap
+          .computeIfAbsent(dnsName, any -> ConcurrentHashMap.newKeySet())
+          .add(uuid);
+    }
   }
 
   private synchronized void removeEntryFromDnsToUuidMap(String dnsName) {
