@@ -20,6 +20,7 @@ package org.apache.ozone.rocksdiff;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_NODES;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_DB_KEYS;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -77,19 +78,28 @@ public class TestRocksDBCheckpointDiffer {
   void testMain() throws Exception {
 
     // Delete the compaction log dir if it already exists
-    File dir = new File("./compaction-log");
-    if (dir.exists()) {
-      deleteDirectory(dir);
+    File clDir = new File("./compaction-log");
+    if (clDir.exists()) {
+      deleteDirectory(clDir);
     }
+
+    final String sstDirStr = "./compaction-sst-backup/";
 
     TestRocksDBCheckpointDiffer tester = new TestRocksDBCheckpointDiffer();
     RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer(
         "./rocksdb-data",
         1000,
         "./rocksdb-data-cp",
-        "./compaction-sst-backup/",
+        sstDirStr,
         0,
         "snap_id_");
+
+    // Empty the SST backup folder first for testing
+    File sstDir = new File(sstDirStr);
+    deleteDirectory(sstDir);
+    if (!sstDir.mkdir()) {
+      fail("Unable to create SST backup directory");
+    }
 
     RocksDB rocksDB = tester.createRocksDBInstance(TEST_DB_PATH, differ);
     tester.readRocksDBInstance(TEST_DB_PATH, rocksDB, null, differ);
@@ -103,8 +113,8 @@ public class TestRocksDBCheckpointDiffer {
     differ.dumpCompactionNodeTable();
 
     for (GType gtype : GType.values()) {
-      String fname = "fwdGraph_" + gtype.toString() +  ".png";
-      String rname = "reverseGraph_" + gtype.toString() + ".png";
+      String fname = "fwdGraph_" + gtype +  ".png";
+      String rname = "reverseGraph_" + gtype + ".png";
 /*
       differ.pngPrintMutableGrapth(differ.getCompactionFwdDAG(), fname, gtype);
       differ.pngPrintMutableGrapth(

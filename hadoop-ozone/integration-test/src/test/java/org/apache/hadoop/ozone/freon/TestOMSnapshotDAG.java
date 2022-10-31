@@ -93,12 +93,6 @@ public class TestOMSnapshotDAG {
   @AfterAll
   public static void shutdown() {
     if (cluster != null) {
-      LOG.warn("Waiting for an extra 10 seconds before shutting down...");
-      try {
-        Thread.sleep(10000);
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
-      }
       cluster.shutdown();
     }
   }
@@ -125,18 +119,18 @@ public class TestOMSnapshotDAG {
 
     List<OmVolumeArgs> volList = cluster.getOzoneManager()
         .listAllVolumes("", "", 10);
-    System.out.println(volList);
+    LOG.debug("List of all volumes: {}", volList);
     final String volumeName = volList.stream().filter(e ->
         !e.getVolume().equals(OZONE_S3_VOLUME_NAME_DEFAULT))  // Ignore s3v vol
         .collect(Collectors.toList()).get(0).getVolume();
     List<OmBucketInfo> bucketList =
         cluster.getOzoneManager().listBuckets(volumeName, "", "", 10);
-    System.out.println(bucketList);
+    LOG.debug("List of all buckets under the first volume: {}", bucketList);
     final String bucketName = bucketList.get(0).getBucketName();
 
     // Create snapshot
     String resp = store.createSnapshot(volumeName, bucketName, "snap1");
-    System.out.println(resp);
+    LOG.debug("Snapshot created: {}", resp);
 
     final OzoneVolume volume = store.getVolume(volumeName);
     final OzoneBucket bucket = volume.getBucket(bucketName);
@@ -146,7 +140,7 @@ public class TestOMSnapshotDAG {
     }
 
     resp = store.createSnapshot(volumeName, bucketName, "snap3");
-    System.out.println(resp);
+    LOG.debug("Snapshot created: {}", resp);
   }
 
 }

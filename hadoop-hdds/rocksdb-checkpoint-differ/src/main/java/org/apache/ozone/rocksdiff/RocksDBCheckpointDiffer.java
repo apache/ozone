@@ -234,7 +234,7 @@ public class RocksDBCheckpointDiffer {
     // Create the directory if SST backup path does not already exist
     File dir = new File(saveCompactedFilePath);
 
-    if (!dir.mkdir()) {
+    if (!dir.exists() && !dir.mkdir()) {
       LOG.error("Failed to create SST file backup directory!");
       // TODO: Throw custom checked exception instead?
       throw new RuntimeException("Failed to create SST file backup directory. "
@@ -256,19 +256,6 @@ public class RocksDBCheckpointDiffer {
     //  mapping.
 
     // Note: Previous compaction log files are loaded in RDBStore, not here.
-  }
-
-  /**
-   * Helper function that recursively deletes the dir. TODO: REMOVE
-   */
-  boolean deleteDirectory(File directoryToBeDeleted) {
-    File[] allContents = directoryToBeDeleted.listFiles();
-    if (allContents != null) {
-      for (File file : allContents) {
-        deleteDirectory(file);
-      }
-    }
-    return directoryToBeDeleted.delete();
   }
 
   // Node in the DAG to represent an SST file
@@ -995,6 +982,19 @@ public class RocksDBCheckpointDiffer {
     for (CompactionNode n : allNodes) {
       LOG.warn("Files are: " + n.fileName);
     }
+  }
+
+  /**
+   * Helper function that recursively deletes the dir. TODO: REMOVE
+   */
+  boolean deleteDirectory(File directoryToBeDeleted) {
+    File[] allContents = directoryToBeDeleted.listFiles();
+    if (allContents != null) {
+      for (File file : allContents) {
+        deleteDirectory(file);
+      }
+    }
+    return directoryToBeDeleted.delete();
   }
 
   @VisibleForTesting
