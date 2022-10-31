@@ -332,7 +332,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     DeletionMarker schemaV3Marker = (table, batch, tid, txn) -> {
       Table<String, DeletedBlocksTransaction> delTxTable =
           (Table<String, DeletedBlocksTransaction>) table;
-      delTxTable.putWithBatch(batch, containerData.deleteTxnKey(tid), txn);
+      delTxTable.putWithBatch(batch, containerData.getDeleteTxnMetaKey(tid),
+          txn);
     };
 
     markBlocksForDeletionTransaction(containerData, delTX, newDeletionBlocks,
@@ -402,10 +403,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       try (BatchOperation batch = containerDB.getStore().getBatchHandler()
           .initBatchOperation()) {
         for (Long blkLong : delTX.getLocalIDList()) {
-          String blk = containerData.blockKey(blkLong);
+          String blk = containerData.getBlockMetaKey(blkLong);
           BlockData blkInfo = blockDataTable.get(blk);
           if (blkInfo != null) {
-            String deletingKey = containerData.deletingBlockKey(blkLong);
+            String deletingKey = containerData.getDeletingBlockMetaKey(blkLong);
             if (blockDataTable.get(deletingKey) != null
                 || deletedBlocksTable.get(blk) != null) {
               if (LOG.isDebugEnabled()) {
@@ -457,15 +458,15 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
         // Update in DB pending delete key count and delete transaction ID.
         metadataTable
-            .putWithBatch(batchOperation, containerData.latestDeleteTxnKey(),
-                delTX.getTxID());
+            .putWithBatch(batchOperation,
+                containerData.getLatestDeleteTxnMetaKey(), delTX.getTxID());
       }
 
       long pendingDeleteBlocks =
           containerData.getNumPendingDeletionBlocks() + newDeletionBlocks;
       metadataTable
           .putWithBatch(batchOperation,
-              containerData.pendingDeleteBlockCountKey(),
+              containerData.getPendingDeleteBlockCountMetaKey(),
               pendingDeleteBlocks);
 
       // update pending deletion blocks count and delete transaction ID in

@@ -111,7 +111,7 @@ public class TestStorageContainerManagerHelper {
 
       for (Table.KeyValue<String, BlockData> entry : kvs) {
         pendingDeletionBlocks
-            .add(entry.getKey().replace(cData.deletingBlockKeyPrefix(), ""));
+            .add(entry.getKey().replace(cData.getDeletingBlockKeyPrefix(), ""));
       }
     }
     return pendingDeletionBlocks;

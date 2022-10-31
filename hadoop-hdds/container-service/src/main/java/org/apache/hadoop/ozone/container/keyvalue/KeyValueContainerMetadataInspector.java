@@ -229,15 +229,15 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     JsonObject dBMetadata = new JsonObject();
 
     dBMetadata.addProperty(OzoneConsts.BLOCK_COUNT,
-        metadataTable.get(containerData.blockCountKey()));
+        metadataTable.get(containerData.getBlockCountMetaKey()));
     dBMetadata.addProperty(OzoneConsts.CONTAINER_BYTES_USED,
-        metadataTable.get(containerData.bytesUsedKey()));
+        metadataTable.get(containerData.getBytesUsedMetaKey()));
     dBMetadata.addProperty(OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
-        metadataTable.get(containerData.pendingDeleteBlockCountKey()));
+        metadataTable.get(containerData.getPendingDeleteBlockCountMetaKey()));
     dBMetadata.addProperty(OzoneConsts.DELETE_TRANSACTION_KEY,
-        metadataTable.get(containerData.latestDeleteTxnKey()));
+        metadataTable.get(containerData.getLatestDeleteTxnMetaKey()));
     dBMetadata.addProperty(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID,
-        metadataTable.get(containerData.bcsIdKey()));
+        metadataTable.get(containerData.getBcsIdMetaKey()));
 
     return dBMetadata;
   }
@@ -341,7 +341,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       BooleanSupplier keyRepairAction = () -> {
         boolean repaired = false;
         try {
-          metadataTable.put(containerData.blockCountKey(),
+          metadataTable.put(containerData.getBlockCountMetaKey(),
               blockCountAggregate.getAsLong());
           repaired = true;
         } catch (IOException ex) {
@@ -376,7 +376,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       BooleanSupplier keyRepairAction = () -> {
         boolean repaired = false;
         try {
-          metadataTable.put(containerData.bytesUsedKey(),
+          metadataTable.put(containerData.getBytesUsedMetaKey(),
               usedBytesAggregate.getAsLong());
           repaired = true;
         } catch (IOException ex) {

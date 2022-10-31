@@ -161,11 +161,11 @@ public class TestContainerReader {
                 metadataStore.getStore().getBlockDataTable();
 
         Long localID = blockNames.get(i);
-        String blk = cData.blockKey(localID);
+        String blk = cData.getBlockMetaKey(localID);
         BlockData blkInfo = blockDataTable.get(blk);
 
         blockDataTable.delete(blk);
-        blockDataTable.put(cData.deletingBlockKey(localID), blkInfo);
+        blockDataTable.put(cData.getDeletingBlockMetaKey(localID), blkInfo);
       }
 
       if (setMetaData) {
@@ -173,7 +173,8 @@ public class TestContainerReader {
         // and bytes used metadata values, so those do not change.
         Table<String, Long> metadataTable =
                 metadataStore.getStore().getMetadataTable();
-        metadataTable.put(cData.pendingDeleteBlockCountKey(), (long)count);
+        metadataTable.put(cData.getPendingDeleteBlockCountMetaKey(),
+            (long)count);
       }
     }
 
@@ -201,14 +202,14 @@ public class TestContainerReader {
         blockData.setChunks(chunkList);
         blkNames.add(localBlockID);
         metadataStore.getStore().getBlockDataTable()
-                .put(cData.blockKey(localBlockID), blockData);
+                .put(cData.getBlockMetaKey(localBlockID), blockData);
       }
 
       if (setMetaData) {
         metadataStore.getStore().getMetadataTable()
-                .put(cData.blockCountKey(), (long)blockCount);
+                .put(cData.getBlockCountMetaKey(), (long)blockCount);
         metadataStore.getStore().getMetadataTable()
-                .put(cData.bytesUsedKey(), blockCount * blockLen);
+                .put(cData.getBytesUsedMetaKey(), blockCount * blockLen);
       }
     }
 

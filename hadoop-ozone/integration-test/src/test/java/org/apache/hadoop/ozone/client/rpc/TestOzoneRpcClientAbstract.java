@@ -1790,7 +1790,8 @@ public abstract class TestOzoneRpcClientAbstract {
         KeyValueContainerData cData =
             (KeyValueContainerData) container.getContainerData();
         try (DBHandle db = BlockUtils.getDB(cData, cluster.getConf())) {
-          db.getStore().getMetadataTable().put(cData.bcsIdKey(), newBCSID);
+          db.getStore().getMetadataTable().put(cData.getBcsIdMetaKey(),
+              newBCSID);
         }
         container.updateBlockCommitSequenceId(newBCSID);
         index++;
