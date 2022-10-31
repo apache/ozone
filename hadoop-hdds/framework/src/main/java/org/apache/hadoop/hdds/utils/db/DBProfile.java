@@ -20,11 +20,11 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedBloomFilter;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
+import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.CompactionStyle;
 
 import java.math.BigDecimal;
@@ -80,19 +80,18 @@ public enum DBProfile {
     }
 
     @Override
-    public ManagedBlockBasedTableConfig getBlockBasedTableConfig() {
+    public BlockBasedTableConfig getBlockBasedTableConfig() {
       // Set BlockCacheSize to 256 MB. This should not be an issue for HADOOP.
       final long blockCacheSize = toLong(StorageUnit.MB.toBytes(256.00));
 
       // Set the Default block size to 16KB
       final long blockSize = toLong(StorageUnit.KB.toBytes(16));
 
-      ManagedBlockBasedTableConfig config = new ManagedBlockBasedTableConfig();
-      config.setBlockCache(new ManagedLRUCache(blockCacheSize))
-            .setBlockSize(blockSize)
-            .setPinL0FilterAndIndexBlocksInCache(true)
-            .setFilterPolicy(new ManagedBloomFilter());
-      return config;
+      return new BlockBasedTableConfig()
+          .setBlockCache(new ManagedLRUCache(blockCacheSize))
+          .setBlockSize(blockSize)
+          .setPinL0FilterAndIndexBlocksInCache(true)
+          .setFilterPolicy(new ManagedBloomFilter());
     }
 
   },
@@ -118,7 +117,7 @@ public enum DBProfile {
     }
 
     @Override
-    public ManagedBlockBasedTableConfig getBlockBasedTableConfig() {
+    public BlockBasedTableConfig getBlockBasedTableConfig() {
       return SSD.getBlockBasedTableConfig();
     }
   };
@@ -132,5 +131,5 @@ public enum DBProfile {
 
   public abstract ManagedColumnFamilyOptions getColumnFamilyOptions();
 
-  public abstract ManagedBlockBasedTableConfig getBlockBasedTableConfig();
+  public abstract BlockBasedTableConfig getBlockBasedTableConfig();
 }

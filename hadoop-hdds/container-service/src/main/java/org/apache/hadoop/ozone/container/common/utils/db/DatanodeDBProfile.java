@@ -21,10 +21,12 @@ package org.apache.hadoop.ozone.container.common.utils.db;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
+import org.rocksdb.BlockBasedTableConfig;
+
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT;
@@ -104,6 +106,8 @@ public abstract class DatanodeDBProfile {
    * Base profile for datanode storage disks.
    */
   private static final class StorageBasedProfile {
+    private final AtomicReference<ManagedColumnFamilyOptions> cfOptions =
+        new AtomicReference<>();
     private final DBProfile baseProfile;
 
     private StorageBasedProfile(DBProfile profile) {
@@ -116,15 +120,15 @@ public abstract class DatanodeDBProfile {
 
     private ManagedColumnFamilyOptions getColumnFamilyOptions(
         ConfigurationSource config) {
-      ManagedColumnFamilyOptions cfOptions =
-          baseProfile.getColumnFamilyOptions();
-      return cfOptions.closeAndSetTableFormatConfig(
-          getBlockBasedTableConfig(config));
+      cfOptions.updateAndGet(op -> op != null ? op :
+          baseProfile.getColumnFamilyOptions()
+              .setTableFormatConfig(getBlockBasedTableConfig(config)));
+      return cfOptions.get();
     }
 
-    private ManagedBlockBasedTableConfig getBlockBasedTableConfig(
+    private BlockBasedTableConfig getBlockBasedTableConfig(
         ConfigurationSource config) {
-      ManagedBlockBasedTableConfig blockBasedTableConfig =
+      BlockBasedTableConfig blockBasedTableConfig =
           baseProfile.getBlockBasedTableConfig();
       if (config == null) {
         return blockBasedTableConfig;
@@ -134,8 +138,7 @@ public abstract class DatanodeDBProfile {
           .getStorageSize(HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE,
               HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT,
               StorageUnit.BYTES);
-      blockBasedTableConfig.closeAndSetBlockCache(
-          new ManagedLRUCache(cacheSize));
+      blockBasedTableConfig.setBlockCache(new ManagedLRUCache(cacheSize));
       return blockBasedTableConfig;
     }
   }

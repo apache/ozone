@@ -233,7 +233,6 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   @Override
   public void close() throws IOException {
     this.store.close();
-    this.cfOptions.close();
   }
 
   @Override
