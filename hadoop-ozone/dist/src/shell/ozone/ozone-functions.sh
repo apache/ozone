@@ -839,6 +839,9 @@ function ozone_basic_init
   # default policy file for service-level authorization
   OZONE_POLICYFILE=${OZONE_POLICYFILE:-"hadoop-policy.xml"}
 
+  OZONE_ORIGINAL_LOGLEVEL="${OZONE_LOGLEVEL:-}"
+  OZONE_ORIGINAL_ROOT_LOGGER="${OZONE_ROOT_LOGGER:-}"
+
   # if for some reason the shell doesn't have $USER defined
   # (e.g., ssh'd in to execute a command)
   # let's get the effective username and use that

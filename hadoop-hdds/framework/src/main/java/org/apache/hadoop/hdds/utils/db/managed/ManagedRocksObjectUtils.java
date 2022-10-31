@@ -33,20 +33,25 @@ public final class ManagedRocksObjectUtils {
       LoggerFactory.getLogger(ManagedRocksObjectUtils.class);
 
   static void assertClosed(RocksObject rocksObject) {
-    ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
-    if (rocksObject.isOwningHandle()) {
-      ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
-      LOG.warn("{} is not closed properly",
-          rocksObject.getClass().getSimpleName());
-    }
+    assertClosed(rocksObject, null);
   }
 
-  static void assertClosed(RocksObject rocksObject, Throwable stack) {
+  public static void assertClosed(ManagedObject<?> object) {
+    assertClosed(object.get(), object.getStackTrace());
+  }
+
+  static void assertClosed(RocksObject rocksObject, String stackTrace) {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
     if (rocksObject.isOwningHandle()) {
       ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
-      LOG.warn("{} is not closed properly",
-          rocksObject.getClass().getSimpleName(), stack);
+      String warning = String.format("%s is not closed properly",
+          rocksObject.getClass().getSimpleName());
+      if (stackTrace != null && LOG.isDebugEnabled()) {
+        String debugMessage = String
+            .format("%n StackTrace for unclosed instance: %s", stackTrace);
+        warning = warning.concat(debugMessage);
+      }
+      LOG.warn(warning);
     }
   }
 }
