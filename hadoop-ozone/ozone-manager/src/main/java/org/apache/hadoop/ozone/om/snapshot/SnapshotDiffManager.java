@@ -27,11 +27,11 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffReport.DiffType;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffReport.DiffReportEntry;
 
 import org.apache.ozone.rocksdb.util.ManagedSSTFileReader;
+import org.apache.ozone.rocksdb.util.RDBUtil;
 import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -39,6 +39,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
+/**
+ * Class to generate snapshot diff.
+ */
 public class SnapshotDiffManager {
 
   public SnapshotDiffReport getSnapshotDiffReport(final String volume,
@@ -50,7 +53,14 @@ public class SnapshotDiffManager {
     // TODO: Once RocksDBCheckpointDiffer exposes method to get list
     //  of delta SST files, plug it in here.
 
-    final Set<String> deltaFiles = Collections.emptySet();
+    Set<String> fromSnapshotFiles = RDBUtil.getKeyTableSSTFiles(fromSnapshot
+        .getMetadataManager().getStore().getDbLocation().getPath());
+    Set<String> toSnapshotFiles = RDBUtil.getKeyTableSSTFiles(toSnapshot
+        .getMetadataManager().getStore().getDbLocation().getPath());
+
+    final Set<String> deltaFiles = new HashSet<>();
+    deltaFiles.addAll(fromSnapshotFiles);
+    deltaFiles.addAll(toSnapshotFiles);
 
     // TODO: Filter out the files.
 
@@ -146,13 +156,13 @@ public class SnapshotDiffManager {
       }
 
       // Key Deleted.
-      if(newKeyName == null) {
+      if (newKeyName == null) {
         deleteDiffs.add(DiffReportEntry.of(DiffType.DELETE, oldKeyName));
         continue;
       }
 
       // Key modified.
-      if(oldKeyName.equals(newKeyName)) {
+      if (oldKeyName.equals(newKeyName)) {
         modifyDiffs.add(DiffReportEntry.of(DiffType.MODIFY, newKeyName));
         continue;
       }
@@ -214,7 +224,9 @@ public class SnapshotDiffManager {
   }
 
   private boolean areKeysEqual(OmKeyInfo oldKey, OmKeyInfo newKey) {
-    if (oldKey == null && newKey == null) return true;
+    if (oldKey == null && newKey == null) {
+      return true;
+    }
     if (oldKey != null) {
       return oldKey.equals(newKey);
     }

@@ -21,9 +21,12 @@ package org.apache.hadoop.ozone.om.snapshot;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * Snapshot diff report.
+ */
 public class SnapshotDiffReport {
 
-  private final static String LINE_SEPARATOR = System.getProperty(
+  private static final String LINE_SEPARATOR = System.getProperty(
       "line.separator", "\n");
 
   /**
@@ -51,7 +54,10 @@ public class SnapshotDiffReport {
     }
   }
 
-  public static class DiffReportEntry {
+  /**
+   * Snapshot diff report entry.
+   */
+  public static final class DiffReportEntry {
 
     /**
      * The type of diff.
@@ -112,6 +118,11 @@ public class SnapshotDiffReport {
             && targetPath.equals(entry.targetPath);
       }
       return false;
+    }
+
+    @Override
+    public int hashCode() {
+      return toString().hashCode();
     }
 
   }

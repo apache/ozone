@@ -238,5 +238,4 @@ public final class OmSnapshotManager {
       throw new IOException("fromSnapshot should be older than to toSnapshot");
     }
   }
-
-  }
+}

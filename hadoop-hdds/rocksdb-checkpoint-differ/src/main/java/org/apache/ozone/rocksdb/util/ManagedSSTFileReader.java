@@ -33,6 +33,10 @@ import java.util.Spliterators;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+/**
+ * ManagedSSTFileReader provides an abstraction layer using which we can
+ * iterate over multiple underlying SST files transparently.
+ */
 public class ManagedSSTFileReader {
 
   private final Collection<String> sstFiles;
@@ -47,9 +51,13 @@ public class ManagedSSTFileReader {
     return StreamSupport.stream(spliterator, false).onClose(iterator::close);
   }
 
-  public interface ClosableIterator<T> extends Iterator<T>, Closeable {}
+  /**
+   * Closable Iterator.
+   */
+  public interface ClosableIterator<T> extends Iterator<T>, Closeable { }
 
-  private static class OMSSTFileIterator implements ClosableIterator<String> {
+  private static final class OMSSTFileIterator implements
+      ClosableIterator<String> {
 
     private final Iterator<String> fileNameIterator;
     private final Options options;
@@ -58,7 +66,8 @@ public class ManagedSSTFileReader {
     private SstFileReader currentFileReader;
     private SstFileReaderIterator currentFileIterator;
 
-    private OMSSTFileIterator(Collection<String> files) throws RocksDBException {
+    private OMSSTFileIterator(Collection<String> files)
+        throws RocksDBException {
       // TODO: Check if default Options and ReadOptions is enough.
       this.options = new Options();
       this.readOptions = new ReadOptions();

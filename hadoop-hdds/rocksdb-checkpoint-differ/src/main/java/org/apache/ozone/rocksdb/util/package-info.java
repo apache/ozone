@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.ozone.rocksdb.util;
-
-/*
+/**
  * This package contains utility classes related to rocksdb.
  */
+package org.apache.ozone.rocksdb.util;
