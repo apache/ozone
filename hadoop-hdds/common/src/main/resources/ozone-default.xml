@@ -2507,6 +2507,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.address</name>
+    <value>0.0.0.0:9891</value>
+    <tag>RECON, DATANODE</tag>
+    <description>
+      RPC address of the Recon. Datanodes use it to send reports.
+
+      If this value is not set correctly, Recon will not be able to show
+      the cluster state.
+    </description>
+  </property>
+  <property>
     <name>ozone.recon.http.enabled</name>
     <value>true</value>
     <tag>RECON, MANAGEMENT</tag>
