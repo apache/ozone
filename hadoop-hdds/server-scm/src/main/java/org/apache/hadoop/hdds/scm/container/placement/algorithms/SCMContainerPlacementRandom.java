@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.slf4j.Logger;
@@ -40,7 +41,7 @@ import java.util.List;
  * can be practically used.
  */
 public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
-    implements PlacementPolicy {
+    implements PlacementPolicy<Node> {
   @VisibleForTesting
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementRandom.class);

@@ -27,7 +27,7 @@ import java.util.List;
  * A PlacementPolicy support choosing datanodes to build
  * pipelines or containers with specified constraints.
  */
-public interface PlacementPolicy {
+public interface PlacementPolicy<G> {
 
   default List<DatanodeDetails> chooseDatanodes(
           List<DatanodeDetails> excludedNodes,
@@ -65,4 +65,6 @@ public interface PlacementPolicy {
    */
   ContainerPlacementStatus validateContainerPlacement(
       List<DatanodeDetails> dns, int replicas);
+
+  G getPlacementGroup(DatanodeDetails dn);
 }

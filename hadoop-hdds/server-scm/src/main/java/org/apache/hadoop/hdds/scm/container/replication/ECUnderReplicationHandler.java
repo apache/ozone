@@ -48,6 +48,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -398,7 +399,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
    * @param container
    * @param excludedNodes
    * @param sources
-   * @param createdIndexes
+   * @param excludedIndexes
    * @param containerHealthResult
    * @throws IOException
    */
@@ -407,27 +408,41 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           List<DatanodeDetails> deletionInFlight, ContainerInfo container,
           List<DatanodeDetails> excludedNodes,
           Map<Integer, Pair<ContainerReplica, NodeStatus>> sources,
-          Set<Integer> createdIndexes,
+          Set<Integer> excludedIndexes,
           ContainerHealthResult.UnderReplicatedHealthResult
                   containerHealthResult)
           throws IOException {
-    if (containerHealthResult.isSufficientlyReplicatedAfterPending() ||
+    if (containerHealthResult.isSufficientlyReplicatedAfterPending() &&
             containerHealthResult.getMisreplicationCountAfterPending()
-                    <= createdIndexes.size()) {
+                    <= excludedIndexes.size()) {
       return Collections.emptyMap();
     }
     Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
+
     List<Integer> sortedReplicaIdx =
             getSourcesStream(replicas, deletionInFlight)
-                    .collect(Collectors.groupingBy(
-                            r -> r.getLeft().getReplicaIndex(),
-                            Collectors.counting()))
-                    .entrySet().stream()
-                    .sorted(Comparator.comparingLong(Map.Entry::getValue))
-                    .map(Map.Entry::getKey).collect(Collectors.toList());
+            .map(Pair::getKey).collect(Collectors.groupingBy(r ->
+                    containerPlacement.getPlacementGroup(
+                            r.getDatanodeDetails()),
+                    Collectors.mapping(
+                            ContainerReplica::getReplicaIndex,
+                            Collectors.toSet())))
+            .entrySet().stream()
+            .filter(e -> {
+              if (e.getValue().size() == 1) {
+                excludedIndexes.addAll(e.getValue());
+              }
+              return e.getValue().size() > 1;
+            }).flatMap(e -> e.getValue().stream())
+            .collect(Collectors.groupingBy(Function.identity(),
+                    Collectors.counting())).entrySet().stream()
+            .sorted(Comparator.comparingLong(Map.Entry::getValue))
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toList());
+
     int additionalCopiesForPlacementStatus =
             containerHealthResult.getMisreplicationCountAfterPending()
-                    - createdIndexes.size();
+                    - excludedIndexes.size();
     List<DatanodeDetails> targets = getTargetDatanodes(excludedNodes, container,
             additionalCopiesForPlacementStatus);
     excludedNodes.addAll(targets);
@@ -435,7 +450,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     Iterator<DatanodeDetails> iterator = targets.iterator();
     // copy replica from source DN to a target DN
     for (int replicaIdx : sortedReplicaIdx) {
-      if (!createdIndexes.contains(replicaIdx) &&
+      if (!excludedIndexes.contains(replicaIdx) &&
               additionalCopiesForPlacementStatus > 0) {
         if (!iterator.hasNext()) {
           LOG.warn("Couldn't find enough targets to fix placement status. "
@@ -456,7 +471,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         DatanodeDetails target = iterator.next();
         commands.put(target, replicateCommand);
         additionalCopiesForPlacementStatus -= 1;
-        createdIndexes.add(replicaIdx);
+        excludedIndexes.add(replicaIdx);
       }
     }
     return commands;
