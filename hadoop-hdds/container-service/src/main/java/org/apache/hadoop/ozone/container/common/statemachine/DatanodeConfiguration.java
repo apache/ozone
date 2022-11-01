@@ -368,7 +368,7 @@ public class DatanodeConfiguration {
       defaultValue = "true",
       type = ConfigType.BOOLEAN,
       tags = { DATANODE },
-      description = "Auto compaction small sst files when threshold is met. "
+      description = "Auto compaction small sst files when condition is met. "
   )
   private boolean autoCompactionSmallSstFile = true;
 
