@@ -23,10 +23,8 @@ import com.google.common.graph.MutableGraph;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
 import org.rocksdb.AbstractEventListener;
-import org.rocksdb.Checkpoint;
 import org.rocksdb.CompactionJobInfo;
 import org.rocksdb.DBOptions;
-import org.rocksdb.FlushOptions;
 import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
@@ -55,7 +53,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-// TODO
 //  1. Create a local instance of RocksDiff-local-RocksDB. This is the
 //  rocksDB that we can use for maintaining DAG and any other state. This is
 //  a per node state so it it doesn't have to go through RATIS anyway.
@@ -96,24 +93,17 @@ import java.util.stream.Stream;
  *  RocksDBCheckpointDiffer class.
  */
 public class RocksDBCheckpointDiffer {
-  private final String rocksDbPath;
-  private String cpPath;
-  private String saveCompactedFilePath;
-  private int maxSnapshots;
+
   private static final Logger LOG =
       LoggerFactory.getLogger(RocksDBCheckpointDiffer.class);
 
-  // keeps track of all the snapshots created so far.
-  private int lastSnapshotCounter;
-  private String lastSnapshotPrefix;
-
-  // Something to track all the snapshots created so far. TODO: REMOVE
-  private Snapshot[] allSnapshots;
+  private String sstBackupDir;
 
   private String compactionLogParentDir = null;
   private String compactionLogDir = null;
 
   // Name of the directory that holds compaction logs (under metadata dir)
+  // TODO: Make this a constructor parameter as well
   private static final String COMPACTION_LOG_DIR = "compaction-log/";
 
   /**
@@ -121,8 +111,8 @@ public class RocksDBCheckpointDiffer {
    * This is the source of truth for in-memory SST DAG reconstruction upon
    * OM restarts.
    *
-   * Initialized to the latest sequence number on OM startup. And the log rolls
-   * over to a new file whenever an Ozone snapshot is taken.
+   * Initialized to the latest sequence number on OM startup. The log also rolls
+   * over (gets appended to a new file) whenever an Ozone snapshot is taken.
    */
   private volatile String currentCompactionLogPath = null;
 
@@ -153,6 +143,9 @@ public class RocksDBCheckpointDiffer {
   private static final int SST_FILE_EXTENSION_LENGTH =
       SST_FILE_EXTENSION.length();
 
+  private static final int LONG_MAX_STRLEN =
+      String.valueOf(Long.MAX_VALUE).length();
+
   public void setCompactionLogParentDir(String parentDir) {
     this.compactionLogParentDir = parentDir;
 
@@ -179,9 +172,6 @@ public class RocksDBCheckpointDiffer {
 
     // TODO: Write a README there explaining what the dir is for
   }
-
-  private static final int LONG_MAX_STRLEN =
-      String.valueOf(Long.MAX_VALUE).length();
 
   /**
    * Set the current compaction log filename with a given RDB sequence number.
@@ -214,83 +204,49 @@ public class RocksDBCheckpointDiffer {
     appendToCurrentCompactionLog("");
   }
 
-  public RocksDBCheckpointDiffer(String dbPath,
-                                 int maxSnapshots,
-                                 String checkpointPath,
-                                 String sstFileSaveDir,
-                                 int initialSnapshotCounter,
-                                 String snapPrefix) {
-    this.maxSnapshots = maxSnapshots;
-    allSnapshots = new Snapshot[this.maxSnapshots];
-    cpPath = checkpointPath;
+  public RocksDBCheckpointDiffer(String sstBackupDir) {
 
-    saveCompactedFilePath = sstFileSaveDir;
+    this.sstBackupDir = sstBackupDir;
 
     // Append /
-    if (!saveCompactedFilePath.endsWith("/")) {
-      saveCompactedFilePath += "/";
+    if (!this.sstBackupDir.endsWith("/")) {
+      this.sstBackupDir += "/";
     }
 
     // Create the directory if SST backup path does not already exist
-    File dir = new File(saveCompactedFilePath);
+    File dir = new File(this.sstBackupDir);
 
     if (!dir.exists() && !dir.mkdir()) {
-      LOG.error("Failed to create SST file backup directory!");
-      // TODO: Throw custom checked exception instead?
-      throw new RuntimeException("Failed to create SST file backup directory. "
-          + "Check write permission.");
+      final String errorMsg = "Failed to create SST file backup directory. "
+          + "Check write permission.";
+      LOG.error(errorMsg);
+      throw new RuntimeException(errorMsg);
     }
 
-    rocksDbPath = dbPath;
-
-    // TODO: This module should be self sufficient in tracking the last
-    //  snapshotCounter and currentCompactionGen for a given dbPath. It needs
-    //  to be persisted.
-    // TODO: Only used in UT. Move
-    lastSnapshotCounter = initialSnapshotCounter;
-    lastSnapshotPrefix = snapPrefix;
-
-    // TODO: this should also independently persist every compaction e.g.
-    //  (input files) ->
-    //  {  (output files) + lastSnapshotCounter + currentCompactionGen }
-    //  mapping.
-
-    // Note: Previous compaction log files are loaded in RDBStore, not here.
+    // Note: Previous compaction logs are loaded in RDBStore, not here
   }
 
   // Node in the DAG to represent an SST file
   private static class CompactionNode {
     // Name of the SST file
-    private String fileName;
+    private final String fileName;
     // The last snapshot created before this node came into existence
-    private String snapshotId;
-    private long snapshotGeneration;
-    private long totalNumberOfKeys;
+    private final String snapshotId;
+    private final long snapshotGeneration;
+    private final long totalNumberOfKeys;
     private long cumulativeKeysReverseTraversal;
 
     CompactionNode(String file, String ssId, long numKeys, long seqNum) {
       fileName = file;
-      snapshotId = ssId;
+      snapshotId = ssId;  // TODO: Unused. Remove?
       totalNumberOfKeys = numKeys;
       snapshotGeneration = seqNum;
       cumulativeKeysReverseTraversal = 0L;
     }
   }
 
-  private static class Snapshot {
-    private String dbPath;
-    private String snapshotID;
-    private long snapshotGeneration;
-
-    Snapshot(String db, String id, long gen) {
-      dbPath = db;
-      snapshotID = id;
-      snapshotGeneration = gen;
-    }
-  }
-
   // Hash table to track CompactionNode for a given SST File.
-  private ConcurrentHashMap<String, CompactionNode> compactionNodeTable =
+  private final ConcurrentHashMap<String, CompactionNode> compactionNodeTable =
       new ConcurrentHashMap<>();
 
   // We are maintaining a two way DAG. This allows easy traversal from
@@ -320,21 +276,6 @@ public class RocksDBCheckpointDiffer {
 
   public static void addDebugLevel(Integer level) {
     DEBUG_LEVEL.add(level);
-  }
-
-  // Flushes the WAL and Creates a RocksDB checkpoint
-  @SuppressWarnings({"NM_METHOD_NAMING_CONVENTION"})
-  public void createCheckPoint(String dbPathArg, String cpPathArg,
-                               RocksDB rocksDB) {
-    LOG.debug("Creating RocksDB '{}' checkpoint at '{}'",
-        dbPathArg, cpPathArg);
-    try {
-      rocksDB.flush(new FlushOptions());
-      Checkpoint cp = Checkpoint.create(rocksDB);
-      cp.createCheckpoint(cpPathArg);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e.getMessage());
-    }
   }
 
   /**
@@ -416,7 +357,7 @@ public class RocksDBCheckpointDiffer {
           for (String file : compactionJobInfo.inputFiles()) {
             LOG.debug("Creating hard link for '{}'", file);
             String saveLinkFileName =
-                saveCompactedFilePath + new File(file).getName();
+                sstBackupDir + new File(file).getName();
             Path link = Paths.get(saveLinkFileName);
             Path srcFile = Paths.get(file);
             try {
@@ -543,9 +484,9 @@ public class RocksDBCheckpointDiffer {
     Options option = new Options();
     SstFileReader reader = new SstFileReader(option);
     try {
-      reader.open(saveCompactedFilePath + filename);
+      reader.open(sstBackupDir + filename);
     } catch (RocksDBException e) {
-      reader.open(rocksDbPath + "/" + filename);
+      throw new RuntimeException("Failed to open SST file: " + filename);
     }
     TableProperties properties = reader.getTableProperties();
 
@@ -711,9 +652,7 @@ public class RocksDBCheckpointDiffer {
               .toLowerCase().endsWith(COMPACTION_LOG_FILENAME_SUFFIX))
           .sorted()) {
         for (Path logPath : pathStream.collect(Collectors.toList())) {
-
-          // TODO: Potential optimization: stop reading as soon as all nodes are
-          //  there. Currently it loads an entire file at a time.
+          // Load the current compaction log chunk to in-memory DAG
           readCompactionLogToDAG(logPath.toString());
 
           for (Iterator<String> it = loadSet.iterator(); it.hasNext();) {
@@ -765,6 +704,33 @@ public class RocksDBCheckpointDiffer {
     } catch (IOException e) {
       throw new RuntimeException("Error listing compaction log dir " +
           compactionLogDir, e);
+    }
+  }
+
+  /**
+   * Snapshot information node class in the DAG.
+   */
+  static class Snapshot {
+    private final String dbPath;
+    private final String snapshotID;
+    private final long snapshotGeneration;
+
+    Snapshot(String db, String id, long gen) {
+      dbPath = db;
+      snapshotID = id;
+      snapshotGeneration = gen;
+    }
+
+    public String getDbPath() {
+      return dbPath;
+    }
+
+    public String getSnapshotID() {
+      return snapshotID;
+    }
+
+    public long getSnapshotGeneration() {
+      return snapshotGeneration;
     }
   }
 
@@ -984,77 +950,6 @@ public class RocksDBCheckpointDiffer {
     }
   }
 
-  /**
-   * Helper function that recursively deletes the dir. TODO: REMOVE
-   */
-  boolean deleteDirectory(File directoryToBeDeleted) {
-    File[] allContents = directoryToBeDeleted.listFiles();
-    if (allContents != null) {
-      for (File file : allContents) {
-        deleteDirectory(file);
-      }
-    }
-    return directoryToBeDeleted.delete();
-  }
-
-  @VisibleForTesting
-  public void createSnapshot(RocksDB rocksDB) throws InterruptedException {
-
-    LOG.trace("Current time: " + System.currentTimeMillis());
-    long t1 = System.currentTimeMillis();
-
-    cpPath = cpPath + lastSnapshotCounter;
-    // Delete the checkpoint dir if it already exists
-    File dir = new File(cpPath);
-    if (dir.exists()) {
-      deleteDirectory(dir);  // TODO: TESTING ONLY
-    }
-
-    final long dbLatestSequenceNumber = rocksDB.getLatestSequenceNumber();
-
-    createCheckPoint(rocksDbPath, cpPath, rocksDB);
-    allSnapshots[lastSnapshotCounter] =
-        new Snapshot(cpPath, lastSnapshotPrefix, lastSnapshotCounter);
-
-    // Does what OmSnapshotManager#createOmSnapshotCheckpoint would do
-    appendSequenceNumberToCompactionLog(dbLatestSequenceNumber);
-
-    setCompactionLogParentDir(".");
-    setCurrentCompactionLog(dbLatestSequenceNumber);
-
-    long t2 = System.currentTimeMillis();
-    LOG.trace("Current time: " + t2);
-    LOG.debug("Time elapsed: " + (t2 - t1) + " ms");
-    Thread.sleep(100);
-    ++lastSnapshotCounter;
-    lastSnapshotPrefix = "sid_" + lastSnapshotCounter;
-  }
-
-  public void printAllSnapshots() {
-    for (Snapshot snap : allSnapshots) {
-      if (snap == null) {
-        break;
-      }
-      LOG.warn("Snapshot id" + snap.snapshotID);
-      LOG.warn("Snapshot path" + snap.dbPath);
-      LOG.warn("Snapshot Generation" + snap.snapshotGeneration);
-      LOG.warn("");
-    }
-  }
-
-  public void diffAllSnapshots() {
-    for (Snapshot snap : allSnapshots) {
-      if (snap == null) {
-        break;
-      }
-      System.out.println();
-      // Returns a list of SST files to be fed into RocksDiff
-      List<String> sstListForRocksDiff =
-          getSSTDiffList(allSnapshots[lastSnapshotCounter - 1], snap);
-      LOG.debug("getSSTDiffList returns: {}", sstListForRocksDiff);
-    }
-  }
-
   public MutableGraph<CompactionNode> getCompactionFwdDAG() {
     return compactionDAGFwd;
   }
@@ -1083,8 +978,7 @@ public class RocksDBCheckpointDiffer {
         } catch (Exception e) {
           LOG.warn("Exception in getSSTFileSummary: {}", e.getMessage());
         }
-        outfileNode = new CompactionNode(outfile, lastSnapshotPrefix, numKeys,
-            seqNum);
+        outfileNode = new CompactionNode(outfile, null, numKeys, seqNum);
         compactionDAGFwd.addNode(outfileNode);
         compactionDAGReverse.addNode(outfileNode);
         compactionNodeTable.put(outfile, outfileNode);
@@ -1099,8 +993,7 @@ public class RocksDBCheckpointDiffer {
           } catch (Exception e) {
             LOG.warn("Exception in getSSTFileSummary: {}", e.getMessage());
           }
-          infileNode = new CompactionNode(infile, lastSnapshotPrefix, numKeys,
-              seqNum);
+          infileNode = new CompactionNode(infile, null, numKeys, seqNum);
           compactionDAGFwd.addNode(infileNode);
           compactionDAGReverse.addNode(infileNode);
           compactionNodeTable.put(infile, infileNode);

@@ -64,6 +64,8 @@ public class RDBStore implements DBStore {
   private final RDBMetrics rdbMetrics;
   private final RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
   private final String dbJmxBeanName;
+  private final String dbCompactionSSTBackupDirectory = "compaction-sst-backup";
+  private final String dbCheckpointDirectory = "db.checkpoints";
 
   @VisibleForTesting
   public RDBStore(File dbFile, ManagedDBOptions options,
@@ -86,13 +88,8 @@ public class RDBStore implements DBStore {
         dbJmxBeanNameName;
 
     try {
-      rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
-          dbLocation.getAbsolutePath(),
-          maxFSSnapshots,
-          Paths.get(dbLocation.getParent(), "db.checkpoints").toString(),
-          Paths.get(dbLocation.getParent(), "db.snapdiffssts").toString(),
-          0,
-          "Snapshot_");
+      rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(Paths.get(
+          dbLocation.getParent(), dbCompactionSSTBackupDirectory).toString());
       rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
 
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
@@ -113,9 +110,9 @@ public class RDBStore implements DBStore {
         }
       }
 
-      //create checkpoints directory if not exists.
+      // Create checkpoint directory if does not exist
       checkpointsParentDir =
-              Paths.get(dbLocation.getParent(), "db.checkpoints").toString();
+          Paths.get(dbLocation.getParent(), dbCheckpointDirectory).toString();
       File checkpointsDir = new File(checkpointsParentDir);
       if (!checkpointsDir.exists()) {
         boolean success = checkpointsDir.mkdir();
@@ -126,9 +123,9 @@ public class RDBStore implements DBStore {
         }
       }
 
-      //create snapshot directory if does not exist.
-      snapshotsParentDir = Paths.get(dbLocation.getParent(),
-          OM_SNAPSHOT_DIR).toString();
+      // Create snapshot directory if does not exist
+      snapshotsParentDir =
+          Paths.get(dbLocation.getParent(), OM_SNAPSHOT_DIR).toString();
       File snapshotsDir = new File(snapshotsParentDir);
       if (!snapshotsDir.exists()) {
         boolean success = snapshotsDir.mkdir();

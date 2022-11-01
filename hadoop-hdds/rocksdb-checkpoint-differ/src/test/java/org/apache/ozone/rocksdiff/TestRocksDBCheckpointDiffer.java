@@ -31,13 +31,16 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.Snapshot;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.rocksdb.Checkpoint;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
+import org.rocksdb.FlushOptions;
 import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
@@ -55,9 +58,21 @@ public class TestRocksDBCheckpointDiffer {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestRocksDBCheckpointDiffer.class);
 
+  /**
+   * RocksDB path for the test.
+   */
   private static final String TEST_DB_PATH = "./rocksdb-data";
   private static final int NUM_ROW = 250000;
   private static final int SNAPSHOT_EVERY_SO_MANY_KEYS = 49999;
+
+  /**
+   * RocksDB checkpoint path prefix.
+   */
+  private static final String CP_PATH_PREFIX = "rocksdb-cp-";
+  private static final int MAX_SNAPSHOTS = 100;
+  private final Snapshot[] allSnapshots = new Snapshot[MAX_SNAPSHOTS];
+  private int lastSnapshotCounter = 0;
+  private String lastSnapshotPrefix = "snap_id_";
 
   /**
    * Graph type.
@@ -77,7 +92,7 @@ public class TestRocksDBCheckpointDiffer {
   @Test
   void testMain() throws Exception {
 
-    // Delete the compaction log dir if it already exists
+    // Delete the compaction log dir for the test, if it exists
     File clDir = new File("./compaction-log");
     if (clDir.exists()) {
       deleteDirectory(clDir);
@@ -86,13 +101,7 @@ public class TestRocksDBCheckpointDiffer {
     final String sstDirStr = "./compaction-sst-backup/";
 
     TestRocksDBCheckpointDiffer tester = new TestRocksDBCheckpointDiffer();
-    RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer(
-        "./rocksdb-data",
-        1000,
-        "./rocksdb-data-cp",
-        sstDirStr,
-        0,
-        "snap_id_");
+    RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer(sstDirStr);
 
     // Empty the SST backup folder first for testing
     File sstDir = new File(sstDirStr);
@@ -104,12 +113,13 @@ public class TestRocksDBCheckpointDiffer {
     RocksDB rocksDB = tester.createRocksDBInstance(TEST_DB_PATH, differ);
     tester.readRocksDBInstance(TEST_DB_PATH, rocksDB, null, differ);
 
-    differ.printAllSnapshots();
+    printAllSnapshots();
     differ.traverseGraph(
         differ.getCompactionReverseDAG(),
         differ.getCompactionFwdDAG());
 
-    differ.diffAllSnapshots();
+    diffAllSnapshots(differ);
+
     differ.dumpCompactionNodeTable();
 
     for (GType gtype : GType.values()) {
@@ -136,6 +146,84 @@ public class TestRocksDBCheckpointDiffer {
         .collect(StringBuilder::new,
             StringBuilder::appendCodePoint, StringBuilder::append)
         .toString();
+  }
+
+  /**
+   * Test SST diffs.
+   */
+  public void diffAllSnapshots(RocksDBCheckpointDiffer differ) {
+    for (Snapshot snap : allSnapshots) {
+      if (snap == null) {
+        break;
+      }
+      System.out.println();
+      // Returns a list of SST files to be fed into RocksDiff
+      List<String> sstListForRocksDiff =
+          differ.getSSTDiffList(allSnapshots[lastSnapshotCounter - 1], snap);
+      LOG.debug("getSSTDiffList returns: {}", sstListForRocksDiff);
+    }
+  }
+
+  /**
+   * Helper function that creates an RDB checkpoint (= Ozone snapshot).
+   */
+  public void createCheckpoint(RocksDBCheckpointDiffer differ, RocksDB rocksDB)
+      throws InterruptedException {
+
+    LOG.trace("Current time: " + System.currentTimeMillis());
+    long t1 = System.currentTimeMillis();
+
+    final String cpPath = CP_PATH_PREFIX + lastSnapshotCounter;
+
+    // Delete the checkpoint dir if it already exists for the test
+    File dir = new File(cpPath);
+    if (dir.exists()) {
+      deleteDirectory(dir);
+    }
+
+    final long dbLatestSequenceNumber = rocksDB.getLatestSequenceNumber();
+
+    createCheckPoint(TEST_DB_PATH, cpPath, rocksDB);
+    allSnapshots[lastSnapshotCounter] =
+        new Snapshot(cpPath, lastSnapshotPrefix, lastSnapshotCounter);
+
+    // Does what OmSnapshotManager#createOmSnapshotCheckpoint would do
+    differ.appendSequenceNumberToCompactionLog(dbLatestSequenceNumber);
+
+    differ.setCompactionLogParentDir(".");
+    differ.setCurrentCompactionLog(dbLatestSequenceNumber);
+
+    long t2 = System.currentTimeMillis();
+    LOG.trace("Current time: " + t2);
+    LOG.debug("Time elapsed: " + (t2 - t1) + " ms");
+    Thread.sleep(100);
+    ++lastSnapshotCounter;
+    lastSnapshotPrefix = "sid_" + lastSnapshotCounter;
+  }
+
+  // Flushes the WAL and Creates a RocksDB checkpoint
+  public void createCheckPoint(String dbPathArg, String cpPathArg,
+      RocksDB rocksDB) {
+    LOG.debug("Creating RocksDB '{}' checkpoint at '{}'", dbPathArg, cpPathArg);
+    try {
+      rocksDB.flush(new FlushOptions());
+      Checkpoint cp = Checkpoint.create(rocksDB);
+      cp.createCheckpoint(cpPathArg);
+    } catch (RocksDBException e) {
+      throw new RuntimeException(e.getMessage());
+    }
+  }
+
+  public void printAllSnapshots() {
+    for (Snapshot snap : allSnapshots) {
+      if (snap == null) {
+        break;
+      }
+      LOG.warn("Snapshot id" + snap.getSnapshotID());
+      LOG.warn("Snapshot path" + snap.getDbPath());
+      LOG.warn("Snapshot Generation" + snap.getSnapshotGeneration());
+      LOG.warn("");
+    }
   }
 
   // Test Code to create sample RocksDB instance.
@@ -166,10 +254,10 @@ public class TestRocksDBCheckpointDiffer {
       byte[] key = keyStr.getBytes(UTF_8);
       rocksDB.put(key, valueStr.getBytes(UTF_8));
       if (i % SNAPSHOT_EVERY_SO_MANY_KEYS == 0) {
-        differ.createSnapshot(rocksDB);
+        createCheckpoint(differ, rocksDB);
       }
     }
-    differ.createSnapshot(rocksDB);
+    createCheckpoint(differ, rocksDB);
     return rocksDB;
   }
 
@@ -209,7 +297,9 @@ public class TestRocksDBCheckpointDiffer {
     }
   }
 
-  //  RocksDB.DEFAULT_COLUMN_FAMILY
+  /**
+   * RocksDB.DEFAULT_COLUMN_FAMILY.
+   */
   public void testDefaultColumnFamilyOriginal() {
     System.out.println("testDefaultColumnFamily begin...");
 

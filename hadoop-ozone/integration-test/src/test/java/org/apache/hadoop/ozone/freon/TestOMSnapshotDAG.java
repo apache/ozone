@@ -139,6 +139,7 @@ public class TestOMSnapshotDAG {
       bucket.createKey("b_" + i, 0).close();
     }
 
+    // Create another snapshot
     resp = store.createSnapshot(volumeName, bucketName, "snap3");
     LOG.debug("Snapshot created: {}", resp);
   }
