@@ -93,7 +93,8 @@ public class TestOzoneManagerHAWithFailover extends TestOzoneManagerHA {
         break;
       }
     }
-    Assertions.assertTrue(followerOM.getOmRatisServer().checkLeaderStatus() ==
+    assert followerOM != null;
+    Assertions.assertSame(followerOM.getOmRatisServer().checkLeaderStatus(),
         OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER);
 
     OzoneManagerProtocolProtos.OMRequest writeRequest =
