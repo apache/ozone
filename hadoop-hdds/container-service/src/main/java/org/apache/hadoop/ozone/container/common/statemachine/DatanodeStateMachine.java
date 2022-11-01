@@ -200,7 +200,7 @@ public class DatanodeStateMachine implements Closeable {
     // trick.
     commandDispatcher = CommandDispatcher.newBuilder()
         .addHandler(new CloseContainerCommandHandler())
-        .addHandler(new DeleteBlocksCommandHandler(container.getContainerSet(),
+        .addHandler(new DeleteBlocksCommandHandler(getContainer(),
             conf, dnConf.getBlockDeleteThreads(),
             dnConf.getBlockDeleteQueueLimit()))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor))
