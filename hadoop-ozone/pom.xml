@@ -124,6 +124,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-filesystem-hadoop3-client</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-filesystem-hadoop2</artifactId>
         <version>${ozone.version}</version>
       </dependency>
@@ -373,6 +378,7 @@
         <module>ozonefs-shaded</module>
         <module>ozonefs-hadoop2</module>
         <module>ozonefs-hadoop3</module>
+        <module>ozonefs-hadoop3-client</module>
       </modules>
     </profile>
     <profile>
