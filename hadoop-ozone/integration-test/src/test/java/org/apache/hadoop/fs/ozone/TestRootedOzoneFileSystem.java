@@ -1597,11 +1597,6 @@ public class TestRootedOzoneFileSystem {
     long prevNumTrashAtomicDirRenames = getOMMetrics()
         .getNumTrashAtomicDirRenames();
 
-    // Call moveToTrash. We can't call protected fs.rename() directly
-    trash.moveToTrash(keyPath1);
-    // for key in second bucket
-    trash.moveToTrash(keyPath2);
-
     // Construct paths for first key
     String username = UserGroupInformation.getCurrentUser().getShortUserName();
     Path trashRoot = new Path(bucketPath, TRASH_PREFIX);
@@ -1613,6 +1608,15 @@ public class TestRootedOzoneFileSystem {
     Path trashRoot2 = new Path(bucketPath2, TRASH_PREFIX);
     Path userTrash2 = new Path(trashRoot2, username);
     Path trashPath2 = new Path(userTrashCurrent, testKeyName + "1");
+
+    // Call moveToTrash. We can't call protected fs.rename() directly
+    trash.moveToTrash(keyPath1);
+    // for key in second bucket
+    trash.moveToTrash(keyPath2);
+
+    // key should either be present in Current or checkpointDir
+    Assert.assertTrue(ofs.exists(trashPath)
+        || ofs.listStatus(ofs.listStatus(userTrash)[0].getPath()).length > 0);
 
 
     // Wait until the TrashEmptier purges the keys
