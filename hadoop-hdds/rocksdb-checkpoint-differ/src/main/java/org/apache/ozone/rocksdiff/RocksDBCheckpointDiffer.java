@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
+import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -459,10 +460,11 @@ public class RocksDBCheckpointDiffer {
           // Populate the DAG
           populateCompactionDAG(inputFiles, outputFiles,
               db.getLatestSequenceNumber());
-
-//          if (debugEnabled(DEBUG_DAG_BUILD_UP)) {
-//            printMutableGraph(null, null, compactionDAGFwd);
-//          }
+/*
+          if (debugEnabled(DEBUG_DAG_BUILD_UP)) {
+            printMutableGraph(null, null, compactionDAGFwd);
+          }
+ */
         }
       }
     };
@@ -471,10 +473,6 @@ public class RocksDBCheckpointDiffer {
   public RocksDB getRocksDBInstanceWithCompactionTracking(String dbPath)
       throws RocksDBException {
     final Options opt = new Options().setCreateIfMissing(true);
-//    opt.setWriteBufferSize(1L);  // Unit in bytes. Default is 64 MB.
-//    opt.setMaxWriteBufferNumber(1);  // Default is 2
-//    opt.setCompressionType(CompressionType.NO_COMPRESSION);
-//    opt.setMaxBytesForLevelMultiplier(2);
     setRocksDBForCompactionTracking(opt);
     return RocksDB.open(opt, dbPath);
   }
@@ -534,7 +532,6 @@ public class RocksDBCheckpointDiffer {
    * @param dbPathArg
    * @return a list of SST files (without extension) in the DB.
    */
-  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   public HashSet<String> readRocksDBLiveFiles(String dbPathArg) {
     RocksDB rocksDB = null;
     HashSet<String> liveFiles = new HashSet<>();
@@ -615,87 +612,6 @@ public class RocksDBCheckpointDiffer {
   }
 
   /**
-   * Returns a set of SST nodes that doesn't exist in the in-memory DAG.
-   */
-  private Set<String> getNonExistentSSTSet(Set<String> sstSet) {
-
-    // Make a copy of sstSet
-    HashSet<String> loadSet = new HashSet<>(sstSet);
-
-    // Check if all the nodes in the provided SST set is already loaded in DAG
-    for (String sstFile : sstSet) {
-      if (compactionNodeTable.containsKey(sstFile)) {
-        loadSet.remove(sstFile);
-      }
-    }
-
-    return loadSet;
-  }
-
-  /**
-   * Returns true only when all nodes in sstSet exists in DAG.
-   */
-  private boolean isSSTSetLoaded(HashSet<String> sstSet) {
-
-    return getNonExistentSSTSet(sstSet).size() == 0;
-  }
-
-  /**
-   * Read compaction log until all dest (and src) db checkpoint SST
-   * nodes show up in the graph, or when it reaches the end of the log.
-   */
-  private boolean loadCompactionDAGBySSTSet(HashSet<String> sstSet) {
-
-    // Get a set of SSTs that doesn't exist in the current in-memory DAG
-    Set<String> loadSet = getNonExistentSSTSet(sstSet);
-
-    if (loadSet.size() == 0) {
-      // All expected nodes in the sstSet are already there,
-      //  no need to read/load any compaction log from disk.
-      return true;
-    }
-
-    // Otherwise, load compaction logs in order until all nodes are present in
-    //  the DAG.
-    try {
-      try (Stream<Path> pathStream = Files.list(Paths.get(compactionLogDir))
-          .filter(e -> e.toString()
-              .toLowerCase().endsWith(COMPACTION_LOG_FILENAME_SUFFIX))
-          .sorted()) {
-        for (Path logPath : pathStream.collect(Collectors.toList())) {
-          // Load the current compaction log chunk to in-memory DAG
-          readCompactionLogToDAG(logPath.toString());
-
-          for (Iterator<String> it = loadSet.iterator(); it.hasNext();) {
-            String sstFile = it.next();
-            if (compactionNodeTable.containsKey(sstFile)) {
-              LOG.debug("Found SST node: {}", sstFile);
-              it.remove();
-            }
-          }
-
-          if (loadSet.size() == 0) {
-            break;
-          }
-        }
-      }
-    } catch (IOException e) {
-      throw new RuntimeException("Error listing compaction log dir " +
-          compactionLogDir, e);
-    }
-
-    // Just in case there are still nodes to be expected not loaded.
-    if (loadSet.size() > 0) {
-      LOG.warn("The following nodes are missing from the compaction log: {}. "
-          + "Possibly because those a newly flushed SSTs that haven't gone "
-          + "though any compaction yet", loadSet);
-      return false;
-    }
-
-    return true;
-  }
-
-  /**
    * Load existing compaction log files to the in-memory DAG.
    * This only needs to be done once during OM startup.
    */
@@ -706,7 +622,8 @@ public class RocksDBCheckpointDiffer {
     reconstructionSnapshotGeneration = 0L;
     try {
       try (Stream<Path> pathStream = Files.list(Paths.get(compactionLogDir))
-          .filter(e -> e.toString().toLowerCase().endsWith(".log"))
+          .filter(e -> e.toString().toLowerCase()
+              .endsWith(COMPACTION_LOG_FILENAME_SUFFIX))
           .sorted()) {
         for (Path logPath : pathStream.collect(Collectors.toList())) {
           readCompactionLogToDAG(logPath.toString());
@@ -795,11 +712,12 @@ public class RocksDBCheckpointDiffer {
     return res;
   }
 
+  /**
+   * Core getSSTDiffList logic.
+   */
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
-  public synchronized void internalGetSSTDiffList(
-      Snapshot src, Snapshot dest,
-      HashSet<String> srcSnapFiles,
-      HashSet<String> destSnapFiles,
+  private void internalGetSSTDiffList(Snapshot src, Snapshot dest,
+      HashSet<String> srcSnapFiles, HashSet<String> destSnapFiles,
       MutableGraph<CompactionNode> mutableGraph,
       HashSet<String> sameFiles, HashSet<String> differentFiles) {
 
@@ -866,8 +784,8 @@ public class RocksDBCheckpointDiffer {
     }
   }
 
-  @SuppressFBWarnings("SIC_INNER_SHOULD_BE_STATIC")
-  class NodeComparator implements Comparator<CompactionNode> {
+  static class NodeComparator
+      implements Comparator<CompactionNode>, Serializable {
     public int compare(CompactionNode a, CompactionNode b) {
       return a.fileName.compareToIgnoreCase(b.fileName);
     }
@@ -878,6 +796,7 @@ public class RocksDBCheckpointDiffer {
     }
   }
 
+  @VisibleForTesting
   public void dumpCompactionNodeTable() {
     List<CompactionNode> nodeList = compactionNodeTable.values().stream()
         .sorted(new NodeComparator()).collect(Collectors.toList());
@@ -888,9 +807,10 @@ public class RocksDBCheckpointDiffer {
     }
   }
 
+  @VisibleForTesting
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
-  public synchronized void printMutableGraphFromAGivenNode(
-      String fileName, int level, MutableGraph<CompactionNode> mutableGraph) {
+  public synchronized void printMutableGraphFromAGivenNode(String fileName,
+      int level, MutableGraph<CompactionNode> mutableGraph) {
     CompactionNode infileNode =
         compactionNodeTable.get(Paths.get(fileName).getFileName().toString());
     if (infileNode == null) {
@@ -912,8 +832,7 @@ public class RocksDBCheckpointDiffer {
         }
       }
       LOG.info(sb.toString());
-      currentLevel = new HashSet<>();
-      currentLevel.addAll(nextLevel);
+      currentLevel = new HashSet<>(nextLevel);
       nextLevel = new HashSet<>();
     }
   }
