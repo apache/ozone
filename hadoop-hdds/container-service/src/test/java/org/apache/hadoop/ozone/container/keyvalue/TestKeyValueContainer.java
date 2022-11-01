@@ -744,7 +744,7 @@ public class TestKeyValueContainer {
       List<LiveFileMetaData> fileMetaDataList1 =
           ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
       hddsVolume.check(true);
-      // Sleep a while to wait for compaction to finish
+      // Sleep a while to wait for compaction to complete
       Thread.sleep(7000);
       List<LiveFileMetaData> fileMetaDataList2 =
           ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
