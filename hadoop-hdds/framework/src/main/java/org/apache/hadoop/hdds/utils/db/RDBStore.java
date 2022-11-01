@@ -80,14 +80,15 @@ public class RDBStore implements DBStore {
   public RDBStore(File dbFile, ManagedDBOptions options,
                   Set<TableConfig> families) throws IOException {
     this(dbFile, options, new ManagedWriteOptions(), families,
-        new CodecRegistry(), false, 1000, null);
+        new CodecRegistry(), false, 1000, null, false);
   }
 
   @SuppressWarnings("parameternumber")
   public RDBStore(File dbFile, ManagedDBOptions dbOptions,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
                   CodecRegistry registry, boolean readOnly, int maxFSSnapshots,
-                  String dbJmxBeanNameName) throws IOException {
+                  String dbJmxBeanNameName, boolean enableCompactionLog)
+      throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
     Preconditions.checkArgument(!families.isEmpty());
@@ -97,10 +98,14 @@ public class RDBStore implements DBStore {
         dbJmxBeanNameName;
 
     try {
-      rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
-          dbLocation.getParent(), dbCompactionSSTBackupDirName,
-          dbCompactionLogDirName);
-      rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
+      if (enableCompactionLog) {
+        rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
+            dbLocation.getParent(), dbCompactionSSTBackupDirName,
+            dbCompactionLogDirName);
+        rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
+      } else {
+        rocksDBCheckpointDiffer = null;
+      }
 
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
           families, readOnly);
@@ -146,12 +151,14 @@ public class RDBStore implements DBStore {
         }
       }
 
-      // Finish the initialization of compaction DAG tracker by setting the
-      // sequence number as current compaction log filename.
-      rocksDBCheckpointDiffer.setCurrentCompactionLog(
-          db.getLatestSequenceNumber());
-      // Load all previous compaction logs
-      rocksDBCheckpointDiffer.loadAllCompactionLogs();
+      if (enableCompactionLog) {
+        // Finish the initialization of compaction DAG tracker by setting the
+        // sequence number as current compaction log filename.
+        rocksDBCheckpointDiffer.setCurrentCompactionLog(
+            db.getLatestSequenceNumber());
+        // Load all previous compaction logs
+        rocksDBCheckpointDiffer.loadAllCompactionLogs();
+      }
 
       //Initialize checkpoint manager
       checkPointManager = new RDBCheckpointManager(db, dbLocation.getName());
