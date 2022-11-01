@@ -152,12 +152,11 @@ public class TestRocksDBCheckpointDiffer {
   /**
    * Test SST diffs.
    */
-  public void diffAllSnapshots(RocksDBCheckpointDiffer differ) {
+  void diffAllSnapshots(RocksDBCheckpointDiffer differ) {
     for (Snapshot snap : snapshots) {
       if (snap == null) {
         break;
       }
-      System.out.println();
       // Returns a list of SST files to be fed into RocksDiff
       List<String> sstListForRocksDiff =
           differ.getSSTDiffList(snapshots.get(snapshots.size() - 1), snap);
@@ -202,7 +201,7 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   // Flushes the WAL and Creates a RocksDB checkpoint
-  public void createCheckPoint(String dbPathArg, String cpPathArg,
+  void createCheckPoint(String dbPathArg, String cpPathArg,
       RocksDB rocksDB) {
     LOG.debug("Creating RocksDB '{}' checkpoint at '{}'", dbPathArg, cpPathArg);
     try {
@@ -214,7 +213,7 @@ public class TestRocksDBCheckpointDiffer {
     }
   }
 
-  public void printAllSnapshots() {
+  void printAllSnapshots() {
     for (Snapshot snap : snapshots) {
       if (snap == null) {
         break;
@@ -426,9 +425,8 @@ public class TestRocksDBCheckpointDiffer {
 
   // Read from a given RocksDB instance and optionally write all the
   // keys to a given file.
-  public void readRocksDBInstance(String dbPathArg, RocksDB rocksDB,
-                                  FileWriter file,
-                                  RocksDBCheckpointDiffer differ) {
+  void readRocksDBInstance(String dbPathArg, RocksDB rocksDB, FileWriter file,
+      RocksDBCheckpointDiffer differ) {
 
     LOG.info("Reading RocksDB: " + dbPathArg);
     boolean createdDB = false;

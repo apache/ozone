@@ -98,7 +98,7 @@ public class RocksDBCheckpointDiffer {
   private static final Logger LOG =
       LoggerFactory.getLogger(RocksDBCheckpointDiffer.class);
 
-  private String sstBackupDir;
+  private final String sstBackupDir;
 
   private String compactionLogDir = null;
 
@@ -106,7 +106,7 @@ public class RocksDBCheckpointDiffer {
    * Compaction log path for DB compaction history persistence.
    * This is the source of truth for in-memory SST DAG reconstruction upon
    * OM restarts.
-   *
+   * <p>
    * Initialized to the latest sequence number on OM startup. The log also rolls
    * over (gets appended to a new file) whenever an Ozone snapshot is taken.
    */
@@ -141,6 +141,8 @@ public class RocksDBCheckpointDiffer {
 
   private static final int LONG_MAX_STRLEN =
       String.valueOf(Long.MAX_VALUE).length();
+
+  private long reconstructionSnapshotGeneration;
 
   /**
    * Dummy object that acts as a write lock in compaction listener.
@@ -264,10 +266,10 @@ public class RocksDBCheckpointDiffer {
   // We are maintaining a two way DAG. This allows easy traversal from
   // source snapshot to destination snapshot as well as the other direction.
 
-  private MutableGraph<CompactionNode> compactionDAGFwd =
+  private final MutableGraph<CompactionNode> compactionDAGFwd =
       GraphBuilder.directed().build();
 
-  private MutableGraph<CompactionNode> compactionDAGReverse =
+  private final MutableGraph<CompactionNode> compactionDAGReverse =
       GraphBuilder.directed().build();
 
   public static final Integer DEBUG_DAG_BUILD_UP = 2;
@@ -388,8 +390,6 @@ public class RocksDBCheckpointDiffer {
   /**
    * Helper function to append the list of SST files to a StringBuilder
    * for a compaction log entry. Does not append a new line.
-   * @param files
-   * @param sb
    */
   private static void appendCompactionLogStringBuilder(List<String> files,
       StringBuilder sb) {
@@ -478,13 +478,11 @@ public class RocksDBCheckpointDiffer {
   }
 
   /**
-   * Get number of entries in an SST file.
-   * @param filename
-   * @return
-   * @throws RocksDBException
+   * Get number of keys in an SST file.
+   * @param filename SST filename
+   * @return number of keys
    */
-  public long getSSTFileSummary(String filename)
-      throws RocksDBException {
+  private long getSSTFileSummary(String filename) throws RocksDBException {
 
     if (!filename.endsWith(SST_FILE_EXTENSION)) {
       filename += SST_FILE_EXTENSION;
@@ -529,7 +527,7 @@ public class RocksDBCheckpointDiffer {
   /**
    * Read the current Live manifest for a given RocksDB instance (Active or
    * Checkpoint).
-   * @param dbPathArg
+   * @param dbPathArg path to a RocksDB directory
    * @return a list of SST files (without extension) in the DB.
    */
   public HashSet<String> readRocksDBLiveFiles(String dbPathArg) {
@@ -559,8 +557,6 @@ public class RocksDBCheckpointDiffer {
     }
     return liveFiles;
   }
-
-  private long reconstructionSnapshotGeneration;
 
   /**
    * Process each line of compaction log text file input and populate the DAG.
@@ -837,8 +833,7 @@ public class RocksDBCheckpointDiffer {
     }
   }
 
-  public synchronized void printMutableGraph(
-      String srcSnapId, String destSnapId,
+  synchronized void printMutableGraph(String srcSnapId, String destSnapId,
       MutableGraph<CompactionNode> mutableGraph) {
     LOG.warn("Printing the Graph");
     Set<CompactionNode> topLevelNodes = new HashSet<>();
@@ -853,16 +848,16 @@ public class RocksDBCheckpointDiffer {
     while (iter.hasNext()) {
       CompactionNode n = iter.next();
       Set<CompactionNode> succ = mutableGraph.successors(n);
-      LOG.warn("Parent Node: " + n.fileName);
+      LOG.debug("Parent Node: " + n.fileName);
       if (succ.size() == 0) {
-        LOG.warn("No child node");
+        LOG.debug("No child node");
         allNodes.add(n);
         iter.remove();
         iter = topLevelNodes.iterator();
         continue;
       }
       for (CompactionNode oneSucc : succ) {
-        LOG.warn("Children Node: " + oneSucc.fileName);
+        LOG.debug("Children Node: " + oneSucc.fileName);
         if (srcSnapId == null ||
             oneSucc.snapshotId.compareToIgnoreCase(destSnapId) == 0) {
           allNodes.add(oneSucc);
@@ -873,10 +868,10 @@ public class RocksDBCheckpointDiffer {
       iter.remove();
       iter = topLevelNodes.iterator();
     }
-    LOG.warn("src snap: " + srcSnapId);
-    LOG.warn("dest snap: " + destSnapId);
+    LOG.debug("src snap: " + srcSnapId);
+    LOG.debug("dest snap: " + destSnapId);
     for (CompactionNode n : allNodes) {
-      LOG.warn("Files are: " + n.fileName);
+      LOG.debug("Files are: " + n.fileName);
     }
   }
 
@@ -939,6 +934,7 @@ public class RocksDBCheckpointDiffer {
 
   }
 
+  @VisibleForTesting
   public synchronized void traverseGraph(
       MutableGraph<CompactionNode> reverseMutableGraph,
       MutableGraph<CompactionNode> fwdMutableGraph) {
@@ -947,7 +943,7 @@ public class RocksDBCheckpointDiffer {
         .sorted(new NodeComparator()).collect(Collectors.toList());
 
     for (CompactionNode infileNode : nodeList) {
-      // fist go through fwdGraph to find nodes that don't have succesors.
+      // fist go through fwdGraph to find nodes that don't have successors.
       // These nodes will be the top level nodes in reverse graph
       Set<CompactionNode> successors = fwdMutableGraph.successors(infileNode);
       if (successors.size() == 0) {
@@ -998,6 +994,7 @@ public class RocksDBCheckpointDiffer {
     }
   }
 
+  @VisibleForTesting
   public boolean debugEnabled(Integer level) {
     return DEBUG_LEVEL.contains(level);
   }
