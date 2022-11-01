@@ -62,7 +62,7 @@ public final class OmKeyInfo extends WithParentObjectId {
   private FileEncryptionInfo encInfo;
   private FileChecksum fileChecksum;
   /**
-   * Support OSF use-case to identify if the key is a file or a directory.
+   * Support OFS use-case to identify if the key is a file or a directory.
    */
   private boolean isFile;
 
